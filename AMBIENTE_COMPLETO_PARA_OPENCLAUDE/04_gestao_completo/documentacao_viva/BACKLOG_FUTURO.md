@@ -10,7 +10,14 @@
 ## Onda 1 — Produção Real: Filesystem & Terminal
 > Pré-requisito: Sessões 01 a 05 concluídas e validadas
 
+### ❓ DEFINIÇÕES PENDENTES (Terminal Real)
+Para avançar com a Sessão 07 (Terminal Real), as seguintes definições são necessárias para "bater o martelo":
+1. **Implementação do Backend PTY:** Como será a infraestrutura do Pseudo-Terminal? (O `xterm.js` é apenas a interface; a execução real exige um backend/processo externo para gerenciar o shell).
+2. **Sincronização de Foco:** Qual o comportamento esperado do cursor e do estado de foco ao alternar entre abas e panes de sessões diferentes?
+3. **Escopo de Interatividade:** Quais funcionalidades do shell são prioritárias (ex: suporte total a cores ANSI, redimensionamento dinâmico de colunas/linhas, interatividade de apps de terminal)?
+
 ### Itens
+
 
 | ID | Entregável | Descrição (entregue ou planejada) | Arquivos Impactados | Critério de Aceite | Status |
 |----|------------|-----------------------------------|----------------------|---------------------|--------|
