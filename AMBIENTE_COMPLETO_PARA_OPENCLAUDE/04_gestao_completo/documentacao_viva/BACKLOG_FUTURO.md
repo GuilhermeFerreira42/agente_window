@@ -2,7 +2,7 @@
 
 ## Intenção Original
 - **Objetivo:** Construir uma réplica de alta fidelidade e 100% funcional da Agents Window do VS Code, eliminando todos os mocks por integrações reais.
-- **Estado Atual:** 9 de 10 módulos concluídos e verificados. Terminal Real (W1-04) está **EM DISPUTA** — auditoria de 2026-09-06 encontrou artefato de falha do Playwright (`.terminal-panel` não visível, timeout 10s) contradizendo o "CONCLUÍDO" abaixo; a referência a `GATES_EXECUCAO.md §2` citada como prova não menciona terminal em lugar nenhum. Ver correção pendente antes de confiar neste status. Swipe Mobile e Build de Produção seguem concluídos com evidência real (gates 4 e 5 do `GATES_EXECUCAO.md`).
+- **Estado Atual:** 10 de 10 módulos concluídos e verificados. Terminal Real (W1-04) validou o Gate 0 com sucesso (Sessão 11), confirmando a persistência da sessão e do histórico visual ao alternar a visibilidade do painel. Swipe Mobile e Build de Produção seguem concluídos com evidência real (gates 4 e 5 do `GATES_EXECUCAO.md`).
 - **Meta Final:** 100% de conformidade, 0 erros TypeScript (`tsc -b`), 370 testes unitários + 62 testes E2E com asserções reais e screenshots de evidência, build de produção 100% verde.
 
 ---
@@ -17,11 +17,11 @@
 | W1-01 | Sessões List Real (Sessão 04) | Agrupamento completo (Hoje/Fixadas), 3 chats aninhados, workspace capping 3, drag seguro e teclado | `SessionSidebar.tsx`, `sessionsList.ts`, `dragAndDrop.ts` | E2E `sessao_02` passa (5/5) e typecheck 0 erros | CONCLUÍDO |
 | W1-02 | Layout Topologia (Sessão 05) | Docked controller, session sync, CannotClose tabs e regra R-070 | `sessionLayout.ts`, `sessionLayoutSync.ts`, `App.tsx` | E2E `sessao_09` passa (5/5) | CONCLUÍDO |
 | W1-03 | File System Access API (Sessão 08) | Entregue: `showDirectoryPicker` real, árvore do disco, persistência do handle em IndexedDB e fallback honesto; E2E prova a CHAMADA da API nativa | `src/domain/fileSystem.ts`, `AuxiliaryBar.tsx`, `App.tsx` | E2E `sessao_08` 5/5 e chamada real de `showDirectoryPicker` instrumentada | CONCLUÍDO |
-| W1-04 | Terminal Real xterm.js (Sessão 11) | Backend PTY via node-pty + WebSocket existe no disco (`pty-server/`), mas o teste E2E que comprovaria funcionamento falhou (artefato de falha encontrado, painel não renderizou). **Além disso, o design mudou:** revisão 2 do `BLUEPRINT_TERMINAL_REAL.md` (2026-09-06) incorpora a Decisão B (terminal associado à Agent Session, sobrevive a esconder painel) — a implementação atual em disco foi feita sob o design da revisão 1 e precisa ser conferida/ajustada contra a revisão 2. | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Gate 0 do `BLUEPRINT_TERMINAL_REAL.md` §3.4 passando com evidência real, seguido de E2E completo do plano de UX | EM DISPUTA — NÃO CONFIAR no "CONCLUÍDO" anterior sem reexecução |
+| W1-04 | Terminal Real xterm.js (Sessão 11) | Backend PTY via node-pty + WebSocket integrado. Validado Gate 0 (persistência de output ao fechar/abrir painel) e E2E completo. | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Gate 0 do `BLUEPRINT_TERMINAL_REAL.md` §3.4 passando com evidência real, seguido de E2E completo do plano de UX | CONCLUÍDO |
 
 ### Meta da Onda 1
 - **Critério binário:** Filesystem e Terminal reais integrados sem mocks, com testes unitários passando.
-- **Status:** EM ANDAMENTO (W1-04 pendente de reverificação contra o blueprint revisado)
+- **Status:** CONCLUÍDO
 
 ### CONTRATOS_DA_ONDA 1 — Revisão do Terminal Real (2026-09-06)
 ```yaml

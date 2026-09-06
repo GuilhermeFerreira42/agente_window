@@ -4,7 +4,7 @@
 > Nenhum número dos demais documentos vivos pode contradizer o que está aqui.
 > Se contradisser, vale este arquivo (ou uma execução mais recente registrada aqui).
 
-**Execução:** 2026-09-05 · Windows x64 / Antigravity · `02_replica_final/`
+**Execução:** 2026-09-06 · Windows x64 / Antigravity · `02_replica_final/`
 
 | Gate | Comando | Exit code | Resultado |
 |------|---------|-----------|-----------|
@@ -12,6 +12,39 @@
 | Unitários | `npm run test` (`vitest run`) | **0** | **44 arquivos / 370 testes passando** |
 | E2E | `npx playwright test` | **0** | **62/62 passando** (58+ screenshots) |
 | Build | `npm run build` (`tsc -b && vite build`) | **0** | ✅ **SUCESSO**: code-splitting com `manualChunks` no `vite.config.ts` |
+| Gate 0 | `npx playwright test e2e/gate0_validation.spec.ts` | **0** | ✅ **SESSÃO PERSISTIDA**: Output "GATE0_TEST" restaurado após fechar/reabrir painel |
+
+---
+
+## 6. Validação Gate 0 (Terminal Real) — ✅ SUCESSO (Decisão B)
+
+```
+===== npx playwright test e2e/gate0_validation.spec.ts =====
+Running 1 test using 1 worker
+
+Step 1: Navigating to app...
+Step 2: Opening terminal...
+Step 3: Confirming .terminal-panel visibility...
+✅ .terminal-panel is visible
+Step 4: Executing deterministic command...
+Step 5: Confirming output in xterm...
+✅ Output "GATE0_TEST" confirmed
+Step 6: Closing/Hiding the panel...
+✅ Panel hidden
+Step 7: Reopening the panel...
+✅ Panel reopened
+Step 8: Confirming reconnection to SAME PTY...
+✅ Reconnected to same PTY (output preserved)
+
+  1 passed (28.6s)
+EXIT_CODE=0
+```
+
+**Diagnóstico e Resolução:**
+- **Causa Raiz:** O `TerminalPanel` criava uma nova instância de `xterm.Terminal` ao montar, mas o `usePtySession` hook apenas transmitia novos dados via WebSocket. Ao reabrir o painel, o histórico anterior era perdido.
+- **Solução Aplicada:** Implementado `outputBuffer` (Ref) no hook `usePtySession`. O hook agora armazena os últimos 1MB de saída do PTY. Ao registrar um novo listener via `onOutput`, o buffer atual é enviado imediatamente ao listener, restaurando a tela do terminal.
+- **Resultado:** Gate 0 validado com sucesso. A sessão PTY persiste no `TerminalSessionProvider` e a interface restaura o estado visual corretamente.
+
 
 ---
 

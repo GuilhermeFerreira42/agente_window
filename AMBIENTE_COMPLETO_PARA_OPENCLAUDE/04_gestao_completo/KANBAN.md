@@ -41,6 +41,7 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Recurso | Terminal Real: Validação Gate 0 (Sessão 11) | OpenClaude / Antigravity | Implementar buffer de saída no `usePtySession` para restaurar histórico ao reabrir painel | Garantir que output do PTY persista visualmente após fechar/abrir o painel (Decisão B) | Alta | 5 | 4h | ✅ Gate 0 Passou: E2E validou persistência de "GATE0_TEST". Ver GATES_EXECUCAO.md §6 |
 | Recurso | Build de Produção Otimizado (Resolução OOM) | OpenClaude / Antigravity | Configurar code-splitting com `manualChunks` no `vite.config.ts` | Eliminar pico de memória do V8 isolando `@xterm/xterm` e `monaco-editor` em chunks dedicados | Crítica | 8 | 2h | `npm run build` passa com exit code 0 em ~1min! Ver GATES_EXECUCAO.md §4 |
 | Tarefa | Layout Responsivo Mobile (gesto de swipe) | OpenClaude / Antigravity | Implementar detecção de swipe touch (`onTouchStart`/`onTouchEnd`) no layout | Permitir abrir a sidebar deslizando da borda esquerda e fechar deslizando para esquerda | Alta | 5 | 3h | Entregue em `App.tsx` com tolerância de threshold e limites de viewport |
 | Pesquisa | Comportamento de Foco no Terminal | OpenClaude / Antigravity | Auto-foco do cursor xterm na alternância de abas/visibilidade e blur com `Escape` | Garantir usabilidade consistente sem perda de input ao navegar | Alta | 5 | 2h | Implementado em `TerminalPanel.tsx` com `term.focus()` no lifecycle e keydown Escape |

@@ -93,4 +93,8 @@ F9 | ADD | `e2e/sessao_11_terminal_pty_real.spec.ts` validado 5/5 (PID real, tro
 ### Fase 10 / Resolução Build OOM, Swipe Mobile e Foco do Terminal — 2026-09-05
 F10 | CFG | Adicionar `manualChunks` no `vite.config.ts` isolando `monaco-editor` e `@xterm/xterm` | Resolução do OOM do V8 (exit 134) durante `npm run build`, viabilizando o build de produção com exit code 0 | `vite.config.ts`
 F10 | ADD | Handlers de swipe touch (`onTouchStart`, `onTouchEnd`) no container de layout em `App.tsx` | Permitir abrir sidebar arrastando da borda esquerda e fechar arrastando para esquerda em mobile | `src/App.tsx`
-F10 | MOD | Foco automático de terminal em montagem/troca de sessão ativa e escape keydown blur em `TerminalPanel.tsx` | Garantir usabilidade imediata do terminal e atalho ergonômico para desfoque | `src/components/TerminalPanel.tsx`
+---
+
+### Fase 11 / Validação Gate 0 & Persistência de Histórico — 2026-09-06
+F11 | ADD | Implementação de `outputBuffer` (Ref) no hook `usePtySession` com limite de 1MB | Garantir que novos listeners de output recebam o histórico acumulado ao montar o `TerminalPanel`, resolvendo falha do Gate 0 (Decisão B) | `src/hooks/usePtySession.ts`
+

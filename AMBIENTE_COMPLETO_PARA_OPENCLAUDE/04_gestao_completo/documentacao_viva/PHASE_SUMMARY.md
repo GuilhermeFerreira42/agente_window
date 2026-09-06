@@ -163,7 +163,17 @@ Resolver os três itens remanescentes do sprint: o bloqueio histórico de build 
 
 ---
 
-## Próxima Sessão no Roadmap
-- **Onda B:** Extensões opcionais do terminal (histórico recente e comandos recentes persistidos).
-- **Integração MCP Externa:** Bridge para servidores de ferramentas MCP (planejado para v1.1).
+## Fase 11 — Validação Gate 0 & Persistência de Histórico
+> Data de Conclusão: 2026-09-06 | Status: ✅ Validado (Gate 0 Verde)
+
+### Objetivo
+Resolver a falha do Gate 0 (Sessão 11) onde o output do terminal era perdido ao fechar e reabrir o painel, mesmo com o WebSocket persistindo no `TerminalSessionProvider`. A solução exige que a interface recupere o estado visual do PTY ao remontar.
+
+### Entregáveis
+- `src/hooks/usePtySession.ts` — Implementação de `outputBuffer` (Ref) para acumular a saída do PTY (limite 1MB). Ao registrar um novo listener via `onOutput`, o buffer é enviado imediatamente, restaurando a tela do terminal.
+
+### Métricas de Teste
+- **Gate 0 (E2E):** `npx playwright test e2e/gate0_validation.spec.ts` aprovado.
+- **Resultado:** Confirmação de que "GATE0_TEST" permanece visível após a sequência Abrir → Digitar → Fechar → Reabrir.
+
 

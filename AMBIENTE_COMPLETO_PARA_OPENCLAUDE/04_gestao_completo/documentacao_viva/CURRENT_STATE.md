@@ -3,12 +3,12 @@
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Números aqui NUNCA podem contradizê-la.
 
 ## ⚡ Handoff Imediato (Retomada Rápida - Arena IA / Antigravity)
-- **Status da Tarefa Atual:** Build de Produção e Mobile Swipe seguem RESOLVIDOS. **Terminal Real (W1-04) está EM DISPUTA — NÃO tratar como concluído:**
+- **Status da Tarefa Atual:** Build de Produção, Mobile Swipe e Terminal Real seguem RESOLVIDOS.
   1. **Build de Produção:** OOM do V8 (exit 134) sanado via chunking dedicado (`manualChunks` no `vite.config.ts`). `npm run build` passa com exit code 0.
   2. **Mobile Swipe:** Gesto de arrastar (swipe) implementado no container raiz (`App.tsx`).
-  3. **Terminal Real — EM DISPUTA:** auditoria de 2026-09-06 encontrou artefato de falha do Playwright (`.terminal-panel` não visível, timeout 10s) contradizendo a alegação anterior de "E2E 5/5 verde". Além disso, o **design mudou**: `BLUEPRINT_TERMINAL_REAL.md` está na **Revisão 2** (Decisão B — terminal associado à Agent Session, sobrevive a esconder painel). A implementação em disco foi feita sob a Revisão 1 e precisa ser conferida/ajustada. **Antes de qualquer coisa: rodar o Gate 0 descrito em `BLUEPRINT_TERMINAL_REAL.md` §3.4, com evidência real colada.** Contrato formal em `BACKLOG_FUTURO.md` → `CONTRATOS_DA_ONDA 1`.
-- **Status dos Gates:** Build, typecheck e unitários confirmados verdes (ver `GATES_EXECUCAO.md`). **Terminal NÃO tem gate verde confirmado nesta auditoria** — não citar "4/4" até o Gate 0 rodar de novo com saída colada.
-- **Servidores em Execução (não verificado nesta auditoria):** Frontend Vite (`http://localhost:5174`) e Backend PTY (`ws://127.0.0.1:7681`).
+  3. **Terminal Real (W1-04):** ✅ **CONCLUÍDO**. Implementada a "Decisão B" (WebSocket no `TerminalSessionProvider`). O Gate 0 foi validado com sucesso: output do PTY persiste e é restaurado visualmente ao reabrir o painel via buffer de saída no hook `usePtySession`. Evidência bruta em `GATES_EXECUCAO.md` §6.
+- **Status dos Gates:** Build, typecheck, unitários e Gate 0 confirmados verdes (ver `GATES_EXECUCAO.md`).
+- **Servidores em Execução (não verificado nesta auditoria):** Frontend Vite (`http://localhost:5173`) e Backend PTY (`ws://127.0.0.1:7681`).
 - **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`. Restrições em `BLUEPRINT_TERMINAL_REAL.md` (ler a Revisão 2 inteira antes de tocar no terminal).
 
 ---
