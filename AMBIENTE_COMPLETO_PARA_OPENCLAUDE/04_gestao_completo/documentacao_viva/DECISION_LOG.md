@@ -83,7 +83,14 @@ F8 | MOD | Achados dos relatórios soltos preservados nos docs vivos antes do ar
 ---
 
 ### Fase 9 / Verificação Sessão 11 & Diagnóstico `.platform` — 2026-09-05
-F9 | TECH | Ambiente E2E montado do zero no sandbox: `npm install`, `cd pty-server && npm install` (node-pty nativo compilado: `node_modules/node-pty/build/Release/pty.node` OK), `npx playwright install chromium` + `sudo npx playwright install-deps chromium` (libnss3, libnspr4, libatk, libxkbcommon, libasound etc.) | Sem node_modules, sem pty-server buildado e sem libs do Chromium a suíte E2E nem iniciava — essa era a causa real do "bloqueio" descrito no CURRENT_STATE | `node_modules/`, `pty-server/dist/`, `~/.cache/ms-playwright/`
+F9 | TECH | Ambiente E2E montado do zero no sandbox: `npm install`, `cd pty-server && npm install` (node-pty nativo compilado — `node_modules/node-pty/build/Release/pty.node` OK), `npx playwright install chromium` + `sudo npx playwright install-deps chromium` (libs do SO: libnss3, libnspr4, libatk, libxkbcommon, libasound etc.) | Sem node_modules, sem pty-server buildado e sem libs do Chromium a suíte E2E nem iniciava — essa era a causa real do "bloqueio" descrito no CURRENT_STATE | `node_modules/`, `pty-server/dist/`, `~/.cache/ms-playwright/`
 F9 | FIX | `e2e/debug_terminal_toggle.spec.ts` reescrito para usar `BASE_URL` de `helpers.ts`, sem `console.log` e com indentação de 2 espaços no `test(...)` | O spec violava o contrato anti-trapaça (`e2eAssertionContract`): porta hardcoded, console.log e teste não detectado; quebrava 3 asserts do contrato (unit ficou 367/370) | `e2e/debug_terminal_toggle.spec.ts`
 F9 | TECH | Diagnóstico estático: em `lib/xterm.mjs` o objeto "process" (`xe`) só pode ser processo real, `globalThis.vscode.process` ou `undefined` — nunca `null`; guard `if (typeof xe === "object")` é seguro | O crash `.platform` citado no CURRENT_STATE NÃO se reproduziu; era ambiente incompleto, não bug de código | `node_modules/@xterm/xterm/lib/xterm.mjs`
 F9 | ADD | `e2e/sessao_11_terminal_pty_real.spec.ts` validado 5/5 (PID real, troca de shell, split, ações de menu, DISCOVERY_FAILED) | Sessão 11 (Terminal Real / Onda A) encerrada com evidência E2E real | `e2e/sessao_11_terminal_pty_real.spec.ts`
+
+---
+
+### Fase 10 / Resolução Build OOM, Swipe Mobile e Foco do Terminal — 2026-09-05
+F10 | CFG | Adicionar `manualChunks` no `vite.config.ts` isolando `monaco-editor` e `@xterm/xterm` | Resolução do OOM do V8 (exit 134) durante `npm run build`, viabilizando o build de produção com exit code 0 | `vite.config.ts`
+F10 | ADD | Handlers de swipe touch (`onTouchStart`, `onTouchEnd`) no container de layout em `App.tsx` | Permitir abrir sidebar arrastando da borda esquerda e fechar arrastando para esquerda em mobile | `src/App.tsx`
+F10 | MOD | Foco automático de terminal em montagem/troca de sessão ativa e escape keydown blur em `TerminalPanel.tsx` | Garantir usabilidade imediata do terminal e atalho ergonômico para desfoque | `src/components/TerminalPanel.tsx`

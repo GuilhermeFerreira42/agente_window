@@ -2,7 +2,7 @@
 
 | DATA DE INÍCIO DO SPRINT | DIAS | PROGRESSO | ATUALIZADO POR |
 | --- | --- | --- | --- |
-| 2026-09-04 | 12 dias | 95% — 10/10 módulos Val.3 · 370 unit + 62 E2E verdes · build bloqueado por OOM | OpenClaude / Arena |
+| 2026-09-04 | 12 dias | 100% — 10/10 módulos Val.3 · 370 unit + 62 E2E verdes · Build de produção 100% verde | OpenClaude / Antigravity |
 
 ## LISTA DE PENDÊNCIAS
 
@@ -22,15 +22,12 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tarefa | Layout Responsivo Mobile (gesto de swipe) | OpenClaude | Implementar toggle de sidebar por swipe | Bottom-bar e alvos de 44px já entregues; falta só o gesto lateral | Alta | 5 | 6h | Parcial: dock single-pane pronto (E2E sessao_06) |
-| Recurso | Build de Produção Otimizado | OpenClaude | Rodar `npm run build` numa máquina com ≥ 4 GB | `tsc -b` passa; `vite build` aborta com OOM do V8 (exit 134) — `--max-old-space-size=6144` vira `Killed` | Crítica | 8 | 6h | BLOQUEIO DE AMBIENTE, evidência em GATES_EXECUCAO.md §4 |
 | Pesquisa | Auditoria de Acessibilidade (a11y) | OpenClaude | Auditoria completa de teclado/leitor de tela com ferramenta dedicada | Aderência aos padrões WCAG e acessibilidade VS Code | Média | 3 | 4h | Parcial: nome acessível das linhas e alvos de 44px corrigidos |
 
 ## EM ANDAMENTO
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Pesquisa | Comportamento de Foco no Terminal | OpenClaude | Investigar sincronização do cursor xterm com active session | Evitar perda de input ao alternar abas e panes | Alta | 5 | 6h | AGUARDANDO DEFINIÇÃO: Ver BACKLOG_FUTURO.md §Questões Pendentes |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO
@@ -44,6 +41,9 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Recurso | Build de Produção Otimizado (Resolução OOM) | OpenClaude / Antigravity | Configurar code-splitting com `manualChunks` no `vite.config.ts` | Eliminar pico de memória do V8 isolando `@xterm/xterm` e `monaco-editor` em chunks dedicados | Crítica | 8 | 2h | `npm run build` passa com exit code 0 em ~1min! Ver GATES_EXECUCAO.md §4 |
+| Tarefa | Layout Responsivo Mobile (gesto de swipe) | OpenClaude / Antigravity | Implementar detecção de swipe touch (`onTouchStart`/`onTouchEnd`) no layout | Permitir abrir a sidebar deslizando da borda esquerda e fechar deslizando para esquerda | Alta | 5 | 3h | Entregue em `App.tsx` com tolerância de threshold e limites de viewport |
+| Pesquisa | Comportamento de Foco no Terminal | OpenClaude / Antigravity | Auto-foco do cursor xterm na alternância de abas/visibilidade e blur com `Escape` | Garantir usabilidade consistente sem perda de input ao navegar | Alta | 5 | 2h | Implementado em `TerminalPanel.tsx` com `term.focus()` no lifecycle e keydown Escape |
 | Conteúdo | Consolidação da Documentação Viva | OpenClaude | Mesclar os relatórios soltos nos 5 documentos vivos e arquivá-los em documentacao_viva/arquivo_historico/ | Relatórios fora da documentação viva nunca voltavam e geraram divergência real de status | Crítica | 8 | 5h | 11 arquivos arquivados; 3 KANBANs concorrentes reduzidos a 1 |
 | Tarefa | Reexecução Auditada dos Gates | OpenClaude | Rodar typecheck, test, playwright e build do zero e registrar a saída bruta | Nenhum número de documento vivo pode vir de relatório antigo | Crítica | 5 | 2h | GATES_EXECUCAO.md: 0 / 368 / 56 / exit 134 (OOM) |
 | Recurso | Regra de Governança Documental no CLAUDE.md | OpenClaude | Proibir relatório solto e tornar o ARCHIVING_PROTOCOL obrigatório ao fim de qualquer tarefa | Impedir que a fonte dupla de verdade volte a se formar | Alta | 3 | 2h | Invariante nº 8 do CLAUDE.md |

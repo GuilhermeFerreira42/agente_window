@@ -129,6 +129,14 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       instance.write(data)
     })
 
+    instance.attachCustomKeyEventHandler((arg) => {
+      if (arg.type === 'keydown' && arg.key === 'Escape') {
+        instance.blur()
+        return false
+      }
+      return true
+    })
+
     const resize = () => {
       try {
         fit.fit()
@@ -184,6 +192,14 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       instance.write(data)
     })
 
+    instance.attachCustomKeyEventHandler((arg) => {
+      if (arg.type === 'keydown' && arg.key === 'Escape') {
+        instance.blur()
+        return false
+      }
+      return true
+    })
+
     const resize = () => {
       try {
         fit.fit()
@@ -205,7 +221,7 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
     }
   }, [split, visible, activeTab])
 
-  // Refit on visibility / maximize / split change
+  // Refit and focus on visibility / maximize / split change
   useEffect(() => {
     if (visible && activeTab === 'terminal') {
       try {
@@ -214,8 +230,17 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       } catch {
         // Ignore
       }
+      
+      // Auto-focus the terminal (wait for DOM to be ready)
+      setTimeout(() => {
+        if (split && splitTerminal.current) {
+          splitTerminal.current.focus()
+        } else if (terminal.current) {
+          terminal.current.focus()
+        }
+      }, 50)
     }
-  }, [maximized, visible, activeTab, split])
+  }, [maximized, visible, activeTab, split, sessionId])
 
   const clearTerminal = () => {
     terminal.current?.clear()

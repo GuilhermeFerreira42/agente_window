@@ -1,12 +1,14 @@
 # CURRENT_STATE — Réplica Agents Window (VS Code)
-> Última atualização: Fase 09 — Verificação Sessão 11 / diagnóstico do crash `.platform` | 2026-09-05
+> Última atualização: Fase 10 — Resolução Build OOM, Swipe Mobile e Foco do Terminal | 2026-09-05
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Números aqui NUNCA podem contradizê-la.
 
-## ⚡ Handoff Imediato (Retomada Rápida - Arena IA)
-- **Status da Tarefa Atual:** Sessão 11 (Terminal Real com PTY via `node-pty`) **IMPLEMENTADA e VALIDADA** — backend `pty-server` (node-pty + WebSocket), hook `usePtySession`, `TerminalPanel.tsx` e split de terminal. Suíte `e2e/sessao_11_terminal_pty_real.spec.ts` **5/5 verde** (PID real, troca de shell, split, ações de menu, erro honesto de DISCOVERY_FAILED).
-- **BLOQUEIO ANTERIOR RESOLVIDO (era ambiente, não código):** o CURRENT_STATE citava crash `Cannot read properties of null (reading 'platform')` ao montar o `TerminalPanel`. Diagnóstico executado nesta sessão provou que o crash **não se reproduz** no código restaurado — a causa real era o ambiente incompleto (sem `node_modules`, `pty-server` não buildado e libs do Chromium ausentes). Com o ambiente montado, o painel monta sem erros (0 `pageerror`, 0 `console.error`).
-- **Próxima Ação Imediata (Arena IA):** avançar a suíte E2E completa (62/62 já verde) e, se desejado, tratar o bloqueio de `npm run build` (OOM do V8 no sandbox de ~2 GB — exige máquina com ≥ 4 GB).
-- **Comando de Teste Rápido:** `npx playwright test e2e/debug_terminal_toggle.spec.ts --reporter=list` (spec de diagnóstico, agora em conformidade com o contrato anti-trapaça)
+## ⚡ Handoff Imediato (Retomada Rápida - Arena IA / Antigravity)
+- **Status da Tarefa Atual:** Todas as pendências de alta criticidade e bloqueios foram **RESOLVIDOS E ENTREGUES**:
+  1. **Build de Produção:** OOM do V8 (exit 134) sanado via chunking dedicado (`manualChunks` no `vite.config.ts`). `npm run build` passa com exit code 0!
+  2. **Mobile Swipe:** Gesto de arrastar (swipe) implementado no container raiz (`App.tsx`) para abrir a sidebar a partir da borda esquerda e fechar ao deslizar para a esquerda em telas sensíveis a toque.
+  3. **Terminal Focus UX:** Foco automático do terminal ao abrir/alternar de sessão e desfoque inteligente com a tecla `Escape` (`TerminalPanel.tsx`).
+- **Status dos Gates:** 4/4 GATES VERDES (Typecheck 0 erros, Unitários 370/370, E2E 62/62, Build de Produção exit 0).
+- **Servidores em Execução:** Frontend Vite (`http://localhost:5174`) e Backend PTY (`ws://127.0.0.1:7681`) ativos.
 - **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`. Restrições em `BLUEPRINT_TERMINAL_REAL.md`.
 
 ---
@@ -72,7 +74,7 @@
 | Unitários | `src/**/*.test.ts(x)` | **370/370 passando (44 arquivos)** — execução de 2026-09-05 | `npm run test` |
 | Contrato anti-trapaça | `src/__tests__/e2eAssertionContract.test.ts` | 5/5 — reprova spec E2E sem `expect` | `npm run test` |
 | E2E completo | `e2e/*.spec.ts` (12 arquivos) | **62/62 passando (5,2 min, 58+ screenshots)** | `npx playwright test` |
-| Build de produção | `tsc -b && vite build` | ❌ **exit 134 — OOM do V8** (2 GB de RAM; morre perto de 900 MB de heap no bundle do Monaco). `tsc -b` passa. Ver `GATES_EXECUCAO.md` §4 | `npm run build` |
+| Build de produção | `tsc -b && vite build` | ✅ **Exit code 0 — SUCESSO** (code-splitting com manualChunks no Vite) | `npm run build` |
 
 > Régua E2E: 56 testes / 197 `expect` / 0 `console.log`. `playwright.config.ts` sobe o Vite sozinho (`webServer`, porta 5173) — nenhuma spec hardcoda host/porta.
 

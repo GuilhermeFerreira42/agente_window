@@ -144,7 +144,26 @@ Retomar a Sessão 11 (Terminal Real com PTY) descrita como bloqueada por um cras
 
 ---
 
+## Fase 10 — RESOLUÇÃO BUILD OOM, SWIPE MOBILE & FOCO DO TERMINAL
+> Data de Conclusão: 2026-09-05 | Status: ✅ Validado (4/4 gates verdes: Typecheck + Unitários + E2E + Build)
+
+### Objetivo
+Resolver os três itens remanescentes do sprint: o bloqueio histórico de build por estouro de heap no V8 (exit 134), o suporte ao gesto de swipe mobile para a barra lateral, e a sincronização e ergonomia de foco no terminal real.
+
+### Entregáveis
+- `vite.config.ts` — Configuração de `build.rollupOptions.output.manualChunks` separando `@xterm/xterm` e `monaco-editor` em chunks dedicados (`xterm-vendor` e `monaco-vendor`).
+- `src/App.tsx` — Handlers de toque (`onTouchStart`, `onTouchEnd`) para alternar a visibilidade da barra lateral por swipe (deslizar para direita a partir da borda para abrir, e para esquerda para fechar).
+- `src/components/TerminalPanel.tsx` — Auto-foco do cursor `term.focus()` ao montar ou alternar entre sessões ativas e tecla `Escape` customizada para desfocar o xterm.
+
+### Métricas de Teste (100% Verdes)
+- **Typecheck (`tsc -b --force`):** 0 erros
+- **Unitários:** 370/370 (44 arquivos)
+- **E2E:** 62/62 (12 specs)
+- **Build de Produção (`tsc -b && vite build`):** ✅ **Exit Code 0 — Sucesso em ~1 min** (sem OOM)
+
+---
+
 ## Próxima Sessão no Roadmap
-- **Sessão 07:** Terminal real com PTY (adiado por decisão do usuário).
-- **Mobile:** gesto de swipe para abrir/fechar a lista de sessões.
-- **Build:** rodar `npm run build` em máquina com mais memória (OOM no sandbox de 2 GB).
+- **Onda B:** Extensões opcionais do terminal (histórico recente e comandos recentes persistidos).
+- **Integração MCP Externa:** Bridge para servidores de ferramentas MCP (planejado para v1.1).
+

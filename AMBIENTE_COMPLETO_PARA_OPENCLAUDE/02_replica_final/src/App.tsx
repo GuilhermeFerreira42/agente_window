@@ -1716,8 +1716,39 @@ export default function App() {
     />
   )
 
+  const touchStartRef = useRef<{ x: number, y: number } | null>(null)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const endX = e.changedTouches[0].clientX
+    const endY = e.changedTouches[0].clientY
+    const deltaX = endX - touchStartRef.current.x
+    const deltaY = endY - touchStartRef.current.y
+    
+    if (Math.abs(deltaY) > Math.abs(deltaX) || Math.abs(deltaX) < 40) {
+      touchStartRef.current = null
+      return
+    }
+
+    if (!sidebarVisible && deltaX > 0 && touchStartRef.current.x < 30) {
+      setSidebarVisible(true)
+    } else if (sidebarVisible && deltaX < 0) {
+      setSidebarVisible(false)
+    }
+    touchStartRef.current = null
+  }
+
   return (
-    <div className={`app-frame agent-sessions-workbench${isSinglePane ? ' single-pane' : ''}${customViewActive ? ' custom-view-active' : ''}`}>
+    <div 
+      className={`app-frame agent-sessions-workbench${isSinglePane ? ' single-pane' : ''}${customViewActive ? ' custom-view-active' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <Titlebar
         activeSession={activeSession}
         unreadCount={unreadCount}

@@ -11,5 +11,15 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          monaco: ['monaco-editor'],
+          xterm: ['@xterm/xterm']
+        }
+      }
+    }
+  }
 })
 
