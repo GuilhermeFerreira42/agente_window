@@ -1,7 +1,8 @@
 # BLUEPRINT — Terminal Real com PTY
-> Status: **DECISÕES FINAIS INCORPORADAS — AGUARDANDO APROVAÇÃO PARA IMPLEMENTAÇÃO**
-> Criado em: 2026-09-05 | Revisado em: 2026-09-05 | Autor: Antigravity
-> Referências analisadas: code-server (coder/code-server), VS Code (microsoft/vscode), OpenHands
+> Status: **REVISÃO 2 — DECISÃO B (terminal por sessão) INCORPORADA — AGUARDANDO GATE 0**
+> Criado em: 2026-09-05 | Revisado em: 2026-09-05 | Revisão 2 em: 2026-09-06
+> Referências analisadas: code-server (coder/code-server), VS Code (microsoft/vscode), OpenHands, `runInTerminalTool.ts` (microsoft/vscode) — associação real de terminal por `chatSessionResource` confirmada em código-fonte
+> Regra de sequência: nenhuma linha de implementação antes do Gate 0 (ver seção 3.4) passar com evidência real de execução.
 
 ---
 
@@ -25,7 +26,7 @@ Substituir o shell simulado em `TerminalPanel.tsx` por um terminal real: o front
    - Nova Janela do Terminal
    - Limpar Terminal
    - Rolar para Comando Anterior / Próximo (via API nativa do xterm.js — `terminal.scrollToLine()` — sem nenhuma mudança no backend)
-4. **Sem sessão persistente:** ao fechar ou recarregar a página, o processo do shell morre. O scrollback normal do xterm.js funciona enquanto a aba estiver aberta, mas **nada sobrevive a um reload**. Não há serialização de buffer.
+4. **Persistência revisada (Decisão B, 2026-09-06):** esconder ou fechar o *painel* do terminal, ou trocar de terminal, **não mata o processo PTY**. O processo pertence à infraestrutura do workspace/backend e fica associado contextualmente à Agent Session (mesmo padrão encontrado no VS Code real: `_sessionTerminalAssociations` em `runInTerminalTool.ts`, chave por `chatSessionResource`). Só matam o processo: (a) o usuário mata/fecha o terminal explicitamente, (b) o shell sai sozinho (`exit`), (c) timeout de inatividade, (d) **F5/reload da página — persistência pós-reload fica fora de escopo nesta onda**, é evolução futura que exige reconexão de verdade no protocolo.
 
 ### O que está FORA DE ESCOPO nesta onda — registrado em BACKLOG_FUTURO.md (Onda B):
 
@@ -151,30 +152,37 @@ Frontend                     pty-server
 
 ---
 
-## 3. Ciclo de Vida do Processo Shell
+## 3. Ciclo de Vida do Processo Shell (revisado — Decisão B)
 
-### 3.1 Quando o processo nasce
+### 3.1 Onde a conexão WebSocket vive
 
-O processo PTY nasce **ao receber a mensagem `{ type:"open" }`** — que o frontend envia quando `TerminalPanel.tsx` monta (ou seja, quando o painel de terminal fica visível pela primeira vez para uma sessão).
+**Mudança de arquitetura desta revisão:** a conexão WebSocket deixa de pertencer ao ciclo de montagem/desmontagem do componente `TerminalPanel.tsx` e passa a viver num provider acima dele, no nível da Agent Session (`TerminalSessionProvider`, análogo ao `TerminalWorkbench` do plano de UX). Esconder ou fechar o painel é **só um toggle visual** — não desmonta o provider, não fecha o WebSocket. Isso é o que torna a persistência ao esconder o painel possível sem precisar de reconexão: a conexão nunca chegou a cair.
 
-**Não** abre na inicialização do servidor (lazy spawn): múltiplas sessões existem no App mas o usuário normalmente usa uma de cada vez. Abrir um shell por sessão antecipadamente desperdiçaria memória.
+### 3.2 Quando o processo nasce
 
-### 3.2 Quando o processo morre
+O processo PTY nasce **ao receber a mensagem `{ type:"open" }`** — enviada quando o `TerminalSessionProvider` da Agent Session é inicializado pela primeira vez (não a cada vez que o painel fica visível). Lazy spawn: só quando a sessão realmente pede um terminal pela primeira vez, não antecipadamente para todas as sessões abertas.
 
-O processo shell é encerrado em qualquer um destes eventos:
+### 3.3 Quando o processo morre
 
 | Evento | Ação |
 |--------|------|
-| Frontend envia `{ type:"close" }` | `pty.kill('SIGTERM')` -> `SIGKILL` após 3s se não encerrar |
-| Conexão WebSocket fecha (tab fechada, reload, app fechado) | `pty.kill('SIGTERM')` no evento `ws.on('close')` |
+| Usuário mata/fecha o terminal explicitamente (ação de UI, não esconder painel) | Frontend envia `{ type:"close" }` → `pty.kill('SIGTERM')` -> `SIGKILL` após 3s |
+| Esconder painel, trocar de terminal, trocar de Agent Session | **Nenhuma ação.** WS permanece aberto (seção 3.1); PTY continua rodando em segundo plano. |
 | Shell sai por conta própria (usuário digita `exit`) | PTY emite evento `exit`; backend notifica frontend com `{ type:"exit" }` |
 | **Timeout de inatividade: 30 minutos** | Se nenhuma mensagem `input` for recebida em 30 min, o backend encerra o PTY e envia `{ type:"exit", code:-1 }`. Configurável via env `PTY_IDLE_TIMEOUT_MS`. |
+| **F5 / reload da página / fechar o app** | WS cai de verdade (evento de rede, não de UI) → `pty.kill('SIGTERM')` no `ws.on('close')`. Persistência pós-reload é **fora de escopo nesta onda** — evolução futura exigiria protocolo de reconexão com reenvio de buffer. |
 
-**Por que timeout de inatividade?** O servidor escuta em loop contínuo. Se o usuário fechar o navegador sem digitar `exit`, o shell ficaria vivo indefinidamente. 30 minutos é o padrão adotado pelo code-server e pelo VS Code Tunnel.
+### 3.4 Gate 0 — obrigatório antes de qualquer outra implementação
 
-### 3.3 Múltiplas sessões simultâneas
+Antes de construir Session Manager, Workbench lateral ou Split, validar com evidência real de execução (não relato, execução de verdade, saída colada):
 
-O `ptyManager` mantém um `Map<sessionId, PtyProcess>`. Cada sessão do frontend pode ter exatamente um PTY ao mesmo tempo. Uma segunda mensagem `open` para o mesmo `sessionId` encerra o PTY anterior e abre um novo (comportamento de "reabrir terminal").
+> Abrir a Agents Window → abrir terminal → confirmar que `.terminal-panel` fica visível → executar um comando com saída determinística → confirmar que a saída aparece no xterm.js → fechar o painel → reabrir → confirmar que o terminal reconectou ao mesmo PTY (não recriou um novo).
+
+Se esse teste básico falhar, **parar e corrigir a fundação antes de avançar** — não implementar Session Manager/Workbench/Split sobre uma base não verificada.
+
+### 3.5 Múltiplas sessões simultâneas e associação por Agent Session (Decisão B)
+
+O `ptyManager` mantém um `Map<agentSessionId, TerminalSession[]>` — infraestrutura e processos no nível do workspace/backend, mas cada `TerminalSession` fica **associada contextualmente** à Agent Session que a criou (mesmo padrão do VS Code real, confirmado em código-fonte: `_sessionTerminalAssociations` chaveado por `chatSessionResource` em `runInTerminalTool.ts`). Trocar de Agent Session troca **a lista de terminais mostrada no Workbench**, mas não mata os processos das sessões que ficaram em segundo plano. Uma segunda mensagem `open` para o mesmo `sessionId+terminalId` **reconecta** ao PTY existente (envia o buffer de scrollback acumulado) em vez de encerrar e recriar — isso substitui o comportamento antigo descrito na revisão 1 deste documento.
 
 ---
 
@@ -323,11 +331,13 @@ O `TerminalPanel.tsx` tem hoje dois sistemas paralelos que serão substituídos:
 | **C** | Linhas 171–177: loop que escreve `initialTerminalLines` no xterm | **Removido**: o terminal começa em branco; o shell real escreve seu próprio prompt |
 | **D** | Linha 290: split terminal usa mock local | **Substituído**: split terminal abre uma segunda sessão WS (sessionId diferente, ex.: `s1-split`) |
 | **E** | Linhas 140–169: inicialização do xterm | **Mantida**: a instância do `Terminal`, `FitAddon`, `WebLinksAddon` permanecem iguais |
-| **F** | Linhas 257–269: cleanup do useEffect | **Expandido**: no cleanup também fecha o WebSocket e envia `{ type:"close" }` |
+| **F** | Linhas 257–269: cleanup do useEffect | **Revisado (Decisão B):** o cleanup do `TerminalPanel.tsx` NÃO fecha mais o WebSocket nem envia `{ type:"close" }` — esconder o painel é só um toggle visual. O `{ type:"close" }` só é enviado por uma ação explícita do usuário (botão de fechar/matar terminal), não pelo unmount do painel. |
 | **G** | Linhas 24–25: constante `SHELLS` e type `Shell` | **Substituída**: o shell não é mais escolhido pelo frontend — o backend detecta. O seletor de shell vira uma sugestão enviada no `open`, mas o backend decide se honra |
 | **H** | Snapshots (`TerminalSnapshot`) em App.tsx linha 161 | **Depreciado**: com shell real não há snapshot de linhas; o PTY mantém o scrollback internamente |
 
 ### 6.2 Novo hook a criar: `usePtySession`
+
+**Nota da Decisão B:** este hook não pode viver dentro do `TerminalPanel.tsx` — precisa ser instanciado num nível acima (o `TerminalSessionProvider` da seção 3.1), e o `TerminalPanel.tsx` apenas consome o estado já existente. Se o hook nascer dentro do painel, o WebSocket volta a morrer no unmount e a Decisão B não se sustenta na prática.
 
 Para isolar a lógica de WebSocket do componente visual, toda a conexão WS será extraída para um hook custom (`usePtySession`). O `TerminalPanel.tsx` usará esse hook com a assinatura:
 
@@ -444,6 +454,8 @@ O OpenHands usa Python no backend, mas o padrão de comunicação é relevante:
 3. **Detecção automática de SO**: frontend não configura shell; backend detecta e informa.
 4. **Falha explícita**: qualquer falha de startup (node-pty, porta, shell) termina o processo com código de erro e mensagem legível — nunca degrada silenciosamente.
 5. **node-pty como biblioteca principal**: não reinventar PTY em userland.
+6. **Decisão B (2026-09-06):** infraestrutura/processo do terminal pertence ao workspace/backend; associação visual/contextual pertence à Agent Session. Trocar de sessão troca o que é mostrado, não o que está vivo.
+7. **Gate 0 é bloqueante**: nenhuma implementação de Session Manager, Workbench ou Split começa antes do teste da seção 3.4 passar com evidência real.
 
 ---
 
@@ -456,11 +468,16 @@ O OpenHands usa Python no backend, mas o padrão de comunicação é relevante:
 | Seletor de shell | **DECIDIDO:** Dropdown populado com perfis detectados pelo backend (`availableProfiles` em `opened`). PowerShell é o padrão no Windows. Frontend envia `shellId` no `open`; backend resolve o caminho real. |
 | Snapshot de terminal (`TerminalSnapshot`) | **DECIDIDO:** Depreciado completamente. Shell real não precisa de snapshot — o PTY mantém o scrollback. `TerminalSnapshot` e `saveTerminalSnapshot` serão removidos do `App.tsx`. |
 | Timeout de inatividade | **DECIDIDO:** 30 minutos. Configurável via env `PTY_IDLE_TIMEOUT_MS`. |
-| Split terminal | **DECIDIDO:** Dois PTYs independentes — dois `sessionId` diferentes (ex.: `s1` e `s1-split`), cada um com sua própria conexão WS. |
-| Sessão persistente (reload) | **DECIDIDO:** Sem persistência. Shell morre ao fechar/recarregar. Scrollback do xterm.js funciona enquanto a aba está aberta. |
+| Split terminal | **DECIDIDO:** Layout recursivo (Split { Terminal \| Split }), preparado para H+V na arquitetura; primeira implementação visual entrega só horizontal. Dois PTYs independentes por split — dois `sessionId+terminalId` diferentes, cada um com sua própria conexão WS. |
+| Sessão persistente (reload) | **REVISADO (Decisão B):** esconder/fechar painel, trocar de terminal e trocar de Agent Session NÃO matam o PTY (ver seção 3). Só matam: kill explícito, `exit` do shell, timeout de 30min, ou F5/reload (persistência pós-reload fica fora de escopo nesta onda). |
+| Terminal pertence ao workspace ou à sessão? | **DECIDIDO — Decisão B, 2026-09-06:** infraestrutura/processo no workspace/backend; associação contextual na Agent Session. Confirmado com evidência de código-fonte real do VS Code (`_sessionTerminalAssociations` em `runInTerminalTool.ts`, chave `chatSessionResource`) — não foi decisão por achismo. Teste 9 do plano de UX (Sessão A → terminal A; Sessão B → terminal B; voltar A → terminal correto recuperado) permanece válido como está. |
+| Escopo do Workbench | **DECIDIDO:** suportar N terminais por workspace, sem limite artificial de interface definido agora. Limite técnico configurável (ex. `MAX_TERMINAL_SESSIONS`) pode ser adicionado depois se testes mostrarem necessidade. |
 | Features de voz | **DECIDIDO:** Fora de escopo desta onda e de qualquer onda futura sem blueprint próprio. Não há subsistema de voz no projeto. |
+| Terminal de Depuração de JavaScript (visto nas imagens de referência) | **DECIDIDO:** Fora de escopo — é um perfil de debug do editor, não um shell real. Não entra no dropdown desta onda. |
 
 ---
 
 *Este documento é a fonte única de verdade do design do terminal real.*
-*Nenhuma linha de código deve ser escrita antes da aprovação explícita do usuário.*
+*Revisão 1 (2026-09-05): decisões de infraestrutura, protocolo e detecção de shell.*
+*Revisão 2 (2026-09-06): Decisão B (terminal por sessão) e persistência ao esconder painel, com evidência de código-fonte do VS Code.*
+*Nenhuma linha de implementação deve ser escrita antes do Gate 0 (seção 3.4) passar com evidência real de execução.*

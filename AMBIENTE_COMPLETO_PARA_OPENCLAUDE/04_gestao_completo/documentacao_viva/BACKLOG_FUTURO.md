@@ -2,7 +2,7 @@
 
 ## Intenção Original
 - **Objetivo:** Construir uma réplica de alta fidelidade e 100% funcional da Agents Window do VS Code, eliminando todos os mocks por integrações reais.
-- **Estado Atual:** 100% concluído (10 dos 10 módulos da Validação 3 entregues; Terminal Real, Swipe Mobile e Build de Produção concluídos com sucesso).
+- **Estado Atual:** 9 de 10 módulos concluídos e verificados. Terminal Real (W1-04) está **EM DISPUTA** — auditoria de 2026-09-06 encontrou artefato de falha do Playwright (`.terminal-panel` não visível, timeout 10s) contradizendo o "CONCLUÍDO" abaixo; a referência a `GATES_EXECUCAO.md §2` citada como prova não menciona terminal em lugar nenhum. Ver correção pendente antes de confiar neste status. Swipe Mobile e Build de Produção seguem concluídos com evidência real (gates 4 e 5 do `GATES_EXECUCAO.md`).
 - **Meta Final:** 100% de conformidade, 0 erros TypeScript (`tsc -b`), 370 testes unitários + 62 testes E2E com asserções reais e screenshots de evidência, build de produção 100% verde.
 
 ---
@@ -17,11 +17,47 @@
 | W1-01 | Sessões List Real (Sessão 04) | Agrupamento completo (Hoje/Fixadas), 3 chats aninhados, workspace capping 3, drag seguro e teclado | `SessionSidebar.tsx`, `sessionsList.ts`, `dragAndDrop.ts` | E2E `sessao_02` passa (5/5) e typecheck 0 erros | CONCLUÍDO |
 | W1-02 | Layout Topologia (Sessão 05) | Docked controller, session sync, CannotClose tabs e regra R-070 | `sessionLayout.ts`, `sessionLayoutSync.ts`, `App.tsx` | E2E `sessao_09` passa (5/5) | CONCLUÍDO |
 | W1-03 | File System Access API (Sessão 08) | Entregue: `showDirectoryPicker` real, árvore do disco, persistência do handle em IndexedDB e fallback honesto; E2E prova a CHAMADA da API nativa | `src/domain/fileSystem.ts`, `AuxiliaryBar.tsx`, `App.tsx` | E2E `sessao_08` 5/5 e chamada real de `showDirectoryPicker` instrumentada | CONCLUÍDO |
-| W1-04 | Terminal Real xterm.js (Sessão 11) | Backend PTY via node-pty + WebSocket, shell dropdown, auto-focus e desfoque com Escape | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Execução de comandos reais com validação de PID, saída no xterm e UX de foco — **CONCLUÍDO** | CONCLUÍDO |
+| W1-04 | Terminal Real xterm.js (Sessão 11) | Backend PTY via node-pty + WebSocket existe no disco (`pty-server/`), mas o teste E2E que comprovaria funcionamento falhou (artefato de falha encontrado, painel não renderizou). **Além disso, o design mudou:** revisão 2 do `BLUEPRINT_TERMINAL_REAL.md` (2026-09-06) incorpora a Decisão B (terminal associado à Agent Session, sobrevive a esconder painel) — a implementação atual em disco foi feita sob o design da revisão 1 e precisa ser conferida/ajustada contra a revisão 2. | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Gate 0 do `BLUEPRINT_TERMINAL_REAL.md` §3.4 passando com evidência real, seguido de E2E completo do plano de UX | EM DISPUTA — NÃO CONFIAR no "CONCLUÍDO" anterior sem reexecução |
 
 ### Meta da Onda 1
 - **Critério binário:** Filesystem e Terminal reais integrados sem mocks, com testes unitários passando.
-- **Status:** CONCLUÍDO
+- **Status:** EM ANDAMENTO (W1-04 pendente de reverificação contra o blueprint revisado)
+
+### CONTRATOS_DA_ONDA 1 — Revisão do Terminal Real (2026-09-06)
+```yaml
+FONTE: "04_gestao_completo/documentacao_viva/BLUEPRINT_TERMINAL_REAL.md (Revisão 2)"
+
+ORDEM_OBRIGATORIA:
+  - "1. Gate 0 (BLUEPRINT §3.4): abrir terminal real, confirmar .terminal-panel visível,
+     executar comando com saída determinística, confirmar saída no xterm, fechar/reabrir
+     painel e confirmar reconexão ao MESMO PTY (não recriação). Colar saída bruta."
+  - "2. Se Gate 0 falhar: corrigir a fundação. NÃO avançar para os itens abaixo."
+  - "3. Se Gate 0 passar: implementar/ajustar Session Manager, Workbench, Split conforme
+     o plano de UX aprovado, sobre a base do BLUEPRINT_TERMINAL_REAL.md."
+
+OUTPUT_SCHEMAS:
+  W1-04: "TerminalSessionProvider -> { open, close(explícito), input, resize, availableProfiles }"
+
+DECISOES_IMUTAVEIS_DESTA_REVISAO:
+  - "Terminal pertence contextualmente à Agent Session; processo/infra pertence ao
+     workspace/backend (Decisão B, evidência em runInTerminalTool.ts do VS Code real)."
+  - "Esconder/fechar painel, trocar de terminal, trocar de sessão: NÃO mata o PTY."
+  - "Só mata o PTY: kill explícito do usuário, exit do shell, timeout de 30min, ou
+     F5/reload (persistência pós-reload fica fora de escopo desta onda)."
+  - "WebSocket vive num provider acima do TerminalPanel.tsx, não no ciclo de
+     mount/unmount do componente."
+  - "N terminais por workspace, sem limite artificial de interface agora."
+  - "Split: layout recursivo H+V na arquitetura; primeira entrega visual só horizontal."
+  - "Teste 9 do plano de UX (Sessão A → terminal A; Sessão B → terminal B; voltar A →
+     terminal certo) permanece válido e deve ser o E2E principal desta decisão."
+
+FORA_DE_ESCOPO:
+  - "Persistência de terminal através de F5/reload."
+  - "Ir para Diretório Recente, Executar Comando Recente (Onda B — WB-01, WB-02)."
+  - "Executar Arquivo Ativo, Executar Texto Selecionado (Onda B — WB-03, WB-04)."
+  - "Serviço de Voz (BLOQUEADO, sem blueprint próprio — WB-05)."
+  - "Terminal de Depuração de JavaScript (perfil de debug do editor, não um shell)."
+```
 
 ---
 
