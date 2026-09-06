@@ -2,13 +2,16 @@
 > Última atualização: Fase 08 — Consolidação da documentação viva | 2026-09-05
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Números aqui NUNCA podem contradizê-la.
 
-## ⚡ Handoff Imediato (Retomada Rápida)
-- **Status da Tarefa Atual:** Fase 08 concluída — consolidação documental: relatórios soltos mesclados nos documentos vivos e movidos para `arquivo_historico/`; três KANBANs concorrentes eliminados (só `04_gestao_completo/KANBAN.md` é canônico); gates reexecutados do zero.
-- **Último Arquivo Editado:** `documentacao_viva/*` (consolidação) + `CLAUDE.md` (nova regra de governança documental).
-- **Próxima Ação Imediata:** Sessão 07 (Terminal real com PTY — adiado por decisão do usuário) e o gesto de swipe do mobile. O resíduo de topologia da Sessão 05 foi fechado (grid não-proporcional).
-- **Comando de Teste Rápido:** `npm run typecheck && npm run test && npx playwright test`
-- **Fonte única de verdade documental:** só `04_gestao_completo/documentacao_viva/` (+ `KANBAN.md` ao lado). Qualquer relatório fora daí é proibido pelo `CLAUDE.md`; o histórico anterior está em `documentacao_viva/arquivo_historico/`.
-- **ATENÇÃO (armadilha corrigida):** `tsc --noEmit` na raiz é NO-OP (`tsconfig.json` tem `"files": []`). O gate real é `tsc -b --force`, já configurado em `npm run typecheck`. Ele revelou `onToggleFolder` inexistente em `App.tsx`.
+## ⚡ Handoff Imediato (Retomada Rápida - Arena IA)
+- **Status da Tarefa Atual:** Implementação da Sessão 11 (Terminal Real com PTY via `node-pty`). O backend (`pty-server`) e o hook (`usePtySession`) foram criados. O `TerminalPanel.tsx` foi atualizado. 
+- **⚠️ BLOQUEIO ATUAL:** Os testes E2E da Sessão 11 falham (timeout esperando `.terminal-panel`). Diagnóstico revelou que o React "capota" (desmonta toda a UI) ao renderizar o `TerminalPanel`.
+- **Causa Raiz:** Erro não tratado: `Cannot read properties of null (reading 'platform')` disparado de dentro do `TerminalPanel.tsx` (provavelmente xterm.js tentando acessar `navigator.platform` ou vazamento de `process.platform` do Node para o browser bundle).
+- **Próxima Ação Imediata (Arena IA):** 
+  1. Identificar o ponto exato que tenta acessar `.platform` no carregamento de dependências no Frontend (provavelmente algum import do `@xterm/xterm` ou poluição de ambiente).
+  2. Corrigir o erro para que `TerminalPanel.tsx` monte sem "crashar" o app.
+  3. Fazer os testes em `e2e/sessao_11_terminal_pty_real.spec.ts` passarem.
+- **Comando de Teste Rápido:** `npx playwright test e2e/debug_terminal_toggle.spec.ts --reporter=list` (teste de diagnóstico construído na sessão anterior)
+- **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`. Leia o `BLUEPRINT_TERMINAL_REAL.md` para entender as restrições da implementação.
 
 ---
 

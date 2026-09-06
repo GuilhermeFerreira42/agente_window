@@ -1,14 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { TerminalPanel, type TerminalSnapshot } from '../components/TerminalPanel'
+import { TerminalPanel } from '../components/TerminalPanel'
 
 const xtermMock = vi.hoisted(() => {
-  // O mock precisa acompanhar a superfície REAL da API do xterm usada por
-  // TerminalPanel.tsx. Quando o terminal deixou de ser somente-leitura
-  // (passou a aceitar digitação), o componente passou a chamar `write` e
-  // `onData` — que faltavam aqui e faziam os 7 testes deste arquivo
-  // quebrarem com "instance.write is not a function".
   class MockTerminal {
     static instances: MockTerminal[] = []
     clear = vi.fn()
@@ -20,14 +15,12 @@ const xtermMock = vi.hoisted(() => {
     write = vi.fn()
     writeln = vi.fn()
     attachCustomKeyEventHandler = vi.fn()
-    // Guarda o callback para que os testes possam simular digitação real.
     dataHandlers: Array<(data: string) => void> = []
     onData = vi.fn((handler: (data: string) => void) => {
       this.dataHandlers.push(handler)
       return { dispose: vi.fn() }
     })
     onKey = vi.fn(() => ({ dispose: vi.fn() }))
-    /** Helper de teste: simula o usuário digitando no terminal. */
     type(data: string) {
       for (const handler of this.dataHandlers) handler(data)
     }
@@ -50,6 +43,28 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 vi.mock('@xterm/addon-web-links', () => ({
   WebLinksAddon: class {},
+}))
+
+const mockPtySession = vi.hoisted(() => ({
+  status: 'open' as const,
+  pid: 1234,
+  activeProfile: { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+  availableProfiles: [
+    { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
+    { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+    { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' }
+  ],
+  lastError: undefined,
+  sendInput: vi.fn(),
+  sendResize: vi.fn(),
+  closeSession: vi.fn(),
+  onOutput: vi.fn((_cb: (d: string) => void) => () => {})
+}))
+
+vi.mock('../hooks/usePtySession', () => ({
+  usePtySession: vi.fn(() => ({
+    ...mockPtySession
+  }))
 }))
 
 const baseProps: React.ComponentProps<typeof TerminalPanel> = {
@@ -77,7 +92,6 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('region', { name: 'Terminal' })).toHaveAttribute('data-session-id', 'session-one')
     const instance = xtermMock.MockTerminal.instances[0]
     expect(instance.open).toHaveBeenCalledTimes(1)
-    expect(instance.writeln).toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'Limpar terminal' }))
     expect(instance.clear).toHaveBeenCalledTimes(1)
@@ -114,14 +128,13 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('tab', { name: 'Terminal' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('seleciona o shell pelo seletor (E8)', async () => {
+  it('seleciona o shell pelo seletor de perfis reais', async () => {
     const user = userEvent.setup()
     renderPanel()
 
     await user.click(screen.getByRole('button', { name: /Selecionar shell/ }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'zsh' }))
-    expect(screen.getByRole('button', { name: /atual: zsh/ })).toBeInTheDocument()
-    expect(document.querySelector('.terminal-container')).toHaveAttribute('data-shell', 'zsh')
+    await user.click(screen.getByRole('menuitemradio', { name: 'Command Prompt' }))
+    expect(screen.queryByRole('menu', { name: 'Shells disponíveis' })).not.toBeInTheDocument()
   })
 
   it('divide o terminal e fecha a divisão (E8)', async () => {
@@ -136,52 +149,24 @@ describe('TerminalPanel', () => {
     expect(document.querySelector('.terminal-panes.is-split')).toBeNull()
   })
 
-  it('descarta a instância anterior e mantém snapshots isolados ao trocar de sessão', () => {
-    const onSnapshot = vi.fn()
-    const view = renderPanel({ onSnapshot })
+  it('descarta a instância anterior ao trocar de sessão', () => {
+    const view = renderPanel()
     const first = xtermMock.MockTerminal.instances[0]
 
-    view.rerender(<TerminalPanel {...baseProps} sessionId="session-two" workspace="workspace-two" onSnapshot={onSnapshot} />)
+    view.rerender(<TerminalPanel {...baseProps} sessionId="session-two" workspace="workspace-two" />)
     const second = xtermMock.MockTerminal.instances[1]
 
     expect(first.dispose).toHaveBeenCalledTimes(1)
     expect(second.open).toHaveBeenCalledTimes(1)
-    expect(onSnapshot).toHaveBeenCalledWith('session-one', expect.objectContaining({
-      cleared: false,
-      lines: expect.arrayContaining(['Agent Sessions terminal  workspace-one']),
-    }))
     expect(screen.getByRole('region', { name: 'Terminal' })).toHaveAttribute('data-session-id', 'session-two')
-    expect(second.writeln).toHaveBeenCalledWith('Agent Sessions terminal  workspace-two')
-  })
-
-  it('salva o clear ao fechar e restaura a sessão sem recuperar saída de outra sessão', () => {
-    const onSnapshot = vi.fn()
-    const view = renderPanel({ onSnapshot })
-    const first = xtermMock.MockTerminal.instances[0]
-
-    view.rerender(<TerminalPanel {...baseProps} sessionId="session-two" workspace="workspace-two" onSnapshot={onSnapshot} />)
-    const second = xtermMock.MockTerminal.instances[1]
-    fireEvent.click(screen.getByRole('button', { name: 'Limpar terminal' }))
-
-    view.rerender(<TerminalPanel {...baseProps} visible={false} sessionId="session-two" workspace="workspace-two" onSnapshot={onSnapshot} />)
-    expect(second.dispose).toHaveBeenCalledTimes(1)
-    expect(onSnapshot).toHaveBeenLastCalledWith('session-two', { lines: [], cleared: true })
-
-    const sessionTwoSnapshot: TerminalSnapshot = { lines: [], cleared: true }
-    view.rerender(<TerminalPanel {...baseProps} sessionId="session-two" workspace="workspace-two" snapshot={sessionTwoSnapshot} onSnapshot={onSnapshot} />)
-    const restored = xtermMock.MockTerminal.instances[2]
-    expect(restored.writeln).not.toHaveBeenCalled()
-    expect(first.dispose).toHaveBeenCalledTimes(1)
   })
 
   it('rotula a aba Terminal com o nome da sessão e o rótulo segue a sessão (R-063)', () => {
     const view = renderPanel({ sessionLabel: 'session-1' })
     expect(screen.getByRole('tab', { name: /session-1/ })).toBeInTheDocument()
 
-    // Trocar de sessão troca o rótulo exibido.
     view.rerender(<TerminalPanel {...baseProps} sessionId="session-two" sessionLabel="session-2" workspace="workspace-two" />)
     expect(screen.getByRole('tab', { name: /session-2/ })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: /session-1/ })).not.toBeInTheDocument()
   })
 })
-

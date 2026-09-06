@@ -24,7 +24,7 @@ Para avançar com a Sessão 07 (Terminal Real), as seguintes definições são n
 | W1-01 | Sessões List Real (Sessão 04) | Agrupamento completo (Hoje/Fixadas), 3 chats aninhados, workspace capping 3, drag seguro e teclado | `SessionSidebar.tsx`, `sessionsList.ts`, `dragAndDrop.ts` | E2E `sessao_02` passa (5/5) e typecheck 0 erros | CONCLUÍDO |
 | W1-02 | Layout Topologia (Sessão 05) | Docked controller, session sync, CannotClose tabs e regra R-070 | `sessionLayout.ts`, `sessionLayoutSync.ts`, `App.tsx` | E2E `sessao_09` passa (5/5) | CONCLUÍDO |
 | W1-03 | File System Access API (Sessão 08) | Entregue: `showDirectoryPicker` real, árvore do disco, persistência do handle em IndexedDB e fallback honesto; E2E prova a CHAMADA da API nativa | `src/domain/fileSystem.ts`, `AuxiliaryBar.tsx`, `App.tsx` | E2E `sessao_08` 5/5 e chamada real de `showDirectoryPicker` instrumentada | CONCLUÍDO |
-| W1-04 | Terminal Real xterm.js (Sessão 07) | xterm recebe digitação real (`onData`), mas a execução é shell simulado; PTY real exige backend | `src/components/TerminalPanel.tsx` | Execução de comandos interativos no terminal | PENDENTE (adiado por decisão do usuário) |
+| W1-04 | Terminal Real xterm.js (Sessão 07) | Backend PTY via node-pty + WebSocket, shell dropdown e substituição de mock no TerminalPanel | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Execução de comandos reais com validação de PID e saída no xterm | EM ANDAMENTO (Onda A em execução) |
 
 ### Meta da Onda 1
 - **Critério binário:** Filesystem e Terminal reais integrados sem mocks, com testes unitários passando.
@@ -88,3 +88,20 @@ DECISOES_EXTRAS:
 1. Itens movem de `PENDENTE` para `CONCLUÍDO` apenas após validação estrita (`typecheck` + `test` + `playwright`) registrada em `GATES_EXECUCAO.md` na mesma sessão.
 2. Nenhuma Onda inicia sem a anterior validada e arquivada.
 3. Se um contrato for definido no `CONTRATOS_DA_ONDA`, a IA deve tratá-lo como fato imutável.
+
+---
+
+## Onda B — Extensões do Terminal Real
+> Pré-requisito: Onda A (Backend PTY + dropdown de shell) concluída e validada
+> Decisão registrada em: 2026-09-05 — itens adiados da Onda A por decisão explícita do usuário
+
+Estes itens **não foram esquecidos** — foram conscientemente adiados. O motivo de cada adiamento está registrado abaixo para rastreabilidade.
+
+| ID | Feature | Motivo do adiamento | Status |
+|----|---------|---------------------|--------|
+| WB-01 | "Ir para Diretório Recente" | Exige histórico de diretórios persistido (ex.: localStorage ou arquivo). O backend PTY não muda — é uma camada de persistência simples acima do terminal real. Onda A não inclui nenhum mecanismo de persistência de histórico. | PENDENTE |
+| WB-02 | "Executar Comando Recente" | Mesma razão do WB-01: precisa de histórico persistido de comandos (análogo ao ~/.bash_history, mas gerenciado pela UI). Backend não muda. | PENDENTE |
+| WB-03 | "Executar Arquivo Ativo" | Integração editor↔terminal — requer que o EditorArea exponha o arquivo atualmente focado e que o TerminalPanel receba esse dado via prop ou evento. Sistema separado do PTY em si; requer design de integração próprio. | PENDENTE |
+| WB-04 | "Executar Texto Selecionado" | Integração editor↔terminal — requer que o Monaco Editor exponha o texto selecionado e o injete no PTY ativo. Mesma dependência de WB-03. | PENDENTE |
+| WB-05 | "Iniciar Serviço de Voz" | **Feature de voz — sem nenhuma relação com o terminal PTY.** Nenhum subsistema de voz existe no projeto. Não iniciar implementação sem blueprint próprio e aprovação explícita do usuário. Colocado aqui apenas para não perder o registro da solicitação original. | BLOQUEADO — aguarda blueprint próprio |
+

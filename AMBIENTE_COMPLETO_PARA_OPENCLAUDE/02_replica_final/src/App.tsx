@@ -71,7 +71,7 @@ import { MobileDiffView } from './components/MobileDiffView'
 import { SessionLanding } from './components/SessionLanding'
 import { SessionSidebar } from './components/SessionSidebar'
 import { SessionsPicker } from './components/SessionsPicker'
-import { TerminalPanel, type TerminalSnapshot } from './components/TerminalPanel'
+import { TerminalPanel } from './components/TerminalPanel'
 import { Titlebar } from './components/Titlebar'
 import {
   readNewSessionViewState,
@@ -155,11 +155,7 @@ export default function App() {
   const [terminalVisible, setTerminalVisible] = useState(persistedLayout.current.shell.terminalVisible)
   const [sidebarWidth, setSidebarWidth] = useState(persistedLayout.current.shell.sidebarWidth)
   const [partSizesBySession, setPartSizesBySession] = useState<Record<string, number[]>>(persistedLayout.current.partSizesBySession)
-  // Terminals belong to a session. The mock has no shell process, so a small
-  // output snapshot preserves the visible buffer while the active session
-  // changes or the panel is temporarily closed.
-  const [terminalSnapshotsBySession, setTerminalSnapshotsBySession] = useState<Record<string, TerminalSnapshot>>({})
-  const archivedTerminalSessions = useRef<Set<string>>(new Set())
+
   const [auxiliaryTab, setAuxiliaryTab] = useState<'changes' | 'files'>('changes')
   // E4 — estado de layout por sessão: ao sair capturamos auxiliaryVisible +
   // activeViewContainerId; ao voltar restauramos. Working sets (abas/browser)
@@ -522,28 +518,7 @@ export default function App() {
 
   const notify = (message: string) => setToast(message)
 
-  const saveTerminalSnapshot = (sessionId: string, snapshot: TerminalSnapshot) => {
-    if (archivedTerminalSessions.current.has(sessionId)) {
-      setTerminalSnapshotsBySession((current) => {
-        if (!(sessionId in current)) return current
-        const next = { ...current }
-        delete next[sessionId]
-        return next
-      })
-      return
-    }
-    setTerminalSnapshotsBySession((current) => ({ ...current, [sessionId]: snapshot }))
-  }
 
-  const discardTerminalSnapshot = (sessionId: string) => {
-    archivedTerminalSessions.current.add(sessionId)
-    setTerminalSnapshotsBySession((current) => {
-      if (!(sessionId in current)) return current
-      const next = { ...current }
-      delete next[sessionId]
-      return next
-    })
-  }
 
   const copyText = async (text: string) => {
     try {
@@ -1202,14 +1177,12 @@ export default function App() {
       setBrowserViews(nextResources.browserViews)
       setEditorTabs(nextResources.editorTabs)
       delete activeTabBySession.current[id]
-      discardTerminalSnapshot(id)
       if (activeSessionId === id) {
         setActiveTabId(resolveVisibleEditorTabId(getEditorTabsVisibleForSession(nextResources.editorTabs, id), activeTabId))
         setTerminalVisible(false)
       }
       notify('Sessão arquivada e browsers descartados')
     } else {
-      archivedTerminalSessions.current.delete(id)
       notify('Sessão restaurada')
     }
   }
@@ -1238,7 +1211,6 @@ export default function App() {
     setEditorTabs(nextResources.editorTabs)
     delete activeTabBySession.current[id]
     sessionLayouts.current = forgetSessionLayout(sessionLayouts.current, id)
-    discardTerminalSnapshot(id)
     if (activeSessionId === id) {
       // Ao excluir a última sessão, cai na tela inicial (landing) — não há
       // próxima sessão para ativar.
@@ -1907,8 +1879,6 @@ export default function App() {
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
               workspace={activeSession.workspace}
-              snapshot={terminalSnapshotsBySession[activeSession.id]}
-              onSnapshot={saveTerminalSnapshot}
               onClose={() => setTerminalVisible(false)}
             />
           </div>

@@ -31,7 +31,7 @@
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Pesquisa | Comportamento de Foco no Terminal | OpenClaude | Investigar sincronização do cursor xterm com active session | Evitar perda de input ao alternar abas e panes | Alta | 5 | 6h | AGUARDANDO DEFINIÇÃO: Ver BACKLOG_FUTURO.md §Questões Pendentes |
-| Recurso | Terminal Real xterm.js & Shell PTY | OpenClaude | Integrar xterm com backend de execução e suporte a input real | Substituir terminal mockado por terminal funcional | Alta | 8 | 12h | AGUARDANDO DEFINIÇÃO: Ver BACKLOG_FUTURO.md §Questões Pendentes |
+| Recurso | Terminal Real xterm.js & Shell PTY | OpenClaude | Integrar xterm com backend de execução e suporte a input real | Substituir terminal mockado por terminal funcional | Alta | 8 | 12h | Blueprint aprovado; implementando Onda A (pty-server + WebSocket) |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO

@@ -3,7 +3,9 @@ import { ChevronDown, Columns2, Eraser, Minimize2, PanelBottomClose, Plus, Termi
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { usePtySession, type ShellProfile } from '../hooks/usePtySession'
 
+/** @deprecated Snapshots are deprecated in favor of real PTY session lifecycle */
 export interface TerminalSnapshot {
   lines: string[]
   cleared: boolean
@@ -21,8 +23,10 @@ interface TerminalPanelProps {
 
 type BottomTab = 'terminal' | 'output' | 'problems'
 
-const SHELLS = ['bash', 'zsh', 'pwsh', 'fish'] as const
-type Shell = (typeof SHELLS)[number]
+const PROBLEMS = [
+  { severity: 'warning' as const, file: 'src/App.tsx', line: 480, message: 'Bloco maior que 500 kB após minificação.' },
+  { severity: 'info' as const, file: 'src/components/EditorArea.tsx', line: 372, message: 'Considere memoizar visibleTabs.' },
+]
 
 const OUTPUT_LINES = [
   '[info] Iniciando tarefa: npm run build',
@@ -33,109 +37,51 @@ const OUTPUT_LINES = [
   '[info] ✓ built in 15.56s',
 ]
 
-const PROBLEMS = [
-  { severity: 'warning' as const, file: 'src/App.tsx', line: 480, message: 'Bloco maior que 500 kB após minificação.' },
-  { severity: 'info' as const, file: 'src/components/EditorArea.tsx', line: 372, message: 'Considere memoizar visibleTabs.' },
-]
-
 function token(name: string) {
+  if (typeof document === 'undefined') return ''
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-function initialTerminalLines(workspace: string): string[] {
-  return [
-    `Agent Sessions terminal  ${workspace}`,
-    '$ git status --short',
-    ' M src/browser/parts/titlebarPart.ts',
-    ' M src/contrib/sessions/browser/media/sessionsList.css',
-    '?? src/contrib/browserView/browser/sessionBrowserView.ts',
-    '$ npm run typecheck',
-    '✓ No type errors found',
-    '',
-  ]
-}
-
-export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, snapshot, onSnapshot, onClose }: TerminalPanelProps) {
+export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: TerminalPanelProps) {
   const terminalElement = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal | null>(null)
   const fitAddon = useRef<FitAddon | null>(null)
-  const outputLines = useRef<string[]>([])
-  const onSnapshotRef = useRef(onSnapshot)
-  const currentInput = useRef('')
-  const commandHistory = useRef<string[]>([])
-  const historyIndex = useRef(-1)
+
   const [maximized, setMaximized] = useState(false)
   const [activeTab, setActiveTab] = useState<BottomTab>('terminal')
-  const [shell, setShell] = useState<Shell>('bash')
+  const [selectedShellId, setSelectedShellId] = useState<string | undefined>(undefined)
   const [shellMenuOpen, setShellMenuOpen] = useState(false)
+
+  // Split terminal state
   const [split, setSplit] = useState(false)
+  const [splitShellId, setSplitShellId] = useState<string | undefined>(undefined)
   const splitTerminalRef = useRef<HTMLDivElement>(null)
-  const splitTerminalInstance = useRef<Terminal | null>(null)
+  const splitTerminal = useRef<Terminal | null>(null)
+  const splitFitAddon = useRef<FitAddon | null>(null)
 
+  // Primary PTY session hook
+  const ptySession = usePtySession({
+    sessionId,
+    shellId: selectedShellId,
+    enabled: visible && activeTab === 'terminal'
+  })
+
+  // Split PTY session hook
+  const splitPtySession = usePtySession({
+    sessionId: `${sessionId}-split`,
+    shellId: splitShellId,
+    enabled: visible && activeTab === 'terminal' && split
+  })
+
+  const ptySessionRef = useRef(ptySession)
+  ptySessionRef.current = ptySession
+
+  const splitPtySessionRef = useRef(splitPtySession)
+  splitPtySessionRef.current = splitPtySession
+
+  // Setup primary xterm instance
   useEffect(() => {
-    onSnapshotRef.current = onSnapshot
-  }, [onSnapshot])
-
-  const writePrompt = (term: Terminal) => {
-    term.write('\r\n\x1b[32m$ \x1b[0m')
-  }
-
-  const executeCommand = (term: Terminal, cmd: string) => {
-    const trimmed = cmd.trim()
-    if (!trimmed) {
-      writePrompt(term)
-      return
-    }
-
-    // Save to history
-    if (trimmed && commandHistory.current[commandHistory.current.length - 1] !== trimmed) {
-      commandHistory.current.push(trimmed)
-      if (commandHistory.current.length > 100) commandHistory.current.shift()
-    }
-    historyIndex.current = -1
-
-    outputLines.current.push(`$ ${trimmed}`)
-
-    // Mock command execution - simulates real shell
-    if (trimmed === 'clear') {
-      term.clear()
-      outputLines.current = []
-      writePrompt(term)
-      return
-    }
-
-    if (trimmed.startsWith('echo ')) {
-      const text = trimmed.slice(5)
-      term.writeln(`\r\n${text}`)
-      outputLines.current.push(text)
-    } else if (trimmed === 'ls' || trimmed.startsWith('ls ')) {
-      term.writeln('\r\nsrc  package.json  README.md  vite.config.ts')
-      outputLines.current.push('src  package.json  README.md  vite.config.ts')
-    } else if (trimmed === 'pwd') {
-      term.writeln(`\r\n/home/user/${workspace}`)
-      outputLines.current.push(`/home/user/${workspace}`)
-    } else if (trimmed.startsWith('cd ')) {
-      term.writeln(`\r\n`)
-    } else if (trimmed === 'git status --short' || trimmed === 'git status') {
-      term.writeln('\r\n M src/browser/parts/titlebarPart.ts')
-      term.writeln(' M src/contrib/sessions/browser/media/sessionsList.css')
-      term.writeln('?? src/contrib/browserView/browser/sessionBrowserView.ts')
-    } else if (trimmed.includes('typecheck') || trimmed.includes('npm run')) {
-      term.writeln('\r\n✓ No type errors found')
-      outputLines.current.push('✓ No type errors found')
-    } else if (trimmed === 'help') {
-      term.writeln('\r\nComandos disponíveis: echo, ls, pwd, cd, clear, git status, npm run typecheck, help')
-    } else {
-      term.writeln(`\r\n\x1b[90m${shell}: ${trimmed.split(' ')[0]}: command not found (mock shell)\x1b[0m`)
-      term.writeln(`\r\n\x1b[90mDica: tente echo, ls, pwd, clear, git status\x1b[0m`)
-      outputLines.current.push(`${shell}: ${trimmed.split(' ')[0]}: command not found (mock shell)`)
-    }
-
-    writePrompt(term)
-  }
-
-  useEffect(() => {
-    if (!visible || !terminalElement.current) return
+    if (!visible || !terminalElement.current || activeTab !== 'terminal') return
 
     const fit = new FitAddon()
     const instance = new Terminal({
@@ -161,117 +107,53 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
         brightBlue: token('--vscode-charts-blue') || '#3794ff',
       },
     })
+
     instance.loadAddon(fit)
     instance.loadAddon(new WebLinksAddon())
     instance.open(terminalElement.current)
-    fit.fit()
+    try {
+      fit.fit()
+    } catch {
+      // Ignore if layout not ready
+    }
     fitAddon.current = fit
     terminal.current = instance
 
-    const restoredLines = snapshot?.cleared ? [] : snapshot?.lines ?? initialTerminalLines(workspace)
-    outputLines.current = [...restoredLines]
-    for (const line of restoredLines) {
-      if (line === '') instance.writeln('')
-      else instance.writeln(line)
-    }
-    instance.write('\x1b[32m$ \x1b[0m')
-
-    // REAL: onData handler - allows typing
+    // Send input from user typing to real PTY backend
     const dataDisposable = instance.onData((data) => {
-      const code = data.charCodeAt(0)
-
-      // Enter
-      if (data === '\r') {
-        const cmd = currentInput.current
-        instance.writeln('')
-        executeCommand(instance, cmd)
-        currentInput.current = ''
-        return
-      }
-
-      // Backspace
-      if (code === 127 || data === '\x7f') {
-        if (currentInput.current.length > 0) {
-          currentInput.current = currentInput.current.slice(0, -1)
-          instance.write('\b \b')
-        }
-        return
-      }
-
-      // Ctrl+C
-      if (code === 3) {
-        instance.writeln('^C')
-        currentInput.current = ''
-        writePrompt(instance)
-        return
-      }
-
-      // Ctrl+L (clear)
-      if (code === 12) {
-        instance.clear()
-        outputLines.current = []
-        writePrompt(instance)
-        currentInput.current = ''
-        return
-      }
-
-      // Arrow Up - history
-      if (data === '\x1b[A') {
-        if (commandHistory.current.length > 0) {
-          if (historyIndex.current === -1) historyIndex.current = commandHistory.current.length - 1
-          else if (historyIndex.current > 0) historyIndex.current--
-
-          // Clear current line
-          const len = currentInput.current.length
-          for (let i = 0; i < len; i++) instance.write('\b \b')
-          currentInput.current = commandHistory.current[historyIndex.current] || ''
-          instance.write(currentInput.current)
-        }
-        return
-      }
-
-      // Arrow Down
-      if (data === '\x1b[B') {
-        if (historyIndex.current !== -1) {
-          const len = currentInput.current.length
-          for (let i = 0; i < len; i++) instance.write('\b \b')
-          if (historyIndex.current < commandHistory.current.length - 1) {
-            historyIndex.current++
-            currentInput.current = commandHistory.current[historyIndex.current] || ''
-          } else {
-            historyIndex.current = -1
-            currentInput.current = ''
-          }
-          instance.write(currentInput.current)
-        }
-        return
-      }
-
-      // Regular character
-      if (code >= 32) {
-        currentInput.current += data
-        instance.write(data)
-      }
+      ptySessionRef.current.sendInput(data)
     })
 
-    const resize = () => fit.fit()
+    // Listen to output from real PTY backend
+    const unsubscribeOutput = ptySessionRef.current.onOutput((data) => {
+      instance.write(data)
+    })
+
+    const resize = () => {
+      try {
+        fit.fit()
+      } catch {
+        // Ignore
+      }
+      ptySessionRef.current.sendResize(instance.cols, instance.rows)
+    }
+
     window.addEventListener('resize', resize)
+
     return () => {
       window.removeEventListener('resize', resize)
       dataDisposable.dispose()
-      onSnapshotRef.current?.(sessionId, {
-        lines: [...outputLines.current],
-        cleared: outputLines.current.length === 0,
-      })
+      unsubscribeOutput()
       instance.dispose()
       if (fitAddon.current === fit) fitAddon.current = null
       terminal.current = null
     }
-  }, [sessionId, snapshot, visible, workspace, shell])
+  }, [sessionId, visible, activeTab])
 
-  // Split terminal - second instance with same behavior
+  // Setup split xterm instance
   useEffect(() => {
-    if (!split || !splitTerminalRef.current || activeTab !== 'terminal') return
+    if (!split || !splitTerminalRef.current || !visible || activeTab !== 'terminal') return
+
     const fit = new FitAddon()
     const instance = new Terminal({
       convertEol: true,
@@ -283,54 +165,87 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
         foreground: token('--vscode-foreground') || '#cccccc',
       },
     })
+
     instance.loadAddon(fit)
     instance.open(splitTerminalRef.current)
-    fit.fit()
-    splitTerminalInstance.current = instance
-    for (const line of initialTerminalLines(workspace)) instance.writeln(line)
-    instance.write('\x1b[32m$ \x1b[0m')
-    let input = ''
-    instance.onData((data) => {
-      if (data === '\r') {
-        instance.writeln('')
-        if (input.trim() === 'clear') instance.clear()
-        else if (input.startsWith('echo ')) instance.writeln(`\r\n${input.slice(5)}`)
-        else if (input.trim()) instance.writeln(`\r\n${input}: command not found (split mock)`)
-        instance.write('\r\n\x1b[32m$ \x1b[0m')
-        input = ''
-      } else if (data.charCodeAt(0) === 127) {
-        if (input.length > 0) {
-          input = input.slice(0, -1)
-          instance.write('\b \b')
-        }
-      } else if (data.charCodeAt(0) >= 32) {
-        input += data
-        instance.write(data)
-      }
-    })
-    return () => {
-      instance.dispose()
-      splitTerminalInstance.current = null
+    try {
+      fit.fit()
+    } catch {
+      // Ignore
     }
-  }, [split, activeTab, workspace])
+    splitFitAddon.current = fit
+    splitTerminal.current = instance
 
+    const dataDisposable = instance.onData((data) => {
+      splitPtySessionRef.current.sendInput(data)
+    })
+
+    const unsubscribeOutput = splitPtySessionRef.current.onOutput((data) => {
+      instance.write(data)
+    })
+
+    const resize = () => {
+      try {
+        fit.fit()
+      } catch {
+        // Ignore
+      }
+      splitPtySessionRef.current.sendResize(instance.cols, instance.rows)
+    }
+
+    window.addEventListener('resize', resize)
+
+    return () => {
+      window.removeEventListener('resize', resize)
+      dataDisposable.dispose()
+      unsubscribeOutput()
+      instance.dispose()
+      if (splitFitAddon.current === fit) splitFitAddon.current = null
+      splitTerminal.current = null
+    }
+  }, [split, visible, activeTab])
+
+  // Refit on visibility / maximize / split change
   useEffect(() => {
-    if (visible && activeTab === 'terminal') fitAddon.current?.fit()
+    if (visible && activeTab === 'terminal') {
+      try {
+        fitAddon.current?.fit()
+        splitFitAddon.current?.fit()
+      } catch {
+        // Ignore
+      }
+    }
   }, [maximized, visible, activeTab, split])
 
   const clearTerminal = () => {
-    outputLines.current = []
     terminal.current?.clear()
-    terminal.current?.write('\x1b[32m$ \x1b[0m')
-    currentInput.current = ''
   }
 
   const handleClose = () => {
     setMaximized(false)
+    ptySession.closeSession()
+    if (split) {
+      splitPtySession.closeSession()
+    }
     onClose()
   }
 
+  const handleSelectShell = (profile: ShellProfile) => {
+    setSelectedShellId(profile.id)
+    setShellMenuOpen(false)
+  }
+
   if (!visible) return null
+
+  const activeShellLabel = ptySession.activeProfile?.label || ptySession.activeProfile?.id || 'bash'
+  const profilesList = ptySession.availableProfiles.length > 0
+    ? ptySession.availableProfiles
+    : [
+        { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
+        { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+        { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' },
+        { id: 'bash', label: 'Bash', path: '/bin/bash' }
+      ]
 
   const terminalLabel = sessionLabel ? `Terminal — ${sessionLabel}` : 'Terminal'
   const tabs: { id: BottomTab; label: string }[] = [
@@ -340,7 +255,14 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
   ]
 
   return (
-    <section className={`terminal-panel${maximized ? ' is-maximized' : ''}`} aria-label="Terminal" data-session-id={sessionId}>
+    <section
+      className={`terminal-panel${maximized ? ' is-maximized' : ''}`}
+      aria-label="Terminal"
+      data-session-id={sessionId}
+      data-pty-status={ptySession.status}
+      data-pty-pid={ptySession.pid}
+      data-pty-shell-path={ptySession.activeProfile?.path}
+    >
       <div className="terminal-header">
         <div className="terminal-tabs" role="tablist" aria-label="Painéis inferiores">
           {tabs.map((tab) => (
@@ -352,7 +274,11 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
             >
-              {tab.id === 'problems' && PROBLEMS.length > 0 && <span className="terminal-tab-badge" aria-label={`${PROBLEMS.length} problemas`}>{PROBLEMS.length}</span>}
+              {tab.id === 'problems' && PROBLEMS.length > 0 && (
+                <span className="terminal-tab-badge" aria-label={`${PROBLEMS.length} problemas`}>
+                  {PROBLEMS.length}
+                </span>
+              )}
               {tab.label}
             </button>
           ))}
@@ -365,24 +291,26 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={shellMenuOpen}
-                aria-label={`Selecionar shell (atual: ${shell})`}
+                aria-label={`Selecionar shell (atual: ${activeShellLabel})`}
                 title="Selecionar shell"
                 onClick={() => setShellMenuOpen((current) => !current)}
               >
-                <TerminalSquare size={13} /><span className="terminal-shell-name">{shell}</span><ChevronDown size={12} />
+                <TerminalSquare size={13} />
+                <span className="terminal-shell-name">{activeShellLabel}</span>
+                <ChevronDown size={12} />
               </button>
               {shellMenuOpen && (
                 <div className="terminal-shell-menu" role="menu" aria-label="Shells disponíveis">
-                  {SHELLS.map((option) => (
+                  {profilesList.map((profile) => (
                     <button
-                      key={option}
-                      className={`terminal-shell-option${option === shell ? ' is-active' : ''}`}
+                      key={profile.id}
+                      className={`terminal-shell-option${profile.id === ptySession.activeProfile?.id ? ' is-active' : ''}`}
                       type="button"
                       role="menuitemradio"
-                      aria-checked={option === shell}
-                      onClick={() => { setShell(option); setShellMenuOpen(false); terminal.current?.writeln(`\r\n\x1b[90mShell alterado para ${option} (mock)\x1b[0m`); terminal.current?.write('\r\n\x1b[32m$ \x1b[0m'); currentInput.current = '' }}
+                      aria-checked={profile.id === ptySession.activeProfile?.id}
+                      onClick={() => handleSelectShell(profile)}
                     >
-                      {option}
+                      {profile.label}
                     </button>
                   ))}
                 </div>
@@ -390,22 +318,77 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
             </div>
           )}
           {activeTab === 'terminal' && (
-            <button className={`terminal-action${split ? ' is-active' : ''}`} type="button" title={split ? 'Fechar divisão' : 'Dividir terminal'} aria-label={split ? 'Fechar divisão' : 'Dividir terminal'} aria-pressed={split} onClick={() => setSplit((current) => !current)}><Columns2 size={13} /></button>
+            <button
+              className={`terminal-action${split ? ' is-active' : ''}`}
+              type="button"
+              title={split ? 'Fechar divisão' : 'Dividir terminal'}
+              aria-label={split ? 'Fechar divisão' : 'Dividir terminal'}
+              aria-pressed={split}
+              onClick={() => setSplit((current) => !current)}
+            >
+              <Columns2 size={13} />
+            </button>
           )}
           {activeTab === 'terminal' && (
-            <button className="terminal-action" type="button" title="Novo terminal" aria-label="Novo terminal" onClick={() => { setSplit(true); setShell('bash') }}><Plus size={13} /></button>
+            <button
+              className="terminal-action"
+              type="button"
+              title="Novo terminal"
+              aria-label="Novo terminal"
+              onClick={() => {
+                setSplit(true)
+                setSplitShellId(undefined)
+              }}
+            >
+              <Plus size={13} />
+            </button>
           )}
-          <button className="terminal-action" type="button" title="Limpar terminal" aria-label="Limpar terminal" onClick={clearTerminal}><Eraser size={13} /></button>
-          <button className="terminal-action" type="button" title={maximized ? 'Restaurar terminal' : 'Maximizar terminal'} aria-label={maximized ? 'Restaurar terminal' : 'Maximizar terminal'} aria-pressed={maximized} onClick={() => setMaximized((current) => !current)}>{maximized ? <Minimize2 size={13} /> : <PanelBottomClose size={13} />}</button>
-          <button className="terminal-action" type="button" title="Fechar terminal" aria-label="Fechar terminal" onClick={handleClose}><X size={13} /></button>
+          <button
+            className="terminal-action"
+            type="button"
+            title="Limpar terminal"
+            aria-label="Limpar terminal"
+            onClick={clearTerminal}
+          >
+            <Eraser size={13} />
+          </button>
+          <button
+            className="terminal-action"
+            type="button"
+            title={maximized ? 'Restaurar terminal' : 'Maximizar terminal'}
+            aria-label={maximized ? 'Restaurar terminal' : 'Maximizar terminal'}
+            aria-pressed={maximized}
+            onClick={() => setMaximized((current) => !current)}
+          >
+            {maximized ? <Minimize2 size={13} /> : <PanelBottomClose size={13} />}
+          </button>
+          <button
+            className="terminal-action"
+            type="button"
+            title="Fechar terminal"
+            aria-label="Fechar terminal"
+            onClick={handleClose}
+          >
+            <X size={13} />
+          </button>
         </div>
       </div>
 
       <div className="terminal-body">
         <div className={`terminal-panes${split ? ' is-split' : ''}`} hidden={activeTab !== 'terminal'}>
-          <div className="terminal-container" ref={terminalElement} data-shell={shell} />
+          <div
+            className="terminal-container"
+            ref={terminalElement}
+            data-shell={ptySession.activeProfile?.id || selectedShellId || 'bash'}
+          />
           {split && (
-            <div className="terminal-container terminal-container-split" role="group" aria-label="Terminal dividido" ref={splitTerminalRef} />
+            <div
+              className="terminal-container terminal-container-split"
+              role="group"
+              aria-label="Terminal dividido"
+              ref={splitTerminalRef}
+              data-shell={splitPtySession.activeProfile?.id || splitShellId || 'bash'}
+            />
           )}
         </div>
 
@@ -423,9 +406,13 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, workspace, sna
               <ul className="terminal-problems-list">
                 {PROBLEMS.map((problem) => (
                   <li className={`terminal-problem is-${problem.severity}`} key={`${problem.file}:${problem.line}`}>
-                    <span className={`terminal-problem-severity is-${problem.severity}`} aria-label={problem.severity}>{problem.severity === 'warning' ? '⚠' : 'ℹ'}</span>
+                    <span className={`terminal-problem-severity is-${problem.severity}`} aria-label={problem.severity}>
+                      {problem.severity === 'warning' ? '⚠' : 'ℹ'}
+                    </span>
                     <span className="terminal-problem-message">{problem.message}</span>
-                    <span className="terminal-problem-location">{problem.file}:{problem.line}</span>
+                    <span className="terminal-problem-location">
+                      {problem.file}:{problem.line}
+                    </span>
                   </li>
                 ))}
               </ul>
