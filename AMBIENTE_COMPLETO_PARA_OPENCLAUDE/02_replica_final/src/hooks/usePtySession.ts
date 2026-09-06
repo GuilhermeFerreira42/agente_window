@@ -64,6 +64,7 @@ export function usePtySession({
 
   const wsRef = useRef<WebSocket | null>(null)
   const outputListeners = useRef<Set<(data: string) => void>>(new Set())
+  const outputBuffer = useRef<string>('')
   const dimensionsRef = useRef({ cols, rows })
   dimensionsRef.current = { cols, rows }
 
@@ -105,6 +106,10 @@ export function usePtySession({
   }, [sessionId])
 
   const onOutput = useCallback((callback: (data: string) => void) => {
+    // Send existing buffer to new listener
+    if (outputBuffer.current) {
+      callback(outputBuffer.current)
+    }
     outputListeners.current.add(callback)
     return () => {
       outputListeners.current.delete(callback)
@@ -170,6 +175,12 @@ export function usePtySession({
               }
               case 'output': {
                 if (typeof msg.data === 'string') {
+                  // Update buffer
+                  outputBuffer.current += msg.data
+                  if (outputBuffer.current.length > 1024 * 1024) {
+                    outputBuffer.current = outputBuffer.current.slice(-1024 * 1024)
+                  }
+
                   for (const listener of outputListeners.current) {
                     listener(msg.data)
                   }

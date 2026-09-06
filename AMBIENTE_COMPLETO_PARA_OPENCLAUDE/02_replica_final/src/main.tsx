@@ -11,6 +11,7 @@ import '@xterm/xterm/css/xterm.css'
 import './styles/theme.css'
 import './styles/app.css'
 import App from './App'
+import { TerminalSessionProvider } from './providers/TerminalSessionProvider'
 
 // (R-090) Workers do Monaco no Vite.
 // Sem MonacoEnvironment.getWorker, o Monaco tenta resolver o worker por
@@ -32,6 +33,8 @@ loader.config({ monaco })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <TerminalSessionProvider>
+      <App />
+    </TerminalSessionProvider>
   </React.StrictMode>,
 )

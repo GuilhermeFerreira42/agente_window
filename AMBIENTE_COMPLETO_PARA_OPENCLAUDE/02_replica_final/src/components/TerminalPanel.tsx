@@ -3,7 +3,8 @@ import { ChevronDown, Columns2, Eraser, Minimize2, PanelBottomClose, Plus, Termi
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { usePtySession, type ShellProfile } from '../hooks/usePtySession'
+import { useTerminalSessions } from '../providers/TerminalSessionProvider'
+import type { ShellProfile } from '../hooks/usePtySession'
 
 /** @deprecated Snapshots are deprecated in favor of real PTY session lifecycle */
 export interface TerminalSnapshot {
@@ -59,19 +60,41 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
   const splitTerminal = useRef<Terminal | null>(null)
   const splitFitAddon = useRef<FitAddon | null>(null)
 
-  // Primary PTY session hook
-  const ptySession = usePtySession({
-    sessionId,
-    shellId: selectedShellId,
-    enabled: visible && activeTab === 'terminal'
-  })
+  // Primary PTY session
+  const { sessions, getOrCreateSession } = useTerminalSessions()
 
-  // Split PTY session hook
-  const splitPtySession = usePtySession({
-    sessionId: `${sessionId}-split`,
-    shellId: splitShellId,
-    enabled: visible && activeTab === 'terminal' && split
-  })
+  useEffect(() => {
+    getOrCreateSession(sessionId)
+  }, [sessionId, getOrCreateSession])
+
+  const ptySession = sessions[sessionId] || {
+    status: 'connecting',
+    pid: undefined,
+    activeProfile: undefined,
+    availableProfiles: [],
+    sendInput: () => {},
+    sendResize: () => {},
+    closeSession: () => {},
+    onOutput: () => () => {},
+  }
+
+  // Split PTY session
+  useEffect(() => {
+    if (split) {
+      getOrCreateSession(`${sessionId}-split`)
+    }
+  }, [split, sessionId, getOrCreateSession])
+
+  const splitPtySession = sessions[`${sessionId}-split`] || {
+    status: 'connecting',
+    pid: undefined,
+    activeProfile: undefined,
+    availableProfiles: [],
+    sendInput: () => {},
+    sendResize: () => {},
+    closeSession: () => {},
+    onOutput: () => () => {},
+  }
 
   const ptySessionRef = useRef(ptySession)
   ptySessionRef.current = ptySession
