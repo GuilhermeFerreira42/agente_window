@@ -125,6 +125,25 @@ Acabar com a fonte dupla de verdade: relatórios de análise nasciam soltos no w
 
 ---
 
+## Fase 09 — VERIFICAÇÃO SESSÃO 11 & DIAGNÓSTICO `.platform`
+> Data de Conclusão: 2026-09-05 | Status: ✅ Validado (typecheck + 370 unitários + 62 E2E)
+
+### Objetivo
+Retomar a Sessão 11 (Terminal Real com PTY) descrita como bloqueada por um crash `Cannot read properties of null (reading 'platform')` ao montar o `TerminalPanel`, diagnosticar a causa raiz e garantir a suíte `e2e/sessao_11_terminal_pty_real.spec.ts` verde.
+
+### Achados
+- **Ambiente era a causa real do bloqueio.** O workspace restaurado de `codigo_completo.txt` não trazia `node_modules`, o `pty-server` não estava buildado (sem `dist/index.js` → o `webServer` do Playwright nem subia) e faltavam as bibliotecas do Chromium no SO. Montado o ambiente (`npm install`, `cd pty-server && npm install` com node-pty nativo, `npx playwright install chromium` + `sudo npx playwright install-deps chromium`), a suíte E2E passou integralmente.
+- **Crash `.platform` NÃO se reproduziu.** Análise estática do `lib/xterm.mjs`: o objeto "process" (`xe`) só recebe `process` real, `globalThis.vscode.process` ou fica `undefined` — nunca `null`; o guard `if (typeof xe === "object")` é seguro. `navigator.platform` é lido só no branch web. Logo não há ponto de acesso `null.platform` no código do xterm sob o bundle ESM que o Vite carrega.
+- **Violação de contrato corrigida:** `e2e/debug_terminal_toggle.spec.ts` violava o `e2eAssertionContract` (porta hardcoded, `console.log`, `test(...)` sem indentação). Reescrito para conformidade → unitários 370/370.
+
+### Métricas de Teste (executadas nesta sessão)
+- **Typecheck (`tsc -b --force`):** 0 erros
+- **Unitários:** 370/370 (44 arquivos)
+- **E2E:** 62/62 (12 specs, ~5,2 min) — inclui Sessão 11 T1–T5
+- **Build:** exit 134 — OOM do V8 (bloqueio de ambiente persiste; exige ≥ 4 GB)
+
+---
+
 ## Próxima Sessão no Roadmap
 - **Sessão 07:** Terminal real com PTY (adiado por decisão do usuário).
 - **Mobile:** gesto de swipe para abrir/fechar a lista de sessões.

@@ -2,7 +2,7 @@
 
 | DATA DE INÍCIO DO SPRINT | DIAS | PROGRESSO | ATUALIZADO POR |
 | --- | --- | --- | --- |
-| 2026-09-04 | 12 dias | 90% — 9,5/10 módulos Val.3 · 368 unit + 56 E2E verdes · build bloqueado por OOM | OpenClaude / Arena |
+| 2026-09-04 | 12 dias | 95% — 10/10 módulos Val.3 · 370 unit + 62 E2E verdes · build bloqueado por OOM | OpenClaude / Arena |
 
 ## LISTA DE PENDÊNCIAS
 
@@ -31,7 +31,6 @@
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Pesquisa | Comportamento de Foco no Terminal | OpenClaude | Investigar sincronização do cursor xterm com active session | Evitar perda de input ao alternar abas e panes | Alta | 5 | 6h | AGUARDANDO DEFINIÇÃO: Ver BACKLOG_FUTURO.md §Questões Pendentes |
-| Recurso | Terminal Real xterm.js & Shell PTY | OpenClaude | Integrar xterm com backend de execução e suporte a input real | Substituir terminal mockado por terminal funcional | Alta | 8 | 12h | Blueprint aprovado; implementando Onda A (pty-server + WebSocket) |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO
@@ -67,6 +66,8 @@
 | Tarefa | Custom View Grid full-surface (AI Customizations) | OpenClaude | Tornar AI Customizations uma superfície full-surface que cobre Sessions Part, Editor, Aux e Panel | Antes era só mais uma aba do editor: `.custom-view-grid` existia apenas no CSS | Alta | 8 | 10h | E2E 6/6 (inclui dismiss por sessão, F5 e back no phone) |
 | Pesquisa | Auditoria Anti-Trapaça da Suíte E2E | OpenClaude | Auditar os 48 testes Playwright contra o DOM real da aplicação | 10 testes não tinham nenhum `expect` e passariam com a tela em branco | Crítica | 5 | 4h | Auditoria fechada: 34 asserts → 160 asserts |
 | Tarefa | Typecheck Rigoroso (0 Erros) | OpenClaude | Trocar `tsc --noEmit` (no-op) por `tsc -b --force` em `npm run typecheck` | O gate antigo não checava nada: `tsconfig.json` da raiz tem `"files": []` | Crítica | 5 | 3h | 0 erros com o gate real; revelou `onToggleFolder` inexistente |
+
+| Recurso | Terminal Real xterm.js & Shell PTY (Sessão 11) | OpenClaude | Integrar xterm ao PTY real (node-pty + WebSocket) e validar montagem sem crash | Substituir terminal mockado por terminal funcional (PID real, split, troca de shell, erro honesto) | Alta | 8 | 15h | Sessão 11 CONCLUÍDO (2026-09-05): E2E 5/5 verde; crash `.platform` NÃO se reproduziu — era ambiente (node_modules/pty-server/libs Chromium). `e2e/sessao_11_terminal_pty_real.spec.ts` 5/5 + spec de diagnóstico verde, 0 erros. Ver GATES_EXECUCAO.md §2 |
 | Tarefa | Execução de Testes Unitários Vitest | OpenClaude | Rodar a suíte unitária completa no Vitest | Prevenir regressões nas funções de domínio e lógica | Alta | 8 | 4h | 368/368 em 43 arquivos (execução 2026-09-05, ver GATES_EXECUCAO.md) |
 | Recurso | Reescrita dos 49 Testes E2E com Asserções Reais | OpenClaude | Reescrever as 10 specs com asserts de estado, geometria (`boundingBox`), `localStorage` e erros de console | Teste sem assert mascarou bugs visíveis no vídeo do usuário | Crítica | 13 | 10h | 49/49 passando em 4,6 min; 51 screenshots em test-results/ |
 | Tarefa | Trava Permanente Anti-Trapaça | OpenClaude | Criar `e2eAssertionContract.test.ts` que reprova spec sem `expect`, porta hardcoded ou `console.log` | Impedir que a régua afrouxe de novo em sessões futuras | Alta | 5 | 3h | 5/5 no Vitest; roda junto com `npm run test` |

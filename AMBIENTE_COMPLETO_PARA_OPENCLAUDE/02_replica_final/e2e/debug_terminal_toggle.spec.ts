@@ -1,71 +1,40 @@
 import { test, expect } from '@playwright/test'
-import { BTN } from './helpers'
+import { BTN, BASE_URL } from './helpers'
 
-test('DEBUG: diagnostico do toggle do terminal', async ({ page }) => {
-  // Capturar erros desde o início
-  const consoleErrors: string[] = []
-  const pageErrors: string[] = []
-  page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text())
-  })
-  page.on('pageerror', err => pageErrors.push(err.message))
+// Spec de diagnóstico do toggle do terminal.
+// Mantém-se em conformidade com o contrato anti-trapaça (e2eAssertionContract):
+// usa BASE_URL de helpers (sem host/porta hardcoded), possui asserções reais
+// e não usa console.log como substituto de prova.
+test.describe('DEBUG — diagnóstico do toggle do terminal', () => {
+  test('o painel do terminal monta sem crash ao alternar', async ({ page }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', (err) => pageErrors.push(err.message))
 
-  await page.goto('http://localhost:5173')
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
+    await page.goto(BASE_URL)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
 
-  // Aguardar o workbench aparecer
-  try {
-    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible', timeout: 10000 })
-    console.log('✅ workbench encontrado')
-  } catch {
-    const bodyText = await page.evaluate(() => document.body?.innerHTML?.slice(0, 1000) || 'body vazio')
-    console.log('❌ workbench NÃO encontrado! Body:', bodyText)
-  }
+    await expect(
+      page.locator('.agent-sessions-workbench'),
+      'o workbench deve carregar'
+    ).toBeVisible({ timeout: 10000 })
 
-  await page.waitForTimeout(500)
-
-  // Verificar se o botão toggle existe
-  const toggleBtn = page.getByRole('button', { name: BTN.toggleTerminal })
-  try {
-    await expect(toggleBtn).toBeVisible({ timeout: 5000 })
-    console.log('✅ toggleTerminalBtn encontrado')
-  } catch {
-    console.log('❌ toggleTerminalBtn NÃO encontrado')
-    // Listar todos os botões no DOM
-    const buttons = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('button')).map(b => b.getAttribute('aria-label') + ' / ' + b.textContent)
+    const toggleBtn = page.getByRole('button', { name: BTN.toggleTerminal })
+    await expect(toggleBtn, 'o botão de toggle do terminal deve existir').toBeVisible({
+      timeout: 5000,
     })
-    console.log('Botões no DOM:', JSON.stringify(buttons))
-  }
 
-  // Captura o estado antes do clique
-  const countBefore = await page.locator('.terminal-panel').count()
-  console.log(`Estado antes do clique: .terminal-panel count = ${countBefore}`)
+    await toggleBtn.click()
+    await page.waitForTimeout(1500)
 
-  await toggleBtn.click()
-  await page.waitForTimeout(1500)
-
-  // Captura o estado depois do clique
-  const countAfter = await page.locator('.terminal-panel').count()
-  console.log(`Estado após clique (1.5s depois): .terminal-panel count = ${countAfter}`)
-
-  // Verificar toda a estrutura HTML do workbench para entender o DOM
-  const workbenchInfo = await page.evaluate(() => {
-    const workbench = document.querySelector('.agent-sessions-workbench')
-    if (!workbench) return { found: false, html: document.body?.innerHTML?.slice(-500) || '' }
-    return { found: true, html: workbench.innerHTML.slice(-1500) }
+    const terminalPanel = page.locator('.terminal-panel')
+    await expect(
+      terminalPanel,
+      'o painel do terminal deve aparecer no DOM após o toggle'
+    ).toHaveCount(1)
+    expect(
+      pageErrors,
+      'não pode haver erros de página ao montar o terminal'
+    ).toEqual([])
   })
-  if (workbenchInfo.found) {
-    console.log('Fim do workbench HTML:', workbenchInfo.html.slice(-600))
-  } else {
-    console.log('Workbench NÃO encontrado depois do clique. Body tail:', workbenchInfo.html)
-  }
-
-  // Erros capturados
-  console.log('Console errors:', consoleErrors)
-  console.log('Page errors:', pageErrors)
-
-  // o assert real
-  expect(countAfter, 'O terminal deve aparecer no DOM após clicar no toggle').toBeGreaterThan(0)
 })

@@ -1,17 +1,13 @@
 # CURRENT_STATE — Réplica Agents Window (VS Code)
-> Última atualização: Fase 08 — Consolidação da documentação viva | 2026-09-05
+> Última atualização: Fase 09 — Verificação Sessão 11 / diagnóstico do crash `.platform` | 2026-09-05
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Números aqui NUNCA podem contradizê-la.
 
 ## ⚡ Handoff Imediato (Retomada Rápida - Arena IA)
-- **Status da Tarefa Atual:** Implementação da Sessão 11 (Terminal Real com PTY via `node-pty`). O backend (`pty-server`) e o hook (`usePtySession`) foram criados. O `TerminalPanel.tsx` foi atualizado. 
-- **⚠️ BLOQUEIO ATUAL:** Os testes E2E da Sessão 11 falham (timeout esperando `.terminal-panel`). Diagnóstico revelou que o React "capota" (desmonta toda a UI) ao renderizar o `TerminalPanel`.
-- **Causa Raiz:** Erro não tratado: `Cannot read properties of null (reading 'platform')` disparado de dentro do `TerminalPanel.tsx` (provavelmente xterm.js tentando acessar `navigator.platform` ou vazamento de `process.platform` do Node para o browser bundle).
-- **Próxima Ação Imediata (Arena IA):** 
-  1. Identificar o ponto exato que tenta acessar `.platform` no carregamento de dependências no Frontend (provavelmente algum import do `@xterm/xterm` ou poluição de ambiente).
-  2. Corrigir o erro para que `TerminalPanel.tsx` monte sem "crashar" o app.
-  3. Fazer os testes em `e2e/sessao_11_terminal_pty_real.spec.ts` passarem.
-- **Comando de Teste Rápido:** `npx playwright test e2e/debug_terminal_toggle.spec.ts --reporter=list` (teste de diagnóstico construído na sessão anterior)
-- **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`. Leia o `BLUEPRINT_TERMINAL_REAL.md` para entender as restrições da implementação.
+- **Status da Tarefa Atual:** Sessão 11 (Terminal Real com PTY via `node-pty`) **IMPLEMENTADA e VALIDADA** — backend `pty-server` (node-pty + WebSocket), hook `usePtySession`, `TerminalPanel.tsx` e split de terminal. Suíte `e2e/sessao_11_terminal_pty_real.spec.ts` **5/5 verde** (PID real, troca de shell, split, ações de menu, erro honesto de DISCOVERY_FAILED).
+- **BLOQUEIO ANTERIOR RESOLVIDO (era ambiente, não código):** o CURRENT_STATE citava crash `Cannot read properties of null (reading 'platform')` ao montar o `TerminalPanel`. Diagnóstico executado nesta sessão provou que o crash **não se reproduz** no código restaurado — a causa real era o ambiente incompleto (sem `node_modules`, `pty-server` não buildado e libs do Chromium ausentes). Com o ambiente montado, o painel monta sem erros (0 `pageerror`, 0 `console.error`).
+- **Próxima Ação Imediata (Arena IA):** avançar a suíte E2E completa (62/62 já verde) e, se desejado, tratar o bloqueio de `npm run build` (OOM do V8 no sandbox de ~2 GB — exige máquina com ≥ 4 GB).
+- **Comando de Teste Rápido:** `npx playwright test e2e/debug_terminal_toggle.spec.ts --reporter=list` (spec de diagnóstico, agora em conformidade com o contrato anti-trapaça)
+- **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`. Restrições em `BLUEPRINT_TERMINAL_REAL.md`.
 
 ---
 
@@ -73,9 +69,9 @@
 |-------|----------------|-------------------|---------|
 | Typecheck (projeto inteiro) | `tsc -b --force` | 0 erros | `npm run typecheck` |
 | Lint | `eslint .` | 0 erros / 2 warnings (exhaustive-deps intencionais) | `npm run lint` |
-| Unitários | `src/**/*.test.ts(x)` | **368/368 passando (43 arquivos)** — execução de 2026-09-05 | `npm run test` |
+| Unitários | `src/**/*.test.ts(x)` | **370/370 passando (44 arquivos)** — execução de 2026-09-05 | `npm run test` |
 | Contrato anti-trapaça | `src/__tests__/e2eAssertionContract.test.ts` | 5/5 — reprova spec E2E sem `expect` | `npm run test` |
-| E2E completo | `e2e/*.spec.ts` (11 arquivos) | **56/56 passando (5,4 min, 58 screenshots)** | `npx playwright test` |
+| E2E completo | `e2e/*.spec.ts` (12 arquivos) | **62/62 passando (5,2 min, 58+ screenshots)** | `npx playwright test` |
 | Build de produção | `tsc -b && vite build` | ❌ **exit 134 — OOM do V8** (2 GB de RAM; morre perto de 900 MB de heap no bundle do Monaco). `tsc -b` passa. Ver `GATES_EXECUCAO.md` §4 | `npm run build` |
 
 > Régua E2E: 56 testes / 197 `expect` / 0 `console.log`. `playwright.config.ts` sobe o Vite sozinho (`webServer`, porta 5173) — nenhuma spec hardcoda host/porta.
@@ -89,5 +85,5 @@
 | `vite` | `^5.0.0` | Bundler e HMR ultrarrápido |
 | `vitest` | `^1.0.0` | Testes unitários com suporte a ESM e Vite |
 | `@playwright/test` | `^1.40.0` | Testes E2E e automação visual de screenshots |
-| `xterm` | `^5.3.0` | Terminal funcional integrado |
+| `xterm` | `^6.0.0` (`@xterm/xterm`) | Terminal funcional integrado (PTY real via pty-server) |
 | `monaco-editor` | `^0.44.0` | Editor de código e diff visual |

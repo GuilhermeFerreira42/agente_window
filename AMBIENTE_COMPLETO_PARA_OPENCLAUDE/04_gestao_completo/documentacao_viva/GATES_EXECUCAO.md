@@ -110,3 +110,23 @@ EXIT_CODE=134
 - **Conclusão:** não é bug do projeto; é limite do sandbox. O gate precisa rodar
   numa máquina com ≥ 4 GB. Enquanto isso, permanece como o único gate vermelho e
   está registrado no KANBAN (`A FAZER`) e no BACKLOG (`W2-04`).
+
+---
+
+## 2. Execução 2026-09-05 (Arena IA) — Verificação Sessão 11 + diagnóstico do crash `.platform`
+> Workspace restaurado de `codigo_completo.txt`. Ambiente montado do zero nesta sessão:
+> `npm install` (frontend), `cd pty-server && npm install` (node-pty nativo compilado — `node_modules/node-pty/build/Release/pty.node` OK),
+> `npx playwright install chromium` + `sudo npx playwright install-deps chromium` (libs do SO: libnss3, libnspr4, libatk, libxkbcommon, libasound etc.).
+> Vite 5.4.21, Chromium headless 151.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| Tipos | `npm run typecheck` (`tsc -b --force`) | **0** | 0 erros |
+| Unitários | `npm run test` (`vitest run`) | **0** | **44 arquivos / 370 testes passando** |
+| E2E completo | `npx playwright test` | **0** | **62/62 passando (~5,2 min, 12 specs)** — inclui Sessão 11 T1–T5 |
+| Build | `npm run build` | **134** | ❌ BLOQUEIO DE AMBIENTE persiste: OOM do V8 (mesmo sandbox ~2 GB) |
+
+### Diagnóstico do crash `.platform` (CURRENT_STATE citava "Cannot read properties of null (reading 'platform')" ao montar o TerminalPanel)
+- **Conclusão:** o crash **NÃO se reproduz** no código restaurado. Com o ambiente correto, o painel monta sem erros (spec de diagnóstico + Sessão 11 verdes; 0 `pageerror`, 0 `console.error`).
+- **Análise estática do xterm:** em `node_modules/@xterm/xterm/lib/xterm.mjs` o objeto "process" (`xe`) só recebe `process` real, `globalThis.vscode.process` ou fica `undefined` — **nunca `null`**. O guard `if (typeof xe === "object")` é seguro (typeof null === "object" só importaria se `xe` fosse null, o que não ocorre). `navigator.platform` é lido só no branch web (browser sempre tem `navigator`). Logo a causa raiz do "bloqueio" descrito era o **ambiente incompleto** (sem node_modules / pty-server buildado / libs do Chromium), não um bug de código.
+- **Correção de governança encontrada:** `e2e/debug_terminal_toggle.spec.ts` (citado no CURRENT_STATE como teste rápido) violava o contrato anti-trapaça (`e2eAssertionContract`): hardcode de `localhost:5173`, `console.log` e `test(...)` sem indentação de 2 espaços → quebrava 3 asserts do contrato (unit ficou 367/370). Reescrito para usar `BASE_URL` de `helpers.ts`, sem `console.log` e indentado → unitários 370/370.

@@ -2,8 +2,8 @@
 
 ## Intenção Original
 - **Objetivo:** Construir uma réplica de alta fidelidade e 100% funcional da Agents Window do VS Code, eliminando todos os mocks por integrações reais.
-- **Estado Atual:** 88% concluído (9 dos 10 módulos da Validação 3 entregues; régua de testes capaz de falhar; resta o Terminal real e o resíduo de topologia da Sessão 05).
-- **Meta Final:** 100% de conformidade, 0 erros TypeScript (`tsc -b`), 368 testes unitários + 55 testes E2E com asserções reais (190 `expect`) e screenshots de evidência.
+- **Estado Atual:** 95% concluído (10 dos 10 módulos da Validação 3 entregues; régua de testes capaz de falhar; resta apenas o build de produção — bloqueio de ambiente OOM).
+- **Meta Final:** 100% de conformidade, 0 erros TypeScript (`tsc -b`), 370 testes unitários + 62 testes E2E com asserções reais e screenshots de evidência.
 
 ---
 
@@ -24,7 +24,7 @@ Para avançar com a Sessão 07 (Terminal Real), as seguintes definições são n
 | W1-01 | Sessões List Real (Sessão 04) | Agrupamento completo (Hoje/Fixadas), 3 chats aninhados, workspace capping 3, drag seguro e teclado | `SessionSidebar.tsx`, `sessionsList.ts`, `dragAndDrop.ts` | E2E `sessao_02` passa (5/5) e typecheck 0 erros | CONCLUÍDO |
 | W1-02 | Layout Topologia (Sessão 05) | Docked controller, session sync, CannotClose tabs e regra R-070 | `sessionLayout.ts`, `sessionLayoutSync.ts`, `App.tsx` | E2E `sessao_09` passa (5/5) | CONCLUÍDO |
 | W1-03 | File System Access API (Sessão 08) | Entregue: `showDirectoryPicker` real, árvore do disco, persistência do handle em IndexedDB e fallback honesto; E2E prova a CHAMADA da API nativa | `src/domain/fileSystem.ts`, `AuxiliaryBar.tsx`, `App.tsx` | E2E `sessao_08` 5/5 e chamada real de `showDirectoryPicker` instrumentada | CONCLUÍDO |
-| W1-04 | Terminal Real xterm.js (Sessão 07) | Backend PTY via node-pty + WebSocket, shell dropdown e substituição de mock no TerminalPanel | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Execução de comandos reais com validação de PID e saída no xterm | EM ANDAMENTO (Onda A em execução) |
+| W1-04 | Terminal Real xterm.js (Sessão 11) | Backend PTY via node-pty + WebSocket, shell dropdown e substituição de mock no TerminalPanel | `pty-server/`, `TerminalPanel.tsx`, `usePtySession.ts` | Execução de comandos reais com validação de PID e saída no xterm — **CONCLUÍDO (Sessão 11 validada 5/5 em 2026-09-05)** | CONCLUÍDO |
 
 ### Meta da Onda 1
 - **Critério binário:** Filesystem e Terminal reais integrados sem mocks, com testes unitários passando.
