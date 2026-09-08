@@ -150,7 +150,9 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
   })
 
   test('T5: simulação de falha real de conexão exibe estado de erro honesto', async ({ page }) => {
-    await page.route('**/pty-port', (route) => route.abort('connectionrefused'))
+    await page.addInitScript(() => {
+      ;(window as Window & { __AGENTS_WINDOW_PTY_URL__?: string }).__AGENTS_WINDOW_PTY_URL__ = 'ws://127.0.0.1:9/pty'
+    })
 
     await page.goto(BASE_URL)
     await page.evaluate(() => localStorage.clear())

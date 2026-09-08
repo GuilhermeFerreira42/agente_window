@@ -21,35 +21,30 @@ interface UsePtySessionOptions {
   enabled?: boolean
 }
 
-const START_PORT = 7681
-const MAX_PORT = 7699
 const OUTPUT_BUFFER_LIMIT = 1024 * 1024
 
 type OutputListener = (data: string) => void
 
-async function discoverPtyPort(): Promise<number> {
-  for (let port = START_PORT; port <= MAX_PORT; port++) {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 400)
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/pty-port`, {
-        signal: controller.signal,
-      })
-      if (!res.ok) continue
-      const data = await res.json()
-      if (typeof data.port === 'number') {
-        return data.port
-      }
-    } catch {
-      // Try the next port.
-    } finally {
-      clearTimeout(timeoutId)
+declare global {
+  interface Window {
+    __AGENTS_WINDOW_PTY_URL__?: string
+  }
+}
+
+function resolvePtyWebSocketUrl(): string {
+  if (typeof window !== 'undefined' && typeof window.__AGENTS_WINDOW_PTY_URL__ === 'string') {
+    const override = window.__AGENTS_WINDOW_PTY_URL__.trim()
+    if (override.length > 0) {
+      return override
     }
   }
 
-  throw new Error(
-    `pty-server não encontrado no intervalo de portas ${START_PORT}-${MAX_PORT}. Inicie o servidor com: cd pty-server && npm start`
-  )
+  if (typeof window !== 'undefined' && window.location?.host) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}/pty`
+  }
+
+  return 'ws://localhost:5173/pty'
 }
 
 function appendBufferedOutput(current: string, chunk: string): string {
@@ -132,10 +127,10 @@ export function usePtySession({
 
     async function initConnection() {
       try {
-        const port = await discoverPtyPort()
+        const wsUrl = resolvePtyWebSocketUrl()
         if (!isSubscribed) return
 
-        const ws = new WebSocket(`ws://127.0.0.1:${port}`)
+        const ws = new WebSocket(wsUrl)
         currentWs = ws
         wsRef.current = ws
 
@@ -210,7 +205,7 @@ export function usePtySession({
           if (!isSubscribed) return
           const err: PtyError = {
             code: 'WS_ERROR',
-            message: 'Erro de comunicação WebSocket com pty-server',
+            message: 'Erro de comunicação WebSocket com o terminal integrado',
           }
           setStatus('error')
           setLastError(err)
@@ -224,8 +219,8 @@ export function usePtySession({
       } catch (error: unknown) {
         if (!isSubscribed) return
         const ptyErr: PtyError = {
-          code: 'DISCOVERY_FAILED',
-          message: error instanceof Error ? error.message : 'Falha ao conectar com o servidor PTY',
+          code: 'WS_INIT_FAILED',
+          message: error instanceof Error ? error.message : 'Falha ao conectar com o terminal integrado',
         }
         setStatus('error')
         setLastError(ptyErr)

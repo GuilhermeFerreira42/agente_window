@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { ptyPlugin } from './vite-plugin-pty'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), ptyPlugin()],
   server: {
     host: '0.0.0.0',
     allowedHosts: true,
@@ -16,10 +17,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           monaco: ['monaco-editor'],
-          xterm: ['@xterm/xterm']
-        }
-      }
-    }
-  }
+          xterm: ['@xterm/xterm'],
+        },
+      },
+    },
+  },
 })
-

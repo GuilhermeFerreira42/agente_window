@@ -31,6 +31,7 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | Em execução nesta sessão; critério: `probe-terminal.mjs` verde com prompt antes do input, `echo` no output e mesmo PID após toggle |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO
@@ -44,7 +45,6 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | ✅ CONCLUÍDO em 2026-09-08: Sonda verde, PID estável, Gates E2E e Build validados |
 | Conteúdo | Sincronização do Blueprint Revisão 3 na Documentação Viva | Arena IA | Atualizar `BLUEPRINT_TERMINAL_REAL.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `DECISION_LOG.md` e `PHASE_SUMMARY.md` para refletir a Onda TR | Tornar a documentação viva consistente com o plano aprovado após a regressão do terminal | Alta | 3 | 2h | ✅ Concluído sem alterar código nem reexecutar gates |
 | Recurso | Terminal Real: Validação Gate 0 (Sessão 11) | OpenClaude / Antigravity | Implementar buffer de saída no `usePtySession` para restaurar histórico ao reabrir painel | Garantir que output do PTY persista visualmente após fechar/abrir o painel (Decisão B) | Alta | 5 | 4h | ✅ Gate 0 histórico passou em 2026-09-06; terminal reaberto depois pela regressão de 2026-09-07. Ver GATES_EXECUCAO.md §§6–7 |
 | Recurso | Build de Produção Otimizado (Resolução OOM) | OpenClaude / Antigravity | Configurar code-splitting com `manualChunks` no `vite.config.ts` | Eliminar pico de memória do V8 isolando `@xterm/xterm` e `monaco-editor` em chunks dedicados | Crítica | 8 | 2h | `npm run build` passa com exit code 0 em ~1min! Ver GATES_EXECUCAO.md §4 |

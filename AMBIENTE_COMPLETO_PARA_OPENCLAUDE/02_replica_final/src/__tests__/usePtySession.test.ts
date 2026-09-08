@@ -31,18 +31,17 @@ describe('usePtySession', () => {
   beforeEach(() => {
     MockWebSocket.instances = []
     vi.stubGlobal('WebSocket', MockWebSocket)
+    vi.stubGlobal('fetch', vi.fn())
+    delete window.__AGENTS_WINDOW_PTY_URL__
+    window.history.replaceState({}, '', '/')
   })
 
   afterEach(() => {
+    delete window.__AGENTS_WINDOW_PTY_URL__
     vi.restoreAllMocks()
   })
 
-  it('discovers port and connects via WebSocket', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ port: 7681 })
-    }))
-
+  it('connects to the integrated /pty websocket without port discovery', async () => {
     const { result } = renderHook(() =>
       usePtySession({ sessionId: 'session-test-1' })
     )
@@ -54,9 +53,9 @@ describe('usePtySession', () => {
     })
 
     const ws = MockWebSocket.instances[0]
-    expect(ws.url).toBe('ws://127.0.0.1:7681')
+    expect(ws.url).toMatch(/^ws:\/\/localhost(?::\d+)?\/pty$/)
+    expect(fetch).not.toHaveBeenCalled()
 
-    // Simulate server 'opened' response
     act(() => {
       ws.onmessage?.({
         data: JSON.stringify({
@@ -65,8 +64,8 @@ describe('usePtySession', () => {
           pid: 4567,
           shell: 'powershell',
           shellPath: 'powershell.exe',
-          availableProfiles: [{ id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' }]
-        })
+          availableProfiles: [{ id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' }],
+        }),
       })
     })
 
@@ -75,12 +74,19 @@ describe('usePtySession', () => {
     expect(result.current.activeProfile?.id).toBe('powershell')
   })
 
-  it('handles output messages and sends input', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ port: 7681 })
-    }))
+  it('uses an explicit websocket override when provided', async () => {
+    window.__AGENTS_WINDOW_PTY_URL__ = 'wss://preview.example.dev/pty'
 
+    renderHook(() => usePtySession({ sessionId: 'session-test-override' }))
+
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1)
+    })
+
+    expect(MockWebSocket.instances[0].url).toBe('wss://preview.example.dev/pty')
+  })
+
+  it('handles output messages and sends input', async () => {
     const { result } = renderHook(() =>
       usePtySession({ sessionId: 'session-test-2' })
     )
@@ -103,8 +109,8 @@ describe('usePtySession', () => {
         data: JSON.stringify({
           type: 'output',
           sessionId: 'session-test-2',
-          data: 'hello from pty'
-        })
+          data: 'hello from pty',
+        }),
       })
     })
 
@@ -119,12 +125,18 @@ describe('usePtySession', () => {
     )
   })
 
-  it('handles discovery failure and transitions to error state', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
-
+  it('handles websocket failures and transitions to error state', async () => {
     const { result } = renderHook(() =>
       usePtySession({ sessionId: 'session-test-err' })
     )
+
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1)
+    })
+
+    act(() => {
+      MockWebSocket.instances[0].onerror?.()
+    })
 
     await vi.waitFor(
       () => {
@@ -133,6 +145,6 @@ describe('usePtySession', () => {
       { timeout: 3000 }
     )
 
-    expect(result.current.lastError?.code).toBe('DISCOVERY_FAILED')
+    expect(result.current.lastError?.code).toBe('WS_ERROR')
   })
 })

@@ -3,18 +3,18 @@
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Nenhum número abaixo pode contradizê-la.
 
 ## ⚡ Handoff Imediato (Retomada Rápida)
-- **Escopo desta sessão documental:** encerrar formalmente a Fase E1 (Fundação do Terminal) e preparar a transição para E2.
-- **Status real do Terminal:** **Fase E1 Concluída**. A fundação foi revalidada em 2026-09-08 com sonda verde, PID estável, build e E2E aprovados (`GATES_EXECUCAO.md` §8).
+- **Escopo desta sessão documental:** atualizar a documentação viva para refletir o blueprint aprovado de Terminal Real (Revisão 3). **Nenhum código foi alterado nesta sincronização** e **nenhum gate foi reexecutado**.
+- **Status real do Terminal:** a entrega histórica da Sessão 11 / Gate 0 (verde em 2026-09-06) continua registrada como evidência histórica em `GATES_EXECUCAO.md` §6, **mas não basta mais como critério de encerramento**. A sonda real de 2026-09-07 reproduziu regressão (`RC1`–`RC4`) com terminal em branco / input morto / reconexão incorreta (`GATES_EXECUCAO.md` §7; `DECISION_LOG.md` Fase 12).
 - **Plano aprovado agora vigente:** `BLUEPRINT_TERMINAL_REAL.md` **Revisão 3**.
-  1. **Fase E1:** Concluída (Fundação estável).
+  1. **Fase E1:** corrigir `RC1`–`RC4` e revalidar a fundação com `probe-terminal.mjs` verde.
   2. **Fase E2:** migrar de `pty-server` standalone + discovery de porta para **servidor único / porta única** com WebSocket em `/pty` na mesma origem.
   3. **Fase E3:** aplicar **paridade visual** com tokens/CSS/ícones do VS Code sobre `xterm.js`.
   4. **Fase E4:** fechar a onda com `typecheck` + `test` + `playwright` + `build` + atualização documental na mesma sessão.
 - **Próxima leitura obrigatória antes de tocar no terminal:**
   - `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
   - `documentacao_viva/BACKLOG_FUTURO.md` (seção da Onda TR)
-  - `documentacao_viva/DECISION_LOG.md` (Fase 14)
-  - `documentacao_viva/GATES_EXECUCAO.md` (§8)
+  - `documentacao_viva/DECISION_LOG.md` (Fases 12 e 13)
+  - `documentacao_viva/GATES_EXECUCAO.md` (§§ 6 e 7)
 - **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`.
 
 ---
@@ -46,7 +46,7 @@
 2. `sessionLayoutSync` captura o layout da sessão atual e restaura a topologia exata da nova sessão.
 3. `buildSessionsList` agrupa itens em: Fixadas > Quick Chats > Hoje > Ontem > Última semana > Mais antigos > Arquivadas (com workspace capping = 3).
 4. Abrir uma custom view cobre Sessions Part/Editor/Aux/Panel; abrir uma sessão ou voltar no mobile dispensa a view e restaura a *desired visibility*.
-5. **Terminal (alvo da próxima execução):** Fase E1 Concluída. Próximo passo: **E2 Servidor Único**. Abrir painel deve mostrar prompt/output real sem tela em branco; fechar/reabrir o painel deve reconectar ao **mesmo** PTY; discovery de porta dedicada deixa de existir após E2.
+5. **Terminal (alvo da próxima execução):** abrir painel deve mostrar prompt/output real sem tela em branco; fechar/reabrir o painel deve reconectar ao **mesmo** PTY; discovery de porta dedicada deixa de existir após E2.
 
 ---
 
