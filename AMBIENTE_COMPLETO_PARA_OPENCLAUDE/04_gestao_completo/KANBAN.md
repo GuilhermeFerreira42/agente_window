@@ -2,7 +2,7 @@
 
 | DATA DE INÍCIO DO SPRINT | DIAS | PROGRESSO | ATUALIZADO POR |
 | --- | --- | --- | --- |
-| 2026-09-04 | 12 dias | Histórico: 10/10 módulos Val.3 concluídos · Terminal reaberto na Onda TR (Revisão 3) | Arena IA / OpenClaude |
+| 2026-09-04 | 12 dias | Onda TR: E1 ✅ e E2 ✅ concluídas localmente · Próximo: E3 (Paridade Visual) | Arena IA / Antigravity |
 
 ## LISTA DE PENDÊNCIAS
 
@@ -22,8 +22,7 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tarefa | Onda TR — E2 Servidor Único / Porta Única | Arena IA | Migrar app + terminal para a mesma origem com WebSocket `/pty`, removendo `discoverPtyPort()` e `/pty-port` | Simplificar arquitetura e eliminar fragilidade do processo standalone em sandbox/Windows | Alta | 8 | 8h | Só iniciar após E1 verde |
-| Tarefa | Onda TR — E3 Paridade Visual do Terminal | Arena IA | Aplicar tokens, CSS e ícones do VS Code sobre `xterm.js` e criar o chrome React de abas/ações | Alinhar fidelidade visual sem copiar literalmente o workbench | Alta | 5 | 8h | Só iniciar após E2 fechado |
+| Tarefa | Onda TR — E3 Paridade Visual do Terminal | Arena IA | Aplicar tokens, CSS e ícones do VS Code sobre `xterm.js` e criar o chrome React de abas/ações | Alinhar fidelidade visual sem copiar literalmente o workbench | Alta | 5 | 8h | Pronto para iniciar após fechamento da E2 |
 | Tarefa | Onda TR — E4 Fechamento e Régua Final | Arena IA | Reforçar `sessao_11` e validar `typecheck`, `test`, `playwright` e `build`, arquivando na mesma sessão | Fechar a onda com prova real e documentação consistente | Crítica | 5 | 4h | Só iniciar após E3; atualizar docs vivos e KANBAN no mesmo fechamento |
 | Pesquisa | Auditoria de Acessibilidade (a11y) | OpenClaude | Auditoria completa de teclado/leitor de tela com ferramenta dedicada | Aderência aos padrões WCAG e acessibilidade VS Code | Média | 3 | 4h | Parcial: nome acessível das linhas e alvos de 44px corrigidos |
 
@@ -31,7 +30,6 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | Em execução nesta sessão; critério: `probe-terminal.mjs` verde com prompt antes do input, `echo` no output e mesmo PID após toggle |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO
@@ -45,6 +43,8 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Tarefa | Onda TR — E2 Servidor Único / Porta Única | Arena IA | Migrar app + terminal para a mesma origem com WebSocket `/pty`, removendo `discoverPtyPort()` e `/pty-port` | Simplificar arquitetura e eliminar fragilidade do processo standalone em sandbox/Windows | Alta | 8 | 8h | ✅ CONCLUÍDO — Validado localmente em 2026-09-08 com dev e preview integrados |
+| Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | ✅ CONCLUÍDO — Validado via probe-terminal.mjs, Gate 0 e Sessão 11 E2E em 2026-09-08 |
 | Conteúdo | Sincronização do Blueprint Revisão 3 na Documentação Viva | Arena IA | Atualizar `BLUEPRINT_TERMINAL_REAL.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `DECISION_LOG.md` e `PHASE_SUMMARY.md` para refletir a Onda TR | Tornar a documentação viva consistente com o plano aprovado após a regressão do terminal | Alta | 3 | 2h | ✅ Concluído sem alterar código nem reexecutar gates |
 | Recurso | Terminal Real: Validação Gate 0 (Sessão 11) | OpenClaude / Antigravity | Implementar buffer de saída no `usePtySession` para restaurar histórico ao reabrir painel | Garantir que output do PTY persista visualmente após fechar/abrir o painel (Decisão B) | Alta | 5 | 4h | ✅ Gate 0 histórico passou em 2026-09-06; terminal reaberto depois pela regressão de 2026-09-07. Ver GATES_EXECUCAO.md §§6–7 |
 | Recurso | Build de Produção Otimizado (Resolução OOM) | OpenClaude / Antigravity | Configurar code-splitting com `manualChunks` no `vite.config.ts` | Eliminar pico de memória do V8 isolando `@xterm/xterm` e `monaco-editor` em chunks dedicados | Crítica | 8 | 2h | `npm run build` passa com exit code 0 em ~1min! Ver GATES_EXECUCAO.md §4 |

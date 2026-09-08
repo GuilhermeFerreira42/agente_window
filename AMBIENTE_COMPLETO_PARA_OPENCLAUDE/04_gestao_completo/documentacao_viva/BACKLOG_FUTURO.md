@@ -73,14 +73,14 @@ DECISOES_EXTRAS:
 
 | ID | Entregável | Descrição (planejada) | Arquivos Impactados | Critério de Aceite | Status |
 |----|------------|------------------------|----------------------|---------------------|--------|
-| TR-01 | Fase E1 — Fundação / RC1–RC4 | Corrigir loop de `setState`, re-subscribe do output, reconexão ao mesmo PTY e resize inicial; filtrar PowerShell fora do Windows | `src/providers/TerminalSessionProvider.tsx`, `src/components/TerminalPanel.tsx`, `src/hooks/usePtySession.ts`, `pty-server/src/ptyManager.ts`, `pty-server/src/wsHandler.ts`, `pty-server/src/shellDetector.ts` | `probe-terminal.mjs` verde: prompt visível antes do input, `echo` aparece no output e o mesmo PID sobrevive ao fechar/reabrir o painel | APROVADO PARA EXECUÇÃO |
-| TR-02 | Fase E2 — Servidor Único / Porta Única | Eliminar processo standalone + discovery de porta; servir terminal na mesma origem via `/pty` em dev e produção | `vite.config.ts`, `vite-plugin-pty.ts`, `server.mjs`, `src/hooks/usePtySession.ts`, `pty-server/` | Nenhuma chamada a `discoverPtyPort()` ou `/pty-port`; app e WS funcionando na mesma origem | PENDENTE |
-| TR-03 | Fase E3 — Paridade Visual | Tokens, CSS, ícones e chrome do terminal inspirados no VS Code real, reimplementados em React sobre `xterm.js` | `src/styles/terminal-vscode.css`, `src/styles/xterm-vscode.css`, `src/components/TerminalTabsList.tsx`, assets `codicon` | Screenshot E2E com tema `#1e1e1e`, abas à direita, borda ativa correta e action bar consistente | PENDENTE |
+| TR-01 | Fase E1 — Fundação / RC1–RC4 | Corrigir loop de `setState`, re-subscribe do output, reconexão ao mesmo PTY e resize inicial; filtrar PowerShell fora do Windows | `src/providers/TerminalSessionProvider.tsx`, `src/components/TerminalPanel.tsx`, `src/hooks/usePtySession.ts`, `pty-server/src/ptyManager.ts`, `pty-server/src/wsHandler.ts`, `pty-server/src/shellDetector.ts` | `probe-terminal.mjs` verde: prompt visível antes do input, `echo` aparece no output e o mesmo PID sobrevive ao fechar/reabrir o painel | ✅ CONCLUÍDO — Validado 2026-09-08 |
+| TR-02 | Fase E2 — Servidor Único / Porta Única | Eliminar processo standalone + discovery de porta; servir terminal na mesma origem via `/pty` em dev e produção | `vite.config.ts`, `vite-plugin-pty.ts`, `server.mjs`, `src/hooks/usePtySession.ts`, `pty-server/` | Nenhuma chamada a `discoverPtyPort()` ou `/pty-port`; app e WS funcionando na mesma origem | ✅ CONCLUÍDO — Validado 2026-09-08 |
+| TR-03 | Fase E3 — Paridade Visual | Tokens, CSS, ícones e chrome do terminal inspirados no VS Code real, reimplementados em React sobre `xterm.js` | `src/styles/terminal-vscode.css`, `src/styles/xterm-vscode.css`, `src/components/TerminalTabsList.tsx`, assets `codicon` | Screenshot E2E com tema `#1e1e1e`, abas à direita, borda ativa correta e action bar consistente | PRÓXIMO PASSO (PRONTO PARA INICIAR) |
 | TR-04 | Fase E4 — Fechamento / Régua Final | Reforçar `sessao_11`, validar suíte completa, build e arquivamento documental na mesma sessão | `e2e/sessao_11_*`, `GATES_EXECUCAO.md`, `CURRENT_STATE.md`, `DECISION_LOG.md`, `PHASE_SUMMARY.md` | `npm run typecheck` + `npm run test` + `npx playwright test` + `npm run build` todos verdes; docs vivos atualizados | PENDENTE |
 
 ### Meta da Onda TR
 - **Critério binário:** terminal real revalidado sob a Revisão 3, com arquitetura de servidor único e paridade visual aprovada.
-- **Status:** EM ABERTO
+- **Status:** EM ANDAMENTO — E1 ✅, E2 ✅, **E3 PRÓXIMO PASSO EXATO**
 
 ### CONTRATOS_DA_ONDA TR — Revisão 3 (vigente)
 ```yaml

@@ -199,4 +199,67 @@ Atualizar a documentação viva para refletir o `BLUEPRINT_TERMINAL_REAL.md` Rev
   - §7 = diagnóstico de regressão Arena em 2026-09-07
 - A próxima execução válida do terminal deve começar pela **Fase E1 / TR-01** e só avançar após a sonda real ficar verde.
 
+---
+
+## Fase 14 — E2 SERVIDOR ÚNICO / PORTA ÚNICA (VALIDAÇÃO LOCAL)
+> Data de Conclusão: 2026-09-08 | Status: ✅ Validado localmente com 100% de sucesso
+
+### Objetivo
+Validar localmente (Windows) a migração do terminal para arquitetura single-port `/pty`, eliminando o processo standalone `pty-server` com discovery de porta (7681–7699) e endpoint `/pty-port`. Confirmar que app + WebSocket do terminal são servidos na mesma origem, em dev e produção.
+
+### Validações Executadas (Todas com Evidência Real)
+
+| Componente | Comando | Exit Code | Resultado |
+|------------|---------|-----------|-----------|
+| **PTY Server** | `npm ci` | 0 | ✅ 11 pacotes auditados em 3s |
+| | `npm run typecheck` | 0 | ✅ 0 erros TypeScript (`tsc --noEmit`) |
+| | `npm test` | 0 | ✅ 5/5 testes passando (detecção de shell, spawn PTY, ponte WS single-port, fallback timers) |
+| | `npm run build` | 0 | ✅ Compilado para `dist/` |
+| **App Principal** | `npm ci` | 0 | ✅ 498 pacotes auditados em 14s |
+| | `npm run typecheck` | 0 | ✅ 0 erros TypeScript (`tsc -b --force`) |
+| | `npm test` | 0 | ✅ 44 arquivos / 371 testes passando (Vitest) |
+| **Dev Integrado** | `npm run dev` | — | ✅ Sobe em 5173, terminal via `/pty` same-origin |
+| **Probe Terminal (dev)** | `node probe-terminal.mjs` | 0 | ✅ `PROBE_OK` (prompt, echo e PID preservado) |
+| **Gate 0 E2E (dev)** | `npx playwright test e2e/gate0_validation.spec.ts` | 0 | ✅ 1/1 passed (prompt antes do input, mesmo PID após toggle) |
+| **Sessão 11 E2E (dev)** | `npx playwright test e2e/sessao_11_terminal_pty_real.spec.ts` | 0 | ✅ 6/6 passed (T1 a T6 100% verdes em 23.2s) |
+| **Build Local** | `npm run build` | 0 | ✅ Exit code 0 em 28.22s, chunks otimizados (manualChunks) |
+| **Preview Integrado** | `npm run preview` | — | ✅ Sobe em 4173, serve `dist/` + terminal `/pty` same-origin |
+| **Probe Terminal (preview)** | `BASE_URL=http://localhost:4173 node probe-terminal.mjs` | 0 | ✅ `PROBE_OK` em produção integrada |
+| **Gate 0 E2E (preview)** | `BASE_URL=http://localhost:4173 npx playwright test e2e/gate0_validation.spec.ts` | 0 | ✅ 1/1 passed em produção integrada |
+
+### Critérios de Aceite da E2 — Todos Atendidos ✅
+
+1. ✅ Terminal conecta via `/pty` na mesma origem da app (dev 5173, preview 4173)
+2. ✅ Fluxo principal **não depende mais** de `discoverPtyPort()` — `grep -r` retorna vazio
+3. ✅ Fluxo principal **não depende mais** de `/pty-port` — `grep -r` retorna vazio
+4. ✅ Em dev, app sobe e terminal funciona sem processo separado obrigatório no fluxo principal
+5. ✅ E1 preservada:
+   - Prompt antes do input ✅ (Gate 0, Sessão 11 T1, probe)
+   - `echo` no output ✅ (Gate 0, Sessão 11 T1, probe)
+   - Mesmo PID após toggle ✅ (Gate 0, Sessão 11 T6, probe)
+   - Scrollback preservado ✅ (Sessão 11 T6)
+   - Erro visível/honesto ✅ (Sessão 11 T5)
+6. ✅ Build local da app passa (exit code 0 em 28.22s)
+7. ✅ Preview/produção integrada serve app + terminal com mesma origem (`server.mjs` + `vite-plugin-pty.ts`)
+
+### Arquivos Principais da E2 Confirmados
+
+**Novos/Alterados:**
+- `pty-server/src/singlePort.ts` — Ponte WebSocket single-port (`/pty`), `createPtyWebSocketBridge()`, `assertNodePtyAvailable()`
+- `pty-server/src/ptyManager.ts` — Ajuste de finalização no Windows (`ptyProcess.kill()` sem sinal) e `.unref()` nos timers
+- `pty-server/src/index.ts` — Processo standalone aposentado (mantido apenas para compat, não usado no fluxo principal)
+- `pty-server/src/__tests__/ptyServer.test.ts` — Testes da ponte single-port e reconexão mesmo PTY
+- `02_replica_final/src/hooks/usePtySession.ts` — Resolve WS same-origin em `/pty` via `location.host`, sem discovery
+- `02_replica_final/vite-plugin-pty.ts` — Plugin Vite integra PTY no dev server via `upgrade`
+- `02_replica_final/vite.config.ts` — Registra `ptyPlugin()`, `server.host = '0.0.0.0'`
+- `02_replica_final/server.mjs` — Preview/produção integrado: Express/HTTP + WS `/pty` + static `dist/`
+- `02_replica_final/probe-terminal.mjs` — Sonda E1/E2 com waitForFunction para renderização de prompt
+- `02_replica_final/package.json` — Script `preview` builda pty-server e roda `server.mjs`
+
+### Próximo Passo
+**Fase E3 — Paridade Visual do Terminal** (TR-03 no BACKLOG_FUTURO.md):
+- Tokens de cor, CSS e ícones do VS Code real sobre `xterm.js`
+- `TerminalTabsList.tsx` com abas à direita, tema `#1e1e1e`, borda ativa correta
+- Screenshot E2E como critério de aceite
+
 

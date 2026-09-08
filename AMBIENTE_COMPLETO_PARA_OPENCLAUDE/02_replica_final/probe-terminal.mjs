@@ -27,6 +27,12 @@ try {
     { timeout: 15000 }
   )
 
+  await page.waitForFunction(
+    () => /[$>#]|user@/i.test(document.querySelector('.terminal-container .xterm-rows')?.textContent || ''),
+    undefined,
+    { timeout: 10000 }
+  )
+
   const rows = page.locator('.terminal-container .xterm-rows').first()
   const promptText = (await rows.textContent()) || ''
   const hasPrompt = /[$>#]|user@/i.test(promptText)

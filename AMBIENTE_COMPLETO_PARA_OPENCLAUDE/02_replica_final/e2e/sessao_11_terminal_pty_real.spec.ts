@@ -103,6 +103,9 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
     const splitContainer = page.locator('.terminal-container-split')
     await expect(splitContainer).toBeVisible()
 
+    const splitRows = splitContainer.locator('.xterm-rows')
+    await expect(splitRows).toContainText(/[$>#]|user@/i, { timeout: 15000 })
+
     const splitTextarea = splitContainer.locator('textarea.xterm-helper-textarea')
     await splitTextarea.focus()
 

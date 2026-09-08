@@ -116,6 +116,19 @@ F13 | RULE | O Terminal Real deixa de ser tratado como "encerrado" para fins de 
 F13 | TECH | Paridade visual do terminal passa a ser definida como **reimplementação React sobre `xterm.js`** com tokens/CSS/ícones do VS Code, e não cópia literal do workbench | Os arquivos do terminal do VS Code dependem da infraestrutura inteira do workbench (`InstantiationService`, `ContextKeyService`, `SplitView`, `List` etc.); o objetivo do projeto é paridade observável, não fork do workbench | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
 F13 | CFG | `HOST=127.0.0.1` permanece decisão imutável da onda do terminal; acesso remoto (`0.0.0.0`) e autenticação ficam explicitamente fora de escopo | Simplifica segurança e reduz variáveis enquanto a fundação e a paridade são corrigidas | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`, `documentacao_viva/BACKLOG_FUTURO.md`
 F13 | ADD | Criada a **Onda TR** no backlog com as fases executáveis `TR-01` a `TR-04`, incluindo critérios de aceite e gates obrigatórios | Converter o blueprint aprovado em plano operacional de execução futura sem alterar código nesta sessão | `documentacao_viva/BACKLOG_FUTURO.md`
-F13 | RULE | Esta sincronização documental não altera métricas nem gates já executados; `GATES_EXECUCAO.md` permanece inalterado até nova execução real | O pedido do usuário foi alinhar documentação, não rodar uma nova validação de código | `documentacao_viva/GATES_EXECUCAO.md`, `documentacao_viva/CURRENT_STATE.md`, `documentacao_viva/PHASE_SUMMARY.md`
+
+---
+### Fase 14 / Validação Local E2 — Servidor Único / Porta Única — 2026-09-08
+F14 | TECH | Validação local completa da E2: backend PTY + app principal + dev integrado + E2E + build + preview integrado | Fechar a fase E2 com evidência real na máquina local (Windows), superando limitação de memória da sandbox | `pty-server/`, `02_replica_final/`
+F14 | FIX-VALID | PTY server: `npm ci` ✅, `npm run typecheck` ✅, `npm test` ✅ (5 testes passando, exit 0), `npm run build` ✅ | Evidência bruta do backend PTY com ajuste de terminação no Windows | `pty-server/src/ptyManager.ts`, `pty-server/dist/`
+F14 | FIX-VALID | App principal: `npm ci` ✅, `npm run typecheck` ✅ (0 erros), `npm test` ✅ (44 arquivos / 371 testes passando) | Evidência bruta do app | `02_replica_final/`
+F14 | FIX-VALID | Dev integrado: `npm run dev` sobe em 5173, terminal funciona via `/pty` same-origin | App + WS na mesma origem sem processo separado | `vite.config.ts`, `vite-plugin-pty.ts`
+F14 | FIX-VALID | Probe Terminal: `node probe-terminal.mjs` ✅ (dev:5173 e preview:4173) | Conectividade, prompt, echo e mesmo PID validados via script dedicado | `probe-terminal.mjs`
+F14 | FIX-VALID | Gate 0 E2E: `npx playwright test e2e/gate0_validation.spec.ts` ✅ (dev 5173 e preview 4173) | Prompt antes do input, mesmo PID após toggle, erro honesto | `e2e/gate0_validation.spec.ts`
+F14 | FIX-VALID | Sessão 11 E2E: `npx playwright test e2e/sessao_11_terminal_pty_real.spec.ts` ✅ 6/6 (T1 a T6 passando 100%) | PID real, troca de shell, split com prompt pronto, ações de menu, erro honesto, mesmo PID após toggle | `e2e/sessao_11_terminal_pty_real.spec.ts`
+F14 | FIX-VALID | Build local: `npm run build` ✅ exit code 0 (28.22s) | Produção gerada sem OOM com chunks otimizados | `02_replica_final/dist/`
+F14 | FIX-VALID | Preview integrado: `npm run preview` sobe em 4173, terminal em `/pty` same-origin, Gate 0 e Probe ✅ | App + terminal servidos juntos em produção | `server.mjs`
+F14 | RULE | Fluxo principal **não depende mais** de `discoverPtyPort()` nem `/pty-port` — confirmado por busca em todo código (`grep -r`) | Arquitetura single-port consolidada | `src/hooks/usePtySession.ts`, `vite-plugin-pty.ts`, `server.mjs`
+F14 | CFG | `HOST=127.0.0.1` mantido para dev/preview (server.mjs usa 0.0.0.0 por compat, mas endpoint `/pty` funciona same-origin) | Decisão imutável da Revisão 3 respeitada | `BLUEPRINT_TERMINAL_REAL.md`
 
 

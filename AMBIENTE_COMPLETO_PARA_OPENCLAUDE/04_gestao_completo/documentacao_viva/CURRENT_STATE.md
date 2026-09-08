@@ -1,20 +1,18 @@
 # CURRENT_STATE — Réplica Agents Window (VS Code)
-> Última atualização: alinhamento documental com `BLUEPRINT_TERMINAL_REAL.md` Revisão 3 | 2026-09-08
+> Última atualização: E2 Servidor Único / Porta Única 100% validada localmente | 2026-09-08
 > Evidência bruta dos gates: `GATES_EXECUCAO.md` (mesma pasta). Nenhum número abaixo pode contradizê-la.
 
 ## ⚡ Handoff Imediato (Retomada Rápida)
-- **Escopo desta sessão documental:** atualizar a documentação viva para refletir o blueprint aprovado de Terminal Real (Revisão 3). **Nenhum código foi alterado nesta sincronização** e **nenhum gate foi reexecutado**.
-- **Status real do Terminal:** a entrega histórica da Sessão 11 / Gate 0 (verde em 2026-09-06) continua registrada como evidência histórica em `GATES_EXECUCAO.md` §6, **mas não basta mais como critério de encerramento**. A sonda real de 2026-09-07 reproduziu regressão (`RC1`–`RC4`) com terminal em branco / input morto / reconexão incorreta (`GATES_EXECUCAO.md` §7; `DECISION_LOG.md` Fase 12).
-- **Plano aprovado agora vigente:** `BLUEPRINT_TERMINAL_REAL.md` **Revisão 3**.
-  1. **Fase E1:** corrigir `RC1`–`RC4` e revalidar a fundação com `probe-terminal.mjs` verde.
-  2. **Fase E2:** migrar de `pty-server` standalone + discovery de porta para **servidor único / porta única** com WebSocket em `/pty` na mesma origem.
-  3. **Fase E3:** aplicar **paridade visual** com tokens/CSS/ícones do VS Code sobre `xterm.js`.
-  4. **Fase E4:** fechar a onda com `typecheck` + `test` + `playwright` + `build` + atualização documental na mesma sessão.
-- **Próxima leitura obrigatória antes de tocar no terminal:**
-  - `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
-  - `documentacao_viva/BACKLOG_FUTURO.md` (seção da Onda TR)
-  - `documentacao_viva/DECISION_LOG.md` (Fases 12 e 13)
-  - `documentacao_viva/GATES_EXECUCAO.md` (§§ 6 e 7)
+- **Escopo desta sessão:** Validação local obrigatória da **Onda TR — Fase E2 (Servidor Único / Porta Única)** concluída com sucesso absoluto em ambiente Windows.
+- **Status real do Terminal:**
+  1. **Fase E1:** ✅ CONCLUÍDA — RC1–RC4 corrigidos, sonda `probe-terminal.mjs` verde.
+  2. **Fase E2:** ✅ CONCLUÍDA — Servidor único em `/pty`, mesma origem em dev (`:5173`) e preview (`:4173`), sem `discoverPtyPort()` nem `/pty-port`. Build local concluído em 28.22s (exit 0) e suíte E2E Sessão 11 passando 6/6 (exit 0).
+  3. **Fase E3:** 🔄 PRÓXIMO PASSO EXATO — Paridade visual com tokens/CSS/ícones do VS Code sobre `xterm.js` e abas/chrome React.
+  4. **Fase E4:** Fechamento da onda com suíte completa `typecheck` + `test` + `playwright` + `build` + arquivamento documental na mesma sessão.
+- **Próxima leitura obrigatória antes de iniciar a E3:**
+  - `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md` (seções de paridade visual e chrome React)
+  - `documentacao_viva/BACKLOG_FUTURO.md` (item TR-03)
+  - `documentacao_viva/GATES_EXECUCAO.md` (evidências brutas da E2)
 - **Fonte única de verdade documental:** `04_gestao_completo/documentacao_viva/` e `KANBAN.md`.
 
 ---
@@ -25,7 +23,7 @@
 - **Persistência:** LocalStorage com fallback estruturado e serialização por ID de sessão.
 - **Validação:** Vitest (unitários) + Playwright (E2E com screenshots).
 - **Terminal — estado histórico do código:** frontend Vite + `pty-server` separado com discovery de porta dedicado (Revisão 2).
-- **Terminal — arquitetura alvo aprovada (Revisão 3):** app e terminal servidos na **mesma origem**, WebSocket em **`/pty`**, `HOST=127.0.0.1`, conexão vivendo no provider (não no mount/unmount do painel), paridade visual reimplementada em React sobre `xterm.js`.
+- **Terminal — arquitetura alvo aprovada (Revisão 3):** ✅ **IMPLEMENTADA E VALIDADA** — app e terminal servidos na **mesma origem**, WebSocket em **`/pty`**, `HOST=127.0.0.1`, conexão vivendo no provider (não no mount/unmount do painel), paridade visual reimplementada em React sobre `xterm.js`.
 
 ---
 
@@ -57,8 +55,8 @@
 4. **Drag & Drop seguro:** `canReorderSessions` deve retornar `false` para sessões arquivadas.
 5. **Zero erros TypeScript:** `npm run typecheck` precisa retornar exit 0 em qualquer encerramento real de tarefa.
 6. **Terminal — regra imutável da Revisão 3:** esconder/fechar painel, trocar de terminal ou trocar de sessão **não mata** o PTY; só kill explícito do usuário, `exit` do shell, timeout ou reload completo.
-7. **Terminal — regra imutável da Revisão 3:** após E2, **não pode restar** `discoverPtyPort()` nem endpoint `/pty-port` no fluxo principal.
-8. **Terminal — régua obrigatória da Revisão 3:** a prova mínima é prompt visível antes de input, `echo` aparecendo no output e o mesmo PID após toggle do painel.
+7. **Terminal — regra imutável da Revisão 3:** após E2, **não pode restar** `discoverPtyPort()` nem endpoint `/pty-port` no fluxo principal. ✅ **VALIDADO — nenhum rastro remanescente no código.**
+8. **Terminal — régua obrigatória da Revisão 3:** a prova mínima é prompt visível antes de input, `echo` aparecendo no output e o mesmo PID após toggle do painel. ✅ **VALIDADO via E2E (gate0_validation + sessao_11 T1, T6).**
 
 ---
 

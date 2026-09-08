@@ -155,16 +155,23 @@ export class PtyManager {
     this.sessions.delete(sessionId);
 
     try {
-      session.ptyProcess.kill('SIGTERM');
-      const pid = session.ptyProcess.pid;
-      setTimeout(() => {
-        try {
-          process.kill(pid, 0);
-          session.ptyProcess.kill('SIGKILL');
-        } catch {
-          // Process already ended.
+      if (process.platform === 'win32') {
+        session.ptyProcess.kill();
+      } else {
+        session.ptyProcess.kill('SIGTERM');
+        const pid = session.ptyProcess.pid;
+        const killTimer = setTimeout(() => {
+          try {
+            process.kill(pid, 0);
+            session.ptyProcess.kill('SIGKILL');
+          } catch {
+            // Process already ended.
+          }
+        }, 3000);
+        if (typeof killTimer.unref === 'function') {
+          killTimer.unref();
         }
-      }, 3000);
+      }
     } catch {
       // Ignore kill errors.
     }
@@ -188,6 +195,9 @@ export class PtyManager {
       console.log(`[ptyManager] Session ${session.sessionId} idle timeout (${this.idleTimeoutMs}ms). Terminating.`);
       this.closeSession(session.sessionId);
     }, this.idleTimeoutMs);
+    if (typeof session.idleTimer.unref === 'function') {
+      session.idleTimer.unref();
+    }
   }
 
   private clearIdleTimer(session: PtySession): void {
