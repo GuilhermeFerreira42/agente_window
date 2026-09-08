@@ -2,7 +2,7 @@
 
 | DATA DE INÍCIO DO SPRINT | DIAS | PROGRESSO | ATUALIZADO POR |
 | --- | --- | --- | --- |
-| 2026-09-04 | 12 dias | 100% — 10/10 módulos Val.3 · 370 unit + 62 E2E verdes · Build de produção 100% verde | OpenClaude / Antigravity |
+| 2026-09-04 | 12 dias | Histórico: 10/10 módulos Val.3 concluídos · Terminal reaberto na Onda TR (Revisão 3) | Arena IA / OpenClaude |
 
 ## LISTA DE PENDÊNCIAS
 
@@ -22,6 +22,10 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | Critério: `probe-terminal.mjs` verde com prompt antes do input, `echo` no output e mesmo PID após toggle |
+| Tarefa | Onda TR — E2 Servidor Único / Porta Única | Arena IA | Migrar app + terminal para a mesma origem com WebSocket `/pty`, removendo `discoverPtyPort()` e `/pty-port` | Simplificar arquitetura e eliminar fragilidade do processo standalone em sandbox/Windows | Alta | 8 | 8h | Só iniciar após E1 verde |
+| Tarefa | Onda TR — E3 Paridade Visual do Terminal | Arena IA | Aplicar tokens, CSS e ícones do VS Code sobre `xterm.js` e criar o chrome React de abas/ações | Alinhar fidelidade visual sem copiar literalmente o workbench | Alta | 5 | 8h | Só iniciar após E2 fechado |
+| Tarefa | Onda TR — E4 Fechamento e Régua Final | Arena IA | Reforçar `sessao_11` e validar `typecheck`, `test`, `playwright` e `build`, arquivando na mesma sessão | Fechar a onda com prova real e documentação consistente | Crítica | 5 | 4h | Só iniciar após E3; atualizar docs vivos e KANBAN no mesmo fechamento |
 | Pesquisa | Auditoria de Acessibilidade (a11y) | OpenClaude | Auditoria completa de teclado/leitor de tela com ferramenta dedicada | Aderência aos padrões WCAG e acessibilidade VS Code | Média | 3 | 4h | Parcial: nome acessível das linhas e alvos de 44px corrigidos |
 
 ## EM ANDAMENTO
@@ -41,7 +45,8 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Recurso | Terminal Real: Validação Gate 0 (Sessão 11) | OpenClaude / Antigravity | Implementar buffer de saída no `usePtySession` para restaurar histórico ao reabrir painel | Garantir que output do PTY persista visualmente após fechar/abrir o painel (Decisão B) | Alta | 5 | 4h | ✅ Gate 0 Passou: E2E validou persistência de "GATE0_TEST". Ver GATES_EXECUCAO.md §6 |
+| Conteúdo | Sincronização do Blueprint Revisão 3 na Documentação Viva | Arena IA | Atualizar `BLUEPRINT_TERMINAL_REAL.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `DECISION_LOG.md` e `PHASE_SUMMARY.md` para refletir a Onda TR | Tornar a documentação viva consistente com o plano aprovado após a regressão do terminal | Alta | 3 | 2h | ✅ Concluído sem alterar código nem reexecutar gates |
+| Recurso | Terminal Real: Validação Gate 0 (Sessão 11) | OpenClaude / Antigravity | Implementar buffer de saída no `usePtySession` para restaurar histórico ao reabrir painel | Garantir que output do PTY persista visualmente após fechar/abrir o painel (Decisão B) | Alta | 5 | 4h | ✅ Gate 0 histórico passou em 2026-09-06; terminal reaberto depois pela regressão de 2026-09-07. Ver GATES_EXECUCAO.md §§6–7 |
 | Recurso | Build de Produção Otimizado (Resolução OOM) | OpenClaude / Antigravity | Configurar code-splitting com `manualChunks` no `vite.config.ts` | Eliminar pico de memória do V8 isolando `@xterm/xterm` e `monaco-editor` em chunks dedicados | Crítica | 8 | 2h | `npm run build` passa com exit code 0 em ~1min! Ver GATES_EXECUCAO.md §4 |
 | Tarefa | Layout Responsivo Mobile (gesto de swipe) | OpenClaude / Antigravity | Implementar detecção de swipe touch (`onTouchStart`/`onTouchEnd`) no layout | Permitir abrir a sidebar deslizando da borda esquerda e fechar deslizando para esquerda | Alta | 5 | 3h | Entregue em `App.tsx` com tolerância de threshold e limites de viewport |
 | Pesquisa | Comportamento de Foco no Terminal | OpenClaude / Antigravity | Auto-foco do cursor xterm na alternância de abas/visibilidade e blur com `Escape` | Garantir usabilidade consistente sem perda de input ao navegar | Alta | 5 | 2h | Implementado em `TerminalPanel.tsx` com `term.focus()` no lifecycle e keydown Escape |
@@ -68,7 +73,7 @@
 | Pesquisa | Auditoria Anti-Trapaça da Suíte E2E | OpenClaude | Auditar os 48 testes Playwright contra o DOM real da aplicação | 10 testes não tinham nenhum `expect` e passariam com a tela em branco | Crítica | 5 | 4h | Auditoria fechada: 34 asserts → 160 asserts |
 | Tarefa | Typecheck Rigoroso (0 Erros) | OpenClaude | Trocar `tsc --noEmit` (no-op) por `tsc -b --force` em `npm run typecheck` | O gate antigo não checava nada: `tsconfig.json` da raiz tem `"files": []` | Crítica | 5 | 3h | 0 erros com o gate real; revelou `onToggleFolder` inexistente |
 
-| Recurso | Terminal Real xterm.js & Shell PTY (Sessão 11) | OpenClaude | Integrar xterm ao PTY real (node-pty + WebSocket) e validar montagem sem crash | Substituir terminal mockado por terminal funcional (PID real, split, troca de shell, erro honesto) | Alta | 8 | 15h | Sessão 11 CONCLUÍDO (2026-09-05): E2E 5/5 verde; crash `.platform` NÃO se reproduziu — era ambiente (node_modules/pty-server/libs Chromium). `e2e/sessao_11_terminal_pty_real.spec.ts` 5/5 + spec de diagnóstico verde, 0 erros. Ver GATES_EXECUCAO.md §2 |
+| Recurso | Terminal Real xterm.js & Shell PTY (Sessão 11) | OpenClaude | Integrar xterm ao PTY real (node-pty + WebSocket) e validar montagem sem crash | Substituir terminal mockado por terminal funcional (PID real, split, troca de shell, erro honesto) | Alta | 8 | 15h | Marco histórico concluído em 2026-09-05; regressão posterior reabriu a frente na Onda TR / Revisão 3. Ver GATES_EXECUCAO.md §§6–7 e BACKLOG_FUTURO.md |
 | Tarefa | Execução de Testes Unitários Vitest | OpenClaude | Rodar a suíte unitária completa no Vitest | Prevenir regressões nas funções de domínio e lógica | Alta | 8 | 4h | 368/368 em 43 arquivos (execução 2026-09-05, ver GATES_EXECUCAO.md) |
 | Recurso | Reescrita dos 49 Testes E2E com Asserções Reais | OpenClaude | Reescrever as 10 specs com asserts de estado, geometria (`boundingBox`), `localStorage` e erros de console | Teste sem assert mascarou bugs visíveis no vídeo do usuário | Crítica | 13 | 10h | 49/49 passando em 4,6 min; 51 screenshots em test-results/ |
 | Tarefa | Trava Permanente Anti-Trapaça | OpenClaude | Criar `e2eAssertionContract.test.ts` que reprova spec sem `expect`, porta hardcoded ou `console.log` | Impedir que a régua afrouxe de novo em sessões futuras | Alta | 5 | 3h | 5/5 no Vitest; roda junto com `npm run test` |

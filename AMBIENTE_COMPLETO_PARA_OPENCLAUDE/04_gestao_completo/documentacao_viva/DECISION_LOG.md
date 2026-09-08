@@ -98,3 +98,24 @@ F10 | ADD | Handlers de swipe touch (`onTouchStart`, `onTouchEnd`) no container 
 ### Fase 11 / Validação Gate 0 & Persistência de Histórico — 2026-09-06
 F11 | ADD | Implementação de `outputBuffer` (Ref) no hook `usePtySession` com limite de 1MB | Garantir que novos listeners de output recebam o histórico acumulado ao montar o `TerminalPanel`, resolvendo falha do Gate 0 (Decisão B) | `src/hooks/usePtySession.ts`
 
+
+---
+
+### Fase 12 / Diagnóstico de Regressão do Terminal (Arena) — 2026-09-07
+F12 | FIX-DIAG | RC1: loop infinito de setState — `PtySessionInstance` dispara `onStateChange(sessionId, session)` em effect com dep `session` (objeto novo a cada render); `setSessions` nunca bate o guard de identidade → "Maximum update depth exceeded" contínuo, status preso em `closed`, input morto | Causa primária do terminal instável/em branco reportado pelo usuário (Windows e sandbox) | `src/providers/TerminalSessionProvider.tsx`
+F12 | FIX-DIAG | RC2: `TerminalPanel` assina `onOutput` no stub no-op (`sessions[sessionId] || {...}`) quando a sessão real ainda não está no context; sem efeito de re-assinatura quando ela chega → output (e mensagens de erro) nunca chegam ao xterm; explica "abre em branco" mesmo com pty-server fora | Erros de discovery precisam ser visíveis no xterm (falha explícita, invariante 4 do BLUEPRINT) | `src/components/TerminalPanel.tsx`, `src/hooks/usePtySession.ts`
+F12 | FIX-DIAG | RC3: `ptyManager.openSession` fecha e recria PTY existente; BLUEPRINT §3.5 exige reconexão ao MESMO PTY com reenvio de scrollback; cleanup do `usePtySession` envia `{type:'close'}` no unmount (mata PTY em cenários de erro) | Gate 0 pede "reconectar ao MESMO PTY (não recriação)" — buffer client-side mascarava a recriação | `pty-server/src/ptyManager.ts`, `pty-server/src/wsHandler.ts`, `src/hooks/usePtySession.ts`
+F12 | FIX-DIAG | RC4: nenhum `sendResize` após o primeiro `fit()` — PTY nasce 80×24 (default do hook) e permanece assim; prompt quebra/alinha errado em painel largo | Paridade visual com VS Code | `src/components/TerminalPanel.tsx`, `src/hooks/usePtySession.ts`
+F12 | RULE | Régua E2E da Sessão 11 deve ganhar asserts de: (a) prompt visível ANTES de qualquer input; (b) mesmo PID após fechar/reabrir painel; (c) mensagem vermelha legível quando pty-server está fora | Impedir regressão silenciosa do tipo "terminal em branco" | `e2e/sessao_11_terminal_pty_real.spec.ts`
+
+---
+
+### Fase 13 / Realinhamento Documental com BLUEPRINT Revisão 3 — 2026-09-07
+F13 | MOD | `BLUEPRINT_TERMINAL_REAL.md` promovido para **Revisão 3**, substituindo formalmente a estratégia de `pty-server` standalone com discovery (`/pty-port`, faixa 7681–7699) pela arquitetura de **servidor único / porta única** com WebSocket em `/pty` | A regressão real de 2026-09-07 mostrou que a topologia anterior é frágil em sandbox/Windows e que a próxima execução precisa de uma arquitetura mais simples e auditável | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
+F13 | RULE | O Terminal Real deixa de ser tratado como "encerrado" para fins de planejamento futuro até o fechamento da sequência **E1 -> E2 -> E3 -> E4** | O Gate 0 verde de 2026-09-06 continua histórico, mas não é mais critério suficiente depois do diagnóstico RC1–RC4 reproduzido em 2026-09-07 | `documentacao_viva/CURRENT_STATE.md`, `documentacao_viva/BACKLOG_FUTURO.md`
+F13 | TECH | Paridade visual do terminal passa a ser definida como **reimplementação React sobre `xterm.js`** com tokens/CSS/ícones do VS Code, e não cópia literal do workbench | Os arquivos do terminal do VS Code dependem da infraestrutura inteira do workbench (`InstantiationService`, `ContextKeyService`, `SplitView`, `List` etc.); o objetivo do projeto é paridade observável, não fork do workbench | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
+F13 | CFG | `HOST=127.0.0.1` permanece decisão imutável da onda do terminal; acesso remoto (`0.0.0.0`) e autenticação ficam explicitamente fora de escopo | Simplifica segurança e reduz variáveis enquanto a fundação e a paridade são corrigidas | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`, `documentacao_viva/BACKLOG_FUTURO.md`
+F13 | ADD | Criada a **Onda TR** no backlog com as fases executáveis `TR-01` a `TR-04`, incluindo critérios de aceite e gates obrigatórios | Converter o blueprint aprovado em plano operacional de execução futura sem alterar código nesta sessão | `documentacao_viva/BACKLOG_FUTURO.md`
+F13 | RULE | Esta sincronização documental não altera métricas nem gates já executados; `GATES_EXECUCAO.md` permanece inalterado até nova execução real | O pedido do usuário foi alinhar documentação, não rodar uma nova validação de código | `documentacao_viva/GATES_EXECUCAO.md`, `documentacao_viva/CURRENT_STATE.md`, `documentacao_viva/PHASE_SUMMARY.md`
+
+

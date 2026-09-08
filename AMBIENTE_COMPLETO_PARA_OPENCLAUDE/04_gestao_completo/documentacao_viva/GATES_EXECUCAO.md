@@ -152,3 +152,32 @@ EXIT_CODE=0
 2. **Gesto Swipe Mobile:** Suporte a toque com abertura da sidebar por deslize a partir da borda esquerda e fechamento por deslize à esquerda (`App.tsx`).
 3. **Foco e Desfoque do Terminal:** `TerminalPanel.tsx` gerencia foco automático em `term.focus()` na montagem/troca de abas e suporte a tecla `Escape` para desfocar.
 
+
+---
+
+## 7. Execução 2026-09-07 (Arena IA) — Sonda de diagnóstico do Terminal Real (REGRESSÃO)
+> Ambiente: sandbox Arena (Linux x64). `pty-server` compilou e subiu OK (`[pty-server] Escutando em http://127.0.0.1:7681`, node-pty nativo OK). Vite dev em 5173. Sonda: `02_replica_final/probe-terminal.mjs` (Playwright headless). **Gate 0 NÃO revalidado como verde — esta execução é de diagnóstico, não de aceite.**
+
+Saída bruta (erros de console resumidos por contagem):
+```
+[console.error] Warning: Maximum update depth exceeded. ... at PtySessionInstance
+    (centenas de ocorrências contínuas — loop de setState em TerminalSessionProvider)
+!!! data-pty-status nunca chegou a "open"
+status pty: closed
+shell: /bin/bash
+=== FASE A (sem digitar) — linhas não-vazias: 1
+"user@e2b:~$  "
+=== FASE B (após digitar "echo PROBE_123" + Enter) — linhas não-vazias: 1
+"user@e2b:~$  "      <- input NÃO foi processado (ws em estado closed)
+=== FASE C (fechar/reabrir painel)
+PROBE_123 sobrevive ao toggle? false
+```
+Screenshots: `probe_A_sem_digitar.png` / `probe_B_apos_digitar.png` (raiz do workspace Arena).
+
+**Causas raiz identificadas (ver DECISION_LOG Fase 12):**
+- RC1: loop infinito de setState em `PtySessionInstance`/`TerminalSessionProvider` (`session` é objeto novo a cada render + `onStateChange` → `setSessions`).
+- RC2: `TerminalPanel` subscreve output via stub no-op quando a sessão ainda não chegou ao context; nunca re-subscreve quando a sessão real aparece → tela em branco e erros invisíveis.
+- RC3: `ptyManager.openSession` MATA e RECRIA sessão existente em vez de reconectar com scrollback (viola BLUEPRINT §3.5 e o critério "reconectar ao MESMO PTY" do Gate 0); `usePtySession` cleanup envia `{type:'close'}` em unmount.
+- RC4: resize inicial nunca enviado após o primeiro `fit()` → PTY fica 80×24 enquanto o painel é maior.
+
+**Lacuna da régua E2E:** `sessao_11` T1 só asserta saída APÓS digitar; não asserta prompt visível antes de qualquer input nem reconexão ao mesmo PID. Spec deve ser reforçada junto do fix.

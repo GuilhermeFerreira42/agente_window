@@ -177,3 +177,26 @@ Resolver a falha do Gate 0 (Sessão 11) onde o output do terminal era perdido ao
 - **Resultado:** Confirmação de que "GATE0_TEST" permanece visível após a sequência Abrir → Digitar → Fechar → Reabrir.
 
 
+
+---
+
+## Fase 13 — REALINHAMENTO DO BLUEPRINT DO TERMINAL REAL
+> Data de Conclusão: 2026-09-07 | Status: ✅ Documentação sincronizada (sem execução de código)
+
+### Objetivo
+Atualizar a documentação viva para refletir o `BLUEPRINT_TERMINAL_REAL.md` Revisão 3, após o diagnóstico da regressão Arena (`RC1`–`RC4`) e antes de qualquer nova implementação no terminal.
+
+### Entregáveis
+- `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md` — promovido para a **Revisão 3** aprovada.
+- `documentacao_viva/CURRENT_STATE.md` — handoff reescrito para deixar explícito que o terminal foi reaberto e agora segue a sequência `E1 -> E2 -> E3 -> E4`.
+- `documentacao_viva/BACKLOG_FUTURO.md` — inclusão da **Onda TR** com os itens `TR-01` a `TR-04` e contratos imutáveis da revisão.
+- `documentacao_viva/DECISION_LOG.md` — registro formal da substituição da arquitetura de discovery por servidor único, da nova estratégia de paridade visual e da regra de não considerar o terminal encerrado antes do fechamento da Revisão 3.
+
+### Observações de Validação
+- **Nenhum gate foi reexecutado nesta fase documental.**
+- A última evidência real continua em `documentacao_viva/GATES_EXECUCAO.md`:
+  - §6 = Gate 0 histórico verde de 2026-09-06
+  - §7 = diagnóstico de regressão Arena em 2026-09-07
+- A próxima execução válida do terminal deve começar pela **Fase E1 / TR-01** e só avançar após a sonda real ficar verde.
+
+
