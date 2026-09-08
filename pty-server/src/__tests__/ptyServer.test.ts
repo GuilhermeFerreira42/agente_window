@@ -77,7 +77,7 @@ test('PtyManager spawns a real OS process, writes input, and captures output', a
   ptyManager.closeSession(sessionId);
 });
 
-test('Full WebSocket protocol test with open, input, output, and close', async () => {
+test('Full WebSocket protocol test with open, input, output, reconnect, and close', async () => {
   const server = http.createServer();
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
   const address = server.address() as { port: number };
@@ -98,7 +98,6 @@ test('Full WebSocket protocol test with open, input, output, and close', async (
   const sessionId = 'ws-test-session';
   ws.send(JSON.stringify({ type: 'open', sessionId, cols: 80, rows: 24 }));
 
-  // Wait for 'opened' message
   const startTime = Date.now();
   while (!messagesReceived.some((m) => m.type === 'opened') && Date.now() - startTime < 5000) {
     await new Promise((r) => setTimeout(r, 100));
@@ -110,7 +109,6 @@ test('Full WebSocket protocol test with open, input, output, and close', async (
   assert.ok(openedMsg.pid > 0);
   assert.ok(Array.isArray(openedMsg.availableProfiles));
 
-  // Send deterministic input
   const marker = `WS_MARKER_${Date.now()}`;
   if (process.platform === 'win32') {
     ws.send(JSON.stringify({ type: 'input', sessionId, data: `Write-Output "${marker}"\r\n` }));
@@ -118,7 +116,6 @@ test('Full WebSocket protocol test with open, input, output, and close', async (
     ws.send(JSON.stringify({ type: 'input', sessionId, data: `echo "${marker}"\n` }));
   }
 
-  // Wait for output containing marker
   while (!messagesReceived.some((m) => m.type === 'output' && m.data.includes(marker)) && Date.now() - startTime < 10000) {
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -126,11 +123,36 @@ test('Full WebSocket protocol test with open, input, output, and close', async (
   const outputMsg = messagesReceived.find((m) => m.type === 'output' && m.data.includes(marker));
   assert.ok(outputMsg, `Should receive output with marker "${marker}"`);
 
-  // Close session
-  ws.send(JSON.stringify({ type: 'close', sessionId }));
-  await new Promise((r) => setTimeout(r, 300));
-
   ws.close();
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(ptyManager.getSession(sessionId), 'Session should remain alive after socket disconnect');
+
+  const wsReconnect = new WebSocket(`ws://127.0.0.1:${port}`);
+  await new Promise((resolve) => wsReconnect.once('open', resolve));
+
+  const reconnectedMessages: any[] = [];
+  wsReconnect.on('message', (data) => {
+    reconnectedMessages.push(JSON.parse(data.toString()));
+  });
+
+  wsReconnect.send(JSON.stringify({ type: 'open', sessionId, cols: 120, rows: 30 }));
+
+  const reconnectStart = Date.now();
+  while (!reconnectedMessages.some((m) => m.type === 'opened') && Date.now() - reconnectStart < 5000) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  const reopenedMsg = reconnectedMessages.find((m) => m.type === 'opened');
+  assert.ok(reopenedMsg, 'Should receive opened message after reconnect');
+  assert.strictEqual(reopenedMsg.pid, openedMsg.pid, 'PID should stay the same after reconnect');
+  assert.ok(typeof reopenedMsg.scrollback === 'string', 'Reconnect should include scrollback');
+  assert.ok(reopenedMsg.scrollback.includes(marker), 'Scrollback should preserve previous output');
+
+  wsReconnect.send(JSON.stringify({ type: 'close', sessionId }));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.strictEqual(ptyManager.getSession(sessionId), undefined, 'Session should close only after explicit close');
+
+  wsReconnect.close();
   wss.close();
   server.close();
   ptyManager.closeAllSessions();

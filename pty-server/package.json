@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsc && node --test dist/__tests__/**/*.test.js"
+    "test": "tsc && node --test dist/__tests__/*.test.js"
   },
   "dependencies": {
     "node-pty": "^1.0.0",

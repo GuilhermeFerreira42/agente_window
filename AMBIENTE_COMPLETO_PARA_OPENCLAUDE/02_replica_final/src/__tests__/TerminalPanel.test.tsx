@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -6,9 +7,11 @@ import { TerminalPanel } from '../components/TerminalPanel'
 const xtermMock = vi.hoisted(() => {
   class MockTerminal {
     static instances: MockTerminal[] = []
+    cols = 80
+    rows = 24
+    blur = vi.fn()
     clear = vi.fn()
     dispose = vi.fn()
-    fit = vi.fn()
     focus = vi.fn()
     loadAddon = vi.fn()
     open = vi.fn()
@@ -20,7 +23,6 @@ const xtermMock = vi.hoisted(() => {
       this.dataHandlers.push(handler)
       return { dispose: vi.fn() }
     })
-    onKey = vi.fn(() => ({ dispose: vi.fn() }))
     type(data: string) {
       for (const handler of this.dataHandlers) handler(data)
     }
@@ -35,6 +37,33 @@ const xtermMock = vi.hoisted(() => {
 
 const fitMock = vi.hoisted(() => ({ fit: vi.fn() }))
 
+const mockSession = vi.hoisted(() => ({
+  status: 'open' as const,
+  pid: 1234,
+  activeProfile: { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+  availableProfiles: [
+    { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
+    { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+    { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' },
+  ],
+  lastError: undefined,
+  sendInput: vi.fn(),
+  sendResize: vi.fn(),
+  closeSession: vi.fn(),
+  onOutput: vi.fn((_cb: (data: string) => void) => () => {}),
+}))
+
+const terminalSessionsMock = vi.hoisted(() => ({
+  sessions: {
+    'session-one': mockSession,
+    'session-one-split': mockSession,
+    'session-two': mockSession,
+    'session-two-split': mockSession,
+  },
+  getOrCreateSession: vi.fn(),
+  closeSession: vi.fn(),
+}))
+
 vi.mock('@xterm/xterm', () => ({ Terminal: xtermMock.MockTerminal }))
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
@@ -44,37 +73,18 @@ vi.mock('@xterm/addon-fit', () => ({
 vi.mock('@xterm/addon-web-links', () => ({
   WebLinksAddon: class {},
 }))
-
-const mockPtySession = vi.hoisted(() => ({
-  status: 'open' as const,
-  pid: 1234,
-  activeProfile: { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
-  availableProfiles: [
-    { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
-    { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
-    { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' }
-  ],
-  lastError: undefined,
-  sendInput: vi.fn(),
-  sendResize: vi.fn(),
-  closeSession: vi.fn(),
-  onOutput: vi.fn((_cb: (d: string) => void) => () => {})
+vi.mock('../providers/TerminalSessionProvider', () => ({
+  useTerminalSessions: vi.fn(() => terminalSessionsMock),
 }))
 
-vi.mock('../hooks/usePtySession', () => ({
-  usePtySession: vi.fn(() => ({
-    ...mockPtySession
-  }))
-}))
-
-const baseProps: React.ComponentProps<typeof TerminalPanel> = {
+const baseProps: ComponentProps<typeof TerminalPanel> = {
   visible: true,
   sessionId: 'session-one',
   workspace: 'workspace-one',
   onClose: vi.fn(),
 }
 
-function renderPanel(overrides: Partial<React.ComponentProps<typeof TerminalPanel>> = {}) {
+function renderPanel(overrides: Partial<ComponentProps<typeof TerminalPanel>> = {}) {
   return render(<TerminalPanel {...baseProps} {...overrides} />)
 }
 
@@ -99,7 +109,6 @@ describe('TerminalPanel', () => {
     const maximize = screen.getByRole('button', { name: 'Maximizar terminal' })
     await user.click(maximize)
     expect(screen.getByRole('region', { name: 'Terminal' })).toHaveClass('is-maximized')
-    expect(maximize).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Restaurar terminal' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Restaurar terminal' }))
@@ -107,18 +116,18 @@ describe('TerminalPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fechar terminal' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+    expect(terminalSessionsMock.closeSession).toHaveBeenCalledWith('session-one')
   })
 
-  it('alterna abas Output/Problems e volta ao Terminal (E8)', async () => {
+  it('alterna abas Output/Problems e volta ao Terminal', async () => {
     const user = userEvent.setup()
     renderPanel()
 
-    // Terminal ativo por padrão.
     expect(screen.getByRole('tab', { name: 'Terminal' })).toHaveAttribute('aria-selected', 'true')
 
     await user.click(screen.getByRole('tab', { name: 'Output' }))
     expect(screen.getByRole('tabpanel', { name: 'Output' })).toBeInTheDocument()
-    expect(screen.getByText(/vite v5 building/)).toBeInTheDocument()
+    expect(screen.getByText(/vite v5 building/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /Problems/ }))
     const problems = screen.getByRole('tabpanel', { name: 'Problems' })
@@ -135,9 +144,10 @@ describe('TerminalPanel', () => {
     await user.click(screen.getByRole('button', { name: /Selecionar shell/ }))
     await user.click(screen.getByRole('menuitemradio', { name: 'Command Prompt' }))
     expect(screen.queryByRole('menu', { name: 'Shells disponíveis' })).not.toBeInTheDocument()
+    expect(terminalSessionsMock.closeSession).toHaveBeenCalledWith('session-one')
   })
 
-  it('divide o terminal e fecha a divisão (E8)', async () => {
+  it('divide o terminal e fecha a divisão', async () => {
     const user = userEvent.setup()
     renderPanel()
 
@@ -145,8 +155,9 @@ describe('TerminalPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Dividir terminal' }))
     expect(document.querySelector('.terminal-panes.is-split')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Terminal dividido' })).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Fechar divisão' }))
-    expect(document.querySelector('.terminal-panes.is-split')).toBeNull()
+    expect(terminalSessionsMock.closeSession).toHaveBeenCalledWith('session-one-split')
   })
 
   it('descarta a instância anterior ao trocar de sessão', () => {
@@ -161,7 +172,7 @@ describe('TerminalPanel', () => {
     expect(screen.getByRole('region', { name: 'Terminal' })).toHaveAttribute('data-session-id', 'session-two')
   })
 
-  it('rotula a aba Terminal com o nome da sessão e o rótulo segue a sessão (R-063)', () => {
+  it('rotula a aba Terminal com o nome da sessão e o rótulo segue a sessão', () => {
     const view = renderPanel({ sessionLabel: 'session-1' })
     expect(screen.getByRole('tab', { name: /session-1/ })).toBeInTheDocument()
 

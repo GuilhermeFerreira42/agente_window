@@ -23,6 +23,9 @@ interface UsePtySessionOptions {
 
 const START_PORT = 7681
 const MAX_PORT = 7699
+const OUTPUT_BUFFER_LIMIT = 1024 * 1024
+
+type OutputListener = (data: string) => void
 
 async function discoverPtyPort(): Promise<number> {
   for (let port = START_PORT; port <= MAX_PORT; port++) {
@@ -30,23 +33,29 @@ async function discoverPtyPort(): Promise<number> {
     const timeoutId = setTimeout(() => controller.abort(), 400)
     try {
       const res = await fetch(`http://127.0.0.1:${port}/pty-port`, {
-        signal: controller.signal
+        signal: controller.signal,
       })
-      if (res.ok) {
-        const data = await res.json()
-        if (typeof data.port === 'number') {
-          return data.port
-        }
+      if (!res.ok) continue
+      const data = await res.json()
+      if (typeof data.port === 'number') {
+        return data.port
       }
     } catch {
-      // Continue searching next port
+      // Try the next port.
     } finally {
       clearTimeout(timeoutId)
     }
   }
+
   throw new Error(
     `pty-server não encontrado no intervalo de portas ${START_PORT}-${MAX_PORT}. Inicie o servidor com: cd pty-server && npm start`
   )
+}
+
+function appendBufferedOutput(current: string, chunk: string): string {
+  const combined = current + chunk
+  if (combined.length <= OUTPUT_BUFFER_LIMIT) return combined
+  return combined.slice(-OUTPUT_BUFFER_LIMIT)
 }
 
 export function usePtySession({
@@ -54,7 +63,7 @@ export function usePtySession({
   cols = 80,
   rows = 24,
   shellId,
-  enabled = true
+  enabled = true,
 }: UsePtySessionOptions) {
   const [status, setStatus] = useState<PtyStatus>('connecting')
   const [lastError, setLastError] = useState<PtyError | undefined>()
@@ -63,50 +72,46 @@ export function usePtySession({
   const [pid, setPid] = useState<number | undefined>()
 
   const wsRef = useRef<WebSocket | null>(null)
-  const outputListeners = useRef<Set<(data: string) => void>>(new Set())
-  const outputBuffer = useRef<string>('')
+  const outputListeners = useRef<Set<OutputListener>>(new Set())
+  const outputBuffer = useRef('')
   const dimensionsRef = useRef({ cols, rows })
   dimensionsRef.current = { cols, rows }
 
-  const sendInput = useCallback(
-    (data: string) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'input', sessionId, data }))
-      }
-    },
-    [sessionId]
-  )
+  const emitOutput = useCallback((data: string) => {
+    outputBuffer.current = appendBufferedOutput(outputBuffer.current, data)
+    for (const listener of outputListeners.current) {
+      listener(data)
+    }
+  }, [])
 
-  const sendResize = useCallback(
-    (newCols: number, newRows: number) => {
-      dimensionsRef.current = { cols: newCols, rows: newRows }
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: 'resize',
-            sessionId,
-            cols: newCols,
-            rows: newRows
-          })
-        )
-      }
-    },
-    [sessionId]
-  )
+  const sendInput = useCallback((data: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'input', sessionId, data }))
+    }
+  }, [sessionId])
+
+  const sendResize = useCallback((newCols: number, newRows: number) => {
+    dimensionsRef.current = { cols: newCols, rows: newRows }
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'resize',
+        sessionId,
+        cols: newCols,
+        rows: newRows,
+      }))
+    }
+  }, [sessionId])
 
   const closeSession = useCallback(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'close', sessionId }))
     }
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
+    wsRef.current?.close()
+    wsRef.current = null
     setStatus('closed')
   }, [sessionId])
 
-  const onOutput = useCallback((callback: (data: string) => void) => {
-    // Send existing buffer to new listener
+  const onOutput = useCallback((callback: OutputListener) => {
     if (outputBuffer.current) {
       callback(outputBuffer.current)
     }
@@ -120,10 +125,10 @@ export function usePtySession({
     if (!enabled || !sessionId) return
 
     let isSubscribed = true
+    let currentWs: WebSocket | null = null
+
     setStatus('connecting')
     setLastError(undefined)
-
-    let currentWs: WebSocket | null = null
 
     async function initConnection() {
       try {
@@ -139,19 +144,18 @@ export function usePtySession({
             ws.close()
             return
           }
-          ws.send(
-            JSON.stringify({
-              type: 'open',
-              sessionId,
-              cols: dimensionsRef.current.cols,
-              rows: dimensionsRef.current.rows,
-              shellId
-            })
-          )
+          ws.send(JSON.stringify({
+            type: 'open',
+            sessionId,
+            cols: dimensionsRef.current.cols,
+            rows: dimensionsRef.current.rows,
+            shellId,
+          }))
         }
 
         ws.onmessage = (event) => {
           if (!isSubscribed) return
+
           try {
             const msg = JSON.parse(event.data)
             if (msg.sessionId && msg.sessionId !== sessionId) return
@@ -162,28 +166,23 @@ export function usePtySession({
                 setPid(msg.pid)
                 if (Array.isArray(msg.availableProfiles)) {
                   setAvailableProfiles(msg.availableProfiles)
-                  const current = msg.availableProfiles.find(
-                    (p: ShellProfile) => p.id === msg.shell || p.path === msg.shellPath
-                  ) || {
+                  const currentProfile = msg.availableProfiles.find(
+                    (profile: ShellProfile) => profile.id === msg.shell || profile.path === msg.shellPath
+                  ) ?? {
                     id: msg.shell,
                     label: msg.shell,
-                    path: msg.shellPath
+                    path: msg.shellPath,
                   }
-                  setActiveProfile(current)
+                  setActiveProfile(currentProfile)
+                }
+                if (typeof msg.scrollback === 'string' && msg.scrollback.length > 0 && outputBuffer.current.length === 0) {
+                  emitOutput(msg.scrollback)
                 }
                 break
               }
               case 'output': {
                 if (typeof msg.data === 'string') {
-                  // Update buffer
-                  outputBuffer.current += msg.data
-                  if (outputBuffer.current.length > 1024 * 1024) {
-                    outputBuffer.current = outputBuffer.current.slice(-1024 * 1024)
-                  }
-
-                  for (const listener of outputListeners.current) {
-                    listener(msg.data)
-                  }
+                  emitOutput(msg.data)
                 }
                 break
               }
@@ -192,62 +191,64 @@ export function usePtySession({
                 break
               }
               case 'error': {
-                setStatus('error')
-                setLastError({ code: msg.code, message: msg.message })
-                for (const listener of outputListeners.current) {
-                  listener(`\r\n\x1b[31m[PTY Error] ${msg.message}\x1b[0m\r\n`)
+                const ptyErr: PtyError = {
+                  code: msg.code,
+                  message: msg.message,
                 }
+                setStatus('error')
+                setLastError(ptyErr)
+                emitOutput(`\r\n\x1b[31m[PTY Error] ${ptyErr.message}\x1b[0m\r\n`)
                 break
               }
             }
-          } catch (e) {
-            console.error('[usePtySession] Error parsing message:', e)
+          } catch (error) {
+            console.error('[usePtySession] Error parsing message:', error)
           }
         }
 
         ws.onerror = () => {
           if (!isSubscribed) return
-          setStatus('error')
           const err: PtyError = {
             code: 'WS_ERROR',
-            message: 'Erro de comunicação WebSocket com pty-server'
+            message: 'Erro de comunicação WebSocket com pty-server',
           }
+          setStatus('error')
           setLastError(err)
+          emitOutput(`\r\n\x1b[31m[PTY Error] ${err.message}\x1b[0m\r\n`)
         }
 
         ws.onclose = () => {
           if (!isSubscribed) return
-          setStatus('closed')
+          setStatus((currentStatus) => (currentStatus === 'error' ? currentStatus : 'closed'))
         }
-      } catch (err: any) {
+      } catch (error: unknown) {
         if (!isSubscribed) return
-        setStatus('error')
         const ptyErr: PtyError = {
           code: 'DISCOVERY_FAILED',
-          message: err.message || 'Falha ao conectar com o servidor PTY'
+          message: error instanceof Error ? error.message : 'Falha ao conectar com o servidor PTY',
         }
+        setStatus('error')
         setLastError(ptyErr)
-        for (const listener of outputListeners.current) {
-          listener(`\r\n\x1b[31m[PTY Error] ${ptyErr.message}\x1b[0m\r\n`)
-        }
+        emitOutput(`\r\n\x1b[31m[PTY Error] ${ptyErr.message}\x1b[0m\r\n`)
       }
     }
 
-    initConnection()
+    void initConnection()
 
     return () => {
       isSubscribed = false
-      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+      if (currentWs && currentWs.readyState !== WebSocket.CLOSED) {
         try {
-          currentWs.send(JSON.stringify({ type: 'close', sessionId }))
           currentWs.close()
         } catch {
-          // ignore
+          // Ignore close errors during cleanup.
         }
       }
-      wsRef.current = null
+      if (wsRef.current === currentWs) {
+        wsRef.current = null
+      }
     }
-  }, [sessionId, shellId, enabled])
+  }, [sessionId, shellId, enabled, emitOutput])
 
   return {
     status,
@@ -258,6 +259,6 @@ export function usePtySession({
     sendInput,
     sendResize,
     closeSession,
-    onOutput
+    onOutput,
   }
 }

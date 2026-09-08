@@ -176,6 +176,25 @@ Resolver a falha do Gate 0 (Sessão 11) onde o output do terminal era perdido ao
 - **Gate 0 (E2E):** `npx playwright test e2e/gate0_validation.spec.ts` aprovado.
 - **Resultado:** Confirmação de que "GATE0_TEST" permanece visível após a sequência Abrir → Digitar → Fechar → Reabrir.
 
+---
+
+## Fase E1 — FUNDAÇÃO DO TERMINAL (Onda TR)
+> Data de Conclusão: 2026-09-08 | Status: ✅ Validado ( typecheck + unit + build + E2E + sonda )
+
+### Objetivo
+Resolver as regressões RC1–RC4 diagnosticadas em 2026-09-07, estabilizando a fundação do terminal real para permitir a migração para servidor único e paridade visual.
+
+### Entregáveis
+- `src/providers/TerminalSessionProvider.tsx` — Estabilização da sessão para evitar loops de `setState` (RC1).
+- `src/components/TerminalPanel.tsx` — Re-assinatura de output ao montar e envio de resize inicial (RC2, RC4).
+- `pty-server/src/ptyManager.ts` — Lógica de reconexão ao mesmo PTY com preservação de PID (RC3).
+- `src/hooks/usePtySession.ts` — Cleanup corrigido para não matar PTY no unmount do React.
+
+### Métricas de Teste
+- **Typecheck:** 0 erros | **Unitários:** 370/370 passando | **Build:** exit 0.
+- **Sonda E1:** `node probe-terminal.mjs` verde (PID 8424 estável, Prompt visível, Echo OK).
+- **E2E:** `gate0_validation.spec.ts` e `sessao_11_terminal_pty_real.spec.ts` aprovados.
+
 
 
 ---

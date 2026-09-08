@@ -10,7 +10,7 @@ interface ShellCandidate {
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
-    await fs.promises.access(filePath, fs.constants.F_OK);
+    await fs.promises.access(filePath, fs.constants.X_OK);
     return true;
   } catch {
     return false;
@@ -19,6 +19,10 @@ async function fileExists(filePath: string): Promise<boolean> {
 
 export async function detectShellProfiles(platform: NodeJS.Platform = process.platform): Promise<ShellProfile[]> {
   const profiles: ShellProfile[] = [];
+
+  if (platform !== 'win32' && platform !== 'linux' && platform !== 'darwin') {
+    return profiles;
+  }
 
   if (platform === 'win32') {
     const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
@@ -32,15 +36,13 @@ export async function detectShellProfiles(platform: NodeJS.Platform = process.pl
         label: 'PowerShell 7',
         paths: [
           path.join(programFiles, 'PowerShell', '7', 'pwsh.exe'),
-          path.join(programFilesX86, 'PowerShell', '7', 'pwsh.exe')
-        ]
+          path.join(programFilesX86, 'PowerShell', '7', 'pwsh.exe'),
+        ],
       },
       {
         id: 'powershell',
         label: 'Windows PowerShell',
-        paths: [
-          path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-        ]
+        paths: [path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')],
       },
       {
         id: 'gitbash',
@@ -48,64 +50,51 @@ export async function detectShellProfiles(platform: NodeJS.Platform = process.pl
         paths: [
           path.join(programFiles, 'Git', 'bin', 'bash.exe'),
           path.join(programFilesX86, 'Git', 'bin', 'bash.exe'),
-          path.join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe')
-        ]
+          path.join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe'),
+        ],
       },
       {
         id: 'cmd',
         label: 'Command Prompt',
-        paths: [
-          path.join(systemRoot, 'System32', 'cmd.exe')
-        ]
-      }
+        paths: [path.join(systemRoot, 'System32', 'cmd.exe')],
+      },
     ];
 
     for (const candidate of candidates) {
-      for (const p of candidate.paths) {
-        if (await fileExists(p)) {
-          profiles.push({
-            id: candidate.id,
-            label: candidate.label,
-            path: p
-          });
+      for (const candidatePath of candidate.paths) {
+        if (await fileExists(candidatePath)) {
+          profiles.push({ id: candidate.id, label: candidate.label, path: candidatePath });
           break;
         }
       }
     }
-  } else {
-    const candidates: ShellCandidate[] = [
-      {
-        id: 'bash',
-        label: 'Bash',
-        paths: ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']
-      },
-      {
-        id: 'zsh',
-        label: 'Zsh',
-        paths: ['/bin/zsh', '/usr/bin/zsh', '/usr/local/bin/zsh']
-      },
-      {
-        id: 'sh',
-        label: 'sh',
-        paths: ['/bin/sh', '/usr/bin/sh']
-      }
-    ];
 
-    for (const candidate of candidates) {
-      for (const p of candidate.paths) {
-        if (await fileExists(p)) {
-          profiles.push({
-            id: candidate.id,
-            label: candidate.label,
-            path: p
-          });
-          break;
-        }
+    return profiles;
+  }
+
+  const candidates: ShellCandidate[] = [
+    {
+      id: 'bash',
+      label: 'Bash',
+      paths: ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash'],
+    },
+    {
+      id: 'sh',
+      label: 'sh',
+      paths: ['/bin/sh', '/usr/bin/sh'],
+    },
+  ];
+
+  for (const candidate of candidates) {
+    for (const candidatePath of candidate.paths) {
+      if (await fileExists(candidatePath)) {
+        profiles.push({ id: candidate.id, label: candidate.label, path: candidatePath });
+        break;
       }
     }
   }
 
-  return profiles;
+  return profiles.filter((profile) => profile.id !== 'pwsh' && profile.id !== 'powershell');
 }
 
 export async function resolveShell(
@@ -118,20 +107,22 @@ export async function resolveShell(
   }
 
   if (shellId) {
-    const matched = allProfiles.find((p) => p.id === shellId || p.path.toLowerCase() === shellId.toLowerCase());
+    const matched = allProfiles.find((profile) => profile.id === shellId || profile.path.toLowerCase() === shellId.toLowerCase());
     if (matched) {
       return { profile: matched, allProfiles };
     }
   }
 
-  // Default selection
-  // On Windows: pwsh -> powershell -> first available
   if (platform === 'win32') {
-    const pwsh = allProfiles.find((p) => p.id === 'pwsh');
+    const pwsh = allProfiles.find((profile) => profile.id === 'pwsh');
     if (pwsh) return { profile: pwsh, allProfiles };
-    const powershell = allProfiles.find((p) => p.id === 'powershell');
+
+    const powershell = allProfiles.find((profile) => profile.id === 'powershell');
     if (powershell) return { profile: powershell, allProfiles };
   }
+
+  const bash = allProfiles.find((profile) => profile.id === 'bash');
+  if (bash) return { profile: bash, allProfiles };
 
   return { profile: allProfiles[0], allProfiles };
 }

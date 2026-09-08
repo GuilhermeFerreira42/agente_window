@@ -39,6 +39,7 @@ export interface OpenedMessage {
   shell: string;
   shellPath: string;
   availableProfiles: ShellProfile[];
+  scrollback?: string;
 }
 
 export interface OutputMessage {

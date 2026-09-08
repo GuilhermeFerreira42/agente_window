@@ -1,40 +1,39 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+import { BASE_URL, BTN, SEL } from './helpers'
 
 test.describe('Gate 0 - Terminal Real Validation', () => {
-  test('should validate terminal connectivity and session persistence', async ({ page }) => {
-    console.log('Step 1: Navigating to app...');
-    await page.goto('http://localhost:5173');
+  test('valida conectividade, prompt antes do input e persistência do mesmo PTY', async ({ page }) => {
+    await page.goto(BASE_URL)
 
-    console.log('Step 2: Opening terminal...');
-    const terminalToggle = page.getByRole('button', { name: 'Alternar terminal' });
-    await terminalToggle.click();
+    const terminalToggle = page.getByRole('button', { name: BTN.toggleTerminal })
+    await terminalToggle.click()
 
-    console.log('Step 3: Confirming .terminal-panel visibility...');
-    const terminalPanel = page.locator('.terminal-panel');
-    await expect(terminalPanel).toBeVisible({ timeout: 10000 });
-    console.log('✅ .terminal-panel is visible');
+    const terminalPanel = page.locator(SEL.terminalPanel)
+    await expect(terminalPanel).toBeVisible({ timeout: 10000 })
+    await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
 
-    console.log('Step 4: Executing deterministic command...');
-    await terminalPanel.click();
-    await page.keyboard.type('echo "GATE0_TEST"');
-    await page.keyboard.press('Enter');
+    const terminalRows = page.locator('.xterm-rows').first()
+    await expect(terminalRows).toContainText(/[$>#]|user@/i, { timeout: 10000 })
 
-    console.log('Step 5: Confirming output in xterm...');
-    await expect(page.locator('.xterm-rows')).toContainText('GATE0_TEST', { timeout: 10000 });
-    console.log('✅ Output "GATE0_TEST" confirmed');
+    const pidBeforeToggle = await terminalPanel.getAttribute('data-pty-pid')
+    expect(pidBeforeToggle).not.toBeNull()
 
-    console.log('Step 6: Closing/Hiding the panel...');
-    await terminalToggle.click();
-    await expect(terminalPanel).not.toBeVisible();
-    console.log('✅ Panel hidden');
+    const textarea = page.locator('.terminal-container').first().locator('textarea.xterm-helper-textarea')
+    await textarea.focus()
+    await page.keyboard.type('echo GATE0_TEST')
+    await page.keyboard.press('Enter')
 
-    console.log('Step 7: Reopening the panel...');
-    await terminalToggle.click();
-    await expect(terminalPanel).toBeVisible();
-    console.log('✅ Panel reopened');
+    await expect(terminalRows).toContainText('GATE0_TEST', { timeout: 10000 })
 
-    console.log('Step 8: Confirming reconnection to SAME PTY...');
-    await expect(page.locator('.xterm-rows')).toContainText('GATE0_TEST', { timeout: 10000 });
-    console.log('✅ Reconnected to same PTY (output preserved)');
-  });
-});
+    await terminalToggle.click()
+    await expect(terminalPanel).not.toBeVisible()
+
+    await terminalToggle.click()
+    await expect(terminalPanel).toBeVisible({ timeout: 10000 })
+    await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
+    await expect(terminalRows).toContainText('GATE0_TEST', { timeout: 10000 })
+
+    const pidAfterToggle = await terminalPanel.getAttribute('data-pty-pid')
+    expect(pidAfterToggle).toBe(pidBeforeToggle)
+  })
+})

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Columns2, Eraser, Minimize2, PanelBottomClose, Plus, TerminalSquare, X } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -43,6 +43,18 @@ function token(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+function defaultProfiles(): ShellProfile[] {
+  if (typeof navigator !== 'undefined' && /Win/i.test(navigator.platform)) {
+    return [
+      { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
+      { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
+      { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' },
+    ]
+  }
+
+  return [{ id: 'bash', label: 'Bash', path: '/bin/bash' }]
+}
+
 export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: TerminalPanelProps) {
   const terminalElement = useRef<HTMLDivElement>(null)
   const terminal = useRef<Terminal | null>(null)
@@ -52,49 +64,18 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
   const [activeTab, setActiveTab] = useState<BottomTab>('terminal')
   const [selectedShellId, setSelectedShellId] = useState<string | undefined>(undefined)
   const [shellMenuOpen, setShellMenuOpen] = useState(false)
-
-  // Split terminal state
   const [split, setSplit] = useState(false)
   const [splitShellId, setSplitShellId] = useState<string | undefined>(undefined)
+
   const splitTerminalRef = useRef<HTMLDivElement>(null)
   const splitTerminal = useRef<Terminal | null>(null)
   const splitFitAddon = useRef<FitAddon | null>(null)
 
-  // Primary PTY session
-  const { sessions, getOrCreateSession } = useTerminalSessions()
+  const { sessions, getOrCreateSession, closeSession: closeManagedSession } = useTerminalSessions()
 
-  useEffect(() => {
-    getOrCreateSession(sessionId)
-  }, [sessionId, getOrCreateSession])
-
-  const ptySession = sessions[sessionId] || {
-    status: 'connecting',
-    pid: undefined,
-    activeProfile: undefined,
-    availableProfiles: [],
-    sendInput: () => {},
-    sendResize: () => {},
-    closeSession: () => {},
-    onOutput: () => () => {},
-  }
-
-  // Split PTY session
-  useEffect(() => {
-    if (split) {
-      getOrCreateSession(`${sessionId}-split`)
-    }
-  }, [split, sessionId, getOrCreateSession])
-
-  const splitPtySession = sessions[`${sessionId}-split`] || {
-    status: 'connecting',
-    pid: undefined,
-    activeProfile: undefined,
-    availableProfiles: [],
-    sendInput: () => {},
-    sendResize: () => {},
-    closeSession: () => {},
-    onOutput: () => () => {},
-  }
+  const ptySession = sessions[sessionId]
+  const splitSessionId = `${sessionId}-split`
+  const splitPtySession = sessions[splitSessionId]
 
   const ptySessionRef = useRef(ptySession)
   ptySessionRef.current = ptySession
@@ -102,7 +83,23 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
   const splitPtySessionRef = useRef(splitPtySession)
   splitPtySessionRef.current = splitPtySession
 
-  // Setup primary xterm instance
+  useEffect(() => {
+    setSplit(false)
+    setShellMenuOpen(false)
+    setSelectedShellId(undefined)
+    setSplitShellId(undefined)
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!visible) return
+    getOrCreateSession(sessionId, selectedShellId)
+  }, [visible, sessionId, selectedShellId, getOrCreateSession])
+
+  useEffect(() => {
+    if (!visible || !split) return
+    getOrCreateSession(splitSessionId, splitShellId)
+  }, [visible, split, splitSessionId, splitShellId, getOrCreateSession])
+
   useEffect(() => {
     if (!visible || !terminalElement.current || activeTab !== 'terminal') return
 
@@ -134,26 +131,22 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
     instance.loadAddon(fit)
     instance.loadAddon(new WebLinksAddon())
     instance.open(terminalElement.current)
+
     try {
       fit.fit()
     } catch {
-      // Ignore if layout not ready
+      // Ignore if layout is not ready yet.
     }
+
     fitAddon.current = fit
     terminal.current = instance
 
-    // Send input from user typing to real PTY backend
     const dataDisposable = instance.onData((data) => {
-      ptySessionRef.current.sendInput(data)
+      ptySessionRef.current?.sendInput(data)
     })
 
-    // Listen to output from real PTY backend
-    const unsubscribeOutput = ptySessionRef.current.onOutput((data) => {
-      instance.write(data)
-    })
-
-    instance.attachCustomKeyEventHandler((arg) => {
-      if (arg.type === 'keydown' && arg.key === 'Escape') {
+    instance.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.key === 'Escape') {
         instance.blur()
         return false
       }
@@ -164,9 +157,9 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       try {
         fit.fit()
       } catch {
-        // Ignore
+        // Ignore.
       }
-      ptySessionRef.current.sendResize(instance.cols, instance.rows)
+      ptySessionRef.current?.sendResize(instance.cols, instance.rows)
     }
 
     window.addEventListener('resize', resize)
@@ -174,16 +167,14 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
     return () => {
       window.removeEventListener('resize', resize)
       dataDisposable.dispose()
-      unsubscribeOutput()
       instance.dispose()
       if (fitAddon.current === fit) fitAddon.current = null
       terminal.current = null
     }
-  }, [sessionId, visible, activeTab])
+  }, [visible, activeTab, sessionId])
 
-  // Setup split xterm instance
   useEffect(() => {
-    if (!split || !splitTerminalRef.current || !visible || activeTab !== 'terminal') return
+    if (!split || !visible || !splitTerminalRef.current || activeTab !== 'terminal') return
 
     const fit = new FitAddon()
     const instance = new Terminal({
@@ -199,24 +190,22 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
 
     instance.loadAddon(fit)
     instance.open(splitTerminalRef.current)
+
     try {
       fit.fit()
     } catch {
-      // Ignore
+      // Ignore if layout is not ready yet.
     }
+
     splitFitAddon.current = fit
     splitTerminal.current = instance
 
     const dataDisposable = instance.onData((data) => {
-      splitPtySessionRef.current.sendInput(data)
+      splitPtySessionRef.current?.sendInput(data)
     })
 
-    const unsubscribeOutput = splitPtySessionRef.current.onOutput((data) => {
-      instance.write(data)
-    })
-
-    instance.attachCustomKeyEventHandler((arg) => {
-      if (arg.type === 'keydown' && arg.key === 'Escape') {
+    instance.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.key === 'Escape') {
         instance.blur()
         return false
       }
@@ -227,9 +216,9 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       try {
         fit.fit()
       } catch {
-        // Ignore
+        // Ignore.
       }
-      splitPtySessionRef.current.sendResize(instance.cols, instance.rows)
+      splitPtySessionRef.current?.sendResize(instance.cols, instance.rows)
     }
 
     window.addEventListener('resize', resize)
@@ -237,63 +226,111 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
     return () => {
       window.removeEventListener('resize', resize)
       dataDisposable.dispose()
-      unsubscribeOutput()
       instance.dispose()
       if (splitFitAddon.current === fit) splitFitAddon.current = null
       splitTerminal.current = null
     }
-  }, [split, visible, activeTab])
+  }, [split, visible, activeTab, splitSessionId])
 
-  // Refit and focus on visibility / maximize / split change
   useEffect(() => {
-    if (visible && activeTab === 'terminal') {
-      try {
-        fitAddon.current?.fit()
-        splitFitAddon.current?.fit()
-      } catch {
-        // Ignore
-      }
-      
-      // Auto-focus the terminal (wait for DOM to be ready)
-      setTimeout(() => {
-        if (split && splitTerminal.current) {
-          splitTerminal.current.focus()
-        } else if (terminal.current) {
-          terminal.current.focus()
-        }
-      }, 50)
+    if (!visible || activeTab !== 'terminal' || !terminal.current || !ptySession) return
+
+    const unsubscribe = ptySession.onOutput((data) => {
+      terminal.current?.write(data)
+    })
+
+    try {
+      fitAddon.current?.fit()
+      ptySession.sendResize(terminal.current.cols, terminal.current.rows)
+    } catch {
+      // Ignore fit/resize race during mount.
     }
-  }, [maximized, visible, activeTab, split, sessionId])
+
+    return unsubscribe
+  }, [visible, activeTab, sessionId, ptySession?.onOutput])
+
+  useEffect(() => {
+    if (!split || !visible || activeTab !== 'terminal' || !splitTerminal.current || !splitPtySession) return
+
+    const unsubscribe = splitPtySession.onOutput((data) => {
+      splitTerminal.current?.write(data)
+    })
+
+    try {
+      splitFitAddon.current?.fit()
+      splitPtySession.sendResize(splitTerminal.current.cols, splitTerminal.current.rows)
+    } catch {
+      // Ignore fit/resize race during mount.
+    }
+
+    return unsubscribe
+  }, [split, visible, activeTab, splitSessionId, splitPtySession?.onOutput])
+
+  useEffect(() => {
+    if (!visible || activeTab !== 'terminal') return
+
+    try {
+      fitAddon.current?.fit()
+      if (terminal.current && ptySession) {
+        ptySession.sendResize(terminal.current.cols, terminal.current.rows)
+      }
+      splitFitAddon.current?.fit()
+      if (splitTerminal.current && splitPtySession) {
+        splitPtySession.sendResize(splitTerminal.current.cols, splitTerminal.current.rows)
+      }
+    } catch {
+      // Ignore.
+    }
+
+    const timer = window.setTimeout(() => {
+      if (split && splitTerminal.current) {
+        splitTerminal.current.focus()
+      } else {
+        terminal.current?.focus()
+      }
+    }, 50)
+
+    return () => window.clearTimeout(timer)
+  }, [visible, activeTab, maximized, split, sessionId, ptySession?.status, splitPtySession?.status])
 
   const clearTerminal = () => {
     terminal.current?.clear()
+    splitTerminal.current?.clear()
   }
 
   const handleClose = () => {
     setMaximized(false)
-    ptySession.closeSession()
+    closeManagedSession(sessionId)
     if (split) {
-      splitPtySession.closeSession()
+      closeManagedSession(splitSessionId)
+      setSplit(false)
     }
     onClose()
   }
 
   const handleSelectShell = (profile: ShellProfile) => {
-    setSelectedShellId(profile.id)
     setShellMenuOpen(false)
+    if (profile.id === ptySession?.activeProfile?.id) return
+    closeManagedSession(sessionId)
+    setSelectedShellId(profile.id)
   }
 
-  if (!visible) return null
+  const handleToggleSplit = () => {
+    if (split) {
+      closeManagedSession(splitSessionId)
+      setSplit(false)
+      return
+    }
+    setSplit(true)
+    setSplitShellId(undefined)
+  }
 
-  const activeShellLabel = ptySession.activeProfile?.label || ptySession.activeProfile?.id || 'bash'
-  const profilesList = ptySession.availableProfiles.length > 0
-    ? ptySession.availableProfiles
-    : [
-        { id: 'pwsh', label: 'PowerShell 7', path: 'pwsh.exe' },
-        { id: 'powershell', label: 'Windows PowerShell', path: 'powershell.exe' },
-        { id: 'cmd', label: 'Command Prompt', path: 'cmd.exe' },
-        { id: 'bash', label: 'Bash', path: '/bin/bash' }
-      ]
+  const baseProfiles = useMemo(() => defaultProfiles(), [])
+  const profilesList = ptySession?.availableProfiles?.length ? ptySession.availableProfiles : baseProfiles
+  const selectedProfile = profilesList.find((profile) => profile.id === selectedShellId)
+  const activeShellLabel = ptySession?.activeProfile?.label || selectedProfile?.label || baseProfiles[0]?.label || 'bash'
+
+  if (!visible) return null
 
   const terminalLabel = sessionLabel ? `Terminal — ${sessionLabel}` : 'Terminal'
   const tabs: { id: BottomTab; label: string }[] = [
@@ -307,9 +344,9 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
       className={`terminal-panel${maximized ? ' is-maximized' : ''}`}
       aria-label="Terminal"
       data-session-id={sessionId}
-      data-pty-status={ptySession.status}
-      data-pty-pid={ptySession.pid}
-      data-pty-shell-path={ptySession.activeProfile?.path}
+      data-pty-status={ptySession?.status ?? 'connecting'}
+      data-pty-pid={ptySession?.pid}
+      data-pty-shell-path={ptySession?.activeProfile?.path}
     >
       <div className="terminal-header">
         <div className="terminal-tabs" role="tablist" aria-label="Painéis inferiores">
@@ -352,10 +389,10 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
                   {profilesList.map((profile) => (
                     <button
                       key={profile.id}
-                      className={`terminal-shell-option${profile.id === ptySession.activeProfile?.id ? ' is-active' : ''}`}
+                      className={`terminal-shell-option${profile.id === ptySession?.activeProfile?.id ? ' is-active' : ''}`}
                       type="button"
                       role="menuitemradio"
-                      aria-checked={profile.id === ptySession.activeProfile?.id}
+                      aria-checked={profile.id === ptySession?.activeProfile?.id}
                       onClick={() => handleSelectShell(profile)}
                     >
                       {profile.label}
@@ -372,7 +409,7 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
               title={split ? 'Fechar divisão' : 'Dividir terminal'}
               aria-label={split ? 'Fechar divisão' : 'Dividir terminal'}
               aria-pressed={split}
-              onClick={() => setSplit((current) => !current)}
+              onClick={handleToggleSplit}
             >
               <Columns2 size={13} />
             </button>
@@ -427,7 +464,7 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
           <div
             className="terminal-container"
             ref={terminalElement}
-            data-shell={ptySession.activeProfile?.id || selectedShellId || 'bash'}
+            data-shell={ptySession?.activeProfile?.id || selectedShellId || 'bash'}
           />
           {split && (
             <div
@@ -435,7 +472,7 @@ export function TerminalPanel({ visible, sessionId, sessionLabel, onClose }: Ter
               role="group"
               aria-label="Terminal dividido"
               ref={splitTerminalRef}
-              data-shell={splitPtySession.activeProfile?.id || splitShellId || 'bash'}
+              data-shell={splitPtySession?.activeProfile?.id || splitShellId || 'bash'}
             />
           )}
         </div>

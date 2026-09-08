@@ -3,10 +3,8 @@ import type { PtyManager } from './ptyManager.js';
 import type { ClientMessage, ErrorMessage, ExitMessage, OpenedMessage, OutputMessage } from './types.js';
 
 export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManager): void {
-  // Map ws -> set of sessionIds opened by this connection
   const socketSessions = new Map<WebSocket, Set<string>>();
 
-  // Global listeners from ptyManager to forward to connected sockets
   ptyManager.onData((sessionId, data) => {
     const msg: OutputMessage = { type: 'output', sessionId, data };
     const json = JSON.stringify(msg);
@@ -40,7 +38,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
         const errorMsg: ErrorMessage = {
           type: 'error',
           code: 'INVALID_MESSAGE',
-          message: 'Malformed JSON message received'
+          message: 'Malformed JSON message received',
         };
         ws.send(JSON.stringify(errorMsg));
         return;
@@ -50,7 +48,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
         const errorMsg: ErrorMessage = {
           type: 'error',
           code: 'INVALID_MESSAGE',
-          message: 'Missing type or sessionId in message'
+          message: 'Missing type or sessionId in message',
         };
         ws.send(JSON.stringify(errorMsg));
         return;
@@ -61,30 +59,32 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
       switch (clientMsg.type) {
         case 'open': {
           try {
-            sessions.add(sessionId);
             const openedInfo = await ptyManager.openSession({
               sessionId,
               cols: clientMsg.cols,
               rows: clientMsg.rows,
-              shellId: clientMsg.shellId
+              shellId: clientMsg.shellId,
             });
 
+            sessions.add(sessionId);
             const openedMsg: OpenedMessage = {
               type: 'opened',
               sessionId,
               pid: openedInfo.pid,
               shell: openedInfo.shell,
               shellPath: openedInfo.shellPath,
-              availableProfiles: openedInfo.availableProfiles
+              availableProfiles: openedInfo.availableProfiles,
+              scrollback: openedInfo.scrollback,
             };
             ws.send(JSON.stringify(openedMsg));
-          } catch (err: any) {
-            const code = err.code || 'SPAWN_FAILED';
+          } catch (err: unknown) {
+            sessions.delete(sessionId);
+            const error = err as Error & { code?: string };
             const errorMsg: ErrorMessage = {
               type: 'error',
               sessionId,
-              code,
-              message: err.message || 'Falha ao iniciar processo de terminal'
+              code: (error.code as ErrorMessage['code']) || 'SPAWN_FAILED',
+              message: error.message || 'Falha ao iniciar processo de terminal',
             };
             ws.send(JSON.stringify(errorMsg));
           }
@@ -118,7 +118,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
             type: 'error',
             sessionId,
             code: 'INVALID_MESSAGE',
-            message: `Unknown message type: ${(clientMsg as any).type}`
+            message: `Unknown message type: ${(clientMsg as { type: string }).type}`,
           };
           ws.send(JSON.stringify(errorMsg));
         }
@@ -126,12 +126,6 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
     });
 
     ws.on('close', () => {
-      const activeSessions = socketSessions.get(ws);
-      if (activeSessions) {
-        for (const sessionId of activeSessions) {
-          ptyManager.closeSession(sessionId);
-        }
-      }
       socketSessions.delete(ws);
     });
 

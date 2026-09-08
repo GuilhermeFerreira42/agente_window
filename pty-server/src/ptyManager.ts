@@ -2,11 +2,14 @@ import * as pty from 'node-pty';
 import { resolveShell } from './shellDetector.js';
 import type { ShellProfile } from './types.js';
 
+const OUTPUT_BUFFER_LIMIT = 1024 * 1024;
+
 export interface PtySession {
   sessionId: string;
   ptyProcess: pty.IPty;
   profile: ShellProfile;
   availableProfiles: ShellProfile[];
+  outputBuffer: string;
   idleTimer?: NodeJS.Timeout;
 }
 
@@ -39,12 +42,24 @@ export class PtyManager {
     rows?: number;
     shellId?: string;
     cwd?: string;
-  }): Promise<{ pid: number; shell: string; shellPath: string; availableProfiles: ShellProfile[] }> {
+  }): Promise<{ pid: number; shell: string; shellPath: string; availableProfiles: ShellProfile[]; scrollback: string }> {
     const { sessionId, cols = 80, rows = 24, shellId, cwd } = options;
 
-    // If session already exists, close it first
-    if (this.sessions.has(sessionId)) {
-      this.closeSession(sessionId);
+    const existing = this.sessions.get(sessionId);
+    if (existing) {
+      this.resetIdleTimer(existing);
+      try {
+        existing.ptyProcess.resize(cols, rows);
+      } catch {
+        // Ignore resize failures on reconnect.
+      }
+      return {
+        pid: existing.ptyProcess.pid,
+        shell: existing.profile.id,
+        shellPath: existing.profile.path,
+        availableProfiles: existing.availableProfiles,
+        scrollback: existing.outputBuffer,
+      };
     }
 
     const resolved = await resolveShell(shellId);
@@ -52,7 +67,7 @@ export class PtyManager {
       const err = new Error(
         'Nenhum shell encontrado. Windows: pwsh.exe, powershell.exe e cmd.exe não localizados. Linux: /bin/bash e /bin/sh não encontrados.'
       );
-      (err as any).code = 'SHELL_NOT_FOUND';
+      (err as Error & { code?: string }).code = 'SHELL_NOT_FOUND';
       throw err;
     }
 
@@ -64,36 +79,42 @@ export class PtyManager {
       cols,
       rows,
       cwd: workingDir,
-      env: process.env as Record<string, string>
+      env: process.env as Record<string, string>,
     });
 
     const session: PtySession = {
       sessionId,
       ptyProcess,
       profile,
-      availableProfiles: allProfiles
+      availableProfiles: allProfiles,
+      outputBuffer: '',
     };
 
     this.resetIdleTimer(session);
 
     ptyProcess.onData((data: string) => {
+      session.outputBuffer += data;
+      if (session.outputBuffer.length > OUTPUT_BUFFER_LIMIT) {
+        session.outputBuffer = session.outputBuffer.slice(-OUTPUT_BUFFER_LIMIT);
+      }
+
       for (const listener of this.dataListeners) {
         try {
           listener(sessionId, data);
-        } catch (e) {
-          console.error('[ptyManager] Data listener error:', e);
+        } catch (error) {
+          console.error('[ptyManager] Data listener error:', error);
         }
       }
     });
 
-    ptyProcess.onExit((e: { exitCode: number }) => {
+    ptyProcess.onExit((event: { exitCode: number }) => {
       this.clearIdleTimer(session);
       this.sessions.delete(sessionId);
       for (const listener of this.exitListeners) {
         try {
-          listener(sessionId, e.exitCode);
-        } catch (err) {
-          console.error('[ptyManager] Exit listener error:', err);
+          listener(sessionId, event.exitCode);
+        } catch (error) {
+          console.error('[ptyManager] Exit listener error:', error);
         }
       }
     });
@@ -104,7 +125,8 @@ export class PtyManager {
       pid: ptyProcess.pid,
       shell: profile.id,
       shellPath: profile.path,
-      availableProfiles: allProfiles
+      availableProfiles: allProfiles,
+      scrollback: session.outputBuffer,
     };
   }
 
@@ -137,15 +159,14 @@ export class PtyManager {
       const pid = session.ptyProcess.pid;
       setTimeout(() => {
         try {
-          // If still running after 3s, send SIGKILL
-          process.kill(pid, 0); // test if alive
+          process.kill(pid, 0);
           session.ptyProcess.kill('SIGKILL');
         } catch {
-          // Process already ended
+          // Process already ended.
         }
       }, 3000);
     } catch {
-      // Ignore kill errors
+      // Ignore kill errors.
     }
 
     return true;
@@ -166,9 +187,6 @@ export class PtyManager {
     session.idleTimer = setTimeout(() => {
       console.log(`[ptyManager] Session ${session.sessionId} idle timeout (${this.idleTimeoutMs}ms). Terminating.`);
       this.closeSession(session.sessionId);
-      for (const listener of this.exitListeners) {
-        listener(session.sessionId, -1);
-      }
     }, this.idleTimeoutMs);
   }
 

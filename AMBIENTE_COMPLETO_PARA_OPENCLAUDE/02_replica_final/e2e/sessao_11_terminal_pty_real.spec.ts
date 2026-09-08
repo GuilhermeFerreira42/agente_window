@@ -1,41 +1,36 @@
 import { test, expect } from '@playwright/test'
-import { BTN, collectConsoleErrors, resetApp, SEL, shot } from './helpers'
+import { BASE_URL, BTN, collectConsoleErrors, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
-  test('T1: abre terminal real, valida PID de processo do SO e saída determinística no xterm.js', async ({ page }) => {
+  test('T1: abre terminal real, mostra prompt antes do input, valida PID e saída determinística no xterm.js', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await resetApp(page)
 
-    // Abrir o painel do terminal
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
     await toggleTerminalBtn.click()
-    await page.waitForTimeout(600)
 
     const terminalPanel = page.locator(SEL.terminalPanel)
     await expect(terminalPanel).toBeVisible({ timeout: 10000 })
     expect(errors, 'não pode haver erros de console ao abrir o terminal').toEqual([])
 
-    // Aguardar o PTY conectar e receber status 'open'
     await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
 
-    // Validar que o PID retornado é um número de processo real do SO
     const pidAttr = await terminalPanel.getAttribute('data-pty-pid')
     expect(pidAttr, 'PID deve estar presente no terminal').not.toBeNull()
     const pid = Number(pidAttr)
     expect(Number.isInteger(pid) && pid > 0, `PID deve ser um número positivo real, recebido: ${pidAttr}`).toBe(true)
 
-    // Focar no terminal e digitar comando com saída determinística
     const terminalContainer = page.locator('.terminal-container').first()
+    const xtermRows = terminalContainer.locator('.xterm-rows')
+    await expect(xtermRows).toContainText(/[$>#]|user@/i, { timeout: 10000 })
+
     const textarea = terminalContainer.locator('textarea.xterm-helper-textarea')
     await textarea.focus()
 
     const marker = `PTY_PROOF_${Date.now()}`
-    // Digita comando com quebra de linha (Enter)
     await page.keyboard.type(`echo ${marker}`)
     await page.keyboard.press('Enter')
 
-    // Validar que a saída exata apareceu na tela do xterm.js
-    const xtermRows = terminalContainer.locator('.xterm-rows')
     await expect(xtermRows).toContainText(marker, { timeout: 12000 })
 
     await shot(page, 'sessao11_t1_terminal_real_pid_output')
@@ -46,7 +41,6 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
 
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
     await toggleTerminalBtn.click()
-    await page.waitForTimeout(400)
 
     const terminalPanel = page.locator(SEL.terminalPanel)
     await expect(terminalPanel).toBeVisible({ timeout: 10000 })
@@ -55,42 +49,36 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
     const initialShellPath = await terminalPanel.getAttribute('data-pty-shell-path')
     expect(initialShellPath, 'shellPath inicial deve existir').toBeTruthy()
 
-    // Abrir seletor de shell
     const shellButton = page.locator('.terminal-shell-button')
     await shellButton.click()
 
     const shellMenu = page.locator('.terminal-shell-menu')
     await expect(shellMenu).toBeVisible()
 
-    // Identificar opções disponíveis no menu
     const options = shellMenu.locator('.terminal-shell-option')
     const optionCount = await options.count()
     expect(optionCount).toBeGreaterThan(0)
 
-    // Clicar numa opção diferente da atual se houver múltiplas
     let targetOption = options.first()
     for (let i = 0; i < optionCount; i++) {
-      const opt = options.nth(i)
-      const isActive = await opt.getAttribute('aria-checked')
+      const option = options.nth(i)
+      const isActive = await option.getAttribute('aria-checked')
       if (isActive !== 'true') {
-        targetOption = opt
+        targetOption = option
         break
       }
     }
 
-    const selectedLabel = await targetOption.textContent()
+    const selectedLabel = (await targetOption.textContent())?.trim() || ''
     await targetOption.click()
-    await page.waitForTimeout(400)
 
-    // Aguardar reconexão do PTY com o novo perfil
     await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
 
     const updatedShellPath = await terminalPanel.getAttribute('data-pty-shell-path')
     expect(updatedShellPath, 'shellPath deve estar preenchido após troca').toBeTruthy()
 
-    // Se havia mais de uma opção, comprova que o caminho ou profile selecionado é refletido
     if (optionCount > 1) {
-      expect(shellButton).toContainText(selectedLabel?.trim() || '')
+      await expect(shellButton).toContainText(selectedLabel)
     }
 
     await shot(page, 'sessao11_t2_shell_profile_switch')
@@ -101,16 +89,13 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
 
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
     await toggleTerminalBtn.click()
-    await page.waitForTimeout(400)
 
     const terminalPanel = page.locator(SEL.terminalPanel)
     await expect(terminalPanel).toBeVisible({ timeout: 10000 })
     await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
 
-    // Clicar em dividir terminal
     const splitButton = page.getByRole('button', { name: 'Dividir terminal' })
     await splitButton.click()
-    await page.waitForTimeout(400)
 
     const splitPanes = page.locator('.terminal-panes.is-split')
     await expect(splitPanes).toBeVisible()
@@ -118,7 +103,6 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
     const splitContainer = page.locator('.terminal-container-split')
     await expect(splitContainer).toBeVisible()
 
-    // Digitar comando no segundo terminal dividido
     const splitTextarea = splitContainer.locator('textarea.xterm-helper-textarea')
     await splitTextarea.focus()
 
@@ -128,10 +112,8 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
 
     await expect(splitContainer.locator('.xterm-rows')).toContainText(splitMarker, { timeout: 12000 })
 
-    // Fechar divisão
     const closeSplitButton = page.getByRole('button', { name: 'Fechar divisão' })
     await closeSplitButton.click()
-    await page.waitForTimeout(300)
     await expect(page.locator('.terminal-panes.is-split')).not.toBeVisible()
 
     await shot(page, 'sessao11_t3_split_terminal')
@@ -142,59 +124,85 @@ test.describe('Sessão 11 — Terminal Real com PTY (Onda A)', () => {
 
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
     await toggleTerminalBtn.click()
-    await page.waitForTimeout(400)
 
     const terminalPanel = page.locator(SEL.terminalPanel)
     await expect(terminalPanel).toBeVisible({ timeout: 10000 })
     await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
 
-    // Maximizar
     const maxButton = page.getByRole('button', { name: 'Maximizar terminal' })
     await maxButton.click()
-    await page.waitForTimeout(300)
     await expect(terminalPanel).toHaveClass(/is-maximized/)
     await expect(page.getByRole('button', { name: 'Restaurar terminal' })).toBeVisible()
 
-    // Restaurar
     const restoreButton = page.getByRole('button', { name: 'Restaurar terminal' })
     await restoreButton.click()
-    await page.waitForTimeout(300)
     await expect(terminalPanel).not.toHaveClass(/is-maximized/)
 
-    // Limpar terminal
     const clearButton = page.getByRole('button', { name: 'Limpar terminal' })
     await clearButton.click()
-    expect(await clearButton.isVisible()).toBe(true)
+    await expect(clearButton).toBeVisible()
 
-    // Fechar terminal
     const closeButton = page.getByRole('button', { name: 'Fechar terminal' })
     await closeButton.click()
-    await page.waitForTimeout(300)
     await expect(terminalPanel).not.toBeVisible()
 
     await shot(page, 'sessao11_t4_menu_actions')
   })
 
-  test('T5: simulação de falha real de conexão (DISCOVERY_FAILED) exibe estado de erro honesto', async ({ page }) => {
-    // Intercepta a rota /pty-port simulando que o pty-server está inacessível
+  test('T5: simulação de falha real de conexão exibe estado de erro honesto', async ({ page }) => {
     await page.route('**/pty-port', (route) => route.abort('connectionrefused'))
 
-    await resetApp(page)
+    await page.goto(BASE_URL)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.waitForSelector(SEL.workbench, { state: 'visible' })
 
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
     await toggleTerminalBtn.click()
-    await page.waitForTimeout(400)
 
     const terminalPanel = page.locator(SEL.terminalPanel)
     await expect(terminalPanel).toBeVisible({ timeout: 10000 })
-
-    // O terminal deve transicionar de forma transparente para status 'error'
     await expect(terminalPanel).toHaveAttribute('data-pty-status', 'error', { timeout: 15000 })
 
-    // A mensagem de erro deve ser renderizada no display do xterm
     const terminalContainer = page.locator('.terminal-container').first()
     await expect(terminalContainer.locator('.xterm-rows')).toContainText('[PTY Error]', { timeout: 10000 })
 
     await shot(page, 'sessao11_t5_pty_error_simulation')
+  })
+
+  test('T6: fechar e reabrir o painel preserva o mesmo PID e o output já emitido', async ({ page }) => {
+    await resetApp(page)
+
+    const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })
+    await toggleTerminalBtn.click()
+
+    const terminalPanel = page.locator(SEL.terminalPanel)
+    await expect(terminalPanel).toBeVisible({ timeout: 10000 })
+    await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
+
+    const pidBeforeToggle = await terminalPanel.getAttribute('data-pty-pid')
+    expect(pidBeforeToggle).toBeTruthy()
+
+    const terminalContainer = page.locator('.terminal-container').first()
+    const textarea = terminalContainer.locator('textarea.xterm-helper-textarea')
+    await textarea.focus()
+
+    const marker = `PID_PROOF_${Date.now()}`
+    await page.keyboard.type(`echo ${marker}`)
+    await page.keyboard.press('Enter')
+    await expect(terminalContainer.locator('.xterm-rows')).toContainText(marker, { timeout: 12000 })
+
+    await toggleTerminalBtn.click()
+    await expect(terminalPanel).not.toBeVisible()
+
+    await toggleTerminalBtn.click()
+    await expect(terminalPanel).toBeVisible({ timeout: 10000 })
+    await expect(terminalPanel).toHaveAttribute('data-pty-status', 'open', { timeout: 15000 })
+    await expect(terminalContainer.locator('.xterm-rows')).toContainText(marker, { timeout: 12000 })
+
+    const pidAfterToggle = await terminalPanel.getAttribute('data-pty-pid')
+    expect(pidAfterToggle).toBe(pidBeforeToggle)
+
+    await shot(page, 'sessao11_t6_same_pid_after_toggle')
   })
 })

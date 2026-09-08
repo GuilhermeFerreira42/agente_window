@@ -110,12 +110,7 @@ F12 | RULE | Régua E2E da Sessão 11 deve ganhar asserts de: (a) prompt visíve
 
 ---
 
-### Fase 13 / Realinhamento Documental com BLUEPRINT Revisão 3 — 2026-09-07
-F13 | MOD | `BLUEPRINT_TERMINAL_REAL.md` promovido para **Revisão 3**, substituindo formalmente a estratégia de `pty-server` standalone com discovery (`/pty-port`, faixa 7681–7699) pela arquitetura de **servidor único / porta única** com WebSocket em `/pty` | A regressão real de 2026-09-07 mostrou que a topologia anterior é frágil em sandbox/Windows e que a próxima execução precisa de uma arquitetura mais simples e auditável | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
-F13 | RULE | O Terminal Real deixa de ser tratado como "encerrado" para fins de planejamento futuro até o fechamento da sequência **E1 -> E2 -> E3 -> E4** | O Gate 0 verde de 2026-09-06 continua histórico, mas não é mais critério suficiente depois do diagnóstico RC1–RC4 reproduzido em 2026-09-07 | `documentacao_viva/CURRENT_STATE.md`, `documentacao_viva/BACKLOG_FUTURO.md`
-F13 | TECH | Paridade visual do terminal passa a ser definida como **reimplementação React sobre `xterm.js`** com tokens/CSS/ícones do VS Code, e não cópia literal do workbench | Os arquivos do terminal do VS Code dependem da infraestrutura inteira do workbench (`InstantiationService`, `ContextKeyService`, `SplitView`, `List` etc.); o objetivo do projeto é paridade observável, não fork do workbench | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`
-F13 | CFG | `HOST=127.0.0.1` permanece decisão imutável da onda do terminal; acesso remoto (`0.0.0.0`) e autenticação ficam explicitamente fora de escopo | Simplifica segurança e reduz variáveis enquanto a fundação e a paridade são corrigidas | `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md`, `documentacao_viva/BACKLOG_FUTURO.md`
-F13 | ADD | Criada a **Onda TR** no backlog com as fases executáveis `TR-01` a `TR-04`, incluindo critérios de aceite e gates obrigatórios | Converter o blueprint aprovado em plano operacional de execução futura sem alterar código nesta sessão | `documentacao_viva/BACKLOG_FUTURO.md`
-F13 | RULE | Esta sincronização documental não altera métricas nem gates já executados; `GATES_EXECUCAO.md` permanece inalterado até nova execução real | O pedido do usuário foi alinhar documentação, não rodar uma nova validação de código | `documentacao_viva/GATES_EXECUCAO.md`, `documentacao_viva/CURRENT_STATE.md`, `documentacao_viva/PHASE_SUMMARY.md`
+### Fase 14 — Validação Final da Fundação do Terminal (E1) — 2026-09-08
+F14 | FIX | Validação local da Fundação do Terminal (E1) concluída com sucesso | Prova real via sonda, typecheck, build e E2E confirmando a resolução de RC1–RC4 e a estabilidade do PID | `GATES_EXECUCAO.md` §8
 
 
