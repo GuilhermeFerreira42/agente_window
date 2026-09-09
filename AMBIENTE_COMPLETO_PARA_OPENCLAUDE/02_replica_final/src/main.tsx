@@ -10,6 +10,8 @@ import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import '@xterm/xterm/css/xterm.css'
 import './styles/theme.css'
 import './styles/app.css'
+import './styles/terminal-vscode.css'
+import './styles/xterm-vscode.css'
 import App from './App'
 import { TerminalSessionProvider } from './providers/TerminalSessionProvider'
 

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import appSource from '../App.tsx?raw'
 import chatPanelSource from '../components/ChatPanel.tsx?raw'
-import terminalSource from '../components/TerminalPanel.tsx?raw'
+import terminalViewSource from '../components/terminal/TerminalView.tsx?raw'
+import splitSashSource from '../components/terminal/SplitSash.tsx?raw'
+import xtermHookSource from '../hooks/useXtermTerminal.ts?raw'
 
 /**
  * P7.6 — Performance.
@@ -11,7 +13,7 @@ import terminalSource from '../components/TerminalPanel.tsx?raw'
  */
 describe('P7.6 resource-hygiene contracts', () => {
   it('balances addEventListener with removeEventListener in each surface', () => {
-    for (const source of [appSource, terminalSource]) {
+    for (const source of [appSource, terminalViewSource, splitSashSource, xtermHookSource]) {
       const adds = (source.match(/addEventListener/g) ?? []).length
       const removes = (source.match(/removeEventListener/g) ?? []).length
       expect(adds).toBeGreaterThan(0)
@@ -40,9 +42,10 @@ describe('P7.6 resource-hygiene contracts', () => {
   })
 
   it('disposes the xterm instance and drops addon refs on cleanup', () => {
-    expect(terminalSource).toContain('instance.dispose()')
-    expect(terminalSource).toContain('terminal.current = null')
-    expect(terminalSource).toMatch(/removeEventListener\('resize', resize\)/)
+    expect(xtermHookSource).toContain('instance.dispose()')
+    expect(xtermHookSource).toContain('instanceRef.current = null')
+    expect(xtermHookSource).toContain('fitAddonRef.current = null')
+    expect(xtermHookSource).toMatch(/removeEventListener\('resize', handleResize\)/)
   })
 
   it('does not schedule setCopied after unmount (runtime)', async () => {
@@ -69,4 +72,3 @@ describe('P7.6 resource-hygiene contracts', () => {
     }
   })
 })
-

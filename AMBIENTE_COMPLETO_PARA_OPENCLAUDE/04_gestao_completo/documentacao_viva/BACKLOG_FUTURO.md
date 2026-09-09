@@ -67,7 +67,7 @@ DECISOES_EXTRAS:
 
 ## Onda TR — Terminal Real: Correção de Regressão + Servidor Único + Paridade Visual
 > Pré-requisito: diagnóstico de regressão documentado em `GATES_EXECUCAO.md` §7
-> Fonte mandatória: `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md` **Revisão 3**
+> Fontes mandatórias: `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md` **Revisão 3** + `terminal_vscode_completo/plano_implementacao/README.md` + `terminal_vscode_completo/plano_implementacao/REVISAO_CRITICA.md`
 
 ### Itens
 
@@ -75,12 +75,12 @@ DECISOES_EXTRAS:
 |----|------------|------------------------|----------------------|---------------------|--------|
 | TR-01 | Fase E1 — Fundação / RC1–RC4 | Corrigir loop de `setState`, re-subscribe do output, reconexão ao mesmo PTY e resize inicial; filtrar PowerShell fora do Windows | `src/providers/TerminalSessionProvider.tsx`, `src/components/TerminalPanel.tsx`, `src/hooks/usePtySession.ts`, `pty-server/src/ptyManager.ts`, `pty-server/src/wsHandler.ts`, `pty-server/src/shellDetector.ts` | `probe-terminal.mjs` verde: prompt visível antes do input, `echo` aparece no output e o mesmo PID sobrevive ao fechar/reabrir o painel | ✅ CONCLUÍDO — Validado 2026-09-08 |
 | TR-02 | Fase E2 — Servidor Único / Porta Única | Eliminar processo standalone + discovery de porta; servir terminal na mesma origem via `/pty` em dev e produção | `vite.config.ts`, `vite-plugin-pty.ts`, `server.mjs`, `src/hooks/usePtySession.ts`, `pty-server/` | Nenhuma chamada a `discoverPtyPort()` ou `/pty-port`; app e WS funcionando na mesma origem | ✅ CONCLUÍDO — Validado 2026-09-08 |
-| TR-03 | Fase E3 — Paridade Visual | Tokens, CSS, ícones e chrome do terminal inspirados no VS Code real, reimplementados em React sobre `xterm.js` | `src/styles/terminal-vscode.css`, `src/styles/xterm-vscode.css`, `src/components/TerminalTabsList.tsx`, assets `codicon` | Screenshot E2E com tema `#1e1e1e`, abas à direita, borda ativa correta e action bar consistente | PRÓXIMO PASSO (PRONTO PARA INICIAR) |
-| TR-04 | Fase E4 — Fechamento / Régua Final | Reforçar `sessao_11`, validar suíte completa, build e arquivamento documental na mesma sessão | `e2e/sessao_11_*`, `GATES_EXECUCAO.md`, `CURRENT_STATE.md`, `DECISION_LOG.md`, `PHASE_SUMMARY.md` | `npm run typecheck` + `npm run test` + `npx playwright test` + `npm run build` todos verdes; docs vivos atualizados | PENDENTE |
+| TR-03 | Fase E3 — Paridade Visual | Internalizar e executar o blueprint detalhado da E3: tokens, CSS, chrome React, tabs, shell picker, split visual e tema reativo sobre `xterm.js` | `src/components/TerminalPanel.tsx`, `src/components/terminal/*`, `src/hooks/useXtermTerminal.ts`, `src/hooks/useTerminalTheme.ts`, `src/domain/terminalInstances.ts`, `src/styles/terminal-vscode.css`, `src/styles/xterm-vscode.css`, `terminal_vscode_completo/plano_implementacao/*` | Painel desktop flat, abas à direita, action bar/shell picker consistentes, clear sem ressuscitar, split com sash redimensionável, tema reativo sem recriar PTY, contexto por botão direito e regressão E1/E2 protegida por Gate 0 + Sessão 11 + `sessao_11b_visual` + `sessao_11c_clear_active` + `sessao_11d_split_sash` + `sessao_11e_theme_states` + `sessao_11f_context_menu` | ✅ CONCLUÍDO — Etapas 0, 1, 2, 3, 4, 5 e 6 aplicadas/validadas; limpeza final de CSS e alinhamento dos contratos estáticos concluídos |
+| TR-04 | Fase E4 — Fechamento / Régua Final | Reforçar `sessao_11`, **reconciliar os gaps vistos na validação local Windows** (bootstrap do `pty-server`, click-outside do menu, N terminais/lista, layout/base, PTY/WebSocket, supressão de demo/debug, resize vertical, X vs lixeira) e só então validar suíte completa, build e arquivamento documental na mesma sessão | `e2e/sessao_11_*`, `GATES_EXECUCAO.md`, `CURRENT_STATE.md`, `DECISION_LOG.md`, `PHASE_SUMMARY.md` | `npm run typecheck` + `npm run test` + `npx playwright test` + `npm run build` todos verdes; divergências locais Windows eliminadas; docs vivos atualizados | PENDENTE — reconciliação local aberta antes do fechamento final |
 
 ### Meta da Onda TR
 - **Critério binário:** terminal real revalidado sob a Revisão 3, com arquitetura de servidor único e paridade visual aprovada.
-- **Status:** EM ANDAMENTO — E1 ✅, E2 ✅, **E3 PRÓXIMO PASSO EXATO**
+- **Status:** EM ANDAMENTO — E1 ✅, E2 ✅ e checkpoint E3 verde na régua interna; a validação local Windows reabriu uma reconciliação obrigatória antes da E4 final
 
 ### CONTRATOS_DA_ONDA TR — Revisão 3 (vigente)
 ```yaml
@@ -95,12 +95,16 @@ ORDEM_OBRIGATORIA:
 DECISOES_IMUTAVEIS_DESTA_REVISAO:
   - "Esconder/fechar painel, trocar de terminal ou trocar de sessão NÃO mata o PTY."
   - "A régua mínima do terminal exige prompt visível antes de input e o mesmo PID após toggle do painel."
-  - "A arquitetura futura remove o discovery de porta e centraliza tudo na mesma origem com endpoint /pty."
-  - "Paridade visual não é copy/paste literal do workbench; é reimplementação React sobre xterm.js usando tokens/CSS/ícones do VS Code."
-  - "HOST do produto permanece 127.0.0.1 nesta onda; acesso remoto fica fora de escopo."
+  - "A arquitetura vigente remove o discovery de porta e centraliza tudo na mesma origem com endpoint /pty."
+  - "A E3 segue o blueprint detalhado internalizado em terminal_vscode_completo/plano_implementacao/."
+  - "Paridade visual continua sendo reimplementação React sobre xterm.js, sem reabrir a base funcional da E1/E2."
+  - "No desktop, o terminal da E3 é flat/ponta a ponta; mobile/single-pane/dock preservam o comportamento próprio do app."
+  - "A E3 mantém lucide-react 16px nesta onda; codicon fica como melhoria pós-E3."
+  - "Limpar terminal atua só na instância ativa e o conteúdo limpo não pode ressuscitar ao reabrir o painel."
+  - "Dev e preview seguem a origem do servidor ativo (`vite --host 0.0.0.0:5173`, `server.mjs` default `0.0.0.0:4173`) mantendo WS same-origin em /pty."
 
 FORA_DE_ESCOPO:
-  - "Acesso remoto (0.0.0.0) e autenticação de terminal."
+  - "Exposição remota do terminal para redes externas e autenticação dedicada."
   - "Ir para Diretório Recente / Executar Comando Recente (WB-01, WB-02)."
   - "Executar Arquivo Ativo / Executar Texto Selecionado (WB-03, WB-04)."
   - "Serviço de Voz (WB-05)."

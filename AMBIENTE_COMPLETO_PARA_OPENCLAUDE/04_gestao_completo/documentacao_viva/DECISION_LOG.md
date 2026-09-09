@@ -132,3 +132,46 @@ F14 | RULE | Fluxo principal **não depende mais** de `discoverPtyPort()` nem `/
 F14 | CFG | `HOST=127.0.0.1` mantido para dev/preview (server.mjs usa 0.0.0.0 por compat, mas endpoint `/pty` funciona same-origin) | Decisão imutável da Revisão 3 respeitada | `BLUEPRINT_TERMINAL_REAL.md`
 
 
+
+
+---
+
+### Fase 15 / Internalização do Blueprint Operacional da E3 — 2026-09-09
+F15 | ADD | Internalizar o plano detalhado da E3 na governança viva apontando para `terminal_vscode_completo/plano_implementacao/` e `REVISAO_CRITICA.md` | Evitar que o blueprint operacional fique solto fora da documentação canônica e permitir retomada contínua por qualquer IA | `KANBAN.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `PHASE_SUMMARY.md`, `BLUEPRINT_TERMINAL_REAL.md`
+F15 | RULE | TR-03 passa para EM ANDAMENTO a partir da Etapa 0 do plano detalhado | O blueprint da E3 foi fechado o suficiente para iniciar execução sem reabrir E1/E2 | `KANBAN.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`
+F15 | CFG | Corrigir a governança para a topologia real validada da E2: dev em `vite --host 0.0.0.0:5173`, preview integrado com `server.mjs` default `0.0.0.0:4173`, sempre same-origin em `/pty` | Alinhar documentação viva ao código e às validações reais, removendo o resíduo textual de `127.0.0.1` como contrato central da onda | `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `BLUEPRINT_TERMINAL_REAL.md`
+F15 | TECH | Travar as decisões operacionais da E3: painel desktop flat, abas de terminais à direita, `lucide-react` 16px nesta onda, `clear` sem ressuscitar histórico e estado de instâncias por agente-sessão | Eliminar ambiguidade antes do início da implementação e proteger o recorte exato da paridade visual | `terminal_vscode_completo/plano_implementacao/03_requisitos_funcionais_e_aceite.md`, `06_decisoes_adr_tradeoffs.md`, `08_riscos_e_definition_of_done.md`
+F15 | RULE | A E3 continua sendo camada de apresentação/UX sobre a base E1/E2 já validada; qualquer refactor deve manter Gate 0, Sessão 11 e o contrato `/pty` intactos | Impedir que o trabalho visual reabra regressões estruturais do terminal real | `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `terminal_vscode_completo/plano_implementacao/05_plano_testes.md`
+
+---
+
+### Fase 16 / E3 Etapa 4 — Split visual redimensionável — 2026-09-09
+F16 | ADD | Criados `TerminalGroup` e `SplitSash` como camada explícita do split do terminal | Separar a composição visual do split do `TerminalPanel` e preparar a topologia redimensionável prevista no blueprint da E3 | `src/components/terminal/TerminalGroup.tsx`, `src/components/terminal/SplitSash.tsx`
+F16 | MOD | `TerminalPanel` passou a delegar o split ao `TerminalGroup`, com `splitRatio` local, sash real e `fitAndSync()` reaplicado nas panes após resize | Garantir split redimensionável sem matar PTY nem reabrir a arquitetura da E2 | `src/components/TerminalPanel.tsx`, `src/hooks/useXtermTerminal.ts`
+F16 | ADD | Nova régua de validação `sessao_11d_split_sash.spec.ts` + testes unitários de `SplitSash`/`TerminalGroup` | Blindar a Etapa 4 com prova real de drag do sash, resize visual e terminal funcional após redimensionamento | `e2e/sessao_11d_split_sash.spec.ts`, `src/__tests__/SplitSash.test.tsx`, `src/__tests__/TerminalGroup.test.tsx`
+F16 | FIX | VS Code/code-server restaurado após queda do serviço durante a execução, usando o fluxo validado com `TMPDIR=/home/user/.cache` | Preservar a preferência do usuário de manter a visualização do VS Code ativa ao final do bloco | `/home/user/restore-code-server.sh`, `/home/user/code-server-main`
+
+---
+
+### Fase 17 / E3 Etapa 5 — Tema reativo + estados por instância — 2026-09-09
+F17 | MOD | `useXtermTerminal` passa a reaplicar `theme` na instância viva do xterm, com `refresh()`/`fitAndSync()` após toggle dark-light, sem recriar PTY | Fechar o tema reativo da E3 preservando PID e scrollback das instâncias abertas | `src/hooks/useXtermTerminal.ts`
+F17 | MOD | `TerminalView` passa a expor `data-pty-status`, `data-pty-pid` e `data-pty-shell-path` por instância/pane | Tornar observável a saúde operacional real de cada terminal no DOM e nos testes | `src/components/terminal/TerminalView.tsx`
+F17 | MOD | `TerminalPanel` passa a renderizar banner honesto para `error`/`closed` e estilos dedicados de estado | Dar feedback claro sem esconder o estado real nem matar o conteúdo visível do terminal | `src/components/TerminalPanel.tsx`, `src/styles/terminal-vscode.css`
+F17 | ADD | Nova régua de validação `sessao_11e_theme_states.spec.ts` e cobertura unitária dos hooks/estado da Etapa 5 | Blindar a troca de tema sem recriar PTY e o estado `closed` com scrollback preservado | `e2e/sessao_11e_theme_states.spec.ts`, `src/__tests__/useTerminalTheme.test.ts`, `src/__tests__/useXtermTerminal.test.tsx`, `src/__tests__/TerminalPanel.test.tsx`
+
+
+---
+
+### Fase 18 / E3 Etapa 6 — Contexto do terminal + regressão mobile — 2026-09-09
+F18 | MOD | `TerminalPanel` passa a integrar o `ContextMenu` reutilizável do app para ações por botão direito no terminal | Fechar RF-G sem reabrir a arquitetura PTY nem duplicar um menu paralelo | `src/components/TerminalPanel.tsx`, `src/components/ContextMenu.tsx`
+F18 | MOD | `TerminalView`/`useXtermTerminal` passam a expor operações de seleção (`hasSelection`, `getSelection`, `selectAll`) na instância viva | Permitir copiar/selecionar tudo sobre o xterm sem recriar terminal nem quebrar o foco | `src/components/terminal/TerminalView.tsx`, `src/hooks/useXtermTerminal.ts`
+F18 | ADD | Nova régua `sessao_11f_context_menu.spec.ts` e revalidação explícita de `sessao_06_mobile.spec.ts` | Blindar o menu de contexto do terminal e garantir que o bloco da Etapa 6 não quebrou mobile/single-pane | `e2e/sessao_11f_context_menu.spec.ts`, `e2e/sessao_06_mobile.spec.ts`, `src/__tests__/TerminalPanel.test.tsx`
+F18 | OPS | Após `npm ci`, foi necessário restaurar navegadores/deps do Playwright e religar app/VS Code para reexecutar a régua real | Node modules e binários auxiliares não persistem de forma confiável entre ondas de execução | `02_replica_final/node_modules`, `/home/user/.cache/ms-playwright`, `/home/user/code-server-main`
+
+
+---
+
+### Fase 19 / E3 Etapa 6 — Limpeza final de CSS + alinhamento de testes — 2026-09-09
+F19 | DEL | Remover do `app.css` os blocos legados/duplicados do terminal e manter a fonte de verdade visual em `terminal-vscode.css`/`xterm-vscode.css` | A E3 já tinha stylesheet dedicado; manter regras duplicadas no CSS global aumentava risco de regressão e confundia os contratos de densidade/layout | `src/styles/app.css`, `src/styles/terminal-vscode.css`, `src/styles/xterm-vscode.css`
+F19 | MOD | Reapontar contratos estáticos do terminal para os subcomponentes e hooks reais da arquitetura final | `TerminalPanel` deixou de concentrar ícones/listeners/dispose; os testes precisavam seguir a decomposição final da E3 em vez de acusar falsos negativos | `src/__tests__/layoutDensity.test.ts`, `src/__tests__/iconLabels.test.ts`, `src/__tests__/performance.test.tsx`
+F19 | RULE | A limpeza final da E3 só é aceita com typecheck, suíte Vitest completa, probe real e E2E prático do terminal ainda verdes na mesma sessão | Garantir que a consolidação visual não reabra regressões da E1/E2 ou da UX já estabilizada da E3 | `documentacao_viva/GATES_EXECUCAO.md`, `e2e/sessao_11_terminal_pty_real.spec.ts`, `e2e/sessao_11c_clear_active.spec.ts`, `e2e/sessao_11d_split_sash.spec.ts`

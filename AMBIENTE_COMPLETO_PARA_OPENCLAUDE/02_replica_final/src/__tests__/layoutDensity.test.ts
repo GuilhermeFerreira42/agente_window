@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import themeSource from '../styles/theme.css?raw'
 import appSource from '../styles/app.css?raw'
+import terminalSource from '../styles/terminal-vscode.css?raw'
+import xtermSource from '../styles/xterm-vscode.css?raw'
+import entrySource from '../main.tsx?raw'
 import appComponentSource from '../App.tsx?raw'
 import chatInputSource from '../components/ChatInput.tsx?raw'
 
@@ -28,8 +31,21 @@ describe('Agents window density and layout contracts', () => {
     expect(rule('.auxiliary-bar')).toContain('flex: 0 0 var(--auxiliary-width)')
     expect(rule('.auxiliary-bar')).toContain('padding-left: 5px')
     expect(rule('.auxiliary-bar')).toContain('border-radius: 0 var(--vscode-cornerRadius-large) var(--vscode-cornerRadius-large) 0')
-    expect(rule('.terminal-panel')).toContain('flex: 0 0 var(--terminal-height)')
-    expect(rule('.terminal-panel')).toContain('border: 1px solid var(--vscode-agentsBottomPanel-border)')
+    expect(rule('.terminal-panel', terminalSource)).toContain('flex: 0 0 var(--terminal-height)')
+    expect(rule('.terminal-panel', terminalSource)).toContain('border-top: var(--vscode-strokeThickness) solid var(--vscode-panel-border)')
+  })
+
+  it('keeps terminal CSS isolated in dedicated files', () => {
+    expect(entrySource).toContain("import './styles/terminal-vscode.css'")
+    expect(entrySource).toContain("import './styles/xterm-vscode.css'")
+    expect(appSource).not.toMatch(/^\.terminal-panel\s*\{/m)
+    expect(appSource).not.toMatch(/^\.terminal-shell-menu\s*\{/m)
+    expect(appSource).not.toMatch(/^\.terminal-tabs\s*\{/m)
+    expect(terminalSource).toMatch(/^\.terminal-panel\s*\{/m)
+    expect(terminalSource).toMatch(/^\.terminal-shell-menu\s*\{/m)
+    expect(terminalSource).toMatch(/^\.single-pane \.terminal-panel\s*\{/m)
+    expect(terminalSource).toMatch(/^\.custom-view-active \.terminal-panel\s*\{/m)
+    expect(xtermSource).toMatch(/\.terminal-panel \.terminal-container \.xterm\s*\{/)
   })
 
   it('caps transcript and composer content at the restored 950px band', () => {
@@ -69,4 +85,3 @@ describe('Agents window density and layout contracts', () => {
     expect(rule('.single-pane .main-surface')).toContain('border-radius: 0')
   })
 })
-

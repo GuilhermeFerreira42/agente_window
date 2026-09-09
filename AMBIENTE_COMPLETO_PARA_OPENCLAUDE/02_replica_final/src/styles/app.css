@@ -3302,75 +3302,6 @@ svg {
   color: var(--vscode-foreground);
 }
 
-.terminal-panel {
-  height: var(--terminal-height);
-  min-height: 120px;
-  flex: 0 0 var(--terminal-height);
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--vscode-agentsBottomPanel-border);
-  border-radius: var(--vscode-cornerRadius-large);
-  background: var(--vscode-panel-background);
-  box-sizing: border-box;
-  z-index: 2;
-}
-
-.terminal-panel.is-maximized {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  height: auto;
-  min-height: 0;
-  border-top: 0;
-}
-
-.terminal-panel.is-maximized .terminal-container {
-  padding: var(--vscode-spacing-size100);
-}
-
-.terminal-panel.is-maximized .terminal-header {
-  min-height: 36px;
-}
-
-.terminal-header {
-  min-height: 30px;
-  padding: 0 8px 0 10px;
-  background: var(--vscode-panel-background);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.terminal-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  color: var(--vscode-foreground);
-  font-size: var(--vscode-fontSize-label1);
-  font-weight: var(--vscode-fontWeight-semiBold);
-}
-
-.terminal-status {
-  color: var(--vscode-descriptionForeground);
-  font-size: var(--vscode-fontSize-label2);
-}
-
-.terminal-container {
-  min-height: 0;
-  flex: 1;
-  padding: 5px 8px;
-  overflow: hidden;
-}
-
-.terminal-container .xterm {
-  height: 100%;
-  padding: 3px;
-}
-
-.terminal-container .xterm-viewport {
-  background: var(--vscode-panel-background) !important;
-}
 
 .mobile-dock-tabs {
   min-height: 35px;
@@ -3865,179 +3796,6 @@ svg {
   z-index: 2;
 }
 
-/* Terminal — Onda 4 / E8 (abas Output/Problems, seletor de shell, split) */
-.terminal-tabs {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.terminal-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  background: transparent;
-  color: var(--vscode-descriptionForeground);
-  font-size: var(--vscode-fontSize-label1);
-  cursor: pointer;
-}
-
-.terminal-tab.is-active {
-  color: var(--vscode-foreground);
-  border-bottom-color: var(--vscode-panelTitle-activeBorder);
-}
-
-.terminal-tab-badge {
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--vscode-list-warningForeground);
-  color: var(--vscode-panel-background);
-  font-size: 10px;
-  text-align: center;
-}
-
-.terminal-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.terminal-shell-picker {
-  position: relative;
-}
-
-.terminal-shell-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: auto;
-  padding: 0 6px;
-}
-
-.terminal-shell-name {
-  font-size: var(--vscode-fontSize-label2);
-}
-
-.terminal-shell-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 20;
-  min-width: 120px;
-  padding: 4px;
-  border: 1px solid var(--vscode-menu-border);
-  border-radius: var(--vscode-cornerRadius-medium, 6px);
-  background: var(--vscode-menu-background);
-  box-shadow: 0 4px 12px var(--vscode-widget-shadow, transparent);
-}
-
-.terminal-shell-option {
-  display: block;
-  width: 100%;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: var(--vscode-cornerRadius-small, 4px);
-  background: transparent;
-  color: var(--vscode-menu-foreground);
-  text-align: left;
-  cursor: pointer;
-}
-
-.terminal-shell-option:hover,
-.terminal-shell-option.is-active {
-  background: var(--vscode-list-activeSelectionBackground);
-  color: var(--vscode-list-activeSelectionForeground);
-}
-
-.terminal-body {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.terminal-panes {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.terminal-panes.is-split .terminal-container {
-  border-right: 1px solid var(--vscode-panel-border);
-}
-
-.terminal-container-split {
-  border-right: 0 !important;
-}
-
-.terminal-split-output {
-  margin: 0;
-  padding: 5px 8px;
-  color: var(--vscode-descriptionForeground);
-  font-family: var(--monaco-monospace-font);
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
-.terminal-output-view,
-.terminal-problems-view {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 6px 10px;
-}
-
-.terminal-output-lines {
-  margin: 0;
-  color: var(--vscode-foreground);
-  font-family: var(--monaco-monospace-font);
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
-.terminal-problems-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.terminal-problem {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: var(--vscode-fontSize-label1);
-  color: var(--vscode-foreground);
-}
-
-.terminal-problem-severity.is-warning {
-  color: var(--vscode-list-warningForeground);
-}
-
-.terminal-problem-severity.is-info {
-  color: var(--vscode-charts-blue);
-}
-
-.terminal-problem-location {
-  margin-left: auto;
-  color: var(--vscode-descriptionForeground);
-  font-size: var(--vscode-fontSize-label2);
-}
-
-.terminal-problems-empty {
-  margin: 0;
-  color: var(--vscode-descriptionForeground);
-  font-size: var(--vscode-fontSize-label1);
-}
 
 /* Floating sessions picker — Onda 5 / E9 (Command Center → Show Sessions) */
 .sessions-picker-overlay {
@@ -4711,7 +4469,6 @@ svg {
 }
 
 
-
 /* ===== FIXES PRODUCAO REAL - VALIDAÇÃO 3 ===== */
 
 /* SessionLanding chip clicável (06:13 original) */
@@ -4832,26 +4589,6 @@ svg {
   margin-bottom: 12px;
 }
 
-/* Terminal real - agora aceita digitação */
-.terminal-container {
-  flex: 1;
-  overflow: hidden;
-}
-.terminal-container .xterm {
-  height: 100%;
-  padding: 8px;
-}
-.terminal-split-output {
-  margin: 0;
-  padding: 8px;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 12px;
-  white-space: pre-wrap;
-  background: var(--vscode-panel-background);
-  color: var(--vscode-foreground);
-  overflow: auto;
-  height: 100%;
-}
 
 /* Layout Topologia - Sessions Part flexível que absorve resize (LAYOUT.md) */
 .workbench-body {
@@ -4951,11 +4688,6 @@ svg {
   min-height: 0;
 }
 
-/* Com custom view ativa o painel inferior não participa da cadeia principal. */
-.custom-view-active .terminal-panel {
-  display: none;
-}
-
 /* Tab bar invariante (keepForDockedTabBar) */
 .editor-tabs-bar {
   display: flex;
@@ -4998,21 +4730,6 @@ svg {
   align-items: center;
 }
 
-/* Terminal panes split */
-.terminal-panes {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-}
-.terminal-panes.is-split {
-  gap: 1px;
-  background: var(--vscode-panel-border);
-}
-.terminal-panes.is-split .terminal-container {
-  flex: 1;
-}
 
 /* Production real badges */
 .auxiliary-subtitle {

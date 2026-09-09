@@ -263,3 +263,141 @@ Validar localmente (Windows) a migração do terminal para arquitetura single-po
 - Screenshot E2E como critério de aceite
 
 
+
+
+---
+
+## Fase 15 — INTERNALIZAÇÃO DO PLANO OPERACIONAL DA E3
+> Data de Conclusão: 2026-09-09 | Status: ✅ Documentação sincronizada para início da execução
+
+### Objetivo
+Absorver o blueprint detalhado da **Onda TR — Fase E3 (Paridade Visual do Terminal)** pela governança viva do projeto, mover `TR-03` para **EM ANDAMENTO** e deixar explícito o próximo passo operacional da implementação sem reabrir E1/E2.
+
+### Entregáveis
+- `KANBAN.md` — `TR-03` movido para **EM ANDAMENTO**, com referência ao blueprint detalhado e próxima ação definida como **Etapa 0**.
+- `documentacao_viva/CURRENT_STATE.md` — handoff reescrito para refletir que a E3 agora está internalizada e pronta para execução direta.
+- `documentacao_viva/BACKLOG_FUTURO.md` — Onda TR atualizada com `TR-03` em andamento, decisões operacionais da E3 e topologia real same-origin da E2.
+- `documentacao_viva/DECISION_LOG.md` — registro formal da internalização do plano, da correção do contrato textual de host/porta e das decisões fechadas da E3.
+- `documentacao_viva/BLUEPRINT_TERMINAL_REAL.md` — macro-blueprint passa a apontar explicitamente para o plano detalhado em `terminal_vscode_completo/plano_implementacao/`.
+
+### Observações de Validação
+- **Nenhum gate de código foi reexecutado nesta fase documental.**
+- A última evidência executada do terminal continua em `documentacao_viva/GATES_EXECUCAO.md`, especialmente a validação local da E2 e os gates históricos do terminal real.
+- A fase seguinte deixa de ser "planejar a E3" e passa a ser **executar a Etapa 0 do plano detalhado**.
+
+---
+
+## Fase 16 — E3 ETAPA 4 / TERMINALGROUP + SPLITSASH
+> Data de Conclusão: 2026-09-09 | Status: ✅ Código e validação concluídos
+
+### Objetivo
+Introduzir a camada visual redimensionável do split do terminal, extraindo `TerminalGroup` e `SplitSash`, sem quebrar a base same-origin em `/pty`, a persistência do PTY e os fluxos já estabilizados das Etapas 0–3.
+
+### Entregáveis
+- `src/components/terminal/TerminalGroup.tsx` — novo compositor do grupo de panes do terminal.
+- `src/components/terminal/SplitSash.tsx` — separador real com drag para redimensionamento horizontal do split.
+- `src/components/TerminalPanel.tsx` — adoção de `splitRatio`, delegação do split ao `TerminalGroup` e reexecução de `fitAndSync()` após resize.
+- `src/styles/terminal-vscode.css` — estilos do sash e das panes agrupadas.
+- `src/__tests__/SplitSash.test.tsx` e `src/__tests__/TerminalGroup.test.tsx` — nova cobertura unitária.
+- `e2e/sessao_11d_split_sash.spec.ts` — validação prática do sash com redimensionamento real e terminal funcional depois do resize.
+
+### Validação Executada
+- `npm run typecheck` ✅
+- `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts` ✅ (`9 arquivos / 26 testes`)
+- `node probe-terminal.mjs` ✅ (`PROBE_OK`, `PID=3765`)
+- `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts` ✅ (`10/10`)
+- VS Code restaurado com `TMPDIR=/home/user/.cache bash /home/user/restore-code-server.sh` e novo start do serviço em `:8080` ✅
+
+### Resultado Líquido
+- Split do terminal agora tem **sash real e redimensionável**.
+- As duas panes continuam funcionais após o resize.
+- A base E1/E2, a multi-instância da Etapa 2 e o `clear` focado da Etapa 3 permaneceram verdes.
+- Próxima frente operacional: **Etapa 5** (tema reativo completo + estados erro/closed/maximizado refinados).
+
+---
+
+## Fase 17 — E3 ETAPA 5 / TEMA REATIVO + ESTADOS POR INSTÂNCIA
+> Data de Conclusão: 2026-09-09 | Status: ✅ Código e validação concluídos
+
+### Objetivo
+Fechar a Etapa 5 da E3 garantindo troca de tema dark/light no xterm sem recriar PTY, exposição de estado real por instância e feedback honesto para `error`/`closed`, preservando a base same-origin estabilizada nas fases E1/E2.
+
+### Entregáveis
+- `src/hooks/useXtermTerminal.ts` — reaplicação de `theme` na instância viva com `refresh()` e `fitAndSync()` sem recriar terminal.
+- `src/components/terminal/TerminalView.tsx` — exposição de `data-pty-status`, `data-pty-pid` e `data-pty-shell-path` por instância/pane.
+- `src/components/TerminalPanel.tsx` — banner de estado para `error`/`closed` e leitura da sessão visível para feedback operacional honesto.
+- `src/styles/terminal-vscode.css` — refinamentos visuais dos estados `error`/`closed` e do banner.
+- `src/__tests__/useTerminalTheme.test.ts`, `src/__tests__/useXtermTerminal.test.tsx` e ajuste em `src/__tests__/TerminalPanel.test.tsx` — cobertura unitária da Etapa 5.
+- `e2e/sessao_11e_theme_states.spec.ts` — validação prática da troca de tema sem recriar PTY e do estado `closed` com scrollback preservado.
+
+### Validação Executada
+- `npm run typecheck` ✅
+- `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts src/__tests__/useTerminalTheme.test.ts src/__tests__/useXtermTerminal.test.tsx` ✅ (`11 arquivos / 29 testes`)
+- `node probe-terminal.mjs` ✅ (`PROBE_OK`, `PID=4963`)
+- `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts e2e/sessao_11e_theme_states.spec.ts` ✅ (`12/12`)
+
+### Resultado Líquido
+- O tema do terminal agora reage ao toggle dark/light **sem recriar PTY**.
+- Cada instância/pane expõe seu próprio estado operacional e metadados essenciais no DOM.
+- `closed` mantém scrollback visível e `error`/`closed` exibem feedback honesto no painel.
+- Próxima frente operacional: **E4** (build de fechamento + arquivamento documental final da Onda TR).
+
+
+---
+
+## Fase 18 — E3 ETAPA 6 / CONTEXTO DO TERMINAL + REGRESSÃO MOBILE
+> Data de Conclusão: 2026-09-09 | Status: ✅ Parcial da Etapa 6 concluído
+
+### Objetivo
+Abrir a Etapa 6 em bloco pequeno e seguro, integrando o menu de contexto do terminal com ações reais por instância/pane e revalidando que a camada visual do terminal não quebrou o modo mobile/single-pane.
+
+### Entregáveis
+- `src/components/TerminalPanel.tsx` — integra `ContextMenu` reutilizável ao terminal e direciona ações para a instância/pane focada.
+- `src/components/terminal/TerminalView.tsx` — passa a encaminhar `onContextMenu` e expõe operações de seleção na handle da view.
+- `src/hooks/useXtermTerminal.ts` — adiciona `hasSelection()`, `getSelection()` e `selectAll()` sem recriar o terminal.
+- `src/__tests__/TerminalPanel.test.tsx` — nova cobertura unitária do menu de contexto.
+- `e2e/sessao_11f_context_menu.spec.ts` — validação prática do botão direito, fechamento com Escape e kill honesto via contexto.
+
+### Validação Executada
+- `npm ci` no app e no `pty-server` ✅ (restauração de dependências para reexecutar os gates)
+- `npm run typecheck` ✅
+- `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts src/__tests__/useTerminalTheme.test.ts src/__tests__/useXtermTerminal.test.tsx` ✅ (`11 arquivos / 31 testes`)
+- `node probe-terminal.mjs` ✅ (`PROBE_OK`, `PID=5675`)
+- `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts e2e/sessao_11e_theme_states.spec.ts e2e/sessao_11f_context_menu.spec.ts e2e/sessao_06_mobile.spec.ts` ✅ (`19/19`)
+- VS Code restaurado e religado em `:8080`; app Vite religada em `:5173` ✅
+
+### Resultado Líquido
+- O terminal agora abre menu de contexto via botão direito com `Copiar`, `Colar`, `Selecionar tudo`, `Limpar terminal` e `Encerrar processo`.
+- As ações respeitam a instância/pane focada, sem regressão perceptível na base E1/E2/E3 já verde.
+- A régua mobile (`sessao_06_mobile`) permaneceu verde após o novo encaixe visual/comportamental.
+- **Ainda falta concluir a Etapa 6** com limpeza/consolidação final de CSS, suíte completa de fechamento e build da E4.
+
+
+---
+
+## Fase 19 — E3 ETAPA 6 / LIMPEZA FINAL DE CSS + ALINHAMENTO DE TESTES
+> Data de Conclusão: 2026-09-09 | Status: ✅ Código e validação concluídos
+
+### Objetivo
+Fechar a Etapa 6 da E3 removendo CSS legado/duplicado do terminal do `app.css`, consolidando o chrome do terminal nos stylesheets dedicados e realinhando os contratos estáticos da suíte para a arquitetura final da E3.
+
+### Entregáveis
+- `src/styles/app.css` — remoção dos blocos legados/duplicados do terminal que já pertenciam à camada dedicada.
+- `src/styles/terminal-vscode.css` — consolidação das regras do terminal, incluindo variantes `single-pane` e `custom-view-active`.
+- `src/__tests__/layoutDensity.test.ts` — contratos de layout do terminal passam a validar os arquivos dedicados de CSS e os imports em `main.tsx`.
+- `src/__tests__/iconLabels.test.ts` — contratos de ícones do terminal passam a refletir a composição por subcomponentes (`TerminalActionBar`, `ShellPicker`, `TerminalInstanceTabs`).
+- `src/__tests__/performance.test.tsx` — contratos de listeners/dispose passam a mirar `TerminalView`, `SplitSash` e `useXtermTerminal`.
+
+### Validação Executada
+- `npm ci` no app e no `pty-server` ✅
+- `npm run typecheck` ✅
+- `npm run test` ✅ (`52 arquivos / 389 testes`)
+- `node probe-terminal.mjs` ✅ (`PROBE_OK`, `PID=6939`)
+- `npx playwright install chromium && npx playwright install-deps chromium` ✅
+- `npx playwright test e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts` ✅ (`8/8`)
+
+### Resultado Líquido
+- O CSS do terminal ficou **isolado** na camada dedicada (`terminal-vscode.css` + `xterm-vscode.css`).
+- Os contratos estáticos foram alinhados à arquitetura final da E3, eliminando acoplamentos antigos ao `app.css` e ao `TerminalPanel` monolítico.
+- A régua prática continuou verde após a limpeza final, incluindo abrir terminal, maximizar/restaurar, split, digitação e `clear`.
+- Próxima frente operacional: **E4** (build de fechamento + arquivamento documental final).

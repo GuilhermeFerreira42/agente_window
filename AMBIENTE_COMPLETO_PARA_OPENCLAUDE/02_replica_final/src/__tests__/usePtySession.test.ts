@@ -125,6 +125,51 @@ describe('usePtySession', () => {
     )
   })
 
+  it('clears the buffered output for future listeners without touching the socket', async () => {
+    const { result } = renderHook(() =>
+      usePtySession({ sessionId: 'session-test-clear' })
+    )
+
+    await vi.waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1)
+    })
+
+    const ws = MockWebSocket.instances[0]
+    const firstListener: string[] = []
+
+    act(() => {
+      result.current.onOutput((data) => {
+        firstListener.push(data)
+      })
+    })
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: 'output',
+          sessionId: 'session-test-clear',
+          data: 'persist-me',
+        }),
+      })
+    })
+
+    expect(firstListener).toContain('persist-me')
+
+    act(() => {
+      result.current.clearOutputBuffer()
+    })
+
+    const replayedAfterClear: string[] = []
+    act(() => {
+      result.current.onOutput((data) => {
+        replayedAfterClear.push(data)
+      })
+    })
+
+    expect(replayedAfterClear).toEqual([])
+    expect(ws.close).not.toHaveBeenCalled()
+  })
+
   it('handles websocket failures and transitions to error state', async () => {
     const { result } = renderHook(() =>
       usePtySession({ sessionId: 'session-test-err' })

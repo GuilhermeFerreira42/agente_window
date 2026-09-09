@@ -1,3 +1,111 @@
+## 14. Execução 2026-09-09 (Arena IA) — E3 Etapa 6 concluída / limpeza final de CSS + alinhamento de testes
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build; Playwright exigiu restauração local de navegador + libs do SO para a régua prática.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| Infra app | `npm ci` | **0** | dependências restauradas |
+| Infra pty-server | `npm ci` | **0** | dependências restauradas |
+| Infra Playwright | `npx playwright install chromium` | **0** | navegador restaurado |
+| Infra Playwright deps | `npx playwright install-deps chromium` | **0** | libs do SO restauradas (`libnspr4`, `libnss3`, etc.) |
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários completos | `npm run test` | **0** | **52 arquivos / 389 testes passando** |
+| Sonda terminal | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` (`PID=6939`) |
+| E2E terminal focado | `npx playwright test e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts` | **0** | **8/8 passando** |
+
+```
+===== npm ci (app) =====
+added 497 packages
+EXIT_CODE=0
+
+===== npm ci (pty-server) =====
+added 10 packages
+EXIT_CODE=0
+
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npm run test =====
+Test Files  52 passed (52)
+Tests  389 passed (389)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=6939
+MARKER=PROBE_1788978507935
+EXIT_CODE=0
+
+===== npx playwright test (...) =====
+Running 8 tests using 1 worker
+8 passed (46.0s)
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- O CSS do terminal foi consolidado nos arquivos dedicados e saiu do `app.css`.
+- `layoutDensity`, `iconLabels` e `performance` foram realinhados para a arquitetura final da E3, eliminando falsos negativos da suíte completa.
+- A validação prática permaneceu verde após a limpeza final: abrir terminal, maximizar/restaurar, split, digitação nas panes e `clear`.
+- A **E3 está concluída**; resta a E4 (build de fechamento + arquivamento documental final).
+
+## 13. Execução 2026-09-09 (Arena IA) — E3 Etapa 6 parcial / ContextMenu do terminal + regressão mobile
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build, com VS Code restaurado e mantido ativo ao final.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| Infra app | `npm ci` | **0** | dependências restauradas |
+| Infra pty-server | `npm ci` | **0** | dependências restauradas |
+| Infra Playwright | `npx playwright install chromium && npx playwright install-deps chromium` | **0** | navegador + libs do sistema restaurados |
+| Infra VS Code | `TMPDIR=/home/user/.cache bash /home/user/restore-code-server.sh` + restart | **0** | VS Code restaurado e ouvindo em `:8080` |
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários focados E3/E6 | `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts src/__tests__/useTerminalTheme.test.ts src/__tests__/useXtermTerminal.test.tsx` | **0** | **11 arquivos / 31 testes passando** |
+| Sonda E3/E6 | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` |
+| E2E regressão base + mobile + contexto | `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts e2e/sessao_11e_theme_states.spec.ts e2e/sessao_11f_context_menu.spec.ts e2e/sessao_06_mobile.spec.ts` | **0** | **19/19 passando** |
+
+```
+===== npm ci (app) =====
+added 497 packages
+EXIT_CODE=0
+
+===== npm ci (pty-server) =====
+added 10 packages
+EXIT_CODE=0
+
+===== npx playwright install chromium =====
+EXIT_CODE=0
+
+===== npx playwright install-deps chromium =====
+EXIT_CODE=0
+
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npx vitest run (...) =====
+Test Files  11 passed (11)
+Tests  31 passed (31)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=5675
+MARKER=PROBE_1788972591680
+EXIT_CODE=0
+
+===== npx playwright test (...) =====
+Running 19 tests using 1 worker
+19 passed (1.8m)
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- O terminal passou a abrir menu de contexto reutilizando `ContextMenu` do app.
+- O kill por contexto encerra o processo focado e preserva o layout com estado `closed` honesto.
+- `sessao_06_mobile` permaneceu verde após este bloco.
+- A Etapa 6 foi iniciada, mas ainda falta a limpeza/consolidação final de CSS e o fechamento completo com build.
+
 # GATES_EXECUCAO — Evidência bruta da última cadeia de validação
 
 > **Regra:** este arquivo guarda a saída BRUTA dos gates, executada de verdade.
@@ -15,6 +123,174 @@
 | Gate 0 | `npx playwright test e2e/gate0_validation.spec.ts` | **0** | ✅ **SESSÃO PERSISTIDA**: Output "GATE0_TEST" restaurado após fechar/reabrir painel |
 
 ---
+
+## 12. Execução 2026-09-09 (Arena IA) — E3 Etapa 5 / Tema reativo e estados por instância
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build, com VS Code mantido ativo.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários focados E3/E5 | `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts src/__tests__/useTerminalTheme.test.ts src/__tests__/useXtermTerminal.test.tsx` | **0** | **11 arquivos / 29 testes passando** |
+| Sonda E3/E5 | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` |
+| E2E regressão base + E3 | `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts e2e/sessao_11e_theme_states.spec.ts` | **0** | **12/12 passando** |
+
+```
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts src/__tests__/useTerminalTheme.test.ts src/__tests__/useXtermTerminal.test.tsx =====
+Test Files  11 passed (11)
+Tests  29 passed (29)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=4963
+MARKER=PROBE_1788968268801
+EXIT_CODE=0
+
+===== npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts e2e/sessao_11e_theme_states.spec.ts =====
+Running 12 tests using 1 worker
+12 passed (1.0m)
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- O `theme` do xterm agora é reaplicado na instância viva sem recriar PTY.
+- `TerminalView` expõe `data-pty-status`, `data-pty-pid` e `data-pty-shell-path` por instância.
+- O estado `closed` mantém scrollback visível e ganhou prova E2E dedicada.
+- A regressão base E1/E2 e as Etapas 2–4 da E3 permaneceram verdes após a Etapa 5.
+
+## 11. Execução 2026-09-09 (Arena IA) — E3 Etapa 4 / TerminalGroup, SplitSash e split redimensionável
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build, com VS Code restaurado ao final e app Vite em `:5173`.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários focados E3 | `npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts` | **0** | **9 arquivos / 26 testes passando** |
+| Sonda E3 | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` |
+| E2E regressão + E3 | `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts` | **0** | **10/10 passando** |
+| Infra auxiliar | `TMPDIR=/home/user/.cache bash /home/user/restore-code-server.sh` + start do code-server | **0** | VS Code restaurado e ouvindo em `:8080` |
+
+```
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npx vitest run src/__tests__/SplitSash.test.tsx src/__tests__/TerminalGroup.test.tsx src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts =====
+Test Files  9 passed (9)
+Tests  26 passed (26)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=3765
+MARKER=PROBE_1788967345073
+EXIT_CODE=0
+
+===== npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts e2e/sessao_11d_split_sash.spec.ts =====
+Running 10 tests using 1 worker
+10 passed (52.0s)
+EXIT_CODE=0
+
+===== restore code-server =====
+TMPDIR=/home/user/.cache bash /home/user/restore-code-server.sh
+./lib/node out/node/entry.js --bind-addr 0.0.0.0:8080 --auth none /home/user
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- `TerminalGroup` passou a encapsular as panes do terminal e mediar o ratio do split.
+- `SplitSash` introduziu um separador real com drag para redimensionar as panes.
+- O split reexecuta `fitAndSync()` quando o ratio muda, mantendo o terminal funcional após resize.
+- Regressões-base E1/E2, multi-instância da Etapa 2 e clear focado da Etapa 3 permaneceram verdes após a refatoração.
+
+## 10. Execução 2026-09-09 (Arena IA) — E3 Etapa 3 / Shell picker, action bar e clear focado
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build, com VS Code mantido ativo.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários focados E3 | `npx vitest run src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts` | **0** | **7 arquivos / 23 testes passando** |
+| Sonda E3 | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` |
+| E2E regressão + E3 | `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts` | **0** | **9/9 passando** |
+
+```
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npx vitest run src/__tests__/PanelTabs.test.tsx src/__tests__/ShellPicker.test.tsx src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts src/__tests__/usePtySession.test.ts =====
+Test Files  7 passed (7)
+Tests  23 passed (23)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=5411
+MARKER=PROBE_1788963651220
+EXIT_CODE=0
+
+===== npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts e2e/sessao_11b_visual.spec.ts e2e/sessao_11c_clear_active.spec.ts =====
+Running 9 tests using 1 worker
+9 passed (40.3s)
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- `TerminalPanel` passou a usar `PanelTabs`, `ShellPicker` e `TerminalActionBar` como chrome dedicado da Etapa 3.
+- O `clear` ficou restrito à instância/pane focada.
+- `usePtySession`/provider agora expõem limpeza do buffer local por instância, impedindo que conteúdo limpo ressuscite após toggle do painel.
+- Regressões-base E1/E2 e a base multi-instância da Etapa 2 permaneceram verdes após a refatoração.
+
+## 9. Execução 2026-09-09 (Arena IA) — E3 Etapa 2 / Multi-instância com abas reais
+> Ambiente: Linux x64 | `02_replica_final/` | validação sem build, com VS Code mantido ativo.
+
+| Gate | Comando | Exit code | Resultado |
+|------|---------|-----------|-----------|
+| App Typecheck | `npm run typecheck` | **0** | 0 erros |
+| Unitários focados E3 | `npx vitest run src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts` | **0** | **4 arquivos / 15 testes passando** |
+| Sonda E3 | `node probe-terminal.mjs` | **0** | ✅ `PROBE_OK` |
+| E2E regressão base | `npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts` | **0** | **7/7 passando** |
+| E2E novo da E3 | `npx playwright test e2e/sessao_11b_visual.spec.ts` | **0** | **1/1 passando** |
+
+```
+===== npm run typecheck =====
+> agents-window-replica@0.1.0 typecheck
+> tsc -b --force
+EXIT_CODE=0
+
+===== npx vitest run src/__tests__/terminalInstances.test.ts src/__tests__/TerminalInstanceTabs.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/themeTokens.test.ts =====
+Test Files  4 passed (4)
+Tests  15 passed (15)
+EXIT_CODE=0
+
+===== node probe-terminal.mjs =====
+PROBE_OK
+PID=4611
+MARKER=PROBE_1788962515905
+EXIT_CODE=0
+
+===== npx playwright test e2e/gate0_validation.spec.ts e2e/sessao_11_terminal_pty_real.spec.ts =====
+Running 7 tests using 1 worker
+7 passed (30.4s)
+EXIT_CODE=0
+
+===== npx playwright test e2e/sessao_11b_visual.spec.ts =====
+Running 1 test using 1 worker
+1 passed (8.3s)
+EXIT_CODE=0
+```
+
+**Checkpoint técnico consolidado:**
+- `TerminalPanel` passou a operar sobre `terminalInstances` + `TerminalInstanceTabs` com `ptySessionId` ordinal (`:0`, `:1`, ...).
+- Alternar abas preserva PIDs distintos e o scrollback por instância.
+- Regressões-base E1/E2 permaneceram verdes após a migração.
+- `useXtermTerminal` recebeu ajuste de `fit`/reativação com `setTimeout` e `ResizeObserver` protegido para melhorar estabilidade da pane ativa e do split sem quebrar jsdom.
 
 ## 8. Validação Local E2 — Servidor Único / Porta Única — 2026-09-08 (Windows Local)
 

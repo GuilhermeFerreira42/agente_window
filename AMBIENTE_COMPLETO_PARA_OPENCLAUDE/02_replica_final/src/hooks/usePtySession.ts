@@ -79,6 +79,10 @@ export function usePtySession({
     }
   }, [])
 
+  const clearOutputBuffer = useCallback(() => {
+    outputBuffer.current = ''
+  }, [])
+
   const sendInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'input', sessionId, data }))
@@ -162,7 +166,7 @@ export function usePtySession({
                 if (Array.isArray(msg.availableProfiles)) {
                   setAvailableProfiles(msg.availableProfiles)
                   const currentProfile = msg.availableProfiles.find(
-                    (profile: ShellProfile) => profile.id === msg.shell || profile.path === msg.shellPath
+                    (profile: ShellProfile) => profile.id === msg.shell || profile.path === msg.shellPath,
                   ) ?? {
                     id: msg.shell,
                     label: msg.shell,
@@ -254,6 +258,7 @@ export function usePtySession({
     sendInput,
     sendResize,
     closeSession,
+    clearOutputBuffer,
     onOutput,
   }
 }

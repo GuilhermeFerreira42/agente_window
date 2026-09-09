@@ -2,7 +2,7 @@
 
 | DATA DE INÍCIO DO SPRINT | DIAS | PROGRESSO | ATUALIZADO POR |
 | --- | --- | --- | --- |
-| 2026-09-04 | 12 dias | Onda TR: E1 ✅ e E2 ✅ concluídas localmente · Próximo: E3 (Paridade Visual) | Arena IA / Antigravity |
+| 2026-09-04 | 12 dias | Onda TR: E1 ✅, E2 ✅ e E3 ✅ validadas na régua interna · divergências da validação local Windows reabriram a reconciliação antes da E4 | Arena IA |
 
 ## LISTA DE PENDÊNCIAS
 
@@ -22,14 +22,14 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tarefa | Onda TR — E3 Paridade Visual do Terminal | Arena IA | Aplicar tokens, CSS e ícones do VS Code sobre `xterm.js` e criar o chrome React de abas/ações | Alinhar fidelidade visual sem copiar literalmente o workbench | Alta | 5 | 8h | Pronto para iniciar após fechamento da E2 |
-| Tarefa | Onda TR — E4 Fechamento e Régua Final | Arena IA | Reforçar `sessao_11` e validar `typecheck`, `test`, `playwright` e `build`, arquivando na mesma sessão | Fechar a onda com prova real e documentação consistente | Crítica | 5 | 4h | Só iniciar após E3; atualizar docs vivos e KANBAN no mesmo fechamento |
+| Tarefa | Onda TR — E4 Fechamento e Régua Final | Arena IA | Reforçar `sessao_11`, executar a cadeia `typecheck + test + playwright + build` e arquivar na mesma sessão | Fechar a onda com prova real e documentação consistente | Crítica | 5 | 4h | **Bloqueada pela reconciliação local Windows**: só fechar depois de confirmar sem divergências os pontos de menu, N terminais/lista, layout/base, PTY/WebSocket, supressão de demo/debug, resize vertical e semântica X vs lixeira |
 | Pesquisa | Auditoria de Acessibilidade (a11y) | OpenClaude | Auditoria completa de teclado/leitor de tela com ferramenta dedicada | Aderência aos padrões WCAG e acessibilidade VS Code | Média | 3 | 4h | Parcial: nome acessível das linhas e alvos de 44px corrigidos |
 
 ## EM ANDAMENTO
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Tarefa | Onda TR — Reconciliação local Windows do terminal | Arena IA | Comparar a execução local do usuário com a régua interna e fechar os gaps de UX/PTY/menus antes da E4 | A validação em `localhost:5173` no Windows expôs divergências que precisam ser tratadas antes do fechamento final da onda | Crítica | 5 | 6h | 🔄 EM ANDAMENTO — checklist aberto: bootstrap local do `pty-server` (`node-pty`), menu do terminal fechar ao clicar fora, suporte a N terminais com lista organizada, layout do painel inferior ocupando a largura correta, eliminação do erro `[PTY Error]`/WebSocket, remoção de conteúdo demo/debug/build na superfície, resize vertical pela borda superior, mensagem `Processo encerrado...` só quando o processo realmente termina e confirmação da semântica X (persistir) vs lixeira (deletar e recriar) |
 | Pesquisa | Resiliência do LocalStorage State | OpenClaude | Testar limites de quota e migração de schema de sessão | Prevenir corrupção de estado ao reiniciar aplicação | Média | 3 | 4h | Refinamento contínuo de persistência |
 
 ## TESTE/VERIFICAÇÃO
@@ -43,6 +43,7 @@
 
 | CATEGORIA | FUNÇÃO | ATRIBUÍDO A | AÇÃO | JUSTIFICATIVA | PRIORIDADE | PONTOS | HORAS | NOTAS E COMENTÁRIOS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Tarefa | Onda TR — E3 Paridade Visual do Terminal | Arena IA | Executar a Etapa 0→6 do blueprint detalhado da E3 sobre o terminal same-origin já validado | Internalizar o plano aprovado e fechar a implementação visual sem reabrir E1/E2 | Alta | 5 | 8h | ✅ CONCLUÍDO — Etapas 0, 1, 2, 3, 4, 5 e 6 aplicadas e validadas; o CSS legado do terminal foi isolado em `terminal-vscode.css`/`xterm-vscode.css`, os contratos estáticos foram realinhados e a régua prática permaneceu verde (`sessao_11_terminal_pty_real`, `sessao_11c_clear_active`, `sessao_11d_split_sash`). Próxima ação: E4 com build + arquivamento documental |
 | Tarefa | Onda TR — E2 Servidor Único / Porta Única | Arena IA | Migrar app + terminal para a mesma origem com WebSocket `/pty`, removendo `discoverPtyPort()` e `/pty-port` | Simplificar arquitetura e eliminar fragilidade do processo standalone em sandbox/Windows | Alta | 8 | 8h | ✅ CONCLUÍDO — Validado localmente em 2026-09-08 com dev e preview integrados |
 | Tarefa | Onda TR — E1 Fundação do Terminal (RC1–RC4) | Arena IA | Corrigir loop de setState no provider, re-assinar output no TerminalPanel, reconectar ao MESMO PTY com scrollback, enviar resize inicial e filtrar PowerShell fora do Windows | Regressão reproduzida em 2026-09-07: terminal em branco, input morto e reconexão incorreta; base obrigatória da Revisão 3 | Crítica | 8 | 6h | ✅ CONCLUÍDO — Validado via probe-terminal.mjs, Gate 0 e Sessão 11 E2E em 2026-09-08 |
 | Conteúdo | Sincronização do Blueprint Revisão 3 na Documentação Viva | Arena IA | Atualizar `BLUEPRINT_TERMINAL_REAL.md`, `CURRENT_STATE.md`, `BACKLOG_FUTURO.md`, `DECISION_LOG.md` e `PHASE_SUMMARY.md` para refletir a Onda TR | Tornar a documentação viva consistente com o plano aprovado após a regressão do terminal | Alta | 3 | 2h | ✅ Concluído sem alterar código nem reexecutar gates |

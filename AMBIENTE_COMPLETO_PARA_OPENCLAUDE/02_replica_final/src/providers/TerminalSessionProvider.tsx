@@ -10,6 +10,7 @@ export interface PtySessionState {
   sendInput: (data: string) => void
   sendResize: (cols: number, rows: number) => void
   closeSession: () => void
+  clearOutputBuffer: () => void
   onOutput: (callback: (data: string) => void) => () => void
 }
 
@@ -30,7 +31,7 @@ function PtySessionInstance({
   shellId?: string
   onStateChange: (id: string, state: PtySessionState) => void
 }) {
-  const { status, pid, activeProfile, availableProfiles, lastError, sendInput, sendResize, closeSession, onOutput } = usePtySession({
+  const { status, pid, activeProfile, availableProfiles, lastError, sendInput, sendResize, closeSession, clearOutputBuffer, onOutput } = usePtySession({
     sessionId,
     shellId,
     enabled: true,
@@ -45,8 +46,9 @@ function PtySessionInstance({
     sendInput,
     sendResize,
     closeSession,
+    clearOutputBuffer,
     onOutput,
-  }), [status, pid, activeProfile, availableProfiles, lastError, sendInput, sendResize, closeSession, onOutput])
+  }), [status, pid, activeProfile, availableProfiles, lastError, sendInput, sendResize, closeSession, clearOutputBuffer, onOutput])
 
   useEffect(() => {
     onStateChange(sessionId, stableSession)

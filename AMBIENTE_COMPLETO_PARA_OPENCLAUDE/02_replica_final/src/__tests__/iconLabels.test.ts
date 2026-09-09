@@ -4,7 +4,10 @@ import auxiliarySource from '../components/AuxiliaryBar.tsx?raw'
 import editorSource from '../components/EditorArea.tsx?raw'
 import chatInputSource from '../components/ChatInput.tsx?raw'
 import chatPanelSource from '../components/ChatPanel.tsx?raw'
-import terminalSource from '../components/TerminalPanel.tsx?raw'
+import terminalPanelSource from '../components/TerminalPanel.tsx?raw'
+import terminalActionBarSource from '../components/terminal/TerminalActionBar.tsx?raw'
+import shellPickerSource from '../components/terminal/ShellPicker.tsx?raw'
+import terminalInstanceTabsSource from '../components/terminal/TerminalInstanceTabs.tsx?raw'
 import appSource from '../App.tsx?raw'
 
 /**
@@ -50,7 +53,10 @@ describe('P7.3 icon and label contracts', () => {
       editorSource,
       chatInputSource,
       chatPanelSource,
-      terminalSource,
+      terminalPanelSource,
+      terminalActionBarSource,
+      shellPickerSource,
+      terminalInstanceTabsSource,
       appSource,
     ]) {
       expect(iconOnlyButtonsHaveNames(source)).toBe(true)
@@ -84,10 +90,19 @@ describe('P7.3 icon and label contracts', () => {
     expect(auxiliarySource).toContain('aria-hidden="true"')
   })
 
-  it('imports icons only from lucide-react (single icon family)', () => {
-    for (const source of [titlebarSource, auxiliarySource, editorSource, chatPanelSource, terminalSource]) {
+  it('imports terminal icons from lucide-react via dedicated subcomponents', () => {
+    for (const source of [
+      titlebarSource,
+      auxiliarySource,
+      editorSource,
+      chatPanelSource,
+      terminalActionBarSource,
+      shellPickerSource,
+      terminalInstanceTabsSource,
+    ]) {
       expect(source).toContain("from 'lucide-react'")
     }
+    expect(terminalPanelSource).not.toContain("from 'lucide-react'")
     // Nenhum <img>/emoji como substituto de ícone nas superfícies principais.
     for (const source of [titlebarSource, auxiliarySource, editorSource]) {
       expect(source).not.toMatch(/<img\b/)
@@ -95,10 +110,9 @@ describe('P7.3 icon and label contracts', () => {
   })
 
   it('keeps at least one title tooltip on each primary toolbar surface', () => {
-    for (const source of [titlebarSource, editorSource, chatInputSource, auxiliarySource]) {
+    for (const source of [titlebarSource, editorSource, chatInputSource, auxiliarySource, terminalActionBarSource]) {
       const tags = buttonTags(source)
       expect(tags.some((t) => t.includes('title='))).toBe(true)
     }
   })
 })
-

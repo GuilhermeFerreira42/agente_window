@@ -1,8 +1,17 @@
 # BLUEPRINT — Terminal Real: Correção de Regressão + Servidor Único + Paridade Visual
 > **Revisão 3 de `BLUEPRINT_TERMINAL_REAL.md`** (Revisão 2 permanece válida onde não for formalmente revisada aqui — ver seção 6)
-> Status: **APROVADO PARA EXECUÇÃO — Fase E1 liberada; E2/E3/E4 seguem os gates abaixo**
+> Status: **REVISÃO 3 VIGENTE — E1 ✅ e E2 ✅ concluídas; E3 segue o plano detalhado internalizado e E4 permanece como fechamento da onda**
 > Data: 2026-09-07 | Projeto: `agente_window/AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final`
 > Origem: consolidação de dois blueprints concorrentes — `arena_BLUEPRINT_TERMINAL_VSCODE_EMBED.md` (estrutura, avaliação crítica de viabilidade, perguntas abertas) e `meta_BLUEPRINT-TERMINAL-CTRL-C-CTRL-V.md` (diffs de correção RC1–RC4, código de servidor único) — decisão e consolidação por Guilherme + orquestrador IA.
+
+---
+
+## 0.1 Situação vigente após o fechamento da E2 e detalhamento da E3
+
+- **E1 e E2 já foram concluídas e validadas**; este blueprint permanece como guia macro da onda, não como plano operacional detalhado.
+- O **plano detalhado de implementação da E3** passa a viver em `terminal_vscode_completo/plano_implementacao/`, com revisão crítica em `terminal_vscode_completo/plano_implementacao/REVISAO_CRITICA.md`.
+- Decisões já travadas para a E3: **desktop flat/ponta a ponta**, `lucide-react` 16px nesta onda, **abas de terminais à direita**, `clear` da instância ativa sem ressuscitar conteúdo ao reabrir e modelo de instâncias por agente-sessão.
+- Sempre que este blueprint macro conflitar com detalhes de host/porta/etapas do plano detalhado, prevalece o que foi **reverificado no código real**: dev em `vite --host 0.0.0.0:5173`, preview integrado com `server.mjs` default `0.0.0.0:4173`, ambos same-origin em `/pty`.
 
 ---
 
@@ -109,7 +118,7 @@ S→C: {type:'output', data}
 S→C: {type:'exit', code}
 ```
 
-**Decisão de rede:** `HOST` fixo em `127.0.0.1`. Sem exposição remota (`0.0.0.0`) nesta onda — corta a necessidade de token de autenticação e simplifica o escopo. Se acesso remoto vier a ser necessário, isso é uma decisão nova, com blueprint próprio de segurança.
+**Decisão de rede (vigente após a E2):** dev e preview seguem a **origem do servidor ativo** mantendo WebSocket same-origin em `/pty` — `vite --host 0.0.0.0:5173` no desenvolvimento e `server.mjs` default `0.0.0.0:4173` no preview integrado. Exposição remota controlada e autenticação dedicada continuam fora de escopo desta onda; a E3 não altera o protocolo nem a topologia same-origin já validada.
 
 ### Dev — plugin do Vite
 ```ts
@@ -140,7 +149,7 @@ export function ptyPlugin() {
 import { ptyPlugin } from './vite-plugin-pty'
 export default defineConfig({
   plugins: [react(), ptyPlugin()],
-  server: { host: '127.0.0.1', port: 5173 }
+  server: { host: '0.0.0.0', port: 5173 }
 })
 ```
 
@@ -165,8 +174,8 @@ app.use(express.static('dist'))
 const server = createServer(app)
 const wss = new WebSocketServer({ server, path: '/pty' })
 setupWebSocketHandler(wss, new PtyManager())
-server.listen(process.env.PORT || 5173, '127.0.0.1', () =>
-  console.log('single port 5173')
+server.listen(process.env.PORT || 4173, process.env.HOST || '0.0.0.0', () =>
+  console.log('single port preview 4173')
 )
 ```
 
@@ -182,9 +191,10 @@ server.listen(process.env.PORT || 5173, '127.0.0.1', () =>
 **Gate de saída:** screenshot E2E do terminal com abas à direita, tema `#1e1e1e`, tab ativa com borda de cor do token `terminal.tab.activeBorder`, botões `+`/split/trash com hover consistente.
 
 - Tokens de `terminalColorRegistry.ts` (background, foreground, cursor, selection, bordas, 16 ANSI) → CSS custom properties, alimentando o objeto `theme` do xterm.
-- `terminal.css` e `xterm.css` extraídos seletivamente (só os blocos que não dependem de classes do workbench) para `src/styles/terminal-vscode.css` e `xterm-vscode.css`.
-- Ícones: `codicon.ttf` copiado como asset (licença MIT, manter atribuição) — fidelidade 1:1 de nome de classe e tamanho, já que o objetivo declarado do projeto é réplica de alta fidelidade.
-- `TerminalTabsList.tsx` novo: abas **à direita** (default do VS Code), altura 22px, rename por duplo-clique, context menu, action bar no hover (≥105px).
+- `terminal.css` e `xterm.css` extraídos seletivamente para `src/styles/terminal-vscode.css` e `src/styles/xterm-vscode.css`, com limpeza do padding duplicado do `.xterm`.
+- Ícones do chrome do terminal permanecem em **`lucide-react` 16px** nesta onda; adoção de codicon fica como melhoria pós-E3 por decisão de escopo já travada.
+- O chrome React da E3 segue o plano detalhado em `terminal_vscode_completo/plano_implementacao/`: `TerminalView`, `TerminalInstanceTabs`, `TerminalGroup`, `SplitSash`, `ShellPicker`, `PanelTabs`, `useXtermTerminal`, `useTerminalTheme` e `terminalInstances`.
+- O painel do terminal fica **flat no desktop**, com abas de terminais **à direita**, shell picker/action bar refinados, split visual com sash e `clear` da instância ativa sem ressuscitar conteúdo ao reabrir.
 - Abas inferiores "Output/Problems" seguem mockadas por enquanto — Output real fica para uma onda futura, sem bloquear esta.
 
 ---
@@ -214,7 +224,7 @@ Nenhuma das `DECISOES_IMUTAVEIS_DESTA_REVISAO` do bloco `CONTRATOS_DA_ONDA 1` (`
 
 ## 7. Fora de Escopo (nesta onda)
 
-- Acesso remoto (`HOST=0.0.0.0`) e autenticação de terminal.
+- Exposição remota do terminal para redes externas e autenticação dedicada.
 - "Ir para Diretório Recente" / "Executar Comando Recente" (WB-01, WB-02 — já adiados no `BACKLOG_FUTURO.md`).
 - "Executar Arquivo Ativo" / "Executar Texto Selecionado" (WB-03, WB-04).
 - Output real do painel inferior (segue mockado).
