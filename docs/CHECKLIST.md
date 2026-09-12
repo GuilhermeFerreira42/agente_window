@@ -154,3 +154,21 @@ FASE 5 — VALIDAÇÃO FINAL
 - [x] As referências estão completas com ordem de precedência
 - [x] Qualquer pessoa consegue implementar o AGENTE WINDOW a partir da fonte_da_verdade sem perguntar nada
 - [x] Reportei a Fase 5 e aguardei validação final
+
+───────────────────────────────────────────────────────────────
+FASE 6 — CONSOLIDAÇÃO OPERACIONAL EM docs/
+───────────────────────────────────────────────────────────────
+- [x] 00_COMO_LER_ESTA_DOCUMENTACAO.md criado
+- [x] 01_FONTE_DA_VERDADE.md criado
+- [x] 02_ESCOPO_V1_E_NAO_ESCOPO.md criado
+- [x] 03_ARQUITETURA_EXECUTAVEL.md criado
+- [x] 04_CONTRATOS_TECNICOS.md criado
+- [x] 05_BACKLOG_MESTRE.md criado
+- [x] 06_PLANO_DE_IMPLANTACAO_PARA_IA.md criado
+- [x] 07_MATRIZ_DE_VALIDACAO.md criado
+- [x] 08_CRITERIOS_DE_HOMOLOGACAO.md criado
+- [x] 09_PLANO_DE_DEPLOY_E_OPERACAO.md criado
+- [x] 10_GOVERNANCA_E_EVOLUCAO.md criado
+- [x] docs/ definido como fonte principal de continuidade
+- [x] insumos úteis de docs-1 absorvidos em escopo, arquitetura e backlog
+- [x] implementação permaneceu bloqueada nesta etapa
