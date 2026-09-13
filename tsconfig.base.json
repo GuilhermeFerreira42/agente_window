@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@contracts/*": ["platform/packages/contracts/*"],
+      "@contracts": ["platform/packages/contracts"],
+      "@shared/*": ["platform/packages/shared/*"],
+      "@shared": ["platform/packages/shared"],
+      "@runtime/*": ["platform/packages/agent-runtime/*"],
+      "@logic/*": ["platform/apps/workbench/src/logic/*"],
+      "@workbench/*": ["platform/apps/workbench/src/workbench/*"],
+      "@ui/*": ["platform/apps/workbench/src/ui/*"]
+    }
+  }
+}

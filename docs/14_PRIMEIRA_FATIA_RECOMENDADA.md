@@ -1,7 +1,17 @@
 # 14 — PRIMEIRA FATIA RECOMENDADA
 
 ## Objetivo
-Sugerir a primeira fatia de implementação mais segura para a próxima IA, com baixo risco arquitetural e alto valor estrutural.
+Registrar qual foi a primeira fatia de implementação mais segura escolhida para inaugurar a convergência arquitetural do projeto.
+
+## Status atual deste documento
+Esta recomendação **já foi executada** no repositório atual.
+
+Ela permanece aqui como referência histórica da abertura da execução, mas **não** define mais a próxima frente vigente.
+
+Para estado atual e próxima frente autorizada, prevalecem:
+- `docs/12_DOCUMENTACAO_VIVA.md`
+- `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`
+- `docs/11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md`
 
 ## Opções consideradas
 
@@ -13,7 +23,7 @@ Sugerir a primeira fatia de implementação mais segura para a próxima IA, com 
 | Começar por Workbench Layout puro | dá visibilidade e base geométrica | ainda depende de contratos compartilhados estáveis | quase recomendada |
 
 ## Recomendação final
-A primeira fatia recomendada é:
+A primeira fatia recomendada na abertura da execução foi:
 
 ### FATIA-01 — Fundação estrutural da raiz única + contratos compartilhados mínimos
 
@@ -23,7 +33,7 @@ Preparar o repositório para a execução incremental futura, reduzindo o risco 
 ## Resultado esperado
 - uma raiz única reconhecível como alvo futuro;
 - espaço comum para contratos compartilhados;
-- ponte clara entre frontend atual e `pty-server`;
+- ponte clara entre frontend atual e o serviço PTY;
 - impacto zero ou mínimo no comportamento funcional visível;
 - typecheck do escopo estrutural tocado.
 
@@ -57,12 +67,18 @@ Preparar o repositório para a execução incremental futura, reduzindo o risco 
 3. boot do app sem regressão imediata;
 4. relato final da fatia com arquivos alterados e próximos passos.
 
-## Próxima fatia natural após a FATIA-01
+## Continuação histórica após a FATIA-01
 ### FATIA-02 — Workbench Layout base estabilizado
 - toggles de partes
 - resize
 - persistência geométrica
 - maximize/restore
+
+## Situação atual após execução desta recomendação
+- FATIA-01 já foi concluída;
+- FATIA-02 já foi concluída;
+- a arquitetura híbrida em `platform/` já foi materializada estruturalmente;
+- a próxima frente funcional vigente é a FATIA-03.
 
 ## Alternativa visível, se o objetivo for prova rápida de comportamento
 Se você quiser priorizar uma fatia com efeito visual mais perceptível, a alternativa segura é:

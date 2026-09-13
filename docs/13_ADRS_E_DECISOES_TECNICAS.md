@@ -114,3 +114,14 @@ Registrar, em formato explícito, as decisões arquiteturais já consolidadas no
 | Alternativas rejeitadas | Copiar diretamente acoplamentos ou estrutura física do VS Code foi rejeitado por incompatibilidade com o alvo modular do projeto. |
 | Consequências | A engenharia reversa serve como evidência e não como licença para ignorar a arquitetura aprovada. |
 | Mitigação | `03_ARQUITETURA_EXECUTAVEL.md`, `03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md` e pacotes F/G/H/I por módulo. |
+
+## ADR-011 — `platform/` como container da nova arquitetura híbrida
+| Campo | Valor |
+|---|---|
+| Status | ACEITA |
+| Data | 2026-09-13 |
+| Contexto | A estrutura transitória em `src/` na raiz já separava responsabilidades conceitualmente, mas ainda deixava a nova arquitetura exposta na raiz e com fronteiras físicas menos fortes do que o desejado para manutenção por múltiplas IAs. |
+| Decisão | A materialização física aprovada da nova arquitetura passa a viver dentro de `platform/`, com macro-organização híbrida: `apps/`, `packages/` e `services/`. A aplicação visual principal viverá em `platform/apps/workbench/src/`; contratos, shared, runtime de agente, provider e tools viverão em `platform/packages/`; serviços operacionais como PTY viverão em `platform/services/`. |
+| Alternativas rejeitadas | Deixar a nova arquitetura diretamente na raiz do repositório foi rejeitado por poluir a raiz e reduzir clareza operacional. Manter tudo em um único `platform/src/` foi rejeitado como estado final por não reforçar estruturalmente a separação entre interface, runtime/backend e camada de IA. |
+| Consequências | A próxima reorganização estrutural deve convergir a árvore transitória atual para o container `platform/`. A leitura da documentação precisa distinguir claramente estado transitório atual e árvore alvo aprovada. |
+| Mitigação | `03_ARQUITETURA_EXECUTAVEL.md`, `03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md` e `12_DOCUMENTACAO_VIVA.md` registram a decisão; `16_INICIAR_POR_AQUI_IA_EXECUTORA.md` deve orientar a próxima IA a não reabrir essa discussão. |

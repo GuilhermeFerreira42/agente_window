@@ -80,14 +80,62 @@ Os exemplos concretos de aplicação desta arquitetura estão em [`03A_FLUXOS_AR
 | tema e preferências visuais | `ThemeService` | persistência local |
 | comandos disponíveis e context keys | `CommandRegistry` | recomputado em boot |
 
-## Baseline físico atual vs alvo
+## Organização física alvo aprovada
 
-| Aspecto | Baseline atual | Alvo arquitetural |
+A arquitetura lógica de 4 camadas permanece a mesma, mas sua materialização física aprovada passa a usar um container dedicado `platform/`.
+
+```text
+agente_window/
+├─ docs/
+├─ legacy/
+│  └─ AMBIENTE_COMPLETO_PARA_OPENCLAUDE/
+│     └─ 02_replica_final/
+├─ platform/
+│  ├─ apps/
+│  │  └─ workbench/
+│  │     ├─ src/
+│  │     │  ├─ ui/
+│  │     │  ├─ workbench/
+│  │     │  └─ logic/
+│  │     └─ tests/
+│  ├─ packages/
+│  │  ├─ contracts/
+│  │  ├─ shared/
+│  │  ├─ agent-runtime/
+│  │  ├─ model-provider/
+│  │  └─ tools-sdk/
+│  ├─ services/
+│  │  └─ pty-server/
+│  └─ tests/
+│     ├─ integration/
+│     ├─ e2e/
+│     └─ probes/
+├─ package.json
+├─ package-lock.json
+└─ tsconfig.json
+```
+
+## Regra de fronteira física
+- `platform/apps/` hospeda aplicações compostas e experiência visual final.
+- `platform/apps/workbench/src/` concentra a carcaça visual, o shell e a lógica de interação do workbench.
+- `platform/packages/` hospeda módulos independentes, reutilizáveis e trocáveis, especialmente contratos, runtime de agente, provider e tools.
+- `platform/services/` hospeda serviços operacionais dependentes do ambiente, como PTY e futuros bridges locais.
+- `platform/packages/*` não deve depender de `platform/apps/*`.
+- `platform/services/*` não deve conhecer componentes visuais.
+- `legacy/` não participa da autoridade arquitetural; ele existe apenas como referência transitória até migração explícita.
+
+## Baseline físico atual vs alvo aprovado
+
+| Aspecto | Baseline atual | Alvo arquitetural aprovado |
 |---|---|---|
-| frontend | `AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` | raiz única do projeto |
-| backend PTY | `pty-server/` | runtime integrado na mesma raiz |
-| documentação | herdada de múltiplas fontes históricas | canônica em `docs/` |
-| instalação | múltiplos manifests | um `npm install` na raiz |
+| frontend visual | baseline antiga em `legacy/AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` + nova estrutura em `platform/apps/workbench/` | consolidar a migração funcional para `platform/apps/workbench/` |
+| shell/layout/lógica do workbench | `platform/apps/workbench/src/{workbench,ui,logic}` | expandir essa estrutura com implementação funcional progressiva |
+| contratos e base compartilhada | `platform/packages/{contracts,shared}` | ampliar o uso desses contratos na migração dos fluxos funcionais |
+| runtime de agente / provider / tools | `platform/packages/agent-runtime/` + placeholders em `platform/packages/{model-provider,tools-sdk}` | completar a materialização funcional dos módulos plugáveis |
+| backend PTY | `platform/services/pty-server/` | integrar a ponte funcional com a FATIA-03 |
+| legado/base antiga | `legacy/AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` | manter como referência transitória até migração explícita |
+| documentação | `docs/` | `docs/` |
+| instalação | `package.json` raiz único + workspaces já apontando para `legacy/...` e `platform/services/pty-server` | preservar um `npm install` na raiz enquanto a migração funcional avança |
 
 ## Regras de implementação derivadas
 1. Toda feature nova nasce primeiro em contrato, não em componente de UI.
@@ -95,3 +143,4 @@ Os exemplos concretos de aplicação desta arquitetura estão em [`03A_FLUXOS_AR
 3. Toda persistência tem formato explícito e versionável.
 4. Toda referência ao VS Code serve para comportamento; não autoriza copiar acoplamentos incompatíveis com a modularidade alvo.
 5. O workbench deve permanecer operacional mesmo quando runtime/provider forem trocados.
+6. A estrutura física aprovada deve reforçar a separação entre interface, runtime/backend e camada de IA, e não apenas representá-la nominalmente.

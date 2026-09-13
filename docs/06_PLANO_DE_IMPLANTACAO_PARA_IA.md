@@ -24,7 +24,7 @@ A IA **não decide arquitetura**. Ela executa a arquitetura aprovada.
 7. Não compactar ou criar arquivos de pacote sem pedido explícito.
 8. Não tratar arquivos renomeados de pacote comprimido como texto por conta própria.
 9. Manter o VS Code disponível; se for indispensável desligá-lo temporariamente por memória em validação pesada, informar e reerguer no mesmo turno.
-10. Sempre reportar no final: o que foi feito, o que faltou, quais validações rodaram e percentuais.
+10. Sempre reportar no final: o que foi feito, o que faltou e quais validações rodaram. Só incluir percentuais se o usuário pedir explicitamente.
 
 ## Formato mínimo de trabalho por fatia
 
@@ -40,7 +40,7 @@ A IA **não decide arquitetura**. Ela executa a arquitetura aprovada.
 - resumo do comportamento implementado;
 - validações executadas;
 - pendências ou riscos;
-- progresso numérico da execução.
+- pendências, riscos e limitações observadas na fatia.
 
 ## Sequência operacional por fatia
 1. Confirmar a fatia exata.
@@ -79,10 +79,11 @@ Se a implementação necessária entrar em conflito com `03_ARQUITETURA_EXECUTAV
 
 ## Handoff recomendado para a próxima IA
 Ao iniciar um novo chat, o pedido ideal é:
-1. ler `docs/00` a `docs/07`;
-2. resumir o entendimento;
-3. escolher a próxima fatia do `05_BACKLOG_MESTRE.md`;
+1. ler `docs/00` a `docs/07`, `docs/11`, `docs/12`, `docs/13`, `docs/14`, `docs/15` e `docs/16`;
+2. resumir o entendimento do estado vigente do repositório;
+3. confirmar a próxima frente autorizada;
 4. listar arquivos a alterar;
-5. implementar a fatia;
-6. validar;
-7. parar e reportar.
+5. aguardar confirmação do usuário antes de implementar;
+6. implementar apenas a fatia aprovada;
+7. validar;
+8. parar e reportar.

@@ -13,7 +13,7 @@ Ordenar a construção do AGENTE WINDOW em ondas executáveis, preservando a mod
 
 | Onda | Objetivo | Dependências | Entregas mínimas | Validação de saída |
 |---|---|---|---|---|
-| 0 | fechar documentação canônica | engenharia reversa pronta | docs 00-15 aprovados | revisão documental completa |
+| 0 | fechar documentação canônica | engenharia reversa pronta | docs 00-16 aprovados | revisão documental completa |
 | 1 | convergir a estrutura física para raiz única e contratos compartilhados | onda 0 | raiz única de instalação, pastas de contratos, bootstrap compartilhado | typecheck dos contratos e boot do app |
 | 2 | estabilizar Workbench Shell | onda 1 | layout base, partes, resize, persistência de layout, command registry básico | E2E de toggles, resize, maximize/restore |
 | 3 | entregar Terminal piloto real | onda 2 | PTY real, tabs, split, focus, clear, persistência por sessão | probe real + E2E do terminal |
@@ -84,7 +84,12 @@ Uma fatia só avança quando tiver:
 - contrato associado;
 - critério de aceite objetivo;
 - validação executada;
-- relato final no chat com concluído/restante/percentuais.
+- relato final no chat com concluído, pendências e validações executadas.
+
+## Estado atual da execução
+- Ondas 1 e 2 já foram concluídas no repositório atual.
+- A base estrutural aprovada já foi materializada em `platform/` e `legacy/`.
+- A próxima frente funcional autorizada é a Onda 3 / FATIA-03 — Terminal piloto real com PTY.
 
 ## O que a próxima IA não deve fazer
 - pular da onda 0 para a 3 sem concluir fundação;

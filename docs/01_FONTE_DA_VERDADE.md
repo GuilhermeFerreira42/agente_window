@@ -15,7 +15,7 @@ Em caso de dúvida ou conflito, a ordem de precedência é esta:
 1. `docs/00` a `docs/10`
 2. `docs/engenharia_reversa/*`
 3. código atual do repositório
-4. `vscode-main.zip` e `code-server-main`
+4. `code-server-main` e referências externas já absorvidas na engenharia reversa
 5. conteúdo herdado da antiga `docs-1/`, já absorvido nesta camada e sem autoridade própria futura
 
 ## Quem manda em cada assunto
@@ -30,7 +30,7 @@ Em caso de dúvida ou conflito, a ordem de precedência é esta:
 | protocolo para IA | `docs/06_PLANO_DE_IMPLANTACAO_PARA_IA.md` | NEXUS + decisões registradas em conversa | prevalece o 06 em `docs/` |
 | testes e aceite | `docs/07_MATRIZ_DE_VALIDACAO.md` e `docs/08_CRITERIOS_DE_HOMOLOGACAO.md` | critérios por subsistema em `docs/engenharia_reversa/*` | prevalece 07/08 em `docs/` |
 | deploy, operação e suporte | `docs/09_PLANO_DE_DEPLOY_E_OPERACAO.md` e `docs/10_GOVERNANCA_E_EVOLUCAO.md` | limitações da réplica, scripts e manifests | prevalece 09/10 em `docs/` |
-| comportamento detalhado por módulo | `docs/engenharia_reversa/<modulo>/*` | `vscode-main.zip` e código atual do repositório | prevalece a engenharia reversa de `docs/` |
+| comportamento detalhado por módulo | `docs/engenharia_reversa/<modulo>/*` | `code-server-main` e código atual do repositório | prevalece a engenharia reversa de `docs/` |
 
 ## Política para conflitos documentais
 1. Se a camada canônica de `docs/` contradizer qualquer formulação herdada da antiga `docs-1/`, prevalece `docs/`.

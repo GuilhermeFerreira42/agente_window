@@ -1,5 +1,7 @@
 # CHECKLIST DE VALIDAÇÃO — AGENTE WINDOW DOCUMENTATION
 
+> Nota histórica: este checklist preserva etapas já executadas em momentos anteriores da consolidação. Menções a caminhos como `02_replica_final`, `pty-server` na raiz ou estruturas transitórias não substituem a topologia vigente atual em `platform/` e `legacy/`.
+
 ───────────────────────────────────────────────────────────────
 FASE 1 — LEITURA E ENTENDIMENTO
 ───────────────────────────────────────────────────────────────

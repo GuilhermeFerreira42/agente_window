@@ -12,7 +12,7 @@ Seu papel é:
 - ler a documentação na ordem correta;
 - resumir o entendimento para validação humana;
 - aguardar confirmação do usuário;
-- só então iniciar a primeira fatia de implementação.
+- só então iniciar a próxima frente autorizada de implementação.
 
 ## 2. Regra principal
 Você **não deve começar a implementar imediatamente**.
@@ -35,8 +35,16 @@ Leia os arquivos abaixo nesta ordem exata:
 11. `docs/12_DOCUMENTACAO_VIVA.md`
 12. `docs/13_ADRS_E_DECISOES_TECNICAS.md`
 13. `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md`
+14. `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`
 
 Depois disso, leia os pacotes modulares apenas se eles forem necessários para a fatia escolhida.
+
+Se a fatia exigir fidelidade visual, menus, estados de tela ou comparação de layout, consulte também como apoio:
+- `docs/referencias_visuais/README.md`
+- `docs/referencias_visuais/TAXONOMIA.md`
+- `docs/referencias_visuais/CATALOGO.md`
+
+Essas referências visuais são apoio documental. Em caso de conflito, prevalece a documentação textual canônica de `docs/`.
 
 ## 4. O que você deve entender ao final da leitura
 Ao terminar a leitura acima, você deve ter entendido claramente:
@@ -46,7 +54,7 @@ Ao terminar a leitura acima, você deve ter entendido claramente:
 - quais contratos são obrigatórios;
 - qual é a ordem de execução aprovada;
 - como validar cada fatia;
-- qual é a primeira fatia recomendada.
+- qual é a próxima frente autorizada no estado vigente do repositório.
 
 ## 5. O que você deve responder antes de começar
 Depois da leitura, responda ao usuário com estes cinco blocos, em texto claro:
@@ -57,8 +65,8 @@ Explique, com suas palavras, o que é o projeto e qual é o objetivo da fase atu
 ### B. Arquitetura entendida
 Explique como você entendeu as 4 camadas e os limites entre elas.
 
-### C. Primeira fatia que pretende executar
-Diga qual fatia você pretende executar primeiro.
+### C. Próxima frente que pretende executar
+Diga qual é a próxima frente que você pretende executar no estado vigente do repositório.
 
 ### D. Arquivos que você espera alterar
 Liste os arquivos ou áreas do repositório que você acredita que serão tocados.
@@ -71,32 +79,40 @@ Depois de responder os cinco blocos acima, pare.
 Não implemente nada ainda.
 Espere a confirmação explícita do usuário.
 
-## 7. Primeira fatia oficial desta rodada
-A primeira fatia oficial desta rodada **não é o Terminal**.
+## 7. Estado vigente e próxima frente autorizada
+O estado vigente deste repositório **já está após a FATIA-01 e a FATIA-02**.
 
-A primeira fatia oficial desta rodada é:
+Portanto:
+- não reinicie a execução pela FATIA-01;
+- não trate a arquitetura como discussão em aberto;
+- use `docs/12_DOCUMENTACAO_VIVA.md` para distinguir estado atual, decisões congeladas e o que ainda está apenas em transição.
 
-**FATIA-01 — Fundação estrutural da raiz única + contratos compartilhados mínimos**
+A direção arquitetural aprovada para a nova estrutura é:
+- container `platform/`;
+- `platform/apps/workbench/src/` para a aplicação visual principal;
+- `platform/packages/` para contratos, shared, runtime de agente, provider e tools;
+- `platform/services/` para serviços operacionais.
 
-Você deve seguir a recomendação registrada em:
-- `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md`
+A próxima frente funcional alvo continua sendo:
 
-## 8. O que significa essa primeira fatia
-Nesta primeira fatia, o objetivo é começar a convergir o projeto para uma única raiz de instalação, reduzindo a necessidade de dois `npm install` separados em pastas diferentes.
+**FATIA-03 — Terminal piloto REAL com PTY**
 
-Isso inclui, em nível geral:
-- preparar a base estrutural da raiz única;
-- definir o espaço comum de contratos compartilhados;
-- organizar a convergência entre frontend atual e runtime;
-- evitar migração total de todos os módulos de uma vez.
+Ela deve começar já assumindo `platform/` como estrutura vigente e sem reabrir a discussão arquitetural já congelada.
 
-## 9. O que você não deve fazer nessa primeira fatia
-Não faça nada disso na primeira fatia:
-- não tente implementar o terminal inteiro;
-- não tente migrar o chat inteiro;
-- não tente reorganizar o sistema inteiro numa única passada;
-- não tente concluir toda a unificação de uma vez só;
-- não redefina a arquitetura;
+## 8. O que significa a próxima frente desta rodada
+Nesta etapa, a IA executora deve assumir que:
+- FATIA-01 e FATIA-02 já são fatos concluídos no repositório atual;
+- a estrutura vigente já foi materializada em `platform/` e `legacy/`; registros antigos podem mencionar a antiga árvore `src/` na raiz como estado histórico de transição;
+- a separação entre interface/workbench, backend/runtime/serviços e camada de IA/provider/tools não é opcional;
+- qualquer continuidade rumo à FATIA-03 precisa respeitar essa separação e não pode reintroduzir acoplamento estrutural.
+
+## 9. O que você não deve fazer nesta etapa
+Não faça nada disso nesta etapa:
+- não reinicie a execução pela FATIA-01 como se o repositório estivesse no estado inicial;
+- não reabra a discussão sobre deixar a nova arquitetura solta na raiz;
+- não colapse `platform/apps`, `platform/packages` e `platform/services` em uma única massa indiferenciada;
+- não tentar implementar o terminal inteiro ao mesmo tempo em que reorganiza todo o sistema sem recorte claro;
+- não usar referências visuais para sobrescrever a documentação textual canônica;
 - não pule contratos para ganhar velocidade.
 
 ## 10. Regras invioláveis
@@ -118,4 +134,4 @@ Se houver lacuna documental, conflito arquitetural ou ambiguidade suficiente par
 
 ## 12. Regra final
 Seu primeiro objetivo não é codar rápido.
-Seu primeiro objetivo é provar que entendeu corretamente a documentação e que consegue executar a primeira fatia sem desviar da arquitetura.
+Seu primeiro objetivo é provar que entendeu corretamente a documentação e que consegue executar a próxima frente autorizada sem desviar da arquitetura.

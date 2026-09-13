@@ -3,64 +3,57 @@
 ## Objetivo
 Mostrar, com exemplos concretos, como a arquitetura do AGENTE WINDOW deve se comportar na prática. Este documento complementa `03_ARQUITETURA_EXECUTAVEL.md` e reduz ambiguidade na implementação.
 
-## Árvore física alvo da raiz única
-A estrutura final desejada converge para uma única raiz de instalação, com separação explícita por papel arquitetural.
+## Árvore física alvo aprovada
+A estrutura final desejada converge para uma única raiz de instalação, com um container explícito `platform/` para a nova arquitetura.
 
 ```text
 agente_window/
-  package.json
-  src/
-    contracts/
-      runtime/
-      terminal/
-      filesystem/
-      chat/
+  docs/
+  legacy/
+    AMBIENTE_COMPLETO_PARA_OPENCLAUDE/
+      02_replica_final/
+  platform/
+    apps/
       workbench/
-      commands/
-      theme/
-    runtime/
-      agent/
-      pty/
-      filesystem/
-      tools/
-    logic/
-      terminal/
-      chat/
-      explorer/
-      editor/
-      workbench/
-      commands/
-      theme/
-    workbench/
-      layout/
-      parts/
-      containers/
-    ui/
-      terminal/
-      chat/
-      explorer/
-      editor/
+        src/
+          ui/
+          workbench/
+          logic/
+        tests/
+    packages/
+      contracts/
       shared/
-    shared/
-      types/
-      events/
-      persistence/
-      utils/
-  tests/
-    unit/
-    integration/
-    e2e/
+      agent-runtime/
+      model-provider/
+      tools-sdk/
+    services/
+      pty-server/
+    tests/
+      integration/
+      e2e/
+      probes/
+  package.json
+  package-lock.json
+  tsconfig.json
 ```
 
+## Observação sobre o estado transitório atual
+A materialização estrutural inicial desta árvore já foi aplicada no repositório. Registros históricos anteriores ainda podem mencionar `src/` e `pty-server/` na raiz como estágio transitório anterior; a estrutura vigente, porém, já deve ser lida a partir de `platform/` e `legacy/`.
+
 ## Regra de posicionamento de código
-| Tipo de responsabilidade | Lugar alvo |
+| Tipo de responsabilidade | Lugar alvo aprovado |
 |---|---|
-| interfaces e tipos públicos | `src/contracts/` |
-| bridge de SO, PTY, providers e tools | `src/runtime/` |
-| estado, orquestração e regras de negócio | `src/logic/` |
-| carcaça do layout e hospedagem visual | `src/workbench/` |
-| componentes React e renderização | `src/ui/` |
-| tipos compartilhados e helpers puros | `src/shared/` |
+| interfaces e tipos públicos compartilhados | `platform/packages/contracts/` |
+| tipos compartilhados e helpers puros | `platform/packages/shared/` |
+| runtime de agente e orquestração desacoplada de provider | `platform/packages/agent-runtime/` |
+| adapters de modelo/LLM | `platform/packages/model-provider/` |
+| tools, skills e registry plugável | `platform/packages/tools-sdk/` |
+| serviços operacionais dependentes do ambiente | `platform/services/` |
+| carcaça do layout e hospedagem visual | `platform/apps/workbench/src/workbench/` |
+| componentes React e renderização | `platform/apps/workbench/src/ui/` |
+| coordenação de fluxos e regras do workbench | `platform/apps/workbench/src/logic/` |
+| testes do app visual | `platform/apps/workbench/tests/` |
+| testes transversais, integração, E2E e probes | `platform/tests/` |
 
 ## Exemplo 1 — Abrir um terminal
 ```mermaid

@@ -52,4 +52,4 @@ Uma correção ou evolução só é encerrada quando:
 - os contratos impactados permanecem coerentes;
 - a validação correspondente foi executada;
 - a documentação canônica foi atualizada se necessário;
-- o resumo final informa concluído/restante/percentuais.
+- o resumo final informa concluído, pendências e validações executadas; percentuais só entram quando o usuário pedir explicitamente.

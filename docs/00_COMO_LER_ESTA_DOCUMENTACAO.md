@@ -29,13 +29,14 @@ Para qualquer pessoa ou IA que vá atuar no projeto, a leitura obrigatória é:
 15. [`13_ADRS_E_DECISOES_TECNICAS.md`](13_ADRS_E_DECISOES_TECNICAS.md)
 16. [`14_PRIMEIRA_FATIA_RECOMENDADA.md`](14_PRIMEIRA_FATIA_RECOMENDADA.md)
 17. [`15_HANDOFF_PROMPT_PARA_NOVA_IA.md`](15_HANDOFF_PROMPT_PARA_NOVA_IA.md)
+18. [`16_INICIAR_POR_AQUI_IA_EXECUTORA.md`](16_INICIAR_POR_AQUI_IA_EXECUTORA.md)
 
 Depois da camada canônica acima, a consulta detalhada deve seguir esta ordem:
 
 1. `docs/engenharia_reversa/*`
-2. código atual do repositório (`AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` e `pty-server`)
+2. código atual do repositório em `platform/` e `legacy/`
 3. código atual do repositório e `docs/engenharia_reversa/*` como evidência operacional
-4. `vscode-main.zip` e `code-server-main` apenas para esclarecer comportamento ou arquitetura de referência
+4. `code-server-main` apenas para esclarecer comportamento ou arquitetura de referência
 
 ## Quando usar cada conjunto
 
@@ -44,7 +45,7 @@ Depois da camada canônica acima, a consulta detalhada deve seguir esta ordem:
 | `docs/*.md` (esta camada) | decisão e execução | sempre primeiro |
 | `docs/engenharia_reversa/*` | evidência observável e critérios por subsistema | quando a tarefa tocar um módulo específico |
 | código atual do repositório | baseline real de continuidade | quando a tarefa depender do estado implementado hoje |
-| `vscode-main.zip` / `code-server-main` | referência externa de comportamento e host web | apenas quando houver dúvida concreta não resolvida pelas fontes acima |
+| `code-server-main` e referências internas já extraídas na engenharia reversa | referência externa de comportamento e host web | apenas quando houver dúvida concreta não resolvida pelas fontes acima |
 
 ## Leitura mínima por perfil
 
@@ -73,4 +74,5 @@ Leitura mínima obrigatória:
 Nesta consolidação:
 - a linha de continuidade foi centralizada em `docs/`;
 - os insumos úteis de `docs-1/` foram absorvidos como apoio de arquitetura, escopo e backlog;
-- a implementação permanece deliberadamente fora desta etapa.
+- a arquitetura híbrida aprovada já foi materializada estruturalmente em `platform/` e `legacy/`;
+- a próxima continuidade funcional deve partir desse estado vigente, não de uma releitura do estado anterior.

@@ -8,6 +8,9 @@ Comece por:
 - [`02_ESCOPO_V1_E_NAO_ESCOPO.md`](02_ESCOPO_V1_E_NAO_ESCOPO.md)
 
 Documentos centrais:
+
+> Para iniciar uma nova IA executora sem reabrir o contexto do zero, o arquivo de entrada preferencial é `16_INICIAR_POR_AQUI_IA_EXECUTORA.md`. O `14_PRIMEIRA_FATIA_RECOMENDADA.md` permanece como registro histórico da abertura da execução.
+
 - `03_ARQUITETURA_EXECUTAVEL.md`
 - `03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md`
 - `04_CONTRATOS_TECNICOS.md`
@@ -26,6 +29,11 @@ Documentos centrais:
 
 Base detalhada por subsistema:
 - `engenharia_reversa/` (inclui Terminal, Left Sidebar, Right Sidebar, Center Chat, Editor/Browser, Filesystem, Command Menu, Theme/Token, Workbench Layout e Explorer Coordinator)
+
+Referências visuais de apoio:
+- `referencias_visuais/README.md`
+- `referencias_visuais/TAXONOMIA.md`
+- `referencias_visuais/CATALOGO.md`
 
 Checklist histórico e de consolidação:
 - `CHECKLIST.md`
