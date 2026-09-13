@@ -6,7 +6,7 @@ Este pacote transforma a pasta `docs/` na camada canônica de documentação do 
 A regra geral é simples:
 - `docs/` = autoridade principal para continuação do projeto;
 - `docs/engenharia_reversa/` = evidência detalhada por subsistema;
-- `fonte_da_verdade/` = consolidação histórica útil como apoio e herança;
+- o conteúdo histórico já relevante foi absorvido nesta camada canônica;
 - a antiga linha `docs-1/` foi absorvida nesta consolidação e não é mais uma pasta operacional.
 
 ## Ordem obrigatória de leitura
@@ -16,19 +16,25 @@ Para qualquer pessoa ou IA que vá atuar no projeto, a leitura obrigatória é:
 2. [`01_FONTE_DA_VERDADE.md`](01_FONTE_DA_VERDADE.md)
 3. [`02_ESCOPO_V1_E_NAO_ESCOPO.md`](02_ESCOPO_V1_E_NAO_ESCOPO.md)
 4. [`03_ARQUITETURA_EXECUTAVEL.md`](03_ARQUITETURA_EXECUTAVEL.md)
-5. [`04_CONTRATOS_TECNICOS.md`](04_CONTRATOS_TECNICOS.md)
-6. [`05_BACKLOG_MESTRE.md`](05_BACKLOG_MESTRE.md)
-7. [`06_PLANO_DE_IMPLANTACAO_PARA_IA.md`](06_PLANO_DE_IMPLANTACAO_PARA_IA.md)
-8. [`07_MATRIZ_DE_VALIDACAO.md`](07_MATRIZ_DE_VALIDACAO.md)
-9. [`08_CRITERIOS_DE_HOMOLOGACAO.md`](08_CRITERIOS_DE_HOMOLOGACAO.md)
-10. [`09_PLANO_DE_DEPLOY_E_OPERACAO.md`](09_PLANO_DE_DEPLOY_E_OPERACAO.md)
-11. [`10_GOVERNANCA_E_EVOLUCAO.md`](10_GOVERNANCA_E_EVOLUCAO.md)
+5. [`03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md`](03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md)
+6. [`04_CONTRATOS_TECNICOS.md`](04_CONTRATOS_TECNICOS.md)
+7. [`05_BACKLOG_MESTRE.md`](05_BACKLOG_MESTRE.md)
+8. [`06_PLANO_DE_IMPLANTACAO_PARA_IA.md`](06_PLANO_DE_IMPLANTACAO_PARA_IA.md)
+9. [`07_MATRIZ_DE_VALIDACAO.md`](07_MATRIZ_DE_VALIDACAO.md)
+10. [`08_CRITERIOS_DE_HOMOLOGACAO.md`](08_CRITERIOS_DE_HOMOLOGACAO.md)
+11. [`09_PLANO_DE_DEPLOY_E_OPERACAO.md`](09_PLANO_DE_DEPLOY_E_OPERACAO.md)
+12. [`10_GOVERNANCA_E_EVOLUCAO.md`](10_GOVERNANCA_E_EVOLUCAO.md)
+13. [`11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md`](11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md)
+14. [`12_DOCUMENTACAO_VIVA.md`](12_DOCUMENTACAO_VIVA.md)
+15. [`13_ADRS_E_DECISOES_TECNICAS.md`](13_ADRS_E_DECISOES_TECNICAS.md)
+16. [`14_PRIMEIRA_FATIA_RECOMENDADA.md`](14_PRIMEIRA_FATIA_RECOMENDADA.md)
+17. [`15_HANDOFF_PROMPT_PARA_NOVA_IA.md`](15_HANDOFF_PROMPT_PARA_NOVA_IA.md)
 
 Depois da camada canônica acima, a consulta detalhada deve seguir esta ordem:
 
 1. `docs/engenharia_reversa/*`
 2. código atual do repositório (`AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` e `pty-server`)
-3. `fonte_da_verdade/*` como apoio histórico
+3. código atual do repositório e `docs/engenharia_reversa/*` como evidência operacional
 4. `vscode-main.zip` e `code-server-main` apenas para esclarecer comportamento ou arquitetura de referência
 
 ## Quando usar cada conjunto
@@ -37,7 +43,6 @@ Depois da camada canônica acima, a consulta detalhada deve seguir esta ordem:
 |---|---|---|
 | `docs/*.md` (esta camada) | decisão e execução | sempre primeiro |
 | `docs/engenharia_reversa/*` | evidência observável e critérios por subsistema | quando a tarefa tocar um módulo específico |
-| `fonte_da_verdade/*` | consolidação histórica anterior | quando for útil aproveitar redação, referências e módulos já mapeados |
 | código atual do repositório | baseline real de continuidade | quando a tarefa depender do estado implementado hoje |
 | `vscode-main.zip` / `code-server-main` | referência externa de comportamento e host web | apenas quando houver dúvida concreta não resolvida pelas fontes acima |
 

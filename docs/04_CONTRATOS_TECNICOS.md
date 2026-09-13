@@ -134,7 +134,38 @@ export interface FileNode {
 ```
 Regra: escrita direta fora deste contrato é proibida.
 
-## 6. Contrato do Layout / Workbench
+## 6. Contrato do Explorer
+```ts
+export interface ExplorerService {
+  setRoot(input: { uri: WorkspaceUri }): Promise<void>;
+  expand(input: { uri: WorkspaceUri }): Promise<void>;
+  collapse(input: { uri: WorkspaceUri }): Promise<void>;
+  open(input: { uri: WorkspaceUri }): Promise<void>;
+  reveal(input: { uri: WorkspaceUri }): Promise<void>;
+  refresh(input?: { uri?: WorkspaceUri }): Promise<void>;
+}
+```
+Regra: o Explorer coordena navegação e seleção; leitura e escrita continuam pertencendo ao `FileSystemPort`.
+
+## 7. Contrato do Editor
+```ts
+export interface EditorResource {
+  uri: WorkspaceUri;
+  kind: 'code' | 'browser' | 'search' | 'changes' | 'diff';
+  title: string;
+}
+
+export interface EditorService {
+  open(resource: EditorResource): Promise<void>;
+  close(input: { uri: WorkspaceUri }): Promise<void>;
+  split(input: { direction: 'horizontal' | 'vertical' }): void;
+  reveal(input: { uri: WorkspaceUri; line?: number; column?: number }): Promise<void>;
+  save(input: { uri: WorkspaceUri }): Promise<void>;
+}
+```
+Regra: abertura de recurso, foco de abas e ações centrais passam pelo `EditorService`, não por componentes isolados.
+
+## 8. Contrato do Layout / Workbench
 ```ts
 export interface WorkbenchLayoutService {
   togglePart(input: { part: 'leftSidebar' | 'rightSidebar' | 'panel' | 'auxiliaryBar' }): void;
@@ -155,7 +186,7 @@ export interface WorkbenchLayoutSnapshot {
 ```
 Regra: a geometria do workbench pertence ao serviço de layout, não aos componentes isolados.
 
-## 7. Contrato das Sessões de Chat
+## 9. Contrato das Sessões de Chat
 ```ts
 export interface ChatSessionService {
   createSession(input: { title?: string }): Promise<{ sessionId: SessionId }>;
@@ -168,7 +199,7 @@ export interface ChatSessionService {
 ```
 Regra: histórico, unread e estado do turno pertencem ao serviço de sessão, não ao componente de chat.
 
-## 8. Contrato de Persistência
+## 10. Contrato de Persistência
 ```ts
 export interface PersistencePort {
   load<T>(key: string): Promise<T | null>;
@@ -178,7 +209,7 @@ export interface PersistencePort {
 ```
 Regra: snapshots devem ter `version` e migração definida quando o schema mudar.
 
-## 9. Contrato de Comandos e Contextos
+## 11. Contrato de Comandos e Contextos
 ```ts
 export interface CommandRegistry {
   register(command: { id: string; title: string; run: () => Promise<void> | void }): () => void;
@@ -188,7 +219,7 @@ export interface CommandRegistry {
 ```
 Regra: menus e atalhos disparam comandos; não executam lógica de negócio inline.
 
-## 10. Contrato de Tema
+## 12. Contrato de Tema
 ```ts
 export interface ThemeService {
   getToken(token: string): string;

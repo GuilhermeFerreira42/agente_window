@@ -54,6 +54,8 @@ flowchart LR
   WB --> UI
 ```
 
+Os exemplos concretos de aplicação desta arquitetura estão em [`03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md`](03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md).
+
 ## Módulos funcionais previstos
 
 | Módulo | Camada dominante | Responsabilidade resumida |
@@ -84,7 +86,7 @@ flowchart LR
 |---|---|---|
 | frontend | `AMBIENTE_COMPLETO_PARA_OPENCLAUDE/02_replica_final` | raiz única do projeto |
 | backend PTY | `pty-server/` | runtime integrado na mesma raiz |
-| documentação | distribuída entre `docs/`, `docs-1/`, `fonte_da_verdade/` | canônica em `docs/` |
+| documentação | herdada de múltiplas fontes históricas | canônica em `docs/` |
 | instalação | múltiplos manifests | um `npm install` na raiz |
 
 ## Regras de implementação derivadas

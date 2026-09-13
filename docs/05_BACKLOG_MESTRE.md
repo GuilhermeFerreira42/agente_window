@@ -13,7 +13,7 @@ Ordenar a construção do AGENTE WINDOW em ondas executáveis, preservando a mod
 
 | Onda | Objetivo | Dependências | Entregas mínimas | Validação de saída |
 |---|---|---|---|---|
-| 0 | fechar documentação canônica | engenharia reversa pronta | docs 00-10 aprovados | revisão documental completa |
+| 0 | fechar documentação canônica | engenharia reversa pronta | docs 00-15 aprovados | revisão documental completa |
 | 1 | convergir a estrutura física para raiz única e contratos compartilhados | onda 0 | raiz única de instalação, pastas de contratos, bootstrap compartilhado | typecheck dos contratos e boot do app |
 | 2 | estabilizar Workbench Shell | onda 1 | layout base, partes, resize, persistência de layout, command registry básico | E2E de toggles, resize, maximize/restore |
 | 3 | entregar Terminal piloto real | onda 2 | PTY real, tabs, split, focus, clear, persistência por sessão | probe real + E2E do terminal |

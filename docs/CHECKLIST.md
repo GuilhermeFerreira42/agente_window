@@ -149,10 +149,10 @@ FASE 5 — VALIDAÇÃO FINAL
 - [x] Nenhuma redundância não referenciada
 - [x] hive-mind validou consenso em todos os subsistemas
 - [x] sparc:reviewer aprovou cada subsistema
-- [x] A fonte_da_verdade está consolidada
+- [x] A fonte da verdade está consolidada em `docs/`
 - [x] O glossário cobre todos os termos usados
 - [x] As referências estão completas com ordem de precedência
-- [x] Qualquer pessoa consegue implementar o AGENTE WINDOW a partir da fonte_da_verdade sem perguntar nada
+- [x] Qualquer pessoa consegue implementar o AGENTE WINDOW a partir da documentação canônica atual sem perguntar nada
 - [x] Reportei a Fase 5 e aguardei validação final
 
 ───────────────────────────────────────────────────────────────
@@ -169,6 +169,30 @@ FASE 6 — CONSOLIDAÇÃO OPERACIONAL EM docs/
 - [x] 08_CRITERIOS_DE_HOMOLOGACAO.md criado
 - [x] 09_PLANO_DE_DEPLOY_E_OPERACAO.md criado
 - [x] 10_GOVERNANCA_E_EVOLUCAO.md criado
+- [x] 11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md criado
+- [x] 12_DOCUMENTACAO_VIVA.md criado
+- [x] 13_ADRS_E_DECISOES_TECNICAS.md criado
+- [x] 14_PRIMEIRA_FATIA_RECOMENDADA.md criado
+- [x] 15_HANDOFF_PROMPT_PARA_NOVA_IA.md criado
+- [x] 03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md criado
 - [x] docs/ definido como fonte principal de continuidade
 - [x] insumos úteis de docs-1 absorvidos em escopo, arquitetura e backlog
 - [x] implementação permaneceu bloqueada nesta etapa
+
+───────────────────────────────────────────────────────────────
+FASE 7 — PACOTES DE IMPLEMENTAÇÃO POR SUBSISTEMA
+───────────────────────────────────────────────────────────────
+- [x] Terminal recebeu 01F/01G/01H/01I
+- [x] Left Sidebar recebeu 02F/02G/02H/02I
+- [x] Right Sidebar recebeu 03F/03G/03H/03I
+- [x] Center Chat recebeu 04F/04G/04H/04I
+- [x] Editor / Code / Browser recebeu 05F/05G/05H/05I
+- [x] Filesystem I/O recebeu 06F/06G/06H/06I
+- [x] Command Menu recebeu 07F/07G/07H/07I
+- [x] Theme / Token recebeu 08F/08G/08H/08I
+- [x] Workbench Layout recebeu 09F/09G/09H/09I
+- [x] Explorer Coordinator recebeu 10F/10G/10H/10I
+- [x] Contratos locais foram separados dos contratos globais
+- [x] Fluxos arquiteturais concretos foram adicionados à camada global
+- [x] Testes de implementação foram descritos por subsistema
+- [x] Ordem de implementação foi descrita por subsistema

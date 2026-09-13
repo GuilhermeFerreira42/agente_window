@@ -15,23 +15,22 @@ Em caso de dúvida ou conflito, a ordem de precedência é esta:
 1. `docs/00` a `docs/10`
 2. `docs/engenharia_reversa/*`
 3. código atual do repositório
-4. `fonte_da_verdade/*`
-5. `vscode-main.zip` e `code-server-main`
-6. conteúdo herdado da antiga `docs-1/`, já absorvido nesta camada e sem autoridade própria futura
+4. `vscode-main.zip` e `code-server-main`
+5. conteúdo herdado da antiga `docs-1/`, já absorvido nesta camada e sem autoridade própria futura
 
 ## Quem manda em cada assunto
 
 | Assunto | Documento principal | Evidência/apoio | Regra de desempate |
 |---|---|---|---|
 | leitura inicial | `docs/00_COMO_LER_ESTA_DOCUMENTACAO.md` | índice desta pasta | se houver ambiguidade, seguir o 00 |
-| escopo de produto | `docs/02_ESCOPO_V1_E_NAO_ESCOPO.md` | conteúdo herdado da antiga `docs-1/` + `fonte_da_verdade/01_VISAO_E_ESCOPO.md` | prevalece o 02 em `docs/` |
-| arquitetura | `docs/03_ARQUITETURA_EXECUTAVEL.md` | conteúdo herdado da antiga `docs-1/` + `fonte_da_verdade/02_ARQUITETURA.md` + `fonte_da_verdade/05_RUNTIME.md` | prevalece o 03 em `docs/` |
-| contratos entre módulos | `docs/04_CONTRATOS_TECNICOS.md` | `fonte_da_verdade/08_PROTOCOLS_AND_PROHIBITIONS.md` | prevalece o 04 em `docs/` |
+| escopo de produto | `docs/02_ESCOPO_V1_E_NAO_ESCOPO.md` | conteúdo herdado da antiga `docs-1/` já absorvido nesta camada | prevalece o 02 em `docs/` |
+| arquitetura | `docs/03_ARQUITETURA_EXECUTAVEL.md` | conteúdo herdado da antiga `docs-1/` e referências do VS Code já absorvidos nesta camada | prevalece o 03 em `docs/` |
+| contratos entre módulos | `docs/04_CONTRATOS_TECNICOS.md` | engenharia reversa dos módulos + decisões consolidadas nesta camada | prevalece o 04 em `docs/` |
 | backlog e ordem de construção | `docs/05_BACKLOG_MESTRE.md` | rebuild plans herdados da antiga `docs-1/` | prevalece o 05 em `docs/` |
 | protocolo para IA | `docs/06_PLANO_DE_IMPLANTACAO_PARA_IA.md` | NEXUS + decisões registradas em conversa | prevalece o 06 em `docs/` |
 | testes e aceite | `docs/07_MATRIZ_DE_VALIDACAO.md` e `docs/08_CRITERIOS_DE_HOMOLOGACAO.md` | critérios por subsistema em `docs/engenharia_reversa/*` | prevalece 07/08 em `docs/` |
 | deploy, operação e suporte | `docs/09_PLANO_DE_DEPLOY_E_OPERACAO.md` e `docs/10_GOVERNANCA_E_EVOLUCAO.md` | limitações da réplica, scripts e manifests | prevalece 09/10 em `docs/` |
-| comportamento detalhado por módulo | `docs/engenharia_reversa/<modulo>/*` | `vscode-main.zip`, `fonte_da_verdade/04_MODULOS/*` | prevalece a engenharia reversa de `docs/` |
+| comportamento detalhado por módulo | `docs/engenharia_reversa/<modulo>/*` | `vscode-main.zip` e código atual do repositório | prevalece a engenharia reversa de `docs/` |
 
 ## Política para conflitos documentais
 1. Se a camada canônica de `docs/` contradizer qualquer formulação herdada da antiga `docs-1/`, prevalece `docs/`.
@@ -46,7 +45,6 @@ Em caso de dúvida ou conflito, a ordem de precedência é esta:
 |---|---|
 | `docs/` | camada canônica viva do projeto |
 | `docs/engenharia_reversa/` | base evidencial por subsistema |
-| `fonte_da_verdade/` | acervo histórico consolidado, útil para reaproveitar formulações e rastreabilidade |
 | antiga `docs-1/` | apoio greenfield já minerado e absorvido nesta camada |
 
 ## Critério de liberação para implementação

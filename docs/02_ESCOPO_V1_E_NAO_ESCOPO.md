@@ -60,7 +60,7 @@ Não faz parte da V1:
 
 ## Decisões de produto já congeladas
 - `docs/` é a linha principal de continuidade.
-- `docs-1/` só entra como apoio já absorvido nesta consolidação.
+- o conteúdo útil da antiga `docs-1/` já foi absorvido nesta consolidação.
 - O workbench deve ser modular em quatro camadas: Runtime, Workbench, Lógica, Visual.
 - O produto deve permitir troca futura de runtime e provider.
 - O método de construção é humano no loop, com IA executora e gates frequentes.
