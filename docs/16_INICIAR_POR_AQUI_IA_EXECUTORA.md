@@ -80,7 +80,7 @@ Não implemente nada ainda.
 Espere a confirmação explícita do usuário.
 
 ## 7. Estado vigente e próxima frente autorizada
-O estado vigente deste repositório **já está após a FATIA-01 e a FATIA-02**.
+O estado vigente deste repositório **já está após a FATIA-01, FATIA-02 e FATIA-03**.
 
 Portanto:
 - não reinicie a execução pela FATIA-01;
@@ -93,18 +93,19 @@ A direção arquitetural aprovada para a nova estrutura é:
 - `platform/packages/` para contratos, shared, runtime de agente, provider e tools;
 - `platform/services/` para serviços operacionais.
 
-A próxima frente funcional alvo continua sendo:
+A próxima frente funcional alvo é:
 
-**FATIA-03 — Terminal piloto REAL com PTY**
+**FATIA-04 — Explorador de Arquivos (Explorer)**
 
-Ela deve começar já assumindo `platform/` como estrutura vigente e sem reabrir a discussão arquitetural já congelada.
+Ela deve começar já assumindo `platform/` como estrutura vigente, `legacy/.../VSCodeTerminal.tsx` como terminal estabilizado (não tocar), e sem reabrir discussão arquitetural congelada.
 
 ## 8. O que significa a próxima frente desta rodada
 Nesta etapa, a IA executora deve assumir que:
-- FATIA-01 e FATIA-02 já são fatos concluídos no repositório atual;
+- FATIA-01, FATIA-02 e **FATIA-03** já são fatos concluídos no repositório atual;
+- o terminal (`VSCodeTerminal.tsx` em `legacy/`) está estabilizado — fidelidade ≈85%, PTY real funcionando, redimensionamento corrigido, sidebar condicional, 5 abas funcionais; **não tocar sem autorização explícita**;
 - a estrutura vigente já foi materializada em `platform/` e `legacy/`; registros antigos podem mencionar a antiga árvore `src/` na raiz como estado histórico de transição;
 - a separação entre interface/workbench, backend/runtime/serviços e camada de IA/provider/tools não é opcional;
-- qualquer continuidade rumo à FATIA-03 precisa respeitar essa separação e não pode reintroduzir acoplamento estrutural.
+- qualquer continuidade rumo à FATIA-04 precisa respeitar essa separação e não pode reintroduzir acoplamento estrutural.
 
 ## 9. O que você não deve fazer nesta etapa
 Não faça nada disso nesta etapa:

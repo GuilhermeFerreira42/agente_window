@@ -10,6 +10,7 @@ export interface OpenMessage {
   cols?: number;
   rows?: number;
   shellId?: string;
+  cwd?: string;
 }
 
 export interface InputMessage {

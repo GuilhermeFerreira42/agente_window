@@ -4,6 +4,11 @@
   --terminal-tab-height: 22px;
 }
 
+/* Show close button on tab item hover */
+.terminal-tab-item:hover .terminal-tab-close-btn {
+  opacity: 1 !important;
+}
+
 .terminal-panel {
   height: var(--terminal-height);
   min-height: 120px;

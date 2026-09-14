@@ -42,3 +42,4 @@ blob-report/
 
 # Claude Code
 .claude/
+code-server/

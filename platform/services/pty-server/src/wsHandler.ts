@@ -64,6 +64,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, ptyManager: PtyManag
               cols: clientMsg.cols,
               rows: clientMsg.rows,
               shellId: clientMsg.shellId,
+              cwd: clientMsg.cwd,
             });
 
             sessions.add(sessionId);

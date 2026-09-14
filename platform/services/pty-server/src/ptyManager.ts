@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import * as pty from 'node-pty';
 import { resolveShell } from './shellDetector.js';
 import type { ShellProfile } from './types.js';
@@ -72,7 +73,20 @@ export class PtyManager {
     }
 
     const { profile, allProfiles } = resolved;
-    const workingDir = cwd || process.env.USERPROFILE || process.env.HOME || process.cwd();
+    let workingDir = cwd || process.env.USERPROFILE || process.env.HOME || process.cwd();
+    if (workingDir && workingDir.startsWith('file://')) {
+      workingDir = workingDir.replace(/^file:\/\//, '');
+      if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(workingDir)) {
+        workingDir = workingDir.slice(1);
+      }
+    }
+    try {
+      if (!workingDir || !fs.existsSync(workingDir)) {
+        workingDir = process.env.USERPROFILE || process.env.HOME || process.cwd();
+      }
+    } catch {
+      workingDir = process.env.USERPROFILE || process.env.HOME || process.cwd();
+    }
 
     const ptyProcess = pty.spawn(profile.path, [], {
       name: 'xterm-256color',

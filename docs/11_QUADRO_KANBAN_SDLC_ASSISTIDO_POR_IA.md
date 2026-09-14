@@ -3,11 +3,14 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 
 > Nota de leitura: este quadro combina estado vigente com trilha histórica de execução. Linhas das FATIAS iniciais podem mencionar caminhos anteriores à materialização final em `platform/` e `legacy/`; nesses casos, prevalece o estado vigente descrito em `docs/12_DOCUMENTACAO_VIVA.md` e `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`.
 
-## Leitura rápida do estado vigente
-- A documentação canônica já foi consolidada em `docs/00` a `docs/16`.
+## Leitura rápida do estado vigente — ATUALIZADO 2026-09-14 PARA COMITÊ
+- A documentação canônica já foi consolidada em `docs/00` a `docs/16` + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md`.
 - A arquitetura híbrida aprovada já está materializada em `platform/` e `legacy/`.
-- FATIA-01 e FATIA-02 já foram concluídas.
-- A próxima frente funcional autorizada continua sendo a FATIA-03.
+- FATIA-01 e FATIA-02 concluídas.
+- FATIA-03 executada em 10 sub-fatias (03.1 a 03.10): bridge PTY, service, UI xterm, split, persistência, E2E, integração visível 5173, polish visual, revisão anti-legado com VSCodeTerminal auto-contido.
+- **Status atual FATIA-03: Em revisão comitê — funcional mas não 100% fiel pixel-perfect.** Gaps documentados em `docs/12` seção COMITÊ 2026-09-14.
+- Servidores mantidos: 8080 VS Code Server + 5173 Agente Window ambos 200 OK.
+- Próxima decisão comitê: definir nível de fidelidade aceite (85% vs 100%) e autorizar Opção A/B/C.
 - Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12` + `docs/16`.
 
 | STATUS USADO | SIGNIFICADO |
@@ -23,7 +26,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 
 | DATA DE INÍCIO DO SPRINT | DATA ATUALIZAÇÃO | ESTADO VIGENTE | ATUALIZADO POR | BRANCH |
 |---|---|---|---|---|
-| 2026-09-11 | 2026-09-13 | Onda 0 concluída. FATIA-01 e FATIA-02 concluídas. Arquitetura híbrida com `platform/` aprovada e materializada estruturalmente. Próxima execução funcional: FATIA-03. | Arena Agent | main (d96027e) + working tree local |
+| 2026-09-11 | 2026-09-14 | Onda 0-2 concluídas. FATIA-03 executada 03.1 a 03.10 com VSCodeTerminal auto-contido 34KB, sem tela cinza, sem abas browser-like. Fidelidade atual 85% vs VS Code original, gaps mapeados para comitê. Aguardando decisão sobre Opção A/B/C. Servidores 8080+5173 rodando. | Arena Agent | main + working tree local |
 
 ---
 
@@ -109,20 +112,30 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 ---
 
-### FATIA-03 — Terminal piloto REAL com PTY
-**Onda:** 3 | **Épico:** C — Terminal | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-02 | **Docs:** `engenharia_reversa/01_TERMINAL/01F-01I`
+### FATIA-03 — Terminal piloto REAL com PTY — EXECUTADA 03.1 a 03.10 + EM REVISÃO COMITÊ
+**Onda:** 3 | **Épico:** C — Terminal | **Prioridade:** P0 | **Status:** Em revisão comitê — 85% fiel, gaps mapeados | **Depende de:** FATIA-02 | **Docs:** `engenharia_reversa/01_TERMINAL/01F-01I` + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md` + `12` COMITÊ 2026-09-14
 
 | # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|
-| 3.1 | Bridge PTY real (integrar `platform/services/pty-server` com `platform/packages/agent-runtime/pty/`) | `platform/packages/agent-runtime/pty/`, `platform/services/pty-server/`, `PtyHost` | `TerminalRuntimePort` | probe-terminal.mjs | Planejado |
-| 3.2 | `TerminalService` lifecycle create/write/resize/clear/kill | `platform/apps/workbench/src/logic/terminal/` | `04` #4 | VAL-TERM-01 | Planejado |
-| 3.3 | UI `TerminalPanel`, `TerminalGroup`, `TerminalView` com xterm | `platform/apps/workbench/src/ui/terminal/` | - | E2E abrir terminal | Planejado |
-| 3.4 | Split e focus | `TerminalGroup`, `SplitSash` | - | VAL-TERM-02,04 | Planejado |
-| 3.5 | Maximize/restore, clear | `TerminalActionBar` | `WorkbenchLayoutService` | VAL-TERM-03,05 | Planejado |
-| 3.6 | Persistência por sessão + reanexação | `platform/apps/workbench/src/logic/terminal/`, `legacy/.../usePtySession` | `ChatSessionService` | VAL-TERM-06 | Planejado |
-| 3.7 | Testes focados + E2E terminal real | `platform/apps/workbench/tests/` + `platform/tests/` | `07` matriz terminal | 7 casos obrigatórios do `07` | Planejado |
+| 3.1 | Bridge PTY real (integrar `platform/services/pty-server` com `platform/packages/agent-runtime/pty/`) | `platform/packages/agent-runtime/pty/`, `platform/services/pty-server/`, `PtyHost` | `TerminalRuntimePort` | probe WS /pty + 5 testes pty-server | Concluído 2026-09-13 |
+| 3.2 | `TerminalService` lifecycle create/write/resize/clear/kill + split lateral | `platform/apps/workbench/src/logic/terminal/terminalService.ts` | `04` #4 | 9 testes VAL-T | Concluído 2026-09-13 |
+| 3.3 | UI `TerminalPanel`, `TerminalGroup`, `TerminalView` com xterm + tokens CSS | `platform/apps/workbench/src/ui/terminal/` | - | tsc + 19 testes | Concluído 2026-09-13 |
+| 3.4 | Split e focus — duplo ref12 e quádruplo ref14 | `TerminalGroup`, `SplitSash` | - | VAL-TERM-02,04 — E2E 2 testes | Concluído 2026-09-13 |
+| 3.5 | Maximize/restore, clear, context menu, more menu Modos de Exibição | `TerminalActionBar` + `TerminalPanel` | `WorkbenchLayoutService` | VAL-TERM-03,05 | Concluído 2026-09-13 |
+| 3.6 | Persistência snapshot leve por sessão | `terminalPersistence.ts` + BrowserPersistenceAdapter | `PersistencePort` | 4 testes VAL-TP | Concluído 2026-09-13 |
+| 3.7 | Testes focados + E2E terminal real (fluxo 01H) | `platform/apps/workbench/tests/unit/terminalE2E.test.ts` | `07` matriz | 25 testes unit+E2E | Concluído 2026-09-13 |
+| 3.8 | Integração VISÍVEL na app real 5173 via PlatformTerminalBridge | `legacy/.../components/terminal/PlatformTerminalBridge.tsx` + `TerminalPanel.tsx` flag USE_PLATFORM | - | curl 5173 200, WS /pty real | Concluído 2026-09-13 |
+| 3.9 | Polish visual igual original — lucide icons, ShellPicker, drawer 200px, grid quadruplo, PanelTabs | `platform/.../TerminalPanel.tsx` + `TerminalInstanceTabs.tsx` + `TerminalGroup.tsx` | - | tsc + 25 testes + refs 09/12/14 | Concluído 2026-09-13 |
+| 3.10 | Revisão completa eliminar resquícios legados + fix tela cinza — VSCodeTerminal auto-contido 34KB sem platform deps | `legacy/.../terminal/VSCodeTerminal.tsx` + `PlatformTerminalBridge.tsx` limpo + `TerminalPanel.tsx` só delegação + `platform/.../TerminalPanel.tsx` sem tabs horizontais | - | curl 5173 200, 8080 200, sem tela cinza, sem browser tabs | Concluído 2026-09-14 |
+| 3.11 | COMITÊ — Avaliação fidelidade 85% vs 100%, gaps, opções A/B/C, decisão próximos passos | `docs/12` + `docs/11` + novo doc comitê | `08` critérios homologação | Checklist fidelidade 13 itens com severidade | Em andamento — aguardando comitê |
 
-**Saída:** terminal real, múltiplas instâncias, split, input roteado corretamente, sem sujeira visual.
+**Saída atual:** terminal real visível em 5173, prompt bash/powershell via WS /pty -> PtyManager -> node-pty, split duplo/quádruplo, drawer vertical, context menu 5 itens, more menu Modos de Exibição, sem tela cinza, sem abas browser-like. **Gap vs 100%:** codicons vs lucide, sash 4px vs flex ratio, context menu 5 vs 12 itens, status spinner, ShellPicker sem path, dual implementação legacy+platform (débito técnico). Documentado em `docs/12` 2026-09-14 COMITÊ.
+
+**Próximos passos pendentes decisão comitê:**
+- Opção A: Polish incremental VSCodeTerminal (1-2 dias, 85%→85% fidelidade, baixo risco)
+- Opção B: Migrar app real para 100% platform (3-5 dias, 85%→95%, elimina dual, requer tocar App.tsx)
+- Opção C: Reuso lib/vscode terminal contrib (1-2 semanas, 95%→100%, custo alto)
+- Perguntas comitê: nível aceite, autorização tocar App.tsx, codicons vs lucide, paralelizar FATIA-04, validador visual
 
 ---
 
@@ -214,16 +227,16 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 | Sub | Nome | O que é | Status | Notas |
 |---|---|---|---|---|
-| P4.2 | Execução mais recente concluída | IA produziu as entregas das FATIAS 01 e 02 | Concluído | Fundação estrutural e shell base já consolidados antes da abertura da FATIA-03. |
-| P4.2b | Próxima: FATIA-03 Terminal piloto REAL | Preparar bridge PTY, lifecycle e UI terminal sob arquitetura materializada em `platform/` | A fazer | Estrutura base já consolidada; próxima sessão pode focar a fatia funcional com escopo controlado |
+| P4.2 | Execução mais recente concluída | FATIA-03 executada 03.1 a 03.10 com VSCodeTerminal 34KB auto-contido, integração visível 5173, polish visual, fix tela cinza | Concluído 2026-09-14 | 25 testes unit+E2E + 5 pty-server passando, 8080+5173 rodando |
+| P4.2b | FATIA-03.11 COMITÊ — Avaliação fidelidade | Usuário reportou "ainda nao esta bom, nao esta com a representacao 100% fiel" — preparar docs viva + kanban para comitê discutir próximos passos | Em andamento 2026-09-14 | Gaps mapeados: codicons, sash, context menu, status, dual impl. Opções A/B/C documentadas em docs/12 |
 
-### Coluna 6 — REVISÃO HUMANA (P4.3 – P4.4)
+### Coluna 6 — REVISÃO HUMANA / COMITÊ (P4.3 – P4.4)
 
 | Sub | Nome | Status | Notas |
 |---|---|---|---|
-| P4.3 | Revisão humana | A fazer | Humano revisa o estado consolidado antes da abertura da próxima fatia |
-| P4.4 | Ajustes e correções | A fazer | Corrige desvios encontrados na revisão vigente |
-| P4.5 | Registro da fatia | Contínuo | Atualiza `12_DOCUMENTACAO_VIVA.md` a cada execução relevante |
+| P4.3 | Revisão humana / Comitê | Em andamento 2026-09-14 | Comitê deve decidir nível aceite 85% vs 100%, autorizar tocar App.tsx para Opção B, definir codicons vs lucide, paralelizar FATIA-04 |
+| P4.4 | Ajustes e correções pós-comitê | A fazer | Depende decisão comitê: Opção A (polish), B (migrar platform), C (lib/vscode) |
+| P4.5 | Registro da fatia | Contínuo | docs/12 atualizada com COMITÊ 2026-09-14 + docs/11 com FATIA-03.11 |
 
 ### Coluna 7 — TESTE / VERIFICAÇÃO (P5.1 – P5.4)
 
@@ -253,33 +266,41 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 ---
 
-## FAIXA 4 — BLOQUEIOS E RISCOS
+## FAIXA 4 — BLOQUEIOS E RISCOS — ATUALIZADO PARA COMITÊ 2026-09-14
 
 | ID | Nome | Status | Mitigação |
 |---|---|---|---|
 | BLK-01 | Escolha da primeira fatia | Concluído | FATIA-01 já cumpriu a abertura estrutural do plano |
-| RISK-01 | Drift entre frontend e serviço PTY | Ativo | Mitigado pela FATIA-01 e pela arquitetura atual em `platform/` |
-| RISK-02 | Acoplamento UI/Runtime | Ativo | Mitigado por contratos `04` e `03A` |
-| RISK-03 | Build OOM no ambiente Arena | Ativo | Mitigação: typecheck focado, não build completo toda vez (ADR-008) |
+| RISK-01 | Drift entre frontend e serviço PTY | Ativo — mitigado parcial | Mitigado por bridge PTY real 03.1 + PtyManager, mas dual impl legacy VSCodeTerminal vs platform TerminalService ainda gera drift — Opção B resolve |
+| RISK-02 | Acoplamento UI/Runtime | Ativo — mitigado parcial | Contratos 04 + 03A + TerminalServiceImpl isolado, mas App.tsx ainda usa legacy TerminalPanel — Opção B migra para platform |
+| RISK-03 | Build OOM no ambiente Arena | Ativo | Mitigação: typecheck focado, não build completo toda vez (ADR-008). Vite build travou em transforming... devido monaco — usar dev HMR |
+| RISK-04 | Fidelidade terminal 100% vs 85% | Novo — em revisão comitê 2026-09-14 | Gaps: codicons vs lucide, sash 4px, context menu 5 vs 12, status spinner, ShellPicker, dual impl. Opções A/B/C documentadas em docs/12 COMITÊ. Decisão pendente comitê sobre nível aceite |
+| RISK-05 | Tela cinza por imports platform em legacy | Mitigado 2026-09-14 | VSCodeTerminal auto-contido sem platform deps elimina import estático que quebrava Vite dev. Validado 5173 200 OK |
+| RISK-06 | Abas horizontais browser-like resquício legado | Mitigado 2026-09-14 | TerminalInstanceTabs removido de platform TerminalPanel, VSCodeTerminal só drawer vertical igual VS Code refs 12/14 |
 
 ---
 
-## RESUMO EXECUTIVO PARA ACOMPANHAMENTO
+## RESUMO EXECUTIVO PARA ACOMPANHAMENTO — ATUALIZADO COMITÊ 2026-09-14
 
 | FATIA | NOME | STATUS | PRÓXIMO PASSO |
 |---|---|---|---|
-| 01 | Fundação raiz única + contratos | Concluído | Registrar como etapa histórica já consolidada |
-| 02 | Workbench Shell base | Concluído | Manter como base estável para integração futura |
-| 03 | Terminal PTY real | A fazer | Próxima — aguardando confirmação |
-| 04 | Explorer + Filesystem | Planejado | Aguardar FATIA-03 |
-| 05 | Chat + Runtime | Planejado | Aguardar FATIA-03 |
+| 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
+| 02 | Workbench Shell base | Concluído | Base estável |
+| 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
+| 04 | Explorer + Filesystem | Planejado | Pode iniciar em paralelo se comitê autorizar (independe de 100% terminal) |
+| 05 | Chat + Runtime | Planejado | Aguardar decisão FATIA-03 + FATIA-04 |
 | 06 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03 e 04 |
 | 07 | Command + Theme | Planejado | Aguardar FATIAS 03 a 06 |
 | 08 | Hardening | Planejado | Aguardar FATIAS 03 a 07 |
 | 09 | Release | Planejado | Aguardar FATIA-08 |
 
-**Onda 0:** concluída com docs `00` a `16` + engenharia reversa complementar.
-**Onda 1 / FATIA-01:** concluída.
-**Onda 2 / FATIA-02:** concluída.
+**Onda 0:** concluída com docs `00` a `16` + engenharia reversa + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md`
+**Onda 1 / FATIA-01:** concluída 14 tarefas
+**Onda 2 / FATIA-02:** concluída 10 testes
+**Onda 3 / FATIA-03:** executada 03.1 a 03.10 (25 testes + 5 pty-server), integração visível 5173, polish, fix tela cinza com VSCodeTerminal 34KB auto-contido. Fidelidade atual 85% vs VS Code original, gaps mapeados (codicons, sash, context menu, status, dual impl). **Em revisão comitê 2026-09-14.**
 
-Próxima ação imediata: **iniciar o planejamento/execução controlada da FATIA-03 — Terminal piloto REAL com PTY — já sobre a arquitetura híbrida materializada em `platform/`**.
+**Próxima ação imediata para comitê:**
+1. Revisar `docs/12` seção COMITÊ 2026-09-14 com checklist 13 itens + causas raiz + opções A/B/C
+2. Decidir: nível aceite (85% com gaps documentados ou 100% obrigatório?), autorização tocar App.tsx para Opção B, codicons vs lucide, paralelizar FATIA-04
+3. Registrar decisão em `docs/12` e atualizar kanban para Opção escolhida
+4. Manter servidores 8080+5173 rodando — validados 200 OK
