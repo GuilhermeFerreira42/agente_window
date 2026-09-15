@@ -207,7 +207,8 @@ export function TerminalPanel({
     setContextMenu(null);
   }, [contextMenu, service]);
 
-  if (!visible) return null;
+  // Bug 5 fix: display:none preserva sessão (Regra 5 doc 18) — nunca destruir instância ao alternar aba
+  // if (!visible) return null; // REMOVIDO para preservar sessão
 
   const bottomTabs = [
     { id: 'saida' as const, label: 'Saída' },
@@ -223,7 +224,10 @@ export function TerminalPanel({
       data-session-id={sessionId}
       data-testid="terminal-panel"
       style={{
-        display: 'flex',
+        display: visible ? 'flex' : 'none',
+        position: maximized ? 'absolute' : 'relative',
+        inset: maximized ? 0 : undefined,
+        zIndex: maximized ? 10 : undefined,
         flexDirection: 'column',
         width: '100%',
         height: '100%',

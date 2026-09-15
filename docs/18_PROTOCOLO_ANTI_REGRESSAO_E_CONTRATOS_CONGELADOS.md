@@ -2,7 +2,8 @@
 
 > **Documento Normativo Obrigatório**  
 > **Status:** Ativo / Vigente  
-> **Data de Emissão:** 2026-09-14  
+> **Data de Emissão:** 2026-09-14
+> **Última Atualização:** 2026-09-15 — FATIA-03.11 FASE 1+2 (6/6 PTY real passando)  
 > **Público-Alvo:** Todas as IAs executoras (Arena, Claude, Gemini, Copilot, Cursor, etc.) e desenvolvedores humanos.
 
 ---
@@ -19,13 +20,18 @@ O objetivo deste documento é **blindar contra regressões** tudo o que já foi 
 
 | Componente | Localização do Código | Nível de Proteção | Estado Homologado |
 | :--- | :--- | :---: | :--- |
-| **Terminal PTY Real** | `legacy/.../VSCodeTerminal.tsx` | 🔴 **BLINDADO** | ~85% fidelidade VS Code, WebSocket PTY real, digitação rápida, buffer anti-tela-branca (`pendingOutputRef`), sash drag via `getBoundingClientRect()`. |
-| **Ponte de Persistência** | `legacy/.../PlatformTerminalBridge.tsx` | 🔴 **BLINDADO** | Mantém terminal montado com `display: visible ? 'contents' : 'none'`, preservando conexão WS e processos PTY ativos ao fechar/reabrir. |
-| **Tema Dinâmico do Terminal** | `legacy/.../src/hooks/useTerminalTheme.ts` | 🔴 **BLINDADO** | Reage a trocas de tema via `MutationObserver` em `documentElement`, injetando tokens `--vscode-terminal-*` em tempo real. |
-| **Estilos do Terminal** | `legacy/.../terminal-vscode.css` | 🔴 **BLINDADO** | Variáveis `--terminal-height`, tabs com hover de fechamento, sidebar estilizada, fontes monospace e cores oficiais do tema dark VS Code. |
-| **Painel Inferior (Tabs)** | `legacy/.../VSCodeTerminal.tsx` | 🔴 **BLINDADO** | 5 abas reais (Problemas, Saída, Console de Depuração, Terminal, Portas), alternância preservando instâncias, maximize absoluto no `.right-section`. |
-| **Layout Base e Grids** | `legacy/.../App.css`, `App.tsx` | 🟡 **PROTEGIDO** | Contêineres flexíveis (`workbench-main`), dimensionamento dinâmico sem sobreposição. |
-| **Topbar & Statusbar** | `legacy/.../components/` | 🟡 **PROTEGIDO** | Altura fixa das barras superior (`35px`) e inferior (`22px`), tokens CSS oficiais. |
+| **Terminal PTY Real** | `legacy/.../VSCodeTerminal.tsx` | 🔴 **BLINDADO** | ~90% fidelidade VS Code, WebSocket PTY real, buffer `pendingOutputRef` + `fitAllInstancesRef` + rAF focus+resize, drag&drop tabs, portas dinâmicas `/api/ports`, IDs `crypto.randomUUID()`, attrs `data-pty-status/pid/shell-path`. |
+| **Ponte de Persistência** | `legacy/.../PlatformTerminalBridge.tsx` | 🔴 **BLINDADO** | `display: contents/none` preserva WS PTY ao fechar/reabrir, mounted state, re-fit automático. |
+| **Tema Dinâmico do Terminal** | `legacy/.../src/hooks/useTerminalTheme.ts` | 🔴 **BLINDADO** | `MutationObserver` em `documentElement` observa `class, style, data-theme` + `theme-changed` event, `version` counter, tokens `--vscode-terminal-*` dinâmicos, zero hardcoded #181818. |
+| **Estilos do Terminal** | `legacy/.../terminal-vscode.css` | 🔴 **BLINDADO** | Vars `--terminal-height`, tabs hover X, sidebar #37373d + #007acc, `terminal-panes is-split`, `terminal-container`, `terminal-shell-button`. |
+| **Painel Inferior (Tabs)** | `legacy/.../VSCodeTerminal.tsx` | 🔴 **BLINDADO** | 5 abas reais (Problemas, Saída, Debug, Terminal, Portas), display:none preserve, maximize absolute `.right-section`, botões `+` split trash `Encerrar` `Limpar` `Maximizar terminal` `Fechar terminal`. |
+| **Bridge PTY Vite** | `legacy/.../vite-plugin-pty.ts` + `platform/services/pty-server/src/vitePlugin.ts` + `index.ts` | 🔴 **BLINDADO** | Endpoint `/api/ports` dinâmico [5173,5174,8080,3000] com host dinâmico, WS `/pty` singlePort, `PtyManager` com Map e idle 30min. |
+| **Platform Terminal** | `platform/apps/workbench/src/ui/terminal/useXterm.ts` | 🟡 **PROTEGIDO** | `buildTheme()` var(--vscode-*), MutationObserver tema, fitAndResize. |
+| **Platform Split** | `platform/apps/workbench/src/ui/terminal/TerminalGroup.tsx` | 🟡 **PROTEGIDO** | `closest('.terminal-group-container')` + `getBoundingClientRect()` + clamp 0.2-0.8 + sash 6px role separator. |
+| **Platform Panel** | `platform/apps/workbench/src/ui/terminal/TerminalPanel.tsx` | 🟡 **PROTEGIDO** | `display: visible?flex:none` preserve sessão, `position:absolute inset:0 z10` maximize. |
+| **Layout Base e Grids** | `legacy/.../styles/app.css`, `App.tsx` | 🟡 **PROTEGIDO** | `.right-section {position:relative; flex:1; display:flex; flex-direction:column; overflow:hidden}` + `workbench-main` flex. |
+| **Topbar & Statusbar** | `legacy/.../components/` | 🟡 **PROTEGIDO** | Titlebar 35px, statusbar 22px, activitybar 48px, tokens oficiais. |
+| **Testes Anti-Regressão** | `e2e/sessao_11_terminal_pty_real.spec.ts` (6 testes) + `sessao_11d/e/f` | 🔴 **BLINDADO** | Bateria E2E que valida PTY real, PID, split, maximize, erro honesto, preservação. |
 
 ---
 
@@ -128,6 +134,45 @@ Qualquer alteração que toque direta ou indiretamente no terminal deve respeita
   - Ao reexibir (`visible` tornando-se `true`), o terminal executa re-fit automático em `requestAnimationFrame`.
 - **Proibido:** Desmontar condicionalmente a árvore do terminal ao fechar o painel inferior.
 
+### Regra 11: IDs Únicos sem Colisão via crypto.randomUUID()
+- **Causa:** `Math.random()+Date.now()` colide em criação rápida múltipla (BUG-05).
+- **Contrato:**
+  ```ts
+  function generateId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `${Math.random().toString(36).slice(2,8)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,5)}`;
+  }
+  ```
+- **Proibido:** Usar apenas `Math.random()` para sessionId/terminalId.
+
+### Regra 12: Portas Dinâmicas via /api/ports (BUG-02)
+- **Causa:** lista estática [5173,8080] não mostra 5174 e não abre.
+- **Contrato:**
+  - Backend `vite-plugin-pty.ts` e `platform/.../vitePlugin.ts` e `index.ts` **DEVEM** expor `GET /api/ports` retornando `[{port, protocol, name, url, status}]` com host dinâmico.
+  - Frontend `VSCodeTerminal.tsx` **DEVE** fazer `fetch('/api/ports')` a cada 5s com fallback dinâmico e `window.open` na aba Portas.
+  - Aba Portas **DEVE** ter `<a href target="_blank">` + botão Abrir com `ExternalLink`.
+- **Proibido:** Hardcodar apenas 2 portas sem fetch.
+
+### Regra 13: Drag & Drop MVP de Abas (BUG-06)
+- **Causa:** VS Code permite arrastar tabs para reordenar/split, nosso não tinha draggable.
+- **Contrato:**
+  - Cada `.terminal-tab-item` **DEVE** ter `draggable=true`, `onDragStart` guarda `terminalId` em `dataTransfer`, `onDragOver` seta `dragOverId`, `onDrop` reordena `groups` via `setGroups` (mesmo grupo reorder, grupos diferentes move).
+  - Visual: `cursor:grab`, `opacity 0.5` quando dragged, `background var(--vscode-list-dropBackground)` quando over.
+  - Referência: `code-server/lib/vscode/.../terminalTabsList.ts`.
+- **Proibido:** Deixar tabs sem draggable ou sem indicador visual de drop.
+
+### Regra 14: Atributos data-pty-* e Classes E2E para Validação (Compatibilidade Testes)
+- **Causa:** testes `sessao_11` esperam `data-pty-status`, `data-pty-pid`, `data-pty-shell-path`, `.terminal-container`, `.terminal-panes.is-split`, `.terminal-container-split`, `.terminal-shell-button/menu/option`.
+- **Contrato:**
+  - `.terminal-panel` **DEVE** ter `data-pty-status={activeInstance.status}` + `data-pty-pid={activeInstance.pid}` + `data-pty-shell-path={profile.path}`.
+  - `.terminal-container` **DEVE** ter `className="terminal-container is-active"` + `data-terminal-id` + `data-pty-status/pid/shell-path`.
+  - Quando split: container pai `className="terminal-panes is-split"` + segundo pane `terminal-container-split`.
+  - Shell picker: botão `terminal-shell-button` com label + chevron, menu `terminal-shell-menu`, opções `terminal-shell-option`.
+  - `resolveWsUrl()` **DEVE** checar `window.__AGENTS_WINDOW_PTY_URL__` para simulação falha T5 que espera `data-pty-status="error"` + `[PTY Error]`.
+- **Proibido:** Remover essas classes/attrs ou quebrar compat E2E.
+
 ---
 
 ## 4. Contratos Invioláveis de Layout (FATIA-01 e FATIA-02)
@@ -148,49 +193,51 @@ Qualquer alteração que toque direta ou indiretamente no terminal deve respeita
 
 Antes de commitar ou aprovar qualquer mudança de nova fatia (ex.: FATIA-04 Explorer), a IA ou o desenvolvedor **DEVE** validar os seguintes pontos no navegador real (`http://localhost:5173`):
 
-### 🧪 Bateria de Testes Rápidos (5 minutos):
+### 🧪 Bateria de Testes Rápidos (5 minutos) — Atualizado FATIA-03.11:
 
-1. **[ ] Teste de Resize do Terminal:**
-   - Arrastar a borda superior do terminal para cima e para baixo.
-   - Confirmar que o painel cresce e diminui suavemente e o xterm executa `fitAddon.fit()`.
+1. **[ ] Teste de Resize do Terminal (Regra 1):**
+   - Arrastar borda superior 4px sash ns-resize para cima/baixo, duplo-clique maximize.
+   - Confirmar `--terminal-height` inline muda e `fitAddon.fit()` executa.
 
-2. **[ ] Teste de Maximização Fiel (Bug 1 Anti-Regressão):**
-   - Clicar no botão Maximizar do terminal (ícone 🗖).
-   - Verificar se o terminal expande até o topo da área central, mas **a ActivityBar (esquerda), Sidebar (esquerda) e Barra Auxiliar (direita) continuam 100% visíveis e interativas**.
-   - Clicar em Restaurar e verificar o retorno à altura original.
+2. **[ ] Teste de Maximização Fiel (Regra 6 / BUG-01):**
+   - Clicar `Maximizar terminal` (🗖) → deve ter `position:absolute inset:0 z100` ancorado em `.right-section {relative}`, ActivityBar 48px + Sidebar + AuxBar visíveis.
+   - Restaurar → volta altura original.
 
-3. **[ ] Teste de Sessão Única do Terminal:**
-   - Garantir que existe apenas 1 sessão aberta.
-   - Confirmar visualmente que a sidebar lateral de abas do terminal está **totalmente oculta** e o terminal ocupa 100% da largura útil.
+3. **[ ] Teste de Sessão Única (Regra 2 / BUG-07):**
+   - 1 terminal → `isTabsListVisible = instances.length>1` false, sidebar display none, terminal 100% largura, toolbar split no header.
 
-4. **[ ] Teste de Múltiplas Sessões e Anti-Tela-Branca (Bug 2 Anti-Regressão):**
-   - Clicar no botão `+` (Novo Terminal) 3 vezes seguidas rapidamente.
-   - Confirmar que a sidebar de abas surge com `1: powershell`, `2: powershell`, `3: powershell`.
-   - Clicar em cada aba e confirmar que **nenhum terminal fica em branco** — todos exibem prompt imediatamente.
+4. **[ ] Teste Anti-Tela-Branca (Regra 7 / BUG-02 / BUG-04+09):**
+   - Clicar `+` 3x rápido → sidebar com 1:,2:,3:, nenhum branco, `pendingOutputRef` flush + `rAF fit+focus+resize` + focus 20ms/60ms ao trocar aba Problemas→Terminal e fechar/reabrir painel.
 
-5. **[ ] Teste de Split e Arraste do Sash (Bug 3 Anti-Regressão):**
-   - Clicar no botão Dividir Terminal (Split ao lado).
-   - Arrastar o divisor central (sash 4px) para a esquerda e para a direita.
-   - Confirmar que ambas as divisões redimensionam proporcionalmente de forma suave e estável sem quebrar o layout.
+5. **[ ] Teste de Split Sash (Regra 8 / BUG-03):**
+   - Clicar `Dividir terminal` → `.terminal-panes.is-split` + `.terminal-container-split` visíveis, sash 6px `col-resize` role separator, drag via `getBoundingClientRect()` clamp 0.2-0.8 suave.
 
-6. **[ ] Teste de Tema Dinâmico (Bug 4 Anti-Regressão):**
-   - No console do navegador (F12), alternar `document.documentElement.classList.toggle('theme-light')`.
-   - Confirmar que o fundo do terminal e cores ANSI atualizam imediatamente sem necessidade de recarregar a página.
+6. **[ ] Teste de Tema Dinâmico (Regra 9 / BUG-03):**
+   - Console `document.documentElement.classList.toggle('theme-light')` → `useTerminalTheme` observer `class,style,data-theme` + `theme-changed` → `term.options.theme` instantâneo, zero #181818 hardcoded, usa `var(--vscode-panel-background)`.
 
-7. **[ ] Teste de Preservação de Sessão em Background (Bug 5 Anti-Regressão):**
-   - No terminal, digitar um comando com histórico (ex.: `cd ..`, `echo "SESSAO_VIVA"`).
-   - Clicar no botão `X` do cabeçalho do painel para fechá-lo.
-   - Reabrir o painel (pelo menu ou atalho `Ctrl+\``).
-   - Confirmar que a sessão, texto e subprocesso **continuam intactos** exatamente onde estavam, sem reinício do zero.
+7. **[ ] Teste de Preservação (Regra 10 / BUG-05):**
+   - `echo SESSAO_VIVA`, fechar painel X (`display:contents/none` preserva WS), reabrir → mesmo PID (`data-pty-pid`) e output intacto, T6 passa.
 
-8. **[ ] Teste de I/O Real do PTY:**
-   - No terminal, digitar `dir` ou `echo "TESTE_ANTI_REGRESSAO"`.
-   - Pressionar `Enter` e verificar se a saída do sistema operacional aparece no terminal instantaneamente sem atrasos e sem erros no console DevTools (F12).
+8. **[ ] Teste de I/O Real PTY (Regra 3):**
+   - `echo TESTE_ANTI_REGRESSAO` → output instantâneo xterm direto sem React re-render, sem `[VSCodeTerminal] Erro WS` no console, `data-pty-status=open`.
 
-9. **[ ] Teste de Layout Global:**
-   - Verificar se a Statusbar continua no rodapé (`22px`).
-   - Verificar se a Titlebar continua no topo (`35px`).
-   - Verificar se o novo componente (ex: Explorer) respeita a área de visualização sem empurrar os demais para fora da tela.
+9. **[ ] Teste de Portas Dinâmicas (Regra 12 / BUG-02):**
+   - Aba Portas → fetch `/api/ports` a cada 5s, lista [5173,5174,8080,3000] dinâmica com host, botão Abrir `window.open` funciona.
+
+10. **[ ] Teste de IDs Únicos (Regra 11 / BUG-05):**
+    - Criar 5 terminais rápido → todos IDs únicos `crypto.randomUUID()`, sem colisão.
+
+11. **[ ] Teste de Drag&Drop (Regra 13 / BUG-06):**
+    - Arrastar `.terminal-tab-item` draggable → reorder `groups.terminalIds`, visual `grab` + `dropBackground` + `opacity 0.5`.
+
+12. **[ ] Teste de Botões (Regra 4 / BUG-08):**
+    - Header com `+` `Split` `Encerrar terminal` `Limpar terminal` `Maximizar terminal` `Fechar terminal` — todos com aria-label, X visível ativo e hover inativo, prefixo árvore `┌└├`.
+
+13. **[ ] Teste de Layout Global (FATIA-01/02):**
+    - Titlebar 35px, statusbar 22px, activitybar 48px, `.right-section {relative flex column overflow:hidden}`, sem `fixed` cobrindo tudo.
+
+14. **[ ] Teste E2E Automático:**
+    - `npx playwright test sessao_11_terminal_pty_real` → 6/6 PASSOU (T1 PID output, T2 perfil, T3 split, T4 limpar/max/fechar, T5 erro honesto, T6 preservação).
 
 ---
 
@@ -199,14 +246,19 @@ Antes de commitar ou aprovar qualquer mudança de nova fatia (ex.: FATIA-04 Expl
 Ao delegar a implementação de uma nova fatia para outra IA, **sempre adicione o seguinte trecho de instrução**:
 
 ```text
-AVISO DE CONTRATO ANTI-REGRESSÃO:
-As fatias 01, 02 e 03 (Layout base, Barras e Terminal PTY com os 5 bugs de fidelidade corrigidos) já estão 100% finalizadas e blindadas em docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md.
-É TERMINANTEMENTE PROIBIDO alterar, reescrever ou simplificar os arquivos:
-- `legacy/.../src/components/terminal/VSCodeTerminal.tsx`
-- `legacy/.../src/components/terminal/PlatformTerminalBridge.tsx`
-- `legacy/.../src/hooks/useTerminalTheme.ts`
-- `legacy/.../src/styles/terminal-vscode.css`
-Sua nova implementação (ex: FATIA-04 Explorer) deve se acoplar estritamente aos slots de componentes previstos na arquitetura sem quebrar o redimensionamento do terminal, o maximize absoluto, o tema dinâmico, o sash drag nem a persistência PTY.
+AVISO DE CONTRATO ANTI-REGRESSÃO ATUALIZADO 2026-09-15 (FATIA-03.11):
+As fatias 01, 02 e 03 (Layout base, Barras e Terminal PTY com 5 bugs críticos + 10 regressões FASE 1+2 corrigidas, 6/6 PTY real passando) já estão 100% finalizadas e blindadas em docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md (Regras 1-14).
+É TERMINANTEMENTE PROIBIDO alterar, reescrever ou simplificar sem autorização documentada:
+- `legacy/.../src/components/terminal/VSCodeTerminal.tsx` (55KB, 14 regras, attrs data-pty-*, classes terminal-panes is-split, drag&drop, portas dinâmicas, uuid, rAF focus)
+- `legacy/.../src/components/terminal/PlatformTerminalBridge.tsx` (display:contents/none preserva PTY)
+- `legacy/.../src/hooks/useTerminalTheme.ts` (MutationObserver class,style,data-theme + theme-changed + version)
+- `legacy/.../src/styles/terminal-vscode.css` (vars --terminal-height, terminal-panes, terminal-container, shell-button)
+- `legacy/.../vite-plugin-pty.ts` (endpoint /api/ports + WS /pty)
+- `platform/services/pty-server/src/vitePlugin.ts` e `index.ts` (/api/ports)
+- `platform/apps/workbench/src/ui/terminal/useXterm.ts` (MutationObserver tema)
+- `platform/apps/workbench/src/ui/terminal/TerminalGroup.tsx` (closest + sash 6px role separator)
+- `platform/apps/workbench/src/ui/terminal/TerminalPanel.tsx` (display visible?flex:none + absolute maximize)
+Sua nova implementação (FATIA-04 Explorer) deve se acoplar estritamente aos slots previstos sem quebrar: resize via --terminal-height, maximize absolute .right-section, tema dinâmico var(--vscode-*), sash drag getBoundingClientRect, persistência PTY display contents/none, portas dinâmicas, uuid, drag&drop, data-pty-* attrs. Valide checklist 14 itens no browser antes de commitar.
 ```
 
 ---

@@ -31,11 +31,15 @@ export function TerminalGroup({
     const startX = e.clientX;
     const startY = e.clientY;
     const startRatio = ratio;
+    // Bug 3 fix: pega container específico do grupo, não first querySelector global
+    const sashEl = e.currentTarget as HTMLElement;
+    const container = sashEl.closest('.terminal-group-container') as HTMLElement | null
+      || sashEl.parentElement?.parentElement as HTMLElement | null
+      || document.querySelector('.terminal-group-container') as HTMLElement | null;
+    const rect = container?.getBoundingClientRect();
 
     const onMove = (ev: MouseEvent) => {
-      const container = document.querySelector('.terminal-group-container') as HTMLElement | null;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
+      if (!rect) return;
       let newRatio: number;
       if (direction === 'vertical') {
         const deltaY = ev.clientY - startY;
@@ -44,6 +48,7 @@ export function TerminalGroup({
         const deltaX = ev.clientX - startX;
         newRatio = startRatio + deltaX / rect.width;
       }
+      // Min 80px por painel via ratio clamp 0.2-0.8
       newRatio = Math.min(0.8, Math.max(0.2, newRatio));
       setRatio(newRatio);
       onSplitRatioChange?.(newRatio);
@@ -161,18 +166,24 @@ export function TerminalGroup({
             </div>
             {!isLast && terminalIds.length === 2 && (
               <div
+                role="separator"
+                aria-orientation={isVertical ? 'horizontal' : 'vertical'}
+                aria-label="Redimensionar split do terminal"
                 onMouseDown={handleMouseDown}
+                className="terminal-sash"
                 style={{
                   position: 'absolute',
                   top: 0,
-                  right: isVertical ? 0 : '-2px',
-                  bottom: isVertical ? '-2px' : 0,
+                  right: isVertical ? 0 : '-3px',
+                  bottom: isVertical ? '-3px' : 0,
                   left: isVertical ? 0 : undefined,
-                  width: isVertical ? '100%' : '4px',
-                  height: isVertical ? '4px' : '100%',
+                  width: isVertical ? '100%' : '6px',
+                  height: isVertical ? '6px' : '100%',
                   cursor: isVertical ? 'row-resize' : 'col-resize',
                   zIndex: 10,
                   background: dragging ? 'var(--vscode-sash-hoverBorder, #007acc)' : 'transparent',
+                  borderLeft: !isVertical ? '2px solid transparent' : undefined,
+                  borderRight: !isVertical ? '2px solid transparent' : undefined,
                 }}
               />
             )}

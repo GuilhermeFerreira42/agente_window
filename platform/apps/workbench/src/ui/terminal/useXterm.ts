@@ -158,15 +158,22 @@ export function useXterm(options: UseXtermOptions): UseXtermResult {
     };
   }, [enabled, active, containerRef, loadWebLinks, fitAndResize]);
 
-  // tema reativo — observa mudanças de atributos no html (quando tema troca)
+  // tema reativo — MutationObserver para troca dark/light (Bug 4 fix, RNF-05)
   useEffect(() => {
     if (!enabled || !terminalRef.current) return;
     const term = terminalRef.current as any;
-    const newTheme = buildTheme();
-    if (term.options) {
-      term.options.theme = newTheme;
-      term.refresh?.(0, term.rows - 1);
-    }
+    const applyTheme = () => {
+      const newTheme = buildTheme();
+      if (term.options) {
+        term.options.theme = newTheme;
+        term.refresh?.(0, term.rows - 1);
+      }
+    };
+    applyTheme();
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(applyTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
+    return () => observer.disconnect();
   }, [enabled]);
 
   // ResizeObserver para container

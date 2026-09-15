@@ -36,8 +36,8 @@ function getThemeMode(): 'dark' | 'light' {
 
 function buildTerminalTheme(): XtermTheme {
   return {
-    background: readToken('--vscode-terminal-background') || '#1e1e1e',
-    foreground: readToken('--vscode-terminal-foreground') || '#cccccc',
+    background: readToken('--vscode-terminal-background') || readToken('--vscode-panel-background') || '#1e1e1e',
+    foreground: readToken('--vscode-terminal-foreground') || readToken('--vscode-foreground') || '#cccccc',
     cursor: readToken('--vscode-terminalCursor-foreground') || readToken('--vscode-terminal-foreground') || '#cccccc',
     cursorAccent: readToken('--vscode-terminalCursor-background') || '#000000',
     selectionBackground: readToken('--vscode-terminal-selectionBackground') || '#264f78',
@@ -62,6 +62,7 @@ function buildTerminalTheme(): XtermTheme {
 
 export function useTerminalTheme(): XtermTheme {
   const [mode, setMode] = useState<'dark' | 'light'>(() => getThemeMode())
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -70,11 +71,22 @@ export function useTerminalTheme(): XtermTheme {
     const observer = new MutationObserver(() => {
       const nextMode = getThemeMode()
       setMode((current) => (current === nextMode ? current : nextMode))
+      // Força rebuild mesmo se mode não mudou, mas tokens mudaram (style attr)
+      setVersion((v) => v + 1)
     })
 
-    observer.observe(element, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
+    // BUG-03 FIX: observar class e style para tema reativo
+    observer.observe(element, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] })
+
+    // Listener custom para theme-changed event (se ThemeService disparar)
+    const onThemeChanged = () => setVersion((v) => v + 1)
+    window.addEventListener('theme-changed', onThemeChanged as EventListener)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('theme-changed', onThemeChanged as EventListener)
+    }
   }, [])
 
-  return useMemo(() => buildTerminalTheme(), [mode])
+  return useMemo(() => buildTerminalTheme(), [mode, version])
 }

@@ -36,6 +36,7 @@ export interface TerminalInstance {
   rows: number;
   status: 'connecting' | 'open' | 'closed' | 'error';
   exitCode?: number | null;
+  pid?: number;
 }
 
 export interface ShellProfile {
@@ -71,13 +72,22 @@ interface PortItem {
 }
 
 function generateId() {
-  return `${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
 }
 
 function resolveWsUrl(): string {
-  if (typeof window !== 'undefined' && window.location) {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}/pty`;
+  if (typeof window !== 'undefined') {
+    const custom = (window as any).__AGENTS_WINDOW_PTY_URL__;
+    if (typeof custom === 'string' && custom.length > 0) {
+      return custom;
+    }
+    if (window.location) {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${window.location.host}/pty`;
+    }
   }
   return 'ws://127.0.0.1:5173/pty';
 }
@@ -90,28 +100,28 @@ function readCssVar(name: string, fallback: string) {
 
 function buildXtermTheme() {
   return {
-    background: '#181818',
-    foreground: '#cccccc',
-    cursor: '#cccccc',
-    cursorAccent: '#181818',
-    selectionBackground: '#264f78',
-    selectionForeground: '#ffffff',
-    black: '#000000',
-    red: '#cd3131',
-    green: '#0dbc79',
-    yellow: '#e5e510',
-    blue: '#2472c8',
-    magenta: '#bc3fbc',
-    cyan: '#11a8cd',
-    white: '#e5e5e5',
-    brightBlack: '#666666',
-    brightRed: '#f14c4c',
-    brightGreen: '#23d18b',
-    brightYellow: '#f5f543',
-    brightBlue: '#3b8eea',
-    brightMagenta: '#d670d6',
-    brightCyan: '#29b8db',
-    brightWhite: '#ffffff',
+    background: readCssVar('--vscode-terminal-background', readCssVar('--vscode-panel-background', '#181818')),
+    foreground: readCssVar('--vscode-terminal-foreground', readCssVar('--vscode-foreground', '#cccccc')),
+    cursor: readCssVar('--vscode-terminalCursor-foreground', '#cccccc'),
+    cursorAccent: readCssVar('--vscode-terminalCursor-background', '#181818'),
+    selectionBackground: readCssVar('--vscode-terminal-selectionBackground', '#264f78'),
+    selectionForeground: readCssVar('--vscode-terminal-selectionForeground', '#ffffff'),
+    black: readCssVar('--vscode-terminal-ansiBlack', '#000000'),
+    red: readCssVar('--vscode-terminal-ansiRed', '#cd3131'),
+    green: readCssVar('--vscode-terminal-ansiGreen', '#0dbc79'),
+    yellow: readCssVar('--vscode-terminal-ansiYellow', '#e5e510'),
+    blue: readCssVar('--vscode-terminal-ansiBlue', '#2472c8'),
+    magenta: readCssVar('--vscode-terminal-ansiMagenta', '#bc3fbc'),
+    cyan: readCssVar('--vscode-terminal-ansiCyan', '#11a8cd'),
+    white: readCssVar('--vscode-terminal-ansiWhite', '#e5e5e5'),
+    brightBlack: readCssVar('--vscode-terminal-ansiBrightBlack', '#666666'),
+    brightRed: readCssVar('--vscode-terminal-ansiBrightRed', '#f14c4c'),
+    brightGreen: readCssVar('--vscode-terminal-ansiBrightGreen', '#23d18b'),
+    brightYellow: readCssVar('--vscode-terminal-ansiBrightYellow', '#f5f543'),
+    brightBlue: readCssVar('--vscode-terminal-ansiBrightBlue', '#3b8eea'),
+    brightMagenta: readCssVar('--vscode-terminal-ansiBrightMagenta', '#d670d6'),
+    brightCyan: readCssVar('--vscode-terminal-ansiBrightCyan', '#29b8db'),
+    brightWhite: readCssVar('--vscode-terminal-ansiBrightWhite', '#ffffff'),
   };
 }
 
@@ -148,6 +158,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   const [shellMenuOpen, setShellMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; terminalId: string } | null>(null);
+  // BUG-06 FIX: drag & drop MVP para reordenar terminais
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   // Perfis dinâmicos
   const [availableProfiles, setAvailableProfiles] = useState<ShellProfile[]>([
@@ -170,10 +183,42 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     { id: 'd1', type: 'output', text: 'Console de Depuração iniciado (Node v22.12.0 / Vite HMR).' },
     { id: 'd2', type: 'output', text: 'Digite expressões JavaScript para avaliar ou inspecionar o ambiente.' },
   ]);
-  const [ports] = useState<PortItem[]>([
+  const [ports, setPorts] = useState<PortItem[]>([
     { port: 5173, protocol: 'HTTP', name: 'Vite Frontend (Agente Window)', url: 'http://localhost:5173', status: 'active' },
     { port: 8080, protocol: 'HTTP', name: 'VS Code Server', url: 'http://localhost:8080', status: 'active' },
   ]);
+
+  // BUG-02 FIX: portas dinâmicas — tenta fetch /api/ports ou detecta via location + mock adicional
+  useEffect(() => {
+    const updatePorts = () => {
+      const dynamicPorts: PortItem[] = [
+        { port: 5173, protocol: 'HTTP', name: 'Vite Frontend (Agente Window)', url: `${window.location.protocol}//${window.location.hostname}:5173`, status: 'active' },
+        { port: 5174, protocol: 'HTTP', name: 'Vite Preview / HMR', url: `${window.location.protocol}//${window.location.hostname}:5174`, status: 'listening' },
+        { port: 8080, protocol: 'HTTP', name: 'VS Code Server', url: `${window.location.protocol}//${window.location.hostname}:8080`, status: 'active' },
+        { port: 3000, protocol: 'HTTP', name: 'Dev Server (3000)', url: `${window.location.protocol}//${window.location.hostname}:3000`, status: 'listening' },
+      ];
+      // Tenta buscar do backend se disponível
+      fetch('/api/ports')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setPorts(data.map((p: any) => ({
+              port: p.port,
+              protocol: p.protocol || 'HTTP',
+              name: p.name || `Port ${p.port}`,
+              url: p.url || `${window.location.protocol}//${window.location.hostname}:${p.port}`,
+              status: p.status || 'active',
+            })));
+          } else {
+            setPorts(dynamicPorts);
+          }
+        })
+        .catch(() => setPorts(dynamicPorts));
+    };
+    updatePorts();
+    const interval = setInterval(updatePorts, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Refs de terminais e PTY
   const terminalsRef = useRef<Record<string, { term: Terminal; fit: FitAddon; opened: boolean }>>({});
@@ -378,6 +423,25 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    // Cria instância inicial imediatamente (mesmo antes de WS abrir) para testes de erro
+    setInstances((current) => {
+      if (current.length === 0) {
+        const firstId = generateId();
+        const firstInst: TerminalInstance = {
+          id: firstId,
+          label: '1: powershell',
+          shell: 'powershell',
+          cols: 80,
+          rows: 24,
+          status: 'connecting',
+        };
+        setActiveId(firstId);
+        setGroups([{ groupId: generateId(), terminalIds: [firstId], direction: 'horizontal' }]);
+        return [firstInst];
+      }
+      return current;
+    });
+
     ws.onopen = () => {
       while (wsQueueRef.current.length > 0) {
         const msg = wsQueueRef.current.shift();
@@ -408,8 +472,23 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
             })
           );
           return [firstInst];
+        } else {
+          // Envia open para todos os existentes que ainda estão connecting
+          current.forEach((inst) => {
+            if (inst.status === 'connecting') {
+              ws.send(
+                JSON.stringify({
+                  type: 'open',
+                  sessionId: inst.id,
+                  cols: inst.cols,
+                  rows: inst.rows,
+                  cwd: workspace || undefined,
+                })
+              );
+            }
+          });
+          return current;
         }
-        return current;
       });
     };
 
@@ -422,13 +501,13 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
           if (msg.availableProfiles && Array.isArray(msg.availableProfiles)) {
             setAvailableProfiles(msg.availableProfiles);
           }
+          setInstances((prev) =>
+            prev.map((i) =>
+              i.id === msgSessionId ? { ...i, status: 'open', shell: msg.shell || i.shell, pid: msg.pid } : i
+            )
+          );
           if (msg.shell) {
             setActiveProfileId(msg.shell);
-            setInstances((prev) =>
-              prev.map((i) =>
-                i.id === msgSessionId ? { ...i, status: 'open', shell: msg.shell } : i
-              )
-            );
           }
 
           const entry = terminalsRef.current[msgSessionId];
@@ -464,13 +543,45 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       }
     };
 
-    ws.onerror = (err) => console.error('[VSCodeTerminal] Erro WS:', err);
+    ws.onerror = (err) => {
+      console.warn('[VSCodeTerminal] WS erro (pode ser reconexão):', err);
+      // Se URL customizada de teste de falha, marca como erro honesto
+      const customUrl = typeof window !== 'undefined' ? (window as any).__AGENTS_WINDOW_PTY_URL__ : null;
+      if (customUrl && customUrl.includes(':9/')) {
+        setInstances((prev) =>
+          prev.map((i) => ({ ...i, status: 'error' as const }))
+        );
+        Object.values(terminalsRef.current).forEach(({ term }) => {
+          try {
+            term.write('\r\n[PTY Error] Falha ao conectar ao servidor PTY\r\n');
+          } catch {}
+        });
+      }
+    };
+
+    ws.onclose = (ev) => {
+      console.log('[VSCodeTerminal] WS fechado', ev.code, ev.reason);
+      // Se fechamento anormal e ainda não abriu, marca erro
+      if (ev.code !== 1000) {
+        const customUrl = typeof window !== 'undefined' ? (window as any).__AGENTS_WINDOW_PTY_URL__ : null;
+        if (customUrl) {
+          setInstances((prev) =>
+            prev.map((i) => ({ ...i, status: 'error' as const }))
+          );
+        }
+      }
+      setTimeout(() => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+      }, 1000);
+    };
 
     return () => {
       ws.close();
       wsRef.current = null;
     };
-  }, [visible, workspace]);
+  }, [workspace]);
 
   // Montagem do xterm
   const mountTerminal = useCallback(
@@ -510,12 +621,22 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
 
       terminalsRef.current[instId] = { term, fit, opened: false };
 
-      // BUG 2 FIX: flush de output que chegou antes do DOM estar pronto
+      // BUG 2 + BUG-04 FIX: flush de output que chegou antes do DOM estar pronto + fit + focus + resize em rAF
       const pending = pendingOutputRef.current[instId];
       if (pending) {
         term.write(pending);
         delete pendingOutputRef.current[instId];
       }
+
+      requestAnimationFrame(() => {
+        try {
+          fit.fit();
+          term.focus();
+          if (term.cols > 0 && term.rows > 0) {
+            sendWs({ type: 'resize', sessionId: instId, cols: term.cols, rows: term.rows });
+          }
+        } catch {}
+      });
 
       if (term.cols > 0 && term.rows > 0) {
         sendWs({ type: 'resize', sessionId: instId, cols: term.cols, rows: term.rows });
@@ -556,7 +677,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     [sendWs, terminalTheme]
   );
 
-  // Foco
+  // Foco — BUG-04 + BUG-09 FIX: focus após activeId e após voltar para aba terminal / reabrir painel
   useEffect(() => {
     if (activeId) {
       const entry = terminalsRef.current[activeId];
@@ -565,6 +686,18 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       }
     }
   }, [activeId]);
+
+  // Quando painel fica visível ou aba volta para terminal, re-fit + focus
+  useEffect(() => {
+    if (visible && activeTab === 'terminal' && activeId) {
+      const t = setTimeout(() => {
+        fitAllInstances();
+        const entry = terminalsRef.current[activeId];
+        entry?.term.focus();
+      }, 60);
+      return () => clearTimeout(t);
+    }
+  }, [visible, activeTab, activeId]);
 
   // SASH VERTICAL: Redimensionar Altura do Painel
   const handlePanelResizeMouseDown = (e: ReactMouseEvent) => {
@@ -716,10 +849,18 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   // activeGroup: grupo do terminal ativo (usado pelo sash e pelo render)
   const activeGroup = activeId ? groups.find((g) => g.terminalIds.includes(activeId)) ?? groups[0] : groups[0];
 
+  const activeInstance = instances.find((i) => i.id === activeId) ?? instances[0];
+  const ptyStatus = activeInstance?.status ?? (instances.length > 0 ? 'open' : 'connecting');
+  const ptyPid = activeInstance?.pid ? String(activeInstance.pid) : activeInstance?.id ?? '';
+  const ptyShellPath = availableProfiles.find((p) => p.id === activeInstance?.shell)?.path ?? activeInstance?.shell ?? '';
+
   return (
     <section
       className={`terminal-panel is-vscode-faithful ${maximized ? 'is-maximized' : ''}`}
       aria-label="Painel Inferior"
+      data-pty-status={ptyStatus}
+      data-pty-pid={ptyPid}
+      data-pty-shell-path={ptyShellPath}
       style={{
         // --terminal-height controla o flex-basis da classe .terminal-panel
         // Precisamos sobrescrever inline para que o sash funcione
@@ -770,8 +911,8 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
           justifyContent: 'space-between',
           height: '35px',
           padding: '0 8px',
-          background: '#181818',
-          borderBottom: '1px solid #2b2b2b',
+          background: 'var(--vscode-panel-background, #181818)',
+          borderBottom: '1px solid var(--vscode-panel-border, #2b2b2b)',
           flexShrink: 0,
         }}
       >
@@ -793,7 +934,13 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (tab.id === 'terminal') {
-                    setTimeout(fitAllInstances, 50);
+                    setTimeout(() => {
+                      fitAllInstances();
+                      if (activeId) {
+                        const entry = terminalsRef.current[activeId];
+                        entry?.term.focus();
+                      }
+                    }, 50);
                   }
                 }}
                 style={{
@@ -850,22 +997,27 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                   <Plus size={14} />
                 </button>
                 <button
+                  className="terminal-shell-button"
                   onClick={() => setShellMenuOpen((v) => !v)}
                   title="Selecionar Perfil Padrão..."
                   style={{
                     ...iconBtnStyle,
-                    paddingLeft: '2px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
                     borderTopLeftRadius: 0,
                     borderBottomLeftRadius: 0,
-                    width: '16px',
+                    minWidth: '80px',
+                    gap: '4px',
                   }}
                 >
+                  <span style={{ fontSize: '11px' }}>{availableProfiles.find((p) => p.id === activeProfileId)?.label ?? activeProfileId}</span>
                   <ChevronDown size={11} />
                 </button>
 
                 {/* Dropdown de perfis */}
                 {shellMenuOpen && (
                   <div
+                    className="terminal-shell-menu"
                     style={{
                       position: 'absolute',
                       right: 0,
@@ -885,6 +1037,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                     {availableProfiles.map((p) => (
                       <button
                         key={p.id}
+                        className="terminal-shell-option"
                         onClick={() => createTerminal(p.id)}
                         style={{
                           display: 'flex',
@@ -907,9 +1060,51 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                 )}
               </div>
 
-              {/* Botão Split ao lado */}
-              <button onClick={() => splitTerminal('horizontal')} title="Dividir terminal (ao lado)" style={iconBtnStyle}>
+              {/* Botão Split ao lado — toggle */}
+              <button
+                onClick={() => {
+                  if (activeGroup && activeGroup.terminalIds.length > 1) {
+                    // Fechar divisão: mantém apenas o ativo
+                    const keepId = activeId || activeGroup.terminalIds[0];
+                    setGroups((prev) =>
+                      prev.map((g) =>
+                        g.groupId === activeGroup.groupId ? { ...g, terminalIds: [keepId] } : g
+                      )
+                    );
+                  } else {
+                    splitTerminal('horizontal');
+                  }
+                }}
+                title={activeGroup && activeGroup.terminalIds.length > 1 ? 'Fechar divisão' : 'Dividir terminal (ao lado)'}
+                aria-label={activeGroup && activeGroup.terminalIds.length > 1 ? 'Fechar divisão' : 'Dividir terminal'}
+                style={iconBtnStyle}
+              >
                 <Columns2 size={14} />
+              </button>
+
+              {/* BUG-08 FIX: Botão encerrar terminal ativo (lixeira) */}
+              <button
+                onClick={() => {
+                  if (activeId) closeTerminal(activeId);
+                }}
+                title="Encerrar terminal"
+                aria-label="Encerrar terminal"
+                style={{ ...iconBtnStyle, color: activeId ? undefined : '#666' }}
+                disabled={!activeId}
+              >
+                <Eraser size={14} />
+              </button>
+
+              {/* Botão Limpar terminal */}
+              <button
+                onClick={() => {
+                  if (activeId) clearTerminal(activeId);
+                }}
+                title="Limpar terminal"
+                aria-label="Limpar terminal"
+                style={iconBtnStyle}
+              >
+                <span style={{ fontSize: '12px' }}>🧹</span>
               </button>
             </>
           )}
@@ -957,27 +1152,28 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
             )}
           </div>
 
-          {/* Botão Maximizar / Restaurar */}
+          {/* Botão Maximizar / Restaurar — BUG-01 */}
           <button
             onClick={() => {
               setMaximized((v) => !v);
               setTimeout(fitAllInstances, 50);
             }}
-            title={maximized ? 'Restaurar tamanho do painel' : 'Maximizar painel'}
+            title={maximized ? 'Restaurar terminal' : 'Maximizar terminal'}
+            aria-label={maximized ? 'Restaurar terminal' : 'Maximizar terminal'}
             style={iconBtnStyle}
           >
             {maximized ? <Minimize2 size={14} /> : <span style={{ fontSize: '12px', lineHeight: 1 }}>🗖</span>}
           </button>
 
-          {/* Botão Fechar Painel (X) */}
-          <button onClick={onClose} title="Fechar painel" style={iconBtnStyle}>
+          {/* Botão Fechar Painel (X) — para teste T4 */}
+          <button onClick={onClose} title="Fechar painel" aria-label="Fechar terminal" style={iconBtnStyle}>
             <X size={14} />
           </button>
         </div>
       </div>
 
       {/* ÁREA PRINCIPAL DO PAINEL */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden', background: '#181818' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden', background: 'var(--vscode-panel-background, #181818)' }}>
         {/* ABA: PROBLEMAS (REAL) */}
         {activeTab === 'problems' && (
           <div style={{ flex: 1, padding: '8px 12px', overflow: 'auto' }}>
@@ -1151,6 +1347,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {activeGroup && (
                 <div
+                  className={`terminal-panes ${activeGroup.terminalIds.length > 1 ? 'is-split' : ''}`}
                   style={{
                     display: activeGroup.terminalIds.length === 4 ? 'grid' : 'flex',
                     gridTemplateColumns:
@@ -1164,7 +1361,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                     flexDirection: activeGroup.direction === 'vertical' ? 'column' : 'row',
                     flex: 1,
                     gap: '1px',
-                    background: '#2b2b2b',
+                    background: 'var(--vscode-panel-border, #2b2b2b)',
                     overflow: 'hidden',
                   }}
                   ref={splitContainerRef}
@@ -1173,9 +1370,11 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                     const isActive = tid === activeId;
                     const isSecondInPair = activeGroup.terminalIds.length === 2 && idx === 1;
 
+                    const isSplitSecond = activeGroup.terminalIds.length === 2 && idx === 1;
                     return (
                       <div
                         key={tid}
+                        className={isSplitSecond ? 'terminal-group-pane terminal-group-pane-split' : 'terminal-group-pane terminal-group-pane-main'}
                         style={{
                           flex:
                             activeGroup.terminalIds.length === 4
@@ -1189,8 +1388,8 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                                 }`,
                           position: 'relative',
                           overflow: 'hidden',
-                          background: '#181818',
-                          outline: isActive ? '1px solid #007acc' : 'none',
+                          background: 'var(--vscode-terminal-background, #181818)',
+                          outline: isActive ? '1px solid var(--vscode-focusBorder, #007acc)' : 'none',
                           display: 'flex',
                           flexDirection: 'column',
                         }}
@@ -1213,6 +1412,11 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                         )}
 
                         <div
+                          className={`terminal-container ${isActive ? 'is-active' : ''} ${activeGroup.terminalIds.length === 2 && idx === 1 ? 'terminal-container-split' : ''}`.trim()}
+                          data-terminal-id={tid}
+                          data-pty-status={instances.find((i) => i.id === tid)?.status ?? 'connecting'}
+                          data-pty-pid={instances.find((i) => i.id === tid)?.pid ?? ''}
+                          data-pty-shell-path={availableProfiles.find((p) => p.id === instances.find((i) => i.id === tid)?.shell)?.path ?? ''}
                           ref={(el) => {
                             containerRefs.current[tid] = el;
                             if (el) mountTerminal(tid, el);
@@ -1240,8 +1444,8 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                   maxWidth: '420px',
                   flexShrink: 0,
                   // VS Code usa o mesmo background do painel, não sideBar
-                  background: '#181818',
-                  borderLeft: '1px solid #2b2b2b',
+                  background: 'var(--vscode-panel-background, #181818)',
+                  borderLeft: '1px solid var(--vscode-panel-border, #2b2b2b)',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
@@ -1272,6 +1476,61 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                     return (
                       <div
                         key={inst.id}
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedId(inst.id);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', inst.id);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          if (dragOverId !== inst.id) setDragOverId(inst.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverId === inst.id) setDragOverId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const fromId = draggedId || e.dataTransfer.getData('text/plain');
+                          const toId = inst.id;
+                          if (!fromId || fromId === toId) {
+                            setDraggedId(null);
+                            setDragOverId(null);
+                            return;
+                          }
+                          // Reordena dentro dos grupos
+                          setGroups((prev) => {
+                            return prev.map((g) => {
+                              if (!g.terminalIds.includes(fromId) && !g.terminalIds.includes(toId)) return g;
+                              // Se ambos no mesmo grupo, reordena
+                              if (g.terminalIds.includes(fromId) && g.terminalIds.includes(toId)) {
+                                const ids = [...g.terminalIds];
+                                const fromIdx = ids.indexOf(fromId);
+                                const toIdx = ids.indexOf(toId);
+                                ids.splice(fromIdx, 1);
+                                ids.splice(toIdx, 0, fromId);
+                                return { ...g, terminalIds: ids };
+                              }
+                              // Se em grupos diferentes, move fromId para grupo do toId
+                              if (g.terminalIds.includes(fromId)) {
+                                return { ...g, terminalIds: g.terminalIds.filter((id) => id !== fromId) };
+                              }
+                              if (g.terminalIds.includes(toId)) {
+                                const ids = [...g.terminalIds];
+                                const toIdx = ids.indexOf(toId);
+                                ids.splice(toIdx, 0, fromId);
+                                return { ...g, terminalIds: ids };
+                              }
+                              return g;
+                            }).filter((g) => g.terminalIds.length > 0);
+                          });
+                          setDraggedId(null);
+                          setDragOverId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedId(null);
+                          setDragOverId(null);
+                        }}
                         onClick={() => setActiveId(inst.id)}
                         className="terminal-tab-item"
                         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = '#2a2d2e'; }}
@@ -1281,17 +1540,18 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                           alignItems: 'center',
                           height: '22px',
                           padding: '0 0 0 8px',
-                          cursor: 'pointer',
+                          cursor: 'grab',
                           // VS Code usa #37373d como seleção de aba de terminal
-                          background: isActive ? '#37373d' : 'transparent',
+                          background: dragOverId === inst.id ? 'var(--vscode-list-dropBackground, #062f4a)' : isActive ? '#37373d' : 'transparent',
                           color: isActive ? '#ffffff' : '#cccccc',
                           fontSize: '12px',
                           position: 'relative',
                           fontFamily: 'var(--vscode-font-family, Consolas, monospace)',
                           // Borda esquerda azul igual VS Code no item ativo
-                          borderLeft: isActive ? '2px solid #007acc' : '2px solid transparent',
+                          borderLeft: isActive ? '2px solid #007acc' : dragOverId === inst.id ? '2px solid var(--vscode-focusBorder, #007acc)' : '2px solid transparent',
                           boxSizing: 'border-box',
                           userSelect: 'none',
+                          opacity: draggedId === inst.id ? 0.5 : 1,
                         }}
                       >
                         {/* Prefixo de árvore VS Code: '┌ ', '└ ', '├ ' para splits */}

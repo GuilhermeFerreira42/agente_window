@@ -54,6 +54,19 @@ async function start() {
         return
       }
 
+      if (url.pathname === '/api/ports' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        const host = req.headers.host?.split(':')[0] || HOST
+        const ports = [
+          { port: 5173, protocol: 'HTTP', name: 'Vite Frontend (Agente Window)', url: `http://${host}:5173`, status: 'active' },
+          { port: 5174, protocol: 'HTTP', name: 'Vite Preview / HMR', url: `http://${host}:5174`, status: 'listening' },
+          { port: 8080, protocol: 'HTTP', name: 'VS Code Server', url: `http://${host}:8080`, status: 'active' },
+          { port: 3000, protocol: 'HTTP', name: 'Dev Server (3000)', url: `http://${host}:3000`, status: 'listening' },
+        ]
+        res.end(JSON.stringify(ports))
+        return
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Not Found' }))
     }

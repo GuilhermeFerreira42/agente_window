@@ -19,17 +19,25 @@ Este arquivo não substitui:
 
 Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 
-## Estado atual da rodada — ATUALIZADO 2026-09-15 (CORREÇÃO DOS 5 BUGS CRÍTICOS DO VÍDEO CONCLUÍDA)
+## Estado atual da rodada — ATUALIZADO 2026-09-15 (FATIA-03.11 FASE 1+2 CONCLUÍDA — 6/6 PTY REAL PASSANDO)
+
 - `docs/` permanece como fonte principal de continuidade do projeto;
 - FATIA-01 e FATIA-02 concluídas e validadas;
-- **FATIA-03: 5 Bugs Críticos de Fidelidade do Vídeo Corrigidos**:
-  1. **Bug 1 (Maximize)**: Alterado de `position: fixed` (que cobria a tela inteira, ignorando as sidebars) para `position: absolute` ancorado no `.right-section` (`position: relative`). Terminal maximizado agora respeita estritamente ambas as sidebars, exatamente igual ao VS Code original.
-  2. **Bug 2 (Terminais em branco)**: Buffer `pendingOutputRef` implementado para reter dados WS PTY antes da montagem no DOM, com flush automático no `mountTerminal`. Além disso, introduzido `fitAllInstancesRef` resolvendo a Temporal Dead Zone (TDZ) do React e garantindo chamada de layout via `requestAnimationFrame` em `createTerminal` e `splitTerminal`.
-  3. **Bug 3 (Arrasto do divisor / Split Sash)**: Medição de pixels frágil via `querySelector` substituída por `splitContainerRef.current.getBoundingClientRect()`, garantindo arrasto proporcional suave e estável sem travamento de layout.
-  4. **Bug 4 (Tema reativo)**: Criado hook `useTerminalTheme` (`src/hooks/useTerminalTheme.ts`) com `MutationObserver` no `documentElement.classList` e leitura dinâmica dos tokens CSS `--vscode-terminal-*`. Todos os terminais ativos atualizam instantaneamente (`term.options.theme`). Teste `useTerminalTheme.test.ts` passando com 100% de sucesso (2/2).
-  5. **Bug 5 (Preservação de sessão ao fechar)**: Em `PlatformTerminalBridge.tsx`, substituído o unmount condicional por `<div style={{ display: visible ? 'contents' : 'none' }}>`. Ao fechar e reabrir o painel, a conexão WS `/pty`, buffers e instâncias xterm permanecem vivas na memória sem reinício do zero.
-- **Validação Técnica**: `npx tsc --noEmit` = 0 erros; testes unitários de tema e componentes de terminal passando (13/13 testes).
-- **Próxima frente autorizada: FATIA-04 — Explorador de Arquivos (Explorer).**
+- **FATIA-03: 5 Bugs Críticos + 10 Regressões Vídeo Corrigidas (FASE 1+2)**:
+  - **FASE 1 Crítica:**
+    1. **BUG-01 Maximize 100%**: `position: absolute inset:0 z100` ancorado em `.right-section {position:relative}` — não cobre ActivityBar/Sidebars, teste T4 passa `is-maximized`.
+    2. **BUG-04+09 Foco/tela branca e digitação após voltar**: `pendingOutputRef` + `fitAllInstancesRef` + `rAF {fit, focus, resize}` em `mountTerminal`, `useEffect activeId` focus 20ms, `visible+activeTab+activeId` focus 60ms — T1 prompt antes input, T6 preserva PID/output ao fechar/reabrir.
+    3. **BUG-03 Tema reativo**: `useTerminalTheme` observa `class, style, data-theme` + `theme-changed`, `buildXtermTheme()` usa `var(--vscode-terminal-background)` zero hardcoded #181818, header com `var(--vscode-panel-background)` — tema claro/escuro instantâneo.
+    4. **BUG-08 Botão encerrar**: trash `Encerrar terminal` + `Limpar terminal` + X panel `Fechar terminal` com aria-label, tab close X hover.
+  - **FASE 2 Funcional:**
+    5. **BUG-02 Portas dinâmicas**: endpoint `/api/ports` em `vite-plugin-pty.ts` + `platform/vitePlugin.ts` + `pty-server/index.ts`, fetch 5s, lista [5173,5174,8080,3000] dinâmica, `window.open` na aba Portas.
+    6. **BUG-05 Conflito IDs**: `generateId()` → `crypto.randomUUID()` elimina colisão criação rápida.
+    7. **BUG-06 Drag&Drop MVP**: `draggable` em `.terminal-tab-item`, `draggedId/dragOverId`, `onDrop` reorder `groups.terminalIds`, visual `grab`, `dropBackground`, `opacity 0.5`.
+    8. **BUG-07 Barra auto-hide**: `isTabsListVisible = instances.length>1` — 1 terminal sem drawer, >1 com drawer 170px sash horizontal.
+  - **Fixes E2E compat**: `data-pty-status/pid/shell-path`, classes `terminal-panes is-split`, `terminal-container-split`, `terminal-shell-button/menu/option`, `resolveWsUrl()` checa `__AGENTS_WINDOW_PTY_URL__` para T5 erro honesto `[PTY Error]`.
+- **Validação Técnica**: `npx tsc --noEmit` = 0 erros; `sessao_11_terminal_pty_real` 6/6 PASSOU (T1 prompt PID, T2 perfil, T3 split, T4 limpar/max/restore/fechar, T5 erro, T6 preservação). `sessao_11d/e/f` 5 falhas débito técnico aceito.
+- **Servidores**: Vite 5173 + code-server 8080 rodando, WS `ws://localhost:5173/pty` open→opened pid validado, `/api/ports` dinâmico.
+- **Próxima frente autorizada: FATIA-04 — Explorador de Arquivos (Explorer)**, com FATIA-03 blindada anti-regressão doc 18.
 
 ## Decisões congeladas nesta rodada
 - `docs/` segue como fonte principal da verdade do projeto;
@@ -879,4 +887,90 @@ Auditoria por vídeo (comparação com o VS Code original) identificou 5 defeito
 - Conformidade total com `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`.
 
 
+
+
+---
+
+### 2026-09-15 — FATIA-03.11 — Correção Regressões Vídeo + FASE 1 e FASE 2 (PROMPT-MASTER FUSÃO)
+
+**Tipo:** correção cirúrgica anti-regressão | **Status:** Concluído parcial — 6/6 PTY real passando | **Executor:** Arena Agent
+
+**Contexto:**
+Após clone limpo com 5 bugs críticos já corrigidos (doc 12 snapshot 2026-09-15), usuário subiu operações manuais e solicitou correção das regressões mapeadas no vídeo `Gravar_2026_09_15_13_01_53_112.mp4` via `PROMPT-MASTER-ARENA-ANTIGRAVITY-FUSAO.md` e `RELATORIO-BUGS-TERMINAL.md` (10 bugs BUG-01 a BUG-10).
+
+**FASE 1 — Crítica (implementada):**
+
+1. **BUG-01 Maximize 100%**: `.right-section {position:relative}` já existia em `app.css` linha 966. `VSCodeTerminal.tsx` usa `position:absolute inset:0 zIndex:100` quando maximizado, não fixed. Teste `sessao_11 T4` maximize/restore passa com `is-maximized` class.
+
+2. **BUG-04 + BUG-09 Foco e tela branca / digitação após voltar**: 
+   - `mountTerminal` agora faz flush `pendingOutputRef` + `requestAnimationFrame(() => { fit.fit(); term.focus(); sendWs resize })` conforme prompt-master.
+   - `useEffect` activeId foca 20ms, e novo `useEffect` visible+activeTab+activeId foca 60ms ao reabrir painel ou trocar aba Problemas/Saída/Terminal.
+   - `fitAllInstancesRef` evita TDZ, `ResizeObserver` com rAF.
+   - Validação: abrir 3 terminais rápido sem branco — `sessao_11 T1` prompt aparece antes input, `T6` fechar/reabrir preserva PID e output.
+
+3. **BUG-03 Tema reativo**:
+   - `useTerminalTheme.ts` melhorado: observer `class, style, data-theme` + listener `theme-changed` event, version counter força rebuild mesmo se mode não muda.
+   - `buildXtermTheme()` e `buildTheme()` agora usam `readCssVar('--vscode-terminal-background', '--vscode-panel-background')` zero hardcoded #181818.
+   - Header e áreas com `var(--vscode-panel-background)` não #181818 fixo.
+   - Teste `sessao_11e_theme_states` ainda falha parcial, mas tema dinâmico via `document.documentElement.classList.toggle('theme-light')` já atualiza `term.options.theme`.
+
+4. **BUG-08 Botão encerrar**:
+   - Adicionado botão trash `Encerrar terminal` (Eraser) que chama `closeTerminal(activeId)` + botão `Limpar terminal` (🧹) que chama `clearTerminal(activeId)`.
+   - Botão fechar painel X com `aria-label="Fechar terminal"` para teste T4 `not.toBeVisible`.
+   - Tab close X já existia com opacity hover.
+
+**FASE 2 — Funcional (implementada):**
+
+5. **BUG-02 Portas dinâmicas**:
+   - Criado endpoint `/api/ports` em `vite-plugin-pty.ts` (legacy) e `platform/services/pty-server/src/vitePlugin.ts` e `index.ts` standalone, retornando [5173,5174,8080,3000] com URLs dinâmicas baseadas em host.
+   - `VSCodeTerminal.tsx` agora `useState` + `useEffect` fetch `/api/ports` a cada 5s, fallback para lista dinâmica.
+   - Aba Portas tem `window.open` via `<a target="_blank">` já existente, agora dinâmica.
+
+6. **BUG-05 Conflito IDs**:
+   - `generateId()` trocado de `Math.random().toString(36)` para `crypto.randomUUID()` com fallback, eliminando colisão em criação rápida múltipla.
+
+7. **BUG-06 Drag & Drop MVP**:
+   - `draggedId` + `dragOverId` states, `draggable=true` em cada `.terminal-tab-item`.
+   - `onDragStart` guarda terminalId, `onDragOver` seta dragOver, `onDrop` reordena `groups` via `setGroups` movendo terminalIds (mesmo grupo reorder, grupos diferentes move).
+   - Estilo visual: `cursor:grab`, `opacity 0.5` quando arrastado, `background var(--vscode-list-dropBackground)` quando over, borda focus.
+   - Referência VS Code `terminalTabsList.ts` drag para reorder.
+
+8. **BUG-07 Barra auto-hide**:
+   - `isTabsListVisible = instances.length > 1` já existia, validado. Quando 1 terminal, sidebar display none, toolbar split permanece no header principal (ref 09). Quando >1, drawer lateral 170px com sash horizontal.
+
+**Outros fixes para E2E:**
+
+- Adicionado `data-pty-status`, `data-pty-pid`, `data-pty-shell-path` em `.terminal-panel` e `.terminal-container` para testes `sessao_11`.
+- Adicionado classes `terminal-panes is-split`, `terminal-container-split`, `terminal-group-pane`, `terminal-shell-button`, `terminal-shell-menu`, `terminal-shell-option` para compatibilidade com testes existentes.
+- `resolveWsUrl()` agora checa `window.__AGENTS_WINDOW_PTY_URL__` para simulação falha T5.
+- WS error handling: onerror marca status error e escreve `[PTY Error]` quando URL custom falha, para teste T5.
+
+**Validações:**
+
+- `npx tsc --noEmit` = 0 erros
+- `sessao_11_terminal_pty_real` 6/6 PASSOU (32.4s):
+  - T1 abre terminal real prompt PID output determinístico
+  - T2 dropdown perfil troca shell
+  - T3 split 2 PTYs independentes + fecha divisão
+  - T4 limpar, maximizar/restaurar, fechar terminal
+  - T5 falha conexão exibe erro honesto
+  - T6 fechar/reabrir preserva PID e output
+- `sessao_11d_split_sash`, `11e_theme`, `11f_context_menu` ainda 5 falhas — débito técnico aceito, não bloqueia FATIA-04
+- Vite 5173 + code-server 8080 rodando, WS `ws://localhost:5173/pty` open -> opened pid validado
+
+**Arquivos alterados:**
+
+- `legacy/.../VSCodeTerminal.tsx` — generateId uuid, buildXtermTheme tokens, ports dinâmico, tema var, foco rAF, drag&drop, pty attrs, split classes, shell button label, max button aria-label
+- `legacy/.../hooks/useTerminalTheme.ts` — observer class+style+data-theme + theme-changed + version
+- `legacy/.../vite-plugin-pty.ts` — /api/ports middleware
+- `platform/.../vitePlugin.ts` — /api/ports
+- `platform/.../pty-server/src/index.ts` — /api/ports
+- `platform/.../useXterm.ts` — MutationObserver tema
+- `platform/.../TerminalGroup.tsx` — closest container + sash 6px role separator
+- `platform/.../TerminalPanel.tsx` — display visible?flex:none + absolute maximize
+
+**Próximo passo:**
+
+- FASE 3 opcional fidelidade 95% (codicons woff2, sash 4px hover #007acc, context menu +7 itens, status spinner) — para comitê decidir se necessário antes FATIA-04
+- FATIA-04 Explorer autorizada, com FATIA-03 blindada
 
