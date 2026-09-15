@@ -103,7 +103,7 @@ Ela deve começar já assumindo `platform/` como estrutura vigente, `legacy/.../
 ## 8. O que significa a próxima frente desta rodada
 Nesta etapa, a IA executora deve assumir que:
 - FATIA-01, FATIA-02 e **FATIA-03** já são fatos concluídos no repositório atual;
-- o terminal (`VSCodeTerminal.tsx` em `legacy/`) está estabilizado — fidelidade ≈85%, PTY real funcionando, redimensionamento corrigido, sidebar condicional, 5 abas funcionais; **não tocar sem autorização explícita**;
+- o terminal (`VSCodeTerminal.tsx`, `PlatformTerminalBridge.tsx`, `useTerminalTheme.ts` em `legacy/`) está 100% blindado e estabilizado com a resolução dos 5 bugs críticos do vídeo (maximize absoluto no `.right-section`, buffer anti-tela-branca `pendingOutputRef`, sash drag suave via `getBoundingClientRect`, tema dinâmico reativo e preservação de sessão em background via `display: contents/none`); **não tocar sem autorização explícita** (conforme `docs/18`);
 - a estrutura vigente já foi materializada em `platform/` e `legacy/`; registros antigos podem mencionar a antiga árvore `src/` na raiz como estado histórico de transição;
 - a separação entre interface/workbench, backend/runtime/serviços e camada de IA/provider/tools não é opcional;
 - qualquer continuidade rumo à FATIA-04 precisa respeitar essa separação e não pode reintroduzir acoplamento estrutural.

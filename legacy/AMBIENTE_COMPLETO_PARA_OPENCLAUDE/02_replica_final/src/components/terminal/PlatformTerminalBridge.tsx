@@ -16,26 +16,19 @@ interface Props {
 }
 
 export function PlatformTerminalBridge({ visible, sessionId, workspace, onClose }: Props) {
-  const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(visible);
 
   useEffect(() => {
-    if (visible) {
-      const t = setTimeout(() => setReady(true), 100);
-      return () => clearTimeout(t);
-    } else {
-      setReady(false);
+    if (visible && !mounted) {
+      setMounted(true);
     }
-  }, [visible]);
+  }, [visible, mounted]);
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
-  if (!ready) {
-    return (
-      <div style={{ padding: '12px', background: '#181818', color: '#cccccc', fontSize: '12px', borderTop: '1px solid #2b2b2b' }}>
-        Carregando terminal VS Code fiel...
-      </div>
-    );
-  }
-
-  return <VSCodeTerminal visible={visible} sessionId={sessionId} workspace={workspace} onClose={onClose} />;
+  return (
+    <div style={{ display: visible ? 'contents' : 'none' }}>
+      <VSCodeTerminal visible={visible} sessionId={sessionId} workspace={workspace} onClose={onClose} />
+    </div>
+  );
 }

@@ -15,6 +15,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { useTerminalTheme } from '../../hooks/useTerminalTheme';
 import {
   Columns2,
   Eraser,
@@ -115,12 +116,15 @@ function buildXtermTheme() {
 }
 
 export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, workspace, onClose }: Props) {
+  const terminalTheme = useTerminalTheme();
+
   // Estado das instâncias do terminal
   const [instances, setInstances] = useState<TerminalInstance[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groups, setGroups] = useState<Array<{ groupId: string; terminalIds: string[]; direction: 'horizontal' | 'vertical' }>>([]);
   const [activeTab, setActiveTab] = useState<TabType>('terminal');
   const [maximized, setMaximized] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Redimensionamento Vertical do Painel
   const [panelHeight, setPanelHeight] = useState<number>(() => {
@@ -174,9 +178,12 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   // Refs de terminais e PTY
   const terminalsRef = useRef<Record<string, { term: Terminal; fit: FitAddon; opened: boolean }>>({});
   const containerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pendingOutputRef = useRef<Record<string, string>>({});
   const wsRef = useRef<WebSocket | null>(null);
   const wsQueueRef = useRef<string[]>([]);
   const activeIdRef = useRef<string | null>(null);
+  // fitAllInstancesRef: ref estável para evitar temporal dead zone entre createTerminal e fitAllInstances
+  const fitAllInstancesRef = useRef<() => void>(() => {});
   activeIdRef.current = activeId;
 
   // Envio de mensagens WebSocket sem overhead
@@ -221,6 +228,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     if (profileId) {
       setActiveProfileId(profileId);
     }
+
+    // BUG 2 FIX: recalcular tamanho após React renderizar o novo terminal
+    requestAnimationFrame(() => fitAllInstancesRef.current());
 
     sendWs({
       type: 'open',
@@ -273,6 +283,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     });
 
     setActiveId(instId);
+
+    // BUG 2 FIX: recalcular layout após split
+    requestAnimationFrame(() => fitAllInstancesRef.current());
 
     sendWs({
       type: 'open',
@@ -337,11 +350,30 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       } catch {}
     });
   }, []);
+  // Manter ref em sincronia para uso em callbacks definidos antes desta linha
+  fitAllInstancesRef.current = fitAllInstances;
 
-  // Efeito do WebSocket PTY
+  // Atualizar tema dinamicamente em todos os terminais ativos quando o tema mudar
   useEffect(() => {
-    if (!visible) return;
+    Object.values(terminalsRef.current).forEach(({ term }) => {
+      try {
+        term.options.theme = terminalTheme;
+      } catch {}
+    });
+  }, [terminalTheme]);
 
+  // Recalcular layout do xterm sempre que o painel for reexibido
+  useEffect(() => {
+    if (visible) {
+      const raf = requestAnimationFrame(() => {
+        fitAllInstances();
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [visible, fitAllInstances]);
+
+  // Efeito do WebSocket PTY: mantém conexão persistente mesmo se o painel estiver oculto
+  useEffect(() => {
     const url = resolveWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
@@ -407,11 +439,14 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
             }
           }
         } else if (type === 'output' && msgSessionId) {
-          // FLUXO DIRETO ULTRA-RÁPIDO: Escreve direto no buffer xterm sem passar pelo estado do React
-          // Usando Uint8Array quando possível para máxima performance no xterm v5
+          // FLUXO DIRETO: escreve no xterm ou faz buffer se o DOM ainda não montou
           const entry = terminalsRef.current[msgSessionId];
           if (entry && msg.data) {
             entry.term.write(msg.data as string);
+          } else if (msg.data) {
+            // Terminal ainda não montou no DOM — guarda para flush em mountTerminal
+            pendingOutputRef.current[msgSessionId] =
+              (pendingOutputRef.current[msgSessionId] ?? '') + (msg.data as string);
           }
         } else if (type === 'exit' && msgSessionId) {
           setInstances((prev) =>
@@ -441,7 +476,16 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   const mountTerminal = useCallback(
     (instId: string, el: HTMLDivElement | null) => {
       if (!el) return;
-      if (terminalsRef.current[instId]) return;
+      const existing = terminalsRef.current[instId];
+      if (existing) {
+        if (existing.term.element && existing.term.element.parentElement !== el) {
+          el.appendChild(existing.term.element);
+        }
+        try {
+          existing.fit.fit();
+        } catch {}
+        return;
+      }
 
       const term = new Terminal({
         convertEol: true,
@@ -450,7 +494,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
         fontFamily: readCssVar('--vscode-editor-font-family', 'Consolas, "Courier New", monospace'),
         fontSize: 13,
         lineHeight: 1.2,
-        theme: buildXtermTheme(),
+        theme: terminalTheme,
         allowTransparency: true,
         scrollback: 10000,
       });
@@ -465,6 +509,13 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       } catch {}
 
       terminalsRef.current[instId] = { term, fit, opened: false };
+
+      // BUG 2 FIX: flush de output que chegou antes do DOM estar pronto
+      const pending = pendingOutputRef.current[instId];
+      if (pending) {
+        term.write(pending);
+        delete pendingOutputRef.current[instId];
+      }
 
       if (term.cols > 0 && term.rows > 0) {
         sendWs({ type: 'resize', sessionId: instId, cols: term.cols, rows: term.rows });
@@ -502,7 +553,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
         setTimeout(() => term.focus(), 30);
       }
     },
-    [sendWs]
+    [sendWs, terminalTheme]
   );
 
   // Foco
@@ -569,18 +620,26 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  // SASH SPLIT INTERNO: Arrastar divisão entre 2 terminais no mesmo grupo
+  // SASH SPLIT INTERNO: Arrastar divisão entre 2 terminais no mesmo grupo com medição precisa em pixels
   const handleSashMouseDown = (e: ReactMouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingSash(true);
-    const startX = e.clientX;
-    const startRatio = splitRatio;
+    const container = splitContainerRef.current;
+    const isVertical = activeGroup?.direction === 'vertical';
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const containerWidth = window.innerWidth - sidebarWidth - 100;
-      const deltaRatio = deltaX / (containerWidth || 1);
-      const newRatio = Math.max(0.2, Math.min(0.8, startRatio + deltaRatio));
+      moveEvent.preventDefault();
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      let newRatio: number;
+      if (isVertical) {
+        const deltaY = moveEvent.clientY - rect.top;
+        newRatio = Math.max(0.15, Math.min(0.85, deltaY / (rect.height || 1)));
+      } else {
+        const deltaX = moveEvent.clientX - rect.left;
+        newRatio = Math.max(0.15, Math.min(0.85, deltaX / (rect.width || 1)));
+      }
       setSplitRatio(newRatio);
       fitAllInstances();
     };
@@ -624,8 +683,6 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     }
   };
 
-  if (!visible) return null;
-
   // A barra lateral de abas só deve aparecer se houver mais de 1 instância
   const isTabsListVisible = instances.length > 1;
 
@@ -656,27 +713,30 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     return list;
   }, [groups, instances]);
 
-  const activeGroup = activeId ? groups.find((g) => g.terminalIds.includes(activeId)) || groups[0] : groups[0];
+  // activeGroup: grupo do terminal ativo (usado pelo sash e pelo render)
+  const activeGroup = activeId ? groups.find((g) => g.terminalIds.includes(activeId)) ?? groups[0] : groups[0];
 
   return (
     <section
       className={`terminal-panel is-vscode-faithful ${maximized ? 'is-maximized' : ''}`}
       aria-label="Painel Inferior"
       style={{
-        // Fix resize: --terminal-height CSS var controls flex-basis in terminal-panel class
-        // We must override it inline so the drag handle actually works
+        // --terminal-height controla o flex-basis da classe .terminal-panel
+        // Precisamos sobrescrever inline para que o sash funcione
         ['--terminal-height' as string]: maximized ? '100%' : `${panelHeight}px`,
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
-        maxHeight: maximized ? '100%' : '85vh',
-        minHeight: '130px',
-        background: '#181818',
-        color: '#cccccc',
-        borderTop: '1px solid #2b2b2b',
-        position: maximized ? 'fixed' : 'relative',
+        // BUG 1 FIX: usa position:absolute (relativo ao .right-section que tem position:relative)
+        // em vez de position:fixed que cobria tudo incluindo as sidebars
+        maxHeight: maximized ? 'none' : '85vh',
+        minHeight: maximized ? 0 : '130px',
+        background: 'var(--vscode-panel-background, #181818)',
+        color: 'var(--vscode-panel-foreground, #cccccc)',
+        borderTop: maximized ? 'none' : '1px solid var(--vscode-panel-border, #2b2b2b)',
+        position: maximized ? 'absolute' : 'relative',
         inset: maximized ? 0 : undefined,
-        zIndex: maximized ? 9999 : 10,
+        zIndex: maximized ? 100 : 10,
         overflow: 'hidden',
         fontFamily: 'var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
         userSelect: isResizingPanel || isResizingSidebar || isDraggingSash ? 'none' : 'auto',
@@ -1107,6 +1167,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                     background: '#2b2b2b',
                     overflow: 'hidden',
                   }}
+                  ref={splitContainerRef}
                 >
                   {activeGroup.terminalIds.map((tid, idx) => {
                     const isActive = tid === activeId;

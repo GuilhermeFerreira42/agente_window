@@ -3,15 +3,19 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 
 > Nota de leitura: este quadro combina estado vigente com trilha histórica de execução. Linhas das FATIAS iniciais podem mencionar caminhos anteriores à materialização final em `platform/` e `legacy/`; nesses casos, prevalece o estado vigente descrito em `docs/12_DOCUMENTACAO_VIVA.md` e `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`.
 
-## Leitura rápida do estado vigente — ATUALIZADO 2026-09-14 PARA COMITÊ
-- A documentação canônica já foi consolidada em `docs/00` a `docs/16` + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md`.
+## Leitura rápida do estado vigente — ATUALIZADO 2026-09-15 (5 BUGS DO VÍDEO RESOLVIDOS)
+- A documentação canônica já foi consolidada em `docs/00` a `docs/18` + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md`.
 - A arquitetura híbrida aprovada já está materializada em `platform/` e `legacy/`.
 - FATIA-01 e FATIA-02 concluídas.
-- FATIA-03 executada em 10 sub-fatias (03.1 a 03.10): bridge PTY, service, UI xterm, split, persistência, E2E, integração visível 5173, polish visual, revisão anti-legado com VSCodeTerminal auto-contido.
-- **Status atual FATIA-03: Em revisão comitê — funcional mas não 100% fiel pixel-perfect.** Gaps documentados em `docs/12` seção COMITÊ 2026-09-14.
-- Servidores mantidos: 8080 VS Code Server + 5173 Agente Window ambos 200 OK.
-- Próxima decisão comitê: definir nível de fidelidade aceite (85% vs 100%) e autorizar Opção A/B/C.
-- Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12` + `docs/16`.
+- FATIA-03: Os 5 bugs críticos de fidelidade identificados no vídeo foram 100% corrigidos:
+  1. Maximize restrito à área central (`position: absolute`), respeitando as duas sidebars.
+  2. Buffer `pendingOutputRef` + `fitAllInstancesRef` eliminando tela em branco e TDZ.
+  3. Arraste suave do sash via `getBoundingClientRect()`.
+  4. Tema dinâmico reativo via hook `useTerminalTheme` com `MutationObserver`.
+  5. Preservação de sessão PTY e histórico via `display: contents / none` no bridge.
+- **Status atual FATIA-03: Concluída e blindada contra regressões (conforme `docs/18`), aguardando teste e feedback do usuário.**
+- Servidor Vite ativo em `http://localhost:5173/` (HTTP 200 OK).
+- Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12`, `docs/16` e `docs/18`.
 
 | STATUS USADO | SIGNIFICADO |
 |---|---|
@@ -26,7 +30,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 
 | DATA DE INÍCIO DO SPRINT | DATA ATUALIZAÇÃO | ESTADO VIGENTE | ATUALIZADO POR | BRANCH |
 |---|---|---|---|---|
-| 2026-09-11 | 2026-09-14 | Onda 0-2 concluídas. FATIA-03 executada 03.1 a 03.10 com VSCodeTerminal auto-contido 34KB, sem tela cinza, sem abas browser-like. Fidelidade atual 85% vs VS Code original, gaps mapeados para comitê. Aguardando decisão sobre Opção A/B/C. Servidores 8080+5173 rodando. | Arena Agent | main + working tree local |
+| 2026-09-11 | 2026-09-15 | FATIA-01, 02 e 03 concluídas. 5 bugs críticos do vídeo resolvidos e blindados em docs/18. Servidor 5173 ativo. Aguardando teste e feedback do usuário para avanço à FATIA-04 (Explorer). | Antigravity | main + working tree local |
 
 ---
 

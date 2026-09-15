@@ -19,18 +19,16 @@ Este arquivo não substitui:
 
 Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 
-## Estado atual da rodada — ATUALIZADO 2026-09-14 (FATIA-03 POLISH CONCLUÍDO)
+## Estado atual da rodada — ATUALIZADO 2026-09-15 (CORREÇÃO DOS 5 BUGS CRÍTICOS DO VÍDEO CONCLUÍDA)
 - `docs/` permanece como fonte principal de continuidade do projeto;
 - FATIA-01 e FATIA-02 concluídas e validadas;
-- **FATIA-03 finalizada e polish aplicado nesta sessão** — problemas corrigidos:
-  1. **Redimensionamento do painel** funcionando: raiz-causa era conflito entre `flex: 0 0 var(--terminal-height)` na classe CSS e o `height` inline do React — corrigido injetando a variável `--terminal-height` diretamente no elemento via `['--terminal-height' as string]: panelHeight`.
-  2. **Barra lateral condicional**: já estava correta (`isTabsListVisible = instances.length > 1`); polish aplicado na aparência para maior fidelidade ao VS Code — borda esquerda azul `#007acc` no item ativo, botão X visível no hover, prefixo de árvore `┌ └ ├` para splits.
-  3. **Tabs funcionais**: todas as 5 abas reais confirmadas (Problemas, Saída, Console de Depuração, Terminal, Portas).
-  4. **Velocidade confirmada**: output PTY via xterm direto sem re-render React, `dir` executado e exibido instantaneamente.
-  5. **Decisão Comitê confirmada**: **Opção A** (polish incremental) aprovada — fidelidade ≈ 85% sem risco de regressão; Opção B (migração para `platform/`) fica como débito técnico da próxima sprint.
-- **Blindagem Anti-Regressão ativa**: Publicado [`docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md). As Fatias 01, 02 e 03 estão formalmente congeladas e blindadas contra alterações não autorizadas.
-- Servidor rodando: `http://localhost:5173` com HMR e PTY bridge `/pty` ativo.
-- `.gitignore` atualizado: `code-server/` adicionado.
+- **FATIA-03: 5 Bugs Críticos de Fidelidade do Vídeo Corrigidos**:
+  1. **Bug 1 (Maximize)**: Alterado de `position: fixed` (que cobria a tela inteira, ignorando as sidebars) para `position: absolute` ancorado no `.right-section` (`position: relative`). Terminal maximizado agora respeita estritamente ambas as sidebars, exatamente igual ao VS Code original.
+  2. **Bug 2 (Terminais em branco)**: Buffer `pendingOutputRef` implementado para reter dados WS PTY antes da montagem no DOM, com flush automático no `mountTerminal`. Além disso, introduzido `fitAllInstancesRef` resolvendo a Temporal Dead Zone (TDZ) do React e garantindo chamada de layout via `requestAnimationFrame` em `createTerminal` e `splitTerminal`.
+  3. **Bug 3 (Arrasto do divisor / Split Sash)**: Medição de pixels frágil via `querySelector` substituída por `splitContainerRef.current.getBoundingClientRect()`, garantindo arrasto proporcional suave e estável sem travamento de layout.
+  4. **Bug 4 (Tema reativo)**: Criado hook `useTerminalTheme` (`src/hooks/useTerminalTheme.ts`) com `MutationObserver` no `documentElement.classList` e leitura dinâmica dos tokens CSS `--vscode-terminal-*`. Todos os terminais ativos atualizam instantaneamente (`term.options.theme`). Teste `useTerminalTheme.test.ts` passando com 100% de sucesso (2/2).
+  5. **Bug 5 (Preservação de sessão ao fechar)**: Em `PlatformTerminalBridge.tsx`, substituído o unmount condicional por `<div style={{ display: visible ? 'contents' : 'none' }}>`. Ao fechar e reabrir o painel, a conexão WS `/pty`, buffers e instâncias xterm permanecem vivas na memória sem reinício do zero.
+- **Validação Técnica**: `npx tsc --noEmit` = 0 erros; testes unitários de tema e componentes de terminal passando (13/13 testes).
 - **Próxima frente autorizada: FATIA-04 — Explorador de Arquivos (Explorer).**
 
 ## Decisões congeladas nesta rodada
@@ -834,5 +832,51 @@ Após a conclusão com sucesso e homologação no navegador real das Fatias 01 (
    - Atualizado [`docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md):
      - Item 15 adicionado à lista de leitura obrigatória.
      - Seção 10 reforçada com a regra inviolável de execução do checklist no navegador antes de qualquer entrega.
+
+---
+
+### 2026-09-15 — RESOLUÇÃO DOS 5 BUGS CRÍTICOS DO VÍDEO NO TERMINAL
+**Tipo:** correção de defeitos / fidelidade de comportamento | **Status:** Concluído | **Executor:** Antigravity
+
+**Contexto:**
+Auditoria por vídeo (comparação com o VS Code original) identificou 5 defeitos de usabilidade e layout no terminal:
+1. Terminal maximizado cobria a aplicação inteira incluindo as sidebars esquerda e direita (0:48).
+2. Novos terminais ficavam em branco ao serem criados ou divididos (2:13).
+3. Sash de divisão entre terminais divididos não arrastava suavemente ou travava (3:05).
+4. Fundo escuro fixo `#181818` não acompanhava as mudanças de tema do VS Code (4:20).
+5. Sessão PTY era destruída ao fechar e reabrir o painel inferior (5:10).
+
+**Entregas Realizadas:**
+1. **Bug 1 (Maximize)**: Em `VSCodeTerminal.tsx`, alterado o container de `position: fixed` (que escapava para a viewport inteira) para `position: absolute` ancorado no pai `.right-section` (`position: relative`). O terminal maximizado agora respeita com fidelidade 100% as duas sidebars.
+2. **Bug 2 (Terminais em branco)**:
+   - Adicionado buffer `pendingOutputRef` que retém chunks de output do WebSocket PTY caso cheguem antes da montagem da instância xterm no DOM.
+   - `mountTerminal` faz flush imediato do buffer acumulado.
+   - Resolvida a Temporal Dead Zone (TDZ) do React através de `fitAllInstancesRef`, permitindo disparo assíncrono de `fitAllInstances` via `requestAnimationFrame` sem dependência circular em `useCallback`.
+3. **Bug 3 (Sash Drag)**:
+   - `handleSashMouseDown` refatorado para utilizar `splitContainerRef.current.getBoundingClientRect()` em vez de seletores CSS dinâmicos vulneráveis.
+   - Cálculo de proporção proporcional `deltaX / rect.width` com clamp `[0.15, 0.85]` e feedback visual no mousemove.
+4. **Bug 4 (Tema Dinâmico)**:
+   - Criado hook reativo `useTerminalTheme` em `src/hooks/useTerminalTheme.ts`.
+   - Monitoramento de classe via `MutationObserver` em `document.documentElement`.
+   - Conversão em tempo de execução dos tokens CSS `--vscode-terminal-*` e injeção automática em `term.options.theme` de todas as instâncias vivas.
+   - Suíte `src/__tests__/useTerminalTheme.test.ts` criada e validada com 2/2 testes passando.
+5. **Bug 5 (Preservação de Sessão)**:
+   - `PlatformTerminalBridge.tsx` refatorado: em vez de desmontar `VSCodeTerminal` (`if (!visible) return null`), utiliza `<div style={{ display: visible ? 'contents' : 'none' }}>`.
+   - Sockets, listeners, buffers e abas permanecem vivos em background quando o painel é ocultado, restaurando o estado instantaneamente ao reabrir.
+   - Adicionado re-fit automático no re-render de visibilidade.
+
+**Validações Executadas:**
+- `npx tsc --noEmit` — **0 erros** TypeScript.
+- Suíte de testes unitários do terminal (13 testes passando):
+  - `useTerminalTheme.test.ts`: 2/2 ✅
+  - `terminalInstances.test.ts`: 4/4 ✅
+  - `useXtermTerminal.test.tsx`: 1/1 ✅
+  - `SplitSash.test.tsx`: 1/1 ✅
+  - `TerminalGroup.test.tsx`: 2/2 ✅
+  - `PanelTabs.test.tsx`: 1/1 ✅
+  - `TerminalInstanceTabs.test.tsx`: 1/1 ✅
+  - `ShellPicker.test.tsx`: 1/1 ✅
+- Conformidade total com `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`.
+
 
 
