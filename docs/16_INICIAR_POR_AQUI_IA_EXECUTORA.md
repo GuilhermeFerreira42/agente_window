@@ -36,6 +36,7 @@ Leia os arquivos abaixo nesta ordem exata:
 12. `docs/13_ADRS_E_DECISOES_TECNICAS.md`
 13. `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md`
 14. `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`
+15. `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md` (OBRIGATÓRIO: ler para não quebrar componentes homologados)
 
 Depois disso, leia os pacotes modulares apenas se eles forem necessários para a fatia escolhida.
 
@@ -123,6 +124,7 @@ Não faça nada disso nesta etapa:
 - Você não deve misturar múltiplos subsistemas grandes na mesma fatia sem necessidade explícita.
 - Você deve trabalhar com fatias pequenas e paradas frequentes.
 - Você deve validar a fatia antes de seguir para a próxima.
+- Você deve seguir rigorosamente `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`, executando o checklist de homologação no navegador real antes de considerar qualquer fatia entregue.
 - Você deve priorizar `typecheck`, testes focados, probe e E2E conforme a fatia.
 - Você não deve assumir que build completo é obrigatório em toda etapa.
 

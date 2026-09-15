@@ -28,6 +28,7 @@ Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
   3. **Tabs funcionais**: todas as 5 abas reais confirmadas (Problemas, Saída, Console de Depuração, Terminal, Portas).
   4. **Velocidade confirmada**: output PTY via xterm direto sem re-render React, `dir` executado e exibido instantaneamente.
   5. **Decisão Comitê confirmada**: **Opção A** (polish incremental) aprovada — fidelidade ≈ 85% sem risco de regressão; Opção B (migração para `platform/`) fica como débito técnico da próxima sprint.
+- **Blindagem Anti-Regressão ativa**: Publicado [`docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md). As Fatias 01, 02 e 03 estão formalmente congeladas e blindadas contra alterações não autorizadas.
 - Servidor rodando: `http://localhost:5173` com HMR e PTY bridge `/pty` ativo.
 - `.gitignore` atualizado: `code-server/` adicionado.
 - **Próxima frente autorizada: FATIA-04 — Explorador de Arquivos (Explorer).**
@@ -812,4 +813,26 @@ Para controlar dinamicamente `flex-basis` definido via `var(--X)` numa classe CS
 - Opção B (migrar para `platform/` TerminalPanel + TerminalServiceImpl) = débito técnico próxima sprint.
 - `.gitignore` atualizado: `code-server/` adicionado pelo usuário.
 - **Próxima frente: FATIA-04 — Explorador de Arquivos (Explorer).**
+
+---
+
+### 2026-09-14 — BLINDAGEM ANTI-REGRESSÃO E PROTOCOLO DE CONTRATOS CONGELADOS
+**Tipo:** governança técnica / prevenção de regressão | **Status:** Concluído | **Executor:** Antigravity
+
+**Contexto:**
+Após a conclusão com sucesso e homologação no navegador real das Fatias 01 (Layout Base), 02 (Barras e Navegação) e 03 (Terminal PTY Real e Painel com 85% fidelidade VS Code), estabeleceu-se a necessidade de blindar esses componentes contra regressões acidentais por novas IAs (ex.: LMSYS Arena, Claude Code, Cursor) ou desenvolvedores ao implementar a FATIA-04 (Explorer) e frentes subsequentes.
+
+**Entregas Realizadas:**
+1. **Criação da Norma Canônica Anti-Regressão**:
+   - Criado [`docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md) contendo:
+     - Tabela de componentes blindados (`VSCodeTerminal.tsx`, `terminal-vscode.css`, `App.css`).
+     - Os 5 contratos invioláveis do terminal (injenção inline de `--terminal-height`, sidebar condicional para `instances.length > 1`, preservação de sockets WebSocket e listeners do xterm, botões de hover das abas, e sobrevivência de background das 5 abas).
+     - Contratos invioláveis de layout (tokens `--titlebar-height: 35px`, `--statusbar-height: 22px`, `--activitybar-width: 48px`).
+     - Bateria de testes de homologação no navegador real (6 passos rápidos obrigatórios pré-commit).
+     - Trecho canônico de prompt para inserção em novas IAs para proibir desmontagem do terminal.
+2. **Atualização do Ponto de Entrada para Novas IAs**:
+   - Atualizado [`docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md):
+     - Item 15 adicionado à lista de leitura obrigatória.
+     - Seção 10 reforçada com a regra inviolável de execução do checklist no navegador antes de qualquer entrega.
+
 
