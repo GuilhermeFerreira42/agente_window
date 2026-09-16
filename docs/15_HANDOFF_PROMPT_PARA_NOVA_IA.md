@@ -23,6 +23,14 @@ Leia obrigatoriamente, nesta ordem:
 13. docs/14_PRIMEIRA_FATIA_RECOMENDADA.md
 14. docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md
 15. docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md
+16. docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md
+
+Se a frente autorizada for a FATIA-04 (é a vigente), leia TAMBÉM, antes de implementar:
+17. docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_00_INDICE_E_RESUMO_VIDEO.md
+18. docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md
+19. docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_13_CRITERIOS_ACEITE_VALIDACAO.md
+20. docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_07_BROWSER_SESSAO_EDITOR_IA_HTML.md
+21. docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_14_GAPS_ENTRE_DOC_ATUAL_E_VIDEO.md (§4 — decisões Q1–Q6)
 
 Depois disso:
 1. Resuma seu entendimento do projeto em poucas linhas.
@@ -44,13 +52,19 @@ Referência obrigatória de estado vigente:
 - seguir `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`
 - usar `docs/12_DOCUMENTACAO_VIVA.md` para distinguir estado atual, decisões congeladas e transição histórica
 - tratar `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md` apenas como registro histórico da abertura da execução
+- para a frente vigente (FATIA-04): seguir o plano `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md`, executar na ordem 4.1→4.9 e validar pelo `04_13` (checklist A + B) sem quebrar nada blindado pelo `docs/18`
 
 Se encontrar conflito ou lacuna documental, pare e pergunte antes de improvisar.
 ```
 
 ## Versão curta
 ```text
-Leia docs/00 a docs/07, 11, 12, 13, 14, 15 e 16. Resuma o entendimento. Confirme a próxima frente autorizada no estado atual do repositório. Liste arquivos-alvo. Aguarde confirmação do usuário. Depois implemente apenas essa fatia. Valide. Pare e reporte. Não redefina arquitetura nem pule contratos.
+Leia docs/00 a docs/07, 11, 12, 13, 14, 15, 16 e 18. Resuma o entendimento. Confirme a próxima frente autorizada no estado atual do repositório.
+
+Se a frente for a FATIA-04 (é a vigente), leia ANTES de implementar:
+docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_00 (índice), 04_15 (plano em 9 sub-fatias 4.1→4.9), 04_13 (aceite A+B), 04_07 (browser com acesso da IA ao HTML) e 04_14 §4 (decisões Q1–Q6 fechadas).
+
+Liste arquivos-alvo. Aguarde confirmação do usuário. Depois implemente apenas essa sub-fatia, na ordem 4.1→4.9. Valide com typecheck + testes focados + E2E + checklist do 04_13 e rode a anti-regressão sessao_11_terminal_pty_real (6/6). Pare e reporte. Não redefina arquitetura nem pule contratos.
 ```
 
 ## Uso recomendado

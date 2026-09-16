@@ -69,10 +69,12 @@ Leitura mínima obrigatória:
 3. Nenhuma mudança estrutural pode violar `03_ARQUITETURA_EXECUTAVEL.md` e `04_CONTRATOS_TECNICOS.md`.
 4. Nenhuma fatia é considerada pronta sem passar por `07_MATRIZ_DE_VALIDACAO.md` e `08_CRITERIOS_DE_HOMOLOGACAO.md`.
 5. O projeto continua orientado por documentação antes de implementação.
+6. **A frente vigente (FATIA-04) possui pacote documental próprio e obrigatório:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (`04_00` a `04_16`). Antes de implementar a FATIA-04, leia o `04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md` (plano em 9 sub-fatias) e o `04_13_CRITERIOS_ACEITE_VALIDACAO.md` (aceite). Ver `16_INICIAR_POR_AQUI_IA_EXECUTORA.md` §3.1.
 
 ## Estado atual da documentação
 Nesta consolidação:
 - a linha de continuidade foi centralizada em `docs/`;
 - os insumos úteis de `docs-1/` foram absorvidos como apoio de arquitetura, escopo e backlog;
 - a arquitetura híbrida aprovada já foi materializada estruturalmente em `platform/` e `legacy/`;
-- a próxima continuidade funcional deve partir desse estado vigente, não de uma releitura do estado anterior.
+- a próxima continuidade funcional deve partir desse estado vigente, não de uma releitura do estado anterior;
+- a **FATIA-04** ganhou pacote documental dedicado em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (17 arquivos: mapeamento do vídeo de 8m35s + plano de 9 sub-fatias + critérios de aceite), que **passa a ser a fonte específica da frente** e deve ser consultado antes da implementação.

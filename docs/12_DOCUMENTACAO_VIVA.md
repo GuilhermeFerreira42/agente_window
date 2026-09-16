@@ -38,6 +38,7 @@ Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 - **Validação Técnica**: `npx tsc --noEmit` = 0 erros; `sessao_11_terminal_pty_real` 6/6 PASSOU (T1 prompt PID, T2 perfil, T3 split, T4 limpar/max/restore/fechar, T5 erro, T6 preservação). `sessao_11d/e/f` 5 falhas débito técnico aceito.
 - **Servidores**: Vite 5173 + code-server 8080 rodando, WS `ws://localhost:5173/pty` open→opened pid validado, `/api/ports` dinâmico.
 - **Próxima frente autorizada: FATIA-04 — Explorador de Arquivos (Explorer)**, com FATIA-03 blindada anti-regressão doc 18.
+- **ATUALIZAÇÃO 2026-09-16:** a FATIA-04 foi **ampliada** (Explorer Completo + Editor em Anexo Lateral + Browser com acesso da IA ao HTML) e agora possui **pacote documental próprio e obrigatório** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (**17 arquivos**, `04_00` a `04_16`), com **plano de 9 sub-fatias (4.1 a 4.9)** em `04_15` e critérios de aceite em `04_13`. Esse pacote foi conectado à cadeia de leitura (`docs/16` §3.1, `docs/00` regra 6, `docs/15` itens 17-21, `docs/11` bloco FATIA-04). Nenhum código foi implementado — sub-fatias seguem **Planejado**.
 
 ## Decisões congeladas nesta rodada
 - `docs/` segue como fonte principal da verdade do projeto;
@@ -974,3 +975,62 @@ Após clone limpo com 5 bugs críticos já corrigidos (doc 12 snapshot 2026-09-1
 - FASE 3 opcional fidelidade 95% (codicons woff2, sash 4px hover #007acc, context menu +7 itens, status spinner) — para comitê decidir se necessário antes FATIA-04
 - FATIA-04 Explorer autorizada, com FATIA-03 blindada
 
+
+---
+
+### 2026-09-16 — CONSOLIDAÇÃO DOCUMENTAL DA FATIA-04 (pacote FATIA-04_VIDEO_COMPLETO) + ENTRADA NA CADEIA DE LEITURA
+**Tipo:** documentação (sem alteração de código) | **Status:** Concluído | **Executor:** Arena Agent
+
+**Contexto:**
+A FATIA-04 estava autorizada como próxima frente, porém com apenas 6 tarefas genéricas no kanban (`docs/11`) e sem pacote documental próprio. Após o mapeamento de um vídeo de referência de 8m35s, foi produzido o pacote completo da fase e o mesmo foi **conectado à cadeia oficial de leitura** para que qualquer IA executora chegue até ele seguindo `docs/16`.
+
+**Entregas realizadas:**
+
+1. **Pacote documental criado e relocado para o caminho canônico:**
+   `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — **17 arquivos** (`04_00` a `04_16`), ~220 KB:
+   - `04_00` índice + resumo do vídeo + legenda de evidências + matriz de conformidade dos 4 eixos;
+   - `04_01` a `04_07` especificação por subsistema (inventário visual do Explorer, comportamento, menu de contexto, DnD/upload/download, editor em anexo lateral, search na sessão, **browser com acesso da IA ao HTML**);
+   - `04_08` RF-01 a RF-34 (todos com VISUAL / COMPORTAMENTO / EVENTO / VALIDAÇÃO);
+   - `04_09` RNF (performance, fidelidade, compatibilidade, segurança, acessibilidade, observabilidade);
+   - `04_10` proposta aditiva de contratos (`FileSystemPort`, `ExplorerService`, `EditorService`, `SearchService`, `BrowserPort` + eventos);
+   - `04_11` mapa `arquivo:linha` no `microsoft/vscode` main e no `code-server`;
+   - `04_12` 13 fluxos em mermaid;
+   - `04_13` critérios de aceite: checklist **A** (vídeo) + checklist **B** (14 itens anti-regressão do `docs/18`);
+   - `04_14` gaps vs. FATIA-04 antiga + **decisões Q1–Q6 fechadas** (normativas);
+   - `04_15` **plano de implementação em 9 sub-fatias (4.1 a 4.9)** + protocolo de testes + DoD;
+   - `04_16` proposta de substituição do bloco da FATIA-04 no `docs/11`.
+
+2. **Correção da cadeia de leitura (antes o pacote NÃO era alcançado pelo doc 16):**
+   - `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`: nova seção **§3.1 — Leitura obrigatória da frente vigente (FATIA-04)** com tabela de leitura ordenada + regras Q1–Q6 + ordem 4.1→4.9; §7 atualizado apontando o pacote;
+   - `docs/00_COMO_LER_ESTA_DOCUMENTACAO.md`: Regra de navegação nº 6 + menção no "Estado atual da documentação";
+   - `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`: itens 16 a 21 no prompt longo (inclui `docs/18` e os 5 arquivos-chave da FATIA-04) + versão curta com o mesmo direcionamento;
+   - `docs/11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md`: bloco genérico de 6 linhas **substituído** pela tabela de 9 sub-fatias; leitura rápida e resumo executivo atualizados;
+   - `docs/12` (este arquivo): entrada de consolidação.
+
+3. **Conteúdo metodológico aplicado em todos os arquivos:** os 4 eixos exigidos (VISUAL / COMPORTAMENTO / EVENTO / VALIDAÇÃO) estão presentes e conferidos em **17/17 arquivos**.
+
+**Validação executada (checagens automáticas na própria documentação):**
+
+- arquivos no pacote: **17** (esperado 17);
+- RFs definidos: **34/34**, nenhuma linha RF sem coluna de validação;
+- blocos mermaid: **21**, nenhum bloco desbalanceado;
+- decisões Q1–Q6 presentes: **sim** (`04_14` §4);
+- tokens `--vscode-*` no inventário visual: **19** ocorrências distintas;
+- verificação de conteúdo zip × pasta por md5: **17/17 idênticos** (pacote de commit);
+- varredura da cadeia de leitura: `docs/16`, `docs/00`, `docs/15` e `docs/11` agora referenciam `FATIA-04_VIDEO_COMPLETO`.
+
+**O que NÃO foi feito nesta entrada (e não deve ser confundido com concluído):**
+
+- nenhuma linha de código da FATIA-04 foi implementada (as sub-fatias 4.1 a 4.9 seguem **Planejado**);
+- não foram executados `tsc`, `vitest` nem `playwright` nesta rodada — o protocolo de execução está em `04_15` §4 e o aceite em `04_13` §C/§D;
+- a substituição no `docs/11` foi aplicada como **proposta aprovada pelo usuário nesta rodada**; qualquer ajuste fino de status depende da execução real.
+
+**Pendências abertas:**
+
+- implementar 4.1 → 4.9 na ordem, com evidência por sub-fatia;
+- registrar cada sub-fatia concluída como nova entrada neste arquivo, com arquivos alterados + validações executadas;
+- atualizar `docs/11` de "Planejado" para o status real conforme a execução avance.
+
+**Próximo passo sugerido:**
+
+- iniciar pela **4.1 — FileSystem ampliado** (`platform/packages/agent-runtime/filesystem/` + `platform/packages/contracts/filesystem.ts`), com unit de fs fake e VAL-FS-01/02/03, rodando a anti-regressão `sessao_11_terminal_pty_real` (6/6) antes de fechar a sub-fatia.

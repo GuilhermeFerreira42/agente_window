@@ -40,6 +40,34 @@ Leia os arquivos abaixo nesta ordem exata:
 
 Depois disso, leia os pacotes modulares apenas se eles forem necessários para a fatia escolhida.
 
+### 3.1 🔴 LEITURA OBRIGATÓRIA DA FRENTE VIGENTE — FATIA-04 (Explorer + Editor em anexo + Browser com IA)
+
+A frente autorizada hoje é a **FATIA-04**, e ela **já possui documentação completa própria**. Portanto, **antes de qualquer implementação da FATIA-04**, leia nesta ordem:
+
+| # | Arquivo | Para quê |
+|---|---|---|
+| 1 | `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_00_INDICE_E_RESUMO_VIDEO.md` | índice, resumo do vídeo de 8m35s e legenda de evidências |
+| 2 | `.../04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md` | **plano oficial**: 9 sub-fatias (4.1 a 4.9), ordem obrigatória, arquivos-alvo, contratos, testes e DoD |
+| 3 | `.../04_13_CRITERIOS_ACEITE_VALIDACAO.md` | **checklist de homologação**: A (vídeo) + B (14 itens anti-regressão do `docs/18`) |
+| 4 | `.../04_01` a `.../04_07` | especificação por subsistema: inventor visual, comportamento, menu de contexto, DnD/upload/download, editor em anexo, search e **browser com acesso da IA ao HTML (crítico)** |
+| 5 | `.../04_08_REQUISITOS_FUNCIONAIS_RF.md` | RF-01 a RF-34 (cada um com VISUAL / COMPORTAMENTO / EVENTO / VALIDAÇÃO) |
+| 6 | `.../04_10_CONTRATOS_TECNICOS_ATUALIZADOS.md` | proposta aditiva dos contratos (`FileSystemPort`, `ExplorerService`, `EditorService`, `SearchService`, `BrowserPort`) |
+| 7 | `.../04_11_MAPA_CODIGO_VSCODE_CODE_SERVER.md` | mapa `arquivo:linha` no `microsoft/vscode` main e no `code-server` (zero adivinhação) |
+| 8 | `.../04_12_FLUXOS_EVENTOS_MERMAID.md` | 13 fluxos em mermaid |
+| 9 | `.../04_14_GAPS_ENTRE_DOC_ATUAL_E_VIDEO.md` | o que faltava na FATIA-04 antiga + **decisões fechadas Q1–Q6** (normativas) |
+| 10 | `.../04_16_PROPOSTA_ATUALIZACAO_KANBAN.md` | tabela de sub-fatias que substitui o bloco genérico no `docs/11` |
+| — | `.../04_02`, `.../04_03`, `.../04_04`, `.../04_05`, `.../04_06`, `.../04_09` | leitura de apoio conforme a sub-fatia a executar |
+
+**Regras desta frente (decididas em 04_14 §4):**
+- Q1 — o **anexo do editor nasce só em `platform/`**; **não** tocar `App.tsx`, `EditorArea.tsx` nem `app.css` do legado (área PROTEGIDA 🟡);
+- Q2 — o browser interno roda **no servidor** (Chromium + Playwright/CDP, screencast), não em iframe cross-origin;
+- Q3 — “Novo Arquivo” com arquivo selecionado cria **no pai** (padrão VS Code);
+- Q4 — **single-root** (multi-root fora de escopo nesta fase);
+- Q5 — gravação de browser: **5 min / 200 MB por arquivo, retenção de 7 dias**;
+- Q6 — a pasta canônica é `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (17 arquivos, `04_00` a `04_16`).
+
+**Ordem de execução obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 → 4.5 → 4.6 → 4.7 → 4.8 → 4.9 (cada sub-fatia só começa com a anterior validada).
+
 Se a fatia exigir fidelidade visual, menus, estados de tela ou comparação de layout, consulte também como apoio:
 - `docs/referencias_visuais/README.md`
 - `docs/referencias_visuais/TAXONOMIA.md`
@@ -99,6 +127,11 @@ A próxima frente funcional alvo é:
 **FATIA-04 — Explorador de Arquivos (Explorer)**
 
 Ela deve começar já assumindo `platform/` como estrutura vigente, `legacy/.../VSCodeTerminal.tsx` como terminal estabilizado (não tocar), e sem reabrir discussão arquitetural congelada.
+
+> **A FATIA-04 está ampliada e 100% documentada.** O escopo real desta frente é: **Explorer Completo + Editor em Anexo Lateral + Browser com acesso da IA ao HTML**, dividido em **9 sub-fatias (4.1 a 4.9)**.
+> Documento de entrada obrigatório: `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_00_INDICE_E_RESUMO_VIDEO.md`
+> Plano de execução: `.../04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md` · Aceite: `.../04_13_CRITERIOS_ACEITE_VALIDACAO.md`
+> Não iniciar a implementação sem ter lido os dois (ver §3.1).
 
 ## 8. O que significa a próxima frente desta rodada
 Nesta etapa, a IA executora deve assumir que:

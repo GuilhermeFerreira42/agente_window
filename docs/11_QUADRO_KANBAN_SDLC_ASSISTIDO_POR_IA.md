@@ -15,6 +15,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
   5. Preservação de sessão PTY e histórico via `display: contents / none` no bridge.
 - **Status atual FATIA-03: Concluída e blindada contra regressões (conforme `docs/18`), aguardando teste e feedback do usuário.**
 - Servidor Vite ativo em `http://localhost:5173/` (HTTP 200 OK).
+- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 17 arquivos (`04_00` a `04_16`): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status: Planejado — pronto para implementar.**
 - Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12`, `docs/16` e `docs/18`.
 
 | STATUS USADO | SIGNIFICADO |
@@ -143,17 +144,25 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 ---
 
-### FATIA-04 — Explorer + Filesystem I/O
-**Onda:** 4 | **Épico:** D — Explorer | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01 e 02
+### FATIA-04 — Explorer Completo + Editor em Anexo Lateral + Browser com IA (FASE 4)
+**Onda:** 4 | **Épico:** D — Explorer (+ C/F/E conforme sub-fatia) | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01 e FATIA-02 | **Doc:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (17 arquivos, `04_00` a `04_16`)
 
-| # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
+> **Nota (2026-09-16):** a FATIA-04 foi **ampliada** após o mapeamento do vídeo de 8m35s. Além do Explorer + Filesystem originalmente previstos, ela agora inclui **editor em anexo lateral** (não no centro), **search dentro da sessão** e **browser interno com acesso da IA ao HTML**. A tabela de 6 linhas anterior foi substituída pelas **9 sub-fatias** abaixo. Plano detalhado em `04_15`; critérios de aceite em `04_13`.
+
+| # | Sub-fatia | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|
-| 4.1 | RPC/bridge FileSystem `FileHost` | `platform/packages/agent-runtime/filesystem/` | `FileSystemPort` | teste integração | Planejado |
-| 4.2 | `ExplorerService` setRoot/expand/collapse/open/reveal/refresh | `platform/apps/workbench/src/logic/explorer/` | `04` #6 | VAL-EXP-01 | Planejado |
-| 4.3 | Árvore lazy com reveal e seleção | `platform/apps/workbench/src/ui/explorer/` | - | VAL-EXP-02 | Planejado |
-| 4.4 | Watcher `fs.changed` + refresh automático | `platform/packages/agent-runtime/filesystem/` | evento `fs.changed` | VAL-EXP-03 | Planejado |
-| 4.5 | Operações seguras move/remove com atomic write | `platform/packages/agent-runtime/filesystem/` | `atomic:true` | VAL-FS-01,02 | Planejado |
-| 4.6 | Integração explorer -> editor | `EditorService` | `04` #7 | VAL-INT-01 | Planejado |
+| 4.1 | FileSystem ampliado (I/O real + transferência browser↔workspace) | `platform/packages/agent-runtime/filesystem/` + `platform/packages/contracts/filesystem.ts` | `FileSystemPort` | unit com fs fake + VAL-FS-01/02/03 | Planejado |
+| 4.2 | `ExplorerService` ampliado (create/rename/delete/cut/copy/paste/download/upload/collapseAll/sort/select) | `platform/apps/workbench/src/logic/explorer/` + `platform/packages/contracts/explorer.ts` | `ExplorerService` | unit + VAL-EXP-01/05 | Planejado |
+| 4.3 | UI Explorer: header 5 botões + árvore lazy 22 px + 3 seções (Editores Abertos / Linha do Tempo / Estrutura de Código) | `platform/apps/workbench/src/ui/explorer/` | — | E2E VAL-EXP-02/04/06 + grep hardcode = 0 | Planejado |
+| 4.4 | Menu de contexto completo (inclui **Download** e Upload) | `platform/apps/workbench/src/ui/explorer/` + `platform/apps/workbench/src/logic/commands/` | `CommandRegistry.setContext` | VAL-EXP-08 + matriz de habilitação | Planejado |
+| 4.5 | DnD interno + Upload do SO (arquivos e pastas) + Download para máquina local | `logic/explorer/` + `packages/agent-runtime/filesystem/` | `FileSystemPort.upload/download` | VAL-EXP-07/09/10 | Planejado |
+| 4.6 | Editor em anexo lateral por sessão (sash 6 px, recolher sem desmontar) | `logic/editor/` + `ui/editor/EditorAttach.tsx` | `EditorService` (`surface:'attach'`) | VAL-EXP-11/12/13/14 + teste de não-desmontagem | Planejado |
+| 4.7 | Search na sessão (aba do anexo, debounce, substituir) | `logic/search/` + `ui/editor/` | `SearchService` (novo) | VAL-EXP-15 | Planejado |
+| 4.8 | Browser runtime (Chromium + Playwright/CDP por sessão) + 11 tools de IA + gravação `.webm` | `platform/services/browser-runtime/` + `logic/browser/` + `packages/contracts/browser.ts` + `packages/tools-sdk/` | `BrowserPort` / `BrowserSessionService` | VAL-BRW-01 a 05 | Planejado |
+| 4.9 | Integração final (eventos transversais + homologação completa) | todos | `fs.changed`, `editor.attachCollapsed`, `browser.*` | checklist A + B do `04_13` | Planejado |
+
+**Critério de pronto FATIA-04:** as 9 sub-fatias validadas + `npx playwright test sessao_11_terminal_pty_real` **6/6** (anti-regressão `docs/18`) + `docs/12` atualizado com evidência real.
+**Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 → 4.5 → 4.6 → 4.7 → 4.8 → 4.9 (cada uma só começa com a anterior validada).
 
 ---
 
@@ -291,7 +300,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
 | 02 | Workbench Shell base | Concluído | Base estável |
 | 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
-| 04 | Explorer + Filesystem | Planejado | Pode iniciar em paralelo se comitê autorizar (independe de 100% terminal) |
+| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Planejado — doc 100% pronta (`FATIA-04_VIDEO_COMPLETO/`) | Iniciar pela 4.1 (FileSystem ampliado); plano em `04_15`, aceite em `04_13` |
 | 05 | Chat + Runtime | Planejado | Aguardar decisão FATIA-03 + FATIA-04 |
 | 06 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03 e 04 |
 | 07 | Command + Theme | Planejado | Aguardar FATIAS 03 a 06 |
