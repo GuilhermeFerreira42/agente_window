@@ -40,6 +40,7 @@ O vídeo mostra um workbench no estilo VS Code (na referência visual, o *Google
 | 12 | `04_12_FLUXOS_EVENTOS_MERMAID.md` | Diagramas mermaid de todos os fluxos |
 | 13 | `04_13_CRITERIOS_ACEITE_VALIDACAO.md` | Checklist de homologação (vídeo + anti-regressão) |
 | 14 | `04_14_GAPS_ENTRE_DOC_ATUAL_E_VIDEO.md` | FATIA-04 antiga vs. vídeo; o que faltava e o que foi adicionado |
+| **P** | `prints/CATALOGO_PRINTS_FATIA_04.md` | **Catálogo canônico dos 14 prints extraídos do vídeo de 8m38s** |
 
 ---
 
@@ -61,7 +62,7 @@ Todo requisito desta documentação aparece nos quatro eixos exigidos:
 | `[E-vscode]` | Evidência lida no clone `microsoft/vscode` main (`.cache/vscode`) — arquivo:linha |
 | `[E-code-server]` | Evidência lida no fork `code-server` (dentro do pacote restaurado) |
 | `[E-projeto]` | Evidência do estado atual do AGENTE WINDOW (`platform/`, `legacy/`) |
-| `[REF-visual]` | Referência visual de apoio (`docs/referencias_visuais/`) |
+| `[REF-visual]` | Referência visual de apoio (`docs/referencias_visuais/` e `prints/CATALOGO_PRINTS_FATIA_04.md`) |
 | `[SPEC]` | Especificação desta documentação (decisão de produto a implementar) |
 
 > ⚠️ **Nada aqui autoriza tocar componentes blindados** (`VSCodeTerminal.tsx`, `PlatformTerminalBridge.tsx`, `useTerminalTheme.ts`, `terminal-vscode.css`, `vite-plugin-pty.ts`, pty-server, terminal em `platform/`) — ver `docs/18`, Regras 1–14.
@@ -76,10 +77,10 @@ Todo requisito desta documentação aparece nos quatro eixos exigidos:
 
 ---
 
-## 6. Ambiguidades reconhecidas já no índice
+## 6. Ambiguidades e status do vídeo
 
-1. O diretório de saída pedido no prompt chegou **truncado** ao upload (`[STRIPPED 75 bytes]`); esta documentação foi criada em `/home/user/docs_fase_04_mapeamento_video/` (pasta persistente, fora de `.cache`).
-2. O vídeo não está no workspace — o mapeamento usa a descrição textual fornecida + engenharia reversa + código real do VS Code.
+1. O diretório de saída pedido no prompt original chegou **truncado** ao upload (`[STRIPPED 75 bytes]`); a documentação canônica foi consolidada em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/`.
+2. **RESOLVIDO (2026-09-18):** O vídeo oficial `Gravar_2026_09_15_21_09_30_680.mp4` (8m38s) foi fornecido e analisado integralmente. Foram extraídos 14 prints canônicos em alta resolução (1872x1072) organizados em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/` e catalogados em `prints/CATALOGO_PRINTS_FATIA_04.md` (com espelho em `docs/referencias_visuais/fatia_04/`), cobrindo 100% dos fluxos e comportamentos exigidos.
 3. “Filmar” (gravar vídeo da sessão do browser) não existe no VS Code de referência; está tratado como requisito novo em `04_07` §7 e `04_08` RF-21.
 
 ---

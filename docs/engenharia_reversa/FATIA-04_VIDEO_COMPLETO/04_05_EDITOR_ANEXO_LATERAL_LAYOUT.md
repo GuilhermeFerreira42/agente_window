@@ -32,7 +32,11 @@ Este é um **desvio deliberado** em relação ao VS Code (onde o editor é o gru
 | Empty state | “Selecione um arquivo para abrir no anexo” (centralizado, discreto) |
 | Tokens | `--vscode-editor-background`, `--vscode-tab-activeBackground`, `--vscode-tab-inactiveBackground`, `--vscode-editorGroup-border` |
 
-`[REF-visual]` prints `editor/20_editor_yaml_workflow_syntax.png`, `editor/22_editor_markdown_readme_renderizado.png`, `editor/23_editor_estado_vazio_selecione_arquivo.png`, `tabs_breadcrumbs/27_workbench_tabs_breadcrumb_visivel.png` — usados como referência de **conteúdo** do editor; a **posição** (anexo lateral) vem do vídeo, não dos prints.
+`[REF-visual]` Referências visuais canônicas da FATIA-04 (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
+- [`prints/04_editor_anexo_abrir_menu_mais.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/04_editor_anexo_abrir_menu_mais.png) — Botão `+` na barra de abas abrindo menu dropdown (*Alterações*, *Navegador*, *Pesquisar*) e Empty State do anexo lateral (05:00).
+- [`prints/09_editor_anexo_recolhido_fechar_aba.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/09_editor_anexo_recolhido_fechar_aba.png) — **Comprovante do comportamento chave:** anexo lateral se recolhe integralmente ao fechar a última aba via botão `x`, reexpandindo o chat sem destruir estado (06:34).
+- [`prints/03_vscode_web_sash_resizing.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/03_vscode_web_sash_resizing.png) — Sash divisor de redimensionamento ativo (02:40).
+*(Legado complementar de conteúdo textual: `editor/20`, `22`, `23` e `tabs_breadcrumbs/27`).*
 
 ---
 

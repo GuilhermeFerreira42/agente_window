@@ -3,6 +3,11 @@
 > Requisitos do vídeo: **3.3** (“botão + abre um NAVEGADOR dentro da sessão do editor; funciona de verdade, renderiza página web”) e **3.4** (“a IA deve ter acesso ao conteúdo da página aberta: analisar HTML, analisar conteúdo, clonar página, interagir — filmar, clicar; referência: IA integrada no Chrome que responde *‘Você está vendo uma interface do Visual Studio Code Web aberta no navegador’* quando perguntada *‘o que você está vendo?’*”).
 >
 > **Este é o documento mais importante desta FASE 4.**
+>
+> Evidências visuais canônicas do vídeo oficial (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
+> - [`prints/06_navegador_anexo_empty_state_autocomplete.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/06_navegador_anexo_empty_state_autocomplete.png) — Aba *Navegador*, barra de URL com autocomplete e empty state de suporte ao chat (05:01).
+> - [`prints/07_navegador_anexo_google_renderizado.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/07_navegador_anexo_google_renderizado.png) — Página real renderizada (`https://www.google.com/`) no anexo lateral da sessão ao lado do Chat (05:05).
+> - [`prints/08_ia_percepcao_html_gemini_vscode_web.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/08_ia_percepcao_html_gemini_vscode_web.png) — **Comprovante cabal da percepção da IA:** Gemini analisando e descrevendo o HTML da página web aberta no navegador em resposta à pergunta *"o que vc esta vendo"* (05:40).
 
 ---
 

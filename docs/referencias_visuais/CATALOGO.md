@@ -27,6 +27,27 @@
 | 23 | 02:19 | `editor` | `23_editor_estado_vazio_selecione_arquivo.png` | `editor/23_editor_estado_vazio_selecione_arquivo.png` | Editor em estado vazio aguardando seleção de arquivo. | Documenta o empty state do editor. |
 | 24 | 02:25 | `explorer` | `24_explorer_pesquisa_estado_vazio.png` | `explorer/24_explorer_pesquisa_estado_vazio.png` | Explorer/pesquisa em estado vazio. | Referência de busca sem resultados ou sem item selecionado. |
 | 25 | 03:16 | `editor` | `25_editor_prompt_json_estrutura_agente.png` | `editor/25_editor_prompt_json_estrutura_agente.png` | Editor com arquivo JSON de prompt/estrutura do agente. | Útil para documentos estruturados e leitura técnica no editor. |
-| 26 | 02:53 | `workbench` | `26_workbench_layout_multi_painel.png` | `workbench/26_workbench_layout_multi_painel.png` | Workbench com múltiplos painéis visíveis. | Referência forte de composição complexa do layout. |
-| 27 | 03:02 | `tabs_breadcrumbs` | `27_workbench_tabs_breadcrumb_visivel.png` | `tabs_breadcrumbs/27_workbench_tabs_breadcrumb_visivel.png` | Workbench com tabs e breadcrumb visíveis. | Documenta navegação contextual no topo do editor. |
 | 28 | 03:34 | `workbench` | `28_workbench_visao_final_completa.png` | `workbench/28_workbench_visao_final_completa.png` | Visão final completa do workbench. | Resumo visual amplo do estado mais completo capturado. |
+
+---
+
+## Prints Canônicos da FATIA-04 (Vídeo Oficial de 8m38s)
+
+> Catálogo técnico e detalhamento completo: [`docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)
+
+| # | Timestamp | Subsistema | Arquivo | Caminho | O que aparece | Utilidade principal |
+|---|---|---|---|---|---|---|
+| 01 | 00:10 | `workbench` | `01_workbench_overview_chat_explorer.png` | `fatia_04/01_workbench_overview_chat_explorer.png` | Shell geral com sidebar de arquivos à direita, chat central e sessões à esquerda. | Referência de três colunas e preservação do chat central. |
+| 02 | 01:40 | `workbench` | `02_antigravity_ide_comparativo_split.png` | `fatia_04/02_antigravity_ide_comparativo_split.png` | IDE de referência (Desktop): seções inferiores (*Editores Abertos*, *Estrutura*, *Linha do Tempo*, *Maven*) e terminal split. | Fidelidade visual e de seções do Explorer. |
+| 03 | 02:40 | `workbench` | `03_vscode_web_sash_resizing.png` | `fatia_04/03_vscode_web_sash_resizing.png` | `vscode.dev`: redimensionamento via sash com linha azul ativa e botões de cabeçalho do Explorer. | Sash de redimensionamento e 4 alvos do cabeçalho. |
+| 04 | 05:00 | `editor` | `04_editor_anexo_abrir_menu_mais.png` | `fatia_04/04_editor_anexo_abrir_menu_mais.png` | Botão `+` nas abas da sessão abrindo menu dropdown (*Alterações*, *Navegador*, *Pesquisar*) e Empty State do anexo. | Menu de criação de recursos da sessão e empty state do editor. |
+| 05 | 04:50 | `editor` | `05_editor_anexo_pesquisar_sessao.png` | `fatia_04/05_editor_anexo_pesquisar_sessao.png` | Aba *Pesquisar* no anexo lateral da sessão com toggles `Aa`, `ab`, `.*` e detalhes. | Especificação de pesquisa contextual à sessão. |
+| 06 | 05:01 | `editor` | `06_navegador_anexo_empty_state_autocomplete.png` | `fatia_04/06_navegador_anexo_empty_state_autocomplete.png` | Aba *Navegador* com ícone de globo, barra (`<-`, `->`, `↺`), input de URL com autocomplete e empty state orientando chat. | Controles da barra do browser integrado. |
+| 07 | 05:05 | `editor` | `07_navegador_anexo_google_renderizado.png` | `fatia_04/07_navegador_anexo_google_renderizado.png` | Navegador interno renderizando página real (`https://www.google.com/`) no anexo lateral, coexistindo com Chat central. | Renderização funcional em anexo lateral. |
+| 08 | 05:40 | `chat_agente` | `08_ia_percepcao_html_gemini_vscode_web.png` | `fatia_04/08_ia_percepcao_html_gemini_vscode_web.png` | IA (Gemini) respondendo a *"o que vc esta vendo"* com leitura completa do DOM/HTML da página aberta. | Prova cabal do requisito da IA ter acesso ao DOM/HTML. |
+| 09 | 06:34 | `editor` | `09_editor_anexo_recolhido_fechar_aba.png` | `fatia_04/09_editor_anexo_recolhido_fechar_aba.png` | Anexo lateral recolhendo completamente ao fechar a última aba via `x`, reexpandindo o chat sem destruir estado. | Contrato de recolhimento sem destruição de estado. |
+| 10 | 06:46 | `explorer` | `10_explorer_arvore_pastas_expandidas.png` | `fatia_04/10_explorer_arvore_pastas_expandidas.png` | Árvore com pastas expandidas (`a`, `agente_window`, `code-server`), chevrons e seleção de item ativo. | Navegação e hierarquia de nós do Explorer. |
+| 11 | 07:38 | `explorer` | `11_explorer_menu_contexto_arquivo_baixar.png` | `fatia_04/11_explorer_menu_contexto_arquivo_baixar.png` | Menu de contexto de **arquivo** com a opção explícita **`Baixar...`** (Download) e ações de edição. | Comprovante visual do item `Baixar...` no menu. |
+| 12 | 07:30 | `explorer` | `12_explorer_menu_contexto_pasta.png` | `fatia_04/12_explorer_menu_contexto_pasta.png` | Menu de contexto de **pasta** com `Novo Arquivo...`, `Nova Pasta...`, `Revelar`, `Adicionar ao Workspace`, `Colar`. | Menu contextual de diretório. |
+| 13 | 08:18 | `explorer` | `13_explorer_secao_alteracoes_git.png` | `fatia_04/13_explorer_secao_alteracoes_git.png` | Aba *Alterações* (Source Control) na barra lateral com empty state *Arquivos Não Alterados*. | Painel alternativo de controle de versão. |
+| 14 | 08:34 | `explorer` | `14_explorer_estrutura_arquivos_completa.png` | `fatia_04/14_explorer_estrutura_arquivos_completa.png` | Árvore completa e profunda com ícones por extensão (`.bat`, `.json`, `.ts`, `.md`, `.js`), indent guides e botão `Atualizar`. | Paridade tipográfica e visual completa do Explorer. |

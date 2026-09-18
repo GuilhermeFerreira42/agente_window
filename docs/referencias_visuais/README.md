@@ -24,6 +24,7 @@ Este diretório reúne a coleção canônica de prints usada como **apoio visual
 - `editor/`
 - `terminal/`
 - `tabs_breadcrumbs/`
+- `fatia_04/` (14 prints canônicos em alta resolução extraídos do vídeo oficial de 8m38s para suporte à Arena na FATIA-04)
 
 ## Observação sobre categorias futuras
 

@@ -2,6 +2,9 @@
 
 > Requisito do vídeo: **3.1** — menu de contexto ao clicar com botão direito em arquivo/pasta, incluindo **Download**.
 > Evidência principal: `[E-vscode]` `src/vs/workbench/contrib/files/browser/fileActions.contribution.ts` linhas **478–680** (registros em `MenuId.ExplorerContext`).
+> Evidências visuais canônicas do vídeo oficial (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
+> - [`prints/11_explorer_menu_contexto_arquivo_baixar.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/11_explorer_menu_contexto_arquivo_baixar.png) — Menu de contexto de **arquivo** com a opção explícita **`Baixar...`** (07:38).
+> - [`prints/12_explorer_menu_contexto_pasta.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/12_explorer_menu_contexto_pasta.png) — Menu de contexto de **pasta** com criação e gestão (07:30).
 
 ---
 
