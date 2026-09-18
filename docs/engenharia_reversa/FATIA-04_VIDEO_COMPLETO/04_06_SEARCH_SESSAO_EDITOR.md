@@ -46,9 +46,7 @@
 | Estado inicial | `Digite para pesquisar no escopo da sessão` |
 | Tokens | `--vscode-input-background`, `--vscode-input-border`, `--vscode-inputOption-activeBorder`, `--vscode-list-activeSelectionBackground` |
 
-`[REF-visual]` Referência visual canônica da FATIA-04 (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
-- [`prints/05_editor_anexo_pesquisar_sessao.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/05_editor_anexo_pesquisar_sessao.png) — Aba *Pesquisar* no anexo lateral da sessão com input dedicado e toggles `Aa` (case), `ab` (whole word), `.*` (regex) e botão de alternar detalhes (04:50).
-*(Legado complementar: `explorer/24_explorer_pesquisa_estado_vazio.png` e `editor/23_editor_estado_vazio_selecione_arquivo.png`).*
+`[REF-visual]` `explorer/24_explorer_pesquisa_estado_vazio.png` (estado vazio) e `editor/23_editor_estado_vazio_selecione_arquivo.png` (linguagem de empty state).
 
 ---
 

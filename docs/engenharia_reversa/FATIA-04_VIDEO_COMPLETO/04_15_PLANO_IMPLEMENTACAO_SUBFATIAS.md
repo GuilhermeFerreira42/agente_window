@@ -45,17 +45,19 @@ flowchart LR
 
 ---
 
-| Sub-Fatia | Arquivos-alvo em `platform/` | Contrato | Validação principal | Testes a criar | Referência Visual Canônica (`prints/`) |
+## 2. Tabela resumo das 9 sub-fatias
+
+| Sub-Fatia | Arquivos-alvo em `platform/` | Contrato | Validação principal | Testes a criar | Reuso do legado |
 |---|---|---|---|---|---|
-| **4.1** FileSystem ampliado | `packages/agent-runtime/filesystem/` + `packages/contracts/filesystem.ts` | `FileSystemPort` | unit com fs fake + VAL-FS-01/02 | `filesystemAtomic.test.ts`, `filesystemTransfer.test.ts` | `prints/14_explorer_estrutura_arquivos_completa.png` |
-| **4.2** ExplorerService ampliado | `apps/workbench/src/logic/explorer/` + `packages/contracts/explorer.ts` | `ExplorerService` | unit + VAL-EXP-01 | `explorerService.test.ts` | `prints/10_explorer_arvore_pastas_expandidas.png` |
-| **4.3** UI Explorer (header + árvore 22 px + 3 seções) | `apps/workbench/src/ui/explorer/` | — | E2E VAL-EXP-04/05/06 | `sessao_12_explorer.spec.ts` (parte 1) | `prints/01`, `prints/02`, `prints/03`, `prints/10`, `prints/13` |
-| **4.4** Menu de contexto completo | `ui/explorer/` + `logic/commands/` | `CommandRegistry.setContext` | VAL-EXP-08 | `explorerContextMenu.test.ts` + `sessao_12_explorer.spec.ts` (parte 2) | `prints/11_explorer_menu_contexto_arquivo_baixar.png`, `prints/12_explorer_menu_contexto_pasta.png` |
-| **4.5** DnD interno + Upload do OS + Download | `logic/explorer/` + `packages/agent-runtime/filesystem/` | `FileSystemPort.upload/download` | VAL-EXP-07/09/10 | `explorerTransfer.test.ts` + fixture de upload | `prints/11_explorer_menu_contexto_arquivo_baixar.png` (Download) |
-| **4.6** Editor em anexo lateral | `logic/editor/` + `ui/editor/EditorAttach.tsx` | `EditorService` (`surface:'attach'`) | VAL-EXP-11/12/13/14 + checagem `display:none` | `editorAttach.test.tsx` + `sessao_13_editor_anexo.spec.ts` | `prints/04_editor_anexo_abrir_menu_mais.png`, `prints/09_editor_anexo_recolhido_fechar_aba.png` |
-| **4.7** Search na sessão | `logic/search/` + `ui/editor/` | `SearchService` (novo) | VAL-EXP-15 | `searchService.test.ts` + `sessao_14_search.spec.ts` | `prints/05_editor_anexo_pesquisar_sessao.png` |
-| **4.8** Browser runtime + IA | `services/browser-runtime/` (Playwright) + `logic/browser/` + `packages/contracts/browser.ts` + `packages/tools-sdk/` | `BrowserPort` / `BrowserSessionService` | VAL-BRW-01 a 05 | `browserSession.test.ts` + probe + `sessao_15_browser_ia.spec.ts` | `prints/06_navegador_anexo_empty_state_autocomplete.png`, `prints/07_navegador_anexo_google_renderizado.png`, `prints/08_ia_percepcao_html_gemini_vscode_web.png` |
-| **4.9** Integração final | todos | eventos transversais | checklist A + B do `04_13` | suíte completa + homologação manual | Catálogo completo (`prints/CATALOGO_PRINTS_FATIA_04.md`) |
+| **4.1** FileSystem ampliado | `packages/agent-runtime/filesystem/` + `packages/contracts/filesystem.ts` | `FileSystemPort` | unit com fs fake + VAL-FS-01/02 | `filesystemAtomic.test.ts`, `filesystemTransfer.test.ts` | lógica de I/O de `legacy/.../src/domain/fileSystem.ts` (referência de comportamento) |
+| **4.2** ExplorerService ampliado | `apps/workbench/src/logic/explorer/` + `packages/contracts/explorer.ts` | `ExplorerService` | unit + VAL-EXP-01 | `explorerService.test.ts` | — |
+| **4.3** UI Explorer (header + árvore 22 px + 3 seções) | `apps/workbench/src/ui/explorer/` | — | E2E VAL-EXP-04/05/06 | `sessao_12_explorer.spec.ts` (parte 1) | `legacy/.../components/ContextMenu.tsx` (base do menu), `styles/theme.css` (tokens) |
+| **4.4** Menu de contexto completo | `ui/explorer/` + `logic/commands/` | `CommandRegistry.setContext` | VAL-EXP-08 | `explorerContextMenu.test.ts` + `sessao_12_explorer.spec.ts` (parte 2) | `legacy/.../components/ContextMenu.tsx` |
+| **4.5** DnD interno + Upload do OS + Download | `logic/explorer/` + `packages/agent-runtime/filesystem/` | `FileSystemPort.upload/download` | VAL-EXP-07/09/10 | `explorerTransfer.test.ts` + fixture de upload | `legacy/.../src/domain/dragAndDrop.ts` (referência) |
+| **4.6** Editor em anexo lateral | `logic/editor/` + `ui/editor/EditorAttach.tsx` | `EditorService` (`surface:'attach'`) | VAL-EXP-11/12/13/14 + checagem `display:none` | `editorAttach.test.tsx` + `sessao_13_editor_anexo.spec.ts` | `legacy/.../src/domain/editorTabs.ts`; **contrato** do PlatformTerminalBridge (sem editar o arquivo) |
+| **4.7** Search na sessão | `logic/search/` + `ui/editor/` | `SearchService` (novo) | VAL-EXP-15 | `searchService.test.ts` + `sessao_14_search.spec.ts` | `legacy/.../src/domain/search.ts` |
+| **4.8** Browser runtime + IA | `services/browser-runtime/` (Playwright) + `logic/browser/` + `packages/contracts/browser.ts` + `packages/tools-sdk/` | `BrowserPort` / `BrowserSessionService` | VAL-BRW-01 a 05 | `browserSession.test.ts` + probe + `sessao_15_browser_ia.spec.ts` | `[E-vscode]` `platform/browserView/common/{playwrightService,browserChatToolReferenceNames}.ts` (nomes das tools) |
+| **4.9** Integração final | todos | eventos transversais | checklist A + B do `04_13` | suíte completa + homologação manual | — |
 
 ---
 

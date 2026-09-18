@@ -24,7 +24,6 @@ Este diretório reúne a coleção canônica de prints usada como **apoio visual
 - `editor/`
 - `terminal/`
 - `tabs_breadcrumbs/`
-- `fatia_04/` (14 prints canônicos em alta resolução extraídos do vídeo oficial de 8m38s para suporte à Arena na FATIA-04)
 
 ## Observação sobre categorias futuras
 
@@ -42,3 +41,46 @@ A categoria `activity_bar/` pode existir futuramente, mas **somente** quando hou
 - `workbench/26_workbench_layout_multi_painel.png`
 - `tabs_breadcrumbs/27_workbench_tabs_breadcrumb_visivel.png`
 - `workbench/28_workbench_visao_final_completa.png`
+
+## FATIA-04 - Prints do vídeo de referência (NOVO - 2026-09-18)
+
+Esta atualização adiciona 15 prints extraídos do vídeo `Gravar_2026_09_15_21_09_30_680.mp4` (8m35s) que é a fonte da verdade para FATIA-04.
+
+### O que foi adicionado
+- `explorer/29_fatia04_video_explorer_header_5_botoes.png` - Header 5 botões
+- `explorer/30_fatia04_video_menu_contexto_completo_baixar.png` - Menu contexto + Baixar
+- `explorer/31_fatia04_video_editores_abertos_nenhum_editor.png` - Editores Abertos vazio
+- `explorer/32_fatia04_video_explorer_completo_sessao.png` - Sessão completa
+- `explorer/33_fatia04_video_drag_drop_download.png` - Drag & Drop + Download
+- `explorer/40_fatia04_video_menu_contexto_baixar_detalhe.png` - Detalhe Baixar
+- `editor/34_fatia04_video_editor_anexo_lateral_direita.png` - **CRÍTICO**: Editor em anexo lateral à direita, NÃO no centro
+- `editor/35_fatia04_video_editor_anexo_recolhido.png` - Anexo recolhe ao fechar última aba
+- `editor/36_fatia04_video_botao_plus_navegador_pesquisar.png` - Botão + com Navegador e Pesquisar
+- `editor/37_fatia04_video_editor_anexo_resize_nao_centro.png` - Resize por sash, nunca centro inteiro
+- `workbench/38_fatia04_video_workbench_layout_final_exatamente_igual.png` - Layout final exatamente igual
+- `workbench/39_fatia04_video_visao_geral_inicio.png` - Visão geral início
+- `workbench/41_fatia04_video_antigravity_cor.png` - Prova tema dinâmico
+- `browser/42_fatia04_video_browser_navegador_funcionando.png` - **FUTURO 4.8** Navegador funcionando
+- `browser/43_fatia04_video_browser_ia_acesso_html.png` - **FUTURO 4.8** IA acesso HTML
+
+### Pasta de referência bruta
+`fatia04_video/` contém todos os 15 prints com prefixo de subsistema para navegação rápida da Arena.
+
+### Como a Arena deve usar
+1. Ler `CATALOGO.md` entradas 29-43 para entender timestamp e validação
+2. Ver prints em `explorer/`, `editor/`, `workbench/` para implementar RF-01 a RF-23
+3. Deixar `browser/` para sub-fatia 4.8 (conforme orientação: mexer só quando chegar nessa parte)
+4. Em caso de conflito imagem x texto, prevalece documentação textual de `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/`
+
+### Seleção prioritária atualizada para FATIA-04
+- `explorer/29_fatia04_video_explorer_header_5_botoes.png` - **NOVO - ESSENCIAL**
+- `explorer/30_fatia04_video_menu_contexto_completo_baixar.png` - **NOVO - ESSENCIAL**
+- `editor/34_fatia04_video_editor_anexo_lateral_direita.png` - **NOVO - CRÍTICO**
+- `editor/35_fatia04_video_editor_anexo_recolhido.png` - **NOVO - CRÍTICO**
+- `editor/36_fatia04_video_botao_plus_navegador_pesquisar.png` - **NOVO - ESSENCIAL**
+- `workbench/38_fatia04_video_workbench_layout_final_exatamente_igual.png` - **NOVO - FIDELIDADE**
+- `workbench/01_workbench_visao_geral.png` - Base antiga
+- `explorer/07_explorer_autocomplete_arquivos.png` - Base antiga
+- `editor/20_editor_yaml_workflow_syntax.png` - Base antiga conteúdo
+- `editor/23_editor_estado_vazio_selecione_arquivo.png` - Base antiga empty state
+

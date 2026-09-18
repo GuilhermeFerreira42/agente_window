@@ -60,6 +60,16 @@ Cada arquivo deve, preferencialmente:
 4. indicar o subsistema e o estado visível;
 5. evitar nomes genéricos como `print1`, `imagem_final` ou `captura_ok`.
 
+
+### `browser/` (NOVO - FATIA 4.8 - FUTURO)
+Capturas ligadas ao navegador interno da sessão do editor, acesso da IA ao HTML, clonar página, interagir, filmar.
+**Status:** Documentado mas implementação adiada para sub-fatia 4.8 conforme orientação do usuário. Prints 42 e 43 já estão capturados do vídeo de referência.
+
+### `fatia04_video/` (NOVO - Coleção do vídeo de referência 8m35s)
+Coleção bruta dos prints extraídos diretamente do vídeo `Gravar_2026_09_15_21_09_30_680.mp4`.
+Organizada com prefixo de subsistema para facilitar navegação da Arena.
+Esta pasta é a **fonte da verdade visual** para FATIA-04 e deve ser usada junto com `CATALOGO.md`.
+
 ## Regra de expansão futura
 
 Se uma nova captura puder ser atribuída claramente a um subsistema já existente, ela deve entrar na pasta desse subsistema.

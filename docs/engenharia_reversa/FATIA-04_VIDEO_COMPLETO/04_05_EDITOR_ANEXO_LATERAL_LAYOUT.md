@@ -32,11 +32,7 @@ Este é um **desvio deliberado** em relação ao VS Code (onde o editor é o gru
 | Empty state | “Selecione um arquivo para abrir no anexo” (centralizado, discreto) |
 | Tokens | `--vscode-editor-background`, `--vscode-tab-activeBackground`, `--vscode-tab-inactiveBackground`, `--vscode-editorGroup-border` |
 
-`[REF-visual]` Referências visuais canônicas da FATIA-04 (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
-- [`prints/04_editor_anexo_abrir_menu_mais.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/04_editor_anexo_abrir_menu_mais.png) — Botão `+` na barra de abas abrindo menu dropdown (*Alterações*, *Navegador*, *Pesquisar*) e Empty State do anexo lateral (05:00).
-- [`prints/09_editor_anexo_recolhido_fechar_aba.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/09_editor_anexo_recolhido_fechar_aba.png) — **Comprovante do comportamento chave:** anexo lateral se recolhe integralmente ao fechar a última aba via botão `x`, reexpandindo o chat sem destruir estado (06:34).
-- [`prints/03_vscode_web_sash_resizing.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/03_vscode_web_sash_resizing.png) — Sash divisor de redimensionamento ativo (02:40).
-*(Legado complementar de conteúdo textual: `editor/20`, `22`, `23` e `tabs_breadcrumbs/27`).*
+`[REF-visual]` prints `editor/20_editor_yaml_workflow_syntax.png`, `editor/22_editor_markdown_readme_renderizado.png`, `editor/23_editor_estado_vazio_selecione_arquivo.png`, `tabs_breadcrumbs/27_workbench_tabs_breadcrumb_visivel.png` — usados como referência de **conteúdo** do editor; a **posição** (anexo lateral) vem do vídeo, não dos prints.
 
 ---
 
@@ -182,3 +178,23 @@ sequenceDiagram
 - Não usar `position: fixed` no anexo (viola Regra 6 do `docs/18` por analogia e `09F` por contrato).
 - Não alterar `.right-section`, `app.css` nem `App.tsx` sem decisão explícita — são **PROTEGIDOS** (`docs/18` §2, nível 🟡).
 - O padrão `display: contents/none` do `PlatformTerminalBridge.tsx` **não** deve ser copiado por importação (o arquivo é BLINDADO 🔴); o anexo implementa o **mesmo contrato**, com código próprio.
+
+---
+
+## 10. Prints do vídeo de referência para Editor Anexo Lateral (NOVO - 2026-09-18)
+
+### Novos prints críticos - prova visual que editor NÃO ocupa centro
+
+| Print | Timestamp | O que prova | Validação |
+|---|---|---|---|
+| `editor/34_fatia04_video_editor_anexo_lateral_direita.png` | 03:35 | Editor à direita da árvore, dentro da sessão, não no centro | RF-19, A5.1 - **CRÍTICO** |
+| `editor/35_fatia04_video_editor_anexo_recolhido.png` | 03:55 | Anexo recolhido 100% ao fechar última aba, árvore ocupa tudo | RF-21, A5.3, contrato display:none |
+| `editor/36_fatia04_video_botao_plus_navegador_pesquisar.png` | 04:45 | Botão + no anexo mostrando **Navegador Ctrl+Shift+B** e **Pesquisar Ctrl+Shift+F** | RF-24, RF-25 |
+| `editor/37_fatia04_video_editor_anexo_resize_nao_centro.png` | 08:00 | Editor pode aumentar/diminuir via sash 6px, nunca ocupa área central inteira | RF-20, A5.2 |
+
+**Para Arena - Regra de ouro visual:**
+- Se o print mostra editor ocupando centro inteiro (igual VS Code padrão), está ERRADO.
+- O correto é `editor/34` onde editor está à direita, com árvore à esquerda, dentro da mesma sessão.
+- Quando última aba fecha, deve ficar igual `editor/35` onde só a árvore aparece.
+
+[REF-video] Estes prints são a fonte da verdade e devem ser consultados antes de implementar.

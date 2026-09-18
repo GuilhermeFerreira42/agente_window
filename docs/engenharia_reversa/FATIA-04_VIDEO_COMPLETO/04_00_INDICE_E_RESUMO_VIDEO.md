@@ -40,7 +40,6 @@ O vídeo mostra um workbench no estilo VS Code (na referência visual, o *Google
 | 12 | `04_12_FLUXOS_EVENTOS_MERMAID.md` | Diagramas mermaid de todos os fluxos |
 | 13 | `04_13_CRITERIOS_ACEITE_VALIDACAO.md` | Checklist de homologação (vídeo + anti-regressão) |
 | 14 | `04_14_GAPS_ENTRE_DOC_ATUAL_E_VIDEO.md` | FATIA-04 antiga vs. vídeo; o que faltava e o que foi adicionado |
-| **P** | `prints/CATALOGO_PRINTS_FATIA_04.md` | **Catálogo canônico dos 14 prints extraídos do vídeo de 8m38s** |
 
 ---
 
@@ -62,7 +61,7 @@ Todo requisito desta documentação aparece nos quatro eixos exigidos:
 | `[E-vscode]` | Evidência lida no clone `microsoft/vscode` main (`.cache/vscode`) — arquivo:linha |
 | `[E-code-server]` | Evidência lida no fork `code-server` (dentro do pacote restaurado) |
 | `[E-projeto]` | Evidência do estado atual do AGENTE WINDOW (`platform/`, `legacy/`) |
-| `[REF-visual]` | Referência visual de apoio (`docs/referencias_visuais/` e `prints/CATALOGO_PRINTS_FATIA_04.md`) |
+| `[REF-visual]` | Referência visual de apoio (`docs/referencias_visuais/`) |
 | `[SPEC]` | Especificação desta documentação (decisão de produto a implementar) |
 
 > ⚠️ **Nada aqui autoriza tocar componentes blindados** (`VSCodeTerminal.tsx`, `PlatformTerminalBridge.tsx`, `useTerminalTheme.ts`, `terminal-vscode.css`, `vite-plugin-pty.ts`, pty-server, terminal em `platform/`) — ver `docs/18`, Regras 1–14.
@@ -77,10 +76,10 @@ Todo requisito desta documentação aparece nos quatro eixos exigidos:
 
 ---
 
-## 6. Ambiguidades e status do vídeo
+## 6. Ambiguidades reconhecidas já no índice
 
-1. O diretório de saída pedido no prompt original chegou **truncado** ao upload (`[STRIPPED 75 bytes]`); a documentação canônica foi consolidada em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/`.
-2. **RESOLVIDO (2026-09-18):** O vídeo oficial `Gravar_2026_09_15_21_09_30_680.mp4` (8m38s) foi fornecido e analisado integralmente. Foram extraídos 14 prints canônicos em alta resolução (1872x1072) organizados em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/` e catalogados em `prints/CATALOGO_PRINTS_FATIA_04.md` (com espelho em `docs/referencias_visuais/fatia_04/`), cobrindo 100% dos fluxos e comportamentos exigidos.
+1. O diretório de saída pedido no prompt chegou **truncado** ao upload (`[STRIPPED 75 bytes]`); esta documentação foi criada em `/home/user/docs_fase_04_mapeamento_video/` (pasta persistente, fora de `.cache`).
+2. O vídeo não está no workspace — o mapeamento usa a descrição textual fornecida + engenharia reversa + código real do VS Code.
 3. “Filmar” (gravar vídeo da sessão do browser) não existe no VS Code de referência; está tratado como requisito novo em `04_07` §7 e `04_08` RF-21.
 
 ---
@@ -109,3 +108,23 @@ Todo requisito do vídeo é descrito nos quatro eixos. Este mapa diz **onde** ca
 | 04_16 Kanban | ➖ | ➖ | ➖ | ✅ (rastreio de status por evidência) |
 
 **Regra de conformidade:** nenhum requisito entra em implementação sem aparecer em um RF (`04_08`) com evento associado e validação nomeada.
+
+---
+
+## 8. Atualização 2026-09-18 - Prints do vídeo incorporados
+
+**Vídeo fonte:** `Gravar_2026_09_15_21_09_30_680.mp4` (8m35s) - fornecido pelo usuário como referência canônica.
+
+**O que foi feito:**
+- 19 frames extraídos do vídeo nos timestamps chave (00:03 a 08:25)
+- 15 prints selecionados e organizados em `docs/referencias_visuais/explorer/`, `editor/`, `workbench/`, `browser/` (futuro)
+- `CATALOGO.md` atualizado com entradas 29-43
+- `TAXONOMIA.md` atualizada com categorias `browser/` (futuro 4.8) e `fatia04_video/`
+- `README.md` atualizado com seleção prioritária FATIA-04
+- Documentos `04_01` e `04_05` atualizados com seção de prints do vídeo
+
+**Status para Arena:**
+- **FATIA-04 PARCIAL (sem browser):** Prints 29-41 prontos para implementação de RF-01 a RF-24, RF-31 a RF-34
+- **FATIA 4.8 FUTURO:** Prints 42-43 (browser + IA acesso HTML) já capturados mas marcados como FUTURO conforme orientação do usuário para deixar para depois
+
+**Próximo passo:** Arena pode iniciar sub-fatias 4.1 a 4.7 usando apenas os prints e documentação textual. Browser (4.8) fica para depois.

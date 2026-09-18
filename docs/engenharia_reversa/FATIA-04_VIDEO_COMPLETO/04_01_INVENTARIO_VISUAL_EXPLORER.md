@@ -121,14 +121,7 @@ window
 | Badge de erro/aviso | `--vscode-list-errorForeground` / `--vscode-list-warningForeground` |
 | Activity bar | `--vscode-activityBar-background`, `-foreground`, `-activeBorder` |
 
-`[REF-visual]` Referências visuais canônicas da FATIA-04 (ver [`prints/CATALOGO_PRINTS_FATIA_04.md`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/CATALOGO_PRINTS_FATIA_04.md)):
-- [`prints/01_workbench_overview_chat_explorer.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/01_workbench_overview_chat_explorer.png) — Shell geral com sidebar de arquivos à direita, chat central e sessões à esquerda.
-- [`prints/02_antigravity_ide_comparativo_split.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/02_antigravity_ide_comparativo_split.png) — Paridade com IDE de referência: Explorer com seções inferiores (*Editores Abertos*, *Estrutura do Código*, *Linha do Tempo*, *Maven*).
-- [`prints/03_vscode_web_sash_resizing.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/03_vscode_web_sash_resizing.png) — Cabeçalho com 4 botões de ação e sash ativo de redimensionamento.
-- [`prints/10_explorer_arvore_pastas_expandidas.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/10_explorer_arvore_pastas_expandidas.png) — Hierarquia de pastas expandidas, chevrons e seleção.
-- [`prints/13_explorer_secao_alteracoes_git.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/13_explorer_secao_alteracoes_git.png) — Aba alternativa de Alterações (*Source Control*) com estado vazio.
-- [`prints/14_explorer_estrutura_arquivos_completa.png`](file:///c:/Users/Usuario/Desktop/agente_window/a/agente_window/docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/prints/14_explorer_estrutura_arquivos_completa.png) — Árvore completa e profunda com ícones por extensão e indent guides.
-*(Legado complementar: `docs/referencias_visuais/TAXONOMIA.md` categoria `explorer/` prints 07, 21, 24).*
+`[REF-visual]` `docs/referencias_visuais/TAXONOMIA.md` (categoria `explorer/`) — prints 07, 21, 24 são a base visual de referência; em conflito imagem × texto, prevalece o texto.
 
 ---
 
@@ -139,3 +132,24 @@ window
 - [ ] Três seções presentes com estados vazios corretos, incluindo “Nenhum editor aberto”.
 - [ ] Nenhuma cor hexadecimal hardcoded nos componentes do Explorer (grep `#` no CSS do módulo → 0 ocorrências de sistema).
 - [ ] Aria-labels presentes em todos os botões (`role="button"`, `aria-label`).
+
+---
+
+## 7. Prints do vídeo de referência 8m35s (NOVO - 2026-09-18)
+
+Esta seção foi adicionada após análise do vídeo `Gravar_2026_09_15_21_09_30_680.mp4` enviado pelo usuário.
+
+### Novos prints essenciais para FATIA-04 (Explorer)
+
+| Print | Timestamp vídeo | O que prova | RF relacionado |
+|---|---|---|---|
+| `explorer/29_fatia04_video_explorer_header_5_botoes.png` | 01:25 | Header com 5 alvos: Novo Arquivo, Nova Pasta, Atualizar, Colapsar, ... | RF-01 a RF-05 |
+| `explorer/30_fatia04_video_menu_contexto_completo_baixar.png` | 02:30 | Menu contexto completo com **Baixar arquivo** | RF-12, RF-16 |
+| `explorer/31_fatia04_video_editores_abertos_nenhum_editor.png` | 03:00 | Estado vazio "Nenhum editor aberto" | RF-09 |
+| `explorer/32_fatia04_video_explorer_completo_sessao.png` | 03:15 | Visão completa sessão com docs, legacy, platform, test-results | RF-11, estrutura |
+| `explorer/33_fatia04_video_drag_drop_download.png` | 02:05 | Drag & Drop do SO + Download | RF-17, RF-18 |
+| `explorer/40_fatia04_video_menu_contexto_baixar_detalhe.png` | 07:30 | Detalhe Baixar para máquina local | RF-16 detalhado |
+
+**Para Arena:** Usar estes 6 prints como fonte da verdade visual do Explorer. Eles substituem a necessidade de assistir o vídeo para implementar header, menu contexto e estados vazios.
+
+[REF-video] = `docs/referencias_visuais/fatia04_video/` - coleção bruta de 15 prints do vídeo.
