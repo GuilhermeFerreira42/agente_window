@@ -1,0 +1,52 @@
+import { type ReactNode } from 'react';
+import type { BrowserViewState, BrowserViewport, DiffFile, EditorTab, SearchResult } from '../types';
+import { type SidePaneState } from '../domain/sidePane';
+interface EditorAreaProps {
+    activeSessionId: string;
+    tabs: EditorTab[];
+    activeTabId?: string;
+    browserViews: BrowserViewState[];
+    searchQuery: string;
+    searchResults: SearchResult[];
+    searchFocusRequest: number;
+    diffFiles: DiffFile[];
+    selectedDiffFileId?: string;
+    onSelectTab: (id: string) => void;
+    onCloseTab: (id: string) => void;
+    onReorderTabs: (fromId: string, toId: string) => void;
+    onNewBrowser: () => void;
+    onNewFile: () => void;
+    onNewSearch: () => void;
+    onNewDiff: () => void;
+    onNavigateBrowser: (id: string, url: string) => void;
+    onBrowserBack: (id: string) => void;
+    onBrowserForward: (id: string) => void;
+    onReloadBrowser: (id: string) => void;
+    onBrowserStatus: (id: string, status: BrowserViewState['status']) => void;
+    onChangeViewport: (id: string, viewport: BrowserViewport) => void;
+    onChangeSearchQuery: (query: string) => void;
+    onOpenSearchResult: (result: SearchResult) => void;
+    onSelectDiffFile: (id: string) => void;
+    onAcceptDiff: (id: string) => void;
+    onRevertDiff: (id: string) => void;
+    onAcceptAllDiff: () => void;
+    onRevertAllDiff: () => void;
+    onToggleViewed: (id: string) => void;
+    onCommit: () => void;
+    onCreatePr: () => void;
+    editorMaximized: boolean;
+    onToggleMaximize: () => void;
+    onSplit: () => void;
+    editorContentVisible: boolean;
+    sidePaneState: SidePaneState;
+    onToggleEditorHidden: () => void;
+    onToggleDetails: () => void;
+    detailsVisible: boolean;
+    onNewCustomizations: () => void;
+    customizationsSurface: ReactNode;
+    /** (R-087) Tema ativo — controla o tema do Monaco Editor. */
+    theme?: 'dark' | 'light';
+}
+export declare function EditorArea({ activeSessionId, tabs, activeTabId, browserViews, searchQuery, searchResults, searchFocusRequest, diffFiles, selectedDiffFileId, onSelectTab, onCloseTab, onReorderTabs, onNewBrowser, onNewFile, onNewSearch, onNewDiff, onNewCustomizations, customizationsSurface, onNavigateBrowser, onBrowserBack, onBrowserForward, onReloadBrowser, onBrowserStatus, onChangeViewport, onChangeSearchQuery, onOpenSearchResult, onSelectDiffFile, onAcceptDiff, onRevertDiff, onAcceptAllDiff, onRevertAllDiff, onToggleViewed, onCommit, onCreatePr, editorMaximized, onToggleMaximize, onSplit, editorContentVisible, sidePaneState, onToggleEditorHidden, onToggleDetails, detailsVisible, theme, }: EditorAreaProps): import("react").JSX.Element;
+export {};
+//# sourceMappingURL=EditorArea.d.ts.map

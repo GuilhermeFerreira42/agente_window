@@ -1,0 +1,22 @@
+{
+  "name": "agente-window-platform",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "apps/workbench-v2",
+    "services/pty-server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev:pty\" \"npm:dev:v2\"",
+    "dev:pty": "npm run dev --workspace=@agente-window/pty-server",
+    "dev:v2": "npm run dev --workspace=agents-window-replica-v2",
+    "dev:frontend": "npm run dev --workspace=agents-window-replica-v2",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspace=agents-window-replica-v2",
+    "test:all": "npm run test --workspace=agents-window-replica-v2 && npm run test --workspace=@agente-window/pty-server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

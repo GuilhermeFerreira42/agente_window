@@ -1,0 +1,22 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useState } from 'react';
+import { ArrowUp, Bot, ChevronDown, FolderGit2, Mic, MessageSquare, Plus, ShieldCheck, Wand2 } from 'lucide-react';
+export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, isFileSystemSupported = true }) {
+    const [text, setText] = useState('');
+    const submit = (event) => {
+        event?.preventDefault();
+        const trimmed = text.trim();
+        if (!trimmed)
+            return;
+        onSubmit(trimmed);
+        setText('');
+    };
+    const handleKeyDown = (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            submit();
+        }
+    };
+    return (_jsx("section", { className: "session-landing", "aria-label": "Nova sess\u00E3o", children: _jsxs("div", { className: "session-landing-center", children: [_jsxs("h1", { className: "session-landing-title", children: [_jsx("span", { className: "session-landing-title-lead", children: "Nova sess\u00E3o em" }), onPickWorkspace ? (_jsxs("button", { className: "session-landing-chip is-clickable", type: "button", title: isFileSystemSupported ? "Escolher pasta real do disco (como no vídeo original 06:13)" : "File System API não suportada", "aria-label": `Workspace atual: ${workspace}. Clique para escolher pasta real`, onClick: onPickWorkspace, children: [_jsx(FolderGit2, { size: 14, "aria-hidden": "true" }), workspace, _jsx(ChevronDown, { size: 13, "aria-hidden": "true" })] })) : (_jsxs("span", { className: "session-landing-chip", children: [_jsx(FolderGit2, { size: 14, "aria-hidden": "true" }), workspace, _jsx(ChevronDown, { size: 13, "aria-hidden": "true" })] })), _jsx("span", { className: "session-landing-title-lead", children: "com" }), _jsxs("span", { className: "session-landing-chip", children: [_jsx(Bot, { size: 14, "aria-hidden": "true" }), "Copilot", _jsx(ChevronDown, { size: 13, "aria-hidden": "true" })] })] }), onPickWorkspace && isFileSystemSupported && (_jsxs("p", { style: { fontSize: 12, color: 'var(--vscode-descriptionForeground)', marginBottom: 16, textAlign: 'center' }, children: ["Clique em ", _jsx("strong", { children: workspace }), " para escolher pasta real do disco \u2014 como no original [06:13]"] })), _jsxs("form", { className: "session-landing-input", onSubmit: submit, children: [_jsx("textarea", { className: "session-landing-textarea", placeholder: "O que voc\u00EA est\u00E1 tentando fazer?", "aria-label": "Mensagem para a nova sess\u00E3o", value: text, rows: 1, onChange: (event) => setText(event.target.value), onKeyDown: handleKeyDown }), _jsxs("div", { className: "session-landing-toolbar", children: [_jsxs("div", { className: "session-landing-toolbar-left", children: [_jsx("button", { type: "button", className: "session-landing-icon-button", "aria-label": "Adicionar contexto", title: "Adicionar contexto", onClick: onAddContext, children: _jsx(Plus, { size: 15 }) }), _jsxs("button", { type: "button", className: "session-landing-pill", "aria-label": "Modo Agente", title: "Modo", onClick: onChangeMode, children: [_jsx(Wand2, { size: 13, "aria-hidden": "true" }), "Agente", _jsx(ChevronDown, { size: 12, "aria-hidden": "true" })] }), _jsxs("button", { type: "button", className: "session-landing-pill", "aria-label": "Modelo autom\u00E1tico", title: "Modelo", onClick: onChangeModel, children: [_jsx(Bot, { size: 13, "aria-hidden": "true" }), "Auto", _jsx(ChevronDown, { size: 12, "aria-hidden": "true" })] })] }), _jsxs("div", { className: "session-landing-toolbar-right", children: [_jsx("button", { type: "button", className: "session-landing-icon-button", "aria-label": "Ditar por voz", title: "Ditar por voz", onClick: onDictate, children: _jsx(Mic, { size: 15 }) }), _jsx("button", { type: "submit", className: "session-landing-send", "aria-label": "Enviar mensagem", title: "Enviar", disabled: !text.trim(), children: _jsx(ArrowUp, { size: 15 }) })] })] })] }), _jsxs("div", { className: "session-landing-footer", children: [_jsxs("span", { className: "session-landing-footer-item", children: [_jsx(MessageSquare, { size: 13, "aria-hidden": "true" }), "Interativo"] }), _jsxs("span", { className: "session-landing-footer-item", children: [_jsx(ShieldCheck, { size: 13, "aria-hidden": "true" }), "Permiss\u00F5es manuais"] })] })] }) }));
+}
+//# sourceMappingURL=SessionLanding.js.map

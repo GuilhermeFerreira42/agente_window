@@ -1,0 +1,25 @@
+/* E3 / Etapa 0 — overrides dedicados do xterm alinhados ao terminal do VS Code */
+
+.terminal-panel .terminal-container .xterm {
+  height: 100%;
+  padding: 0;
+}
+
+.terminal-panel .terminal-container .xterm-viewport {
+  background: var(--vscode-terminal-background) !important;
+}
+
+.terminal-panel .terminal-container .xterm-screen,
+.terminal-panel .terminal-container .xterm-rows {
+  background: transparent;
+  color: var(--vscode-terminal-foreground);
+}
+
+.terminal-panel .terminal-container .xterm textarea.xterm-helper-textarea {
+  color: inherit;
+}
+
+.terminal-panel .terminal-container .xterm .xterm-scroll-area,
+.terminal-panel .terminal-container .xterm .xterm-scrollbar {
+  scrollbar-color: color-mix(in srgb, var(--vscode-foreground) 22%, transparent) transparent;
+}

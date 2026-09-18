@@ -1,5 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "include": ["platform/apps/workbench/src/**/*", "platform/packages/**/*"],
-  "exclude": ["node_modules", "legacy", "platform/services/pty-server", "dist"]
-}
