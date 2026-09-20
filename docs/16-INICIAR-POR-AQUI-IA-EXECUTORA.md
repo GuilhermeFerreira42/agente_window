@@ -38,11 +38,28 @@ Leia os arquivos abaixo nesta ordem exata:
 14. `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`
 15. `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md` (OBRIGATÓRIO: ler para não quebrar componentes homologados)
 
-### 3.1 Documentação essencial da próxima frente (FATIA-04)
+### 3.1 Documentação essencial da próxima frente (FATIA-04) — ATUALIZADA 2026-09-20
 Após os arquivos fundamentais, leia os documentos diretores da **FATIA-04**:
 1. `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_00_INDICE_E_RESUMO_VIDEO.md`
 2. `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md`
 3. `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_13_CRITERIOS_ACEITE_VALIDACAO.md`
+4. `docs/12_DOCUMENTACAO_VIVA.md` — seção 2026-09-20 LEGO (obrigatória para entender princípio de transplante)
+
+### 3.2 Princípio Arquitetural LEGO — Módulo Isolado dentro do Monolito (ANTI app.px gigante) — OBRIGATÓRIO
+**Este é o princípio canônico congelado em 2026-09-20. Você DEVE respeitar:**
+
+1. **O projeto é LEGO:** Veio do `microsoft/vscode` main e é montado com peças do `coder/code-server`. Você não cria do zero, você TRANSPLANTA peça pronta.
+2.  **Monolito gigante permanece:** NÃO virar microserviço, NÃO subir processo extra, NÃO comunicar via rede. Tudo fica no mesmo processo, em memória.
+3.  **Transplante por módulo isolado:** Copie a carne do Explorer/Search do VS Code Server, troque imports para adapters internos:
+    - FileWatcher -> nosso FileSystemPort
+    - ContextMenu -> nosso sistema de menu
+    - Search -> nosso SearchService
+4.  **Anti app.px gigante:** `platform/apps/workbench/src/app.tsx` ou `app.px` NÃO pode centralizar lógica. Cada módulo tem fronteira clara, pasta própria e contrato via `index.ts`. App só orquestra: `explorer.openFolder()`, `search.query()`.
+5.  **Quebra isolada:** Se Explorer quebrar, Terminal continua funcionando. Manutenção em um módulo não pode afetar outro. Essa é a métrica de sucesso da arquitetura.
+6.  **FATIA-04 = Explorer + Search unificados:** Trate os dois como um único módulo lateral. No vídeo de referência eles funcionam juntos. Sua raspagem/estudo DEVE mapear os dois + dependências compartilhadas.
+7.  **Sem protocolo Texas:** O sistema já está autodocumentado. Sua responsabilidade é ler a doc canônica, resumir nos 5 blocos e aguardar comando claro do usuário do tipo: "Transplantar Explorer + Search como módulo isolado, lado direito, com adapters, sem virar microserviço".
+
+Se você propor microserviço, processo separado ou centralizar tudo no app principal, você violou a arquitetura.
 
 ## 4. O que você deve entender ao final da leitura
 Ao terminar a leitura ordenada, você deve ser capaz de responder com segurança:
@@ -73,9 +90,9 @@ Explique a estrutura de pastas e responsabilidades:
 
 ### Bloco C — Próxima frente que você pretende executar
 Descreva exatamente a próxima fatia que pretende puxar:
-- nome da fatia (**FATIA-04: Explorer Completo + Editor em Anexo Lateral + Browser com acesso da IA ao HTML**);
-- escopo específico delimitado;
-- o que NÃO será feito nesta fatia para evitar transbordamento de escopo.
+- nome da fatia (**FATIA-04: Explorer + Search unificados como Módulo Lateral Isolado (LEGO) + Editor em Anexo Lateral + Browser com acesso da IA ao HTML**);
+- escopo específico delimitado: transplante por módulo isolado dentro do monolito, sem virar microserviço, com fronteira clara anti app.px gigante, adapters para FileSystemPort/SearchService/ContextMenu;
+- o que NÃO será feito nesta fatia para evitar transbordamento de escopo: não criar microserviço, não centralizar lógica no app principal, não quebrar Terminal homologado.
 
 ### Bloco D — Lista de arquivos que você espera alterar ou criar
 Liste:
@@ -98,18 +115,22 @@ Depois de enviar a resposta com os 5 blocos acima:
 - **NÃO avance para a implementação.**
 - Aguarde a resposta do usuário dizendo expressamente que você pode começar.
 
-## 7. Contexto de transição e estado vigente
+## 7. Contexto de transição e estado vigente — ATUALIZADO 2026-09-20 LEGO
 - **Casa Nova (`platform/apps/workbench-v2/`):** É a base oficial e ativa de desenvolvimento. Roda na porta 5174 em arquitetura modular Single Port com PTY WebSocket integrado.
 - **Casa Velha (`legacy/`):** Mantida intacta para paridade histórica e blindada.
 - **Terminal Interativo Homologado:** Possui 100% de cobertura nos testes automatizados Playwright (`platform/apps/workbench-v2/e2e/sessao_11_terminal_interactive_v2.spec.ts`), cobrindo abertura sem tela cinza, status PTY `open`, regra de abas (`instances.length > 1`) e digitação/execução real no xterm.
-- **Próxima frente oficial:** **FATIA-04** (Explorer Completo + Editor em Anexo Lateral + Browser com acesso da IA ao HTML na Casa Nova).
+- **Princípio LEGO congelado (2026-09-20):** Projeto inteiro = VS Code main desmontado + peças VS Code Server remontadas como módulos isolados DENTRO do monolito. Anti app.px gigante. Fronteira clara por contrato.
+- **Próxima frente oficial:** **FATIA-04** (Explorer + Search unificados como Módulo Lateral Isolado LEGO + Editor em Anexo Lateral + Browser com acesso da IA ao HTML na Casa Nova). Raspagem deve cobrir Explorer + Search juntos.
 
-## 8. Regras invioláveis
+## 8. Regras invioláveis — ATUALIZADAS 2026-09-20
 - `docs/` é a fonte principal de verdade.
 - Nunca misture regras temporárias da infraestrutura do ambiente/sandbox na documentação do produto.
 - Você não deve começar por aparência antes da estrutura e contratos.
 - Trabalhe com fatias pequenas, testes automatizados e aprovações humanas explícitas.
 - Siga rigorosamente `docs/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`.
+- **LEGO: Monolito com módulos isolados, NÃO microserviço.** Não crie processo, rede ou serviço separado para Explorer/Search.
+- **Anti app.px gigante:** Não centralize lógica no app principal. Módulo com fronteira clara e adapter.
+- **Quebra isolada obrigatória:** Manutenção em um módulo não pode afetar Terminal homologado.
 
 ## 9. Regra de parada por dúvida
 Se houver lacuna documental, conflito arquitetural ou ambiguidade:

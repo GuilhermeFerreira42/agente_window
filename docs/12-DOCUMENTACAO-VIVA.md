@@ -48,7 +48,11 @@ Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 - a aplicação visual principal deve viver em `platform/apps/workbench/src/`;
 - a separação estrutural obrigatória é entre interface/workbench, backend/runtime/serviços e camada de IA/provider/tools;
 - as referências visuais são apoio documental e não autoridade acima da documentação textual canônica;
-- a taxonomia visual aprovada é por subsistema dono da referência.
+- a taxonomia visual aprovada é por subsistema dono da referência;
+- **Arquitetura LEGO (2026-09-20):** Transplante por módulos isolados dentro do monolito — pegar peças prontas do VS Code Server (Explorer, Search, etc) e encaixar via adapters, sem virar microserviço/processo/rede;
+- **Anti app.px gigante:** App central não centraliza lógica, apenas orquestra por contratos/interfaces. Cada módulo resolve internamente. Quebra isolada;
+- **Módulo lateral unificado:** Explorer + Search tratados como um único módulo de sidebar, compartilhando FileSystemPort, ContextMenu, SearchService;
+- **Autodocumentação como protocolo:** Não usar protocolo Texas; comando claro + docs/ canônica é suficiente.
 
 ## Decisões rejeitadas ou não repetir
 - não iniciar a nova arquitetura diretamente na raiz do repositório;
@@ -978,6 +982,14 @@ Após clone limpo com 5 bugs críticos já corrigidos (doc 12 snapshot 2026-09-1
 
 ---
 
+### 2026-09-20 — DECISÃO ARQUITETURAL LEGO: Transplante por Módulos Isolados dentro do Monolito (ANTI app.px GIGANTE) — ATUALIZAÇÃO VIVA
+- **Princípio Lego aprovado:** Projeto inteiro é VS Code main desmontado e remontado com peças do VS Code Server. Cada peça (Explorer, Search, etc) é transplantada como **módulo isolado** dentro do monolito gigante, NÃO como microserviço / processo separado / comunicação via rede.
+- **Anti-padrão app.px gigante:** O app central NÃO pode centralizar lógica. Ele apenas chama módulos por contrato/interface bem definida (ex: `explorer.openFolder(path)`). Lógica interna do módulo resolve sozinha.
+- **Padrão de encaixe:** Copiar arquivos relevantes do VS Code Server, trocar imports para adapters internos (FileWatcher -> nosso FS, ContextMenu -> nosso sistema de menu, Search -> nosso SearchService). Tudo em memória, mesmo processo.
+- **Fronteira clara:** Cada módulo tem pasta própria em `platform/packages/` ou `platform/apps/workbench-v2/src/modules/`, com `index.ts` exportando apenas contrato. Se quebrar, não derruba o resto.
+- **Escopo imediato:** FATIA-04 passa a ser **Explorer + Search** como um único módulo lateral (barra lateral completa). Raspagem e estudo devem cobrir os dois juntos por compartilharem dependências.
+- **Autodocumentação suficiente:** Não usar protocolo Texas. Sistema já autodocumentado. Responsabilidade fica no comando claro dado à IA executora.
+
 ### 2026-09-16 — CONSOLIDAÇÃO DOCUMENTAL DA FATIA-04 (pacote FATIA-04_VIDEO_COMPLETO) + ENTRADA NA CADEIA DE LEITURA
 **Tipo:** documentação (sem alteração de código) | **Status:** Concluído | **Executor:** Arena Agent
 
@@ -1058,3 +1070,35 @@ A FATIA-04 estava autorizada como próxima frente, porém com apenas 6 tarefas g
 - A documentação de transição temporária foi arquivada em `docs/historico_migracao_temporaria/`.
 - A documentação canônica consolidada foi restabelecida como a autoridade viva definitiva em `docs/`.
 - A entrada obrigatória para a próxima IA permanece cristalina e estrita em `docs/16_INICIAR_POR_AQUI_IA_EXECUTORA.md`.
+
+---
+
+### 2026-09-20 — ARQUITETURA LEGO: Módulos Isolados dentro do Monolito (ANTI app.px GIGANTE) + EXPLORER/SEARCH UNIFICADOS
+**Tipo:** decisão arquitetural canônica | **Status:** Congelado | **Executor:** Usuário + IA de apoio
+
+**Contexto:**
+Projeto veio do VS Code main e está sendo montado com peças do VS Code Server. Risco identificado: voltar ao monolito gigante centralizado tipo `app.px` que centraliza tudo e quebra em cascata na manutenção. Usuário definiu que não vira microserviço.
+
+**Decisão:**
+1. **Princípio LEGO:** Todo o projeto é um boneco de Lego — desmonta VS Code e remonta diferente. Cada funcionalidade (Explorer, Search, Source Control, etc) é uma peça transplantada.
+2.  **Transplante por módulo isolado:** Copiar carne do VS Code Server, trocar imports para serviços internos, manter tudo no mesmo processo/memória. Zero rede, zero processo extra.
+    - FileWatcher -> adapter para nosso módulo FS
+    - ContextMenu -> adapter para nosso sistema de menu atual
+    - Search -> adapter para SearchService interno
+3.  **Fronteira e contrato:** Cada módulo vive em `platform/packages/<nome>-module/` ou `platform/apps/workbench-v2/src/modules/<nome>/` com `index.ts` exportando apenas interface pública. App principal chama `explorerService.open()`, `searchService.query()`, etc. Não conhece implementação.
+4.  **Anti-centralização:** `app.px` / `platform/apps/workbench/src/app.tsx` NÃO pode acumular lógica. É apenas orquestrador de módulos. Regra: se mexe em Explorer e quebra Terminal, violou fronteira.
+5.  **FATIA-04 ampliada oficialmente:** Não é só Explorer. É **Explorer + Search** juntos, pois no vídeo de referência funcionam acoplados (resultados navegam, destacam, abrem). Raspagem deve mapear ambos + dependências compartilhadas.
+6.  **Protocolo de comando:** Sem protocolo Texas. Doc já autodocumentada. IA executora lê `docs/16` -> resume em 5 blocos -> aguarda aprovação -> inicia raspagem/estudo para gerar plano de encaixe da peça LEGO na casa nova.
+
+**Entregas desta entrada:**
+- Atualização de `docs/12` (esta) e `docs/16` com princípio LEGO.
+- Base para atualizar `docs/03_ARQUITETURA_EXECUTAVEL.md` e `docs/13_ADRS` na próxima rodada.
+
+**Próximo passo autorizado:**
+1. IA executora inicia raspagem e estudo de `microsoft/vscode` (Explorer + Search) e `coder/code-server` correspondente, gerando mapa arquivo:linha + fluxo + contratos necessários, sem codar ainda.
+2. Comando para IA: "Vamos transplantar Explorer + Search do VS Code Server para nosso projeto como módulo isolado dentro do monolito, lado direito/lateral, com adapters, sem virar microserviço, mantendo fronteira clara anti app.px gigante".
+
+**Pendência:**
+- Atualizar `04_00` a `04_16` para refletir que Search faz parte do mesmo módulo lateral.
+
+
