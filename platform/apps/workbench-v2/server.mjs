@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertNodePtyAvailable, createPtyWebSocketBridge, PTY_WS_PATH } from '../../../platform/services/pty-server/dist/singlePort.js'
+import { WebSocketServer } from 'ws'
+import { createExplorerFsServer, FS_WATCH_PATH } from './dist-fs-server/server/fs/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -60,6 +62,14 @@ async function start() {
   await assertNodePtyAvailable()
   const bridge = createPtyWebSocketBridge()
 
+  // FATIA-04 (4.3): FileSystemPort no preview também (Single Port, Q7).
+  // Raiz = repo (relativa a este arquivo) ou FS_TEST_ROOT. Sem PTY tocar.
+  const fsRoot = process.env.FS_TEST_ROOT ?? `file://${path.resolve(__dirname, '../../..')}`
+  const fsServer = await createExplorerFsServer({
+    root: fsRoot,
+    createWsServer: () => new WebSocketServer({ noServer: true }),
+  })
+
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`)
 
@@ -75,6 +85,22 @@ async function start() {
       return
     }
 
+    if (url.pathname.startsWith('/fs/')) {
+      fsServer
+        .tryHandleHttp(req, res)
+        .then((handled) => {
+          if (!handled) {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+            res.end(JSON.stringify({ code: 'io', message: `(preview) não tratado: ${url.pathname}` }))
+          }
+        })
+        .catch((err) => {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' })
+          res.end(JSON.stringify({ code: 'io', message: String(err) }))
+        })
+      return
+    }
+
     const staticFile = resolveStaticFile(url.pathname)
     if (staticFile) {
       sendFile(res, staticFile)
@@ -85,13 +111,18 @@ async function start() {
   })
 
   const detachUpgrade = bridge.attachToServer(server)
+  server.on('upgrade', (req, socket, head) => {
+    fsServer.tryHandleUpgrade(req, socket, head)
+  })
 
   server.listen(PORT, HOST, () => {
-    console.log(`[server.mjs] Preview em http://${HOST}:${PORT} com terminal em ws://${HOST}:${PORT}${PTY_WS_PATH}`)
+    console.log(`[server.mjs] Preview em http://${HOST}:${PORT} com terminal em ws://${HOST}:${PORT}${PTY_WS_PATH} e FS em ${FS_WATCH_PATH} (raiz ${fsRoot})` + `
+[server.mjs] raiz FS = ${fsRoot}`)
   })
 
   const shutdown = () => {
     detachUpgrade()
+    fsServer.dispose()
     bridge.dispose()
     server.close(() => process.exit(0))
   }

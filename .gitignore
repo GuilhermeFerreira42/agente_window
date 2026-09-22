@@ -43,3 +43,5 @@ blob-report/
 # Claude Code
 .claude/
 code-server/
+# FATIA-04 (4.3): build do adapter FS p/ preview (compilado de server/fs)
+dist-fs-server/

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// FATIA-04 (4.4): módulo explorer-search via Barrel único — App NUNCA importa
+// caminhos internos do módulo (fronteira LEGO, FT).
+import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
+import { createShellCommandRegistry } from './domain/shellCommandRegistry'
+import { clampMenuPosition, isImageFile } from './domain/filePreview'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { buildProjectDiffFiles, initialDiffFiles, initialProviders, initialSessions, searchResults as allSearchResults } from './data'
@@ -141,6 +146,86 @@ function sameComposerHistoryEntry(left: ComposerHistoryEntry | undefined, right:
   })
 }
 
+// FATIA-04 (4.4): slot DOM do módulo explorer-search. O mount/unmount REAL é
+// do módulo (DOM só dentro do slot; estado do serviço sobrevive a remount).
+type ExplorerContextMenuState = {
+  x: number; y: number;
+  items: Array<{ id: string; label: string; enabled: boolean; group?: string; order: number; danger?: boolean }>
+}
+
+function ExplorerModuleSlot({ module }: { module: IExplorerSearchModule }) {
+  const hostRef = useCallback((el: HTMLDivElement | null) => {
+    if (el) module.mount(el)
+    else module.unmount()
+  }, [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="explorer-module-slot" />
+}
+
+// (BLOCO 4.4-fix BUG-V1) Host do menu de contexto do Explorer COM clamp na
+// viewport: no painel estreito à direita o botão "…" abre o menu sangrando para
+// fora da tela (texto truncado). Medimos o tamanho real no mount e reposicionamos
+// — rótulos sempre íntegros, nunca fora da tela.
+function ExplorerContextMenuHost({ state, onClose, onExecute }: {
+  state: ExplorerContextMenuState
+  onClose: () => void
+  onExecute: (id: string) => void
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: state.x, y: state.y })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const clamped = clampMenuPosition(state.x, state.y, el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight)
+    if (clamped.x !== pos.x || clamped.y !== pos.y) setPos(clamped)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      data-explorer-context-menu
+      data-testid="explorer-context-menu"
+      style={{
+        position: 'fixed',
+        left: pos.x,
+        top: pos.y,
+        zIndex: 2000,
+        minWidth: 180,
+        // largura natural do conteúdo: rótulos longos NUNCA quebram linha
+        // (fiel ao VSCode); o clamp reposiciona para caber o menu inteiro.
+        width: 'max-content',
+        maxWidth: 'calc(100vw - 16px)',
+        background: 'var(--vscode-menu-background, #252526)',
+        border: '1px solid var(--vscode-menu-border, #454545)',
+        borderRadius: 4,
+        padding: '2px 0',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.36)',
+      }}
+    >
+      {[...state.items].sort((a, b) => a.order - b.order).map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          role="menuitem"
+          disabled={!item.enabled}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left', whiteSpace: 'nowrap',
+            background: 'none', border: 'none', padding: '4px 12px',
+            color: item.enabled ? 'var(--vscode-menu-foreground, #cccccc)' : 'var(--vscode-disabledForeground, #6b6b6b)',
+            cursor: item.enabled ? 'pointer' : 'default', font: 'inherit', fontSize: 13,
+          }}
+          onClick={() => {
+            onClose()
+            void onExecute(item.id)
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>(initialSessions)
   const persistedLayout = useRef(loadLayoutState())
@@ -157,6 +242,49 @@ export default function App() {
   const [partSizesBySession, setPartSizesBySession] = useState<Record<string, number[]>>(persistedLayout.current.partSizesBySession)
 
   const [auxiliaryTab, setAuxiliaryTab] = useState<'changes' | 'files'>('changes')
+  // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
+  // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
+  const [explorerModule, setExplorerModule] = useState<IExplorerSearchModule | null>(null)
+  const explorerFsRef = useRef<BrowserFsPort | null>(null)
+  const handleExplorerFileOpenedRef = useRef<(uri: WorkspaceUri) => void>()
+  const explorerMenusRef = useRef(createShellCommandRegistry())
+  const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
+        explorerFsRef.current = fs
+        const root: WorkspaceUri = await fs.discoverRoot()
+        if (cancelled) return
+        const module = createExplorerSearchModule({
+          fs,
+          menus: explorerMenusRef.current,
+          contextMenu: { open: (input) => setExplorerContextMenu(input) },
+          workspaceRoot: root,
+        })
+        await module.explorer.openFolder({ uri: root })
+        if (cancelled) { module.dispose(); return }
+        module.onEvent((e) => {
+          if (e.type === 'error') console.warn('[explorer-search]', e.code, e.message)
+          if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
+        })
+        setExplorerModule(module)
+      } catch (err) {
+        // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
+        console.warn('[explorer-search] boot: raiz não descoberta', err)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+  useEffect(() => {
+    if (!explorerContextMenu) return
+    const onDown = (ev: MouseEvent) => {
+      if (!(ev.target as HTMLElement).closest('[data-explorer-context-menu]')) setExplorerContextMenu(null)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [explorerContextMenu])
   // E4 — estado de layout por sessão: ao sair capturamos auxiliaryVisible +
   // activeViewContainerId; ao voltar restauramos. Working sets (abas/browser)
   // são preservados separadamente e nunca limpos ao alternar de sessão.
@@ -234,6 +362,8 @@ export default function App() {
       const content = await readFileContent(fileHandle)
       // Abrir no editor como file tab real
       openEditorTab('file', { title: entry.name, path: entry.path, content })
+      // (E10/R-083) mesmo reveal do fluxo do Explorer — o anexo precisa acordar.
+      setEditorHidden(false)
       notify(`Arquivo real aberto: ${entry.name}`)
     } catch (e) {
       console.error(e)
@@ -819,24 +949,64 @@ export default function App() {
     notify('Editor dividido: nova superfície de arquivos aberta')
   }
 
-  const openEditorTab = useCallback((type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean } = { title: type }) => {
+  const openEditorTab = useCallback((type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean; imagePreview?: EditorTab['imagePreview']; readError?: string } = { title: type }) => {
     const ownerSessionId = options.sessionId ?? (type === 'browser' || type === 'diff' ? activeSession.id : undefined)
     // For real files with content, don't reuse tab unless same path and same content - allow update
     const existing = editorTabs.find((tab) => tab.type === type
       && (type !== 'file' || tab.path === options.path)
       && (!ownerSessionId || tab.sessionId === ownerSessionId))
     if (existing) {
-      // If real file with new content, update it
-      if (options.content && existing.content !== options.content) {
-        setEditorTabs((current) => current.map((t) => t.id === existing.id ? { ...t, content: options.content, isRealFile: options.isRealFile ?? t.isRealFile } : t))
+      // If real file with new content, update it; readError também atualiza a
+      // aba existente (content ↔ readError são mutuamente exclusivos: o novo
+      // estado sempre substitui o anterior — nunca mock/placeholder residual).
+      if (options.readError || (options.content && existing.content !== options.content)) {
+        setEditorTabs((current) => current.map((t) => t.id === existing.id ? { ...t, content: options.content, readError: options.readError, isRealFile: options.isRealFile ?? t.isRealFile } : t))
       }
       activateEditorTab(existing)
       return
     }
-    const tab: EditorTab = { id: `${type}-${Date.now()}-${editorTabSequence.current++}`, type, title: options.title, path: options.path, sessionId: ownerSessionId, content: options.content, isRealFile: options.isRealFile ?? !!options.content }
+    const tab: EditorTab = { id: `${type}-${Date.now()}-${editorTabSequence.current++}`, type, title: options.title, path: options.path, sessionId: ownerSessionId, content: options.content, isRealFile: options.isRealFile ?? (!!options.content || !!options.imagePreview), imagePreview: options.imagePreview, readError: options.readError }
     setEditorTabs((current) => [...current, tab])
     activateEditorTab(tab)
   }, [activeSession.id, activateEditorTab, editorTabs])
+
+  // (BLOCO 4.4-fix BUG-P1 + GAP-V1) Clique num arquivo da árvore (evento
+  // explorer.fileOpened): lê o conteúdo REAL via FileSystemPort (Single Port),
+  // abre/reusa a aba `file` do editor (Image Preview para binários — aceite do
+  // bloco) e faz o reveal explícito do anexo no padrão R-083 (nunca só ativar).
+  // Mock segue apenas como fallback declarado (aba sem content, criada por
+  // outros fluxos — demo Files, pesquisa, split etc.).
+  handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
+    setExplorerContextMenu(null)
+    const fs = explorerFsRef.current
+    if (!fs) return
+    const name = uri.split('/').pop() ?? uri
+    void (async () => {
+      try {
+        if (isImageFile(name)) {
+          const bin = await fs.readFileBinary({ uri, maxBytes: 8 * 1024 * 1024 })
+          openEditorTab('file', { title: name, path: uri, isRealFile: true, imagePreview: { dataBase64: bin.dataBase64, mime: bin.mime } })
+        } else {
+          const read = await fs.readFile({ uri })
+          openEditorTab('file', { title: name, path: uri, content: read.content, isRealFile: true })
+        }
+        // (E10/R-083 — mesmo padrão do openDiff) revelar o anexo do editor.
+        setEditorHidden(false)
+      } catch (err) {
+        console.warn('[explorer-search] falha ao abrir arquivo', err)
+        // (4.4-fix, validação manual) Falha de leitura NUNCA cai em conteúdo
+        // sintético: abre a aba como ERROR EDITOR explícito (espelha o
+        // createEditorOpenError do VS Code — handleSetInputError).
+        openEditorTab('file', {
+          title: name,
+          path: uri,
+          readError: err instanceof Error ? err.message : String(err),
+        })
+        setEditorHidden(false)
+        notify(`Não foi possível abrir ${name}`)
+      }
+    })()
+  }
 
   const openBrowser = () => createBrowser()
   const openSearch = useCallback(() => {
@@ -1853,7 +2023,7 @@ export default function App() {
                       onClose={() => setMobilePane('chat')}
                     />
                   ) : (
-                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} visible diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setMobilePane('chat')} /></div>
+                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} visible diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setMobilePane('chat')} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} /></div>
                   )
                 )}
               </div>
@@ -1903,7 +2073,7 @@ export default function App() {
               </>
             )}
               </div>
-              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setAuxiliaryVisible(false)} />}
+              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setAuxiliaryVisible(false)} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} />}
             </div>
             <TerminalPanel
               visible={terminalVisible && !customViewActive}
@@ -1916,6 +2086,13 @@ export default function App() {
         </div>
       </div>
       {toast && <div className="toast" role="status"><Info size={14} /><span>{toast}</span><button type="button" aria-label="Fechar aviso" title="Fechar aviso" onClick={() => setToast(undefined)}><X size={13} /></button></div>}
+      {explorerContextMenu && (
+        <ExplorerContextMenuHost
+          state={explorerContextMenu}
+          onClose={() => setExplorerContextMenu(null)}
+          onExecute={(id) => void explorerMenusRef.current.execute(id)}
+        />
+      )}
       <SessionsPicker
         open={sessionPickerOpen}
         sessions={sessions}

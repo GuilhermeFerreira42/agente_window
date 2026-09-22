@@ -6,8 +6,11 @@
 // automaticamente por `src/__tests__/e2eAssertionContract.test.ts`.
 import { expect, type Locator, type Page } from '@playwright/test'
 
-/** Porta única de toda a suíte. Nenhuma spec deve hardcodar host/porta. */
-export const BASE_URL = 'http://localhost:5173'
+/** Porta única de toda a suíte. Nenhuma spec deve hardcodar host/porta.
+ *  Casa Nova (workbench-v2) roda no Vite 5174 (playwright.config.ts baseURL).
+ *  Override por ambiente: PLAYWRIGHT_BASE_URL.
+ *  (2026-09-20: estava fixo em 5173 — resquício da Casa Velha; alinhado.) */
+export const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5174'
 
 export const LAYOUT_KEY = 'workbench.sessions.layout.v1'
 export const SESSION_LAYOUTS_KEY = 'workbench.sessions.layouts.v1'

@@ -8,6 +8,7 @@ import terminalPanelSource from '../components/TerminalPanel.tsx?raw'
 import terminalActionBarSource from '../components/terminal/TerminalActionBar.tsx?raw'
 import shellPickerSource from '../components/terminal/ShellPicker.tsx?raw'
 import terminalInstanceTabsSource from '../components/terminal/TerminalInstanceTabs.tsx?raw'
+import imagePreviewSource from '../components/ImagePreview.tsx?raw'
 import appSource from '../App.tsx?raw'
 
 /**
@@ -107,6 +108,13 @@ describe('P7.3 icon and label contracts', () => {
     for (const source of [titlebarSource, auxiliarySource, editorSource]) {
       expect(source).not.toMatch(/<img\b/)
     }
+    // ÚNICA exceção legítima à regra anti-<img> (BLOCO 4.4-fix BUG-P1): o
+    // ImagePreview.tsx renderiza o CONTEÚDO binário real do arquivo (data URI
+    // base64 do /fs/read?binary=1) — nunca ícone. Restrição: a <img> DEVE ser
+    // sempre data-URI de conteúdo, nunca URL externa/estática.
+    expect(imagePreviewSource).toMatch(/<img\b/)
+    expect(imagePreviewSource).toContain('src={`data:${mime};base64,${dataBase64}`}')
+    expect(imagePreviewSource).not.toMatch(/src=["'](?!`)[^"']*https?/)
   })
 
   it('keeps at least one title tooltip on each primary toolbar surface', () => {

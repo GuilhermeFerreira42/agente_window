@@ -30,6 +30,9 @@ type CheckStatus = 'success' | 'failure' | 'running' | 'pending'
 interface AuxiliaryBarProps {
   session: Session
   visible: boolean
+  /** FATIA-04 (4.4): quando presente, a aba "Files" renderiza ESTE slot
+   *  (o módulo explorer-search real) em vez do FilesDetails demonstrativo. */
+  filesSlot?: import('react').ReactNode
   diffFiles: DiffFile[]
   tab: 'changes' | 'files'
   checksExpanded: boolean
@@ -112,6 +115,7 @@ export function AuxiliaryBar({
   onPickDirectory,
   onClearDirectory,
   onOpenFileHandle,
+  filesSlot,
 }: AuxiliaryBarProps) {
   if (!visible) return null
 
@@ -146,6 +150,9 @@ export function AuxiliaryBar({
             onMerge={onMerge}
             onOpenTerminal={onOpenTerminal}
           />
+        ) : filesSlot ? (
+          // FATIA-04 (4.4): módulo explorer-search real no slot da aba Files.
+          filesSlot
         ) : (
           <FilesDetails
             expandedFolders={expandedFolders}

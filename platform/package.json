@@ -8,7 +8,8 @@
     "services/pty-server"
   ],
   "scripts": {
-    "dev": "concurrently \"npm:dev:pty\" \"npm:dev:v2\"",
+    "dev": "npm run dev --workspace=agents-window-replica-v2",
+    "dev:full": "concurrently \"npm:dev:pty\" \"npm:dev:v2\"",
     "dev:pty": "npm run dev --workspace=@agente-window/pty-server",
     "dev:v2": "npm run dev --workspace=agents-window-replica-v2",
     "dev:frontend": "npm run dev --workspace=agents-window-replica-v2",

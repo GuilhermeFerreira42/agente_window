@@ -101,6 +101,13 @@ export interface EditorTab {
   browserId?: string
   content?: string
   isRealFile?: boolean
+  /** (BLOCO 4.4-fix BUG-P1) binário aberto do Explorer — renderiza Image Preview
+   *  de verdade (data URL), nunca via Monaco. Aditivo ao contrato do tab. */
+  imagePreview?: { dataBase64: string; mime: string }
+  /** (4.4-fix, validação manual) Falha de leitura do disco/da handle — exibida
+   *  como error editor EXPLÍCITO na aba (padrão VS Code `createEditorOpenError`),
+   *  nunca conteúdo sintético/mock silencioso. */
+  readError?: string
 }
 
 export type DiffResolution = 'accepted' | 'reverted'

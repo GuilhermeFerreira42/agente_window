@@ -33,6 +33,8 @@ import { getDiffResolution } from '../domain/sessionState'
 import { isTabCloseable, type SidePaneState } from '../domain/sidePane'
 import { formatSearchSummary, splitSearchHighlight } from '../domain/search'
 import { ContextMenu, type ContextMenuState } from './ContextMenu'
+import { ImagePreview } from './ImagePreview'
+import { languageForPath } from '../domain/filePreview'
 import { DragTypes } from '../domain/dragAndDrop'
 
 interface EditorAreaProps {
@@ -608,12 +610,50 @@ export function EditorArea({
         {editorContentVisible && activeTab?.type === 'search' && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
         {editorContentVisible && activeTab?.type === 'diff' && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
-        {editorContentVisible && activeTab?.type === 'file' && <div className="monaco-editor-shell">
-          <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-descriptionForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{activeTab.isRealFile ? '📄 Arquivo real do disco' : '📄 Arquivo mock'} — {activeTab.path}</span>
-            {activeTab.isRealFile && <span style={{ fontSize: 10, background: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)', padding: '2px 6px', borderRadius: 4 }}>REAL</span>}
+        {editorContentVisible && activeTab?.type === 'file' && activeTab.imagePreview && (
+          <ImagePreview
+            path={activeTab.path}
+            alt={activeTab.title}
+            dataBase64={activeTab.imagePreview.dataBase64}
+            mime={activeTab.imagePreview.mime}
+            isRealFile={!!activeTab.isRealFile}
+          />
+        )}
+        {/* (4.4-fix, validação manual) Falha de leitura = ERROR EDITOR explícito
+            (espelha createEditorOpenError do VS Code) — nunca conteúdo sintético. */}
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && activeTab.readError && (
+          <div className="monaco-editor-shell" data-testid="file-read-error">
+            <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-errorForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>⚠️ Não foi possível ler o arquivo — {activeTab.path}</span>
+            </div>
+            <div style={{ height: 'calc(100% - 29px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'var(--vscode-editor-background)', color: 'var(--vscode-errorForeground)', textAlign: 'center', padding: 24 }}>
+              <CircleAlert size={28} aria-hidden="true" />
+              <strong>O editor não pôde ser aberto</strong>
+              <span style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)', maxWidth: 420 }}>{activeTab.readError}</span>
+              <span style={{ fontSize: 11, color: 'var(--vscode-descriptionForeground)' }}>A leitura veio do backend Single Port (/fs/read). Verifique se o arquivo existe em disco.</span>
+            </div>
           </div>
-          <Editor height="calc(100% - 29px)" defaultLanguage={activeTab.path?.endsWith('.json') ? 'json' : activeTab.path?.endsWith('.css') ? 'css' : activeTab.path?.endsWith('.md') ? 'markdown' : 'typescript'} defaultValue={activeTab.content ?? `// ${activeTab.path ?? 'workspace file'}\n\nexport const agentWindow = {\n  sessions: true,\n  editorSurface: 'browser | search | diff',\n  singlePaneBreakpoint: 1024,\n  isReal: ${!!activeTab.isRealFile},\n};`} value={activeTab.content} theme={monacoTheme} options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true, padding: { top: 12 }, readOnly: false }} />
+        )}
+        {/* Sem conteúdo E sem erro: estado honesto — este fluxo abriu a aba sem
+            dados (superfícies demo: split/new-file/search). NUNCA mock silencioso. */}
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !activeTab.readError && activeTab.content == null && (
+          <div className="monaco-editor-shell" data-testid="file-content-unavailable">
+            <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-descriptionForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)' }}>
+              <span>📄 Conteúdo indisponível — {activeTab.path}</span>
+            </div>
+            <div style={{ height: 'calc(100% - 29px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'var(--vscode-editor-background)', color: 'var(--vscode-foreground)', textAlign: 'center', padding: 24 }}>
+              <FileCode2 size={28} aria-hidden="true" />
+              <strong>Este arquivo não foi lido do disco</strong>
+              <span style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)', maxWidth: 420 }}>Aberturas pelo EXPLORER (Single Port) trazem o conteúdo real. Este caminho é de uma superfície sem leitura.</span>
+            </div>
+          </div>
+        )}
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !activeTab.readError && activeTab.content != null && <div className="monaco-editor-shell">
+          <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-descriptionForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📄 Arquivo real do disco — {activeTab.path}</span>
+            <span style={{ fontSize: 10, background: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)', padding: '2px 6px', borderRadius: 4 }}>REAL</span>
+          </div>
+          <Editor height="calc(100% - 29px)" defaultLanguage={languageForPath(activeTab.path)} defaultValue={activeTab.content} value={activeTab.content} theme={monacoTheme} options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true, padding: { top: 12 }, readOnly: false }} />
         </div>}
       </div>
       <ContextMenu menu={tabMenu} onClose={() => setTabMenu(null)} />

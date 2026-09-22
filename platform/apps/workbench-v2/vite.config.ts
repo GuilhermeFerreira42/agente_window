@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { ptyPlugin } from './vite-plugin-pty'
+import { fsPlugin } from './src/modules/explorer-search/server'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 export default defineConfig({
-  plugins: [react(), ptyPlugin()],
+  plugins: [
+    react(),
+    ptyPlugin(),
+    // FATIA-04 (4.3): FileSystemPort no Single Port (Q7). Raiz = repo
+    // (relativa ao próprio config — NUNCA hardcoded); FS_TEST_ROOT E2E ganha.
+    fsPlugin({ root: fileURLToPath(new URL('../../..', import.meta.url)) }),
+  ],
   resolve: {
     alias: {
       '@contracts': path.resolve(__dirname, '../../packages/contracts'),
