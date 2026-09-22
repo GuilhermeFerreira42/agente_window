@@ -15,7 +15,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
   5. Preservação de sessão PTY e histórico via `display: contents / none` no bridge.
 - **Status atual FATIA-03: Concluída e blindada contra regressões (conforme `docs/18`), aguardando teste e feedback do usuário.**
 - Servidor Vite ativo em `http://localhost:5173/` (HTTP 200 OK).
-- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 17 arquivos (`04_00` a `04_16`): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status: Planejado — pronto para implementar.**
+- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 17 arquivos (`04_00` a `04_16`): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status (2026-09-22): 4.1–4.4 CONCLUÍDAS; 4.5 é a próxima, com raspagem `04_17` e plano `04_18` em `docs/engenharia_reversa/`.**
 - Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12`, `docs/16` e `docs/18`.
 
 | STATUS USADO | SIGNIFICADO |
@@ -149,20 +149,24 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 > **Nota (2026-09-16):** a FATIA-04 foi **ampliada** após o mapeamento do vídeo de 8m35s. Além do Explorer + Filesystem originalmente previstos, ela agora inclui **editor em anexo lateral** (não no centro), **search dentro da sessão** e **browser interno com acesso da IA ao HTML**. A tabela de 6 linhas anterior foi substituída pelas **9 sub-fatias** abaixo. Plano detalhado em `04_15`; critérios de aceite em `04_13`.
 
-| # | Sub-fatia | Arquivos-alvo | Contrato | Validação | Status |
-|---|---|---|---|---|---|
-| 4.1 | FileSystem ampliado (I/O real + transferência browser↔workspace) | `platform/packages/agent-runtime/filesystem/` + `platform/packages/contracts/filesystem.ts` | `FileSystemPort` | unit com fs fake + VAL-FS-01/02/03 | Planejado |
-| 4.2 | `ExplorerService` ampliado (create/rename/delete/cut/copy/paste/download/upload/collapseAll/sort/select) | `platform/apps/workbench/src/logic/explorer/` + `platform/packages/contracts/explorer.ts` | `ExplorerService` | unit + VAL-EXP-01/05 | Planejado |
-| 4.3 | UI Explorer: header 5 botões + árvore lazy 22 px + 3 seções (Editores Abertos / Linha do Tempo / Estrutura de Código) | `platform/apps/workbench/src/ui/explorer/` | — | E2E VAL-EXP-02/04/06 + grep hardcode = 0 | Planejado |
-| 4.4 | Menu de contexto completo (inclui **Download** e Upload) | `platform/apps/workbench/src/ui/explorer/` + `platform/apps/workbench/src/logic/commands/` | `CommandRegistry.setContext` | VAL-EXP-08 + matriz de habilitação | Planejado |
-| 4.5 | DnD interno + Upload do SO (arquivos e pastas) + Download para máquina local | `logic/explorer/` + `packages/agent-runtime/filesystem/` | `FileSystemPort.upload/download` | VAL-EXP-07/09/10 | Planejado |
-| 4.6 | Editor em anexo lateral por sessão (sash 6 px, recolher sem desmontar) | `logic/editor/` + `ui/editor/EditorAttach.tsx` | `EditorService` (`surface:'attach'`) | VAL-EXP-11/12/13/14 + teste de não-desmontagem | Planejado |
-| 4.7 | Search na sessão (aba do anexo, debounce, substituir) | `logic/search/` + `ui/editor/` | `SearchService` (novo) | VAL-EXP-15 | Planejado |
-| 4.8 | Browser runtime (Chromium + Playwright/CDP por sessão) + 11 tools de IA + gravação `.webm` | `platform/services/browser-runtime/` + `logic/browser/` + `packages/contracts/browser.ts` + `packages/tools-sdk/` | `BrowserPort` / `BrowserSessionService` | VAL-BRW-01 a 05 | Planejado |
-| 4.9 | Integração final (eventos transversais + homologação completa) | todos | `fs.changed`, `editor.attachCollapsed`, `browser.*` | checklist A + B do `04_13` | Planejado |
+> **REV-LEGO (2026-09-20) + ATUALIZADO 2026-09-22:** a tabela abaixo reflete a ordem replanejada em `04_15` (módulo isolado `platform/apps/workbench-v2/src/modules/explorer-search/`) e o status real registrado em `docs/12`. A tabela de 2026-09-16 (ordem antiga) fica como histórico em `04_15 §10`.
 
-**Critério de pronto FATIA-04:** as 9 sub-fatias validadas + `npx playwright test sessao_11_terminal_pty_real` **6/6** (anti-regressão `docs/18`) + `docs/12` atualizado com evidência real.
-**Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 → 4.5 → 4.6 → 4.7 → 4.8 → 4.9 (cada uma só começa com a anterior validada).
+| # | Sub-fatia | Arquivos-alvo (módulo `explorer-search/`) | Contrato | Validação | Status |
+|---|---|---|---|---|---|
+| 4.1 | Congelar contratos do módulo | `contract.ts`, `core/constants.ts` | `04_10` REV-LEGO | teste de fronteira (FT) | **Concluída** (2026-09-20) |
+| 4.2 | Core puro (ExplorerNode, sorter, treeState, dndPolicy, transfer) | `core/**` | — | 77/77 unit, FT-07 | **Concluída** (2026-09-20) |
+| 4.3 | Adapter FS real no Single Port (endpoints + watcher WS `/fs/watch`) | `server/fs/**`, `server/vite-plugin-fs.ts`, `core/fs/browserFsPort.ts` | `FileSystemPort` | 110/110 módulo, E2E `sessao_12` 10/10 | **Concluída** (2026-09-20) |
+| 4.4 | Explorer UI real na aba Files (header, árvore 22 px, seções, inline create/rename, upload/download, DnD básico) + BLOCO 4.4-fix | `ui/Explorer{View,Header,Tree}.tsx`, `ui/sections.tsx`, `ui/ConflictDialog.tsx` | `IExplorerSearchApi` | 128/128 módulo, E2E 9/9 + 15/15, anti-regressão terminal 9/9 | **Concluída** (2026-09-21) |
+| 4.5 | **Menu de contexto completo** (tabela declarativa, grupos/ordem/`when`, keybinding na coluna direita, item 24 px) | `core/menus/explorerMenus.ts` | `deps.menus` + `deps.contextMenu` | VAL-EXP-08 + matriz `04_03 §2` + checklist visual `04_18 §5.1` | **Próxima — plano em `04_18`** |
+| 4.6 | **Área do anexo lateral** (sash 6 px, recolher sem desmontar, largura persistida) + **Search** (inputbox 26 px, toggles, resultados 22 px) | `ui/AttachArea.tsx`, `ui/SearchPanel.tsx`, `core/search/**`, `server/fs/searchEngine.ts` | `IEditorAttachApi`, `ISearchApi` | A5.2/A5.3/A5.7, A6.x + `04_18 §5.2` | Planejado (`04_18`) |
+| 4.7 | **Editor em anexo**: tabs 35 px (borda 1 px no topo, preview itálico, dirty ● ↔ ✕), breadcrumbs 22 px, toolbar, empty state letterpress 256 px | `ui/EditorTabs.tsx`, `ui/Breadcrumbs.tsx`, `ui/CodeEditorPane.tsx`, `core/editor/editorService.ts` | `IEditorAttachApi` | A5.1–A5.7, A6.4, VAL-EXP-11/12/13/14 + `04_18 §5.3` | Planejado (`04_18`) |
+| 4.8 | Browser runtime + IA com acesso ao HTML | — | `BrowserPort` | A7.x | **FUTURO** (fora do ciclo — Q8) |
+| 4.9 | Integração final (eventos transversais + validação de isolamento) | todos | `fs.changed`, `attach.closed` | checklist A + B do `04_13` | Planejado |
+
+**Referência de medidas (fonte única):** `docs/engenharia_reversa/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (raspagem real do VS Code: 22 px linha, 26 px search, 35 px tabs, 22 px breadcrumbs, 24 px item de menu, tokens `--vscode-*`). **Plano de implantação 4.5→4.6→4.7:** `docs/engenharia_reversa/04_18_plano_implantacao_fatia_04.md`.
+
+**Critério de pronto FATIA-04:** sub-fatias 4.1–4.7 + 4.9 validadas + anti-regressão do terminal (`sessao_11_*`) verde + checklist visual do `04_18 §5` preenchido com prints lado a lado + `docs/12` atualizado com evidência real.
+**Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 → **4.5 → 4.6 → 4.7** → 4.9 (4.8 futuro; cada uma só começa com a anterior validada).
 
 ---
 
@@ -300,7 +304,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
 | 02 | Workbench Shell base | Concluído | Base estável |
 | 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
-| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Planejado — doc 100% pronta (`FATIA-04_VIDEO_COMPLETO/`) | Iniciar pela 4.1 (FileSystem ampliado); plano em `04_15`, aceite em `04_13` |
+| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.4 concluídas (2026-09-21) | Próxima: 4.5 (menu de contexto). Medidas em `04_17`, plano em `04_18`, aceite em `04_13` |
 | 05 | Chat + Runtime | Planejado | Aguardar decisão FATIA-03 + FATIA-04 |
 | 06 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03 e 04 |
 | 07 | Command + Theme | Planejado | Aguardar FATIAS 03 a 06 |

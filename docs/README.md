@@ -30,6 +30,11 @@ Documentos centrais:
 Base detalhada por subsistema:
 - `engenharia_reversa/` (inclui Terminal, Left Sidebar, Right Sidebar, Center Chat, Editor/Browser, Filesystem, Command Menu, Theme/Token, Workbench Layout e Explorer Coordinator)
 
+FATIA-04 (Explorer + Search + Editor em anexo) — documentos vivos:
+- `engenharia_reversa/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` — raspagem medida do VS Code original (fonte única de medidas/tokens; evidência em `engenharia_reversa/FATIA-04_VIDEO_COMPLETO/raspagem_04_17/`)
+- `engenharia_reversa/04_18_plano_implantacao_fatia_04.md` — plano de implantação 4.5 → 4.6 → 4.7 com checklist de homologação visual
+- `engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — índice `04_00` … `04_16` (contratos, critérios, sub-fatias)
+
 Referências visuais de apoio:
 - `referencias_visuais/README.md`
 - `referencias_visuais/TAXONOMIA.md`
