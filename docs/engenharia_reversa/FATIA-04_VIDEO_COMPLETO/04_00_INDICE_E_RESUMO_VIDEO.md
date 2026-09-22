@@ -106,6 +106,8 @@ Todo requisito do vídeo é descrito nos quatro eixos. Este mapa diz **onde** ca
 | 04_14 Gaps | ✅ (o que faltava no visual) | ✅ (o que faltava no comportamento) | ✅ (o que faltava em eventos) | ✅ (o que faltava em validação) |
 | 04_15 Plano por sub-fatias | ✅ por sub-fatia | ✅ por sub-fatia | ✅ por sub-fatia | ✅ testes + critérios de pronto |
 | 04_16 Kanban | ➖ | ➖ | ➖ | ✅ (rastreio de status por evidência) |
+| 04_17 Raspagem VS Code original (2026-09-22) | ✅ medidas em px + tokens `--vscode-*` por estado (hover/active/focus/drop/dirty/preview) — **fonte única de medidas** | ✅ UX/atalhos/DnD por componente | ➖ | ✅ 28 prints + 3 JSONs em `raspagem_04_17/`; tabela comparativa + 30 lacunas |
+| 04_18 Plano de implantação 4.5→4.6→4.7 (2026-09-22) | ✅ especificação visual por sub-fatia derivada da 04_17 | ✅ critério de pronto por sub-fatia | ➖ | ✅ §5 checklist de homologação visual (print lado a lado, Δ px por estado) |
 
 **Regra de conformidade:** nenhum requisito entra em implementação sem aparecer em um RF (`04_08`) com evento associado e validação nomeada.
 

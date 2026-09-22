@@ -15,7 +15,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
   5. Preservação de sessão PTY e histórico via `display: contents / none` no bridge.
 - **Status atual FATIA-03: Concluída e blindada contra regressões (conforme `docs/18`), aguardando teste e feedback do usuário.**
 - Servidor Vite ativo em `http://localhost:5173/` (HTTP 200 OK).
-- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 17 arquivos (`04_00` a `04_16`): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status (2026-09-22): 4.1–4.4 CONCLUÍDAS; 4.5 é a próxima, com raspagem `04_17` e plano `04_18` em `docs/engenharia_reversa/`.**
+- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 19 arquivos (`04_00` a `04_18`; `04_17` raspagem real + `04_18` plano 4.5→4.7 adicionados em 2026-09-22): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status (2026-09-22): 4.1–4.4 CONCLUÍDAS; 4.5 é a próxima, com raspagem `04_17` e plano `04_18` em `docs/engenharia_reversa/`.**
 - Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12`, `docs/16` e `docs/18`.
 
 | STATUS USADO | SIGNIFICADO |
@@ -145,7 +145,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 ---
 
 ### FATIA-04 — Explorer Completo + Editor em Anexo Lateral + Browser com IA (FASE 4)
-**Onda:** 4 | **Épico:** D — Explorer (+ C/F/E conforme sub-fatia) | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01 e FATIA-02 | **Doc:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (17 arquivos, `04_00` a `04_16`)
+**Onda:** 4 | **Épico:** D — Explorer (+ C/F/E conforme sub-fatia) | **Prioridade:** P0 | **Status:** Em execução (4.1–4.4 concluídas; próxima 4.5) | **Depende de:** FATIA-01 e FATIA-02 | **Doc:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (19 arquivos, `04_00` a `04_18`)
 
 > **Nota (2026-09-16):** a FATIA-04 foi **ampliada** após o mapeamento do vídeo de 8m35s. Além do Explorer + Filesystem originalmente previstos, ela agora inclui **editor em anexo lateral** (não no centro), **search dentro da sessão** e **browser interno com acesso da IA ao HTML**. A tabela de 6 linhas anterior foi substituída pelas **9 sub-fatias** abaixo. Plano detalhado em `04_15`; critérios de aceite em `04_13`.
 
@@ -163,7 +163,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 4.8 | Browser runtime + IA com acesso ao HTML | — | `BrowserPort` | A7.x | **FUTURO** (fora do ciclo — Q8) |
 | 4.9 | Integração final (eventos transversais + validação de isolamento) | todos | `fs.changed`, `attach.closed` | checklist A + B do `04_13` | Planejado |
 
-**Referência de medidas (fonte única):** `docs/engenharia_reversa/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (raspagem real do VS Code: 22 px linha, 26 px search, 35 px tabs, 22 px breadcrumbs, 24 px item de menu, tokens `--vscode-*`). **Plano de implantação 4.5→4.6→4.7:** `docs/engenharia_reversa/04_18_plano_implantacao_fatia_04.md`.
+**Referência de medidas (fonte única):** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (raspagem real do VS Code: 22 px linha, 26 px search, 35 px tabs, 22 px breadcrumbs, 24 px item de menu, tokens `--vscode-*`). **Plano de implantação 4.5→4.6→4.7:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_18_plano_implantacao_fatia_04.md`.
 
 **Critério de pronto FATIA-04:** sub-fatias 4.1–4.7 + 4.9 validadas + anti-regressão do terminal (`sessao_11_*`) verde + checklist visual do `04_18 §5` preenchido com prints lado a lado + `docs/12` atualizado com evidência real.
 **Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 → **4.5 → 4.6 → 4.7** → 4.9 (4.8 futuro; cada uma só começa com a anterior validada).

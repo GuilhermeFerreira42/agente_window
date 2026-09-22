@@ -1,7 +1,7 @@
 # 04_18 - Plano de Implantação FATIA-04
 
 **Status:** PLANEJAMENTO (nenhuma linha de código nesta fase) · **Criado:** 2026-09-22
-**Fonte única da verdade para medidas e estados:** `docs/engenharia_reversa/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (a "04_17"). Todo número em px e todo token deste plano foi copiado da 04_17 — nada foi inventado. Onde a 04_17 declara "não medido", este plano diz "validar na homologação".
+**Fonte única da verdade para medidas e estados:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (a "04_17"). Todo número em px e todo token deste plano foi copiado da 04_17 — nada foi inventado. Onde a 04_17 declara "não medido", este plano diz "validar na homologação".
 **Documentos que este plano obedece:** `04_15` (ordem 4.5 → 4.6 → 4.7 e regras invioláveis §0), `04_10` (contratos congelados: `contract.ts` — `IEditorAttachApi`, `IExplorerSearchModuleDeps.contextMenu`), `docs/18` (anti-regressão; Regra 10: recolher = `display:none`, nunca desmontar), `docs/16` §3.2 (LEGO: módulo isolado dentro do monolito).
 **Módulo alvo:** `platform/apps/workbench-v2/src/modules/explorer-search/` (Casa Nova, Single Port 5174).
 
@@ -233,12 +233,12 @@ flowchart LR
 ## 7. Referências Vivas
 
 - **Raspagem (fonte única de medidas):** [`04_17_explorer_codeeditorpane_raspagem_vscode_original.md`](./04_17_explorer_codeeditorpane_raspagem_vscode_original.md)
-- **Evidência bruta da raspagem (28 prints + 3 JSONs de medição):** [`FATIA-04_VIDEO_COMPLETO/raspagem_04_17/`](./FATIA-04_VIDEO_COMPLETO/raspagem_04_17/)
-- **Prints de referência visual existentes:** [`../referencias_visuais/fatia_04/`](../referencias_visuais/fatia_04/) · [`../referencias_visuais/explorer/`](../referencias_visuais/explorer/) · [`../referencias_visuais/tabs_breadcrumbs/`](../referencias_visuais/tabs_breadcrumbs/) · catálogo em [`../referencias_visuais/CATALOGO.md`](../referencias_visuais/CATALOGO.md)
-- **Prints de homologação (a criar por sub-fatia):** `../referencias_visuais/fatia_04/homologacao_4x/`
-- **Plano por sub-fatias e regras invioláveis:** [`FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md`](./FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md)
-- **Critérios de aceite A3/A5/A6 e VAL-EXP:** [`FATIA-04_VIDEO_COMPLETO/04_13_CRITERIOS_ACEITE_VALIDACAO.md`](./FATIA-04_VIDEO_COMPLETO/04_13_CRITERIOS_ACEITE_VALIDACAO.md)
-- **Contratos congelados:** [`FATIA-04_VIDEO_COMPLETO/04_10_CONTRATOS_TECNICOS_ATUALIZADOS.md`](./FATIA-04_VIDEO_COMPLETO/04_10_CONTRATOS_TECNICOS_ATUALIZADOS.md) · `platform/apps/workbench-v2/src/modules/explorer-search/contract.ts` · `core/constants.ts`
-- **Menu de contexto (matriz de habilitação):** [`FATIA-04_VIDEO_COMPLETO/04_03_MENU_CONTEXTO_EXPLORER.md`](./FATIA-04_VIDEO_COMPLETO/04_03_MENU_CONTEXTO_EXPLORER.md)
-- **Anti-regressão / contratos congelados do shell:** [`../18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`](../18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)
-- **Documentação viva (estado e cronologia):** [`../12-DOCUMENTACAO-VIVA.md`](../12-DOCUMENTACAO-VIVA.md) · Kanban [`../11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md`](../11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md)
+- **Evidência bruta da raspagem (28 prints + 3 JSONs de medição):** [`FATIA-04_VIDEO_COMPLETO/raspagem_04_17/`](./raspagem_04_17/)
+- **Prints de referência visual existentes:** [`../referencias_visuais/fatia_04/`](../../referencias_visuais/fatia_04/) · [`../referencias_visuais/explorer/`](../../referencias_visuais/explorer/) · [`../referencias_visuais/tabs_breadcrumbs/`](../../referencias_visuais/tabs_breadcrumbs/) · catálogo em [`../referencias_visuais/CATALOGO.md`](../../referencias_visuais/CATALOGO.md)
+- **Prints de homologação (a criar por sub-fatia):** `../../referencias_visuais/fatia_04/homologacao_4x/`
+- **Plano por sub-fatias e regras invioláveis:** [`FATIA-04_VIDEO_COMPLETO/04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md`](./04_15_PLANO_IMPLEMENTACAO_SUBFATIAS.md)
+- **Critérios de aceite A3/A5/A6 e VAL-EXP:** [`FATIA-04_VIDEO_COMPLETO/04_13_CRITERIOS_ACEITE_VALIDACAO.md`](./04_13_CRITERIOS_ACEITE_VALIDACAO.md)
+- **Contratos congelados:** [`FATIA-04_VIDEO_COMPLETO/04_10_CONTRATOS_TECNICOS_ATUALIZADOS.md`](./04_10_CONTRATOS_TECNICOS_ATUALIZADOS.md) · `platform/apps/workbench-v2/src/modules/explorer-search/contract.ts` · `core/constants.ts`
+- **Menu de contexto (matriz de habilitação):** [`FATIA-04_VIDEO_COMPLETO/04_03_MENU_CONTEXTO_EXPLORER.md`](./04_03_MENU_CONTEXTO_EXPLORER.md)
+- **Anti-regressão / contratos congelados do shell:** [`../18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md`](../../18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)
+- **Documentação viva (estado e cronologia):** [`../12-DOCUMENTACAO-VIVA.md`](../../12-DOCUMENTACAO-VIVA.md) · Kanban [`../11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md`](../../11_QUADRO_KANBAN_SDLC_ASSISTIDO_POR_IA.md)
