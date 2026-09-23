@@ -1,0 +1,154 @@
+// ============================================================================
+// explorerMenus.test.ts — tabela declarativa do menu de contexto (04_03 §1/§2/§7).
+// Matriz item × contexto: arquivo, pasta, raiz, multi-seleção, clipboard vazio/
+// cheio, somente leitura. Sem DOM — puro (core/menus/explorerMenus).
+// ============================================================================
+
+import { describe, expect, it } from 'vitest';
+import {
+  EXPLORER_CONTEXT_MENU,
+  EXPLORER_MENU_GROUPS,
+  computeExplorerContext,
+  resolveExplorerContextMenu,
+  type ExplorerContextSource,
+} from '../core/menus/explorerMenus';
+import { EXPLORER_CONTEXT_KEYS } from '../core/constants';
+
+const file = (over: Partial<ExplorerContextSource> = {}): ExplorerContextSource => ({
+  selection: ['/ws/a.txt'],
+  target: { isDirectory: false, isRoot: false, isReadonly: false, parentReadonly: false },
+  clipboardKind: null,
+  viewletFocus: true,
+  ...over,
+});
+const folder = (over: Partial<ExplorerContextSource> = {}): ExplorerContextSource => file({
+  selection: ['/ws/docs'],
+  target: { isDirectory: true, isRoot: false, isReadonly: false, parentReadonly: false },
+  ...over,
+});
+const root = (over: Partial<ExplorerContextSource> = {}): ExplorerContextSource => file({
+  selection: ['/ws'],
+  target: { isDirectory: true, isRoot: true, isReadonly: false, parentReadonly: false },
+  ...over,
+});
+
+function menu(src: ExplorerContextSource) {
+  return resolveExplorerContextMenu(computeExplorerContext(src));
+}
+function ids(src: ExplorerContextSource): string[] {
+  return menu(src).map((i) => i.id);
+}
+function enabled(src: ExplorerContextSource, id: string): boolean | undefined {
+  return menu(src).find((i) => i.id === id)?.enabled;
+}
+
+describe('tabela declarativa (04_03 §1)', () => {
+  it('grupos/ordem portados de fileActions.contribution.ts:478–680', () => {
+    const byId = Object.fromEntries(EXPLORER_CONTEXT_MENU.map((i) => [i.id, i]));
+    expect(byId['explorer.newFile']).toMatchObject({ group: 'navigation', order: 4 });
+    expect(byId['explorer.newFolder']).toMatchObject({ group: 'navigation', order: 6 });
+    expect(byId['explorer.cut']).toMatchObject({ group: '5_cutcopypaste', order: 8 });
+    expect(byId['explorer.copy']).toMatchObject({ group: '5_cutcopypaste', order: 10 });
+    expect(byId['explorer.paste']).toMatchObject({ group: '5_cutcopypaste', order: 20 });
+    expect(byId['explorer.download']).toMatchObject({ group: '5b_importexport', order: 10 });
+    expect(byId['explorer.upload']).toMatchObject({ group: '5b_importexport', order: 20 });
+    expect(byId['explorer.rename']).toMatchObject({ group: '7_modification', order: 10 });
+    expect(byId['explorer.delete']).toMatchObject({ group: '7_modification', order: 20, danger: true });
+  });
+
+  it('todo grupo usado existe na lista ordenada de grupos', () => {
+    for (const it of EXPLORER_CONTEXT_MENU) {
+      expect(EXPLORER_MENU_GROUPS as readonly string[]).toContain(it.group);
+    }
+  });
+
+  it('itens resolvidos saem em ordem de grupo e depois order (separador implícito)', () => {
+    const list = menu(folder({ clipboardKind: 'copy' }));
+    const groups = list.map((i) => i.group);
+    const firstIndex = new Map<string, number>();
+    groups.forEach((g, i) => { if (!firstIndex.has(g)) firstIndex.set(g, i); });
+    const seen = [...firstIndex.keys()];
+    expect(seen).toEqual(EXPLORER_MENU_GROUPS.filter((g) => seen.includes(g)));
+    for (let i = 1; i < list.length; i++) expect(list[i].order).toBeGreaterThan(list[i - 1].order);
+  });
+});
+
+describe('context keys (04_03 §7 / conjunto congelado 04_10 §2.4)', () => {
+  it('computeExplorerContext cobre TODAS as keys congeladas', () => {
+    const ctx = computeExplorerContext(file());
+    for (const k of EXPLORER_CONTEXT_KEYS) expect(k in ctx, `key ${k}`).toBe(true);
+  });
+
+  it('valores por tipo de nó', () => {
+    expect(computeExplorerContext(file())).toMatchObject({
+      explorerResourceIsFolder: false, explorerResourceIsRoot: false, multiSelectionActive: false,
+    });
+    expect(computeExplorerContext(folder())).toMatchObject({ explorerResourceIsFolder: true, explorerResourceIsRoot: false });
+    expect(computeExplorerContext(root())).toMatchObject({ explorerResourceIsFolder: true, explorerResourceIsRoot: true });
+    expect(computeExplorerContext(file({ clipboardKind: 'copy' }))).toMatchObject({ resourceCopied: true, resourceCut: false });
+    expect(computeExplorerContext(file({ clipboardKind: 'cut' }))).toMatchObject({ resourceCopied: false, resourceCut: true });
+    expect(computeExplorerContext(file({ selection: ['/ws/a', '/ws/b'] }))).toMatchObject({ multiSelectionActive: true });
+    expect(computeExplorerContext(file({ viewletFocus: false }))).toMatchObject({ explorerViewletFocus: false });
+  });
+
+  it('ParentReadOnly: em pasta = a própria pasta; em arquivo = o pai', () => {
+    expect(computeExplorerContext(folder({ target: { isDirectory: true, isRoot: false, isReadonly: true, parentReadonly: false } }))
+      .explorerResourceParentReadOnly).toBe(true);
+    expect(computeExplorerContext(file({ target: { isDirectory: false, isRoot: false, isReadonly: false, parentReadonly: true } }))
+      .explorerResourceParentReadOnly).toBe(true);
+  });
+});
+
+describe('matriz de habilitação (04_03 §2)', () => {
+  it('ARQUIVO: New File/Folder (no pai), Open, Cut, Copy, Download, Rename, Delete; sem Paste/Upload', () => {
+    const list = ids(file());
+    expect(list).toEqual(expect.arrayContaining([
+      'explorer.newFile', 'explorer.newFolder', 'explorer.open', 'explorer.cut', 'explorer.copy',
+      'explorer.download', 'explorer.rename', 'explorer.delete', 'explorer.refresh', 'explorer.collapseAll',
+    ]));
+    expect(list).not.toContain('explorer.paste');
+    expect(list).not.toContain('explorer.upload');
+  });
+
+  it('PASTA: todos os itens, Paste presente mas DESABILITADO sem clipboard (precondition)', () => {
+    const list = ids(folder());
+    expect(list).toContain('explorer.paste');
+    expect(list).toContain('explorer.upload');
+    expect(list).not.toContain('explorer.open');
+    expect(enabled(folder(), 'explorer.paste')).toBe(false);
+    expect(enabled(folder({ clipboardKind: 'copy' }), 'explorer.paste')).toBe(true);
+    expect(enabled(folder({ clipboardKind: 'cut' }), 'explorer.paste')).toBe(true);
+  });
+
+  it('RAIZ: sem Cut/Copy/Download/Rename/Delete; New File/Folder e Paste (com clipboard) presentes', () => {
+    const list = ids(root({ clipboardKind: 'copy' }));
+    for (const id of ['explorer.cut', 'explorer.copy', 'explorer.download', 'explorer.rename', 'explorer.delete']) {
+      expect(list, `raiz não deve ter ${id}`).not.toContain(id);
+    }
+    expect(list).toEqual(expect.arrayContaining(['explorer.newFile', 'explorer.newFolder', 'explorer.paste', 'explorer.upload']));
+    expect(enabled(root({ clipboardKind: 'copy' }), 'explorer.paste')).toBe(true);
+  });
+
+  it('MULTI-SELEÇÃO: Cut/Copy/Download/Delete sim; Rename/Open/New*/Upload não', () => {
+    const multi = file({ selection: ['/ws/a.txt', '/ws/b.txt'] });
+    const list = ids(multi);
+    expect(list).toEqual(expect.arrayContaining(['explorer.cut', 'explorer.copy', 'explorer.download', 'explorer.delete']));
+    for (const id of ['explorer.rename', 'explorer.open', 'explorer.newFile', 'explorer.newFolder', 'explorer.upload']) {
+      expect(list, `multi não deve ter ${id}`).not.toContain(id);
+    }
+  });
+
+  it('SOMENTE LEITURA: Copy e Download habilitados; New*/Cut/Paste/Rename/Delete desabilitados', () => {
+    const ro = folder({ target: { isDirectory: true, isRoot: false, isReadonly: true, parentReadonly: false }, clipboardKind: 'copy' });
+    expect(enabled(ro, 'explorer.copy')).toBe(true);
+    expect(enabled(ro, 'explorer.download')).toBe(true);
+    for (const id of ['explorer.newFile', 'explorer.newFolder', 'explorer.cut', 'explorer.paste', 'explorer.rename', 'explorer.delete', 'explorer.upload']) {
+      expect(enabled(ro, id), `${id} deve estar desabilitado em somente leitura`).toBe(false);
+    }
+  });
+
+  it('área vazia (sem recurso): só itens de view', () => {
+    const list = ids(file({ selection: [], target: null }));
+    expect(list).toEqual(['explorer.refresh', 'explorer.collapseAll']);
+  });
+});

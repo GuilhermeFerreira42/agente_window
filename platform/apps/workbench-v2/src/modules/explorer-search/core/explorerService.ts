@@ -133,6 +133,10 @@ export class ExplorerService implements IExplorerSearchApi {
 
   collapseAll(): void {
     this.tree.collapseAll();
+    // VS Code (explorerView.collapseAll → tree.collapseAll): com uma única pasta
+    // no workspace a raiz é o pane-header e permanece expandida — só os
+    // descendentes colapsam. Sem isto a árvore ficaria vazia.
+    if (this.root) this.tree.expand(this.root);
     this.events.fire({ type: 'explorer.allCollapsed' });
   }
 

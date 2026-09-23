@@ -1,0 +1,12 @@
+
+# Artefatos de emissão do tsc (typecheck é noEmit; src/ só tem fonte .ts/.tsx).
+# Um App.js sombra fazia o Vite servir código antigo sem o módulo explorer-search.
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
+!src/vite-env.d.ts
+e2e/**/*.js
+e2e/**/*.js.map
+e2e/**/*.d.ts
+e2e/**/*.d.ts.map

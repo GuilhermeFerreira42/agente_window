@@ -304,7 +304,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
 | 02 | Workbench Shell base | Concluído | Base estável |
 | 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
-| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.4 concluídas (2026-09-21) | Próxima: 4.5 (menu de contexto). Medidas em `04_17`, plano em `04_18`, aceite em `04_13` |
+| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.4 concluídas (4.4 fechada de fato em 2026-09-22: menu declarativo + E2E upload/download/seleção) | Próxima: 4.5 (menu de contexto). Medidas em `04_17`, plano em `04_18`, aceite em `04_13` |
 | 05 | Chat + Runtime | Planejado | Aguardar decisão FATIA-03 + FATIA-04 |
 | 06 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03 e 04 |
 | 07 | Command + Theme | Planejado | Aguardar FATIAS 03 a 06 |

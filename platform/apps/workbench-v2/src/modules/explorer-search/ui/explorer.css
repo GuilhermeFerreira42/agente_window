@@ -1,252 +1,300 @@
 /* ============================================================================
- * modules/explorer-search/ui/explorer.css — Sidebar Explorer (4.4)
- * Tokens obrigatórios (04_01 §5 — zero hardcode de cor). Fallbacks = dark+
- * padrão do workbench da Casa Nova (sobrescritos pelo tema real se existirem).
+ * modules/explorer-search/ui/explorer.css — Explorer (4.4) — CSS transcrito do
+ * VS Code (workbench.web.main.internal.css + HTML SingleFile do vscode.dev).
+ * Cada bloco cita a regra de origem. Cores SOMENTE via tokens --vscode-*.
+ * Escopo: tudo sob `.explorer-viewlet` (não vaza para o shell).
  * ========================================================================== */
 
-.explorer-view {
+/* codicon — mesma fonte do monaco-editor (já dependência do workbench) */
+@font-face {
+  font-family: 'codicon';
+  font-display: block;
+  src: url('./assets/codicon.ttf') format('truetype');
+}
+
+.explorer-viewlet {
+  height: 100%;
+  width: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: var(--vscode-sideBar-background, #21252b);
-  color: var(--vscode-sideBar-foreground, var(--vscode-foreground, #cccccc));
-  font-family: var(--vscode-font-family, 'Segoe WPC', 'Segoe UI', sans-serif);
+  color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  background-color: var(--vscode-sideBar-background);
+  font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size, 13px);
-  overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
 }
 
-/* ---- header (título + 5 botões) ---- */
-.explorer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 35px;
-  padding: 0 8px 0 12px;
-  flex: none;
+/* .codicon (codicon/codicon-modifiers.css) */
+.explorer-viewlet .codicon[class*='codicon-'] {
+  font: normal normal normal 16px/1 codicon;
+  display: inline-block;
+  text-decoration: none;
+  text-rendering: auto;
+  text-align: center;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.explorer-header-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-weight: 500;
-  color: var(--vscode-sideBarTitle-foreground, #cccccc);
-}
-.explorer-header-actions { display: flex; align-items: center; gap: 2px; }
-.explorer-header-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--vscode-icon-foreground, #c5c5c5);
-  cursor: pointer;
-}
-.explorer-header-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31)); }
-.explorer-header-btn:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder, #007fd4);
-  outline-offset: -1px;
-}
-.explorer-header-btn:disabled { opacity: 0.4; cursor: default; }
+.explorer-viewlet .codicon-tree-item-expanded:before,
+.explorer-viewlet .codicon-view-pane-container-expanded:before,
+.explorer-viewlet .codicon-chevron-down:before { content: '\eab4'; }
+.explorer-viewlet .codicon-view-pane-container-collapsed:before,
+.explorer-viewlet .codicon-chevron-right:before { content: '\eab6'; }
+.explorer-viewlet .codicon-new-file:before { content: '\ea7f'; }
+.explorer-viewlet .codicon-new-folder:before { content: '\ea80'; }
+.explorer-viewlet .codicon-refresh:before { content: '\eb37'; }
+.explorer-viewlet .codicon-collapse-all:before { content: '\eac5'; }
+.explorer-viewlet .codicon-editor-layout:before { content: '\eae3'; }
+.explorer-viewlet .codicon-save-all:before { content: '\eb49'; }
+.explorer-viewlet .codicon-close-all:before { content: '\eac1'; }
+.explorer-viewlet .codicon-close:before { content: '\ea76'; }
+.explorer-viewlet .codicon-ellipsis:before { content: '\ea7c'; }
 
-/* ---- corpo (árvore + seções, scroll único vertical) ---- */
-.explorer-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+/* ---------------------------------------------------------------------------
+ * paneview.css
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .monaco-pane-view { width: 100%; height: 100%; min-height: 0; flex: 1 1 0; --pane-header-size: 22px; }
+.explorer-viewlet .monaco-split-view2 { position: relative; width: 100%; height: 100%; min-height: 0; }
+.explorer-viewlet .monaco-split-view2 > .monaco-scrollable-element { width: 100%; height: 100%; min-height: 0; position: relative; overflow: hidden; }
+/* split-view real posiciona por top/height absolutos; aqui = coluna flex com a
+ * mesma ordem/alturas (pasta expandida ocupa o resto; colapsadas = 22px header). */
+.explorer-viewlet .split-view-container { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+/* monaco-editor.css (já carregado pelo workbench) põe `.split-view-view{position:absolute}` — no VS Code
+ * o JS calcula top/height; aqui a coluna flex faz esse papel, então neutralizamos o absolute. */
+.explorer-viewlet .monaco-split-view2 > .monaco-scrollable-element > .split-view-container > .split-view-view { position: relative; width: 100%; flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders'] { flex: 0 0 22px; }
+.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 1 1 0; }
+/* Open Editors expandido não “rouba” a pasta: altura do conteúdo (máx. 9 linhas, explorer.openEditors.visible) */
+.explorer-viewlet .split-view-view[data-pane='openEditors']:has(> .pane.expanded),
+.explorer-viewlet .split-view-view[data-pane='outline']:has(> .pane.expanded),
+.explorer-viewlet .split-view-view[data-pane='timeline']:has(> .pane.expanded) { flex: 0 0 auto; }
 
-/* ---- árvore: linha 22 px (explorerViewer.ts:80 ITEM_HEIGHT) ---- */
-.explorer-tree { outline: none; }
-.explorer-tree:focus-visible {
-  outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder, #007fd4));
-  outline-offset: -1px;
-}
-.explorer-row {
-  display: flex;
-  align-items: center;
-  height: 22px;
-  line-height: 22px;
-  padding-right: 8px;
-  white-space: nowrap;
-  cursor: pointer;
+.explorer-viewlet .monaco-pane-view .pane { overflow: hidden; width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header {
   position: relative;
-}
-.explorer-row:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
-.explorer-row.is-selected {
-  background: var(--vscode-list-inactiveSelectionBackground, #37373d);
-  color: var(--vscode-list-inactiveSelectionForeground, #cccccc);
-}
-.explorer-view:focus-within .explorer-row.is-selected,
-.explorer-row.is-selected.is-focused {
-  background: var(--vscode-list-activeSelectionBackground, #04395e);
-  color: var(--vscode-list-activeSelectionForeground, #ffffff);
-}
-.explorer-row.is-drop-target {
-  background: var(--vscode-list-dropBackground, #383b3d);
-}
-.explorer-row.is-cut { opacity: 0.55; }
-.explorer-row-chevron {
+  height: var(--pane-header-size);
+  line-height: var(--pane-header-size);
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  box-sizing: border-box;
   flex: none;
+  color: var(--vscode-sideBarSectionHeader-foreground);
+  background-color: var(--vscode-sideBarSectionHeader-background);
+  border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+}
+.explorer-viewlet .monaco-pane-view .split-view-view:first-of-type > .pane > .pane-header { border-top: none !important; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header:focus:not(:focus-visible) { outline: none; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .codicon:first-of-type { margin: 0 2px; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header.expanded > .codicon:first-of-type { transform: translateY(1px); }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .twisty-container { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header h3.title {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-size: 11px;
+  min-width: 3ch;
+  margin: 0;
+  font-weight: inherit;
+  line-height: inherit;
+}
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .title { text-transform: uppercase; }
+/* nome da pasta raiz preserva caixa (explorer.pane.preserve-workspace-name-case) */
+.explorer-viewlet .monaco-pane-view .pane.preserve-workspace-name-case > .pane-header > .title { text-transform: none; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .actions { display: none; margin-left: auto; margin-right: 8px; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .actions .action-item { margin-right: 4px; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .actions .action-label { padding: 2px; }
+.explorer-viewlet .monaco-pane-view .pane:hover > .pane-header.expanded > .actions,
+.explorer-viewlet .monaco-pane-view .pane:focus-within > .pane-header.expanded > .actions { display: initial; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-body { overflow: hidden; flex: 1 1 0; min-height: 0; position: relative; }
+.explorer-viewlet .pane-header .open-editors-dirty-count-container { min-width: fit-content; display: flex; align-items: center; }
+
+/* ---------------------------------------------------------------------------
+ * actionbar.css (toolbar do pane-header e do item de Open Editors)
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .monaco-action-bar { white-space: nowrap; height: 100%; }
+.explorer-viewlet .monaco-action-bar .actions-container { display: flex; margin: 0 auto; padding: 0; height: 100%; width: 100%; align-items: center; list-style: none; }
+.explorer-viewlet .monaco-action-bar .action-item { display: block; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+.explorer-viewlet .monaco-action-bar .action-item .codicon { display: flex; align-items: center; width: 16px; height: 16px; }
+.explorer-viewlet .monaco-action-bar .action-label { display: flex; font-size: 11px; padding: 3px; border-radius: 5px; color: inherit; text-decoration: none; }
+.explorer-viewlet .monaco-action-bar:not(.vertical) .action-label:not(.disabled):hover { background-color: var(--vscode-toolbar-hoverBackground); }
+.explorer-viewlet .monaco-action-bar .action-label:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+
+/* ---------------------------------------------------------------------------
+ * list.css / tree.css
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .explorer-folders-view { height: 100%; }
+.explorer-viewlet .pane-body > .monaco-list { height: 100%; }
+.explorer-viewlet .monaco-list { position: relative; height: 100%; width: 100%; white-space: nowrap; outline: none; }
+.explorer-viewlet .monaco-list > .monaco-scrollable-element { height: 100%; overflow: auto; position: relative; }
+.explorer-viewlet .monaco-list-rows { position: relative; width: 100%; background: var(--vscode-sideBar-background); }
+.explorer-viewlet .monaco-list-row { position: absolute; box-sizing: border-box; overflow: hidden; width: 100%; left: 0; }
+.explorer-viewlet .monaco-list.mouse-support .monaco-list-row { cursor: pointer; touch-action: none; }
+
+/* estados (listWidget defaultStyles) */
+.explorer-viewlet .monaco-list:not(.drop-target):not(.dragging) .monaco-list-row:hover:not(.selected):not(.focused) { background-color: var(--vscode-list-hoverBackground); color: var(--vscode-list-hoverForeground); }
+.explorer-viewlet .monaco-list .monaco-list-row.selected { background-color: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground); }
+.explorer-viewlet .monaco-list .monaco-list-row.focused.selected { outline: 1px dotted var(--vscode-contrastActiveBorder, var(--vscode-list-inactiveFocusOutline)); outline-offset: -1px; }
+.explorer-viewlet .monaco-list:focus .monaco-list-row.focused { background-color: var(--vscode-list-focusBackground); color: var(--vscode-list-focusForeground); outline: 1px solid var(--vscode-list-focusOutline); outline-offset: -1px; }
+.explorer-viewlet .monaco-list:focus .monaco-list-row.selected { background-color: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.explorer-viewlet .monaco-list:focus .monaco-list-row.selected .codicon { color: var(--vscode-list-activeSelectionIconForeground); }
+.explorer-viewlet .monaco-list:focus .monaco-list-row.focused.selected { outline: 1px solid var(--vscode-list-focusAndSelectionOutline, var(--vscode-contrastActiveBorder, var(--vscode-list-focusOutline))); outline-offset: -1px; }
+.explorer-viewlet .monaco-list:focus .selected .monaco-icon-label,
+.explorer-viewlet .monaco-list:focus .selected .monaco-icon-label:after { color: inherit !important; }
+
+/* tree row */
+.explorer-viewlet .monaco-tl-row { display: flex; height: 100%; align-items: center; position: relative; }
+.explorer-viewlet .monaco-tl-indent { height: 100%; position: absolute; top: 0; left: 16px; pointer-events: none; }
+.explorer-viewlet .monaco-tl-indent > .indent-guide { display: inline-block; box-sizing: border-box; height: 100%; border-left: 1px solid transparent; opacity: 0; transition: opacity .1s linear; }
+/* tree.renderIndentGuides = onHover (padrão): guias aparecem quando a árvore é hover/focus */
+.explorer-viewlet .monaco-list:hover .monaco-tl-indent > .indent-guide,
+.explorer-viewlet .monaco-list:focus-within .monaco-tl-indent > .indent-guide { border-color: var(--vscode-tree-inactiveIndentGuidesStroke); opacity: 1; }
+.explorer-viewlet .monaco-tl-indent > .indent-guide.active { border-color: var(--vscode-tree-indentGuidesStroke); opacity: 1; }
+.explorer-viewlet .monaco-tl-twistie,
+.explorer-viewlet .monaco-tl-contents { height: 100%; }
+.explorer-viewlet .monaco-tl-twistie {
+  font-size: 10px;
+  text-align: right;
+  padding-right: 6px;
+  flex-shrink: 0;
   width: 16px;
-  height: 22px;
-  display: inline-flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
-  margin-left: -16px;
+  transform: translate(3px);
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+.explorer-viewlet .monaco-tl-twistie.codicon { font-size: 16px; }
+.explorer-viewlet .monaco-tl-contents { flex: 1; overflow: hidden; }
+.explorer-viewlet .monaco-tl-twistie:before { border-radius: 20px; }
+.explorer-viewlet .monaco-tl-twistie.collapsed:before { transform: rotate(-90deg); }
+/* arquivos (sem twistie) alinham com pastas — file-icon-themable-tree.align-icons-and-twisties */
+.explorer-viewlet .file-icon-themable-tree.align-icons-and-twisties .monaco-tl-twistie:not(.force-twistie):not(.collapsible) {
+  background-image: none !important;
+  width: 0 !important;
+  padding-right: 0 !important;
   visibility: hidden;
 }
-.explorer-row.has-children .explorer-row-chevron { visibility: visible; }
-.explorer-row-icon {
-  flex: none;
+
+/* ---------------------------------------------------------------------------
+ * iconlabel.css + explorerviewlet.css
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .monaco-icon-label { display: flex; overflow: hidden; text-overflow: ellipsis; }
+.explorer-viewlet .monaco-icon-label:before {
+  background-size: 16px;
+  background-position: left center;
+  background-repeat: no-repeat;
+  padding-right: 6px;
   width: 16px;
   height: 22px;
+  line-height: inherit !important;
+  display: inline-block;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  vertical-align: top;
+  flex-shrink: 0;
+}
+.explorer-viewlet .monaco-icon-label > .monaco-icon-label-container { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.explorer-viewlet .monaco-icon-label > .monaco-icon-label-container > .monaco-icon-name-container > .label-name { color: inherit; white-space: pre; text-decoration: none; }
+.explorer-viewlet .monaco-icon-label:after { opacity: .75; font-size: 90%; font-weight: 600; margin: auto 16px 0 5px; text-align: center; }
+.explorer-viewlet .explorer-folders-view .explorer-item { height: 22px; line-height: 22px; display: flex; flex-wrap: nowrap; flex: 1; }
+.explorer-viewlet .explorer-folders-view .explorer-item > a { text-overflow: ellipsis; overflow: hidden; }
+.explorer-viewlet .explorer-folders-view .explorer-item.cut { opacity: .5; }
+
+/* Ícones de arquivo — tema Seti gera `.show-file-icons .<ext>-ext-file-icon.ext-file-icon.file-icon::before`
+ * com fonte seti + cor por linguagem. Sem a fonte aqui: glyph genérico do codicon
+ * (file) com as cores Seti por extensão. Pastas: sem ícone (Seti não tem folder icons). */
+.explorer-viewlet .show-file-icons .file-icon.monaco-icon-label:before {
+  content: '\ea7b';
+  font-family: codicon;
+  font-size: 16px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--vscode-icon-foreground, #c5c5c5);
+  color: var(--vscode-explorer-seti-default, #d4d7d6);
 }
-.explorer-row-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-left: 4px;
-}
-.explorer-row-suffix { color: var(--vscode-descriptionForeground, #9d9d9d); }
+.explorer-viewlet .show-file-icons .folder-icon.monaco-icon-label:before { content: none; }
 
-/* ---- input inline (create/rename) ---- */
-.explorer-inline-input {
-  flex: 1;
-  height: 20px;
-  margin: 0 0 0 4px;
-  padding: 0 4px;
-  font: inherit;
-  color: var(--vscode-input-foreground, #cccccc);
-  background: var(--vscode-input-background, #3c3c3c);
-  border: 1px solid var(--vscode-focusBorder, #007fd4);
-  border-radius: 0;
-  outline: none;
-}
-.explorer-inline-input.is-error {
-  border-color: var(--vscode-list-errorForeground, #f88070);
-}
-.explorer-inline-error {
-  color: var(--vscode-list-errorForeground, #f88070);
-  font-size: 11px;
-  padding: 0 8px 4px 24px;
+/* ---------------------------------------------------------------------------
+ * openeditors / outline / timeline (corpo)
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row { padding-left: 8px; display: flex; }
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row > .monaco-action-bar { display: flex; align-items: center; visibility: hidden; }
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row:hover > .monaco-action-bar,
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row.focused > .monaco-action-bar { visibility: visible; }
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row > .monaco-action-bar .action-label { display: block; padding: 2px; }
+.explorer-viewlet .open-editors .monaco-list .monaco-list-row > .open-editor { flex: 1; }
+.explorer-viewlet .open-editors .open-editor { height: 22px; line-height: 22px; }
+.explorer-viewlet .pane-body-inner { height: 100%; }
+.explorer-viewlet .pane-message {
+  padding: 5px 20px;
+  color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  line-height: 1.4em;
   white-space: normal;
+  cursor: default;
 }
 
-/* ---- seções (Open Editors / Timeline / Outline) ---- */
-.explorer-section { border-top: 1px solid var(--vscode-sideBarSectionHeader-border, transparent); }
-.explorer-section-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  background: var(--vscode-sideBarSectionHeader-background, #26292f);
-  color: var(--vscode-sideBarSectionHeader-foreground, #c5c5c5);
-  border: none;
-  width: 100%;
-  text-align: left;
+/* ---------------------------------------------------------------------------
+ * inputbox.css (create/rename inline) — explorerviewlet: .explorer-item .monaco-inputbox
+ * ------------------------------------------------------------------------- */
+.explorer-viewlet .explorer-folders-view .explorer-item.explorer-item-edited .label-name { flex: 0; }
+.explorer-viewlet .explorer-folders-view .explorer-item .monaco-inputbox { width: 100%; line-height: normal; flex: 1; }
+.explorer-viewlet .monaco-inputbox {
+  position: relative; display: block; padding: 0; box-sizing: border-box; border-radius: 2px; font-size: inherit;
+  background-color: var(--vscode-input-background); color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
 }
-.explorer-section-header:hover { color: var(--vscode-foreground, #cccccc); }
-.explorer-section-body { padding: 2px 0 6px; }
-.explorer-section-empty {
-  padding: 4px 12px 8px;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  font-size: 12px;
-  white-space: normal;
+.explorer-viewlet .monaco-inputbox > .ibwrapper { position: relative; width: 100%; }
+.explorer-viewlet .monaco-inputbox > .ibwrapper > .input {
+  display: inline-block; box-sizing: border-box; width: 100%; height: 20px; padding: 0 6px; line-height: inherit;
+  border: none; font-family: inherit; font-size: inherit; resize: none; color: inherit; background: transparent; outline: none;
 }
-.explorer-section-row {
-  display: flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 8px 0 16px;
-  gap: 6px;
-  cursor: pointer;
-  white-space: nowrap;
+.explorer-viewlet .explorer-folders-view .explorer-item .monaco-inputbox input[type=text] {
+  outline-width: 1px; outline-style: solid; outline-offset: -1px; outline-color: var(--vscode-focusBorder); opacity: 1;
 }
-.explorer-section-row:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
-.explorer-section-row-time {
-  margin-left: auto;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  font-size: 11px;
+.explorer-viewlet .monaco-inputbox.error { border-color: var(--vscode-inputValidation-errorBorder); }
+.explorer-viewlet .monaco-inputbox.error > .ibwrapper > .input { outline-color: var(--vscode-inputValidation-errorBorder) !important; }
+.explorer-viewlet .monaco-inputbox-container { text-align: right; position: absolute; left: 0; right: 0; z-index: 2; }
+.explorer-viewlet .monaco-inputbox-container .monaco-inputbox-message {
+  display: inline-block; overflow: hidden; text-align: left; width: 100%; box-sizing: border-box; padding: .4em;
+  font-size: 12px; line-height: 17px; margin-top: -1px; word-wrap: break-word; white-space: normal;
+  background-color: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder);
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
 }
 
-/* ---- estado da raiz (vazio/carregando/erro) ---- */
-.explorer-root-status {
-  padding: 16px 12px;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  white-space: normal;
-}
+/* drop target (list.dropBackground / dropBetweenBackground) */
+.explorer-viewlet .monaco-list-row.drop-target,
+.explorer-viewlet .explorer-folders-view.drop-target-root .monaco-list { background-color: var(--vscode-list-dropBackground) !important; }
+.explorer-viewlet .monaco-list-row.drop-target { outline: 1px solid var(--vscode-list-focusOutline); outline-offset: -1px; }
 
-/* ---- status bar (progresso upload/download) ---- */
-.explorer-status {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 22px;
-  padding: 2px 10px;
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  border-top: 1px solid var(--vscode-sideBar-border, rgba(255, 255, 255, 0.06));
-}
-.explorer-status:empty { display: none; }
-.explorer-status-progress {
-  flex: 1;
-  height: 2px;
-  background: var(--vscode-progressBar-background, #0e70c0);
-}
+/* status de transferência (module-local; VS Code usa progress bar do pane) */
+.explorer-viewlet .explorer-transfer-status { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 11px; line-height: 22px; color: var(--vscode-descriptionForeground); }
+.explorer-viewlet .explorer-transfer-status:empty { display: none; }
+.explorer-viewlet .explorer-transfer-status .action-label { cursor: pointer; padding: 2px; }
 
-/* ---- diálogo de conflito (A4.3) ---- */
-.explorer-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+/* diálogo de conflito (dialog.css: .monaco-dialog-box) */
+.explorer-viewlet .explorer-conflict-dialog { position: fixed; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; background: rgba(0,0,0,.3); z-index: 1000; }
+.explorer-viewlet .explorer-conflict-box {
+  max-width: 420px; padding: 16px; border-radius: 6px;
+  background: var(--vscode-editorWidget-background); color: var(--vscode-editorWidget-foreground);
+  border: 1px solid var(--vscode-editorWidget-border); box-shadow: 0 0 8px 2px var(--vscode-widget-shadow, rgba(0,0,0,.36));
 }
-.explorer-dialog {
-  min-width: 320px;
-  max-width: 420px;
-  background: var(--vscode-editorWidget-background, #252526);
-  border: 1px solid var(--vscode-widget-border, #454545);
-  border-radius: 4px;
-  padding: 16px;
-  color: var(--vscode-foreground, #cccccc);
+.explorer-viewlet .explorer-conflict-title { font-size: 13px; line-height: 1.4; margin-bottom: 14px; white-space: normal; }
+.explorer-viewlet .explorer-conflict-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.explorer-viewlet .monaco-button {
+  padding: 4px 11px; border-radius: 2px; font-size: 13px; cursor: pointer; line-height: 18px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background); color: var(--vscode-button-foreground);
 }
-.explorer-dialog-title { font-weight: 600; margin: 0 0 8px; }
-.explorer-dialog-message { margin: 0 0 16px; color: var(--vscode-descriptionForeground, #bbb); white-space: normal; }
-.explorer-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.explorer-dialog-btn {
-  padding: 4px 12px;
-  border-radius: 2px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font: inherit;
-  background: var(--vscode-button-secondaryBackground, #3a3d41);
-  color: var(--vscode-button-secondaryForeground, #ffffff);
-}
-.explorer-dialog-btn.is-primary {
-  background: var(--vscode-button-background, #0e639c);
-  color: var(--vscode-button-foreground, #ffffff);
-}
-.explorer-dialog-btn:focus-visible { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 1px; }
-
-/* ---- scrollbar fina no corpo da sidebar ---- */
-.explorer-body::-webkit-scrollbar { width: 10px; }
-.explorer-body::-webkit-scrollbar-thumb {
-  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
-}
-.explorer-body::-webkit-scrollbar-thumb:hover {
-  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
-}
+.explorer-viewlet .monaco-button:hover { background: var(--vscode-button-hoverBackground); }
+.explorer-viewlet .monaco-button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.explorer-viewlet .monaco-button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.explorer-viewlet .timeline-label { padding-left: 0; }
+.explorer-viewlet .monaco-action-bar .action-item.disabled .action-label { color: var(--vscode-disabledForeground); cursor: default; }

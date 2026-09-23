@@ -90,7 +90,8 @@ describe('explorerService — openFolder / navegação', () => {
     expect(events.some((e) => e.type === 'explorer.nodeCollapsed' && e.uri === docs)).toBe(true);
     await service.expand({ uri: docs });
     service.collapseAll();
-    expect(service.getTreeForTests().expandedUris.size).toBe(0);
+    // VS Code: a raiz (pane-header) permanece expandida; só os descendentes colapsam.
+    expect([...service.getTreeForTests().expandedUris]).toEqual([ROOT]);
     expect(events.some((e) => e.type === 'explorer.allCollapsed')).toBe(true);
   });
 

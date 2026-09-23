@@ -21,6 +21,7 @@ let service: ExplorerService;
 let menus: CommandRegistryLike;
 let registered: Map<string, () => unknown>;
 let menuOpen: Array<{ x: number; y: number; items: Array<{ id: string; label: string; enabled: boolean; order: number }> }>;
+let contextKeys: Map<string, boolean | string | number>;
 
 function seed(): void {
   fs.seed([
@@ -39,11 +40,12 @@ beforeEach(() => {
   service = new ExplorerService(fs);
   registered = new Map();
   menuOpen = [];
+  contextKeys = new Map();
   menus = {
     register: (cmd) => { registered.set(cmd.id, () => cmd.run()); return () => registered.delete(cmd.id); },
     execute: async (id) => { await registered.get(id)?.() ?? undefined; },
-    setContext: () => undefined,
-    getContext: () => undefined,
+    setContext: (k, v) => { contextKeys.set(k, v); },
+    getContext: (k) => contextKeys.get(k),
   };
 });
 
@@ -62,13 +64,23 @@ async function bootView(): Promise<ReturnType<typeof render>> {
 }
 
 describe('ExplorerView — header (A1.1–A1.5)', () => {
-  it('5 botões com tooltips/aria EXATOS do upstream (04_01 §2)', async () => {
+  it('pane-header da pasta raiz: 22px, nome com caixa preservada e 4 ações com aria EXATOS do upstream (DOM vscode.dev)', async () => {
     await bootView();
-    expect(screen.getByRole('button', { name: 'New File...' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'New Folder...' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Refresh Explorer' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Collapse Folders in Explorer' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'More Actions...' })).toBeTruthy();
+    const header = screen.getByRole('button', { name: 'Explorer Section: ws' });
+    expect(header.classList.contains('pane-header')).toBe(true);
+    expect(within(header).getByRole('heading', { level: 3 }).textContent).toBe('ws');
+    // 4 ações do header da pasta (o "…" pertence ao título do viewlet = shell).
+    // Fiel ao VS Code: `.pane-header > .actions { display:none }` até hover/focus-within.
+    const actions = header.querySelector('.actions') as HTMLElement;
+    expect(getComputedStyle(actions).display).toBe('none');
+    for (const name of ['New File...', 'New Folder...', 'Refresh Explorer', 'Collapse Folders in Explorer']) {
+      expect(within(actions).getByRole('button', { name, hidden: true })).toBeTruthy();
+    }
+    // a raiz NÃO é linha da árvore: filhos começam em aria-level=1
+    const tree = screen.getByRole('tree');
+    const rows = within(tree).getAllByRole('treeitem');
+    expect(rows.every((r) => r.getAttribute('aria-level') === '1')).toBe(true);
+    expect(within(tree).queryByText('ws')).toBeNull();
   });
 
   it('header registra comandos no CommandRegistry (não executa lógica inline)', async () => {
@@ -123,8 +135,7 @@ describe('ExplorerView — árvore lazy (VAL-EXP-01/A2.1)', () => {
 describe('ExplorerView — input inline criar/renomear (A1.1/A1.2, 04_02 §4)', () => {
   it('Novo Arquivo: input inline → Enter cria no disco via serviço', async () => {
     await bootView();
-    // seleciona raiz: clicar no nome da raiz (primeiro row dir)
-    fireEvent.click(screen.getByText('ws'));
+    // sem seleção → cria na raiz (resolveCreateParent → root)
     fireEvent.click(screen.getByTestId('explorer-new-file'));
     const input = await screen.findByTestId('explorer-inline-input');
     fireEvent.change(input, { target: { value: 'novo-arquivo.txt' } });
@@ -148,7 +159,6 @@ describe('ExplorerView — input inline criar/renomear (A1.1/A1.2, 04_02 §4)', 
 
   it('Escape cancela o input inline sem criar nada', async () => {
     await bootView();
-    fireEvent.click(screen.getByText('ws'));
     fireEvent.click(screen.getByTestId('explorer-new-folder'));
     const input = await screen.findByTestId('explorer-inline-input');
     fireEvent.keyDown(input, { key: 'Escape' });
@@ -158,10 +168,15 @@ describe('ExplorerView — input inline criar/renomear (A1.1/A1.2, 04_02 §4)', 
 });
 
 describe('ExplorerView — seções (A2.4) + overflow (A1.5)', () => {
-  it('Open Editors exibe estado vazio "Nenhum editor aberto" (A2.4)', async () => {
+  it('Open Editors é um pane colapsado (22px) que lista os arquivos abertos ao expandir (A2.4)', async () => {
     await bootView();
-    expect(screen.getByText('Open Editors')).toBeTruthy();
-    expect(screen.getByText('Nenhum editor aberto')).toBeTruthy();
+    const header = screen.getByRole('button', { name: 'Open Editors Section' });
+    expect(header.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(screen.getByText('README.md'));   // abre → explorer.fileOpened
+    fireEvent.click(header);
+    expect(header.getAttribute('aria-expanded')).toBe('true');
+    const list = screen.getByRole('list', { name: 'Open Editors' });
+    expect(within(list).getByText('README.md')).toBeTruthy();
   });
 
   it('Timeline e Outline presentes (A2.5/A2.6 mínimo)', async () => {
@@ -170,11 +185,79 @@ describe('ExplorerView — seções (A2.4) + overflow (A1.5)', () => {
     expect(screen.getByText('Outline')).toBeTruthy();
   });
 
-  it('overflow “…” abre menu via contextMenu dep com Download desabilitado sem seleção', async () => {
+  it('menu de contexto na área vazia cai no contexto da raiz (Download/Upload habilitados, Rename/Delete ausentes)', async () => {
     await bootView();
-    fireEvent.click(screen.getByTestId('explorer-overflow'));
+    fireEvent.contextMenu(screen.getByRole('tree'));
     expect(menuOpen.length).toBe(1);
-    const download = menuOpen[0].items.find((i) => i.id === 'explorer.download');
-    expect(download?.enabled).toBe(false);
+    const ids = menuOpen[0].items.map((i) => i.id);
+    expect(ids).toContain('explorer.newFile');
+    expect(ids).not.toContain('explorer.rename');
+    expect(ids).not.toContain('explorer.delete');
+  });
+});
+
+describe('ExplorerView — menu de contexto declarativo + context keys (04_03 §1/§7, VAL-EXP-08)', () => {
+  it('publica context keys via menus.setContext em cada selectionChanged', async () => {
+    await bootView();
+    fireEvent.click(screen.getByText('README.md'));
+    await waitFor(() => expect(contextKeys.get('explorerResourceIsFolder')).toBe(false));
+    expect(contextKeys.get('explorerResourceIsRoot')).toBe(false);
+    expect(contextKeys.get('multiSelectionActive')).toBe(false);
+    expect(contextKeys.get('resourceCopied')).toBe(false);
+    fireEvent.click(screen.getByText('docs'));
+    await waitFor(() => expect(contextKeys.get('explorerResourceIsFolder')).toBe(true));
+    await menus.execute('explorer.copy');
+    await waitFor(() => expect(contextKeys.get('resourceCopied')).toBe(true));
+  });
+
+  it('botão direito em ARQUIVO: itens da tabela (grupos/ordem), sem Paste/Upload; Open executa via registry', async () => {
+    await bootView();
+    fireEvent.contextMenu(screen.getByText('README.md'));
+    expect(menuOpen.length).toBe(1);
+    const ids = menuOpen[0].items.map((i) => i.id);
+    expect(ids).toEqual(expect.arrayContaining(['explorer.newFile', 'explorer.open', 'explorer.cut', 'explorer.copy', 'explorer.download', 'explorer.rename', 'explorer.delete']));
+    expect(ids).not.toContain('explorer.paste');
+    expect(ids).not.toContain('explorer.upload');
+    // ordem global preserva a sequência de grupos: navigation < cutcopypaste < importexport < modification
+    expect(ids.indexOf('explorer.open')).toBeLessThan(ids.indexOf('explorer.cut'));
+    expect(ids.indexOf('explorer.copy')).toBeLessThan(ids.indexOf('explorer.download'));
+    expect(ids.indexOf('explorer.download')).toBeLessThan(ids.indexOf('explorer.rename'));
+    for (const id of ids) expect(registered.has(id), `item ${id} precisa de comando registrado`).toBe(true);
+  });
+
+  it('botão direito em PASTA: Paste desabilitado sem clipboard e habilitado após Copy', async () => {
+    await bootView();
+    fireEvent.contextMenu(screen.getByText('docs'));
+    const paste1 = menuOpen[0].items.find((i) => i.id === 'explorer.paste');
+    expect(paste1?.enabled).toBe(false);
+    expect(menuOpen[0].items.find((i) => i.id === 'explorer.upload')).toBeTruthy();
+    fireEvent.click(screen.getByText('README.md'));
+    await menus.execute('explorer.copy');
+    fireEvent.contextMenu(screen.getByText('docs'));
+    const paste2 = menuOpen[1].items.find((i) => i.id === 'explorer.paste');
+    expect(paste2?.enabled).toBe(true);
+  });
+
+  it('botão direito em área vazia → contexto da RAIZ: sem Cut/Rename/Delete', async () => {
+    await bootView();
+    fireEvent.contextMenu(screen.getByRole('tree'));
+    expect(menuOpen.length).toBe(1);
+    const ids = menuOpen[0].items.map((i) => i.id);
+    expect(ids).not.toContain('explorer.cut');
+    expect(ids).not.toContain('explorer.rename');
+    expect(ids).not.toContain('explorer.delete');
+    expect(ids).toContain('explorer.newFile');
+    expect(contextKeys.get('explorerResourceIsRoot')).toBe(true);
+  });
+
+  it('Upload... registrado e abre o picker (input file oculto)', async () => {
+    await bootView();
+    expect(registered.has('explorer.upload')).toBe(true);
+    const input = screen.getByTestId('explorer-upload-input') as HTMLInputElement;
+    let clicked = 0;
+    input.addEventListener('click', (e) => { clicked++; e.preventDefault(); });
+    fireEvent.click(screen.getByText('docs'));
+    await menus.execute('explorer.upload');
+    expect(clicked).toBe(1);
   });
 });
