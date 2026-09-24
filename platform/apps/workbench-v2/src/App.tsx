@@ -110,21 +110,12 @@ function isSinglePaneWidth(width: number): boolean {
 }
 
 const firstSession = initialSessions[0]
-const initialBrowser: BrowserViewState = {
-  id: 'browser-s1-1',
-  sessionId: firstSession.id,
-  title: 'Browser',
-  url: 'https://agents.local/sessions/s1',
-  history: ['https://agents.local/sessions/s1'],
-  historyIndex: 0,
-  status: 'loading',
-  viewport: 'desktop',
-  reloadToken: 0,
-}
-
-const initialEditorTabs: EditorTab[] = [
-  { id: 'browser-tab-s1-1', type: 'browser', title: 'Browser', sessionId: firstSession.id, browserId: initialBrowser.id },
-]
+// 4.8-B3 (hotfix): o Browser NÃO abre por padrão — começar com uma aba Browser
+// ativa escondia a barra auxiliar (regra Browser→aux bar oculta) e cobria o
+// Explorer no boot. O estado "sem abas / sem browsers" já é válido (é o que
+// resta ao fechar a aba). Novos browsers vêm de `createBrowser` (botão da UI).
+const initialEditorTabs: EditorTab[] = []
+const initialBrowserViews: BrowserViewState[] = []
 
 const initialDiffFilesBySession: Record<string, DiffFile[]> = Object.fromEntries(
   initialSessions
@@ -398,8 +389,8 @@ export default function App() {
   const [checksExpandedBySession, setChecksExpandedBySession] = useState<Record<string, boolean>>({})
   const [expandedFoldersBySession, setExpandedFoldersBySession] = useState<Record<string, Record<string, boolean>>>({})
   const [editorTabs, setEditorTabs] = useState<EditorTab[]>(initialEditorTabs)
-  const [activeTabId, setActiveTabId] = useState<string | undefined>(initialEditorTabs[0].id)
-  const [browserViews, setBrowserViews] = useState<BrowserViewState[]>([initialBrowser])
+  const [activeTabId, setActiveTabId] = useState<string | undefined>(initialEditorTabs[0]?.id)
+  const [browserViews, setBrowserViews] = useState<BrowserViewState[]>(initialBrowserViews)
   const [searchQuery, setSearchQuery] = useState('menubar')
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   // Changes are resolved from the active session, matching the reference
@@ -474,11 +465,11 @@ export default function App() {
   // Date.now() alone can collide when the user creates tabs quickly.
   const browserSequence = useRef(0)
   const editorTabSequence = useRef(0)
-  const browserOrdinalBySession = useRef<Record<string, number>>({ [firstSession.id]: 2 })
+  const browserOrdinalBySession = useRef<Record<string, number>>({})
   // The reference editor group remembers its active editor while a session is
   // swapped. Keep that memory for owned tabs and a separate pointer for shared
   // Search/file tabs that remain visible across sessions.
-  const activeTabBySession = useRef<Record<string, string>>({ [firstSession.id]: initialEditorTabs[0].id })
+  const activeTabBySession = useRef<Record<string, string>>(initialEditorTabs[0] ? { [firstSession.id]: initialEditorTabs[0].id } : {})
   const activeGlobalTabId = useRef<string | undefined>()
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
@@ -862,7 +853,7 @@ export default function App() {
     const sequence = browserSequence.current++
     const id = `browser-${sessionId}-${Date.now()}-${sequence}`
     const url = `https://agents.local/sessions/${sessionId}`
-    const view: BrowserViewState = { id, sessionId, title: `Browser ${nextOrdinal}`, url, history: [url], historyIndex: 0, status: 'loading', viewport: 'desktop', reloadToken: 0 }
+    const view: BrowserViewState = { id, sessionId, title: nextOrdinal === 1 ? 'Browser' : `Browser ${nextOrdinal}`, url, history: [url], historyIndex: 0, status: 'loading', viewport: 'desktop', reloadToken: 0 }
     const tab: EditorTab = { id: `${id}-tab`, type: 'browser', title: view.title, sessionId, browserId: id }
     activeTabBySession.current[sessionId] = tab.id
     setBrowserViews((current) => [...current, view])
@@ -907,9 +898,11 @@ export default function App() {
       const width = entries[0]?.contentRect.width ?? 0
       const previous = lastSurfaceWidth.current
       lastSurfaceWidth.current = width
-      if (!previous || !width || Math.abs(width - previous) < 1) return
       const group = panelGroupRef.current
-      if (!group) return
+      // 4.8-B3: sem PanelGroup (boot sem editor) a largura observada é só
+      // baseline — não há editor cuja largura em px deva ser preservada.
+      if (!group) { lastSurfaceWidth.current = 0; return }
+      if (!previous || !width || Math.abs(width - previous) < 1) return
       const [chatPct, editorPct] = group.getLayout()
       if (typeof editorPct !== 'number') return
       const editorPx = (editorPct / 100) * previous

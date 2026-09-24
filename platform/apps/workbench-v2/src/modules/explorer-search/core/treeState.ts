@@ -7,6 +7,9 @@
 // ============================================================================
 import type { FileSystemPortLike, SortOrder, WorkspaceUri } from '../contract';
 import { compareExplorerItems } from './sorter';
+import { EXPLORER_DEFAULT_EXCLUDES } from './constants';
+
+const EXPLORER_EXCLUDED_NAMES: ReadonlySet<string> = new Set<string>(EXPLORER_DEFAULT_EXCLUDES);
 import { ExplorerItem } from './explorerModel';
 import { uriIsEqualOrParent, uriJoinPath, uriPath, uriRelative } from './uri';
 
@@ -110,7 +113,9 @@ export class TreeState {
   async ensureResolved(item: ExplorerItem): Promise<ExplorerItem[]> {
     if (!item.isDirectory) return []; // arquivos não têm filhos (guard p/ callers genéricos)
     if (item.isDirectoryResolved) return this.childrenOf(item);
-    const entries = await this.fs.list({ uri: item.resource });
+    // FilesFilter upstream (`files.exclude` `**/<nome>`): descarta antes do stat.
+    const entries = (await this.fs.list({ uri: item.resource }))
+      .filter((e) => !EXPLORER_EXCLUDED_NAMES.has(e.name));
     // Upstream: IFileStat vem COMPLETO (mtime, readonly) de statDir. Nossa
     // lista (contrato congelado 04_10 §2.1) só carrega uri/name/kind — então
     // enriquecemos com stat() em lote (1x por diretório = A2.1) para o

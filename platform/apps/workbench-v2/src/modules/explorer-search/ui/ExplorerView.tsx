@@ -15,7 +15,7 @@ import type { ExplorerService } from '../core/explorerService';
 import { ExplorerCreateConflictError, ExplorerRenameConflictError } from '../core/explorerService';
 import type { ExplorerItem } from '../core/explorerModel';
 import type { CommandRegistryLike, FileSystemPortLike, WorkspaceUri, ExplorerSearchEvent } from '../contract';
-import { uriBasename, uriDirname, uriJoinPath } from '../core/uri';
+import { uriBasename, uriDirname, uriJoinPath, uriPath, uriRelative } from '../core/uri';
 import { decideDragOver, planDrop, resolveDropTarget } from '../core/dndPolicy';
 import type { DndData } from '../core/dndPolicy';
 import { collectDroppedFiles, uploadFiles, resetUploadDirCache } from '../core/transfer/upload';
@@ -451,6 +451,16 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
   }, [runUpload]);
 
   // ---- comandos (header/menu executam via CommandRegistry) ----
+  const copyPaths = React.useCallback((relative: boolean) => {
+    const sel = service.getSelection();
+    const rootUri = service.getRootItem()?.resource;
+    const uris = sel.length ? sel : rootUri ? [rootUri] : [];
+    if (uris.length === 0) return;
+    const text = uris
+      .map((u) => (relative && rootUri ? (uriRelative(rootUri, u) ?? uriPath(u)) : uriPath(u)))
+      .join('\n');
+    return navigator.clipboard?.writeText(text).catch(() => undefined);
+  }, [service]);
   React.useEffect(() => {
     const lastSel = () => { const s = service.getSelection(); return s[s.length - 1]; };
     const unsubs = [
@@ -464,13 +474,18 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       menus.register({ id: 'explorer.open', title: 'Open', run: () => { const u = lastSel(); if (u) openRow(u); } }),
       menus.register({ id: 'explorer.rename', title: 'Rename...', run: () => beginRename(lastSel()) }),
       menus.register({
-        id: 'explorer.delete', title: 'Delete',
+        id: 'explorer.delete', title: 'Delete Permanently',
         run: () => {
           const sel = service.getSelection();
           if (sel.length === 0) return;
           void service.remove({ uris: sel, useTrash: false }).then(() => tick.bump(), () => tick.bump());
         },
       }),
+      // G2 — upstream fileActions.contribution.ts:603/610 → fileCommands.ts
+      // `resourcesToClipboard(resources, relative)`: N recursos unidos por quebra
+      // de linha; relativo = ao workspace folder (single-root: sem o nome da raiz).
+      menus.register({ id: 'explorer.copyPath', title: 'Copy Path', run: () => copyPaths(false) }),
+      menus.register({ id: 'explorer.copyRelativePath', title: 'Copy Relative Path', run: () => copyPaths(true) }),
       menus.register({ id: 'explorer.cut', title: 'Cut', run: () => { const s = service.getSelection(); if (s.length) { service.cut({ uris: s }); tick.bump(); } } }),
       menus.register({ id: 'explorer.copy', title: 'Copy', run: () => { const s = service.getSelection(); if (s.length) { service.copy({ uris: s }); tick.bump(); } } }),
       menus.register({
@@ -485,7 +500,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       }),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [menus, service, tick, beginCreate, beginRename, refreshAll, collapseAll, downloadSelection, uploadViaPicker, openRow]);
+  }, [menus, service, tick, beginCreate, beginRename, refreshAll, collapseAll, downloadSelection, uploadViaPicker, openRow, copyPaths]);
 
   // ---- inline commit ----
   const commitInline = React.useCallback((value: string) => {

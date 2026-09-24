@@ -104,10 +104,27 @@ describe('matriz de habilitação (04_03 §2)', () => {
     const list = ids(file());
     expect(list).toEqual(expect.arrayContaining([
       'explorer.newFile', 'explorer.newFolder', 'explorer.open', 'explorer.cut', 'explorer.copy',
-      'explorer.download', 'explorer.rename', 'explorer.delete', 'explorer.refresh', 'explorer.collapseAll',
+      'explorer.download', 'explorer.copyPath', 'explorer.copyRelativePath', 'explorer.rename', 'explorer.delete',
     ]));
     expect(list).not.toContain('explorer.paste');
     expect(list).not.toContain('explorer.upload');
+  });
+
+  // G2 (fileActions.contribution.ts:603/610/662 — 04_11 §2; 04_03 §1 l.24-31)
+  it('G2: Copy Path/Copy Relative Path em grupo 6_copypath entre Download e Rename; Refresh/Collapse NÃO pertencem ao ExplorerContext', () => {
+    const items = resolveExplorerContextMenu(computeExplorerContext(file()));
+    const list = items.map((i) => i.id);
+    expect(list).not.toContain('explorer.refresh');
+    expect(list).not.toContain('explorer.collapseAll');
+    const at = (id: string) => list.indexOf(id);
+    expect(at('explorer.download')).toBeLessThan(at('explorer.copyPath'));
+    expect(at('explorer.copyPath')).toBeLessThan(at('explorer.copyRelativePath'));
+    expect(at('explorer.copyRelativePath')).toBeLessThan(at('explorer.rename'));
+    expect(items.find((i) => i.id === 'explorer.copyPath')?.group).toBe('6_copypath');
+    expect(items.find((i) => i.id === 'explorer.delete')?.label).toBe('Delete Permanently');
+    // raiz e multi-seleção também têm Copy Path (when = IsFileSystemResource)
+    expect(ids(root())).toEqual(expect.arrayContaining(['explorer.copyPath', 'explorer.copyRelativePath']));
+    expect(ids(file({ selection: ['/ws/a.txt', '/ws/b.txt'] }))).toContain('explorer.copyPath');
   });
 
   it('PASTA: todos os itens, Paste presente mas DESABILITADO sem clipboard (precondition)', () => {
@@ -147,8 +164,8 @@ describe('matriz de habilitação (04_03 §2)', () => {
     }
   });
 
-  it('área vazia (sem recurso): só itens de view', () => {
+  it('área vazia (sem recurso): nenhum item de nó (Refresh/Collapse vivem no header, não no menu)', () => {
     const list = ids(file({ selection: [], target: null }));
-    expect(list).toEqual(['explorer.refresh', 'explorer.collapseAll']);
+    expect(list).toEqual([]);
   });
 });

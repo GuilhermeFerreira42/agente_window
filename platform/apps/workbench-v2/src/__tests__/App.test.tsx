@@ -33,6 +33,14 @@ async function createBrowserTab(user: ReturnType<typeof userEvent.setup>): Promi
   await user.click(screen.getByRole('menuitem', { name: 'Browser' }))
 }
 
+// 4.8-B3: o Browser não abre mais no boot. Os fluxos abaixo foram homologados
+// com uma aba Browser inicial — recriamos esse ponto de partida pelo botão do
+// cabeçalho ("Abrir navegador no editor"), que é o caminho real do usuário.
+async function openInitialBrowser(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'Abrir navegador no editor' }))
+  expect(browserEditorTab()).toBeInTheDocument()
+}
+
 // jsdom não implementa DataTransfer; este mock cobre o que o DnD do app usa.
 function createDataTransfer() {
   const store = new Map<string, string>()
@@ -98,6 +106,7 @@ describe('App session flows', () => {
   it('arquiva e restaura, destrói Browser da sessão e faz fallback ao excluir a sessão ativa', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     expect(browserEditorTab()).toBeInTheDocument()
     const activeRow = sessionRow('Replicar a Janela de Agentes')
@@ -397,6 +406,7 @@ describe('App session flows', () => {
   it('preserva seleção de chat e oculta/mostra Browser conforme ownership da sessão', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     const nestedUiChat = Array.from(document.querySelectorAll<HTMLElement>('.nested-chat-title'))
       .find((element) => element.textContent === 'Ajustes de UI')
@@ -414,13 +424,16 @@ describe('App session flows', () => {
   it('cria, seleciona, navega, recarrega, reporta erro e fecha múltiplas abas Browser no Editor', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
     const browserFrame = () => screen.getByTitle(/Browser https:\/\//) as HTMLIFrameElement
     const browserTabTitles = () => editorTabs().map((tab) => tab.querySelector('.editor-tab-title')?.textContent)
 
     expect(editorTabs()).toHaveLength(1)
-    expect(screen.getByText('Carregando')).toBeInTheDocument()
+    // B3: o browser é criado por clique (assíncrono) — em jsdom o `load` do
+    // iframe srcdoc pode já ter disparado; o ciclo loading→ready é provado abaixo.
+    expect(screen.getByText(/^(Carregando|Pronto)$/)).toBeInTheDocument()
     await createBrowserTab(user)
     await createBrowserTab(user)
     expect(editorTabs()).toHaveLength(3)
@@ -489,6 +502,7 @@ describe('App session flows', () => {
   it('seleciona a próxima aba correta ao fechar e expõe o tabpanel ativo', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
     const tabByTitle = (title: string) => editorTabs().find((tab) => tab.querySelector('.editor-tab-title')?.textContent === title)
@@ -527,6 +541,7 @@ describe('App session flows', () => {
   it('navega pelas tabs por teclado e cria Files, Search e Changes no menu de nova aba', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     await createBrowserTab(user)
     const browserTwo = Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]')).find((tab) => tab.querySelector('.editor-tab-title')?.textContent === 'Browser 2')
@@ -576,6 +591,7 @@ describe('App session flows', () => {
   it('preserva Browser por sessão e remove todos os browsers ao arquivar ou excluir', async () => { 
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
     await createBrowserTab(user)
@@ -627,6 +643,7 @@ describe('App session flows', () => {
   it('abre Search no Editor com foco, filtra, conta, destaca, mostra vazio e abre arquivo', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Abrir busca no editor' }))
     const searchInput = screen.getByRole('textbox', { name: 'Pesquisar no workspace' })
@@ -676,6 +693,7 @@ describe('App session flows', () => {
   it('abre Branch Changes como aba do Editor, lista arquivos, seleciona o diff e preserva a seleção por sessão', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
     const diffTab = screen.getByRole('tab', { name: /Branch Changes/ })
@@ -1163,6 +1181,7 @@ describe('App session flows', () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // Oculta o editor (detail-only) para provar que a pill o revela de novo.
     await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
@@ -1226,6 +1245,7 @@ describe('App session flows', () => {
   it('oculta e mostra o conteúdo do editor mantendo a barra de abas (detail-only)', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // A sessão inicial já tem uma aba Browser aberta.
     expect(document.querySelector('.editor-tabs')).not.toBeNull()
@@ -1247,6 +1267,7 @@ describe('App session flows', () => {
   it('Detail-only fecha a aba Browser não-acoplada e a restaura ao mostrar o editor (R-040)', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // Abre a aba acoplada Changes (docked) além da Browser inicial.
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
@@ -1282,6 +1303,7 @@ describe('App session flows', () => {
 
   it('redistribui os tamanhos com duplo-clique no sash', async () => {
     render(<App />)
+    await openInitialBrowser(userEvent.setup())
 
     // A sessão inicial tem editor visível → o sash existe.
     const handle = document.querySelector('.panel-resize-handle') as HTMLElement | null
@@ -1297,6 +1319,7 @@ describe('App session flows', () => {
   it('persiste os tamanhos do split por sessão no storage', async () => {
     window.localStorage.clear()
     render(<App />)
+    await openInitialBrowser(userEvent.setup())
 
     const handle = document.querySelector('.panel-resize-handle') as HTMLElement | null
     expect(handle).not.toBeNull()
@@ -1337,6 +1360,7 @@ describe('App session flows', () => {
   it('protege abas gerenciadas (Files) de fechamento em detail-only', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // Abre uma aba Files (gerenciada) e oculta o editor → estado detail-only.
     await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
@@ -1442,6 +1466,7 @@ describe('App session flows', () => {
 
   it('abre menu de contexto numa aba do editor com Fechar/Dividir', async () => {
     render(<App />)
+    await openInitialBrowser(userEvent.setup())
 
     const tab = browserEditorTab()
     if (!tab) throw new Error('Editor tab not found')
@@ -1514,6 +1539,7 @@ describe('App session flows', () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // Aba padrão = Browser → o painel de detalhes está oculto transitoriamente.
     expect(document.querySelector('.auxiliary-bar')).toBeNull()
@@ -1537,6 +1563,7 @@ describe('App session flows', () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     // Cria uma 2ª aba Browser para ter o que reordenar.
     await createBrowserTab(user)
@@ -1558,6 +1585,7 @@ describe('App session flows', () => {
   it('oculta e reexibe o editor pelo atalho Alt+Cmd+E', async () => {
     window.localStorage.clear()
     render(<App />)
+    await openInitialBrowser(userEvent.setup())
 
     // Editor visível inicialmente.
     expect(screen.queryByTestId('editor-hidden-content')).not.toBeInTheDocument()
@@ -1606,6 +1634,7 @@ describe('App session flows', () => {
   it('abre AI Customizations, troca harness, alterna enablement e executa skill', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
     await user.click(screen.getByRole('menuitem', { name: 'AI Customizations' }))

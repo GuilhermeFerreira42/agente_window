@@ -10,7 +10,7 @@
 // ============================================================================
 
 import type { FileSystemPortLike, WorkspaceUri } from '../../contract';
-import { uriBasename, uriJoinPath, uriRelative } from '../uri';
+import { uriBasename, uriDirname, uriJoinPath, uriRelative } from '../uri';
 
 export interface DownloadProgress {
   filesDone: number;
@@ -45,37 +45,67 @@ export interface DownloadFilesInput {
 export async function downloadFiles(input: DownloadFilesInput): Promise<void> {
   const { fs, uris, save, onProgress, signal } = input;
   const base = input.baseUrl ?? '';
-  for (const target of uris) {
-    if (signal?.aborted) throw new DOMException('Download cancelado', 'AbortError');
+  if (uris.length === 0) return; // contrato: seleção vazia é no-op
+  const aborted = () => { if (signal?.aborted) throw new DOMException('Download cancelado', 'AbortError'); };
+
+  // Walk recursivo de uma pasta → URIs de arquivo (downloadFolderBrowser :680).
+  const walk = async (dir: WorkspaceUri, out: WorkspaceUri[]): Promise<void> => {
+    const list = await fs.list({ uri: dir });
+    for (const entry of list) {
+      aborted();
+      if (entry.kind === 'directory') await walk(entry.uri, out);
+      else out.push(entry.uri);
+    }
+  };
+
+  // 1 arquivo → download direto (doDownloadBrowser :652 — sem zip).
+  if (uris.length === 1) {
+    const target = uris[0];
+    aborted();
     const st = await fs.stat({ uri: target });
     if (st.kind === 'file') {
       const blob = await fetchFileBlob(target, base, signal);
       await save(blob, uriBasename(target));
+      return;
+    }
+  }
+
+  // Pasta única OU multi-seleção → UM ÚNICO zip STORED (A4.6; G1).
+  // Upstream `doDownload` (:633) itera as fontes e usa directory picker por
+  // pasta; no fallback blob (sem picker) agregamos tudo num zip cujo nome é o
+  // do item (pasta única) ou do pai comum da seleção (multi) — `download.zip`
+  // se não houver pai comum.
+  const single = uris.length === 1 ? uris[0] : null;
+  const zipBase = single ?? uriDirname(uris[0]);
+  const zipName = single
+    ? `${uriBasename(single)}.zip`
+    : (uris.every((u) => uriDirname(u) === zipBase) && uriBasename(zipBase)) ? `${uriBasename(zipBase)}.zip` : 'download.zip';
+
+  const planned: Array<{ uri: WorkspaceUri; path: string }> = [];
+  for (const target of uris) {
+    aborted();
+    const st = await fs.stat({ uri: target });
+    if (st.kind === 'file') {
+      planned.push({ uri: target, path: uriBasename(target) });
       continue;
     }
-    // ---- pasta: walk + zip STORED client-side (A4.6) ----
-    const entries: Array<{ path: string; blob: Blob }> = [];
     const files: WorkspaceUri[] = [];
-    const walk = async (dir: WorkspaceUri): Promise<void> => {
-      const list = await fs.list({ uri: dir });
-      for (const entry of list) {
-        if (signal?.aborted) throw new DOMException('Download cancelado', 'AbortError');
-        if (entry.kind === 'directory') await walk(entry.uri);
-        else files.push(entry.uri);
-      }
-    };
-    await walk(target);
-    let filesDone = 0;
-    for (const fileUri of files) {
-      onProgress?.({ filesDone, filesTotal: files.length, currentName: uriRelative(target, fileUri) ?? fileUri });
-      const blob = await fetchFileBlob(fileUri, base, signal);
-      const rel = uriRelative(target, fileUri);
-      entries.push({ path: rel ?? uriBasename(fileUri), blob });
-      filesDone++;
-    }
-    const zip = await buildZipStoreAsync(entries);
-    await save(zip, `${uriBasename(target)}.zip`);
+    await walk(target, files);
+    // pasta única: caminhos relativos à própria pasta; multi: prefixados pelo nome da pasta
+    const prefix = single ? '' : `${uriBasename(target)}/`;
+    for (const f of files) planned.push({ uri: f, path: prefix + (uriRelative(target, f) ?? uriBasename(f)) });
   }
+
+  const entries: Array<{ path: string; blob: Blob }> = [];
+  let filesDone = 0;
+  for (const item of planned) {
+    onProgress?.({ filesDone, filesTotal: planned.length, currentName: item.path });
+    const blob = await fetchFileBlob(item.uri, base, signal);
+    entries.push({ path: item.path, blob });
+    filesDone++;
+  }
+  const zip = await buildZipStoreAsync(entries);
+  await save(zip, zipName);
 }
 
 // ---------------------------------------------------------------------------

@@ -106,9 +106,10 @@ describe('explorerService — openFolder / navegação', () => {
     await service.refresh();
 
     expect(service.getTreeForTests().isExpanded(src)).toBe(true); // A2.6
-    // o nó expandido re-resolve sob demanda (lazy) e enxerga o novo item
-    await service.expand({ uri: src });
+    // upstream tree.refresh re-resolve os nós EXPANDIDOS: o novo item já está
+    // visível sem clique extra (antes ficava "expandido e vazio" na UI)
     expect(childNames(src)).toContain('newDir');
+    expect(service.getVisibleRows().map((r) => r.item.name)).toContain('newDir');
     expect(fs.calls.list).toBeGreaterThan(listsBefore);
   });
 });

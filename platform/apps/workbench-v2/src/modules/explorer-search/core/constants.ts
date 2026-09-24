@@ -27,6 +27,21 @@ export const ATTACH_MIN_WIDTH_RATIO = 0.25 as const;
 export const ATTACH_MAX_WIDTH_RATIO = 0.75 as const;
 
 // ---------------------------------------------------------------------------
+// Explorer — `files.exclude` padrão (upstream files.contribution.ts, registro
+// da configuração `files.exclude`: `**/.git`, `**/.svn`, `**/.hg`, `**/CVS`,
+// `**/.DS_Store`, `**/Thumbs.db`). Aplicado pelo FilesFilter (explorerViewer.ts)
+// em QUALQUER nível — aqui: por nome de entrada, no resolve lazy do diretório.
+// ---------------------------------------------------------------------------
+export const EXPLORER_DEFAULT_EXCLUDES = [
+  '.git',
+  '.svn',
+  '.hg',
+  'CVS',
+  '.DS_Store',
+  'Thumbs.db',
+] as const;
+
+// ---------------------------------------------------------------------------
 // Search (4.6) — 04_10 §2.3
 // ---------------------------------------------------------------------------
 /** Debounce da busca local à sessão — "última busca vence". */

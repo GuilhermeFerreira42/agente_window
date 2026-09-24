@@ -19,7 +19,7 @@ Este arquivo não substitui:
 
 Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 
-## Estado atual da rodada — ATUALIZADO 2026-09-22 (FATIA-04 · SUB-FATIA 4.4 FECHADA DE FATO — menu declarativo + context keys, upload/download/seleção provados por E2E; sessao_12 22/22; vitest módulo 145/145; terminal 6/6 + 3/3; ver entrada 2026-09-22 "FECHAMENTO REAL") — histórico 2026-09-21 (Explorer real na aba Files; E2E 15/15; validação visual NO WORKSPACE REAL homologada por script+screenshots; terminal 6/6 + 3/3 íntegro)
+## Estado atual da rodada — ATUALIZADO 2026-09-24 (FATIA-04 · SUB-FATIA 4.4 = **PARCIAL**: auditoria binária no preview real 5174 → 10/11 PASS após transplante G1/G4; 1 PENDENTE (T-11) + G5 ADIADO; HEAD `0d86656`; vitest módulo 149/149; `sessao_12_explorer` 27/27; terminal 9/9 — ver entrada "2026-09-24 — Sincronização Pós-Auditoria 4.4") — histórico 2026-09-22 ("4.4 fechada de fato" — status REVOGADO pela validação humana em vídeo; ver entrada 2026-09-24) — histórico 2026-09-21
 
 - **2026-09-22 — Raspagem `04_17` + Plano `04_18` prontos (só documentação, zero código):** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` é a **fonte única de medidas/tokens** (raspagem real do VS Code: 22 px linha, 24 px item de menu, 26 px search, 35 px tabs com 1 px no topo, 22 px breadcrumbs, letterpress 256 px; 28 prints + 3 JSONs em `FATIA-04_VIDEO_COMPLETO/raspagem_04_17/`). `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_18_plano_implantacao_fatia_04.md` é o **plano vigente 4.5 → 4.6 → 4.7** com critério de pronto e checklist visual por estado (§5). Kanban `docs/11` e `docs/16` §3.1 atualizados para apontar para eles. Detalhe na entrada cronológica 2026-09-22 abaixo.
 
@@ -30,6 +30,62 @@ Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 - **Portas do sandbox (POLÍTICA APROVADA 2026-09-21):** manter **apenas uma porta de preview do workbench**: **5174** (dev vite + Single Port FS). A fixture E2E **5175 NÃO fica de pé** — sobe sob demanda só para rodar a spec (`FS_TEST_ROOT=file:///tmp/explorer-fs-fixture npx vite --host 0.0.0.0 --port 5175 --strictPort`) e SAI com o runner (não esquecer: servidores via `start_process`). **VS Code real de referência (vídeo FATIA-04):** code-server **4.138.0** standalone na **8080** aberto no repo do projeto — binário em `/home/user/.code-server-release/current/bin/code-server` (release tarball; 707 MB; RAM do sandbox é 1,9 GB → **build do código-fonte do VS Code/code-server é PROIBIDO** — release pré-construído apenas). **SEM senha** (decisão do usuário 2026-09-21: sandbox efêmero/privado da sessão — não pedir auth). Re-subir pós-restore: `/home/user/.code-server-release/current/bin/code-server --host 0.0.0.0 --port 8080 --auth none /home/user/agente_window`. Limpeza 2026-09-21: `code-server-workspace.tar.gz` **confirmado apagado** (usuário removeu; verificado no sandbox — arquivo ausente em todo o FS).
 - **Gate BLOCO 4.4-fix (pré-requisito da 4.5 imposto pelo usuário 2026-09-21): CUMPRIDO EM 2 RODADAS** — (rodada 1: BUG-P1/BUG-V1/GAP-V1, e2e 12/12, 3 screenshots; rodada 2 — validação manual do usuário: mock silencioso ELIMINADO (error editor explícito padrão VS Code + aviso honesto `file-content-unavailable`), POLÍTICA DE PREVIEW corrigida: dev 5174 = workspace real /home/user/agente_window, fixture /tmp SÓ na 5175 durante o e2e; e2e 15/15 + validação visual real-browser em arquivos REAIS (README.md, docs/12 — /home/user/4-4-real-*.png) + anti-regressão fatias 01–03 19/19 na 5174 real. Liberação da 4.5 condicionada à homologação MANUAL do usuário no preview real.
 - **Próxima frente autorizada: FATIA-04 · SUB-FATIA 4.5** — Menu de contexto completo (tabela declarativa portada de `fileActions.contribution.ts:478–680` com grupos/ordem/`when` exatos do 04_03, Download no grupo `5b_importexport`, labels PT-BR do 04_01, context keys publicadas em cada `selectionChanged`/operação, itens fora de escopo do 04_11 §11-C **não** entram). Anti-regressão 6/6 + 3/3 + FT obrigatórios antes de fechar.
+
+- **2026-09-24 — SINCRONIZAÇÃO PÓS-AUDITORIA 4.4 (leia primeiro):** o rótulo "4.4 fechada de fato" de 2026-09-22 foi **revogado** pela validação humana (Vídeo 4) e por uma auditoria binária executada no preview real (5174) — o status canônico da 4.4 passa a ser **PARCIAL**. Detalhe, evidências e débitos na entrada cronológica abaixo. Estado por item: PASS = header/raiz 22 px, nível 1, seções colapsáveis, `.git` oculto, menu com Copy Path/Delete Permanently, DnD do SO, hover "X", seleção pós-criação, **G1 ZIP único** e **G4 ícones Seti** (os dois últimos corrigidos nesta rodada); PENDENTE = T-11 (ruído de rede do `upload.ts`); ADIADO = G5 menu do pane-header, cores Git, DnD/resize de seções, badges. **Hotfix B3 aplicado (`876b83d`): o Browser NÃO abre mais no boot.**
+
+### Entrada cronológica 2026-09-24 — Sincronização Pós-Auditoria 4.4 (estado real medido no preview + backlog refinado)
+
+**Insumos integrados:** (1) `uploads/Checklist-Transplante-Fatia04-Profissional.md` (Lista Mestra de Verificação, 23/09 19:43 — seus status "PENDENTE" das seções 2.1–2.4 estão **superados** onde a auditoria abaixo mediu PASS; permanece válido para 4.5–4.9 e itens transversais TR-BC1/TR-BR1/TR-SC1); (2) Vídeo 4 de validação humana (timestamps citados por item); (3) plano de execução refinado acordado em chat (Hotfix B3 → Auditoria → G1/G4 → 4.5). Método: **nenhum status abaixo foi atribuído por existência de arquivo** — cada PASS tem medição no DOM do 5174 (script `auditoria_44/scripts/audit_fase1.mjs`, prints em `auditoria_44/fase1/`, JSON `resultado.json`) e/ou teste E2E nomeado.
+
+#### A. Estado real da 4.4 — auditoria binária (preview 5174)
+
+| # | Item | Auditoria (antes da Fase 2) | Estado atual | Evidência |
+|---|---|---|---|---|
+| 1 | Raiz é `pane-header` 22 px, bold, ações só no hover | PASS | PASS | h=22, font-weight 700, `.actions` `none→block`; `fase1/01_raiz_header_hover.png` |
+| 2 | Árvore nível 1 sem indent extra | PASS | PASS | `aria-level="1"`, 0 guias de indent |
+| 3 | Seções auxiliares colapsam/expandem com corpo real | PASS | PASS | Outline 22 px → corpo 185 px → 22 px; E2E **T9** (`sessao_12_explorer`); commit `f5a4c1d` |
+| 4 | `.git` oculta | PASS | PASS | `.git` existe no disco e não está na árvore; E2E **T7**; unit `treeState.test.ts`; commit `70f2231` |
+| 5 | Menu de arquivo: Copy Path / Copy Relative Path / Delete Permanently, **sem** Refresh/Collapse | PASS | PASS | labels medidos; E2E **T6**; commit `60287b9`; `fase1/05_menu_contexto_arquivo.png` |
+| 6 | **G1** Download multi-seleção → 1 ZIP | **FAIL** (2 selecionados → 2 downloads) | **PASS** | E2E **T8** (5 entradas, CRC32 do header confere); reauditoria 5174: `agente_window.zip`; commit `e2a1058` |
+| 7 | DnD do SO cria arquivo (upload recursivo) | PASS | PASS | drop sintético → arquivo no disco; E2E "GAP 2 (upload DnD)" |
+| 8 | **G4** Ícones coloridos por extensão | **FAIL** (1 cor para tudo) | **PASS** | E2E **T10** (`.ts/.md/.bat` azul, `.json` amarelo, `.png` roxo, `.gitignore` cinza-ignore, `.txt` default); `fase1/08_icones.png` (antes) × `08_icones_depois.png`; commit `0d86656` |
+| 9 | Hover em item de seção auxiliar mostra "X" | PASS | PASS | `.monaco-action-bar` `hidden→visible`; E2E T9; `fase1/09_open_editors_hover_x.png` |
+| 10 | Seleção pós-criação automática | PASS | PASS | `aria-selected=true` + `.selected`; E2E "GAP 4 (VAL-EXP-04)" |
+| 11 | Zero erros no console | **FAIL** (ruído) | **PENDENTE (T-11)** | 0 `pageerror`; 4 logs de rede: `GET /fs/stat` 404 (sonda "existe?" — protocolo) e `POST /fs/mkdir` 403 ×3 — `core/transfer/upload.ts` `ensureParentDirs` (l.~153) sobe até `/` e tenta `mkdir` fora do workspace. Correção: parar na raiz do workspace. **Não implementado** (fora do foco exclusivo G1/G4 desta rodada) |
+
+**Placar:** auditoria 8/11 PASS → pós-transplante **10/11 PASS**, 1 PENDENTE. Sub-fatia 4.4 continua **PARCIAL** até: T-11 corrigido, G5 decidido (ver B) e homologação manual do usuário no preview real.
+
+**Transplantes desta rodada (um commit por gap, teste vermelho antes de código):**
+- `60287b9` **G2** — tabela `core/menus/explorerMenus.ts` fiel a `fileActions.contribution.ts:603/610/662` (04_11 §2): +`Copy Path`/`Copy Relative Path` (grupo `6_copypath`, `navigator.clipboard.writeText`, N recursos um por linha), `Delete` → `Delete Permanently` (sem lixeira no `FileSystemPort`), −Refresh/Collapse (são `MenuId.ViewTitle`, ficam no header). Unit `explorerMenus.test.ts` + E2E T6.
+- `f5a4c1d` **Seções auxiliares** — causa medida: ao expandir, `pane-body` de Open Editors/Outline tinha **0 px** (por isso "não colapsa" no vídeo). CSS do SplitView reparte altura (Open Editors ≤ 9 linhas; Outline/Timeline fatia mínima). Bônus achado pelo T9: `Refresh` deixava a pasta expandida vazia até novo clique → `explorerService.refresh` re-resolve descendentes expandidos (`tree.refresh` upstream).
+- `70f2231` **G3** — `EXPLORER_DEFAULT_EXCLUDES` (`.git .svn .hg CVS .DS_Store Thumbs.db` = defaults de `files.exclude`) aplicado no resolve lazy (`treeState.ensureResolved`, FilesFilter upstream). `.gitignore` continua visível.
+- `e2a1058` **G1** — `core/transfer/download.ts`: 1 arquivo → download direto (`doDownloadBrowser :652`); pasta única ou multi-seleção → **um** ZIP STORED `<pai>.zip` (pastas prefixadas pelo nome, `download.zip` sem pai comum); `uris: []` no-op (contrato). **Nota de fidelidade:** no VS Code web `doDownload :633` baixa cada fonte separadamente (directory picker); o "1 ZIP" é a adaptação decidida pelo usuário para o fallback blob sem picker.
+- `0d86656` **G4** — paleta de `extensions/theme-seti/icons/vs-seti-icon-theme.json` (mapeamento extensão → linguagem → `fontColor`, lido da fonte) como tokens CSS do módulo (`--vscode-explorer-seti-{blue,yellow,orange,purple,green,grey,ignore}`) mapeados em `<ext>-ext-file-icon`/`<name>-name-file-icon`. Glyph continua codicon (fonte `seti.woff` **não** trazida — pendente autorização).
+
+#### B. Débitos técnicos registrados (linguagem binária)
+
+| Débito | Estado | Destino | Fonte / evidência |
+|---|---|---|---|
+| **B3 — Browser iniciava aberto cobrindo o Explorer** (Vídeo 4 00:53 / 02:10) | **CORRIGIDO** `876b83d` | — | `App.tsx`: boot sem aba/view Browser; 1º browser criado chama-se "Browser"; `ResizeObserver` não preserva px de editor inexistente (o 1º Browser abria com 314 px). 19 testes de `App.test.tsx` adaptados (helper `openInitialBrowser` = botão real "Abrir navegador no editor") → 62/62. E2E `sessao_12` "aba file SEM dados" adaptado. Prints `auditoria_44/hotfix_b3_boot.png`, `hotfix_b3_browser_open.png` |
+| **T-11 — ruído `upload.ts ensureParentDirs`** | **PENDENTE** | 4.4 (fechamento) | item 11 acima |
+| **G5 — botão direito no pane-header** (menu de Views com checkmarks, `MenuId.ViewTitleContext`) | **ADIADO** | 4.5 | `contextMenu.open` do shell não suporta `checked`; decisão do usuário pendente (com/sem check ou evolução do contrato) |
+| **Cores de status Git na árvore** (`gitDecoration-*`) | **BLOQUEADO → ADIADO** | 4.7+ | não existe `GitService`/`IDecorationsService` no repo (grep em `apps/`, `packages/`, contrato, `server/fs`); no VS Code vem da extensão Git via `IDecorationsService`, não do Explorer; `04_11` não mapeia decorations. Exige contrato novo (dep `decorations` + endpoint `git status --porcelain`) — invenção, não transplante |
+| **Menu de contexto nos headers das seções** (S6 do checklist) | **ADIADO** | 4.5 | = G5 |
+| **Drag & Drop para reordenar seções** (S4, Vídeo 4 01:11) e **resize de seções por sash** (S5) | **ADIADO** | 4.9 | refinamento UX; SplitView hoje é coluna flex sem sash |
+| **Badges numéricos na Activity Bar** | **ADIADO** | 4.5/4.6 | shell |
+| **Menu da raiz Add/Remove Folder to Workspace** | **ADIADO** | 4.5 | fora de escopo `04_11 §11-C` (single-root) |
+| **Open Editors real / Outline / Timeline com dados** | **ADIADO** | 4.7 | precisam do fio editor→módulo (dep `editors.{list,activeUri,dirty,onDidChange,activate,close}`) |
+| **Escape não fecha o menu de contexto** | **PENDENTE (shell)** | 4.5 | `ContextMenuHost` do `App.tsx` — débito do shell, não do módulo |
+| **`TerminalPanel.test.tsx` 9/9 vermelhos** e **`sessao_11f_context_menu` 2/2 vermelhos** | **PRÉ-EXISTENTES** | fora da FATIA-04 | idênticos antes/depois (verificado com `App.tsx` anterior ao B3 via `git show 70f2231`); Terminal é intocável; E2E terminal exigidos `pty_real` 6/6 + `interactive_v2` 3/3 **verdes** |
+
+#### C. Anti-regressão executada (HEAD `0d86656`)
+`npm run typecheck` **0** · vitest `explorer-search` **149/149** (16 arquivos) · vitest app 535 verdes (+9 `TerminalPanel` pré-existentes) · E2E `sessao_12_explorer` **27/27** (fixture 5175; inclui T6–T10) · `sessao_03_layout` 5/5 · `sessao_07_browser_editor` 5/5 · `sessao_11_terminal_interactive_v2` 3/3 · `sessao_11_terminal_pty_real` 6/6 · `sessao_04/05/09` 22/22. Servidores: VS Code 8080 (`--auth none`), workbench 5174, fixture 5175 só durante E2E.
+
+#### D. Decisões arquiteturais congeladas (reforço)
+1. **Transplante > Invenção.** Só entra código cuja origem está mapeada em `04_11` (arquivo:linha) ou lida da fonte upstream (ex.: `vs-seti-icon-theme.json`). Quando o upstream exige serviço que não existe aqui (`IDecorationsService`), o item é **BLOQUEADO** e vai para a fase que criar o serviço — nunca se "inventa por baixo".
+2. **VS Code é régua comportamental, não licença de acoplamento.** Fidelidade é medida no DOM/comportamento (`04_17`, HTML do vscode.dev, preview 8080), mas o código vive em `src/modules/explorer-search/` atrás de `contract.ts`. `App.tsx`/shell só mudam com autorização explícita (B3 foi autorizado e registrado).
+3. **Loop fechado obrigatório:** auditar no preview real → teste vermelho → transplante → teste verde → anti-regressão → 1 commit por gap. Status em docs só muda com essa trilha.
+4. **Fonte de status:** este documento + `auditoria_44/fase1/resultado.json`; o checklist de 23/09 é insumo histórico.
 
 ### Entrada cronológica 2026-09-22 — FECHAMENTO REAL DA SUB-FATIA 4.4 (loop fechado: 4 gaps implementados + testados)
 

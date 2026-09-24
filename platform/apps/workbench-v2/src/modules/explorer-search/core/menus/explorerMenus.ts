@@ -34,8 +34,8 @@ export const EXPLORER_MENU_GROUPS = [
   'navigation',
   '5_cutcopypaste',
   '5b_importexport',
+  '6_copypath',
   '7_modification',
-  '9_view',
 ] as const;
 export type ExplorerMenuGroup = (typeof EXPLORER_MENU_GROUPS)[number];
 
@@ -54,8 +54,14 @@ export type ExplorerContextValues = Record<ExplorerContextKey, boolean> & {
  *    principal já homologado na 4.4) — só arquivo.
  *  - Cut/Copy/Paste: `5_cutcopypaste` 8/10/20.
  *  - Download/Upload: `5b_importexport` 10/20 (Upload só em pasta gravável — web).
- *  - Rename/Delete: `7_modification` 10/20 (nunca na raiz).
- *  - Refresh/Collapse: `9_view` (ações do header também acessíveis pelo menu).
+ *  - Copy Path/Copy Relative Path: `6_copypath` 10/20 (upstream :603/:610,
+ *    `when: ResourceContextKey.IsFileSystemResource` → aqui "há recurso"; vale
+ *    também para raiz e multi-seleção).
+ *  - Rename/Delete Permanently: `7_modification` 10/20 (nunca na raiz). Upstream
+ *    :648 "Move to Trash" só quando `ExplorerResourceMoveableToTrash`; no web/
+ *    FileSystemPort não há lixeira → rótulo :662 "Delete Permanently".
+ *  - Refresh/Collapse NÃO pertencem ao ExplorerContext (são ações de título do
+ *    view — `MenuId.ViewTitle`); ficam só no header.
  */
 export const EXPLORER_CONTEXT_MENU: readonly ExplorerMenuItemSpec[] = [
   { id: 'explorer.newFile', label: 'New File...', group: 'navigation', order: 4,
@@ -77,13 +83,15 @@ export const EXPLORER_CONTEXT_MENU: readonly ExplorerMenuItemSpec[] = [
   { id: 'explorer.upload', label: 'Upload...', group: '5b_importexport', order: 20,
     when: 'explorerResourceIsFolder && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
 
+  { id: 'explorer.copyPath', label: 'Copy Path', group: '6_copypath', order: 10,
+    when: 'explorerResourceHasResource' },
+  { id: 'explorer.copyRelativePath', label: 'Copy Relative Path', group: '6_copypath', order: 20,
+    when: 'explorerResourceHasResource' },
+
   { id: 'explorer.rename', label: 'Rename...', group: '7_modification', order: 10,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
-  { id: 'explorer.delete', label: 'Delete', group: '7_modification', order: 20, danger: true,
+  { id: 'explorer.delete', label: 'Delete Permanently', group: '7_modification', order: 20, danger: true,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot', precondition: '!explorerResourceParentReadOnly' },
-
-  { id: 'explorer.refresh', label: 'Refresh Explorer', group: '9_view', order: 10 },
-  { id: 'explorer.collapseAll', label: 'Collapse Folders in Explorer', group: '9_view', order: 20 },
 ];
 
 /** Item resolvido para o adapter `deps.contextMenu.open` (forma congelada do contrato). */

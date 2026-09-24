@@ -113,6 +113,17 @@ export class ExplorerService implements IExplorerSearchApi {
     if (target.isDirectory) {
       target.forgetChildren();
       await this.tree.ensureResolved(target);
+      // upstream tree.refresh(): descendentes expandidos são re-resolvidos
+      // (senão a UI mostra a pasta aberta e vazia até novo clique).
+      await this.resolveExpandedDescendants(target);
+    }
+  }
+
+  private async resolveExpandedDescendants(dir: ExplorerItem): Promise<void> {
+    for (const child of await this.tree.ensureResolved(dir)) {
+      if (child.isDirectory && this.tree.isExpanded(child.resource)) {
+        await this.resolveExpandedDescendants(child);
+      }
     }
   }
 

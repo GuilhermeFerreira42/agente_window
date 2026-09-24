@@ -71,6 +71,29 @@ Ordenar a construção do AGENTE WINDOW em ondas executáveis, preservando a mod
 3. tokens CSS e temas.
 4. coerência visual intermodular.
 
+### Épico D2 — Refinamento UX Explorer (FATIA-04, itens identificados no Vídeo 4 + auditoria 2026-09-24)
+Fonte de estado: `docs/12` entrada "2026-09-24 — Sincronização Pós-Auditoria 4.4"; evidências em `auditoria_44/fase1/`; origem upstream em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_11` (arquivo:linha) e medidas em `04_17`.
+
+| # | Item | Estado | Fase | Evidência / origem | Bloqueador arquitetural |
+|---|---|---|---|---|---|
+| D2.1 | Ruído de rede no upload (`ensureParentDirs` sobe até `/`: 3× `POST /fs/mkdir` 403) | **PENDENTE** | 4.4 (fechamento) | auditoria item 11, `core/transfer/upload.ts` l.~153 | — |
+| D2.2 | Homologação manual da 4.4 no preview real pelo usuário | **PENDENTE** | 4.4 (fechamento) | checklist `docs/12` §A (10/11 PASS) | — |
+| D2.3 | Menu de contexto nos headers das seções (Open Editors/Outline/Timeline + raiz) com checkmarks | **ADIADO** | 4.5 | `viewPane.ts` → `MenuId.ViewTitleContext` (04_11); Vídeo 4 01:30 | `contextMenu.open` (contrato `04_10`) não tem `checked` — exige evolução do contrato do shell |
+| D2.4 | Escape fecha o menu de contexto | **PENDENTE (shell)** | 4.5 | `ContextMenuHost` em `App.tsx` | toque no shell exige autorização |
+| D2.5 | Geometria do menu (item 24 px, separadores por grupo, coluna keybinding) | **PENDENTE (shell)** | 4.5 | `04_17` (24 px), `04_18 §5.1` | idem |
+| D2.6 | Badges numéricos na Activity Bar | **ADIADO** | 4.5/4.6 | Vídeo 4 | shell |
+| D2.7 | Add/Remove Folder to Workspace no menu da raiz | **ADIADO** | 4.5 (decidir) | `fileActions.contribution.ts:617/627` | single-root (`04_11 §11-C`) |
+| D2.8 | Cores de status Git nos nomes da árvore (`--vscode-gitDecoration-*`) | **BLOQUEADO → 4.7+** | 4.7+ | Vídeo 4; upstream `extensions/git/src/decorationProvider.ts` → `IDecorationsService` (não mapeado em `04_11`) | **não existe `GitService`/`IDecorationsService` no repo** — precisa de dep `decorations` no contrato + endpoint `git status --porcelain` no server do módulo (código novo, não transplante) |
+| D2.9 | Open Editors real / Outline / Timeline com dados | **ADIADO** | 4.7 | `openEditorsView.ts`, `outline.contribution.ts`, `timeline.contribution.ts` (04_11) | precisa do fio editor→módulo (dep `editors.{list,activeUri,dirty,onDidChange,activate,close}` em `IExplorerSearchModuleDeps`) |
+| D2.10 | Word Wrap (Alt+Z), Split Editor, Markdown Preview | **DEFERIDO** | 4.7b / 4.7c | Vídeo 4 00:36 / 43 s; checklist 4.7-E4/E5/E6 | editor anexo (4.7) ainda não existe |
+| D2.11 | Drag & drop para reordenar seções | **ADIADO** | 4.9 | Vídeo 4 01:11; checklist 4.4-S4 (`SidebarPart` view drag) | SplitView do módulo é coluna flex (sem `ViewPaneContainer` DnD) |
+| D2.12 | Resize de seções por sash com persistência | **ADIADO** | 4.9 | checklist 4.4-S5 | idem |
+| D2.13 | Hover actions inline nos itens da árvore + feedback visual de drag (opacity/`dropBackground`) | **ADIADO** | 4.9 | checklist 4.4-T5/T6; `explorerViewer.ts:825/1571` | — |
+| D2.14 | Fonte `seti.woff` (glyphs reais por linguagem; hoje glyph codicon + cor Seti) | **ADIADO** | 4.9 | `0d86656`; `vs-seti-icon-theme.json` | trazer asset exige autorização |
+| D2.15 | Breadcrumb bar acima do editor (TR-BC1), BranchChanger real (TR-BR1), Source Control panel (TR-SC1) | **REGISTRADO** | 4.7 / fora da FATIA-04 | checklist §7 | TR-BR1/TR-SC1 dependem de serviço Git (ver D2.8) |
+
+Itens **CORRIGIDOS** nesta frente (não voltam ao backlog): B3 Browser abre no boot (`876b83d`), menu Copy Path/Delete Permanently (`60287b9`), seções com corpo 0 px + Refresh vazio (`f5a4c1d`), `.git` visível (`70f2231`), download multi → 1 ZIP (`e2a1058`), ícones por extensão (`0d86656`).
+
 ### Épico H — Release
 1. build de integração.
 2. testes finais.
@@ -87,6 +110,8 @@ Uma fatia só avança quando tiver:
 - relato final no chat com concluído, pendências e validações executadas.
 
 ## Estado atual da execução
+- **2026-09-24:** Ondas 1–3 concluídas (FATIA-01/02/03). Onda 4 (FATIA-04) em execução: sub-fatias 4.1–4.3 concluídas; **4.4 PARCIAL** (10/11 PASS na auditoria do preview 5174 — `docs/12` 2026-09-24; HEAD `0d86656`); 4.5 a fazer; hotfix 4.8-B3 aplicado. Débitos em Épico D2. Kanban por sub-fatia em `docs/11`.
+- Histórico (2026-09-13):
 - Ondas 1 e 2 já foram concluídas no repositório atual.
 - A base estrutural aprovada já foi materializada em `platform/` e `legacy/`.
 - A próxima frente funcional autorizada é a Onda 3 / FATIA-03 — Terminal piloto real com PTY.

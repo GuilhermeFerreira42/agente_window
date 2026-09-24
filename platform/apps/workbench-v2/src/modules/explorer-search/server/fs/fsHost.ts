@@ -27,7 +27,7 @@ import {
   stat as nodeStat,
   writeFile as nodeWriteFile,
 } from 'node:fs/promises';
-import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import nodePath, { basename, dirname, extname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { WorkspaceUri } from '../../contract';
 
@@ -87,33 +87,84 @@ function mimeOf(path: string): string {
   return MIME_BY_EXT[extname(path).toLowerCase()] ?? 'application/octet-stream';
 }
 
+// ---------------------------------------------------------------------------
+// URI <-> path multiplataforma (Windows/Linux). Forma da URI = a que
+// `node:url.pathToFileURL` produz (`file:///home/x` | `file:///C:/Users/x`),
+// SEM percent-encoding (convenção congelada do módulo: o path vai cru na URI
+// e o cliente — core/uri.ts — nunca decodifica; encodar aqui quebraria nomes
+// com espaço/#/% na árvore). `pathToFileURL`/`fileURLToPath` do Node 20 não
+// aceitam simular outra plataforma, por isso a API de path é injetável
+// (default node:path; testes usam path.win32/path.posix).
+// ---------------------------------------------------------------------------
+export type PathApi = Pick<typeof nodePath, 'normalize' | 'resolve' | 'sep' | 'isAbsolute'>;
+
+const FILE_SCHEME = 'file://';
+const WIN_DRIVE_RE = /^[A-Za-z]:$/;
+
+/** Path do SO → path da URI (sempre posix, absoluto, drive com "/" à frente). */
+function fsPathToUriPath(fsPath: string, p: PathApi): string {
+  let out = p.normalize(fsPath);
+  if (p.sep === '\\') out = out.replace(/\\/g, '/');
+  if (!out.startsWith('/')) out = `/${out}`; // "C:/x" → "/C:/x"
+  // Sem barra final (exceto raiz "/" — nunca usada como workspace).
+  if (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+}
+
+/** Path da URI (posix) → path do SO ("/C:/x" → "C:\\x" no Windows). */
+function uriPathToFsPath(uriPath: string, p: PathApi): string {
+  let raw = uriPath;
+  if (p.sep === '\\') {
+    // file:///C:/x → "/C:/x" → "C:/x"; também tolera "C:\\x" cru (vite.config).
+    if (/^\/[A-Za-z]:/.test(raw)) raw = raw.slice(1);
+    raw = raw.replace(/\//g, '\\');
+    if (WIN_DRIVE_RE.test(raw)) raw += '\\';
+  }
+  return raw;
+}
+
+/** Remove o esquema; aceita WorkspaceUri OU path cru (options.root do vite). */
+function stripScheme(uriOrPath: string): string {
+  return uriOrPath.startsWith(FILE_SCHEME) ? uriOrPath.slice(FILE_SCHEME.length) : uriOrPath;
+}
+
+/** Raiz absoluta e normalizada no formato do SO (usada por FsHost/watcher). */
+export function resolveRootPath(root: string, p: PathApi = nodePath): string {
+  const stripped = stripScheme(root);
+  const raw = root.startsWith(FILE_SCHEME) ? uriPathToFsPath(stripped, p) : stripped;
+  const resolved = p.normalize(p.resolve(raw));
+  // Windows: sem barra final ("C:\\repo\\" → "C:\\repo"), exceto raiz de drive.
+  return resolved.length > 3 && resolved.endsWith(p.sep) ? resolved.slice(0, -1) : resolved;
+}
+
 /** Guarda de travessia: resolve lexicamente e exige prefixo por SEGMENTO. */
-export function toFsPath(rootPath: string, uri: WorkspaceUri): string {
-  const rawPath = uri.startsWith('file://') ? uri.slice('file://'.length) : uri;
-  // WorkspaceUri é ABSOLUTA (file:///home/user/...). resolve() colapsa ".",
-  // "..", "//" e barra final — depois basta exigir relação por segmentos.
-  const resolved = normalize(resolve(rawPath));
-  const root = normalize(rootPath);
-  if (resolved !== root && !resolved.startsWith(root + sep)) {
+export function toFsPath(rootPath: string, uri: WorkspaceUri, p: PathApi = nodePath): string {
+  const rawPath = uriPathToFsPath(stripScheme(uri), p);
+  // WorkspaceUri é ABSOLUTA (file:///home/user/... | file:///C:/...). resolve()
+  // colapsa ".", "..", "//" e barra final — depois basta exigir relação por
+  // segmentos. Comparação case-sensitive (mesmo critério do upstream posix).
+  const resolved = p.normalize(p.resolve(rawPath));
+  const root = p.normalize(rootPath);
+  const rootPrefix = root.endsWith(p.sep) ? root : root + p.sep; // raiz de drive/"/"
+  if (resolved !== root && !resolved.startsWith(rootPrefix)) {
     throw new FsHostError('forbidden_path', `URI fora da raiz do workspace: ${uri}`);
   }
   return resolved;
 }
 
-/** WorkspaceUri é ABSOLUTA (espelho do path posix em file://). rootPath é
- *  mantido só para consistência de assinatura (chamadores guardam/fora da raiz
- *  já foram barrados por toFsPath). */
-export function toWorkspaceUri(rootPath: string, fsPath: string): WorkspaceUri {
+/** WorkspaceUri é ABSOLUTA (path posix em file://; no Windows `file:///C:/...`).
+ *  rootPath é mantido só para consistência de assinatura (chamadores guardam/
+ *  fora da raiz já foram barrados por toFsPath). */
+export function toWorkspaceUri(rootPath: string, fsPath: string, p: PathApi = nodePath): WorkspaceUri {
   void rootPath;
-  return `file://${normalize(fsPath)}` as WorkspaceUri;
+  return `${FILE_SCHEME}${fsPathToUriPath(fsPath, p)}` as WorkspaceUri;
 }
 
 export class FsHost {
   readonly rootPath: string;
 
   constructor(root: WorkspaceUri) {
-    const raw = root.startsWith('file://') ? root.slice('file://'.length) : root;
-    this.rootPath = resolve(normalize(raw));
+    this.rootPath = resolveRootPath(root);
   }
 
   private pathOf(uri: WorkspaceUri): string {
@@ -322,8 +373,7 @@ export function mapNodeError(e: unknown, uri: WorkspaceUri): FsHostError {
 
 /** Varre para garantir que o diretório raiz EXISTE e é diretório. */
 export async function assertWorkspaceRoot(root: WorkspaceUri): Promise<void> {
-  const raw = root.startsWith('file://') ? root.slice('file://'.length) : root;
-  const st = await nodeStat(resolve(normalize(raw))).catch(() => {
+  const st = await nodeStat(resolveRootPath(root)).catch(() => {
     throw new FsHostError('file_not_found', `raiz do workspace não existe: ${root}`);
   });
   if (!st.isDirectory()) {

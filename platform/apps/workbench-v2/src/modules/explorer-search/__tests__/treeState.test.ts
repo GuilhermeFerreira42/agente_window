@@ -68,6 +68,30 @@ describe('treeState — lazy loading (A2.1: 1 leitura por diretório)', () => {
   });
 });
 
+describe('treeState — files.exclude padrão (G3: files.contribution.ts `**/.git` etc.)', () => {
+  it('.git/.svn/.hg/CVS/.DS_Store/Thumbs.db não entram na árvore (em qualquer nível); "git-notes" e ".gitignore" entram', async () => {
+    fs.seed([
+      { path: '/ws/.git', kind: 'directory' },
+      { path: '/ws/.git/HEAD', kind: 'file' },
+      { path: '/ws/.svn', kind: 'directory' },
+      { path: '/ws/.hg', kind: 'directory' },
+      { path: '/ws/CVS', kind: 'directory' },
+      { path: '/ws/.DS_Store', kind: 'file' },
+      { path: '/ws/Thumbs.db', kind: 'file' },
+      { path: '/ws/.gitignore', kind: 'file' },
+      { path: '/ws/git-notes', kind: 'directory' },
+      { path: '/ws/src/.git', kind: 'directory' },
+    ]);
+    const root = await openRoot();
+    const names = tree.childrenOf(root).map((c) => c.name);
+    for (const hidden of ['.git', '.svn', '.hg', 'CVS', '.DS_Store', 'Thumbs.db']) expect(names).not.toContain(hidden);
+    expect(names).toEqual(expect.arrayContaining(['.gitignore', 'git-notes', 'src']));
+    const src = root.getChild('src')!;
+    await tree.ensureResolved(src);
+    expect(tree.childrenOf(src).map((c) => c.name)).not.toContain('.git');
+  });
+});
+
 describe('treeState — expansão / seleção / linhas visíveis', () => {
   it('expand/collapse/collapseAll com remoção de descendentes no collapse', async () => {
     const root = await openRoot();

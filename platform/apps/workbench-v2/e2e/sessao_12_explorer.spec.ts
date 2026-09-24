@@ -252,7 +252,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     expect(box.x + box.width, 'menu nao sai pela direita (truncava no painel estreito)').toBeLessThanOrEqual(vw.width);
     expect(box.y + box.height, 'menu nao sai pela base').toBeLessThanOrEqual(vw.height);
 
-    const item = menu.getByRole('menuitem', { name: 'Collapse Folders in Explorer' });
+    const item = menu.getByRole('menuitem', { name: 'Copy Relative Path' });
     await expect(item, 'item com rotulo completo presente').toBeVisible();
     const ib = (await item.boundingBox())!;
     expect(ib.x, 'item dentro do menu').toBeGreaterThanOrEqual(box.x - 1);
@@ -293,6 +293,8 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await page.reload();
     await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' });
     await page.waitForTimeout(400);
+    // B3: boot sem abas → abre um Browser para existir a barra de abas com o "+".
+    await page.getByRole('button', { name: 'Abrir navegador no editor' }).click();
     // Abre aba "Files" sem dados (onNewFile do menu + — supercie demo do shell).
     await page.locator('[aria-label="Adicionar aba do editor"]').first().click();
     await page.getByRole('menuitem', { name: 'Files', exact: true }).first().click();
@@ -386,7 +388,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     const labels = await menu.locator('[role="menuitem"]').allTextContents();
     // ordem de grupos: navigation ‖ 5_cutcopypaste ‖ 5b_importexport ‖ 7_modification
     const idx = (l: string) => labels.indexOf(l);
-    for (const l of ['New File...', 'New Folder...', 'Open', 'Cut', 'Copy', 'Download...', 'Rename...', 'Delete']) {
+    for (const l of ['New File...', 'New Folder...', 'Open', 'Cut', 'Copy', 'Download...', 'Copy Path', 'Copy Relative Path', 'Rename...', 'Delete Permanently']) {
       expect(labels, `item ${l} presente`).toContain(l);
     }
     expect(labels).not.toContain('Paste');
@@ -396,7 +398,10 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     expect(idx('Cut')).toBeLessThan(idx('Copy'));
     expect(idx('Copy')).toBeLessThan(idx('Download...'));
     expect(idx('Download...')).toBeLessThan(idx('Rename...'));
-    expect(idx('Rename...')).toBeLessThan(idx('Delete'));
+    expect(idx('Rename...')).toBeLessThan(idx('Delete Permanently'));
+    // G2: Refresh/Collapse são ações do header, não do nó (04_03 §1)
+    expect(labels).not.toContain('Refresh Explorer');
+    expect(labels).not.toContain('Collapse Folders in Explorer');
     // executa via registry: Rename... abre o input inline com o nome atual
     await menu.getByText('Rename...', { exact: true }).click();
     await expect(menu).toHaveCount(0);
@@ -404,6 +409,83 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('alpha.txt');
     await input.press('Escape');
+  });
+
+  test('T6 (G2): Copy Path / Copy Relative Path copiam para o clipboard (fileActions.contribution.ts:603/610)', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    await view.locator('[role="treeitem"]', { hasText: 'pasta' }).first().click();
+    const row = view.locator('[role="treeitem"]', { hasText: 'alpha.txt' });
+    await row.click({ button: 'right' });
+    const menu = page.locator('[data-testid="explorer-context-menu"]');
+    await menu.getByText('Copy Relative Path', { exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('e2e-fixture-root/pasta/alpha.txt');
+    await row.click({ button: 'right' });
+    await menu.getByText('Copy Path', { exact: true }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`${SEED}/pasta/alpha.txt`);
+  });
+
+  test('T9 (seções auxiliares): clique no header expande/recolhe com corpo VISÍVEL (>0px); "X" do Open Editors aparece no hover e fecha', async ({ page }) => {
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    const pane = (id: string) => view.locator(`.split-view-view[data-pane="${id}"]`);
+    const bodyH = async (id: string) => (await pane(id).locator('.pane-body').boundingBox())?.height ?? 0;
+    // Open Editors / Outline / Timeline começam recolhidos (só header 22px)
+    for (const id of ['openEditors', 'outline', 'timeline']) {
+      await expect(pane(id).locator('.pane-header')).toHaveAttribute('aria-expanded', 'false');
+      expect((await pane(id).boundingBox())!.height).toBeCloseTo(22, 0);
+    }
+    // expandir Outline → header aria-expanded=true e corpo com altura real (mensagem visível)
+    await pane('outline').locator('.pane-header').click();
+    await expect(pane('outline').locator('.pane-header')).toHaveAttribute('aria-expanded', 'true');
+    expect(await bodyH('outline')).toBeGreaterThan(10);
+    await expect(pane('outline').getByText('No symbols found in document')).toBeVisible();
+    // recolher de novo
+    await pane('outline').locator('.pane-header').click();
+    await expect(pane('outline').locator('.pane-header')).toHaveAttribute('aria-expanded', 'false');
+    expect((await pane('outline').boundingBox())!.height).toBeCloseTo(22, 0);
+    // Open Editors: abrir arquivo → item aparece; hover mostra "Close Editor"; clique remove
+    await writeFile(`${SEED}/t9-open.txt`, 't9\n');
+    await page.locator('[data-testid="explorer-refresh"]').click();
+    const seedRow = view.locator('[role="treeitem"]', { hasText: 'e2e-fixture-root' }).first();
+    await expect(seedRow).toBeVisible();
+    if ((await seedRow.getAttribute('aria-expanded')) !== 'true') await seedRow.click();
+    await view.locator('[role="treeitem"]', { hasText: 't9-open.txt' }).click();
+    await pane('openEditors').locator('.pane-header').click();
+    const row = pane('openEditors').locator('.monaco-list-row', { hasText: 't9-open.txt' });
+    await expect(row).toBeVisible();
+    const close = row.locator('[aria-label="Close Editor"]');
+    await page.mouse.move(5, 5); // ao expandir, a linha passa a ficar sob o cursor — afasta antes de medir
+    await expect(close).toBeHidden();
+    await row.hover();
+    await expect(close).toBeVisible();
+    await close.click();
+    await expect(row).toHaveCount(0);
+    // header da pasta raiz também recolhe e volta
+    await pane('folders').locator('.pane-header').click();
+    await expect(pane('folders').locator('.pane-header')).toHaveAttribute('aria-expanded', 'false');
+    await expect(view.locator('[role="treeitem"]')).toHaveCount(0);
+    await pane('folders').locator('.pane-header').click();
+    await expect(view.locator('[role="treeitem"]', { hasText: 't9-open.txt' })).toBeVisible();
+  });
+
+  test('T7 (G3): pasta .git existente no disco NÃO aparece na árvore (files.exclude padrão); .gitignore aparece', async ({ page }) => {
+    await mkdir(`${SEED}/.git/refs`, { recursive: true });
+    await writeFile(`${SEED}/.git/HEAD`, 'ref: refs/heads/main\n');
+    await writeFile(`${SEED}/.gitignore`, 'node_modules\n');
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    await expect(view.locator('[role="treeitem"]', { hasText: '.gitignore' })).toHaveCount(1);
+    await expect(view.locator('[role="treeitem"]', { hasText: /^\.git$/ })).toHaveCount(0);
+    await page.locator('[data-testid="explorer-refresh"]').click();
+    const seedRow = view.locator('[role="treeitem"]', { hasText: 'e2e-fixture-root' }).first();
+    if ((await seedRow.getAttribute('aria-expanded')) !== 'true') await seedRow.click();
+    await expect(view.locator('[role="treeitem"]', { hasText: '.gitignore' })).toHaveCount(1);
+    await expect(view.locator('[role="treeitem"]', { hasText: /^\.git$/ })).toHaveCount(0);
+    await rm(`${SEED}/.git`, { recursive: true, force: true });
+    await rm(`${SEED}/.gitignore`, { force: true });
   });
 
   test('GAP 1 (menu): PASTA tem Paste DESABILITADO sem clipboard e habilitado após Copy; Paste cola de verdade no disco', async ({ page }) => {
@@ -444,10 +526,10 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await expect(menu).toBeVisible();
     const labels = await menu.locator('[role="menuitem"]').allTextContents();
     expect(labels).toContain('New File...');
-    expect(labels).toContain('Refresh Explorer');
+    expect(labels).toContain('Copy Path'); // G2: raiz tem Copy Path; Refresh/Collapse só no header
     expect(labels).not.toContain('Cut');
     expect(labels).not.toContain('Rename...');
-    expect(labels).not.toContain('Delete');
+    expect(labels).not.toContain('Delete Permanently');
     expect(labels).not.toContain('Download...');
   });
 
@@ -560,6 +642,55 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     expect(text).toContain('alpha.txt');
     expect(text).toContain('sub/deep.txt');
     expect(text).toContain('deep\n'); // STORED: conteúdo legível sem compressão
+  });
+
+  test('T8 (G1): Download... com 2+ itens selecionados gera UM ÚNICO .zip íntegro (CRC32 STORED válido)', async ({ page }) => {
+    await writeFile(`${SEED}/t8-um.txt`, 'um\n');
+    await writeFile(`${SEED}/t8-dois.txt`, 'dois\n');
+    await disablePicker(page);
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    const menu = page.locator('[data-testid="explorer-context-menu"]');
+    await view.locator('[role="treeitem"]', { hasText: 't8-um.txt' }).click();
+    await view.locator('[role="treeitem"]', { hasText: 't8-dois.txt' }).click({ modifiers: ['Control'] });
+    await view.locator('[role="treeitem"]', { hasText: 'pasta' }).first().click({ modifiers: ['Control'] });
+    const downloads: string[] = [];
+    page.on('download', (d) => downloads.push(d.suggestedFilename()));
+    const downloadPromise = page.waitForEvent('download');
+    await view.locator('[role="treeitem"]', { hasText: 'pasta' }).first().click({ button: 'right' });
+    await menu.getByText('Download...', { exact: true }).click();
+    const download = await downloadPromise;
+    await page.waitForTimeout(1500);
+    expect(downloads, 'exatamente 1 download').toEqual(['e2e-fixture-root.zip']);
+    const buf = await readFile((await download.path())!);
+    expect(buf.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
+    const eocd = buf.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1'));
+    expect(buf.readUInt16LE(eocd + 10), 'entradas: t8-um.txt, t8-dois.txt, pasta/alpha.txt, pasta/beta.txt, pasta/sub/deep.txt').toBe(5);
+    // CRC32 do 1º local header confere com o conteúdo STORED
+    const nameLen = buf.readUInt16LE(26); const extraLen = buf.readUInt16LE(28); const size = buf.readUInt32LE(18);
+    const name = buf.subarray(30, 30 + nameLen).toString('utf8');
+    const data = buf.subarray(30 + nameLen + extraLen, 30 + nameLen + extraLen + size);
+    const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+    let crc = 0xffffffff; for (const b of data) crc = crcTable[(crc ^ b) & 0xff] ^ (crc >>> 8); crc = (crc ^ 0xffffffff) >>> 0;
+    expect(crc, `crc32 de ${name}`).toBe(buf.readUInt32LE(14));
+    const text = buf.toString('latin1');
+    for (const n of ['t8-um.txt', 't8-dois.txt', 'pasta/alpha.txt', 'pasta/sub/deep.txt']) expect(text).toContain(n);
+  });
+
+  test('T10 (G4): ícone Seti por extensão — .ts/.md azul, .bat azul, .gitignore cinza-ignore, .json amarelo, .png roxo; .txt default', async ({ page }) => {
+    for (const f of ['t10.ts', 't10.md', 't10.bat', 't10.json', 't10.png', 't10.txt', 't10.gitignore']) await writeFile(`${SEED}/${f}`, 'x');
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    const color = async (name: string) => view.locator('[role="treeitem"]', { hasText: name }).first().locator('.monaco-icon-label').evaluate((e) => getComputedStyle(e, '::before').color);
+    const seti = { blue: 'rgb(81, 154, 186)', yellow: 'rgb(203, 203, 65)', purple: 'rgb(160, 116, 196)', ignore: 'rgb(65, 83, 91)', white: 'rgb(212, 215, 214)' };
+    expect(await color('t10.ts'), 'typescript → blue').toBe(seti.blue);
+    expect(await color('t10.md'), 'markdown → blue').toBe(seti.blue);
+    expect(await color('t10.bat'), 'bat → blue').toBe(seti.blue);
+    expect(await color('t10.json'), 'json → yellow').toBe(seti.yellow);
+    expect(await color('t10.png'), 'image → purple').toBe(seti.purple);
+    expect(await color('t10.gitignore'), 'ignore → grey').toBe(seti.ignore);
+    expect(await color('t10.txt'), 'plaintext → default').toBe(seti.white);
+    for (const f of ['t10.ts', 't10.md', 't10.bat', 't10.json', 't10.png', 't10.txt', 't10.gitignore']) await rm(`${SEED}/${f}`, { force: true });
   });
 
   test('GAP 4 (VAL-EXP-04): nó criado via MENU (New Folder...) fica selecionado — aria-selected E classe .selected', async ({ page }) => {

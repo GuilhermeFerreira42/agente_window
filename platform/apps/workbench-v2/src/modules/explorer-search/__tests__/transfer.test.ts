@@ -20,7 +20,8 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype.arrayBuffer !== 'functi
   };
 }
 import { collectDroppedFiles, uploadFiles, resetUploadDirCache } from '../core/transfer/upload';
-import { crc32, buildZipStoreAsync } from '../core/transfer/download';
+import { crc32, buildZipStoreAsync, downloadFiles } from '../core/transfer/download';
+import { FakeFsPort } from './fakeFs';
 import { asWorkspaceUri } from '../core/uri';
 
 // ---------------------------------------------------------------------------
@@ -211,5 +212,45 @@ describe('zip STORED (A4.6)', () => {
     expect(text).toContain('pasta/a.txt');
     expect(text).toContain('pasta/sub/b.bin');
     expect(text).toContain('hello');
+  });
+});
+
+describe('downloadFiles — G1 multi-seleção → 1 ZIP (adaptação web de fileImportExport.ts:633/652/680)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function seeded() {
+    const fs = new FakeFsPort(asWorkspaceUri('/ws'));
+    fs.seed([
+      { path: '/ws/a.txt', kind: 'file' },
+      { path: '/ws/b.txt', kind: 'file' },
+      { path: '/ws/dir', kind: 'directory' },
+      { path: '/ws/dir/c.txt', kind: 'file' },
+    ]);
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const uri = decodeURIComponent(String(url).split('uri=')[1]);
+      return { ok: true, blob: async () => new Blob([`conteudo:${uri.split('/').pop()}`]) } as unknown as Response;
+    }));
+    return fs;
+  }
+
+  it('1 arquivo → 1 download do próprio arquivo (sem zip)', async () => {
+    const fs = seeded(); const saved: Array<{ name: string; size: number }> = [];
+    await downloadFiles({ fs, uris: [asWorkspaceUri('/ws/a.txt')], save: async (b, n) => { saved.push({ name: n, size: b.size }); } });
+    expect(saved.map((s) => s.name)).toEqual(['a.txt']);
+  });
+
+  it('2 arquivos + 1 pasta → UM ÚNICO zip <pai>.zip com arquivos na raiz e pasta com caminhos relativos', async () => {
+    const fs = seeded(); const saved: Array<{ name: string; blob: Blob }> = [];
+    await downloadFiles({ fs, uris: [asWorkspaceUri('/ws/a.txt'), asWorkspaceUri('/ws/b.txt'), asWorkspaceUri('/ws/dir')], save: async (b, n) => { saved.push({ name: n, blob: b }); } });
+    expect(saved).toHaveLength(1);
+    expect(saved[0].name).toBe('ws.zip');
+    const bytes = new Uint8Array(await saved[0].blob.arrayBuffer());
+    const count = bytes[bytes.length - 12] | (bytes[bytes.length - 11] << 8);
+    expect(count).toBe(3);
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('a.txt');
+    expect(text).toContain('b.txt');
+    expect(text).toContain('dir/c.txt');
+    expect(text).toContain('conteudo:c.txt');
   });
 });

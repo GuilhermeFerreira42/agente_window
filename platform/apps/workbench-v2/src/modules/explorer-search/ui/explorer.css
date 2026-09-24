@@ -68,10 +68,15 @@
 .explorer-viewlet .monaco-split-view2 > .monaco-scrollable-element > .split-view-container > .split-view-view { position: relative; width: 100%; flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .explorer-viewlet .split-view-container > .split-view-view[data-pane='folders'] { flex: 0 0 22px; }
 .explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 1 1 0; }
-/* Open Editors expandido não “rouba” a pasta: altura do conteúdo (máx. 9 linhas, explorer.openEditors.visible) */
-.explorer-viewlet .split-view-view[data-pane='openEditors']:has(> .pane.expanded),
+/* Panes auxiliares expandidos: no VS Code o SplitView (paneview.ts/splitview.ts
+ * `layout`) reparte a altura entre panes expandidos respeitando `minimumBodySize`
+ * (Open Editors = conteúdo até 9 linhas; Outline/Timeline compartilham o resto).
+ * Na coluna flex: Open Editors cresce até o conteúdo; Outline/Timeline recebem uma
+ * fatia (peso 1 vs pasta peso 2) com corpo mínimo garantido — nunca 0px. */
+.explorer-viewlet .split-view-view[data-pane='openEditors']:has(> .pane.expanded) { flex: 0 1 auto; min-height: calc(22px + 22px); max-height: calc(22px + 9 * 22px); }
 .explorer-viewlet .split-view-view[data-pane='outline']:has(> .pane.expanded),
-.explorer-viewlet .split-view-view[data-pane='timeline']:has(> .pane.expanded) { flex: 0 0 auto; }
+.explorer-viewlet .split-view-view[data-pane='timeline']:has(> .pane.expanded) { flex: 1 1 0; min-height: calc(22px + 3 * 22px); }
+.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 2 1 0; min-height: calc(22px + 3 * 22px); }
 
 .explorer-viewlet .monaco-pane-view .pane { overflow: hidden; width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
 .explorer-viewlet .monaco-pane-view .pane > .pane-header {
@@ -221,6 +226,61 @@
   color: var(--vscode-explorer-seti-default, #d4d7d6);
 }
 .explorer-viewlet .show-file-icons .folder-icon.monaco-icon-label:before { content: none; }
+
+/* Paleta Seti (extensions/theme-seti/icons/vs-seti-icon-theme.json → iconDefinitions.fontColor).
+ * Tokens locais do módulo; o tema pode sobrescrever. Mapeamento extensão → linguagem → cor
+ * segue `fileExtensions`/`languageIds` do tema (subset das extensões deste repo). */
+.explorer-viewlet {
+  --vscode-explorer-seti-blue: #519aba;    /* typescript, react, markdown, css, python, bat, tsconfig, info */
+  --vscode-explorer-seti-yellow: #cbcb41;  /* javascript, json, license */
+  --vscode-explorer-seti-orange: #e37933;  /* html, xml */
+  --vscode-explorer-seti-purple: #a074c4;  /* image, svg, yaml */
+  --vscode-explorer-seti-green: #8dc149;   /* shellscript */
+  --vscode-explorer-seti-grey: #6d8086;    /* config/properties (toml, ini) */
+  --vscode-explorer-seti-ignore: #41535b;  /* git_ignore */
+}
+.explorer-viewlet .show-file-icons .file-icon.ts-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.tsx-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.mts-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.cts-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.md-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.markdown-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.css-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.py-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.bat-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.cmd-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.dockerfile-name-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.tsconfig\.json-name-file-icon:before { color: var(--vscode-explorer-seti-blue); }
+.explorer-viewlet .show-file-icons .file-icon.js-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.mjs-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.cjs-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.jsx-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.json-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.jsonc-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.license-name-file-icon:before { color: var(--vscode-explorer-seti-yellow); }
+.explorer-viewlet .show-file-icons .file-icon.html-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.htm-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.xml-ext-file-icon:before { color: var(--vscode-explorer-seti-orange); }
+.explorer-viewlet .show-file-icons .file-icon.png-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.jpg-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.jpeg-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.gif-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.ico-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.webp-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.svg-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.yml-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.yaml-ext-file-icon:before { color: var(--vscode-explorer-seti-purple); }
+.explorer-viewlet .show-file-icons .file-icon.sh-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.bash-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.zsh-ext-file-icon:before { color: var(--vscode-explorer-seti-green); }
+.explorer-viewlet .show-file-icons .file-icon.toml-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.ini-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.properties-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.editorconfig-ext-file-icon:before { color: var(--vscode-explorer-seti-grey); }
+.explorer-viewlet .show-file-icons .file-icon.gitignore-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.gitattributes-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.npmignore-ext-file-icon:before,
+.explorer-viewlet .show-file-icons .file-icon.dockerignore-ext-file-icon:before { color: var(--vscode-explorer-seti-ignore); }
 
 /* ---------------------------------------------------------------------------
  * openeditors / outline / timeline (corpo)
