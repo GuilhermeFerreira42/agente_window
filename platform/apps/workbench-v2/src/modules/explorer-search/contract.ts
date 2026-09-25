@@ -136,7 +136,13 @@ export interface IExplorerSearchModuleDeps {
   menus: CommandRegistryLike;    // adapter 04_10 §2.4 (MenuRegistry → CommandRegistry)
   contextMenu: {
     /** Abre o menu contextual (posicionado pelo módulo). O módulo NÃO desenha o menu. */
-    open(input: { x: number; y: number; items: Array<{ id: string; label: string; enabled: boolean; group?: string; order: number; danger?: boolean }> }): void;
+    open(input: { x: number; y: number; items: Array<{
+      id: string; label: string; enabled: boolean; group?: string; order: number; danger?: boolean;
+      /** 4.5 (evolução ADITIVA autorizada 2026-09-25): rótulo do atalho exibido à direita (04_17 §3.8). OPCIONAL — ausente = nada é desenhado. */
+      keybinding?: string;
+      /** 4.5 (aditivo): item com estado marcado (toggles do ViewTitleContext — check na coluna de 26 px). OPCIONAL. */
+      checked?: boolean;
+    }> }): void;
   };
   workspaceRoot: WorkspaceUri;   // raiz única (Q4: single-root nesta fase)
 }

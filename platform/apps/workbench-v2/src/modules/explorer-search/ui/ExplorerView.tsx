@@ -23,6 +23,11 @@ import type { UploadFileRecord } from '../core/transfer/upload';
 import { downloadFiles } from '../core/transfer/download';
 import { computeExplorerContext, resolveExplorerContextMenu } from '../core/menus/explorerMenus';
 import type { ExplorerContextValues } from '../core/menus/explorerMenus';
+import {
+  DEFAULT_VIEWS_VISIBILITY, EXPLORER_VIEWS, applyViewVisibility, normalizeViewsVisibility,
+  resolveViewTitleContextMenu, viewHideCommandId, viewToggleCommandId,
+} from '../core/menus/viewTitleMenus';
+import type { ExplorerViewId, ExplorerViewsVisibility } from '../core/menus/viewTitleMenus';
 import { saveBlob } from './transfer/saveBlob';
 import './explorer.css';
 
@@ -54,9 +59,11 @@ interface PaneProps {
   actions?: React.ReactNode;
   headerExtra?: React.ReactNode;
   children?: React.ReactNode;
+  /** 4.5 c5: botão direito no header → MenuId.ViewTitleContext (viewPane.ts onContextMenu). */
+  onHeaderContextMenu?(ev: React.MouseEvent): void;
 }
 
-const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, headerClassName, paneClassName, actions, headerExtra, children }) => (
+const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, headerClassName, paneClassName, actions, headerExtra, children, onHeaderContextMenu }) => (
   <div className="split-view-view visible" data-pane={id}>
     <div className={`pane vertical${expanded ? ' expanded' : ''}${paneClassName ? ' ' + paneClassName : ''}`}>
       <div
@@ -67,6 +74,7 @@ const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, h
         aria-label={ariaLabel}
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        onContextMenu={onHeaderContextMenu}
       >
         <div className={`twisty-container codicon codicon-view-pane-container-${expanded ? 'expanded' : 'collapsed'}`} />
         <h3 className="title" aria-label={ariaLabel}>{title}</h3>
@@ -247,6 +255,7 @@ interface ConflictState { name: string; resolve: (action: 'replace' | 'skip' | '
 interface OpenEditorEntry { uri: WorkspaceUri }
 interface TimelineEntry { id: string; label: string; timestampMs: number }
 type PaneId = 'folders' | 'openEditors' | 'outline' | 'timeline';
+const VIEWS_VISIBILITY_STORAGE_KEY = 'explorer-search.viewsVisibility.v1';
 
 const FOLDER_ACTIONS: HeaderAction[] = [
   { id: 'explorer.newFile', label: 'New File...', icon: 'new-file', testId: 'explorer-new-file' },
@@ -268,6 +277,20 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
   const [expandedPanes, setExpandedPanes] = React.useState<Record<PaneId, boolean>>({
     folders: true, openEditors: false, outline: false, timeline: false,
   });
+  // 4.5 c5 — visibilidade das views (ViewTitleContext). Padrão VS Code: Open
+  // Editors OCULTA. Persistida por workspace (estado de UI, não de disco).
+  const [viewsVisibility, setViewsVisibility] = React.useState<ExplorerViewsVisibility>(() => {
+    try {
+      const raw = globalThis.localStorage?.getItem(VIEWS_VISIBILITY_STORAGE_KEY);
+      return raw ? normalizeViewsVisibility(JSON.parse(raw)) : DEFAULT_VIEWS_VISIBILITY;
+    } catch { return DEFAULT_VIEWS_VISIBILITY; }
+  });
+  React.useEffect(() => {
+    try { globalThis.localStorage?.setItem(VIEWS_VISIBILITY_STORAGE_KEY, JSON.stringify(viewsVisibility)); } catch { /* storage indisponível */ }
+  }, [viewsVisibility]);
+  const setViewVisible = React.useCallback((id: ExplorerViewId, next: boolean) => {
+    setViewsVisibility((cur) => applyViewVisibility(cur, id, next));
+  }, []);
   const [inlineEdit, setInlineEdit] = React.useState<InlineEditState | null>(null);
   const [dropTargetUri, setDropTargetUri] = React.useState<WorkspaceUri | null>(null);
   const [transferStatus, setTransferStatus] = React.useState<TransferStatus | null>(null);
@@ -468,6 +491,11 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       menus.register({ id: 'explorer.newFolder', title: 'New Folder...', run: () => beginCreate('create-folder') }),
       menus.register({ id: 'explorer.refresh', title: 'Refresh Explorer', run: refreshAll }),
       menus.register({ id: 'explorer.collapseAll', title: 'Collapse Folders in Explorer', run: collapseAll }),
+      // 4.5 c5 — ViewTitleContext: Hide '<view>' + toggles (viewPaneContainer.ts)
+      ...EXPLORER_VIEWS.flatMap((v) => [
+        menus.register({ id: viewHideCommandId(v.id), title: `Hide '${v.label}'`, run: () => setViewVisible(v.id, false) }),
+        menus.register({ id: viewToggleCommandId(v.id), title: v.label, run: () => setViewVisible(v.id, !viewsVisibilityRef.current[v.id]) }),
+      ]),
       menus.register({ id: 'explorer.download', title: 'Download...', run: downloadSelection }),
       menus.register({ id: 'explorer.upload', title: 'Upload...', run: uploadViaPicker }),
       menus.register({ id: 'explorer.download.finished', title: 'internal noop', run: () => undefined }),
@@ -500,7 +528,16 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       }),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [menus, service, tick, beginCreate, beginRename, refreshAll, collapseAll, downloadSelection, uploadViaPicker, openRow, copyPaths]);
+  }, [menus, service, tick, beginCreate, beginRename, refreshAll, collapseAll, downloadSelection, uploadViaPicker, openRow, copyPaths, setViewVisible]);
+  const viewsVisibilityRef = React.useRef(viewsVisibility);
+  viewsVisibilityRef.current = viewsVisibility;
+
+  // 4.5 c5 — menu de contexto do pane-header (viewPane.ts onContextMenu → ViewTitleContext)
+  const onPaneHeaderContextMenu = React.useCallback((id: ExplorerViewId) => (ev: React.MouseEvent) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    contextMenu.open({ x: ev.clientX, y: ev.clientY, items: resolveViewTitleContextMenu(id, viewsVisibilityRef.current) });
+  }, [contextMenu]);
 
   // ---- inline commit ----
   const commitInline = React.useCallback((value: string) => {
@@ -587,6 +624,23 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       case ' ': if (focused) { ev.preventDefault(); const it = service.findItem(focused); if (it?.isDirectory) openRow(focused); } return;
       case 'F2': if (focused) { ev.preventDefault(); beginRename(focused); } return;
       case 'Delete': if (sel.length) { ev.preventDefault(); void menus.execute('explorer.delete'); } return;
+      case 'F10':
+      case 'ContextMenu': {
+        // 04_03 §6: tecla Menu / Shift+F10 abre o menu no item focado (listWidget
+        // upstream: keyboard contextmenu ancora no elemento focado; sem foco →
+        // menu da raiz, como o clique em área vazia).
+        if (ev.key === 'F10' && !ev.shiftKey) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const container = ev.currentTarget as HTMLElement;
+        const rowEl = focused ? (container.querySelector(`[data-uri="${CSS.escape(focused)}"]`) as HTMLElement | null) : null;
+        const rect = (rowEl ?? container).getBoundingClientRect();
+        const target = focused ?? service.getRootItem()?.resource ?? null;
+        if (!target) return;
+        if (!focused && target) { service.select({ uris: [target] }); tick.bump(); }
+        openItemContextMenu(target, rect.left + 20, rowEl ? rect.bottom : rect.top);
+        return;
+      }
       case 'ArrowRight': {
         if (!focused) return;
         const it = service.findItem(focused);
@@ -606,6 +660,13 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
       }
       case 'Escape': if (abortRef.current) { abortRef.current.abort(); setTransferStatus(null); } setDropTargetUri(null); return;
       default: {
+        // Copy Path Ctrl+Alt+C / Copy Relative Path Ctrl+Shift+Alt+C
+        // (fileActions.contribution.ts keybindings; 04_17 §3.8 ordem medida).
+        if ((ev.ctrlKey || ev.metaKey) && ev.altKey && ev.key.toLowerCase() === 'c') {
+          ev.preventDefault();
+          void menus.execute(ev.shiftKey ? 'explorer.copyRelativePath' : 'explorer.copyPath');
+          return;
+        }
         if ((ev.ctrlKey || ev.metaKey) && !ev.altKey) {
           const k = ev.key.toLowerCase();
           if (k === 'c') { ev.preventDefault(); void menus.execute('explorer.copy'); }
@@ -615,7 +676,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
         }
       }
     }
-  }, [service, rows, selectRows, openRow, beginRename, menus, tick]);
+  }, [service, rows, selectRows, openRow, beginRename, menus, tick, openItemContextMenu]);
 
   // ---- DnD (política pura em core/dndPolicy) ----
   const buildData = React.useCallback((ev: React.DragEvent): DndData | null => {
@@ -798,6 +859,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
                 id="folders"
                 title={rootName || 'No Folder Opened'}
                 ariaLabel={`Explorer Section: ${rootName}`}
+                onHeaderContextMenu={onPaneHeaderContextMenu('folders')}
                 expanded={expandedPanes.folders}
                 onToggle={() => togglePane('folders')}
                 paneClassName="preserve-workspace-name-case"
@@ -831,13 +893,14 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
                 )}
               </Pane>
 
-              {/* ---- Open Editors ---- */}
-              <Pane
+              {/* ---- Open Editors (oculta por padrão — VS Code) ---- */}
+              {viewsVisibility.openEditors && <Pane
                 id="openEditors"
                 title="Open Editors"
                 ariaLabel="Open Editors Section"
                 expanded={expandedPanes.openEditors}
                 onToggle={() => togglePane('openEditors')}
+                onHeaderContextMenu={onPaneHeaderContextMenu('openEditors')}
                 headerExtra={<div className="open-editors-dirty-count-container" />}
               >
                 <div className="pane-body-inner open-editors show-file-icons">
@@ -871,15 +934,15 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
                     </div>
                   </div>
                 </div>
-              </Pane>
+              </Pane>}
 
               {/* ---- Outline ---- */}
-              <Pane id="outline" title="Outline" ariaLabel="Outline Section" expanded={expandedPanes.outline} onToggle={() => togglePane('outline')}>
+              {viewsVisibility.outline && <Pane id="outline" title="Outline" ariaLabel="Outline Section" expanded={expandedPanes.outline} onToggle={() => togglePane('outline')} onHeaderContextMenu={onPaneHeaderContextMenu('outline')}>
                 <div className="outline-pane"><div className="pane-message">No symbols found in document</div></div>
-              </Pane>
+              </Pane>}
 
               {/* ---- Timeline ---- */}
-              <Pane id="timeline" title="Timeline" ariaLabel="Timeline Section" expanded={expandedPanes.timeline} onToggle={() => togglePane('timeline')} headerClassName="timeline-view">
+              {viewsVisibility.timeline && <Pane id="timeline" title="Timeline" ariaLabel="Timeline Section" expanded={expandedPanes.timeline} onToggle={() => togglePane('timeline')} headerClassName="timeline-view" onHeaderContextMenu={onPaneHeaderContextMenu('timeline')}>
                 <div className="timeline-pane">
                   {timeline.length === 0
                     ? <div className="pane-message">The active editor cannot provide timeline information.</div>
@@ -897,7 +960,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
                       </div>
                     )}
                 </div>
-              </Pane>
+              </Pane>}
             </div>
           </div>
         </div>

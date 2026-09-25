@@ -100,12 +100,15 @@ describe('context keys (04_03 §7 / conjunto congelado 04_10 §2.4)', () => {
 });
 
 describe('matriz de habilitação (04_03 §2)', () => {
-  it('ARQUIVO: New File/Folder (no pai), Open, Cut, Copy, Download, Rename, Delete; sem Paste/Upload', () => {
+  it('ARQUIVO: Open, Cut, Copy, Download, Rename, Delete; sem New File/Folder (upstream ExplorerFolderContext, c4), Paste, Upload', () => {
     const list = ids(file());
     expect(list).toEqual(expect.arrayContaining([
-      'explorer.newFile', 'explorer.newFolder', 'explorer.open', 'explorer.cut', 'explorer.copy',
+      'explorer.open', 'explorer.cut', 'explorer.copy',
       'explorer.download', 'explorer.copyPath', 'explorer.copyRelativePath', 'explorer.rename', 'explorer.delete',
     ]));
+    expect(list[0], '04_17 §3.8: menu de arquivo começa em Open').toBe('explorer.open');
+    expect(list).not.toContain('explorer.newFile');
+    expect(list).not.toContain('explorer.newFolder');
     expect(list).not.toContain('explorer.paste');
     expect(list).not.toContain('explorer.upload');
   });
@@ -168,4 +171,64 @@ describe('matriz de habilitação (04_03 §2)', () => {
     const list = ids(file({ selection: [], target: null }));
     expect(list).toEqual([]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// 4.5 commit 3 — keybinding labels (04_17 §3.8 "Ordem medida") + matriz
+// 04_03 §2 item a item: 10 itens × 5 contextos (arquivo, pasta, raiz,
+// multi-seleção, somente leitura). "✔" = presente e habilitado; "✖" = presente
+// e desabilitado (precondition); "—" = ausente (when falso).
+// ---------------------------------------------------------------------------
+describe('keybinding labels (04_17 §3.8)', () => {
+  const expectedKb: Record<string, string | undefined> = {
+    'explorer.newFile': undefined, 'explorer.newFolder': undefined, 'explorer.open': undefined,
+    'explorer.cut': 'Ctrl+X', 'explorer.copy': 'Ctrl+C', 'explorer.paste': 'Ctrl+V',
+    'explorer.download': undefined, 'explorer.upload': undefined,
+    'explorer.copyPath': 'Ctrl+Alt+C', 'explorer.copyRelativePath': 'Ctrl+Shift+Alt+C',
+    'explorer.rename': 'F2', 'explorer.delete': 'Del',
+  };
+  it('tabela declara exatamente os keybindings medidos no VS Code real', () => {
+    for (const it of EXPLORER_CONTEXT_MENU) expect(it.keybinding, it.id).toBe(expectedKb[it.id]);
+  });
+  it('item resolvido carrega keybinding (opcional: ausente quando não há)', () => {
+    const m = menu(folder());
+    expect(m.find((i) => i.id === 'explorer.cut')?.keybinding).toBe('Ctrl+X');
+    expect('keybinding' in (m.find((i) => i.id === 'explorer.newFile') ?? {})).toBe(false);
+    expect(m.every((i) => i.checked === undefined)).toBe(true);
+  });
+});
+
+describe('matriz 04_03 §2 — 10 itens × 5 contextos (item a item)', () => {
+  type Cell = '✔' | '✖' | '—';
+  const multi = (): ExplorerContextSource => file({ selection: ['/ws/a.txt', '/ws/b.txt'] });
+  const readonlyFile = (): ExplorerContextSource => file({ target: { isDirectory: false, isRoot: false, isReadonly: true, parentReadonly: true } });
+  const contexts: Record<string, () => ExplorerContextSource> = {
+    arquivo: () => file(), pasta: () => folder(), raiz: () => root(), multi, somenteLeitura: readonlyFile,
+  };
+  // Linhas = tabela 04_03 §2 (adaptações registradas: Download em pasta/multi
+  // sempre — ZIP fallback G1; Delete = "Delete Permanently" sem lixeira web;
+  // New File/Folder só em pasta — upstream ExplorerFolderContext, c4; a linha
+  // "somenteLeitura" é um ARQUIVO readonly, logo "—").
+  const matrix: Record<string, Record<keyof typeof contexts, Cell>> = {
+    'explorer.newFile':          { arquivo: '—', pasta: '✔', raiz: '✔', multi: '—', somenteLeitura: '—' },
+    'explorer.newFolder':        { arquivo: '—', pasta: '✔', raiz: '✔', multi: '—', somenteLeitura: '—' },
+    'explorer.cut':              { arquivo: '✔', pasta: '✔', raiz: '—', multi: '✔', somenteLeitura: '✖' },
+    'explorer.copy':             { arquivo: '✔', pasta: '✔', raiz: '—', multi: '✔', somenteLeitura: '✔' },
+    'explorer.paste':            { arquivo: '—', pasta: '✖', raiz: '✖', multi: '—', somenteLeitura: '—' },
+    'explorer.download':         { arquivo: '✔', pasta: '✔', raiz: '—', multi: '✔', somenteLeitura: '✔' },
+    'explorer.upload':           { arquivo: '—', pasta: '✔', raiz: '✔', multi: '—', somenteLeitura: '—' },
+    'explorer.copyPath':         { arquivo: '✔', pasta: '✔', raiz: '✔', multi: '✔', somenteLeitura: '✔' },
+    'explorer.rename':           { arquivo: '✔', pasta: '✔', raiz: '—', multi: '—', somenteLeitura: '✖' },
+    'explorer.delete':           { arquivo: '✔', pasta: '✔', raiz: '—', multi: '✔', somenteLeitura: '✖' },
+  };
+  for (const [id, row] of Object.entries(matrix)) {
+    for (const [ctxName, cell] of Object.entries(row)) {
+      it(`${id} × ${ctxName} = ${cell}`, () => {
+        const m = menu(contexts[ctxName]());
+        const found = m.find((i) => i.id === id);
+        if (cell === '—') expect(found, 'ausente').toBeUndefined();
+        else expect(found?.enabled, 'presente').toBe(cell === '✔');
+      });
+    }
+  }
 });

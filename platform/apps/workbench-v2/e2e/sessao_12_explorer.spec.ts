@@ -38,6 +38,15 @@ async function seedFixture() {
 }
 
 /** Abre o app, entra na sessão e aciona a aba Files (onde a 4.4 monta a árvore). */
+/** 4.5 c5: Open Editors vem OCULTA por padrão (VS Code) — liga pelo menu do pane-header (ViewTitleContext). */
+async function showOpenEditors(page: import('@playwright/test').Page) {
+  const view = page.locator('[data-testid="explorer-view"]').first();
+  await view.locator('.pane-header[aria-label="Outline Section"]').click({ button: 'right' });
+  const menu = page.getByTestId('explorer-context-menu');
+  await menu.locator('[data-menu-item-id="explorer.views.toggle.openEditors"]').click();
+  await expect(view.locator('.pane-header[aria-label="Open Editors Section"]')).toBeVisible();
+}
+
 async function openExplorerTab(page: import('@playwright/test').Page) {
   await page.goto(BASE_URL);
   await page.evaluate(() => localStorage.clear());
@@ -124,6 +133,8 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
   test('seções: OPEN EDITORS vazio (VAL-EXP-06), TIMELINE e OUTLINE presentes', async ({ page }) => {
     await openExplorerTab(page);
     const view = page.locator('[data-testid="explorer-view"]').first();
+    await expect(view.locator('.pane-header[aria-label="Open Editors Section"]'), 'c5: Open Editors oculta por padrão').toHaveCount(0);
+    await showOpenEditors(page);
     // DOM VS Code: panes empilhados no split-view, colapsados por padrão (header 22px)
     for (const name of ['Open Editors Section', 'Outline Section', 'Timeline Section']) {
       const h = view.locator(`.pane-header[aria-label="${name}"]`);
@@ -189,6 +200,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
 
   test('clique em arquivo emite fileOpened e Open Editors reage (A2.4 parcial da 4.4)', async ({ page }) => {
     await openExplorerTab(page);
+    await showOpenEditors(page);
     const view = page.locator('[data-testid="explorer-view"]').first();
     await view.locator('[role="treeitem"]', { hasText: 'seed.txt' }).first().click();
     await view.locator('.pane-header[aria-label="Open Editors Section"]').click();
@@ -385,15 +397,18 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await view.locator('[role="treeitem"]', { hasText: 'alpha.txt' }).click({ button: 'right' });
     const menu = page.locator('[data-testid="explorer-context-menu"]');
     await expect(menu).toBeVisible();
-    const labels = await menu.locator('[role="menuitem"]').allTextContents();
+    const labels = await menu.locator('[role="menuitem"] .explorer-context-menu-label').allTextContents();
     // ordem de grupos: navigation ‖ 5_cutcopypaste ‖ 5b_importexport ‖ 7_modification
     const idx = (l: string) => labels.indexOf(l);
-    for (const l of ['New File...', 'New Folder...', 'Open', 'Cut', 'Copy', 'Download...', 'Copy Path', 'Copy Relative Path', 'Rename...', 'Delete Permanently']) {
+    for (const l of ['Open', 'Cut', 'Copy', 'Download...', 'Copy Path', 'Copy Relative Path', 'Rename...', 'Delete Permanently']) {
       expect(labels, `item ${l} presente`).toContain(l);
     }
+    // c4 (upstream ExplorerFolderContext / 04_17 §3.8): ARQUIVO não tem New File/Folder
+    expect(labels[0], 'menu de arquivo começa em Open').toBe('Open');
+    expect(labels).not.toContain('New File...');
+    expect(labels).not.toContain('New Folder...');
     expect(labels).not.toContain('Paste');
     expect(labels).not.toContain('Upload...');
-    expect(idx('New File...')).toBeLessThan(idx('New Folder...'));
     expect(idx('Open')).toBeLessThan(idx('Cut'));
     expect(idx('Cut')).toBeLessThan(idx('Copy'));
     expect(idx('Copy')).toBeLessThan(idx('Download...'));
@@ -429,6 +444,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
 
   test('T9 (seções auxiliares): clique no header expande/recolhe com corpo VISÍVEL (>0px); "X" do Open Editors aparece no hover e fecha', async ({ page }) => {
     await openExplorerTab(page);
+    await showOpenEditors(page);
     const view = page.locator('[data-testid="explorer-view"]').first();
     const pane = (id: string) => view.locator(`.split-view-view[data-pane="${id}"]`);
     const bodyH = async (id: string) => (await pane(id).locator('.pane-body').boundingBox())?.height ?? 0;
@@ -524,7 +540,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     // direito no espaço em branco abaixo das linhas.
     await tree.dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 300 });
     await expect(menu).toBeVisible();
-    const labels = await menu.locator('[role="menuitem"]').allTextContents();
+    const labels = await menu.locator('[role="menuitem"] .explorer-context-menu-label').allTextContents();
     expect(labels).toContain('New File...');
     expect(labels).toContain('Copy Path'); // G2: raiz tem Copy Path; Refresh/Collapse só no header
     expect(labels).not.toContain('Cut');
@@ -708,5 +724,143 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await expect(row).toHaveClass(/\bselected\b/); // classe do monaco-list (VS Code)
     await expect(view.locator('[role="treeitem"][aria-selected="true"]')).toHaveCount(1);
     await expect.poll(async () => (await import('node:fs/promises')).stat(`${SEED}/outra/nova-pasta-menu`).then((s) => s.isDirectory()).catch(() => false)).toBe(true);
+  });
+
+  test('T11 (4.5 c1): host do menu fiel ao VS Code — separadores por grupo, item 24 px, label 0 26px, min-width 200, radius 8, disabled opacity .4 (04_17 §3.8)', async ({ page }) => {
+    await mkdir(`${SEED}/t11-pasta`, { recursive: true });
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    await view.locator('[role="treeitem"]', { hasText: 't11-pasta' }).first().click({ button: 'right' });
+    const menu = page.getByTestId('explorer-context-menu');
+    await expect(menu).toBeVisible();
+    const items = menu.locator('[role="menuitem"]');
+    const groups = ['navigation', '5_cutcopypaste', '5b_importexport', '6_copypath', '7_modification'];
+    await expect(menu.locator('[role="separator"]'), 'separador entre cada par de grupos consecutivos').toHaveCount(groups.length - 1);
+    const m = await menu.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const inner = el.querySelector('[role="menu"]') as HTMLElement;
+      const it = el.querySelector('[role="menuitem"]') as HTMLElement;
+      const dis = el.querySelector('[role="menuitem"][disabled]') as HTMLElement | null;
+      return { minWidth: cs.minWidth, width: el.offsetWidth, radius: getComputedStyle(inner).borderRadius, itemH: it.offsetHeight, itemPad: getComputedStyle(it).padding, font: getComputedStyle(it).fontSize, disOpacity: dis ? getComputedStyle(dis).opacity : null, disId: dis?.getAttribute('data-menu-item-id') };
+    });
+    expect(m.minWidth).toBe('200px');
+    expect(m.width).toBeGreaterThanOrEqual(200);
+    expect(m.radius).toBe('8px');
+    expect(m.itemH).toBe(24);
+    expect(m.itemPad).toBe('0px 26px');
+    expect(m.font).toBe('13px');
+    expect(m.disId, 'Paste desabilitado sem clipboard').toBe('explorer.paste');
+    expect(m.disOpacity).toBe('0.4');
+    // ordem dos grupos preservada (order global grupo*100+order)
+    const ids = await items.evaluateAll((els) => els.map((e) => e.getAttribute('data-menu-item-id')));
+    expect(ids).toEqual(['explorer.newFile', 'explorer.newFolder', 'explorer.cut', 'explorer.copy', 'explorer.paste', 'explorer.download', 'explorer.upload', 'explorer.copyPath', 'explorer.copyRelativePath', 'explorer.rename', 'explorer.delete']);
+    await page.keyboard.press('Escape').catch(() => {});
+  });
+
+  test('T12 (4.5 c2): teclado — Shift+F10 abre no item focado, ↓↓ Enter executa (Cut → Paste habilita), Esc fecha e devolve o foco à árvore; scroll fecha (04_03 §6)', async ({ page }) => {
+    await mkdir(`${SEED}/t12-pasta`, { recursive: true });
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    const row = view.locator('[role="treeitem"]', { hasText: 't12-pasta' }).first();
+    await row.click(); // seleciona + foca o container da lista (monaco-list)
+    const menu = page.getByTestId('explorer-context-menu');
+    await expect(menu).toHaveCount(0);
+    await page.keyboard.press('Shift+F10');
+    await expect(menu, 'Shift+F10 abre o menu').toBeVisible();
+    // âncora: abaixo da linha focada (listWidget upstream ancora no elemento focado)
+    const rowBox = (await row.boundingBox())!;
+    const menuBox = (await menu.boundingBox())!;
+    expect(menuBox.y).toBeGreaterThanOrEqual(rowBox.y);
+    // foco inicial no 1º item habilitado
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-menu-item-id'))).toBe('explorer.newFile');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-menu-item-id'))).toBe('explorer.cut');
+    // End/Home/ArrowUp pulam desabilitados (Paste) e circulam
+    await page.keyboard.press('End');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-menu-item-id'))).toBe('explorer.delete');
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-menu-item-id'))).toBe('explorer.newFile');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-menu-item-id'))).toBe('explorer.copyRelativePath');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter'); // executa Cut
+    await expect(menu, 'Enter fecha o menu após executar').toHaveCount(0);
+    // efeito real do comando: clipboard interno = cut → Paste habilitado ao reabrir
+    await page.keyboard.press('Shift+F10');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('[data-menu-item-id="explorer.paste"]')).toBeEnabled();
+    // Esc fecha e o foco volta ao container da árvore (monaco-list com tabIndex 0)
+    await page.keyboard.press('Escape');
+    await expect(menu, 'Esc fecha').toHaveCount(0);
+    const focusedIsTree = await page.evaluate(() => {
+      const a = document.activeElement as HTMLElement | null;
+      return !!a && !!a.closest('[data-testid="explorer-view"]') && a.getAttribute('role') === 'tree';
+    });
+    expect(focusedIsTree, 'foco retornou à árvore').toBe(true);
+    // scroll (capturado em window) fecha o menu
+    await page.keyboard.press('Shift+F10');
+    await expect(menu).toBeVisible();
+    await page.evaluate(() => { window.dispatchEvent(new Event('scroll')); });
+    await expect(menu, 'scroll fecha').toHaveCount(0);
+  });
+
+  test('T13 (4.5 c5): menu do pane-header = Hide + toggles ✓ (ViewTitleContext, régua 8080); Folders não some; Timeline some/volta e persiste no reload', async ({ page }) => {
+    test.setTimeout(60_000);
+    await openExplorerTab(page);
+    const view = page.locator('[data-testid="explorer-view"]').first();
+    const menu = page.getByTestId('explorer-context-menu');
+    const header = (label: string) => view.locator(`.pane-header[aria-label="${label}"]`);
+    // padrão VS Code: Open Editors oculta; Folders/Outline/Timeline visíveis
+    await expect(header('Open Editors Section')).toHaveCount(0);
+    await expect(header('Outline Section')).toBeVisible();
+    await expect(header('Timeline Section')).toBeVisible();
+    // botão direito em Outline
+    await header('Outline Section').click({ button: 'right' });
+    await expect(menu).toBeVisible();
+    const rows = await menu.locator('[role="menuitem"], [role="menuitemcheckbox"]').evaluateAll((els) => els.map((e) => ({
+      id: e.getAttribute('data-menu-item-id'), label: e.querySelector('.explorer-context-menu-label')?.textContent,
+      role: e.getAttribute('role'), checked: e.getAttribute('aria-checked'), disabled: e.hasAttribute('disabled'),
+      hasCheckGlyph: !!e.querySelector('.explorer-context-menu-check'),
+    })));
+    expect(rows.map((r) => r.label)).toEqual(["Hide 'Outline'", 'Open Editors', 'Folders', 'Outline', 'Timeline']);
+    expect(rows[0]).toMatchObject({ role: 'menuitem', disabled: false });
+    expect(rows[1]).toMatchObject({ role: 'menuitemcheckbox', checked: 'false', disabled: false, hasCheckGlyph: false });
+    expect(rows[2]).toMatchObject({ role: 'menuitemcheckbox', checked: 'true', disabled: true, hasCheckGlyph: true });
+    expect(rows[3]).toMatchObject({ role: 'menuitemcheckbox', checked: 'true', disabled: false, hasCheckGlyph: true });
+    expect(rows[4]).toMatchObject({ role: 'menuitemcheckbox', checked: 'true', disabled: false, hasCheckGlyph: true });
+    await expect(menu.locator('[role="separator"]'), '1 separador entre Hide e toggles').toHaveCount(1);
+    // desmarcar Timeline → pane some
+    await menu.locator('[data-menu-item-id="explorer.views.toggle.timeline"]').click();
+    await expect(header('Timeline Section')).toHaveCount(0);
+    // persiste no reload
+    await page.reload();
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' });
+    if (!(await page.locator('.auxiliary-bar').count())) {
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute('aria-label') || '').toLowerCase().includes('auxiliar'));
+        b?.click();
+      });
+    }
+    await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+    await expect(view).toBeVisible();
+    await expect(header('Timeline Section'), 'oculto após reload').toHaveCount(0);
+    await expect(header('Outline Section')).toBeVisible();
+    // header da raiz: Hide 'Folders' desabilitado; religa Timeline por lá
+    await view.locator('.pane-header[aria-label^="Explorer Section"]').click({ button: 'right' });
+    await expect(menu.locator('[data-menu-item-id="explorer.views.hide.folders"]')).toBeDisabled();
+    await menu.locator('[data-menu-item-id="explorer.views.toggle.timeline"]').click();
+    await expect(header('Timeline Section')).toBeVisible();
+    // Hide 'Outline' pelo próprio header
+    await header('Outline Section').click({ button: 'right' });
+    await menu.locator('[data-menu-item-id="explorer.views.hide.outline"]').click();
+    await expect(header('Outline Section')).toHaveCount(0);
+    // 4.4 intacto: colapso da seção Timeline continua funcionando
+    await header('Timeline Section').click();
+    await expect(header('Timeline Section')).toHaveAttribute('aria-expanded', 'true');
   });
 });

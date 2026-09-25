@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // caminhos internos do módulo (fronteira LEGO, FT).
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 import { createShellCommandRegistry } from './domain/shellCommandRegistry'
-import { clampMenuPosition, isImageFile } from './domain/filePreview'
+import { isImageFile } from './domain/filePreview'
+import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './components/ExplorerContextMenuHost'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { buildProjectDiffFiles, initialDiffFiles, initialProviders, initialSessions, searchResults as allSearchResults } from './data'
@@ -139,82 +140,12 @@ function sameComposerHistoryEntry(left: ComposerHistoryEntry | undefined, right:
 
 // FATIA-04 (4.4): slot DOM do módulo explorer-search. O mount/unmount REAL é
 // do módulo (DOM só dentro do slot; estado do serviço sobrevive a remount).
-type ExplorerContextMenuState = {
-  x: number; y: number;
-  items: Array<{ id: string; label: string; enabled: boolean; group?: string; order: number; danger?: boolean }>
-}
-
 function ExplorerModuleSlot({ module }: { module: IExplorerSearchModule }) {
   const hostRef = useCallback((el: HTMLDivElement | null) => {
     if (el) module.mount(el)
     else module.unmount()
   }, [module])
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="explorer-module-slot" />
-}
-
-// (BLOCO 4.4-fix BUG-V1) Host do menu de contexto do Explorer COM clamp na
-// viewport: no painel estreito à direita o botão "…" abre o menu sangrando para
-// fora da tela (texto truncado). Medimos o tamanho real no mount e reposicionamos
-// — rótulos sempre íntegros, nunca fora da tela.
-function ExplorerContextMenuHost({ state, onClose, onExecute }: {
-  state: ExplorerContextMenuState
-  onClose: () => void
-  onExecute: (id: string) => void
-}) {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [pos, setPos] = useState<{ x: number; y: number }>({ x: state.x, y: state.y })
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const clamped = clampMenuPosition(state.x, state.y, el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight)
-    if (clamped.x !== pos.x || clamped.y !== pos.y) setPos(clamped)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state])
-  return (
-    <div
-      ref={ref}
-      role="menu"
-      data-explorer-context-menu
-      data-testid="explorer-context-menu"
-      style={{
-        position: 'fixed',
-        left: pos.x,
-        top: pos.y,
-        zIndex: 2000,
-        minWidth: 180,
-        // largura natural do conteúdo: rótulos longos NUNCA quebram linha
-        // (fiel ao VSCode); o clamp reposiciona para caber o menu inteiro.
-        width: 'max-content',
-        maxWidth: 'calc(100vw - 16px)',
-        background: 'var(--vscode-menu-background, #252526)',
-        border: '1px solid var(--vscode-menu-border, #454545)',
-        borderRadius: 4,
-        padding: '2px 0',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.36)',
-      }}
-    >
-      {[...state.items].sort((a, b) => a.order - b.order).map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          role="menuitem"
-          disabled={!item.enabled}
-          style={{
-            display: 'block', width: '100%', textAlign: 'left', whiteSpace: 'nowrap',
-            background: 'none', border: 'none', padding: '4px 12px',
-            color: item.enabled ? 'var(--vscode-menu-foreground, #cccccc)' : 'var(--vscode-disabledForeground, #6b6b6b)',
-            cursor: item.enabled ? 'pointer' : 'default', font: 'inherit', fontSize: 13,
-          }}
-          onClick={() => {
-            onClose()
-            void onExecute(item.id)
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 export default function App() {

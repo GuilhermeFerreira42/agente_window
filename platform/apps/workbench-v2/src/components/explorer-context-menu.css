@@ -1,0 +1,109 @@
+/* ExplorerContextMenuHost — medidas de 04_17 §3.8 (VS Code real) + medição ao
+ * vivo code-server 8080 (auditoria_45/c1). Sem cor hex fixa: só tokens. */
+
+.explorer-context-menu-container {
+  position: fixed;
+  z-index: 2000;
+  /* .monaco-menu-container */
+  border-radius: 8px;
+  box-shadow: 0 0 12px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.14));
+  /* largura natural: rótulos NUNCA quebram; clamp reposiciona (BUG-V1) */
+  width: max-content;
+  min-width: 200px;
+  max-width: calc(100vw - 16px);
+}
+
+.explorer-context-menu {
+  /* .monaco-menu */
+  border: 1px solid var(--vscode-menu-border);
+  border-radius: 8px;
+  background: var(--vscode-menu-background);
+  color: var(--vscode-menu-foreground);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.explorer-context-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0; /* padding vertical 4 px da lista de ações */
+}
+
+.explorer-context-menu-row {
+  margin: 0;
+  padding: 0;
+}
+
+/* .action-item — 24 px */
+.explorer-context-menu-item {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0 26px; /* 26 px à esquerda reservam check/ícone; 26 px à direita após keybinding */
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 24px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+}
+
+.explorer-context-menu-item:not(.disabled):hover,
+.explorer-context-menu-item:not(.disabled):focus,
+.explorer-context-menu-item:not(.disabled).focused {
+  background: var(--vscode-menu-selectionBackground);
+  color: var(--vscode-menu-selectionForeground);
+  outline: none;
+}
+
+.explorer-context-menu-item.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.explorer-context-menu-label {
+  flex: 1 1 auto;
+  margin-right: 24px; /* respiro mínimo entre label e keybinding (medido: 348 px total) */
+}
+
+.explorer-context-menu-keybinding {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: inherit;
+}
+
+/* check na coluna reservada de 26 px (.menu-item-check.codicon-menu-selection upstream).
+ * Fonte 'codicon' é declarada (global) em modules/explorer-search/ui/explorer.css. */
+.explorer-context-menu-check::before { content: '\eab2'; }
+.explorer-context-menu-check {
+  font: normal normal normal 16px/1 codicon;
+  -webkit-font-smoothing: antialiased;
+  position: absolute;
+  left: 6px;
+  top: 0;
+  width: 16px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* separador: .action-item.disabled > .action-label.separator */
+.explorer-context-menu-separator {
+  height: 1px;
+  margin: 5px 0;
+  padding: 0;
+  background: var(--vscode-menu-separatorBackground);
+  border: none;
+  list-style: none;
+}

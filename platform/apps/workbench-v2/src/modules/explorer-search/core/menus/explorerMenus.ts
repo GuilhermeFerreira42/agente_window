@@ -27,6 +27,9 @@ export interface ExplorerMenuItemSpec {
   /** Habilitação (upstream `precondition`). Ausente → sempre habilitado. */
   precondition?: string;
   danger?: boolean;
+  /** Rótulo do keybinding exibido à direita (04_17 §3.8 "Ordem medida"; upstream
+   *  KeybindingsRegistry em fileActions.contribution.ts — labels da plataforma Windows/Linux). */
+  keybinding?: string;
 }
 
 /** Grupos na ordem em que aparecem (separador entre grupos — 04_18 item 2). */
@@ -48,8 +51,7 @@ export type ExplorerContextValues = Record<ExplorerContextKey, boolean> & {
 /**
  * Tabela 04_03 §1 (subset em escopo).
  *  - New File/New Folder: `navigation` 4/6, `when: ExplorerFolderContext`
- *    (upstream). No AGENTE WINDOW o clique em ARQUIVO cria "no pai" (Q3 /
- *    04_03 §2 "✔ (no pai)") — portanto `when` = há recurso; precondition = pai gravável.
+ *    (upstream) — portado 1:1 em 4.5 c4 (antes "no pai" em arquivo; revogado).
  *  - Open: `navigation` 10 (upstream Open to the Side é a variante; aqui o Open
  *    principal já homologado na 4.4) — só arquivo.
  *  - Cut/Copy/Paste: `5_cutcopypaste` 8/10/20.
@@ -64,18 +66,22 @@ export type ExplorerContextValues = Record<ExplorerContextKey, boolean> & {
  *    view — `MenuId.ViewTitle`); ficam só no header.
  */
 export const EXPLORER_CONTEXT_MENU: readonly ExplorerMenuItemSpec[] = [
+  // 4.5 c4 (decisão 2026-09-25: alinhar ao upstream): New File/New Folder só em
+  // PASTA (inclui raiz/área vazia) — fileActions.contribution.ts:478–495
+  // `when: ExplorerFolderContext`; em ARQUIVO não aparecem (04_17 §3.8 ordem
+  // medida em arquivo começa em Open). Criar "no pai" continua pelo header.
   { id: 'explorer.newFile', label: 'New File...', group: 'navigation', order: 4,
-    when: 'explorerResourceHasResource && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
+    when: 'explorerResourceIsFolder && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
   { id: 'explorer.newFolder', label: 'New Folder...', group: 'navigation', order: 6,
-    when: 'explorerResourceHasResource && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
+    when: 'explorerResourceIsFolder && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
   { id: 'explorer.open', label: 'Open', group: 'navigation', order: 10,
     when: '!explorerResourceIsFolder && explorerResourceHasResource && !multiSelectionActive' },
 
-  { id: 'explorer.cut', label: 'Cut', group: '5_cutcopypaste', order: 8,
+  { id: 'explorer.cut', label: 'Cut', keybinding: 'Ctrl+X', group: '5_cutcopypaste', order: 8,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot', precondition: '!explorerResourceParentReadOnly' },
-  { id: 'explorer.copy', label: 'Copy', group: '5_cutcopypaste', order: 10,
+  { id: 'explorer.copy', label: 'Copy', keybinding: 'Ctrl+C', group: '5_cutcopypaste', order: 10,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot' },
-  { id: 'explorer.paste', label: 'Paste', group: '5_cutcopypaste', order: 20,
+  { id: 'explorer.paste', label: 'Paste', keybinding: 'Ctrl+V', group: '5_cutcopypaste', order: 20,
     when: 'explorerResourceIsFolder', precondition: '(resourceCopied || resourceCut) && !explorerResourceParentReadOnly' },
 
   { id: 'explorer.download', label: 'Download...', group: '5b_importexport', order: 10,
@@ -83,14 +89,14 @@ export const EXPLORER_CONTEXT_MENU: readonly ExplorerMenuItemSpec[] = [
   { id: 'explorer.upload', label: 'Upload...', group: '5b_importexport', order: 20,
     when: 'explorerResourceIsFolder && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
 
-  { id: 'explorer.copyPath', label: 'Copy Path', group: '6_copypath', order: 10,
+  { id: 'explorer.copyPath', label: 'Copy Path', keybinding: 'Ctrl+Alt+C', group: '6_copypath', order: 10,
     when: 'explorerResourceHasResource' },
-  { id: 'explorer.copyRelativePath', label: 'Copy Relative Path', group: '6_copypath', order: 20,
+  { id: 'explorer.copyRelativePath', label: 'Copy Relative Path', keybinding: 'Ctrl+Shift+Alt+C', group: '6_copypath', order: 20,
     when: 'explorerResourceHasResource' },
 
-  { id: 'explorer.rename', label: 'Rename...', group: '7_modification', order: 10,
+  { id: 'explorer.rename', label: 'Rename...', keybinding: 'F2', group: '7_modification', order: 10,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot && !multiSelectionActive', precondition: '!explorerResourceParentReadOnly' },
-  { id: 'explorer.delete', label: 'Delete Permanently', group: '7_modification', order: 20, danger: true,
+  { id: 'explorer.delete', label: 'Delete Permanently', keybinding: 'Del', group: '7_modification', order: 20, danger: true,
     when: 'explorerResourceHasResource && !explorerResourceIsRoot', precondition: '!explorerResourceParentReadOnly' },
 ];
 
@@ -102,6 +108,8 @@ export interface ResolvedMenuItem {
   group: string;
   order: number;
   danger?: boolean;
+  keybinding?: string;
+  checked?: boolean;
 }
 
 const evaluatorCache = new Map<string, WhenEvaluator>();
@@ -137,6 +145,7 @@ export function resolveExplorerContextMenu(
       order: groupIndex(it.group) * 100 + it.order,
       enabled: evalExpr(it.precondition, ctx),
       ...(it.danger ? { danger: true } : {}),
+      ...(it.keybinding ? { keybinding: it.keybinding } : {}),
     }))
     .sort((a, b) => a.order - b.order);
 }

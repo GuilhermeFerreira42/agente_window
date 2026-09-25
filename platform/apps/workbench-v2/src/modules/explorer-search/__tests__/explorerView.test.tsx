@@ -168,9 +168,11 @@ describe('ExplorerView — input inline criar/renomear (A1.1/A1.2, 04_02 §4)', 
 });
 
 describe('ExplorerView — seções (A2.4) + overflow (A1.5)', () => {
-  it('Open Editors é um pane colapsado (22px) que lista os arquivos abertos ao expandir (A2.4)', async () => {
+  it('Open Editors: OCULTA por padrão (VS Code, c5); após explorer.views.toggle.openEditors é um pane colapsado que lista os arquivos abertos (A2.4)', async () => {
     await bootView();
-    const header = screen.getByRole('button', { name: 'Open Editors Section' });
+    expect(screen.queryByRole('button', { name: 'Open Editors Section' }), 'oculta por padrão').toBeNull();
+    await menus.execute('explorer.views.toggle.openEditors');
+    const header = await screen.findByRole('button', { name: 'Open Editors Section' });
     expect(header.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(screen.getByText('README.md'));   // abre → explorer.fileOpened
     fireEvent.click(header);
@@ -215,7 +217,10 @@ describe('ExplorerView — menu de contexto declarativo + context keys (04_03 §
     fireEvent.contextMenu(screen.getByText('README.md'));
     expect(menuOpen.length).toBe(1);
     const ids = menuOpen[0].items.map((i) => i.id);
-    expect(ids).toEqual(expect.arrayContaining(['explorer.newFile', 'explorer.open', 'explorer.cut', 'explorer.copy', 'explorer.download', 'explorer.rename', 'explorer.delete']));
+    expect(ids).toEqual(expect.arrayContaining(['explorer.open', 'explorer.cut', 'explorer.copy', 'explorer.download', 'explorer.rename', 'explorer.delete']));
+    // c4: upstream ExplorerFolderContext — New File/Folder não aparecem em arquivo
+    expect(ids).not.toContain('explorer.newFile');
+    expect(ids).not.toContain('explorer.newFolder');
     expect(ids).not.toContain('explorer.paste');
     expect(ids).not.toContain('explorer.upload');
     // ordem global preserva a sequência de grupos: navigation < cutcopypaste < importexport < modification
