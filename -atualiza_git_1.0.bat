@@ -7,7 +7,7 @@ cd /d %~dp0
 cls
 echo Diretorio atual: %cd%
 echo =====================================
-echo      GIT AUTOMATION MENU
+echo     GIT AUTOMATION MENU 
 echo =====================================
 echo 1.  Verificar status do repositorio (git status)
 echo 2.  Adicionar todas as alteracoes (git add .)

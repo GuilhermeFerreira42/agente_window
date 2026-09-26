@@ -19,7 +19,31 @@ Este arquivo não substitui:
 
 Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 
-## Estado atual da rodada — ATUALIZADO 2026-09-25 (FATIA-04 · **4.4 HOMOLOGADA** pelo usuário no Windows 11 em 2026-09-24 (fix `a41f02a` URIs Windows) · **4.5 EM EXECUÇÃO — 5/6 commits verdes** (`917e746` host · `53ac6cc` teclado · `b1c19c3` contrato · `d294e5c` fix menu de arquivo · `604bb6d` pane-headers); HEAD `604bb6d`; typecheck 0; vitest explorer-search+App **280/280**; E2E `sessao_12_explorer` **30/30** + `fs_backend` 9/10 (watcher flaky pré-existente). **4.5 só fecha após o checklist visual do usuário no Windows** — ver entrada "2026-09-25 — Execução da 4.5") — histórico 2026-09-24 (4.4 PARCIAL → HOMOLOGADA) — histórico 2026-09-22/21
+## Estado atual da rodada — ATUALIZADO 2026-09-26 — FATIA-04 · **SUB-FATIA 4.6 (Search Panel + Replace) IMPLEMENTADA** — 7 commits atômicos (`5b29da8` engine · `2afd3f9` service · `22e7146` widget · `375e3cb` results · `8064e85` replace · `985160f` open · docs), placar `04_19 §4` **12 PASS · 1 PARCIAL · 1 FAIL** (critério ≥ 12/14 atendido); typecheck 0 · vitest **312/312** · E2E `sessao_12_explorer`+`sessao_13_search_backend`+`sessao_13_search` **50/50** · `fs_backend` 10/10 · terminal 9/9 · `sessao_07` 5/5 · layout ✓. **Falta só o checklist humano no Windows** (busca real no repo, toggles, replace de 3 ocorrências, include/exclude, estado vazio, teclado ↓/Esc) para marcar CONCLUÍDA. **4.7 só depois.** Ver entrada "2026-09-26 — Sub-Fatia 4.6 IMPLEMENTADA".
+
+### Entrada cronológica 2026-09-26 — Sub-Fatia 4.6 IMPLEMENTADA (Loop Fechado Visual, 7 commits)
+
+**Escopo executado (Opção A aprovada pelo usuário):** Search Panel + Replace dentro de `src/modules/explorer-search/`; AttachArea/sash **não** entraram (4.7). Régua = code-server 8080 medido por script (widget, árvore, ações inline, diálogo) — prints em `auditoria_46/c3..c6/`.
+
+**Onde vive:** `server/fs/searchEngine.ts` (`POST /fs/search`, walker próprio com excludes congelados, limites 2000/500, NDJSON opcional) · `core/search/{queryBuilder,textMatcher,searchService,model}.ts` (puro; debounce 250, última vence, `replaceAll` atômico do contrato + `replaceMatches` pontual interno, `lastResult` retido) · `ui/search/{SearchPanel,SearchResults}.tsx` + `search.css` (DOM com as classes do VS Code para comparação lado a lado) · barrel `mountSearch/unmountSearch` → slot `searchSlot` (única mudança de shell autorizada: `App.tsx` `SearchModuleSlot` + prop em `EditorArea.tsx`, mock preservado como fallback).
+
+**Comportamentos entregues:** busca enquanto digita; toggles case/word/regex (Alt+C/W/R) e preserve-case (Alt+P); replace (Ctrl+Shift+H) e details include/exclude (Ctrl+Shift+J); árvore 22 px arquivo (ícone Seti, nome, pasta, badge) / match (indent 8, trecho antes `…26`, `.findInFileMatch`); "N results in M files" e estado vazio com a frase do VS Code; teclado ↓ do input → lista, ↑↓ Home End, ←/→ recolhe/expande, Esc volta; hover/foco mostra Replace/Dismiss 20×20 (Del, Ctrl+Shift+1); preview riscado + texto novo com replace aberto; Replace All com diálogo "Replace N occurrences across M files with 'X'?" → "Replaced …"; clique/Enter no match abre o arquivo pelo mesmo caminho do Explorer; estado do widget em `localStorage explorer-search.search.v1` (sem re-busca ao restaurar).
+
+**Débito Técnico do Shell (novo, ver `docs/05` D2.19–D2.21):** (1) botões Refresh/Clear/Collapse All — a aba Search do shell não tem pane header; (2) reveal na linha/coluna ao abrir match — `explorer.fileOpened` congelado leva só `uri` (4.7, junto do editor); (3) links "Open Settings"/"Learn More"/"Open in editor" — fora de escopo (Settings UI e Search Editor não existem).
+
+**Lições (permanentes):** comprimento do match recalculado no cliente com regex sticky; ações inline só com hover/`:focus-within` (senão o badge some no print); o shell **desmonta** o painel ao trocar de aba → resultado retido no serviço; `unmountSearch` adiado com `setTimeout 0` (warning React quebrava `sessao_07`); bateria de 50 E2E esgota `inotify` do sandbox → reiniciar a fixture antes do `fs_backend`; setup por sessão do sandbox continua (node_modules, browsers, runtime do code-server somem).
+
+## Estado anterior — 2026-09-25 (tarde) — 4.5 CONCLUÍDA E HOMOLOGADA (Windows 11, checklist 4/4); 4.6 em preparação (auditoria + plano `04_19`, aprovado → executado acima).
+
+### Entrada cronológica 2026-09-25 — Sub-Fatia 4.5 CONCLUÍDA (homologação humana no Windows local)
+
+**Homologação (usuário, Windows 11, workspace baixado + dev local):** todos os itens do checklist pessoal passaram — (1) menu de arquivo/pasta/área vazia fiel ao VS Code (arquivo sem New File/Folder; Paste desabilitado sem clipboard); (2) teclado funcional (Shift+F10, ↑↓ Enter, Esc devolvendo foco à linha); (3) headers das seções com toggles ✓ **persistindo após reload**; (4) Open Editors iniciando **oculta** conforme VS Code real. Resultado: **4.5 = CONCLUÍDA**. Evidência técnica: entrada "2026-09-25 — Execução da Sub-Fatia 4.5" logo abaixo (5 commits + placar typecheck 0 · vitest 280/280 · E2E 30/30 + 9/10) e prints em `auditoria_45/`.
+
+**Regra mantida para a 4.6 (Loop Fechado Visual):** teste falhando → transplante cirúrgico → teste passando → anti-regressão → commit atômico; fidelidade comportamental > velocidade; régua = code-server 8080 + `04_06_SEARCH_PANEL.md` + mapa `04_11`.
+
+**Fase 1 da 4.6 (autorizada, sem código):** auditoria binária do Search atual vs `04_06` e 8080; lista de gaps exatos (campos, toggles, debounce, include/exclude, replace all, resultado→reveal); plano atômico (commits + specs E2E novas); aguardar aprovação do usuário.
+
+## Estado anterior — 2026-09-25 (manhã) (FATIA-04 · **4.4 HOMOLOGADA** pelo usuário no Windows 11 em 2026-09-24 (fix `a41f02a` URIs Windows) · **4.5 EM EXECUÇÃO — 5/6 commits verdes** (`917e746` host · `53ac6cc` teclado · `b1c19c3` contrato · `d294e5c` fix menu de arquivo · `604bb6d` pane-headers); HEAD `604bb6d`; typecheck 0; vitest explorer-search+App **280/280**; E2E `sessao_12_explorer` **30/30** + `fs_backend` 9/10 (watcher flaky pré-existente). **4.5 só fecha após o checklist visual do usuário no Windows** — ver entrada "2026-09-25 — Execução da 4.5") — histórico 2026-09-24 (4.4 PARCIAL → HOMOLOGADA) — histórico 2026-09-22/21
 
 ### Entrada cronológica 2026-09-25 — Execução da Sub-Fatia 4.5 (menu de contexto completo) — 5 commits atômicos
 

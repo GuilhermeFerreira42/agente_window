@@ -45,6 +45,9 @@ interface EditorAreaProps {
   searchQuery: string
   searchResults: SearchResult[]
   searchFocusRequest: number
+  /** FATIA-04 4.6 (opção A): Search Panel REAL do módulo explorer-search.
+   *  Presente → renderizado no lugar do SearchView mock; ausente → mock preservado. */
+  searchSlot?: import('react').ReactNode
   diffFiles: DiffFile[]
   selectedDiffFileId?: string
   onSelectTab: (id: string) => void
@@ -408,6 +411,7 @@ export function EditorArea({
   searchQuery,
   searchResults,
   searchFocusRequest,
+  searchSlot,
   diffFiles,
   selectedDiffFileId,
   onSelectTab,
@@ -607,7 +611,8 @@ export function EditorArea({
         {!editorContentVisible && hasActiveSurface && <div className="editor-hidden-content" data-testid="editor-hidden-content"><EyeOff size={26} /><strong>Editor oculto</strong><span>A barra de abas permanece visível. Use "Mostrar editor" para reexibir o conteúdo.</span><button className="secondary-button" type="button" onClick={onToggleEditorHidden}><Eye size={13} />Mostrar editor</button></div>}
         {editorContentVisible && !hasActiveSurface && <div className="editor-empty" data-testid="editor-empty-state"><Code2 size={30} /><strong>Nenhum editor ativo</strong><span>Browser, Search e Branch Changes abrem aqui — não na barra auxiliar.</span><button className="secondary-button" type="button" onClick={onNewBrowser}><Globe2 size={13} />Abrir Browser</button></div>}
         {editorContentVisible && activeTab?.type === 'browser' && activeBrowser && <BrowserPreview view={activeBrowser} monacoTheme={monacoTheme} onNavigate={(url) => onNavigateBrowser(activeBrowser.id, url)} onBack={() => onBrowserBack(activeBrowser.id)} onForward={() => onBrowserForward(activeBrowser.id)} onReload={() => onReloadBrowser(activeBrowser.id)} onStatus={(status) => onBrowserStatus(activeBrowser.id, status)} onChangeViewport={(viewport) => onChangeViewport(activeBrowser.id, viewport)} />}
-        {editorContentVisible && activeTab?.type === 'search' && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
+        {editorContentVisible && activeTab?.type === 'search' && searchSlot}
+        {editorContentVisible && activeTab?.type === 'search' && !searchSlot && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
         {editorContentVisible && activeTab?.type === 'diff' && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
         {editorContentVisible && activeTab?.type === 'file' && activeTab.imagePreview && (

@@ -4,7 +4,8 @@
 // (/fs/*) via fetch; binário com maxBytes; erros carregam `code` do servidor.
 // Sem imports externos (core puro — FT-07): usa globals web (fetch).
 // ============================================================================
-import type { FileSystemPortLike, WorkspaceUri } from '../../contract';
+import type { FileSystemPortLike, WorkspaceUri, SearchQuery } from '../../contract';
+import type { SearchTransportResult } from '../search/searchService';
 import type { ExplorerFsWatchClient } from '../watchClient';
 
 export interface BrowserFsPortOptions {
@@ -62,6 +63,19 @@ export class BrowserFsPort implements FileSystemPortLike {
   async discoverRoot(): Promise<WorkspaceUri> {
     const data = await this.json<{ root: WorkspaceUri }>('/fs/root');
     return data.root;
+  }
+
+  /** 4.6 c2 — transporte de busca (POST /fs/search, c1). Conveniência do
+   *  ADAPTER (não faz parte da FileSystemPortLike congelada); o SearchService
+   *  detecta por duck-typing (`hasSearchTransport`). `signal` aborta o fetch
+   *  → o servidor cancela o walker ("última busca vence"). */
+  async searchText(input: { root: WorkspaceUri; query: SearchQuery; maxResults?: number; maxFiles?: number; signal?: AbortSignal }): Promise<SearchTransportResult> {
+    return this.json<SearchTransportResult>('/fs/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: input.root, query: input.query, maxResults: input.maxResults, maxFiles: input.maxFiles }),
+      signal: input.signal,
+    });
   }
 
   private post<T>(path: string, body: Record<string, unknown>): Promise<T> {

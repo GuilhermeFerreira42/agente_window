@@ -148,6 +148,17 @@ function ExplorerModuleSlot({ module }: { module: IExplorerSearchModule }) {
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="explorer-module-slot" />
 }
 
+/** FATIA-04 4.6 (opção A aprovada 2026-09-25): slot da aba Search → módulo real.
+ *  Mesmo padrão do ExplorerModuleSlot; `focusRequest` repassa o Ctrl+Shift+F. */
+function SearchModuleSlot({ module, focusRequest }: { module: IExplorerSearchModule; focusRequest: number }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hostRef.current) module.mountSearch(hostRef.current, { focusRequest })
+  }, [module, focusRequest])
+  useEffect(() => () => module.unmountSearch(), [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="search-module-slot" />
+}
+
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>(initialSessions)
   const persistedLayout = useRef(loadLayoutState())
@@ -1771,6 +1782,7 @@ export default function App() {
       searchQuery={searchQuery}
       searchResults={filteredSearchResults}
       searchFocusRequest={searchFocusRequest}
+      searchSlot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined}
       diffFiles={activeDiffFiles}
       selectedDiffFileId={selectedDiffFileId}
       onSelectTab={selectEditorTab}

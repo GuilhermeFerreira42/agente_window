@@ -160,7 +160,7 @@ describe('fronteira LEGO — modules/explorer-search (FT)', () => {
     expect(/\bany\b/.test(code), 'contract.ts usa `any` em porta de serviço').toBe(false);
   });
 
-  it('FT-04: fábrica REAL do core (4.2); stubs 4.4/4.6/4.7 falham explícito', async () => {
+  it('FT-04: fábrica REAL do core (4.2); search real (4.6); stub 4.7 falha explícito', async () => {
     const barrel = await import('../index.js');
     expect(typeof barrel.createExplorerSearchModule).toBe('function');
 
@@ -185,9 +185,11 @@ describe('fronteira LEGO — modules/explorer-search (FT)', () => {
     await mod.explorer.openFolder({ uri: root });
     expect(roots).toEqual([root]);
 
-    // REAIS desde 4.4: mount + transfer (upload/download); stubs 4.6/4.7 seguem falhando explícito (04_15 §3).
+    // REAIS desde 4.4: mount + transfer; desde 4.6 c2: search (handle cancelável); stub 4.7 segue falhando explícito (04_15 §3).
     expect(() => mod.mount(document.createElement('div'))).not.toThrow(/4\.4/);
-    expect(() => mod.search.query({ root, query: { pattern: 'x' } })).toThrow(/4\.6/);
+    const handle = mod.search.query({ root, query: { pattern: 'x' } });
+    expect(typeof handle.id).toBe('string');
+    expect(() => handle.cancel()).not.toThrow();
     expect(() => mod.attach.open({ uri: root, kind: 'code', sessionId: 's' })).toThrow(/4\.7/);
     await expect(mod.explorer.upload({ target: root, entries: [], conflict: 'skip' })).resolves.toBeUndefined();
     await expect(mod.explorer.download({ uris: [] })).resolves.toBeUndefined();

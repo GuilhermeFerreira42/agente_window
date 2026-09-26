@@ -154,6 +154,11 @@ export interface IExplorerSearchModule {
   /** Renderiza a sidebar (header + árvore + seções) dentro do slot dado. Só DOM dentro de `root`. */
   mount(root: HTMLElement): void;
   unmount(): void;               // remove DOM; estado do serviço sobrevive (quebra isolada)
+  /** 4.6 c3 (evolução ADITIVA, opção A aprovada 2026-09-25): renderiza o Search
+   *  Panel (widget + resultados) dentro do slot dado — o shell o coloca no lugar
+   *  do SearchView mock da aba `search`. Só DOM dentro de `root`. */
+  mountSearch(root: HTMLElement, opts?: { focusRequest?: number }): void;
+  unmountSearch(): void;
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void;
   dispose(): void;               // libera watchers, comandos registrados, listeners
 }

@@ -49,6 +49,9 @@ export const SEARCH_DEBOUNCE_MS = 250 as const;
 /** Limites antes de marcar `truncated: true` (A6: "resultados truncados"). */
 export const SEARCH_DEFAULT_MAX_RESULTS = 2000 as const;
 export const SEARCH_DEFAULT_MAX_FILES = 500 as const;
+/** Arquivo maior que isto é PULADO com aviso (04_06 §3.4: "arquivo muito
+ *  grande para buscar"); espelho de `search.maxFileSize` upstream. */
+export const SEARCH_MAX_FILE_BYTES = 1024 * 1024;
 /** Excludes padrão CONGELADOS (04_10 §2.3) — sempre aplicados, mesmo sem
  *  `exclude` explícito: pastas pesadas/versionadas + binários detectados. */
 export const SEARCH_DEFAULT_EXCLUDES = [

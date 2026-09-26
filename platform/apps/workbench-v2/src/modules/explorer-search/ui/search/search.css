@@ -1,0 +1,446 @@
+/* ============================================================================
+   ui/search/search.css — 4.6 c3. Geometria medida no code-server 8080
+   (auditoria_46/, 2026-09-25) + 04_17 §5. Tokens --vscode-* (nunca hex).
+   Fontes upstream: contrib/search/browser/media/searchview.css,
+   base/browser/ui/findinput/findInput.css, base/browser/ui/toggle/toggle.css,
+   base/browser/ui/inputbox/inputBox.css.
+   ========================================================================= */
+
+.search-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--vscode-font-family, system-ui, 'Ubuntu', 'Droid Sans', sans-serif);
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background, transparent);
+  user-select: none;
+}
+
+/* container: margin 0 12px 0 2px; padding-top 6px (medido) */
+.search-view .search-widgets-container {
+  margin: 0 12px 0 2px;
+  padding-top: 6px;
+  flex: 0 0 auto;
+}
+
+/* widget: 26 px fechado / 58 px aberto (26 + 6 + 26) — 04_19 §1 item 6 */
+.search-view .search-widget {
+  position: relative;
+}
+
+/* toggle-replace: 16 px × altura do widget, à ESQUERDA, radius 4 */
+.search-view .search-widget .toggle-replace-button {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--vscode-foreground);
+}
+.search-view .search-widget .toggle-replace-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.search-view .search-widget .toggle-replace-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.search-view .search-widget .search-container,
+.search-view .search-widget .replace-container {
+  margin-left: 18px;
+  position: relative;
+}
+.search-view .search-widget .replace-container {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+}
+.search-view .search-widget .replace-container .monaco-findInput {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* monaco-findInput: input + controles absolutos (top 3px, right 2px) */
+.search-view .monaco-findInput {
+  position: relative;
+}
+.search-view .monaco-findInput .controls {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+}
+/* como o FindInput upstream: a textarea ENCOLHE (padding-right 0) para não
+   passar por baixo dos controles — medido 8080: 267 − 199 = 68 px (3 toggles) */
+.search-view.explorer-viewlet .search-container .monaco-inputbox > .ibwrapper > .input { width: calc(100% - 68px); }
+.search-view.explorer-viewlet .replace-container .monaco-inputbox > .ibwrapper > .input { width: calc(100% - 24px); }
+.search-view.explorer-viewlet .pattern-input.has-controls .monaco-inputbox > .ibwrapper > .input { width: calc(100% - 46px); }
+
+/* monaco-inputbox: 26 px, radius 4, borda 1 px; focus outline 1 px */
+.search-view.explorer-viewlet .monaco-inputbox {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: inherit;
+  line-height: 18.2px;
+}
+.search-view.explorer-viewlet .monaco-inputbox.synthetic-focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.search-view .monaco-inputbox .ibwrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.search-view.explorer-viewlet .monaco-inputbox > .ibwrapper > .input {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 3px 0 3px 6px;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background-color: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: pre;
+}
+.search-view.explorer-viewlet .monaco-inputbox > .ibwrapper > .input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+/* PatternInput (details): 25 px medido */
+.search-view.explorer-viewlet .pattern-input .monaco-inputbox { height: 25px; }
+.search-view.explorer-viewlet .pattern-input .monaco-inputbox > .ibwrapper > .input { height: 23px; padding: 2px 0 2px 6px; }
+.search-view .pattern-input .controls { top: 3px; }
+
+/* monaco-custom-toggle: 20×20, radius 3, margin-left 2px, font 16px, padding 1px */
+.search-view .monaco-custom-toggle {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  padding: 1px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--vscode-icon-foreground);
+  opacity: 0.7;
+  user-select: none;
+}
+.search-view .monaco-custom-toggle:hover {
+  opacity: 1;
+  background-color: var(--vscode-inputOption-hoverBackground);
+}
+.search-view .monaco-custom-toggle.checked {
+  opacity: 1;
+  background-color: var(--vscode-inputOption-activeBackground);
+  border-color: var(--vscode-inputOption-activeBorder);
+  color: var(--vscode-inputOption-activeForeground);
+}
+.search-view .monaco-custom-toggle:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Replace All: action-label 22×22 à direita do input de replace */
+.search-view .replace-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.search-view .replace-actions .action-label {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 16px;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+}
+.search-view .replace-actions .action-label:hover:not(.disabled) {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.search-view .replace-actions .action-label.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* query-details: `.more` 25×16 (right -2px, top 0); h4 11px normal, padding-top 4px */
+.search-view .query-details {
+  position: relative;
+  margin-left: 18px;
+  min-height: 16px;
+}
+.search-view .query-details .more {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 25px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+}
+.search-view .query-details .more:hover { opacity: 1; }
+.search-view .query-details .more:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.search-view .query-details .file-types h4 {
+  margin: 0;
+  padding: 4px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18.2px;
+  color: var(--vscode-foreground);
+}
+
+/* messages: margin-top -5px; texto em search.resultsInfoForeground */
+.search-view .messages {
+  margin-top: -5px;
+  cursor: default;
+  flex: 0 0 auto;
+}
+.search-view .messages .message {
+  padding: 8px 22px 0 22px;
+  font-size: 13px;
+  line-height: 18.2px;
+  color: var(--vscode-search-resultsInfoForeground, var(--vscode-descriptionForeground));
+}
+
+.search-view .results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* glifos codicon do Search (codepoints da fonte codicon.ttf do VS Code) */
+.explorer-viewlet .codicon-case-sensitive:before { content: '\eab1'; }
+.explorer-viewlet .codicon-whole-word:before { content: '\eb7e'; }
+.explorer-viewlet .codicon-regex:before { content: '\eb38'; }
+.explorer-viewlet .codicon-preserve-case:before { content: '\eb2e'; }
+.explorer-viewlet .codicon-search-show-replace:before { content: '\eab6'; } /* = chevron-right */
+.explorer-viewlet .codicon-search-hide-replace:before { content: '\eab4'; } /* = chevron-down */
+.explorer-viewlet .codicon-ellipsis:before { content: '\ea7c'; }
+.explorer-viewlet .codicon-exclude:before { content: '\eae5'; }
+.explorer-viewlet .codicon-search-replace-all:before,
+.explorer-viewlet .codicon-replace-all:before { content: '\eb3c'; }
+.explorer-viewlet .codicon-search-replace:before,
+.explorer-viewlet .codicon-replace:before { content: '\eb3d'; }
+.explorer-viewlet .codicon-clear-all:before { content: '\eabf'; }
+.explorer-viewlet .codicon-search-remove:before { content: '\ea76'; } /* = close (codiconsLibrary: search-remove → close) */
+.explorer-search-dialog .codicon[class*='codicon-'] {
+  font: normal normal normal 16px/1 codicon;
+  display: inline-block;
+  text-decoration: none;
+  text-rendering: auto;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+.explorer-search-dialog .codicon-dialog-info:before { content: '\ea74'; } /* = info */
+.explorer-search-dialog .codicon-dialog-close:before { content: '\ea76'; } /* = close */
+.explorer-viewlet .codicon-search:before { content: '\ea6d'; }
+
+
+/* ---------------------------------------------------------------------------
+   Resultados (c4) — searchview.css + iconlabel.css + countBadge.css. A árvore
+   reaproveita o CSS de linha da 4.4 (explorer.css: .monaco-tl-*, estados de
+   foco/hover, .monaco-icon-label:before Seti); aqui só o que difere.
+   ------------------------------------------------------------------------- */
+.search-view.explorer-viewlet .results .monaco-list { height: auto; }
+.search-view.explorer-viewlet .results .monaco-list-row {
+  position: relative;          /* sem virtualização: fluxo normal */
+  height: 22px;
+  line-height: 22px;
+  font-size: 13px;
+}
+.search-view.explorer-viewlet .results .monaco-tl-contents { display: flex; align-items: center; min-width: 0; }
+.search-view.explorer-viewlet .results .filematch { display: flex; align-items: center; flex: 1; min-width: 0; }
+.search-view.explorer-viewlet .results .filematch .monaco-icon-label { flex: 1; min-width: 0; }
+.search-view.explorer-viewlet .results .monaco-icon-label-container { display: flex; align-items: baseline; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.search-view.explorer-viewlet .results .label-name { white-space: pre; overflow: hidden; text-overflow: ellipsis; color: inherit; text-decoration: none; }
+/* iconlabel.css: description 0.9em, opacity .95, margin-left .5em (medido 5.85px) */
+.search-view.explorer-viewlet .results .label-description {
+  margin-left: 0.45em;
+  font-size: 0.9em;
+  opacity: 0.95;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-descriptionForeground, inherit);
+}
+/* countBadge.css: 18×18, padding 3px 5px, radius 11, 11px/11px; search: margin-right 12 */
+.search-view.explorer-viewlet .results .monaco-count-badge {
+  box-sizing: border-box;
+  display: inline-block;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 3px 5px;
+  margin-right: 12px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 11px;
+  text-align: center;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  flex: 0 0 auto;
+}
+/* linematch */
+.search-view.explorer-viewlet .results .linematch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.search-view.explorer-viewlet .results .linematch .matchLineNum { display: none; }
+.search-view.explorer-viewlet .results .linematch a.plain.match { color: inherit; text-decoration: none; white-space: pre; }
+.search-view.explorer-viewlet .results .linematch a.plain.match > span:first-child,
+.search-view.explorer-viewlet .results .linematch a.plain.match > span:last-child { opacity: 0.7; }
+.search-view.explorer-viewlet .results .findInFileMatch {
+  background-color: var(--vscode-editor-findMatchHighlightBackground);
+  border: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent);
+  border-radius: 0;
+  opacity: 1;
+}
+.search-view.explorer-viewlet .results .replaceMatch { display: none; }
+.search-view.explorer-viewlet .results .replaceMatch:not(:empty) {
+  display: inline;
+  background-color: var(--vscode-diffEditor-insertedTextBackground);
+}
+
+
+/* ---------------------------------------------------------------------------
+   c5 — ações inline (searchview.css + actionbar.css, medido 8080): a.action-label
+   20×20 padding 2 radius 6 font 16, só visíveis com hover/foco na linha;
+   preview de replace (.findInFileMatch.replace riscado + .replaceMatch).
+   ------------------------------------------------------------------------- */
+.search-view.explorer-viewlet .results .linematch { display: flex; align-items: center; }
+.search-view.explorer-viewlet .results .linematch a.plain.match { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.search-view.explorer-viewlet .results .actionBarContainer { flex: 0 0 auto; display: flex; align-items: center; height: 22px; visibility: hidden; margin-left: auto; }
+.search-view.explorer-viewlet .results .filematch .actionBarContainer { margin-left: 0; }
+/* como no VS Code: ações no hover ou na linha focada COM a lista focada */
+.search-view.explorer-viewlet .results .monaco-list-row:hover .actionBarContainer,
+.search-view.explorer-viewlet .results .monaco-list:focus-within .monaco-list-row.focused .actionBarContainer { visibility: visible; }
+.search-view.explorer-viewlet .results .monaco-list-row:hover .monaco-count-badge,
+.search-view.explorer-viewlet .results .monaco-list:focus-within .monaco-list-row.focused .monaco-count-badge { display: none; }
+.search-view.explorer-viewlet .results .monaco-toolbar { display: inline-block; height: 22px; }
+.search-view.explorer-viewlet .results .monaco-action-bar { display: inline-block; height: 22px; white-space: nowrap; }
+.search-view.explorer-viewlet .results .monaco-action-bar .actions-container { display: flex; align-items: center; height: 22px; margin: 0; padding: 0; list-style: none; }
+.search-view.explorer-viewlet .results .monaco-action-bar .action-item { display: block; position: relative; }
+.search-view.explorer-viewlet .results .monaco-action-bar .action-label {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 16px;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+  text-decoration: none;
+}
+.search-view.explorer-viewlet .results .monaco-action-bar .action-label:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+.search-view.explorer-viewlet .results .findInFileMatch.replace {
+  text-decoration: line-through;
+  background-color: var(--vscode-diffEditor-removedTextBackground);
+  border-color: var(--vscode-diffEditor-removedTextBorder, transparent);
+}
+.search-view.explorer-viewlet .results .replaceMatch:not(:empty) {
+  border: 1px solid var(--vscode-diffEditor-insertedTextBorder, transparent);
+}
+/* .replaceMatch vazio fica escondido (regra do c4); com texto aparece inline */
+.search-view.explorer-viewlet .results .replaceMatch:empty { display: none; }
+
+/* Diálogo de confirmação (dialog.css) — 498 px, radius 12, padding 8, botões 26 px */
+.monaco-dialog-modal-block.explorer-search-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--vscode-dialog-modalBlockBackground, rgba(0, 0, 0, 0.3));
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: 13px;
+}
+.explorer-search-dialog .monaco-dialog-box {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  width: 498px;
+  max-width: calc(100% - 40px);
+  padding: 8px;
+  border-radius: 12px;
+  color: var(--vscode-editorWidget-foreground);
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-widget-border);
+  box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+  outline: none;
+}
+.explorer-search-dialog .dialog-message-row { display: flex; align-items: flex-start; padding: 24px 24px 20px 24px; }
+.explorer-search-dialog .dialog-icon { flex: 0 0 auto; font-size: 32px !important; line-height: 32px !important; width: 32px; height: 32px; margin-right: 24px; color: var(--vscode-problemsInfoIcon-foreground); }
+.explorer-search-dialog .dialog-message-container { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 32px; }
+.explorer-search-dialog .dialog-message-detail { font-size: 12px; line-height: 16px; word-wrap: break-word; white-space: pre-wrap; user-select: text; }
+.explorer-search-dialog .dialog-buttons-row { display: flex; justify-content: flex-end; padding: 0 20px 16px 20px; }
+.explorer-search-dialog .dialog-buttons { display: flex; overflow: hidden; }
+.explorer-search-dialog .monaco-button {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 4px 10px;
+  margin-left: 8px;
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  text-decoration: none;
+  outline-offset: 2px !important;
+  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background);
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+.explorer-search-dialog .monaco-button:hover { background-color: var(--vscode-button-hoverBackground); }
+.explorer-search-dialog .monaco-button.secondary { color: var(--vscode-button-secondaryForeground); background-color: var(--vscode-button-secondaryBackground); border-color: var(--vscode-button-secondaryBorder, transparent); }
+.explorer-search-dialog .monaco-button.secondary:hover { background-color: var(--vscode-button-secondaryHoverBackground); }
+.explorer-search-dialog .monaco-button:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.explorer-search-dialog .dialog-toolbar-row { position: absolute; top: 8px; right: 8px; }
+.explorer-search-dialog .dialog-toolbar .actions-container { display: flex; margin: 0; padding: 0; list-style: none; }
+.explorer-search-dialog .dialog-toolbar .action-label { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 5px; font-size: 16px; color: var(--vscode-icon-foreground); cursor: pointer; }
+.explorer-search-dialog .dialog-toolbar .action-label:hover { background-color: var(--vscode-toolbar-hoverBackground); }

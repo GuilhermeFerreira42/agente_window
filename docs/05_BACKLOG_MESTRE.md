@@ -82,7 +82,7 @@ Fonte de estado: `docs/12` entrada "2026-09-24 — Sincronização Pós-Auditori
 | D2.4 | Escape fecha o menu de contexto + teclado completo (↑↓ Home/End Enter, Shift+F10, foco devolvido) | **CONCLUÍDO** (`53ac6cc`) | 4.5 | E2E T12 | autorização concedida (host dedicado) |
 | D2.5 | Geometria do menu (item 24 px, separadores por grupo, coluna keybinding) | **CONCLUÍDO** (`917e746` + `b1c19c3`) | 4.5 | T11 print lado a lado `auditoria_45/c1/` | `src/components/ExplorerContextMenuHost.tsx` (exceção autorizada) |
 | D2.6 | Badges numéricos na Activity Bar | **ADIADO** | 4.6 | Vídeo 4 | shell (não tocado na 4.5) |
-| D2.7 | Add/Remove Folder to Workspace no menu da raiz | **ADIADO** | 4.7+ (fora da 4.5) | `fileActions.contribution.ts:617/627` | single-root (`04_11 §11-C`) |
+| D2.7 | Add/Remove Folder to Workspace no menu da raiz | **ADIADO (fase futura)** | 4.9+ | `fileActions.contribution.ts:617/627` | single-root (`04_11 §11-C`) |
 | D2.8 | Cores de status Git nos nomes da árvore (`--vscode-gitDecoration-*`) | **BLOQUEADO → 4.7+** | 4.7+ | Vídeo 4; upstream `extensions/git/src/decorationProvider.ts` → `IDecorationsService` (não mapeado em `04_11`) | **não existe `GitService`/`IDecorationsService` no repo** — precisa de dep `decorations` no contrato + endpoint `git status --porcelain` no server do módulo (código novo, não transplante) |
 | D2.9 | Open Editors real / Outline / Timeline com dados | **ADIADO** | 4.7 | `openEditorsView.ts`, `outline.contribution.ts`, `timeline.contribution.ts` (04_11) | precisa do fio editor→módulo (dep `editors.{list,activeUri,dirty,onDidChange,activate,close}` em `IExplorerSearchModuleDeps`) |
 | D2.10 | Word Wrap (Alt+Z), Split Editor, Markdown Preview | **DEFERIDO** | 4.7b / 4.7c | Vídeo 4 00:36 / 43 s; checklist 4.7-E4/E5/E6 | editor anexo (4.7) ainda não existe |
@@ -91,9 +91,12 @@ Fonte de estado: `docs/12` entrada "2026-09-24 — Sincronização Pós-Auditori
 | D2.13 | Hover actions inline nos itens da árvore + feedback visual de drag (opacity/`dropBackground`) | **ADIADO** | 4.9 | checklist 4.4-T5/T6; `explorerViewer.ts:825/1571` | — |
 | D2.14 | Fonte `seti.woff` (glyphs reais por linguagem; hoje glyph codicon + cor Seti) | **ADIADO** | 4.9 | `0d86656`; `vs-seti-icon-theme.json` | trazer asset exige autorização |
 | D2.15 | Breadcrumb bar acima do editor (TR-BC1), BranchChanger real (TR-BR1), Source Control panel (TR-SC1) | **REGISTRADO** | 4.7 / fora da FATIA-04 | checklist §7 | TR-BR1/TR-SC1 dependem de serviço Git (ver D2.8) |
-| D2.16 | Botão "…" (Views and More Actions) no título do Explorer (35 px) para reexibir views ocultas | **ADIADO** | 4.6 | régua 8080 `auditoria_45/c5/explorer_views_more_actions.png` | título de 35 px é do shell; hoje as views voltam pelo menu de qualquer pane-header (Folders nunca some) |
-| D2.17 | Ordem dos panes igual ao VS Code (Open Editors antes de Folders) | **ADIADO** | 4.6 | `EXPLORER_VIEWS` em `viewTitleMenus.ts` já está na ordem certa; só o JSX de `ExplorerView.tsx` difere | — |
-| D2.18 | Outline "More Actions…" (Follow Cursor / Filter on Type / Sort By) e ações inline do Timeline (Pin / Refresh / Filter) | **ADIADO** | 4.7 | régua 8080 `auditoria_45/c5/header_{Outline,Timeline}.png`; decisão do usuário 2026-09-25 | exigem Outline/Timeline com dados (D2.9) |
+| D2.16 | Botão "…" (Views and More Actions) no título do Explorer (35 px) para reexibir views ocultas | **ADIADO (fase futura)** | 4.7 | régua 8080 `auditoria_45/c5/explorer_views_more_actions.png` | título de 35 px é do shell; hoje as views voltam pelo menu de qualquer pane-header (Folders nunca some) |
+| D2.17 | Ordem dos panes igual ao VS Code (Open Editors antes de Folders) | **ADIADO (fase futura)** | 4.7 | `EXPLORER_VIEWS` em `viewTitleMenus.ts` já está na ordem certa; só o JSX de `ExplorerView.tsx` difere | — |
+| D2.18 | Outline "More Actions…" (Follow Cursor / Filter on Type / Sort By) e ações inline do Timeline (Pin / Refresh / Filter) | **ADIADO (fase futura)** | 4.7 | régua 8080 `auditoria_45/c5/header_{Outline,Timeline}.png`; decisão do usuário 2026-09-25 | exigem Outline/Timeline com dados (D2.9) |
+| D2.19 | Ações do header do Search (Refresh · Clear Search Results · Collapse All) | **ADIADO** | 4.7 | 04_19 §4 item 10 | a aba Search do shell não tem pane header (`EditorArea.tsx`); não inventar barra própria |
+| D2.20 | Reveal na linha/coluna ao abrir um match do Search (preview + Enter pinado) | **ADIADO** | 4.7 | 04_19 §4 item 12; `data-line/data-column` já ficam na row | `explorer.fileOpened` do contrato congelado leva só `uri` (evoluir contrato v2 junto do editor 4.7) |
+| D2.21 | Links "Open Settings"/"Learn More" do estado vazio e "Open in editor" da mensagem de contagem | **FORA DE ESCOPO** | — | 04_19 §3 | Settings UI e Search Editor não existem no produto |
 
 Itens **CORRIGIDOS** nesta frente (não voltam ao backlog): B3 Browser abre no boot (`876b83d`), menu Copy Path/Delete Permanently (`60287b9`), seções com corpo 0 px + Refresh vazio (`f5a4c1d`), `.git` visível (`70f2231`), download multi → 1 ZIP (`e2a1058`), ícones por extensão (`0d86656`).
 
@@ -113,7 +116,9 @@ Uma fatia só avança quando tiver:
 - relato final no chat com concluído, pendências e validações executadas.
 
 ## Estado atual da execução
-- **2026-09-25:** Onda 4 (FATIA-04): 4.1–4.4 concluídas (4.4 homologada no Windows, `a41f02a`); **4.5 em execução — 5/6 commits verdes** (HEAD `604bb6d`; D2.3/D2.4/D2.5 concluídos; novos débitos D2.16–D2.18); falta checklist visual do usuário. Detalhe em `docs/12` 2026-09-25.
+- **2026-09-26:** **4.6 IMPLEMENTADA** (c1–c7, HEAD pós-`985160f`; placar 04_19 §4 = 12 PASS · 1 PARCIAL · 1 FAIL) — aguarda checklist humano no Windows para CONCLUÍDA. Novos débitos D2.19–D2.21. D2.6 (badges Activity Bar) permanece ADIADO (fora do escopo aprovado da 4.6 → 4.9+).
+- **2026-09-25 (tarde):** **4.5 CONCLUÍDA** — homologada pelo usuário no Windows 11 (checklist 4/4). D2.2–D2.5 CONCLUÍDOS; D2.7/D2.16–D2.18 movidos para fases futuras (4.7/4.9+). **4.6 (Search Panel + Replace) em preparação** — auditoria + plano antes de código.
+- **2026-09-25 (manhã):** 4.1–4.4 concluídas (4.4 homologada, `a41f02a`); 4.5 em execução 5/6 (HEAD `604bb6d`).
 - **2026-09-24:** Ondas 1–3 concluídas (FATIA-01/02/03). Onda 4 em execução: 4.1–4.3 concluídas; 4.4 PARCIAL (10/11 PASS — `docs/12` 2026-09-24; HEAD `0d86656`); hotfix 4.8-B3 aplicado.
 - Histórico (2026-09-13):
 - Ondas 1 e 2 já foram concluídas no repositório atual.

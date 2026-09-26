@@ -12,6 +12,10 @@
 //   POST /fs/copy    { from, to }
 //   POST /fs/rename  { from, to }                        (move)
 //   POST /fs/upload  (headers x-explorer-uri; body octet-stream) → { uri }
+//   POST /fs/search  { root, query: SearchQuery, maxResults?, maxFiles? }   (4.6 c1)
+//        → JSON { matches, fileCount, matchCount, filesScanned, skippedLarge, truncated }
+//        → Accept: application/x-ndjson ⇒ 1 linha {type:'file'} por arquivo + {type:'done'}
+//        regex inválida / pattern vazio → 400 invalid_query
 //   WS   /fs/watch   { op:'watch', uri } ⇄ { op:'watched' } | fs.changed
 // Erro padronizado: { code, message } — code = FsErrorCode ("io" default).
 // Reutilizável por vite-plugin-fs.ts (dev) e server.mjs (preview) — 04_15 4.3.
@@ -30,6 +34,8 @@ import {
   toWorkspaceUri,
 } from './fsHost';
 import { ExplorerFsWatcher, type FsChangedBatch } from './watcher';
+import { runSearch, type SearchEngineEvent } from './searchEngine';
+import type { SearchMatch, SearchQuery } from '../../contract';
 
 export const FS_HTTP_PREFIX = '/fs/';
 export const FS_WATCH_PATH = '/fs/watch';
@@ -86,6 +92,8 @@ function statusOf(code: string): number {
       return 404;
     case 'file_exists':
       return 409;
+    case 'invalid_query':
+      return 400;
     default:
       return 500;
   }
@@ -240,6 +248,46 @@ export async function createExplorerFsServer(
           }
           return v as WorkspaceUri;
         };
+        if (p === '/fs/search') {
+          const root = needUri('root');
+          const q = (body.query ?? {}) as Partial<SearchQuery>;
+          const query: SearchQuery = {
+            pattern: typeof q.pattern === 'string' ? q.pattern : '',
+            isCaseSensitive: q.isCaseSensitive === true,
+            isWholeWord: q.isWholeWord === true,
+            isRegExp: q.isRegExp === true,
+            include: typeof q.include === 'string' ? q.include : undefined,
+            exclude: typeof q.exclude === 'string' ? q.exclude : undefined,
+          };
+          const num = (k: string): number | undefined =>
+            typeof body[k] === 'number' && Number.isFinite(body[k] as number) && (body[k] as number) > 0 ? (body[k] as number) : undefined;
+          const ac = new AbortController();
+          req.on('close', () => ac.abort()); // cliente desistiu (última busca vence)
+          const gen = runSearch(host.rootPath, root, query, { maxResults: num('maxResults'), maxFiles: num('maxFiles'), signal: ac.signal });
+          const wantsStream = String(req.headers.accept ?? '').includes('application/x-ndjson');
+          // primeiro evento fora do try de headers: erros de query viram 400 JSON
+          const first = await gen.next();
+          if (wantsStream) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            const write = (ev: SearchEngineEvent) => res.write(`${JSON.stringify(ev)}\n`);
+            if (!first.done) write(first.value);
+            for await (const ev of gen) write(ev);
+            res.end();
+            return true;
+          }
+          const matches: SearchMatch[] = [];
+          let done: Extract<SearchEngineEvent, { type: 'done' }> | undefined;
+          const take = (ev: SearchEngineEvent) => {
+            if (ev.type === 'file') matches.push(...ev.matches);
+            else done = ev;
+          };
+          if (!first.done) take(first.value);
+          for await (const ev of gen) take(ev);
+          sendJson(res, 200, { matches, ...(done ?? { fileCount: 0, matchCount: 0, filesScanned: 0, skippedLarge: 0, truncated: false, cancelled: false }) });
+          return true;
+        }
         switch (p) {
           case '/fs/write': {
             await host.writeFileAtomic(needUri(), String(body.content ?? ''));
