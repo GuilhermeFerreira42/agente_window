@@ -215,16 +215,15 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await view.locator('[role="treeitem"]', { hasText: 'pasta' }).first().click();
     await view.locator('[role="treeitem"]', { hasText: 'alpha.txt' }).first().click();
 
-    // aba do editor aberta com o nome do arquivo
-    const tab = page.locator('.editor-tab', { hasText: 'alpha.txt' }).first();
-    await expect(tab, 'aba alpha.txt aberta no editor').toBeVisible();
-    // reveal padrao R-083: o anexo do editor NAO fica oculto
-    await expect(page.locator('[data-testid="editor-hidden-content"]'), 'editor revelado (sem estado "Editor oculto")').toHaveCount(0);
-    // faixa declara ARQUIVO REAL DO DISCO (mock so como fallback declarado) + badge REAL
-    const shell = page.locator('.monaco-editor-shell').filter({ hasText: 'Arquivo real do disco' }).first();
-    await expect(shell, 'faixa "Arquivo real do disco" na aba aberta').toBeVisible();
-    await expect(shell.getByText('REAL', { exact: true }), 'badge REAL visivel').toBeVisible();
-    // conteudo real do disco ("alpha") renderizado no Monaco
+    // (4.7 c4) arquivo REAL abre no EDITOR ANEXO da barra auxiliar (04_05 §10),
+    // nao mais no editor central: aba do anexo + Monaco com o conteudo do disco.
+    const attach = page.locator('.auxiliary-bar .explorer-attach-area');
+    await expect(attach, 'anexo aberto').toBeVisible();
+    const tab = attach.locator('.tabs-container > .tab', { hasText: 'alpha.txt' }).first();
+    await expect(tab, 'aba alpha.txt aberta no anexo').toBeVisible();
+    await expect(page.locator('.editor-tab', { hasText: 'alpha.txt' }), 'NADA no editor central').toHaveCount(0);
+    // conteudo real do disco ("alpha") renderizado no Monaco do anexo (zero mock)
+    const shell = attach.locator('.editor-container .monaco-editor').first();
     await expect(shell.locator('.view-lines'), 'conteudo real de alpha.txt no Monaco').toContainText('alpha');
 
     await page.screenshot({ path: '/home/user/4-4-fix-bug-p1-conteudo-real.png' });
@@ -282,12 +281,20 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     // No visivel em cache + arquivo apagado no disco SEM refresh (watch do
     // tmpfs e passivo — prova: teste "refresh traz arquivo externo" exige
     // refresh manual). Clicar dispara /fs/read -> 404 -> error editor.
+    // (c5: o watcher voltou a ficar vivo apos re-seed da raiz, entao a arvore
+    // some com o no logo apos o rm. Para manter a prova REAL — leitura falha
+    // porque o arquivo nao existe mais — apagamos o arquivo no exato instante
+    // em que o clique dispara /fs/read, antes de o pedido chegar ao servidor.)
     const target = `${SEED}/seed.txt`;
-    await rm(target);
-    await page.waitForTimeout(200);
     const row = view.locator('[role="treeitem"]', { hasText: 'seed.txt' });
-    await expect(row, 'no de seed.txt ainda visivel no cache da arvore').toHaveCount(1);
+    await expect(row, 'no de seed.txt visivel na arvore').toHaveCount(1);
+    let removed = false;
+    await page.route('**/fs/read**', async (r) => {
+      if (!removed && r.request().url().includes('seed.txt')) { removed = true; await rm(target); }
+      await r.continue();
+    });
     await row.first().click();
+    await expect.poll(() => removed, 'o clique disparou /fs/read (arquivo removido antes da leitura)').toBe(true);
 
     const errPane = page.locator('[data-testid="file-read-error"]');
     await expect(errPane, 'aba de seed.txt abre como ERROR EDITOR (padrao VS Code, nunca mock)').toBeVisible();
@@ -348,10 +355,11 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
     await view.locator('[role="treeitem"]', { hasText: 'pasta' }).first().click();
     await view.locator('[role="treeitem"]', { hasText: 'alpha.txt' }).first().click();
 
-    const shell = page.locator('.monaco-editor-shell').filter({ hasText: 'Arquivo real do disco' }).first();
-    await expect(shell, 'clique REVELA o editor com conteudo real mesmo oculto/estreito').toBeVisible();
-    await expect(shell.locator('.view-lines')).toContainText('alpha');
-    await expect(page.locator('[data-testid="editor-hidden-content"]'), 'pos-clique: nada de "Editor oculto"').toHaveCount(0);
+    // (4.7 c4) o clique abre no EDITOR ANEXO (dentro da propria barra auxiliar),
+    // independente do editor central estar oculto/estreito.
+    const attach = page.locator('.auxiliary-bar .explorer-attach-area');
+    await expect(attach, 'clique REVELA o anexo com conteudo real mesmo com editor central oculto/estreito').toBeVisible();
+    await expect(attach.locator('.editor-container .monaco-editor .view-lines')).toContainText('alpha');
   });
 
   test('collapse-all zera expansões; refresh relê o disco e mostra arquivo externo', async ({ page }) => {

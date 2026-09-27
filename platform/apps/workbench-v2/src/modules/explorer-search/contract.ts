@@ -31,6 +31,22 @@ export type ExplorerSearchEvent =
   | { type: 'search.finished'; id: string; matches: SearchMatch[]; fileCount: number; truncated: boolean }
   | { type: 'search.cancelled'; id: string }
   | { type: 'search.replaceApplied'; files: number; replacements: number }
+  // 4.7 c2 (evolução ADITIVA): Editor Anexo — modelo de abas por sessão.
+  | { type: 'editor.tabOpened'; sessionId: string; uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; preview: boolean }
+  | { type: 'editor.tabClosed'; sessionId: string; uri: WorkspaceUri }
+  | { type: 'editor.tabPinned'; sessionId: string; uri: WorkspaceUri }
+  | { type: 'editor.activeChanged'; sessionId: string; uri: WorkspaceUri | null }
+  | { type: 'editor.dirtyChanged'; sessionId: string; uri: WorkspaceUri; dirty: boolean }
+  | { type: 'editor.revealRequested'; sessionId: string; uri: WorkspaceUri; line: number; column?: number }
+  | { type: 'editor.attachExpanded'; sessionId: string }   // 1.ª aba aberta → layout mostra o anexo
+  | { type: 'editor.attachCollapsed'; sessionId: string }  // última aba fechada → layout esconde (display:none, nunca desmonta)
+  // 4.7 c5 (aditivo): ciclo de save / conflito externo
+  | { type: 'editor.saved'; sessionId: string; uri: WorkspaceUri }
+  | { type: 'editor.attachMaximized'; sessionId: string }  // c6: ⤢ — anexo no máximo do clamp DENTRO da sessão (sem position:fixed)
+  // 4.7-b c1 (aditivo, exceção registrada em docs/12): estado Git do repo do workspace mudou.
+  | { type: 'git.statusChanged'; isRepo: boolean; branch: string | null; count: number }
+  | { type: 'editor.attachRestored'; sessionId: string }   // c6: ⤢ de novo / Esc — volta à largura anterior
+  | { type: 'editor.externalChange'; sessionId: string; uri: WorkspaceUri; dirty: boolean }  // fs.changed numa URI aberta e SUJA (limpa recarrega sozinha)
   | { type: 'error'; code: string; message: string };
 
 // ---------------------------------------------------------------------------
@@ -94,16 +110,26 @@ export interface IExplorerSearchApi {
 // ---------------------------------------------------------------------------
 // Editor em anexo lateral (superfície do módulo — espelho do docs/04 §7 attach)
 // ---------------------------------------------------------------------------
-export interface AttachTab { uri: WorkspaceUri; kind: 'code' | 'search'; dirty: boolean; }
+export interface AttachTab {
+  uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; dirty: boolean;
+  /** 4.7 c2 (aditivo, opcionais): preview = clique simples (itálico); active = aba corrente do grupo. */
+  preview?: boolean; active?: boolean;
+}
 export interface IEditorAttachApi {
   /** Abre (ou foca) um recurso no anexo. `line` para reveal (search → resultado). */
-  open(input: { uri: WorkspaceUri; kind: 'code' | 'search'; line?: number; column?: number; sessionId: string }): Promise<void>;
+  /** 4.7-b c2 (aditivo): `kind: 'changes'` = aba fixa da Source Control View (uri sintética). */
+  open(input: { uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; line?: number; column?: number; sessionId: string;
+    /** 4.7 c2 (aditivo, opcional): true = pinado (duplo clique); ausente = preview (clique simples). */
+    pinned?: boolean }): Promise<void>;
   close(input: { uri: WorkspaceUri; sessionId: string }): Promise<void>;
   closeAll(input: { sessionId: string }): Promise<void>;   // recolhe o anexo (sem desmontar)
   setVisible(input: { sessionId: string; visible: boolean }): void; // NUNCA desmonta (Regra 10 docs/18)
   setWidth(input: { sessionId: string; pixels: number }): void;     // clamp 280–1200 px / 25–75%
   save(input: { uri: WorkspaceUri }): Promise<void>;                // writeFile(atomic:true)
   getTabs(input: { sessionId: string }): AttachTab[];
+  /** 4.7 c6 (aditivo): maximizar/restaurar dentro da sessão; estado persistido. */
+  setMaximized?(input: { sessionId: string; maximized: boolean }): void;
+  isMaximized?(input: { sessionId: string }): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +185,11 @@ export interface IExplorerSearchModule {
    *  do SearchView mock da aba `search`. Só DOM dentro de `root`. */
   mountSearch(root: HTMLElement, opts?: { focusRequest?: number }): void;
   unmountSearch(): void;
+  /** 4.7 c1 (evolução ADITIVA, opção A aprovada 2026-09-26): renderiza o
+   *  Editor Anexo dentro do `attachSlot` da barra auxiliar (à esquerda da
+   *  árvore). `attach.setVisible` só alterna display:none — nunca desmonta. */
+  mountAttach(root: HTMLElement, opts: { sessionId: string }): void;
+  unmountAttach(): void;
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void;
   dispose(): void;               // libera watchers, comandos registrados, listeners
 }

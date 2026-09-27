@@ -185,12 +185,18 @@ describe('fronteira LEGO — modules/explorer-search (FT)', () => {
     await mod.explorer.openFolder({ uri: root });
     expect(roots).toEqual([root]);
 
-    // REAIS desde 4.4: mount + transfer; desde 4.6 c2: search (handle cancelável); stub 4.7 segue falhando explícito (04_15 §3).
+    // REAIS desde 4.4: mount + transfer; desde 4.6 c2: search (handle cancelável);
+    // desde 4.7 c1/c2: attach layout + abas (open/close/getTabs); desde 4.7 c5:
+    // attach.save REAL (writeFile atômico) — sem editor montado (jsdom) rejeita
+    // explicitamente "não está aberto no anexo", nunca grava em silêncio.
     expect(() => mod.mount(document.createElement('div'))).not.toThrow(/4\.4/);
     const handle = mod.search.query({ root, query: { pattern: 'x' } });
     expect(typeof handle.id).toBe('string');
     expect(() => handle.cancel()).not.toThrow();
-    expect(() => mod.attach.open({ uri: root, kind: 'code', sessionId: 's' })).toThrow(/4\.7/);
+    await expect(mod.attach.open({ uri: root, kind: 'code', sessionId: 's' })).resolves.toBeUndefined();
+    expect(mod.attach.getTabs({ sessionId: 's' }).map((t) => t.uri)).toEqual([root]);
+    await expect(mod.attach.save({ uri: root })).rejects.toThrow(/não está aberto no anexo/);
+    await expect(mod.attach.closeAll({ sessionId: 's' })).resolves.toBeUndefined();
     await expect(mod.explorer.upload({ target: root, entries: [], conflict: 'skip' })).resolves.toBeUndefined();
     await expect(mod.explorer.download({ uris: [] })).resolves.toBeUndefined();
     mod.unmount();

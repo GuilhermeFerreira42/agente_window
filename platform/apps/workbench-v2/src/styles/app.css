@@ -3031,6 +3031,28 @@ svg {
   transition: width 160ms ease, min-width 160ms ease, flex-basis 160ms ease, opacity 120ms ease;
 }
 
+/* FATIA-04 4.7 c1 (exceção autorizada): com `attachSlot` a barra vira LINHA
+   [editor anexo][coluna]. A coluna mantém a largura de sempre; a barra só
+   cresce a largura do anexo (o módulo controla `--attach-width`/display). */
+.auxiliary-bar.has-attach-slot {
+  flex-direction: row;
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+}
+.auxiliary-bar.has-attach-slot > .auxiliary-column {
+  flex: 0 0 calc(var(--auxiliary-width) - 5px - 2px);
+  width: calc(var(--auxiliary-width) - 5px - 2px);
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.auxiliary-bar:not(.has-attach-slot) > .auxiliary-column {
+  display: contents;
+}
+
 .auxiliary-header {
   padding: 0 8px;
 }

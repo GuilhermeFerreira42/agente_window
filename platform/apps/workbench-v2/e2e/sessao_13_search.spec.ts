@@ -387,17 +387,19 @@ test.describe('FATIA-04 · 4.6 — Search Panel (módulo explorer-search no slot
     await page.keyboard.type('needle');
     const list = panel.locator('.results .monaco-list');
     await expect(list.locator('.monaco-list-row')).toHaveCount(8);
-    await expect(page.locator('.editor-tab', { hasText: 'a.ts' })).toHaveCount(0);
+    // (4.7 c4) o match abre no EDITOR ANEXO da barra auxiliar (com linha — D2.20), não no editor central.
+    const attachTabs = page.locator('.auxiliary-bar .explorer-attach-area .tabs-container > .tab');
+    await expect(attachTabs.filter({ hasText: 'a.ts' })).toHaveCount(0);
     await list.locator('.monaco-list-row[aria-level="2"]').first().click();
-    await expect(page.locator('.editor-tab', { hasText: 'a.ts' }).first()).toBeVisible();
-    // Enter num match de b.md (foco via teclado) — a aba do editor ficou ativa; volta à aba Search
-    await page.locator('.editor-tab', { hasText: 'Search' }).first().click();
+    await expect(attachTabs.filter({ hasText: 'a.ts' }).first()).toBeVisible();
+    await expect(page.locator('.editor-tab', { hasText: 'a.ts' }), 'nada no editor central').toHaveCount(0);
+    // Enter num match de b.md (foco via teclado) — o painel Search continua visível no centro
     await expect(panel).toBeVisible();
     await panel.locator('.search-container textarea').focus();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('End'); // último match (b.md)
     await page.keyboard.press('Enter');
-    await expect(page.locator('.editor-tab', { hasText: 'b.md' }).first()).toBeVisible();
+    await expect(attachTabs.filter({ hasText: 'b.md' }).first()).toBeVisible();
   });
 
   test('T14 (c6): termo, replace, toggles, include e painéis abertos sobrevivem ao reload (localStorage explorer-search.search.v1) sem refazer a busca; limpar o termo apaga a chave', async ({ page, request }) => {

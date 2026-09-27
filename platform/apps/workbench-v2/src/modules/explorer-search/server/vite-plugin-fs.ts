@@ -10,6 +10,7 @@ import type { Plugin } from 'vite';
 import { WebSocketServer } from 'ws';
 import { createExplorerFsServer, FS_WATCH_PATH, type ExplorerFsServer } from './fs/index';
 import { WATCHER_COALESCE_MS } from '../core/constants';
+import { createExplorerGitServer, GIT_HTTP_PREFIX, type ExplorerGitServer } from './git/index';
 
 export interface FsPluginOptions {
   /** Raiz default (repo root). Sobrescrita por FS_TEST_ROOT em tests E2E. */
@@ -18,6 +19,7 @@ export interface FsPluginOptions {
 
 export function fsPlugin(options: FsPluginOptions): Plugin {
   let fsServer: ExplorerFsServer | undefined;
+  let gitServer: ExplorerGitServer | undefined;
 
   return {
     name: 'explorer-search-fs-single-port',
@@ -28,6 +30,25 @@ export function fsPlugin(options: FsPluginOptions): Plugin {
         root: root as `file://${string}` | string as `file://${string}`,
         watcherCoalesceMs: WATCHER_COALESCE_MS,
         createWsServer: () => new WebSocketServer({ noServer: true }),
+      });
+
+      // 4.7-b c1: adapter Git no MESMO plugin/porta (LEGO — sem processo extra).
+      gitServer = createExplorerGitServer({ workspaceRoot: root });
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith(GIT_HTTP_PREFIX)) {
+          next();
+          return;
+        }
+        gitServer!
+          .tryHandleHttp(req, res)
+          .then((handled) => {
+            if (!handled) next();
+          })
+          .catch((err) => {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ code: 'io', message: String(err) }));
+          });
       });
 
       // Handlers HTTP no middleware stack (Single Port, mesma origem do app).

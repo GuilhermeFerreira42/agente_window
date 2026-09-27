@@ -1,0 +1,390 @@
+/* ==========================================================================
+   ui/attach/attach.css — 4.7 c1. Editor Anexo dentro da barra auxiliar.
+   Tokens: --vscode-editor-background, --vscode-editorGroup-border,
+   --vscode-sash-hoverBorder (04_05 §1). Sem position:fixed (A5.7).
+   ========================================================================== */
+.explorer-attach-area {
+  position: relative;
+  box-sizing: border-box;
+  flex: 0 0 var(--attach-width, 460px);
+  width: var(--attach-width, 460px);
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+  box-shadow: inset -1px 0 0 var(--vscode-editorGroup-border);
+}
+.explorer-attach-area.is-dragging { user-select: none; }
+.explorer-attach-area.is-dragging * { cursor: ew-resize !important; }
+
+.explorer-attach-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* sash.css: 6 px, transparente; hover/ativo pinta `--vscode-sash-hoverBorder`
+   após 300 ms (SASH_HOVER_DELAY_MS) — mesmo padrão do sash do terminal. */
+.explorer-attach-sash {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  background: transparent;
+  outline: none;
+  touch-action: none;
+  z-index: 1;
+  transition: background-color 100ms ease-out;
+}
+.explorer-attach-sash.hover,
+.explorer-attach-sash:focus-visible {
+  background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+}
+
+/* ==========================================================================
+   4.7 c3 — Faixa de abas (tabsTitleControl / media/tabstitlecontrol.css) e
+   breadcrumbs (breadcrumbscontrol.css). Medidas: 04_20 §1 (8080).
+   O bloco interno usa `.explorer-viewlet` para herdar codicon.ttf e a paleta
+   Seti do módulo (explorer.css) — sem duplicar tokens.
+   ========================================================================== */
+.explorer-attach-content > .explorer-viewlet.attach-viewlet {
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  /* Tokens de aba/breadcrumb que o theme.css do shell ainda não expõe:
+     derivados de tokens existentes (sem cor fixa); o tema pode sobrescrever. */
+  --vscode-tab-border: var(--vscode-tab-border-theme, var(--vscode-widget-border, var(--vscode-panel-border)));
+  --vscode-tab-activeBorderTop: var(--vscode-tab-activeBorderTop-theme, var(--vscode-focusBorder));
+  --vscode-tab-activeBackground: var(--vscode-tab-activeBackground-theme, var(--vscode-editor-background));
+  --vscode-tab-inactiveBackground: var(--vscode-tab-inactiveBackground-theme, var(--vscode-editorGroupHeader-tabsBackground));
+  --vscode-tab-activeForeground: var(--vscode-tab-activeForeground-theme, var(--vscode-foreground));
+  --vscode-tab-inactiveForeground: var(--vscode-tab-inactiveForeground-theme, var(--vscode-descriptionForeground));
+  --vscode-breadcrumb-foreground: var(--vscode-breadcrumb-foreground-theme, var(--vscode-descriptionForeground));
+  --vscode-breadcrumb-focusForeground: var(--vscode-breadcrumb-focusForeground-theme, var(--vscode-foreground));
+}
+.attach-viewlet .title.tabs {
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+  border-bottom: var(--vscode-editorGroupHeader-tabsBorder, transparent) solid 1px;
+}
+.attach-viewlet .tabs-and-actions-container {
+  display: flex;
+  height: 35px;
+  position: relative;
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+}
+.attach-viewlet .tabs-and-actions-container > .monaco-scrollable-element {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.attach-viewlet .tabs-container {
+  display: flex;
+  height: 35px;
+  scrollbar-width: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.attach-viewlet .tabs-container::-webkit-scrollbar { display: none; }
+
+.attach-viewlet .tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 35px;
+  min-width: fit-content;
+  padding-left: 10px;
+  padding-right: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  background-color: var(--vscode-tab-inactiveBackground);
+  color: var(--vscode-tab-inactiveForeground);
+  border-right: 1px solid var(--vscode-tab-border);
+}
+.attach-viewlet .tab.active {
+  background-color: var(--vscode-tab-activeBackground);
+  color: var(--vscode-tab-activeForeground);
+}
+.attach-viewlet .tab:hover:not(.active) {
+  background-color: var(--vscode-tab-hoverBackground, var(--vscode-tab-inactiveBackground));
+  color: var(--vscode-tab-hoverForeground, var(--vscode-tab-inactiveForeground));
+}
+.attach-viewlet .tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+/* tab-border-top-container: 1 px no topo da ativa (--vscode-tab-activeBorderTop) */
+.attach-viewlet .tab > .tab-border-top-container {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  pointer-events: none;
+  background-color: var(--vscode-tab-activeBorderTop);
+}
+.attach-viewlet .tab > .tab-border-bottom-container {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  pointer-events: none;
+  background-color: var(--vscode-tab-activeBorder, transparent);
+}
+.attach-viewlet .tab:not(.active) > .tab-border-bottom-container { background-color: transparent; }
+
+.attach-viewlet .tab > .tab-label {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  min-width: 0;
+  line-height: 35px;
+}
+.attach-viewlet .tab .monaco-icon-label {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  line-height: 35px;
+  overflow: hidden;
+}
+.attach-viewlet .tab .label-name {
+  font-size: 13px;
+  line-height: 35px;
+  color: inherit;
+  text-decoration: none;
+}
+.attach-viewlet .tab .monaco-icon-label.italic .label-name,
+.attach-viewlet .tab.preview .label-name { font-style: italic; }
+
+/* ícone Seti: 16 px + padding-right 6 (iconlabel.css / .show-file-icons) */
+.attach-viewlet .show-file-icons .file-icon.monaco-icon-label:before {
+  content: '\ea7b';
+  font-family: codicon;
+  font-size: 16px;
+  width: 16px;
+  height: 22px;
+  line-height: 22px;
+  box-sizing: content-box;
+  padding-right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--vscode-explorer-seti-default, var(--vscode-foreground));
+}
+
+/* .tab-actions 28×20; ✕ 20×20 (16 + padding 2) radius 6 */
+.attach-viewlet .tab > .tab-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.attach-viewlet .tab .monaco-action-bar,
+.attach-viewlet .tab .actions-container {
+  display: flex;
+  align-items: center;
+  margin: 0; padding: 0; list-style: none;
+}
+.attach-viewlet .tab .action-item { display: flex; }
+.explorer-viewlet.attach-viewlet .tab .monaco-action-bar .action-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border-radius: 6px;
+  font-family: codicon;
+  font-size: 16px;
+  line-height: 16px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.explorer-viewlet.attach-viewlet .tab .monaco-action-bar .action-label:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.attach-viewlet .tab .action-label.codicon-close:before { content: '\ea76'; }
+.attach-viewlet .tab .action-label.codicon-close-dirty:before { content: '\ea71'; } /* circle-filled (●) */
+.attach-viewlet .tab.dirty:hover .action-label.codicon-close-dirty:before { content: '\ea76'; } /* hover → ✕ */
+/* inativa limpa: ✕ só no hover/foco (workbench.editor.tabActionCloseVisibility) */
+.attach-viewlet .tab:not(.active):not(.dirty) .tab-actions { opacity: 0; }
+.attach-viewlet .tab:not(.active):not(.dirty):hover .tab-actions,
+.attach-viewlet .tab:not(.active):not(.dirty):focus-within .tab-actions { opacity: 1; }
+
+/* editor-actions (c6): padding 0 8px 0 4px, botões 22×22 r6 (actionbar do
+   editor group: ⤢ screen-full/screen-normal + ✕). */
+.attach-viewlet .editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 35px;
+  padding: 0 8px 0 4px;
+  flex-shrink: 0;
+}
+.attach-viewlet .editor-actions:empty { display: none; }
+.attach-viewlet .editor-actions > .action-label {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px;
+  background: transparent; color: var(--vscode-icon-foreground); cursor: pointer; font-family: codicon; font-size: 16px; line-height: 16px;
+}
+.attach-viewlet .editor-actions > .action-label:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+.attach-viewlet .editor-actions > .action-label:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.attach-viewlet .editor-actions > .action-label.codicon-screen-full:before { content: '\eb4c'; } /* codiconsLibrary: screenFull 0xeb4c */
+.attach-viewlet .editor-actions > .action-label.codicon-screen-normal:before { content: '\eb4d'; } /* screenNormal 0xeb4d */
+.attach-viewlet .editor-actions > .action-label.codicon-close:before { content: '\ea76'; }
+.attach-viewlet .attach-empty-title-bar .tabs-and-actions-container > .monaco-scrollable-element { flex: 1 1 auto; }
+
+/* Breadcrumbs: 22 px, item 13 px, separador codicon chevron-right */
+.attach-viewlet .breadcrumbs-control {
+  height: 22px;
+  flex: 0 0 22px;
+  background: var(--vscode-breadcrumb-background, var(--vscode-editor-background));
+  overflow: hidden;
+}
+.attach-viewlet .monaco-breadcrumbs {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding-left: 4px;
+  font-size: 13px;
+  color: var(--vscode-breadcrumb-foreground);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.attach-viewlet .monaco-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  font-size: 13px;
+  color: var(--vscode-breadcrumb-foreground);
+  cursor: pointer;
+}
+.attach-viewlet .monaco-breadcrumb-item:hover { color: var(--vscode-breadcrumb-focusForeground, var(--vscode-foreground)); }
+.attach-viewlet .monaco-breadcrumb-item .label-name { color: inherit; text-decoration: none; font-size: 13px; }
+.attach-viewlet .monaco-breadcrumb-item .monaco-icon-label { display: flex; align-items: center; height: 22px; }
+.attach-viewlet .monaco-breadcrumbs .codicon-breadcrumb-separator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 22px;
+  font-family: codicon;
+  font-size: 16px;
+  color: var(--vscode-breadcrumb-foreground);
+}
+.attach-viewlet .monaco-breadcrumbs .codicon-breadcrumb-separator:before { content: '\eab6'; }
+
+/* área do editor (c4 preenche) */
+.attach-viewlet .editor-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: var(--vscode-editor-background);
+}
+
+/* ==========================================================================
+   4.7 c4 — Monaco no anexo (fontSize 14 / lineHeight 19 vêm das opções do
+   editor; aqui só o host, o reveal e os painéis Image Preview / ERROR EDITOR).
+   ========================================================================== */
+.attach-viewlet .attach-editor-pane { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
+.attach-viewlet .attach-monaco-host { flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; }
+.attach-viewlet .monaco-editor .attach-reveal-highlight {
+  background-color: var(--vscode-editor-findMatchHighlightBackground);
+}
+.attach-viewlet .attach-pane-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}
+.attach-viewlet .attach-pane-banner.error { color: var(--vscode-errorForeground); }
+.attach-viewlet .attach-pane-name { color: var(--vscode-foreground); }
+.attach-viewlet .attach-pane-badge {
+  margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
+}
+.attach-viewlet .attach-image-preview { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.attach-viewlet .attach-image-body { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 16px; }
+.attach-viewlet .attach-image-body img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.attach-viewlet .attach-read-error { padding-bottom: 8px; }
+.attach-viewlet .attach-error-detail { padding: 8px 12px; font-size: 12px; color: var(--vscode-descriptionForeground); word-break: break-word; }
+.attach-viewlet .attach-error-hint { padding: 0 12px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+
+/* ==========================================================================
+   4.7 c5 — diálogo Save / Don't Save / Cancel e conflito externo. Casca
+   `.explorer-search-dialog` (search.css) + ícone warning e linha de mensagem.
+   ========================================================================== */
+.explorer-search-dialog.attach-dialog .codicon-dialog-warning:before { content: '\ea6c'; } /* = warning */
+.explorer-search-dialog.attach-dialog .codicon-dialog-warning { color: var(--vscode-problemsWarningIcon-foreground, var(--vscode-editorWarning-foreground)); }
+.explorer-search-dialog.attach-dialog .dialog-message-container { flex-direction: column; align-items: flex-start; gap: 6px; }
+.explorer-search-dialog.attach-dialog .dialog-message { font-size: 13px; font-weight: 600; line-height: 18px; word-wrap: break-word; }
+.explorer-search-dialog.attach-dialog .monaco-button { width: fit-content; min-width: 0; flex: 0 0 auto; white-space: nowrap; } /* VS Code: rótulo nunca quebra ("Não Salvar" em 1 linha) */
+.explorer-search-dialog.attach-dialog .monaco-button + .monaco-button { margin-left: 4px; }
+.attach-viewlet .attach-save-error {
+  padding: 4px 12px; font-size: 12px; color: var(--vscode-errorForeground);
+  background: var(--vscode-inputValidation-errorBackground);
+  border-bottom: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+/* ==========================================================================
+   4.7 c6 — Maximizar dentro da sessão + empty state (editorGroupWatermark).
+   • maximizado = --attach-width no teto do clamp (store.getMaximizedWidth);
+     NUNCA position:fixed nem z-index global — o anexo continua um flex item
+     da barra auxiliar; Activity Bar / Chat / Status Bar seguem no fluxo.
+   • enquanto maximizado a coluna da árvore (Files) recolhe (restore devolve).
+   • transição 200 ms ease-in-out só na largura (sem reflow brusco).
+   ========================================================================== */
+.explorer-attach-area.is-animating { transition: flex-basis 200ms ease-in-out, width 200ms ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .explorer-attach-area { transition: none; } }
+.auxiliary-bar.has-attach-slot:has(.explorer-attach-area.is-maximized[data-visible="true"]) > .auxiliary-column { display: none; }
+
+/* editorgroupview.css: .editor-group-watermark ≤ 290 px centralizado;
+   .letterpress quadrado (256 px); dl de atalhos 1fr/auto, dt à direita. */
+.attach-viewlet .editor-group-watermark.attach-empty {
+  position: absolute; inset: 0; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-sizing: border-box; width: 100%; max-width: 290px; height: 100%; margin: 0 auto; padding: 0 12px;
+  background: var(--vscode-editor-background); color: var(--vscode-foreground);
+  user-select: none;
+}
+.attach-viewlet .attach-empty .letterpress {
+  width: 100%; max-width: 256px; height: auto; aspect-ratio: 1 / 1; flex: 0 1 auto; min-height: 0;
+  color: var(--vscode-editorGroup-border, var(--vscode-widget-border)); opacity: 0.85;
+}
+.attach-viewlet .attach-empty .attach-empty-title { margin: 20px 0 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.attach-viewlet .attach-empty .attach-empty-hint { margin: 4px 0 0; font-size: 12px; color: var(--vscode-descriptionForeground); text-align: center; }
+.attach-viewlet .attach-empty .shortcuts {
+  display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items: center;
+  width: 100%; margin: 16px 0 0; font-size: 13px;
+}
+.attach-viewlet .attach-empty .shortcuts dt { text-align: right; letter-spacing: 0.04em; color: var(--vscode-descriptionForeground); }
+.attach-viewlet .attach-empty .shortcuts dd { margin: 0; text-align: left; }
+.attach-viewlet .attach-shortcut-chip {
+  display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  color: var(--vscode-foreground); font: inherit; border-radius: 3px;
+}
+.attach-viewlet .attach-shortcut-chip:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+/* keybindingLabel.css */
+.attach-viewlet .monaco-keybinding-key {
+  display: inline-block; box-sizing: border-box; padding: 3px 5px; margin: 0 2px;
+  border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-widget-border));
+  border-bottom-color: var(--vscode-keybindingLabel-bottomBorder, var(--vscode-widget-border));
+  box-shadow: inset 0 -1px 0 var(--vscode-keybindingLabel-boxShadow, transparent);
+  background-color: var(--vscode-keybindingLabel-background, var(--vscode-editorGroupHeader-tabsBackground));
+  color: var(--vscode-keybindingLabel-foreground, var(--vscode-foreground));
+  border-radius: 3px; font-size: 11px; line-height: 10px; vertical-align: middle;
+}
+.attach-viewlet .monaco-keybinding-key-separator { display: inline-block; font-size: 11px; }
+.attach-viewlet .attach-shortcut-chip:hover .monaco-keybinding-key { background-color: var(--vscode-toolbar-hoverBackground); }

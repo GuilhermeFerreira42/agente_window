@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // caminhos internos do módulo (fronteira LEGO, FT).
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 import { createShellCommandRegistry } from './domain/shellCommandRegistry'
-import { isImageFile } from './domain/filePreview'
 import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './components/ExplorerContextMenuHost'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
@@ -79,6 +78,7 @@ import { SessionSidebar } from './components/SessionSidebar'
 import { SessionsPicker } from './components/SessionsPicker'
 import { TerminalPanel } from './components/TerminalPanel'
 import { Titlebar } from './components/Titlebar'
+import { useMockChangesTransition } from './shell/gitTransition'
 import {
   readNewSessionViewState,
   writeNewSessionViewState,
@@ -159,6 +159,17 @@ function SearchModuleSlot({ module, focusRequest }: { module: IExplorerSearchMod
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="search-module-slot" />
 }
 
+/** FATIA-04 4.7 c1 (exceção autorizada 2026-09-26): slot do Editor Anexo na
+ *  barra auxiliar → módulo real. Mesmo padrão do SearchModuleSlot. */
+function AttachModuleSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hostRef.current) module.mountAttach(hostRef.current, { sessionId })
+  }, [module, sessionId])
+  useEffect(() => () => module.unmountAttach(), [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="attach-module-slot" />
+}
+
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>(initialSessions)
   const persistedLayout = useRef(loadLayoutState())
@@ -178,6 +189,8 @@ export default function App() {
   // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
   // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
   const [explorerModule, setExplorerModule] = useState<IExplorerSearchModule | null>(null)
+  // Transição Temporária 4.7-b (docs/12): com o módulo real de pé, a aba "Changes" simulada some.
+  const hideMockChanges = useMockChangesTransition(explorerModule, auxiliaryTab, setAuxiliaryTab)
   const explorerFsRef = useRef<BrowserFsPort | null>(null)
   const handleExplorerFileOpenedRef = useRef<(uri: WorkspaceUri) => void>()
   const explorerMenusRef = useRef(createShellCommandRegistry())
@@ -911,36 +924,12 @@ export default function App() {
   // bloco) e faz o reveal explícito do anexo no padrão R-083 (nunca só ativar).
   // Mock segue apenas como fallback declarado (aba sem content, criada por
   // outros fluxos — demo Files, pesquisa, split etc.).
+  // (FATIA-04 4.7 c4 — exceção autorizada) Arquivo REAL clicado na árvore abre
+  // no EDITOR ANEXO do módulo (`attach.open`, 04_05 §10), não mais no editor
+  // central. Leitura, Image Preview e ERROR EDITOR vivem no módulo.
   handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
     setExplorerContextMenu(null)
-    const fs = explorerFsRef.current
-    if (!fs) return
-    const name = uri.split('/').pop() ?? uri
-    void (async () => {
-      try {
-        if (isImageFile(name)) {
-          const bin = await fs.readFileBinary({ uri, maxBytes: 8 * 1024 * 1024 })
-          openEditorTab('file', { title: name, path: uri, isRealFile: true, imagePreview: { dataBase64: bin.dataBase64, mime: bin.mime } })
-        } else {
-          const read = await fs.readFile({ uri })
-          openEditorTab('file', { title: name, path: uri, content: read.content, isRealFile: true })
-        }
-        // (E10/R-083 — mesmo padrão do openDiff) revelar o anexo do editor.
-        setEditorHidden(false)
-      } catch (err) {
-        console.warn('[explorer-search] falha ao abrir arquivo', err)
-        // (4.4-fix, validação manual) Falha de leitura NUNCA cai em conteúdo
-        // sintético: abre a aba como ERROR EDITOR explícito (espelha o
-        // createEditorOpenError do VS Code — handleSetInputError).
-        openEditorTab('file', {
-          title: name,
-          path: uri,
-          readError: err instanceof Error ? err.message : String(err),
-        })
-        setEditorHidden(false)
-        notify(`Não foi possível abrir ${name}`)
-      }
-    })()
+    void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id })
   }
 
   const openBrowser = () => createBrowser()
@@ -1959,7 +1948,7 @@ export default function App() {
                       onClose={() => setMobilePane('chat')}
                     />
                   ) : (
-                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} visible diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setMobilePane('chat')} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} /></div>
+                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} visible diffFiles={activeDiffFiles} tab={auxiliaryTab} hideChangesTab={hideMockChanges} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setMobilePane('chat')} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} /></div>
                   )
                 )}
               </div>
@@ -2009,7 +1998,7 @@ export default function App() {
               </>
             )}
               </div>
-              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} diffFiles={activeDiffFiles} tab={auxiliaryTab} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setAuxiliaryVisible(false)} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} />}
+              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} diffFiles={activeDiffFiles} tab={auxiliaryTab} hideChangesTab={hideMockChanges} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setAuxiliaryVisible(false)} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
             </div>
             <TerminalPanel
               visible={terminalVisible && !customViewActive}

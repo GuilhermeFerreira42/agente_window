@@ -39,6 +39,9 @@ export interface ExplorerViewProps {
   };
   fs: FileSystemPortLike;
   baseUrl?: string;
+  /** 4.7-b (transição): abre a aba "Changes" (Source Control) no Editor Anexo a partir
+   *  do header da view Folders — ponto de entrada visível SEM precisar abrir um arquivo. */
+  onOpenChanges?: () => void;
 }
 
 const DND_MIME = 'application/vnd.code.tree.explorer';
@@ -257,6 +260,7 @@ interface TimelineEntry { id: string; label: string; timestampMs: number }
 type PaneId = 'folders' | 'openEditors' | 'outline' | 'timeline';
 const VIEWS_VISIBILITY_STORAGE_KEY = 'explorer-search.viewsVisibility.v1';
 
+const OPEN_CHANGES_ACTION: HeaderAction = { id: 'scm.openChanges', label: 'Open Source Control', icon: 'source-control', testId: 'explorer-open-changes' };
 const FOLDER_ACTIONS: HeaderAction[] = [
   { id: 'explorer.newFile', label: 'New File...', icon: 'new-file', testId: 'explorer-new-file' },
   { id: 'explorer.newFolder', label: 'New Folder...', icon: 'new-folder', testId: 'explorer-new-folder' },
@@ -267,7 +271,7 @@ const FOLDER_ACTIONS: HeaderAction[] = [
 // ---------------------------------------------------------------------------
 // ExplorerView
 // ---------------------------------------------------------------------------
-export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: ExplorerViewProps): React.ReactElement {
+export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges }: ExplorerViewProps): React.ReactElement {
   const tickRef = React.useRef<ViewRenderTick | null>(null);
   if (!tickRef.current) tickRef.current = new ViewRenderTick();
   const tick = tickRef.current;
@@ -751,7 +755,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
   const onDragEnd = React.useCallback(() => { dragData.current = null; setDropTargetUri(null); }, []);
 
   // ---- header actions ----
-  const runHeaderAction = React.useCallback((id: string) => { void menus.execute(id); }, [menus]);
+  const runHeaderAction = React.useCallback((id: string) => { if (id === OPEN_CHANGES_ACTION.id) { onOpenChanges?.(); return; } void menus.execute(id); }, [menus, onOpenChanges]);
   const togglePane = (id: PaneId) => setExpandedPanes((s) => ({ ...s, [id]: !s[id] }));
 
   // ---- posição do input inline na lista ----
@@ -863,7 +867,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl }: Explo
                 expanded={expandedPanes.folders}
                 onToggle={() => togglePane('folders')}
                 paneClassName="preserve-workspace-name-case"
-                actions={<HeaderActions actions={FOLDER_ACTIONS.map((a) => ({ ...a, disabled: !root }))} onRun={runHeaderAction} />}
+                actions={<HeaderActions actions={[...(onOpenChanges ? [OPEN_CHANGES_ACTION] : []), ...FOLDER_ACTIONS].map((a) => ({ ...a, disabled: !root }))} onRun={runHeaderAction} />}
               >
                 {!root ? (
                   <div className="pane-message" data-testid="explorer-empty-root">Nenhuma pasta aberta.</div>

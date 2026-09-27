@@ -50,6 +50,7 @@ export class ExplorerFsWatcher {
 
   private listeners = new Set<(batch: FsChangedBatch) => void>();
   private dirWatchers = new Map<string, fs.FSWatcher>(); // fsPath → watcher
+  private dirInodes = new Map<string, number>(); // fsPath → inode observado (detecta dir recriado)
   private rootWatcher: fs.FSWatcher | null = null;
   private pendingAdded = new Set<WorkspaceUri>();
   private pendingRemoved = new Set<WorkspaceUri>();
@@ -95,7 +96,20 @@ export class ExplorerFsWatcher {
       return; // arquivo ou inexistente — só dirs interessam
     }
     if (!stat.isDirectory()) return;
-    this.watchDir(fsPath);
+    // c5: dir apagado e recriado (inode novo) → o watcher antigo está morto;
+    // descarta e observa de novo (senão a pasta nunca mais emite eventos).
+    const known = this.dirInodes.get(fsPath);
+    if (known !== undefined && known !== stat.ino) this.dropDirWatcher(fsPath);
+    this.watchDir(fsPath, stat.ino);
+  }
+
+  private dropDirWatcher(fsPath: string): void {
+    const w = this.dirWatchers.get(fsPath);
+    if (!w) return;
+    w.removeAllListeners();
+    w.close();
+    this.dirWatchers.delete(fsPath);
+    this.dirInodes.delete(fsPath);
   }
 
   dispose(): void {
@@ -152,9 +166,16 @@ export class ExplorerFsWatcher {
     return true;
   }
 
-  private watchDir(fsDirPath: string): void {
+  private watchDir(fsDirPath: string, ino?: number): void {
     if (this.disposed) return;
     if (this.dirWatchers.has(fsDirPath)) return;
+    if (ino === undefined) {
+      try {
+        ino = fs.statSync(fsDirPath).ino;
+      } catch {
+        ino = undefined;
+      }
+    }
     if (this.dirWatchers.size >= this.maxWatchers) return;
     let w: fs.FSWatcher;
     try {
@@ -174,8 +195,10 @@ export class ExplorerFsWatcher {
       w.removeAllListeners();
       w.close();
       this.dirWatchers.delete(fsDirPath);
+      this.dirInodes.delete(fsDirPath);
     });
     this.dirWatchers.set(fsDirPath, w);
+    if (ino !== undefined) this.dirInodes.set(fsDirPath, ino);
   }
 
   private handleEvent(event: string, fsPath: string): void {
@@ -196,6 +219,7 @@ export class ExplorerFsWatcher {
       } else {
         this.pendingAdded.delete(uri);
         this.pendingRemoved.add(uri);
+        if (this.dirWatchers.has(fsPath)) this.dropDirWatcher(fsPath); // dir observado sumiu
       }
     } else {
       // 'change'

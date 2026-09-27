@@ -63,7 +63,7 @@ Regras herdadas da 4.5: spec E2E escrita **falhando antes** de cada commit; anti
 
 ---
 
-## 4. Execução e placar final (2026-09-26) — 4.6 IMPLEMENTADA (aguarda checklist humano no Windows)
+## 4. Execução e placar final (2026-09-26) — 4.6 **CONCLUÍDA E HOMOLOGADA** (checklist humano no Windows, Vídeo 5: 6/6 ✓)
 
 Commits atômicos, na ordem aprovada, cada um com spec E2E escrita **falhando antes** e anti-regressão completa depois (typecheck 0 · vitest 308→312 · `sessao_12_explorer`+`sessao_13_search_backend`+`sessao_13_search` 40→50 verdes · `fs_backend` 10/10 · terminal 9/9 · `sessao_07` 5/5 · layout):
 

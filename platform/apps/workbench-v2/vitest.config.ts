@@ -1,8 +1,16 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // monaco-editor só tem entry ESM de browser; em jsdom usamos um stub
+      // (FATIA-04 4.7 — o Monaco real é coberto pelos E2E).
+      'monaco-editor': fileURLToPath(new URL('./src/__tests__/stubs/monaco-editor.ts', import.meta.url)),
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

@@ -33,6 +33,13 @@ interface AuxiliaryBarProps {
   /** FATIA-04 (4.4): quando presente, a aba "Files" renderiza ESTE slot
    *  (o módulo explorer-search real) em vez do FilesDetails demonstrativo. */
   filesSlot?: import('react').ReactNode
+  /** FATIA-04 (4.7 c1, exceção autorizada 2026-09-26): Editor Anexo do módulo
+   *  explorer-search, renderizado à ESQUERDA da coluna (header+abas+corpo),
+   *  com sash próprio. A barra vira linha: [attachSlot][coluna]. O módulo
+   *  controla largura/visibilidade do slot; o shell só reserva o lugar. */
+  attachSlot?: import('react').ReactNode
+  /** Transição Temporária 4.7-b (shell/gitTransition.ts): esconde a aba "Changes" simulada. */
+  hideChangesTab?: boolean
   diffFiles: DiffFile[]
   tab: 'changes' | 'files'
   checksExpanded: boolean
@@ -94,7 +101,6 @@ export function AuxiliaryBar({
   session,
   visible,
   diffFiles,
-  tab,
   checksExpanded,
   expandedFolders,
   onChangeTab,
@@ -116,7 +122,14 @@ export function AuxiliaryBar({
   onClearDirectory,
   onOpenFileHandle,
   filesSlot,
+  attachSlot,
+  hideChangesTab = false,
+  tab: rawTab,
 }: AuxiliaryBarProps) {
+  // Transição 4.7-b: com a maquete escondida a aba efetiva é SEMPRE 'files' já na
+  // renderização (nunca desmonta o slot do módulo num estado transitório 'changes').
+  const tab: 'changes' | 'files' = hideChangesTab ? 'files' : rawTab
+
   if (!visible) return null
 
   const checksBodyId = `checks-body-${session.id}`
@@ -127,13 +140,15 @@ export function AuxiliaryBar({
   const hasRealFileSystem = fileSystemEntries && fileSystemEntries.length > 0
 
   return (
-    <aside className="auxiliary-bar" aria-label="Barra auxiliar">
+    <aside className={`auxiliary-bar${attachSlot ? ' has-attach-slot' : ''}`} aria-label="Barra auxiliar">
+      {attachSlot}
+      <div className="auxiliary-column">
       <div className="auxiliary-header">
         <div className="pane-title"><PanelRightClose size={14} /><span>Detalhes</span><span className="pane-title-subtle">· {fileSystemRootName || session.workspace}</span></div>
         <button className="toolbar-button" type="button" title="Fechar barra auxiliar" aria-label="Fechar barra auxiliar" onClick={onClose}><PanelRightClose size={14} /></button>
       </div>
       <div className="aux-tabs" role="tablist" aria-label="Detalhes da sessão">
-        <button id={changesTabId} className={`aux-tab${tab === 'changes' ? ' is-active' : ''}`} type="button" role="tab" aria-selected={tab === 'changes'} aria-controls={panelId} onClick={() => onChangeTab('changes')}><GitCompareArrows size={12} /><span className="aux-tab-title">Changes</span><span aria-label={`${diffFiles.length} arquivos alterados`}>{diffFiles.length}</span></button>
+        {!hideChangesTab && <button id={changesTabId} className={`aux-tab${tab === 'changes' ? ' is-active' : ''}`} type="button" role="tab" aria-selected={tab === 'changes'} aria-controls={panelId} onClick={() => onChangeTab('changes')}><GitCompareArrows size={12} /><span className="aux-tab-title">Changes</span><span aria-label={`${diffFiles.length} arquivos alterados`}>{diffFiles.length}</span></button>}
         <button id={filesTabId} className={`aux-tab${tab === 'files' ? ' is-active' : ''}`} type="button" role="tab" aria-selected={tab === 'files'} aria-controls={panelId} onClick={() => onChangeTab('files')}><Files size={12} /><span className="aux-tab-title">Files</span></button>
       </div>
       <div className="auxiliary-body" id={panelId} role="tabpanel" aria-labelledby={tab === 'changes' ? changesTabId : filesTabId} tabIndex={0}>
@@ -168,6 +183,7 @@ export function AuxiliaryBar({
             hasRealFileSystem={!!hasRealFileSystem}
           />
         )}
+      </div>
       </div>
     </aside>
   )
