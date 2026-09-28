@@ -42,6 +42,8 @@ class FakePort implements GitPortLike {
     return { isRepo: this.isRepo, branch: this.isRepo ? 'main' : null, entries: [...this.entries] };
   }
   async init() { this.calls.push('init'); this.isRepo = true; }
+  blobs: Record<string, string> = {};
+  async show(_r: WorkspaceUri, uri: WorkspaceUri, ref: 'HEAD' | 'index' | 'worktree') { this.calls.push(`show:${ref}`); return this.blobs[`${ref}:${uri}`] ?? ''; }
   async stage(_r: WorkspaceUri, uris: WorkspaceUri[]) { this.calls.push(`stage:${uris.length}`); this.entries = this.entries.map((x) => uris.includes(x.uri) ? { ...x, index: x.index === '?' ? 'A' : 'M', worktree: '.' } : x); }
   async unstage(_r: WorkspaceUri, uris: WorkspaceUri[]) { this.calls.push(`unstage:${uris.length}`); this.entries = this.entries.map((x) => uris.includes(x.uri) ? { ...x, index: '.', worktree: 'M' } : x); }
   async discard(_r: WorkspaceUri, uris: WorkspaceUri[]) { this.calls.push('discard'); this.entries = this.entries.filter((x) => !uris.includes(x.uri)); }
@@ -122,5 +124,21 @@ describe('GitService', () => {
     svc.refresh(); svc.dispose();
     await vi.advanceTimersByTimeAsync(500);
     expect(port.calls).toEqual([]);
+  });
+
+  // ---- 4.7-c c2 ----
+  it('count() = index + working tree; getDiff resolve os lados fiéis ao git.openChange', async () => {
+    port.entries = [e('a.ts', '.', 'M'), e('b.ts', 'A', '.'), e('c.txt', '.', 'D'), e('n.txt', '?', '?')];
+    await svc.setRoot(u(''));
+    expect(svc.count()).toBe(4);
+    port.blobs = { [`HEAD:${u('a.ts')}`]: 'h', [`index:${u('a.ts')}`]: 'i', [`worktree:${u('a.ts')}`]: 'w', [`index:${u('b.ts')}`]: 'ib' };
+    expect(await svc.getDiff(u('a.ts'), 'workingTree')).toEqual({ original: 'i', modified: 'w', title: 'a.ts (Working Tree)' });
+    expect(await svc.getDiff(u('a.ts'), 'index')).toEqual({ original: 'h', modified: 'i', title: 'a.ts (Index)' });
+    expect(await svc.getDiff(u('b.ts'), 'index')).toEqual({ original: '', modified: 'ib', title: 'b.ts (Index)' }); // A: original vazio
+    expect(await svc.getDiff(u('c.txt'), 'workingTree')).toMatchObject({ modified: '' });                      // D: modificado vazio
+    expect(await svc.getDiff(u('n.txt'), 'workingTree')).toMatchObject({ original: '' });                      // U: original vazio
+  });
+  it('getDiff sem raiz rejeita (nunca lança síncrono)', async () => {
+    await expect(svc.getDiff(u('a.ts'), 'workingTree')).rejects.toThrow(/raiz/);
   });
 });

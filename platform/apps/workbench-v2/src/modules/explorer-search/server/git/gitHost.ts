@@ -8,6 +8,7 @@
 // discard (checkout -q -- | clean -f -q -- untracked), commit (-m), init.
 // ============================================================================
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import type { WorkspaceUri } from '../../contract';
 import nodePath from 'node:path';
 import { FsHostError, resolveRootPath, toFsPath, toWorkspaceUri, type PathApi } from '../fs/fsHost';
@@ -42,6 +43,8 @@ export class GitHostError extends Error {
 }
 
 const EXEC_TIMEOUT_MS = 15_000;
+
+export type GitShowRef = 'HEAD' | 'index' | 'worktree';
 
 export interface ExecLike {
   (cwd: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number }>;
@@ -125,6 +128,8 @@ export interface GitHostOptions {
   exec?: ExecLike;
   /** API de path injetável (testes simulam Windows com path.win32). */
   pathApi?: PathApi;
+  /** 4.7-c: leitura do worktree injetável (testes); padrão fs.readFile utf8. */
+  readWorktree?: (absPath: string) => Promise<string>;
 }
 
 /** Igualdade de caminhos do SO. No Windows (sep "\\") o sistema de arquivos é
@@ -138,11 +143,13 @@ export class GitHost {
   private readonly rootPath: string;
   private readonly exec: ExecLike;
   private readonly p: PathApi;
+  private readonly readWorktree: (absPath: string) => Promise<string>;
 
   constructor(options: GitHostOptions) {
     this.p = options.pathApi ?? nodePath;
     this.rootPath = resolveRootPath(String(options.workspaceRoot), this.p);
     this.exec = options.exec ?? nodeGitExec;
+    this.readWorktree = options.readWorktree ?? ((abs) => readFile(abs, 'utf8'));
   }
 
   /** Resolve o repo (uri de pasta dentro do workspace) para caminho do SO. */
@@ -156,7 +163,9 @@ export class GitHost {
     return uris.map((u) => {
       const abs = toFsPath(this.rootPath, u, this.p);
       const rel = abs.slice(base.length).replace(/^[\\/]+/, '').split('\\').join('/');
-      if (rel.length === 0 || abs.length < base.length) {
+      // 4.7-c: prefixo REAL (antes só comparava comprimento — `ws/fora.txt` passava por `ws/repo`)
+      const inside = abs.startsWith(base) && (abs.length === base.length || abs[base.length] === '/' || abs[base.length] === '\\');
+      if (rel.length === 0 || !inside) {
         throw new GitHostError('forbidden_path', `URI fora do repositório: ${u}`);
       }
       return rel;
@@ -227,6 +236,22 @@ export class GitHost {
     const tracked = rel.filter((p) => byPath.get(p) && byPath.get(p)!.worktree !== '?');
     if (tracked.length > 0) await this.run(cwd, ['checkout', '-q', '--', ...tracked]);
     if (untracked.length > 0) await this.run(cwd, ['clean', '-f', '-q', '--', ...untracked]);
+  }
+
+  /** 4.7-c c2 — conteúdo de UM arquivo num dos três lados do diff (04_21 §7):
+   *  'HEAD' → `git show HEAD:rel` · 'index' → `git show :rel` · 'worktree' → disco.
+   *  Ausente em qualquer lado (untracked, deletado, sem HEAD) → '' (nunca erro). */
+  async show(repo: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef): Promise<{ content: string }> {
+    const cwd = this.repoPath(repo);
+    const [rel] = this.relPaths(repo, [uri]);
+    if (ref === 'worktree') {
+      try { return { content: await this.readWorktree(toFsPath(this.rootPath, uri, this.p)) }; }
+      catch { return { content: '' }; }
+    }
+    const spec = ref === 'HEAD' ? `HEAD:${rel}` : `:${rel}`;
+    const r = await this.exec(cwd, ['show', spec]);
+    if (r.code === -1) throw new GitHostError('git_unavailable', 'git não encontrado no PATH');
+    return { content: r.code === 0 ? r.stdout : '' };
   }
 
   async commit(repo: WorkspaceUri, message: string): Promise<{ oid: string }> {

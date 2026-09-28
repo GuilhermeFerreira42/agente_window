@@ -27,8 +27,20 @@ export interface GitStatus {
   entries: GitEntry[];
 }
 
+export type GitShowRef = 'HEAD' | 'index' | 'worktree';
+
+/** 4.7-c: lados de um diff read-only já resolvidos (04_21 §7). */
+export interface GitDiffSides {
+  original: string;
+  modified: string;
+  /** "nome (Working Tree)" | "nome (Index)" — título oficial do `git.openChange`. */
+  title: string;
+}
+
 export interface GitPortLike {
   status(root: WorkspaceUri): Promise<GitStatus>;
+  /** 4.7-c: conteúdo de um lado; ausente → ''. */
+  show(root: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef): Promise<string>;
   init(root: WorkspaceUri): Promise<void>;
   stage(root: WorkspaceUri, uris: WorkspaceUri[]): Promise<void>;
   unstage(root: WorkspaceUri, uris: WorkspaceUri[]): Promise<void>;
@@ -75,6 +87,8 @@ export interface GitServiceState {
 
 export const GIT_REFRESH_DEBOUNCE_MS = 300;
 export const GIT_GROUP_LABELS: Record<GitGroupId, string> = { index: 'Staged Changes', workingTree: 'Changes' };
+/** Sufixos de título do diff (extensão git: `git.openChange`). */
+export const GIT_DIFF_TITLE_SUFFIX: Record<GitGroupId, string> = { index: 'Index', workingTree: 'Working Tree' };
 
 const TOOLTIP: Record<string, string> = {
   M: 'Modified', A: 'Added', D: 'Deleted', R: 'Renamed', C: 'Copied', T: 'Type Changed', U: 'Untracked', '!': 'Ignored',
@@ -213,6 +227,22 @@ export class GitService {
     let out = { oid: '' };
     await this.op(async (r) => { out = await this.port.commit(r, message); });
     return out;
+  }
+
+  /** 4.7-c: total de recursos alterados (index + working tree) — badge da aba Changes. */
+  count(): number { return this.state.groups.reduce((n, g) => n + g.items.length, 0); }
+
+  /** 4.7-c c2 — lados do diff de UM recurso, fiéis ao `git.openChange`:
+   *  workingTree → index ⇄ worktree "(Working Tree)"; index → HEAD ⇄ index "(Index)".
+   *  Untracked/added: original ''. Deletado: modified ''. Nunca bloqueia a UI (async). */
+  async getDiff(uri: WorkspaceUri, group: GitGroupId): Promise<GitDiffSides> {
+    if (!this.root) throw new Error('[explorer-search] git.getDiff: raiz não definida');
+    const root = this.root;
+    const [original, modified] = group === 'index'
+      ? await Promise.all([this.port.show(root, uri, 'HEAD'), this.port.show(root, uri, 'index')])
+      : await Promise.all([this.port.show(root, uri, 'index'), this.port.show(root, uri, 'worktree')]);
+    const name = uri.split('/').pop() ?? uri;
+    return { original, modified, title: `${decodeURIComponent(name)} (${GIT_DIFF_TITLE_SUFFIX[group]})` };
   }
 
   /** Há algo no index? (regra do botão Commit / diálogo "stage all?") */

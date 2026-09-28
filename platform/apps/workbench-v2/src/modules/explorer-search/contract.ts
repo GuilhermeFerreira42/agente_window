@@ -32,7 +32,8 @@ export type ExplorerSearchEvent =
   | { type: 'search.cancelled'; id: string }
   | { type: 'search.replaceApplied'; files: number; replacements: number }
   // 4.7 c2 (evolução ADITIVA): Editor Anexo — modelo de abas por sessão.
-  | { type: 'editor.tabOpened'; sessionId: string; uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; preview: boolean }
+  | { type: 'editor.tabOpened'; sessionId: string; uri: WorkspaceUri; kind: 'code' | 'search' | 'changes' | 'diff'; preview: boolean }
+  | { type: 'editor.diffChanged'; sessionId: string; uri: WorkspaceUri }  // 4.7-c (aditivo): payload da aba fixa Diff trocou
   | { type: 'editor.tabClosed'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.tabPinned'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.activeChanged'; sessionId: string; uri: WorkspaceUri | null }
@@ -110,17 +111,30 @@ export interface IExplorerSearchApi {
 // ---------------------------------------------------------------------------
 // Editor em anexo lateral (superfície do módulo — espelho do docs/04 §7 attach)
 // ---------------------------------------------------------------------------
+/** 4.7-c (aditivo): conteúdo de um diff read-only (lados já resolvidos pelo chamador). */
+export interface AttachDiffPayload {
+  /** Arquivo real a que o diff se refere (ícone/linguagem/título). */
+  resource: WorkspaceUri;
+  /** Título da aba, ex. "a.ts (Working Tree)" / "a.ts (Index)". */
+  title: string;
+  original: string;
+  modified: string;
+}
 export interface AttachTab {
-  uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; dirty: boolean;
+  uri: WorkspaceUri; kind: 'code' | 'search' | 'changes' | 'diff'; dirty: boolean;
+  /** 4.7-c (aditivo): presente só em `kind: 'diff'`. */
+  diff?: AttachDiffPayload;
   /** 4.7 c2 (aditivo, opcionais): preview = clique simples (itálico); active = aba corrente do grupo. */
   preview?: boolean; active?: boolean;
 }
 export interface IEditorAttachApi {
   /** Abre (ou foca) um recurso no anexo. `line` para reveal (search → resultado). */
   /** 4.7-b c2 (aditivo): `kind: 'changes'` = aba fixa da Source Control View (uri sintética). */
-  open(input: { uri: WorkspaceUri; kind: 'code' | 'search' | 'changes'; line?: number; column?: number; sessionId: string;
+  /** 4.7-c (aditivo): `kind: 'diff'` = aba fixa Diff (uri sintética) com `diff` obrigatório. */
+  open(input: { uri: WorkspaceUri; kind: 'code' | 'search' | 'changes' | 'diff'; line?: number; column?: number; sessionId: string;
     /** 4.7 c2 (aditivo, opcional): true = pinado (duplo clique); ausente = preview (clique simples). */
-    pinned?: boolean }): Promise<void>;
+    pinned?: boolean;
+    diff?: AttachDiffPayload }): Promise<void>;
   close(input: { uri: WorkspaceUri; sessionId: string }): Promise<void>;
   closeAll(input: { sessionId: string }): Promise<void>;   // recolhe o anexo (sem desmontar)
   setVisible(input: { sessionId: string; visible: boolean }): void; // NUNCA desmonta (Regra 10 docs/18)

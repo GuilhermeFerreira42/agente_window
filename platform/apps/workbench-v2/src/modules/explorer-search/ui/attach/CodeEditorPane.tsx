@@ -43,7 +43,7 @@ function isImageName(name: string): boolean {
   return i > 0 && IMAGE_EXT.has(name.slice(i + 1).toLowerCase());
 }
 /** Linguagem pela extensão usando o registro do próprio Monaco. */
-function languageFor(monaco: monaco, name: string): string {
+export function languageFor(monaco: monaco, name: string): string {
   const lower = name.toLowerCase();
   const i = lower.lastIndexOf('.');
   const ext = i >= 0 ? lower.slice(i) : '';
@@ -53,7 +53,7 @@ function languageFor(monaco: monaco, name: string): string {
   }
   return 'plaintext';
 }
-function currentTheme(): 'vs' | 'vs-dark' {
+export function currentTheme(): 'vs' | 'vs-dark' {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('theme-light') ? 'vs' : 'vs-dark';
 }
 
@@ -107,7 +107,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
 
   const active = editor.getActive(sessionId);
   // 4.7-b c2: a aba fixa "Changes" não é um arquivo — o Monaco fica sem modelo e oculto.
-  const activeUri = active && active.kind !== 'changes' ? active.uri : null;
+  const activeUri = active && active.kind !== 'changes' && active.kind !== 'diff' ? active.uri : null;
 
   // ---- instância única do Monaco (criada quando o pacote carrega) ----
   useLayoutEffect(() => {

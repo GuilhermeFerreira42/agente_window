@@ -1,0 +1,8 @@
+/* diff.css — 4.7-c c1. Aba Diff no anexo: DiffEditor ocupa o pane; estado vazio centralizado.
+   Só tokens do tema (zero hex). */
+.attach-viewlet .attach-diff-pane { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; z-index: 1; background: var(--vscode-editor-background); }
+.attach-viewlet .attach-diff-host { flex: 1; min-height: 0; width: 100%; }
+.attach-viewlet .attach-diff-host .monaco-diff-editor { height: 100%; }
+/* "No changes detected": mesmo padrão do letterpress do empty state do anexo — texto secundário centralizado */
+.attach-viewlet .attach-diff-empty { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 13px; user-select: none; }
+.attach-viewlet .attach-diff-empty .codicon-check { font-size: 16px; color: var(--vscode-testing-iconPassed, var(--vscode-descriptionForeground)); }

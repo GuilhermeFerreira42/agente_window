@@ -68,6 +68,8 @@ Regras herdadas da 4.6: spec `e2e/sessao_14_editor_anexo.spec.ts` escrita **falh
 
 **Critério de pronto da 4.7:** placar §1 ≥ 10/12 PASS medidos no preview; print lado a lado com 35 px / 1 px topo / 22 px breadcrumbs / itálico / ● ↔ ✕ confirmados; 0 unmounts ao recolher; Ctrl+S atômico com dirty coerente; VAL-EXP-11/12/13/14; checklist humano no Windows (abrir 2 arquivos, editar, salvar, fechar dirty com diálogo, sash, reload, maximizar).
 
+> **Atualização 2026-09-27 (decisão "Motor vs. Layout"):** o critério acima cobre o Editor Anexo (4.7-a). A **Sub-Fatia 4.7 completa** (a + b Git + c Diff) **só fecha com o 4.7-c4 Input de Commit** — DoD em `04_21 §7`.
+
 ---
 
 ## 4. Execução — placar final (2026-09-26, medido no preview 5174/5175 por Playwright)

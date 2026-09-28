@@ -11,7 +11,7 @@
 //   • última aba fechada → `editor.attachCollapsed` (quem esconde é o layout,
 //     com display:none — Regra 10 docs/18); primeira aberta → `attachExpanded`.
 // ============================================================================
-import type { AttachTab, ExplorerSearchEvent, WorkspaceUri } from '../../contract';
+import type { AttachDiffPayload, AttachTab, ExplorerSearchEvent, WorkspaceUri } from '../../contract';
 import { Emitter } from '../emitter';
 
 export interface EditorTab extends AttachTab {
@@ -22,7 +22,10 @@ export interface EditorTab extends AttachTab {
 /** 4.7-b c2: URI sintética da aba fixa "Changes" (nunca vai ao servidor). */
 export const ATTACH_CHANGES_URI = 'file:///.explorer-search/changes' as WorkspaceUri;
 
-export type AttachTabKind = 'code' | 'search' | 'changes';
+/** 4.7-c c1: URI sintética da aba fixa "Diff" (1 por sessão; payload trocado a cada open). */
+export const ATTACH_DIFF_URI = 'file:///.explorer-search/diff' as WorkspaceUri;
+
+export type AttachTabKind = 'code' | 'search' | 'changes' | 'diff';
 
 export interface OpenInput {
   sessionId: string;
@@ -32,9 +35,11 @@ export interface OpenInput {
   pinned?: boolean;
   line?: number;
   column?: number;
+  /** 4.7-c: obrigatório quando kind === 'diff'. */
+  diff?: AttachDiffPayload;
 }
 
-interface TabState { uri: WorkspaceUri; kind: AttachTabKind; dirty: boolean; preview: boolean }
+interface TabState { uri: WorkspaceUri; kind: AttachTabKind; dirty: boolean; preview: boolean; diff?: AttachDiffPayload }
 interface Group { tabs: TabState[]; active: WorkspaceUri | null; mru: WorkspaceUri[] }
 
 export class EditorService {
@@ -76,6 +81,18 @@ export class EditorService {
         existing.preview = false;
         this.fire({ type: 'editor.tabPinned', sessionId, uri });
       }
+      if (kind === 'diff' && input.diff) {
+        // 4.7-c: mesma aba, novo conteúdo (nunca abre uma 2.ª aba Diff)
+        existing.diff = input.diff;
+        this.fire({ type: 'editor.diffChanged', sessionId, uri });
+      }
+    } else if (kind === 'diff') {
+      // 4.7-c c1: aba fixa — logo após "Changes" (ou primeira), nunca preview, nunca dirty, 1 por sessão.
+      if (!input.diff) return;
+      const tab: TabState = { uri, kind, dirty: false, preview: false, diff: input.diff };
+      const afterChanges = g.tabs.findIndex((t) => t.kind === 'changes') + 1;
+      g.tabs.splice(afterChanges, 0, tab);
+      this.fire({ type: 'editor.tabOpened', sessionId, uri, kind, preview: false });
     } else if (kind === 'changes') {
       // 4.7-b c2: aba fixa — sempre a PRIMEIRA, nunca preview, nunca dirty, 1 por sessão.
       const tab: TabState = { uri, kind, dirty: false, preview: false };
@@ -119,7 +136,7 @@ export class EditorService {
   setDirty(input: { sessionId: string; uri: WorkspaceUri; dirty: boolean }): void {
     if (this.disposed) return;
     const t = this.groups.get(input.sessionId)?.tabs.find((x) => x.uri === input.uri);
-    if (!t || t.kind === 'changes' || t.dirty === input.dirty) return;
+    if (!t || t.kind === 'changes' || t.kind === 'diff' || t.dirty === input.dirty) return;
     t.dirty = input.dirty;
     if (input.dirty && t.preview) {
       // editar promove o preview (editorGroupModel: pin on edit)
@@ -155,11 +172,16 @@ export class EditorService {
     if (this.disposed) return false;
     const g = this.groups.get(input.sessionId);
     if (!g) return true;
-    for (const t of [...g.tabs]) if (t.kind !== 'changes') this.close({ sessionId: input.sessionId, uri: t.uri, force: input.force });
-    return g.tabs.every((t) => t.kind === 'changes');
+    // 4.7-b/4.7-c: abas fixas (Changes, Diff) são imunes ao Close All.
+    for (const t of [...g.tabs]) if (t.kind !== 'changes' && t.kind !== 'diff') this.close({ sessionId: input.sessionId, uri: t.uri, force: input.force });
+    return g.tabs.every((t) => t.kind === 'changes' || t.kind === 'diff');
   }
 
   /** 4.7-b c2: a aba "Changes" está aberta nesta sessão? */
+  /** 4.7-c: payload atual da aba Diff (null se fechada). */
+  getDiff(sessionId: string): AttachDiffPayload | null {
+    return this.groups.get(sessionId)?.tabs.find((t) => t.kind === 'diff')?.diff ?? null;
+  }
   hasChanges(sessionId: string): boolean {
     return (this.groups.get(sessionId)?.tabs ?? []).some((t) => t.kind === 'changes');
   }

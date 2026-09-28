@@ -172,18 +172,22 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     await expect(groups).toHaveText(['Staged Changes', 'Changes']);
   });
 
-  test('T5: clique em M abre o arquivo no anexo (preview) mantendo Changes primeira; clique em D não abre; sem repo → frase oficial + "Initialize Repository" (git init real)', async ({ page }) => {
+  // 4.7-c c2: clique num recurso abre a aba fixa DIFF (não mais o arquivo em preview) — inclusive D (lado modificado vazio).
+  test('T5: clique em M abre a aba fixa Diff "(Working Tree)" mantendo Changes primeira; clique em D abre o diff na MESMA aba; sem repo → frase oficial + "Initialize Repository" (git init real)', async ({ page }) => {
     await openFilesTab(page);
     const sid = await openChanges(page);
     await rowByName(page, 'mod.txt').click();
     await expect(page.locator(TAB)).toHaveCount(2);
     await expect(page.locator(TAB).first()).toHaveAttribute('data-kind', 'changes');
     const tabs = await page.evaluate((s) => window.__explorerSearchModule!.attach.getTabs({ sessionId: s }), sid);
-    expect(tabs[1]).toMatchObject({ uri: U('mod.txt'), preview: true, active: true });
-    await expect(page.locator(`${ATTACH} .attach-monaco-host`)).toBeVisible();
+    expect(tabs[1]).toMatchObject({ kind: 'diff', preview: false, active: true });
+    await expect(page.locator(TAB).nth(1).locator('.label-name')).toHaveText('mod.txt (Working Tree)');
+    await expect(page.locator(`${ATTACH} [data-testid="attach-diff-pane"]`)).toBeVisible();
     await page.locator(TAB).first().click();
     await rowByName(page, 'del.txt').click();
     await expect(page.locator(TAB)).toHaveCount(2);
+    await expect(page.locator(TAB).nth(1).locator('.label-name')).toHaveText('del.txt (Working Tree)');
+    await page.locator(TAB).first().click();
     expect((await page.evaluate((s) => window.__explorerSearchModule!.attach.getTabs({ sessionId: s }), sid))[0].active).toBe(true);
     // pasta sem repositório
     rmSync(join(WS_DIR, '.git'), { recursive: true, force: true });

@@ -63,7 +63,9 @@ No VS Code real **não existe** uma "aba Changes" na faixa de abas do editor: o 
 
 | Caso | Texto | Botões |
 |---|---|---|
-| Arquivo rastreado | **"Are you sure you want to discard changes in '{nome}'?"** (detalhe: "This is IRREVERSIBLE! …") | **Discard Changes** · Cancel |
+| Arquivo rastreado (1) | **"Are you sure you want to discard changes in '{nome}'?"** (sem detalhe) | **Discard File** · Cancel — _corrigido 2026-09-27 contra o `dist/main.js` real da extensão git (era "Discard Changes" nesta doc)_ |
+| Rastreados (n) / Discard All | "Are you sure you want to discard ALL changes in {n} files?" + "This is IRREVERSIBLE! Your current working set will be FOREVER LOST if you proceed." | **Discard All {n} Files** · Cancel |
+| Misto (rastreados + untracked) | pergunta dos untracked + " " + pergunta dos rastreados | Discard All {n} Files · Cancel |
 | Untracked (1) | **"Are you sure you want to DELETE the following untracked file: '{nome}'?"** + "This is IRREVERSIBLE! This file will be FOREVER LOST if you proceed." | **Delete File** · Cancel |
 | Untracked (n) | "Are you sure you want to DELETE the {n} untracked files?" | Delete Files · Cancel |
 
@@ -126,10 +128,26 @@ Host do diálogo: o mesmo `.monaco-dialog-box` já homologado em c5 (498 px, rad
 
 **Fixture E2E:** repo temporário `/tmp/git-fixture` criado no `beforeAll` do spec (`git init`, `user.name/email` locais, 1 commit base, depois arquivos M/A/D/U) servido por um vite na 5175 com `FS_TEST_ROOT=file:///tmp/git-fixture` (mesmo mecanismo da 4.6/4.7).
 
-**Débitos a registrar em `docs/05` (não implementar agora):** D2.27 Initialize Repository / pasta sem git · D2.28 diff inline por arquivo (`git.openChange`, Multi-Diff) → 4.7-c · D2.29 Untracked Changes separado (`git.untrackedChanges`) · D2.30 Push/Pull/Fetch/Sync · D2.31 branch picker · D2.32 Merge Changes/conflitos · D2.33 badge de contagem na aba/Activity Bar · D2.34 print 8080 da SCM View (RAM, mesmo caso D2.25).
+**Débitos a registrar em `docs/05` (não implementar agora):** D2.27 Initialize Repository / pasta sem git · D2.28 diff por arquivo → **4.7-c (diff mínimo, autorizada 2026-09-27 — ver §7)** · D2.29 Untracked Changes separado (`git.untrackedChanges`) · D2.30 Push/Pull/Fetch/Sync · D2.31 branch picker · D2.32 Merge Changes/conflitos · D2.33 badge de contagem na aba/Activity Bar · D2.34 print 8080 da SCM View (RAM, mesmo caso D2.25).
 
 ---
 
 ## 6. Execução (a preencher após aprovação)
 
-_(vazio — nenhum código escrito)_
+**c1 `3e12adc`** backend `/git/*` + GitService · **c2 `9575457`** aba fixa Changes + Source Control View · **c3 `3c69242`** Stage/Unstage/Discard + diálogos oficiais · **c3.1 `a931f72`** hotfix caminhos Windows (case-insensitive) · **c3.2 `6c91289`** entrada "Open Source Control" no header do Explorer + Transição Temporária da maquete do shell · docs `3a2f011`. **HOMOLOGADA NO WINDOWS 2026-09-27 (escopo c1–c3.2).** Prints: `auditoria_47b/c2`, `c3`, `validacao_real_v2/`. Pendentes: c4 input de commit (D2.35), placar binário §6 detalhado (aguarda decisão do usuário).
+
+**Placar final da 4.7-c (2026-09-28): ✅ CONCLUÍDA — HOMOLOGADA NO WINDOWS (Vídeo 6).** c1 `9b8d26f` `feat(diff-pane)` · c2 `0b7b7b1` `feat(changes-integration)` · c3 docs. Itens do §7: (1) clique M/A/D/U → `attach.open({kind:'diff'})` ✅ · (2) tipo `'diff'` fixo no EditorService ✅ · (3) `DiffPane` readOnly/renderSideBySide/minimap off/14-19 ✅ (inline automático < 900 px = padrão VS Code) · (4) "No changes detected" + `codicon-check` ✅ · (5) badge + tooltip "X files changed" ✅ · (6) empty state "No source control changes detected" ✅ · (2.1) sessionId real ✅ · `POST /git/show` (HEAD|index|worktree) ✅. Provas: `sessao_14c_diff_minimal` 6/6 · vitest 382 · anti-regressão completa verde · prints `auditoria_47c/c1`, `c2` (8080 não obtido — limitação de RAM em `docs/05`). Validação humana: badge visível · diff read-only ao clicar em M · estado vazio · navegação entre vários diffs · zero regressão.
+
+## 7. Sub-Fatia 4.7-c — Diff mínimo (escopo definido pelo usuário em 2026-09-27)
+
+**D2.28 movido de "futuro" para 4.7-c.** Definição do **diff mínimo**: *side-by-side read-only dentro do anexo, usando o Monaco existente. Sem edição. Ao clicar em arquivo M/A/D/U na lista Changes, abre diff. Se idêntico, mostra "No changes detected".*
+
+**DoD adicional da 4.7 (incluído nesta sub-fatia):** badge numérico na aba Source Control + tooltip "X files changed" + empty state fiel ("No source control changes detected").
+
+**DoD da 4.7 (ATUALIZADO 2026-09-27, decisão "Motor vs. Layout"):** a Sub-Fatia 4.7 (Editor Anexo + Git + Diff) **só é considerada FECHADA com o c4 — Input de Commit**: caixa "Message (Ctrl+Enter to commit)" (`.scm-input`, padding-left 11, radius 4), botão ✓ **Commit** (padding 4 8, radius 4, lh 16, font 12), **Ctrl+Enter** comita, diálogos oficiais "There are no staged changes to commit…" [Yes][Cancel] e "Please provide a commit message", `POST /git/commit` já existente; spec E2E falhando antes; zero shell. Status: **PENDENTE (obrigatório)**. As homologações no Windows de 4.7-a (anexo), 4.7-b c1–c3.2 (Changes) e 4.7-c c1–c2 (Diff) permanecem válidas.
+
+**Escopo permitido (e somente isso):** click handler na lista Changes → `attach.open({kind:'diff', …})`; aba fixa **Diff** (não-preview, imune a Close All, após Changes); `DiffPane.tsx` com `DiffEditor` (`readOnly`, `renderSideBySide`, minimap off, 14/19 px); estado vazio com `codicon-check`; badge + tooltip; empty state da aba Changes; **2.1** `onOpenChanges` usa o sessionId real do anexo (não `'default'`). Lados do diff (fidelidade `git.openChange`): item de **Changes** = index (`:path`) ⇄ working tree (disco); item de **Staged** = HEAD (`HEAD:path`) ⇄ index; A/U → original vazio; D → modificado vazio. Extensão mínima necessária no backend: `POST /git/show {root, uri, ref:'HEAD'|'index'}`.
+
+**Proibido:** edição inline, stage por linha/hunk, navegação entre arquivos no mesmo diff, integração com commit input (c4), qualquer item da FATIA-05 (`docs/05`).
+
+**Plano:** c1 `feat(diff-pane)` · c2 `feat(changes-integration)` · c3 docs. Spec `e2e/sessao_14c_diff_minimal.spec.ts` falhando antes de cada commit; anti-regressão completa; prints `auditoria_47c/c<N>/`. Código só em `ui/attach/diff/` + extensões mínimas em `editorService.ts`, `ChangesList.tsx`, `server/git/`; zero shell.

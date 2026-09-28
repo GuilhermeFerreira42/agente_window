@@ -22,8 +22,9 @@ import { AttachDialog } from './AttachDialog';
 import { ATTACH_STRINGS } from './attachStrings';
 import { AttachEmptyState } from './AttachEmptyState';
 import { ChangesPane } from './changes/ChangesPane';
+import { DiffPane } from './diff/DiffPane';
 import type { GitService } from '../../core/git/gitService';
-import { ATTACH_CHANGES_URI } from '../../core/editor/editorService';
+import { ATTACH_DIFF_URI, ATTACH_CHANGES_URI } from '../../core/editor/editorService';
 import { CHANGES_STRINGS } from './changes/changesStrings';
 import { uriBasename } from '../../core/uri';
 import '../explorer.css';
@@ -167,6 +168,9 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
   // largura do usuário fica intacta no store e volta no restore.
   const style = { [ATTACH_WIDTH_CSS_VAR]: `${maximized ? maxWidth : width}px`, display: visible ? undefined : 'none' } as React.CSSProperties;
   const isChangesActive = activeTab?.kind === 'changes';
+  // 4.7-c c1: aba fixa Diff (sem breadcrumbs — a uri é sintética)
+  const isDiffActive = activeTab?.kind === 'diff';
+  const diffPayload = isDiffActive ? editor.getDiff(sessionId) : null;
   const openChanges = () => editor.open({ sessionId, uri: ATTACH_CHANGES_URI, kind: 'changes', pinned: true });
   const headerActions = (
     <>
@@ -202,8 +206,8 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
         <div className="explorer-viewlet attach-viewlet">
           {activeTab ? (
             <div className="title tabs show-file-icons">
-              <EditorTabs editor={editor} sessionId={sessionId} onCloseBlocked={requestClose} actions={headerActions} />
-              {!isChangesActive && <Breadcrumbs root={root} uri={activeTab.uri} />}
+              <EditorTabs editor={editor} sessionId={sessionId} onCloseBlocked={requestClose} actions={headerActions} git={git} />
+              {!isChangesActive && !isDiffActive && <Breadcrumbs root={root} uri={activeTab.uri} />}
             </div>
           ) : (
             <div className="title tabs attach-empty-title-bar"><div className="tabs-and-actions-container"><div className="monaco-scrollable-element" /><div className="editor-actions">{headerActions}</div></div></div>
@@ -211,8 +215,10 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
           <div className="editor-container">
             {!activeTab && <AttachEmptyState />}
             {isChangesActive && git && (
-              <ChangesPane git={git} root={root} onOpenFile={(uri) => editor.open({ sessionId, uri, kind: 'code' })} />
+              <ChangesPane git={git} root={root} onOpenFile={(uri) => editor.open({ sessionId, uri, kind: 'code' })}
+                onOpenDiff={(item, sides) => editor.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })} />
             )}
+            {isDiffActive && diffPayload && <DiffPane sessionId={sessionId} payload={diffPayload} />}
             <CodeEditorPane editor={editor} sessionId={sessionId} fs={fs} onEditorReady={onEditorReady}
               onSaveRequest={(uri) => { void doSave(uri); }}
               saveError={saveError && saveError.uri === activeTab?.uri ? saveError.message : null} />

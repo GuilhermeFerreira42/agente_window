@@ -23,7 +23,8 @@ export interface ChangesListProps {
   state: GitServiceState;
   repoName: string;
   onRefresh: () => void;
-  onOpen: (item: GitResourceItem) => void;
+  /** 4.7-c: deletados também abrem (diff com lado modificado vazio). */
+  onOpen: (item: GitResourceItem, group: GitGroupId) => void;
   onAction: (action: ResourceActionId, item: GitResourceItem) => void;
   onGroupAction: (action: GroupActionId, group: GitResourceGroup) => void;
 }
@@ -71,6 +72,9 @@ export function ChangesList({ state, repoName, onRefresh, onOpen, onAction, onGr
             </div>
           </div>
           {state.groups.map((g) => <GroupRows key={g.id} group={g} onOpen={onOpen} onAction={onAction} onGroupAction={onGroupAction} />)}
+          {total === 0 && !state.loading && (
+            <div className="scm-empty" data-testid="scm-empty" role="note">{S.noChanges}</div>
+          )}
         </div>
       </div>
     </div>
@@ -112,12 +116,12 @@ function GroupRows({ group, onOpen, onAction, onGroupAction }: { group: GitResou
       {group.items.map((it) => {
         const acts = resourceActions(group.id, it, onAction);
         return (
-          <div key={`${group.id}:${it.uri}`} className={`monaco-list-row${it.deleted ? ' cursor-default' : ''}`} role="treeitem" aria-level={2} tabIndex={0}
+          <div key={`${group.id}:${it.uri}`} className="monaco-list-row" role="treeitem" aria-level={2} tabIndex={0}
             data-uri={it.uri} data-letter={it.letter} data-in-group={group.id} title={`${it.path} • ${it.tooltip}`}
-            onClick={() => { if (!it.deleted) onOpen(it); }}
+            onClick={() => onOpen(it, group.id)}
             onKeyDown={(e) => {
               if (e.target !== e.currentTarget) return; // teclas nas ações são delas
-              if (e.key === 'Enter') { e.preventDefault(); if (!it.deleted) onOpen(it); }
+              if (e.key === 'Enter') { e.preventDefault(); onOpen(it, group.id); }
               else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (group.id !== 'index') onAction('discard', it); }
             }}>
             <div className="monaco-tl-row">

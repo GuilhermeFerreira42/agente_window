@@ -104,19 +104,30 @@ Fonte de estado: `docs/12` entrada "2026-09-24 — Sincronização Pós-Auditori
 | D2.26 | Glifos/raios da faixa: ✕ da aba usa `codicon-close` (`\ea76`) no lugar de `close-small`; botões da toolbar com radius 5 (VS Code: 6) | **ADIADO → 4.9** | 4.9 | `04_20 §4.2` E2.c/E5 | fonte codicon do monaco não traz `close-small`; ajuste de 1 px de raio |
 | T-12 | **Flaky conhecido** em lote: `sessao_12_explorer` T9 ("X do Open Editors aparece no hover") e "ERROR EDITOR" falham ~1 em 3 rodadas **só no lote completo** (30 testes seguidos); passam isolados e no lote seguinte; `sessao_03_layout` "persiste após F5" idem (1 em 2) | **FLAKY CONHECIDO** (não bloqueia) | — | rodadas 2026-09-26 no c5/c6 (relatórios no chat); causa provável: RAM do sandbox (esbuild do vite morreu por EPIPE 1×) | estabilizar com `retries: 1` no Windows ou isolar por `describe.serial` — decisão futura |
 | D2.27 | Pasta sem repositório → `git init` pelo botão **Initialize Repository** | **CONCLUÍDO** (4.7-b c2, texto oficial + E2E `14b_changes` T5) | 4.7-b | `04_21 §1.3` | — |
-| D2.28 | **Diff inline** ao clicar num arquivo da aba Changes (hoje abre o arquivo normal no anexo — decisão do usuário 2026-09-27) | **PENDENTE → 4.7-c** | 4.7-c | `04_21 §2` | exige DiffEditor Monaco + `/git/show` (conteúdo do HEAD/index) |
+| D2.28 | **Diff mínimo** por arquivo na aba Changes (side-by-side read-only no anexo, Monaco DiffEditor; "No changes detected" se idêntico) + badge/tooltip "X files changed" + empty state "No source control changes detected" | ✅ **CONCLUÍDO — 4.7-c homologada no Windows 2026-09-28 (Vídeo 6)** (c1 `9b8d26f` · c2 `0b7b7b1`) | 4.7-c | `04_21 §7`, `docs/12` 2026-09-28 | vista inline automática < 900 px (padrão VS Code); sem print 8080 (RAM) — prova secundária: régua do runtime em `auditoria_47c/c1/README.md` |
 | D2.29 | Grupo **Untracked Changes** separado (config `git.untrackedChanges: separate`) — MVP mostra U dentro de Changes (default `mixed` do VS Code) | **PENDENTE** | 4.7-c | `04_21 §1.2` | — |
 | D2.30 | **Push / Pull / Sync** (barra de status e menu `…` da SCM) | **PENDENTE** | futuro | `04_21 §2` | remoto/credenciais fora do MVP |
 | D2.31 | Branch picker (clicar no nome da branch) | **PENDENTE** | futuro | `04_21 §2` | — |
 | D2.32 | Grupo **Merge Changes** / conflitos (`u` do porcelain v2 já parseado) | **PENDENTE** | futuro | `04_21 §1.2` | — |
-| D2.33 | Badge de contagem no ícone da aba Changes (fixa) | **PENDENTE** | 4.9 | `04_21 §1.1` | — |
+| D2.33 | Badge de contagem no ícone da aba Changes (fixa) | ✅ **CONCLUÍDO na 4.7-c** (badge `--vscode-badge-*` + `title`/`aria-label` "N file(s) changed") | 4.7-c | `04_21 §7` | — |
 | D2.34 | Print 8080 da SCM View real lado a lado (RAM do sandbox) | **PROVA SECUNDÁRIA** (régua CSS do `workbench.web.main.internal.css` + strings do `dist/main.js` da extensão git) | 4.7-b | `auditoria_47b/c2`, `c3` | refazer no Windows do usuário |
 | D2.35 | Botão **Always** no diálogo "no staged changes" (config `git.enableSmartCommit`) | **PENDENTE** (entra com c4) | 4.7-b c4 | `04_21 §1.4` | sem Settings UI |
 | D2.36 | `server.mjs` (preview build) não monta `/git/*` | **PENDENTE** | 4.9 | `platform/README.md` | replicar o padrão `build:fs-server` |
 | D2.37 | Tokens `--vscode-gitDecoration-{untracked,stageModified,stageDeleted,renamed,conflicting,ignored}ResourceForeground` ausentes no `theme.css` do shell (módulo usa fallback semântico encadeado) | **PENDENTE (shell)** | 4.9 | `ChangesList.tsx fallbackFor()` | tema é do shell |
 | D2.38 | **Remoção definitiva da maquete** "Changes N"/Checks/PR do painel Detalhes (`src/data.ts` `initialDiffFiles`) — hoje escondida pela **Transição Temporária 4.7-b** (`src/shell/gitTransition.ts`, fallback se o módulo faltar) | **AGENDADO (pós-homologação 4.7-b completa)** | 4.9 | `docs/12` 2026-09-27 c3.2 | decidir destino de Checks/PR simulados que vivem no mesmo painel |
+| D2.39 | **Browser Runtime IA/CDP** — capacidade de a IA ler o HTML da página e interagir via Playwright/CDP (isolamento por sessão) | **ADIADO (decisão 2026-09-27)** — a 4.8 fica **só com a UI visual** do Simple Browser | pós-FATIA-05 | `docs/11` linha 4.8; `docs/12` "Decisão Estratégica" | nenhum código de runtime na 4.8 |
+| D2.40 | **Layout Global / Activity Bar real** — mover as views de **Search** e **Source Control ("Changer")** para a **Side Bar independente** e criar os ícones (com badges) na **Activity Bar**; visualização simultânea com o editor (abrir arquivo não fecha Search/Changes) | **PENDENTE — alvo da FATIA-05** | FATIA-05 (5.1–5.3) | `docs/11` FATIA-05 | só wiring: `core/**` e `server/**` intocados |
+| D2.41 | **Timeline e Outline views** reais (hoje só headers colapsados no painel Files) | **PENDENTE — backlog da FATIA-05** | FATIA-05 (5.5) | `docs/11` FATIA-05 | medidas do 8080 |
 
 Itens **CORRIGIDOS** nesta frente (não voltam ao backlog): B3 Browser abre no boot (`876b83d`), menu Copy Path/Delete Permanently (`60287b9`), seções com corpo 0 px + Refresh vazio (`f5a4c1d`), `.git` visível (`70f2231`), download multi → 1 ZIP (`e2a1058`), ícones por extensão (`0d86656`).
+
+### FORA DE ESCOPO DA 4.7 / DENTRO DA FATIA-05 (registrado por ordem do usuário, 2026-09-27; reclassificação DEFINITIVA 2026-09-27 "Motor vs. Layout")
+- Reposicionamento de views (Search e Changer na Side Bar real + Activity Bar) e drag & drop de views entre containers (D2.40, FATIA-05 5.1–5.4).
+- Timeline View (history graph) e Outline View (D2.41, FATIA-05 5.5).
+- **Polish visual, animações e menus de contexto avançados** — movidos **definitivamente** da 4.9 para a FATIA-05 (5.6).
+- Runtime de IA no Browser (HTML/Playwright/CDP) — D2.39, adiado; a 4.8 é só UI do Simple Browser.
+
+**Estes itens são exclusivos da FATIA-05 (consolidação/layout/refinamento). Não implementar na 4.7 sob nenhuma hipótese.**
 
 ### Épico H — Release
 1. build de integração.
@@ -134,6 +145,9 @@ Uma fatia só avança quando tiver:
 - relato final no chat com concluído, pendências e validações executadas.
 
 ## Estado atual da execução
+- **2026-09-27 (decisão estratégica "Motor vs. Layout", registrada 2026-09-28):** FATIA-04 = **motores** (Explorer, Search, Git/Changes, Diff, Editor Anexo) — fecha com o **4.7-c4 Input de Commit**; 4.8 redefinida = **só UI do Simple Browser** (D2.39 adia o runtime IA/CDP); **FATIA-05 = Consolidação e Layout Byte a Byte** (D2.40 Activity Bar/Side Bar reais com Search/Changes simultâneos, DnD de views, D2.41 Timeline/Outline, polish). Ver `docs/11` e `docs/12`.
+- **2026-09-28:** **4.7-c (diff mínimo) HOMOLOGADA NO WINDOWS (Vídeo 6) → 4.7 CONCLUÍDA.** D2.28 e D2.33 CONCLUÍDOS. **Limitação registrada:** prints de referência do code-server 8080 para a 4.7-c não foram obtidos no sandbox (abrir pasta no 8080 via Playwright sobe extension hosts e a RAM de ~1,9 GB não comporta junto com Vite + Chromium; o runtime `.cache` também não persiste entre turnos) — prova secundária aceita: régua extraída do runtime VS Code 1.135 + prints próprios (`auditoria_47c/`) + homologação humana. **Próximas frentes (ordem a definir pelo usuário):** (a) **4.8 Browser contextual** (B1/B2) ou (b) **4.7-c4 Input de commit** ("Message (Ctrl+Enter to commit)" + ✓ Commit, D2.35). Nenhuma iniciada.
+- **2026-09-27 (tarde):** **4.7-c (diff mínimo) AUTORIZADA E INICIADA** — D2.28 em execução (`04_21 §7`). FATIA-05 delimitada explicitamente (bloco acima).
 - **2026-09-27:** **4.7-b (aba Changes / Git real) HOMOLOGADA NO WINDOWS no escopo c1–c3.2** (HEAD `6c91289`; smoke real 1/1 · `14b_changes` 11/11 · vitest 372). **D2.22 e D2.27 CONCLUÍDOS**; novos D2.28–D2.38 (D2.38 agendado). Pendentes da 4.7-b: c4 input de commit (+D2.35) e c5 placar `04_21 §6`. **Próxima frente: decisão do usuário** entre 4.7-c Diff inline (D2.28), 4.8 Browser contextual ou refinamentos UX — nenhuma iniciada.
 - **2026-09-26 (noite):** **4.7 IMPLEMENTADA** (c1–c7; HEAD pós-`a394f53`; placar `04_20 §4.2` = **14/14 PASS**; E2E `sessao_14` 16/16; vitest 341). D2.20 **CONCLUÍDO**; D2.19 → 4.9; novos D2.22–D2.26 e T-12. **Aguarda homologação humana no Windows** (checklist `04_20 §4.4`) e decisão da próxima frente: **4.8 Browser contextual (B1/B2)** ou **4.7-b Git (D2.22)**.
 - **2026-09-26 (tarde):** **4.6 CONCLUÍDA** — homologada pelo usuário no Windows (Vídeo 5). 4.7 em auditoria (`04_20`): D2.20 previsto para fechar no c4 da 4.7; D2.19 permanece.

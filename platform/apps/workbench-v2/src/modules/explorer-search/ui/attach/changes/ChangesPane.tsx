@@ -9,7 +9,7 @@
 // ============================================================================
 import React, { useEffect, useState } from 'react';
 import type { WorkspaceUri } from '../../../contract';
-import type { GitResourceGroup, GitResourceItem, GitService, GitServiceState } from '../../../core/git/gitService';
+import type { GitDiffSides, GitGroupId, GitResourceGroup, GitResourceItem, GitService, GitServiceState } from '../../../core/git/gitService';
 import { ConfirmDialog, type DiscardRequest } from './ConfirmDialog';
 import type { GroupActionId, ResourceActionId } from './ChangesList';
 import { uriBasename } from '../../../core/uri';
@@ -19,17 +19,25 @@ import './changes.css';
 export interface ChangesPaneProps {
   git: GitService;
   root: WorkspaceUri;
-  /** Clique num recurso não-deletado → abre o ARQUIVO no anexo (diff = 4.7-c). */
+  /** 4.7-b: clique num recurso → abria o arquivo (mantido como fallback quando não há onOpenDiff). */
   onOpenFile: (uri: WorkspaceUri) => void;
+  /** 4.7-c c2: clique num recurso (M/A/D/U) → aba fixa Diff com os lados já resolvidos. */
+  onOpenDiff?: (item: GitResourceItem, sides: GitDiffSides) => void;
 }
 
-export function ChangesPane({ git, root, onOpenFile }: ChangesPaneProps) {
+export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPaneProps) {
   const [state, setState] = useState<GitServiceState>(() => git.getState());
   useEffect(() => git.onStateChanged(setState), [git]);
   // primeira montagem: garante raiz + status (idempotente; o barrel também chama)
   useEffect(() => { if (git.getRoot() !== root) void git.setRoot(root); }, [git, root]);
 
-  const onOpen = (item: GitResourceItem) => onOpenFile(item.uri);
+  // 4.7-c: getDiff é async e nunca bloqueia; falha → erro gracioso na barra `.scm-error` (não trava).
+  const [openError, setOpenError] = useState<string | null>(null);
+  const onOpen = (item: GitResourceItem, group: GitGroupId) => {
+    if (!onOpenDiff) { if (!item.deleted) onOpenFile(item.uri); return; }
+    setOpenError(null);
+    git.getDiff(item.uri, group).then((sides) => onOpenDiff(item, sides), () => setOpenError(CHANGES_STRINGS.openDiffFailed(item.name)));
+  };
   const repoName = uriBasename(root) || root;
 
   // c3 — ações (o GitService re-stata sozinho após cada operação)
@@ -54,7 +62,7 @@ export function ChangesPane({ git, root, onOpenFile }: ChangesPaneProps) {
 
   return (
     <div className="scm-view show-file-icons" data-testid="scm-view" data-loading={state.loading} data-is-repo={state.isRepo} role="region" aria-label="Source Control">
-      {state.error && <div className="scm-error" role="alert" data-testid="scm-error">{state.error}</div>}
+      {(state.error || openError) && <div className="scm-error" role="alert" data-testid="scm-error">{state.error ?? openError}</div>}
       {!state.isRepo && !state.loading ? (
         <div className="scm-no-repo" data-testid="scm-no-repo">
           <p>{CHANGES_STRINGS.noRepo}</p>

@@ -8,9 +8,10 @@
 // (●) que vira ✕ no hover da aba · clique ativa · dblclick pina · botão do meio fecha.
 // Estado vive no EditorService (puro); aqui só DOM + eventos.
 // ============================================================================
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { WorkspaceUri } from '../../contract';
 import type { EditorService } from '../../core/editor/editorService';
+import type { GitService } from '../../core/git/gitService';
 import { uriBasename, uriPath } from '../../core/uri';
 import { fileIconLabelClasses } from './fileIconClasses';
 import { useEditorVersion } from './useEditorVersion';
@@ -23,11 +24,15 @@ export interface EditorTabsProps {
   onCloseBlocked?: (input: { sessionId: string; uri: WorkspaceUri }) => void;
   /** Slot dos `editor-actions` à direita (c6: maximizar). */
   actions?: React.ReactNode;
+  /** 4.7-c: badge/tooltip dinâmicos da aba fixa "Changes" (`git.count()`). */
+  git?: GitService;
 }
 
-export function EditorTabs({ editor, sessionId, onCloseBlocked, actions }: EditorTabsProps) {
+export function EditorTabs({ editor, sessionId, onCloseBlocked, actions, git }: EditorTabsProps) {
   useEditorVersion(editor, sessionId);
   const tabs = editor.getTabs(sessionId);
+  const [changesCount, setChangesCount] = useState(() => git?.count() ?? 0);
+  useEffect(() => { if (!git) return; setChangesCount(git.count()); return git.onStateChanged(() => setChangesCount(git.count())); }, [git]);
 
   const requestClose = (uri: WorkspaceUri) => {
     if (!editor.close({ sessionId, uri })) onCloseBlocked?.({ sessionId, uri });
@@ -39,7 +44,11 @@ export function EditorTabs({ editor, sessionId, onCloseBlocked, actions }: Edito
         <div className="tabs-container" role="tablist" aria-label="Abas do editor anexo">
           {tabs.map((t) => {
             const isChanges = t.kind === 'changes';
-            const name = isChanges ? CHANGES_STRINGS.tabLabel : uriBasename(t.uri);
+            // 4.7-c c1: aba fixa Diff — label = título do diff ("a.ts (Working Tree)"), ícone do arquivo real, ✕ presente, nunca itálico.
+            const isDiff = t.kind === 'diff';
+            const diffResource = isDiff ? t.diff?.resource ?? t.uri : t.uri;
+            const name = isChanges ? CHANGES_STRINGS.tabLabel : isDiff ? (t.diff?.title ?? 'Diff') : uriBasename(t.uri);
+            const iconName = isDiff ? uriBasename(diffResource) : name;
             const cls = ['tab', 'tab-actions-right', 'sizing-fit', 'has-icon',
               t.active ? 'active' : '', t.preview ? 'preview' : '', t.dirty ? 'dirty' : ''].filter(Boolean).join(' ');
             return (
@@ -48,8 +57,8 @@ export function EditorTabs({ editor, sessionId, onCloseBlocked, actions }: Edito
                 className={cls}
                 role="tab"
                 aria-selected={t.active}
-                aria-label={`${name}${t.dirty ? ', unsaved' : ''}${t.preview ? ', preview' : ''}`}
-                title={isChanges ? CHANGES_STRINGS.openChanges : uriPath(t.uri)}
+                aria-label={isChanges ? `${name}, ${CHANGES_STRINGS.filesChanged(changesCount)}` : `${name}${t.dirty ? ', unsaved' : ''}${t.preview ? ', preview' : ''}`}
+                title={isChanges ? CHANGES_STRINGS.filesChanged(changesCount) : isDiff ? name : uriPath(t.uri)}
                 tabIndex={t.active ? 0 : -1}
                 data-uri={t.uri}
                 data-kind={t.kind}
@@ -67,9 +76,10 @@ export function EditorTabs({ editor, sessionId, onCloseBlocked, actions }: Edito
                       <span className="monaco-icon-label-container">
                         <span className="monaco-icon-name-container"><a className="label-name">{name}</a></span>
                       </span>
+                      {changesCount > 0 && <span className="tab-badge monaco-count-badge" data-testid="changes-tab-badge" data-count={changesCount}>{changesCount}</span>}
                     </div>
                   ) : (
-                    <div className={fileIconLabelClasses(name, [t.preview ? 'italic' : ''])} aria-hidden="true">
+                    <div className={fileIconLabelClasses(iconName, [t.preview ? 'italic' : ''])} aria-hidden="true">
                       <span className="monaco-icon-label-container">
                         <span className="monaco-icon-name-container"><a className="label-name">{name}</a></span>
                       </span>

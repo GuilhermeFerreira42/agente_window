@@ -7,6 +7,7 @@
 //   /git/unstage  { uris }                → 204
 //   /git/discard  { uris }                → 204   (checkout -- | clean -f --)
 //   /git/commit   { message }             → 200 { oid }
+//   /git/show     { uri, ref }            → 200 { content }   (4.7-c; ref: HEAD | index | worktree; ausente → '')
 // Erro: { code, message } — forbidden_path 403 · not_a_repo 404 ·
 //        invalid_message 400 · nothing_to_commit 409 · git_unavailable 503 · io 500
 // ============================================================================
@@ -97,6 +98,12 @@ export function createExplorerGitServer(options: ExplorerGitServerOptions): Expl
           case 'commit':
             sendJson(res, 200, await host.commit(repo, typeof body.message === 'string' ? body.message : ''));
             return true;
+          case 'show': {
+            const ref = body.ref;
+            if (typeof body.uri !== 'string' || (ref !== 'HEAD' && ref !== 'index' && ref !== 'worktree')) throw new GitHostError('io', 'uri/ref inválidos');
+            sendJson(res, 200, await host.show(repo, body.uri as WorkspaceUri, ref));
+            return true;
+          }
           default:
             return false;
         }

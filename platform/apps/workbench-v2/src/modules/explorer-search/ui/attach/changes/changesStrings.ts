@@ -7,6 +7,10 @@ export const CHANGES_STRINGS = {
   initialize: 'Initialize Repository',
   refresh: 'Refresh',
   openChanges: 'Open Source Control',
+  // 4.7-c: lista vazia (repo sem alterações) e tooltip/badge da aba fixa (contagem = provider `.count`)
+  noChanges: 'No source control changes detected',
+  filesChanged: (n: number) => (n === 1 ? '1 file changed' : `${n} files changed`),
+  openDiffFailed: (name: string) => `Could not open changes for '${name}'`,
   // comandos (package.nls.json: command.stage / unstage / clean / stageAll / unstageAll / cleanAll)
   stage: 'Stage Changes',
   unstage: 'Unstage Changes',

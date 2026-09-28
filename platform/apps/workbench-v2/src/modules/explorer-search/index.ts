@@ -45,7 +45,7 @@ const notYet = (slice: string): never => {
 // 4.7 c1: layout (setVisible/setWidth) real; c2: abas (open/close/closeAll/
 // getTabs) reais via EditorService puro; save entra em c5.
 const attachApiFor = (layout: AttachLayoutStore, editor: EditorService, save: (uri: WorkspaceUri) => Promise<void>): IEditorAttachApi => ({
-  open: async ({ uri, kind, line, column, sessionId, pinned }) => { editor.open({ sessionId, uri, kind, line, column, pinned }); },
+  open: async ({ uri, kind, line, column, sessionId, pinned, diff }) => { editor.open({ sessionId, uri, kind, line, column, pinned, diff }); },
   close: async ({ uri, sessionId }) => { editor.close({ sessionId, uri }); },
   closeAll: async ({ sessionId }) => { editor.closeAll({ sessionId }); },
   setVisible: ({ sessionId, visible }) => layout.setVisible(sessionId, visible),
@@ -140,8 +140,16 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // Linha/coluna: reveal no editor é débito da 4.7 (contrato congelado).
   // 4.7 c4 (fecha D2.20): abre NO ANEXO da sessão montada com linha/coluna
   // (reveal + highlight no Monaco) e só seleciona/revela na árvore.
+  // 4.7-c c2 (fix): NUNCA abrir em 'default' — a sessão real é a que o shell
+  // passa em mountAttach. Antes da montagem, a abertura fica pendente e é
+  // executada assim que o anexo montar (zero aba fantasma / sumiço pós-F5).
+  let pendingAttachOpen: ((sessionId: string) => void) | null = null;
+  const openInAttachSession = (fn: (sessionId: string) => void): void => {
+    if (attachSessionId) fn(attachSessionId);
+    else pendingAttachOpen = fn;
+  };
   const onOpenMatch = (m: SearchMatch) => {
-    editorService.open({ sessionId: attachSessionId ?? 'default', uri: m.uri, kind: 'code', line: m.line, column: m.column });
+    openInAttachSession((sessionId) => editorService.open({ sessionId, uri: m.uri, kind: 'code', line: m.line, column: m.column }));
     void service.reveal({ uri: m.uri }).catch(() => undefined);
   };
   const unmountSearch = () => {
@@ -219,7 +227,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
         createElement(ExplorerView, {
           service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
           // 4.7-b: entrada visível da aba Changes (header Folders) — mesma sessão do anexo.
-          onOpenChanges: () => editorService.open({ sessionId: attachSessionId ?? 'default', uri: ATTACH_CHANGES_URI, kind: 'changes', pinned: true }),
+          onOpenChanges: () => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_CHANGES_URI, kind: 'changes', pinned: true })),
         }),
       );
     },
@@ -249,6 +257,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
           attachSessionId = opts.sessionId;
           attachRoot.render(createElement(AttachArea, attachProps(opts.sessionId)));
         }
+        if (pendingAttachOpen) { const fn = pendingAttachOpen; pendingAttachOpen = null; fn(opts.sessionId); }
         return;
       }
       unmountAttach();
@@ -259,6 +268,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       attachSessionId = opts.sessionId;
       attachRoot = createRoot(container);
       attachRoot.render(createElement(AttachArea, attachProps(opts.sessionId)));
+      if (pendingAttachOpen) { const fn = pendingAttachOpen; pendingAttachOpen = null; fn(opts.sessionId); }
     },
 
     unmountAttach,

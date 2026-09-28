@@ -4,7 +4,7 @@
 // PURO (FT-07): só globals web.
 // ============================================================================
 import type { WorkspaceUri } from '../../contract';
-import type { GitPortLike, GitStatus } from './gitService';
+import type { GitPortLike, GitShowRef, GitStatus } from './gitService';
 
 export class BrowserGitError extends Error {
   constructor(readonly code: string, message: string, readonly status: number) {
@@ -42,4 +42,5 @@ export class BrowserGitPort implements GitPortLike {
   unstage(root: WorkspaceUri, uris: WorkspaceUri[]): Promise<void> { return this.post('unstage', { root, uris }); }
   discard(root: WorkspaceUri, uris: WorkspaceUri[]): Promise<void> { return this.post('discard', { root, uris }); }
   commit(root: WorkspaceUri, message: string): Promise<{ oid: string }> { return this.post('commit', { root, message }); }
+  async show(root: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef): Promise<string> { return (await this.post<{ content: string }>('show', { root, uri, ref })).content ?? ''; }
 }

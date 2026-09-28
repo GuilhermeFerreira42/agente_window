@@ -136,4 +136,26 @@ describe('GitHost — git real em tmpdir', () => {
     await expect(host.stage(repo, ['file:///etc/passwd' as WorkspaceUri])).rejects.toMatchObject({ code: 'forbidden_path' });
     await expect(host.status('file:///etc' as WorkspaceUri)).rejects.toMatchObject({ code: 'forbidden_path' });
   });
+
+  // ---- 4.7-c c2: /git/show ----
+  it('show: HEAD / index / worktree; ausente → "" (untracked, deletado, sem HEAD)', async () => {
+    seed();
+    writeFileSync(join(repoDir, 'mod.txt'), 'v2\n');                       // M worktree
+    unlinkSync(join(repoDir, 'del.txt'));                                     // D
+    writeFileSync(join(repoDir, 'new.txt'), 'n\n');                          // U
+    writeFileSync(join(repoDir, 'st.txt'), 's\n'); git('add', 'st.txt');     // A index
+    expect(await host.show(repo, U('mod.txt'), 'HEAD')).toEqual({ content: 'v1\n' });
+    expect(await host.show(repo, U('mod.txt'), 'index')).toEqual({ content: 'v1\n' });
+    expect(await host.show(repo, U('mod.txt'), 'worktree')).toEqual({ content: 'v2\n' });
+    expect(await host.show(repo, U('del.txt'), 'worktree')).toEqual({ content: '' });
+    expect(await host.show(repo, U('del.txt'), 'index')).toEqual({ content: 'x\n' });
+    expect(await host.show(repo, U('new.txt'), 'index')).toEqual({ content: '' });
+    expect(await host.show(repo, U('new.txt'), 'worktree')).toEqual({ content: 'n\n' });
+    expect(await host.show(repo, U('st.txt'), 'HEAD')).toEqual({ content: '' });
+    expect(await host.show(repo, U('st.txt'), 'index')).toEqual({ content: 's\n' });
+  });
+  it('show: uri fora do repo → forbidden_path', async () => {
+    seed();
+    await expect(host.show(repo, toWorkspaceUri(ws, join(ws, 'fora.txt')) as WorkspaceUri, 'HEAD')).rejects.toMatchObject({ code: 'forbidden_path' });
+  });
 });
