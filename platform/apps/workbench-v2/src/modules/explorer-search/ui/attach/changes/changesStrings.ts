@@ -36,4 +36,15 @@ export const CHANGES_STRINGS = {
   deleteUntrackedManyDetail: 'This is IRREVERSIBLE!\nThese files will be FOREVER LOST if you proceed.',
   deleteFile: 'Delete File',
   deleteFiles: 'Delete Files',
+  // 4.7 c4 — input de commit (extensão git: `Message ({0} to commit on "{1}")`, comando commit,
+  // diálogo `commitWithAnyInput`: "There are no staged changes to commit." + detalhe, validação vazia)
+  commitPlaceholder: (branch: string | null) => (branch ? `Message (Ctrl+Enter to commit on "${branch}")` : 'Message (Ctrl+Enter to commit)'),
+  commit: 'Commit',
+  commitTitle: 'Commit (Ctrl+Enter)',
+  emptyMessage: 'Please provide a commit message',
+  noStagedMessage: 'There are no staged changes to commit.',
+  noStagedDetail: 'Would you like to stage all your changes and commit them directly?',
+  yes: 'Yes',
+  close: 'Close',
+  commitFailed: 'Git: commit failed',
 } as const;

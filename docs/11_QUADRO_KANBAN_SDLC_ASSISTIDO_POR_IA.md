@@ -15,7 +15,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
   5. Preservação de sessão PTY e histórico via `display: contents / none` no bridge.
 - **Status atual FATIA-03: Concluída e blindada contra regressões (conforme `docs/18`), aguardando teste e feedback do usuário.**
 - Servidor Vite ativo em `http://localhost:5173/` (HTTP 200 OK).
-- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 19 arquivos (`04_00` a `04_18`; `04_17` raspagem real + `04_18` plano 4.5→4.7 adicionados em 2026-09-22): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status (2026-09-28): 4.1–4.6 CONCLUÍDAS; 4.7 Editor Anexo + 4.7-b Git real + 4.7-c Diff mínimo CONCLUÍDAS e homologadas no Windows (Vídeos 5/6) — Explorer/Search/Git/Diff da FATIA-04 100 % funcionais; próxima frente = decisão do usuário (4.8 Browser ou 4.7-c4 Input Commit) — ver topo de `docs/12`.**
+- **FATIA-04 (frente vigente): documentação 100% concluída** em `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` — 19 arquivos (`04_00` a `04_18`; `04_17` raspagem real + `04_18` plano 4.5→4.7 adicionados em 2026-09-22): mapeamento do vídeo de 8m35s, RF-01 a RF-34, requisitos não funcionais, contratos propostos, mapa `arquivo:linha` no `microsoft/vscode`/`code-server`, 13 fluxos mermaid, critérios de aceite (checklist A do vídeo + B anti-regressão) e **plano de implementação em 9 sub-fatias (4.1 a 4.9)**. **Status (2026-09-28): 4.1–4.6 CONCLUÍDAS; SUB-FATIA 4.7 ✅ CONCLUÍDA (a Editor Anexo + b Git real + c Diff + c4 Input de Commit `2d1b126`), homologada no Windows — Explorer/Search/Git/Diff da FATIA-04 100 % funcionais; próxima frente = decisão do usuário (4.8 Browser ou 4.7-c4 Input Commit) — ver topo de `docs/12`.**
 - Quando houver conflito entre trilha histórica e estado atual, prevalece `docs/12`, `docs/16` e `docs/18`.
 
 | STATUS USADO | SIGNIFICADO |
@@ -35,7 +35,8 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 | 2026-09-11 | 2026-09-25 | FATIA-01–03 concluídas. FATIA-04: 4.1–4.5 concluídas (4.5 homologada Windows 2026-09-25); **4.6 em preparação** (auditoria + plano). Servidores: VS Code 8080 (régua), workbench 5174. | Agente (loop fechado) | main (GitHub `GuilhermeFerreira42/agente_window`) + commits locais `60287b9`…`604bb6d` |
 | 2026-09-11 | 2026-09-26 | FATIA-04: 4.6 homologada (Windows) e **4.7 Editor Anexo implementada** (Opção A, 7 commits `db33bef`…`a394f53` + docs; placar `04_20 §4.2` 14/14; E2E `sessao_14` 16/16; vitest 341). Aguarda homologação humana no Windows e decisão **4.8 vs 4.7-b**. | Agente (loop fechado) | main + commits locais até `a394f53` |
 | 2026-09-11 | 2026-09-27 | FATIA-04: **4.7-b Aba Changes (Git real) HOMOLOGADA NO WINDOWS** (c1–c3.2, HEAD `6c91289`): backend `/git/*` real, Source Control View no anexo, Stage/Unstage/Discard com diálogos oficiais, entrada pelo header do Explorer, maquete "Changes N" do shell escondida (Transição Temporária, `src/shell/gitTransition.ts`). Pendentes: c4 input de commit, c5 placar. **Aguardando diretriz do usuário** (4.7-c Diff · 4.8 Browser · UX). | Agente (loop fechado) | main + commits locais até `6c91289` |
-| 2026-09-11 | 2026-09-28 | FATIA-04: **4.7-c Diff mínimo HOMOLOGADA NO WINDOWS (Vídeo 6)** — c1 `9b8d26f` DiffPane read-only · c2 `0b7b7b1` clique Changes → diff + `/git/show` + badge/tooltip + fix sessionId · c3 docs. **4.7 (Editor Anexo + Git + Diff) = CONCLUÍDA.** vitest 382 · `sessao_14c` 6/6. Aguarda decisão: 4.8 Browser ou 4.7-c4 Input Commit. | Agente (loop fechado) | main + commits locais até `0b7b7b1` |
+| 2026-09-11 | 2026-09-28 | FATIA-04: **4.7-c Diff mínimo HOMOLOGADA NO WINDOWS (Vídeo 6)** — c1 `9b8d26f` DiffPane read-only · c2 `0b7b7b1` clique Changes → diff + `/git/show` + badge/tooltip + fix sessionId · c3 docs. **4.7 (Editor Anexo + Git + Diff) = CONCLUÍDA.** vitest 382 · `sessao_14c` 6/6. | Agente (loop fechado) | main + commits locais até `0b7b7b1` |
+| 2026-09-11 | 2026-09-28 | FATIA-04: **4.7-c4 Input de Commit HOMOLOGADO NO WINDOWS** (`2d1b126`): `.scm-input` + botão ✓ Commit, Ctrl+Enter, validação vazia, diálogo stage-all [Yes][Cancel], diálogo de erro; spec `sessao_14d` 5/5; regressão total verde. **SUB-FATIA 4.7 ✅ CONCLUÍDA (Motor Git fechado).** Aguarda decisão: FATIA-05 Layout ou 4.8 UI do Browser. | Agente (loop fechado) | main + commits locais até `2d1b126` |
 
 ---
 
@@ -67,7 +68,7 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 | Sub | Nome | Saída | Status | Notas |
 |---|---|---|---|---|
 | P3.1 | Montagem do backlog mestre | Backlog mestre | Concluído | Ondas 0-9 em `05` |
-| P3.2 | Fatiamento em slices | Fatias pequenas | Concluído | Agora detalhado abaixo por FATIA-01 a FATIA-09 |
+| P3.2 | Fatiamento em slices | Fatias pequenas | Concluído | Agora detalhado abaixo por FATIA-01 a FATIA-10 (renumeração 2026-09-28: 05 = Layout, 06 = Chat/Runtime) |
 | P3.3 | Definição de critérios de pronto | DoD | Concluído | DoD macro em `05` + por fatia abaixo |
 | P3.4 | Definição de critérios de aceite | Acceptance | Concluído | `07` + `08` + por fatia abaixo |
 | P3.5 | Plano de implantação para IA | Handoff Plan | Concluído | `06` + `15_HANDOFF` + `16_INICIAR_POR_AQUI` |
@@ -149,7 +150,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 ---
 
 ### FATIA-04 — Explorer Completo + Editor em Anexo Lateral + Browser com IA (FASE 4)
-**Onda:** 4 | **Épico:** D — Explorer (+ C/F/E conforme sub-fatia) | **Prioridade:** P0 | **Status:** Em execução (4.1–4.6 ✅; **4.7 Editor Anexo + 4.7-b Git c1–c3.2 + 4.7-c Diff homologados no Windows — o "Motor Git" fecha com o c4 Input de Commit (pendente)**; 4.8 redefinida = só UI do Simple Browser; FATIA-05 = Consolidação e Layout Byte a Byte) | **Depende de:** FATIA-01 e FATIA-02 | **Doc:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (19 arquivos, `04_00` a `04_18`)
+**Onda:** 4 | **Épico:** D — Explorer (+ C/F/E conforme sub-fatia) | **Prioridade:** P0 | **Status:** Em execução (4.1–4.6 ✅; **4.7 ✅ CONCLUÍDA — a/b/c/c4 homologados no Windows, Motor Git fechado com `2d1b126`**; 4.8 redefinida = só UI do Simple Browser; FATIA-05 = Consolidação e Layout Byte a Byte) | **Depende de:** FATIA-01 e FATIA-02 | **Doc:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/` (19 arquivos, `04_00` a `04_18`)
 
 > **Nota (2026-09-16):** a FATIA-04 foi **ampliada** após o mapeamento do vídeo de 8m35s. Além do Explorer + Filesystem originalmente previstos, ela agora inclui **editor em anexo lateral** (não no centro), **search dentro da sessão** e **browser interno com acesso da IA ao HTML**. A tabela de 6 linhas anterior foi substituída pelas **9 sub-fatias** abaixo. Plano detalhado em `04_15`; critérios de aceite em `04_13`.
 
@@ -166,13 +167,14 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 4.7 | **Editor Anexo Lateral** (Opção A: dentro da barra auxiliar, à esquerda da árvore, sash 6 px) — abas 35 px por sessão (preview itálico, ● ↔ ✕), breadcrumbs 22 px, Monaco 14/19 com viewState e reveal linha (D2.20), save atômico + diálogo Salvar/Não Salvar/Cancelar + conflito externo, maximizar dentro da sessão + empty state letterpress; editor central do shell intocado | `ui/attach/{AttachArea,EditorTabs,Breadcrumbs,CodeEditorPane,AttachDialog,AttachEmptyState}.tsx`, `attach.css`, `core/editor/editorService.ts`, `core/attach/attachLayout.ts`; slot `attachSlot` (`AuxiliaryBar.tsx`) + redirecionamento `explorer.fileOpened` (App.tsx) | `IEditorAttachApi` (contrato intocado) | `04_20 §4.2` placar **14/14 PASS**; E2E `sessao_14_editor_anexo` **16/16**; vitest 341/341; anti-regressão 12/13/terminal/07/03 verde | ✅ **CONCLUÍDA** (c1 `db33bef` · c2 `9bbaf3e` · c3 `c7457f8` · c4 `aac4c8b` · c5 `4906c81` · c6 `a394f53` · c7 docs) — homologada no Windows junto com 4.7-b/4.7-c (Vídeo 6, 2026-09-28). ADIADO: Alterações/Git (D2.22 → 4.7-b), picker breadcrumbs (D2.23 → 4.7-c), Split (D2.24), D2.19/D2.26 → 4.9 |
 | 4.7-b | **Aba Changes (Git real)** — `POST /git/{status,init,stage,unstage,discard,commit}` (execFile sem shell, guarda de raiz, porcelain v2), aba fixa "Changes" no anexo (1 por sessão, nunca dirty), Source Control View 22 px (Staged Changes / Changes, letras `::after` com tokens gitDecoration, D riscado, badge, Refresh), sem repo → frase oficial + Initialize Repository, ações inline Stage/Unstage/Discard + Stage All/Unstage All/Discard All + diálogos oficiais (textos do `dist/main.js` da extensão git), watcher → refresh automático; **entrada "Open Source Control" no header do Explorer**; maquete do shell escondida (Transição Temporária) | `server/git/{gitHost,index}.ts`, `core/git/{gitService,browserGitPort}.ts`, `ui/attach/changes/{ChangesPane,ChangesList,ConfirmDialog,changes.css,changesStrings}.tsx`, `ui/ExplorerView.tsx` (ação), exceção shell: `src/shell/gitTransition.ts` + prop `hideChangesTab` (`AuxiliaryBar.tsx`) + hook em `App.tsx` | `contract.ts` aditivo (`kind:'changes'`, `git.statusChanged`) | smoke REAL `sessao_14b_git_smoke` 1/1 (5174, workspace real, UI × `git status`) · `14b_changes` 11/11 · `14b_backend` 7/7 · vitest 372 · anti-regressão 14/12/13/terminal/03/04 verde | ✅ **CONCLUÍDA — HOMOLOGADA NO WINDOWS 2026-09-27** (c1 `3e12adc` · c2 `9575457` · c3 `3c69242` · c3.1 `a931f72` · c3.2 `6c91289`; prints `auditoria_47b/validacao_real_v2/`). **Pendentes por decisão do usuário:** c4 input "Message (Ctrl+Enter to commit)" + ✓ Commit (D2.35), c5 placar `04_21 §6`. Débitos D2.28–D2.38 em `docs/05` |
 | 4.7-c | **Diff mínimo (read-only)** — clique em M/A/D/U na lista Changes abre aba fixa "Diff" (1 por sessão, após Changes, imune a Close All) com Monaco DiffEditor `readOnly` + `renderSideBySide` (inline automático < 900 px, padrão VS Code), minimap off, 14/19; lados fiéis ao `git.openChange` (Changes = index ⇄ worktree "(Working Tree)", Staged = HEAD ⇄ index "(Index)", A/U original vazio, D modificado vazio); "No changes detected" + `codicon-check`; badge + tooltip "X files changed" na aba Changes; empty state "No source control changes detected"; fix sessionId real (sem aba fantasma em `'default'`) | `ui/attach/diff/{DiffPane,diff.css,diffStrings}`, `core/editor/editorService.ts` (kind `'diff'`), `core/git/gitService.ts` (`getDiff`, `count`), `server/git/` (`POST /git/show`), `ui/attach/changes/*`, `EditorTabs.tsx`, `index.ts` (abertura pendente até `mountAttach`) | `contract.ts` aditivo (`kind:'diff'`, `AttachDiffPayload`, `editor.diffChanged`) | `sessao_14c_diff_minimal` **6/6** (cada trio falhou antes do código) · `14b` 11/11 · vitest **382** · anti-regressão 14/12/13/terminal verde · prints `auditoria_47c/c1`, `c2` | ✅ **HOMOLOGADA NO WINDOWS 2026-09-28 (Vídeo 6)** (c1 `9b8d26f` · c2 `0b7b7b1` · c3 docs). **D2.28 e D2.33 CONCLUÍDOS.** **A 4.7 como um todo só fecha com o c4 — Input de Commit ("Message (Ctrl+Enter to commit)" + ✓ Commit, D2.35): último passo do "Motor Git"** (decisão estratégica 2026-09-27, `docs/12`) |
+| 4.7-c4 | **Input de Commit** — `.scm-input` (pl 11, radius 4, 26 px auto-grow) com placeholder `Message (Ctrl+Enter to commit on "branch")`, botão ✓ Commit largura total abaixo do input (4 8 / radius 4 / lh 16 / 12 px), Ctrl+Enter, validação "Please provide a commit message", diálogo oficial stage-all [Yes][Cancel], diálogo de erro com mensagem real do git; sucesso sem diálogo (fiel ao VS Code) | `ui/attach/changes/{CommitInput.tsx,ChangesPane.tsx,changes.css,changesStrings.ts}` | `POST /git/commit` + `/git/stage` já existentes | `sessao_14d_commit_input` 5/5 (falhou antes) · regressão total verde · prints `auditoria_47c/c4` | ✅ **CONCLUÍDA e homologada no Windows 2026-09-28 (`2d1b126`)** — fecha a 4.7; D2.35 (Always) permanece débito |
 | 4.8 | **UI do Browser (Simple Browser) — SOMENTE interface visual, byte a byte** (barra de endereço, botões voltar/avançar/recarregar/abrir externo, área de conteúdo, medidas do `simpleBrowser` do VS Code); coexistência com a sessão no anexo. **FORA (adiado → D2.39):** runtime de IA com acesso ao HTML / Playwright / CDP, isolamento de contexto por sessão | módulo isolado (a definir na auditoria `04_2x`), slot no shell mínimo | `BrowserPort` (UI só) | auditoria + prints lado a lado vs 8080 (Simple Browser real) | 🔜 **Redefinida 2026-09-27 (escopo = só UI)**; B3 hotfix já aplicado (`876b83d`: Browser não abre no boot) |
 | 4.9 | **Polimento UX** — drag & drop para reordenar seções (Open Editors/Outline/Timeline), resize de seções por sash com persistência, hover actions inline nos itens da árvore, feedback visual de drag; + integração final (eventos transversais, validação de isolamento) | `ui/ExplorerView.tsx`, `ui/explorer.css` | `fs.changed`, `attach.closed` | checklist A + B do `04_13` | **Planejado** |
 
 **Referência de medidas (fonte única):** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_17_explorer_codeeditorpane_raspagem_vscode_original.md` (raspagem real do VS Code: 22 px linha, 26 px search, 35 px tabs, 22 px breadcrumbs, 24 px item de menu, tokens `--vscode-*`). **Plano de implantação 4.5→4.6→4.7:** `docs/engenharia_reversa/FATIA-04_VIDEO_COMPLETO/04_18_plano_implantacao_fatia_04.md`.
 
 **Critério de pronto FATIA-04:** sub-fatias 4.1–4.7 + 4.9 validadas + anti-regressão do terminal (`sessao_11_*`) verde + checklist visual do `04_18 §5` preenchido com prints lado a lado + `docs/12` atualizado com evidência real.
-**Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 ✅ → 4.5 ✅ → 4.6 ✅ → 4.7 ✅ → 4.7-b ✅ → **4.7-c ✅ (homologada Windows 2026-09-28) → próxima = decisão do usuário (4.8 Browser contextual · 4.7-c4 Input Commit)** → 4.9 (4.8 planejado; cada uma só começa com a anterior validada). **Débitos e fontes por item:** `docs/12` entrada 2026-09-24 §B; épico "Refinamento UX Explorer" em `docs/05`.
+**Ordem obrigatória:** 4.1 → 4.2 → 4.3 → 4.4 ✅ → 4.5 ✅ → 4.6 ✅ → 4.7 ✅ → 4.7-b ✅ → 4.7-c ✅ → **4.7-c4 ✅ Input de Commit (`2d1b126`, homologado Windows 2026-09-28) = SUB-FATIA 4.7 CONCLUÍDA → próxima = decisão do usuário (FATIA-05 Layout · 4.8 UI do Browser)** → 4.9 (4.8 planejado; cada uma só começa com a anterior validada). **Débitos e fontes por item:** `docs/12` entrada 2026-09-24 §B; épico "Refinamento UX Explorer" em `docs/05`.
 
 ---
 
@@ -192,66 +194,65 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 **Critério de pronto FATIA-05:** Search e Changes abertos ao mesmo tempo que um arquivo no editor (prova E2E); Activity Bar/Side Bar com medidas do 8080; zero regressão nas specs 12/13/14/14b/14c/terminal; nenhuma lógica de `core/**` ou `server/**` alterada (só wiring).
 
-### FATIA-05 (numeração ANTIGA — Chat + Runtime de Agente) — renumeração pendente de decisão do usuário
-> A decisão de 2026-09-27 atribuiu o número 05 à Consolidação/Layout. Este bloco permanece íntegro até o usuário decidir o novo número (provável 06+).
-**Onda:** 5 | **Épico:** E — Chat | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01,02,03
+### FATIA-06 — Chat + Runtime de Agente
+**Onda:** 6 | **Épico:** E — Chat | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01,02,03
 
 | # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|
-| 5.1 | `AgentRuntimeAdapter` + `ModelProviderAdapter` | `platform/packages/agent-runtime/agent/` + `platform/packages/model-provider/` | `04` #1,2 | typecheck | Planejado |
-| 5.2 | `ChatSessionService` create/list/activate/send | `platform/apps/workbench/src/logic/chat/` | `04` #9 | VAL-CHAT-03 | Planejado |
-| 5.3 | Streaming `chat.chunk`, `chat.thinking` | `platform/apps/workbench/src/logic/chat/` | `AgentRuntimeEvent` | VAL-CHAT-01 | Planejado |
-| 5.4 | Tool approval gate `tool.pending` / `tool.result` | `platform/apps/workbench/src/logic/chat/`, `platform/apps/workbench/src/ui/chat/` | `ToolExecutionAdapter` | VAL-CHAT-02 + VAL-INT-02 | Planejado |
-| 5.5 | Snapshots/restore de sessão | `platform/packages/shared/persistence/` | `PersistencePort` | teste focado | Planejado |
-| 5.6 | UI ChatPanel, timeline, input, anexos | `platform/apps/workbench/src/ui/chat/` | - | E2E conversa | Planejado |
+| 6.1 | `AgentRuntimeAdapter` + `ModelProviderAdapter` | `platform/packages/agent-runtime/agent/` + `platform/packages/model-provider/` | `04` #1,2 | typecheck | Planejado |
+| 6.2 | `ChatSessionService` create/list/activate/send | `platform/apps/workbench/src/logic/chat/` | `04` #9 | VAL-CHAT-03 | Planejado |
+| 6.3 | Streaming `chat.chunk`, `chat.thinking` | `platform/apps/workbench/src/logic/chat/` | `AgentRuntimeEvent` | VAL-CHAT-01 | Planejado |
+| 6.4 | Tool approval gate `tool.pending` / `tool.result` | `platform/apps/workbench/src/logic/chat/`, `platform/apps/workbench/src/ui/chat/` | `ToolExecutionAdapter` | VAL-CHAT-02 + VAL-INT-02 | Planejado |
+| 6.5 | Snapshots/restore de sessão | `platform/packages/shared/persistence/` | `PersistencePort` | teste focado | Planejado |
+| 6.6 | UI ChatPanel, timeline, input, anexos | `platform/apps/workbench/src/ui/chat/` | - | E2E conversa | Planejado |
 
 ---
 
-### FATIA-06 — Editor / Browser / Search / Changes
-**Onda:** 6 | **Épico:** F — Editor | **Prioridade:** P1 | **Status:** Planejado | **Depende de:** FATIA-02 e 04
+### FATIA-07 — Editor / Browser / Search / Changes
+**Onda:** 7 | **Épico:** F — Editor | **Prioridade:** P1 | **Status:** Planejado | **Depende de:** FATIA-02 e 04
 
 | # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|
-| 6.1 | `EditorService` open/close/split/reveal/save | `platform/apps/workbench/src/logic/editor/` | `04` #7 | typecheck | Planejado |
-| 6.2 | Abas e grupos centrais com foco | `platform/apps/workbench/src/ui/editor/` | `WorkbenchLayoutService` | VAL-WB-03 | Planejado |
-| 6.3 | Browser, Search, Changes views | `platform/apps/workbench/src/ui/editor/` + `platform/apps/workbench/src/logic/search.ts` | - | E2E navegação cruzada | Planejado |
-| 6.4 | Integração explorer<->editor e chat<->editor | `platform/apps/workbench/src/logic/` | - | VAL-INT-01 | Planejado |
+| 7.1 | `EditorService` open/close/split/reveal/save | `platform/apps/workbench/src/logic/editor/` | `04` #7 | typecheck | Planejado |
+| 7.2 | Abas e grupos centrais com foco | `platform/apps/workbench/src/ui/editor/` | `WorkbenchLayoutService` | VAL-WB-03 | Planejado |
+| 7.3 | Browser, Search, Changes views | `platform/apps/workbench/src/ui/editor/` + `platform/apps/workbench/src/logic/search.ts` | - | E2E navegação cruzada | Planejado |
+| 7.4 | Integração explorer<->editor e chat<->editor | `platform/apps/workbench/src/logic/` | - | VAL-INT-01 | Planejado |
 
 ---
 
-### FATIA-07 — Command Menu + Theme
-**Onda:** 7 | **Épico:** G — Tema e comandos | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-02,04,05,06
+### FATIA-08 — Command Menu + Theme
+**Onda:** 8 | **Épico:** G — Tema e comandos | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-02,04,05,06
 
 | # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|
-| 7.1 | Command Palette + menus contextuais | `platform/apps/workbench/src/ui/shared/`, `platform/apps/workbench/src/logic/commands/` | `CommandRegistry` | VAL-CMD-01 | Planejado |
-| 7.2 | Context keys e keybindings | `platform/apps/workbench/src/logic/commands/` | `CommandRegistry.setContext` | teste focado | Planejado |
-| 7.3 | `ThemeService` + tokens CSS sem hardcode | `platform/apps/workbench/src/workbench/theme/`, `platform/apps/workbench/src/ui/shared/` | `ThemeService` | VAL-THEME-01 + RNF-VAL-05 | Planejado |
-| 7.4 | Coerência visual intermodular | todos `platform/apps/workbench/src/ui/` | - | inspeção visual | Planejado |
+| 8.1 | Command Palette + menus contextuais | `platform/apps/workbench/src/ui/shared/`, `platform/apps/workbench/src/logic/commands/` | `CommandRegistry` | VAL-CMD-01 | Planejado |
+| 8.2 | Context keys e keybindings | `platform/apps/workbench/src/logic/commands/` | `CommandRegistry.setContext` | teste focado | Planejado |
+| 8.3 | `ThemeService` + tokens CSS sem hardcode | `platform/apps/workbench/src/workbench/theme/`, `platform/apps/workbench/src/ui/shared/` | `ThemeService` | VAL-THEME-01 + RNF-VAL-05 | Planejado |
+| 8.4 | Coerência visual intermodular | todos `platform/apps/workbench/src/ui/` | - | inspeção visual | Planejado |
 
 ---
 
-### FATIA-08 — Hardening transversal
-**Onda:** 8 | **Épico:** H — Hardening | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-03 a 07
+### FATIA-09 — Hardening transversal
+**Onda:** 9 | **Épico:** H — Hardening | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-03 a 07
 
 | # | Tarefa | Validação | Status |
 |---|---|---|---|
-| 8.1 | Correções de fidelidade vs VS Code | matriz `07` sem blockers | Planejado |
-| 8.2 | Performance input 16ms + bridge 50ms | RNF-VAL-01,02 | Planejado |
-| 8.3 | Reconexão PTY, persistência layout, bordas | RNF-VAL-03,04 | Planejado |
-| 8.4 | Testes finais 370 unit + 62 e2e (baseline atual) | `npm test` + `e2e` | Planejado |
+| 9.1 | Correções de fidelidade vs VS Code | matriz `07` sem blockers | Planejado |
+| 9.2 | Performance input 16ms + bridge 50ms | RNF-VAL-01,02 | Planejado |
+| 9.3 | Reconexão PTY, persistência layout, bordas | RNF-VAL-03,04 | Planejado |
+| 9.4 | Testes finais 370 unit + 62 e2e (baseline atual) | `npm test` + `e2e` | Planejado |
 
 ---
 
-### FATIA-09 — Release e operação
-**Onda:** 9 | **Épico:** H — Release | **Prioridade:** P1 | **Status:** Planejado | **Depende de:** FATIA-08
+### FATIA-10 — Release e operação
+**Onda:** 10 | **Épico:** H — Release | **Prioridade:** P1 | **Status:** Planejado | **Depende de:** FATIA-09
 
 | # | Tarefa | Doc | Validação | Status |
 |---|---|---|---|---|
-| 9.1 | Build de release `npm run build` | `09_PLANO_DE_DEPLOY` | build passa | Planejado |
-| 9.2 | Deploy staging + smoke test 8 passos | `09` | smoke test pós-deploy | Planejado |
-| 9.3 | Observabilidade logs + healthcheck + rollback | `09` | logs sem erro crítico | Planejado |
-| 9.4 | Runbook operacional + homologação final | `08`, `10` | aceite V1 | Planejado |
+| 10.1 | Build de release `npm run build` | `09_PLANO_DE_DEPLOY` | build passa | Planejado |
+| 10.2 | Deploy staging + smoke test 8 passos | `09` | smoke test pós-deploy | Planejado |
+| 10.3 | Observabilidade logs + healthcheck + rollback | `09` | logs sem erro crítico | Planejado |
+| 10.4 | Runbook operacional + homologação final | `08`, `10` | aceite V1 | Planejado |
 
 ---
 
@@ -327,12 +328,13 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
 | 02 | Workbench Shell base | Concluído | Base estável |
 | 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
-| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.7 ✅, 4.7-b ✅ e **4.7-c ✅ (Diff mínimo, homologada Windows 2026-09-28)** — Explorer/Search/Git/Diff 100 % funcionais | Próximo: **4.7-c4 Input de Commit** (fecha o Motor Git) → depois **FATIA-05 Layout** ou **4.8 UI do Simple Browser**; placar `04_21 §6` detalhado pendente. Medidas em `04_17`, plano em `04_18`, aceite em `04_13`, estado real em `docs/12` 2026-09-24 |
-| 05 | **Consolidação e Layout Byte a Byte** (Activity Bar + Side Bar reais; Search/Changes simultâneos; DnD de views; Timeline/Outline; polish) | Planejado (NOVA, 2026-09-27) | Depende do fechamento do Motor Git (4.7-c4). Chat + Runtime (antiga 05) aguarda renumeração |
-| 06 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03 e 04 |
-| 07 | Command + Theme | Planejado | Aguardar FATIAS 03 a 06 |
-| 08 | Hardening | Planejado | Aguardar FATIAS 03 a 07 |
-| 09 | Release | Planejado | Aguardar FATIA-08 |
+| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.6 ✅ e **SUB-FATIA 4.7 ✅ CONCLUÍDA (a/b/c/c4, homologada Windows 2026-09-28, `2d1b126`)** — Explorer/Search/Git/Diff/Commit 100 % funcionais; Motor Git fechado | Próximo: **decisão do usuário — FATIA-05 Layout Byte a Byte ou 4.8 UI do Simple Browser**; placar final em `04_21 §6`. Medidas em `04_17`, plano em `04_18`, aceite em `04_13`, estado real em `docs/12` 2026-09-24 |
+| 05 | **Consolidação e Layout Byte a Byte** (Activity Bar + Side Bar reais; Search/Changes simultâneos; DnD de views; Timeline/Outline; polish) | Planejado (NOVA, 2026-09-27) | Depende do fechamento do Motor Git (4.7-c4) |
+| 06 | Chat + Runtime de Agente | Planejado | Aguardar decisão FATIA-03 + fechamento FATIA-04/05 |
+| 07 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03, 04 e 05 |
+| 08 | Command + Theme | Planejado | Aguardar FATIAS 03 a 07 |
+| 09 | Hardening | Planejado | Aguardar FATIAS 03 a 08 |
+| 10 | Release | Planejado | Aguardar FATIA-09 |
 
 **Onda 0:** concluída com docs `00` a `16` + engenharia reversa + `ANALISE_TERMINAL_CODE_SERVER_CLONE.md`
 **Onda 1 / FATIA-01:** concluída 14 tarefas

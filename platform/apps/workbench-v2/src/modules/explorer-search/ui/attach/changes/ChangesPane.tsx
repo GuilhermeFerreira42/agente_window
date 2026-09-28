@@ -7,10 +7,12 @@
 //   • detecção pelo estado do GitService (`isRepo`), nunca por erro HTTP;
 //   • estado vive no GitService (puro); aqui só assinatura + DOM.
 // ============================================================================
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { WorkspaceUri } from '../../../contract';
 import type { GitDiffSides, GitGroupId, GitResourceGroup, GitResourceItem, GitService, GitServiceState } from '../../../core/git/gitService';
 import { ConfirmDialog, type DiscardRequest } from './ConfirmDialog';
+import { CommitInput, type CommitInputHandle } from './CommitInput';
+import { AttachDialog } from '../AttachDialog';
 import type { GroupActionId, ResourceActionId } from './ChangesList';
 import { uriBasename } from '../../../core/uri';
 import { CHANGES_STRINGS } from './changesStrings';
@@ -60,9 +62,38 @@ export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPanePr
     run(git.discard(uris));
   };
 
+  // ---- 4.7 c4 — input de commit ----
+  // Fluxo da extensão git (`commitWithAnyInput`): mensagem vazia → validação + foco;
+  // sem staged → "There are no staged changes to commit." [Yes = stage all + commit][Cancel];
+  // erro do git → diálogo de erro (mensagem do servidor), input preservado; sucesso → input limpa
+  // (o VS Code não mostra diálogo de sucesso; a lista se atualiza sozinha).
+  const [message, setMessage] = useState('');
+  const [validation, setValidation] = useState<string | null>(null);
+  const [askStageAll, setAskStageAll] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<CommitInputHandle>(null);
+  const doCommit = async (stageAllFirst: boolean) => {
+    setBusy(true);
+    try {
+      if (stageAllFirst) { await git.refreshNow(); await git.stageAll(); } // estado fresco antes do stage all
+      await git.commit(message);
+      setMessage('');
+    } catch (e) {
+      setCommitError((e as Error).message || String(e));
+    } finally { setBusy(false); }
+  };
+  const onCommitRequest = () => {
+    if (busy) return;
+    if (message.trim().length === 0) { setValidation(CHANGES_STRINGS.emptyMessage); inputRef.current?.focus(); return; }
+    if (!git.hasStaged()) { setAskStageAll(true); return; }
+    void doCommit(false);
+  };
+
   return (
     <div className="scm-view show-file-icons" data-testid="scm-view" data-loading={state.loading} data-is-repo={state.isRepo} role="region" aria-label="Source Control">
-      {(state.error || openError) && <div className="scm-error" role="alert" data-testid="scm-error">{state.error ?? openError}</div>}
+      {/* c4: erro de commit é mostrado no diálogo `scm-commit-error`; a barra não o repete */}
+      {((state.error && state.error !== commitError) || openError) && <div className="scm-error" role="alert" data-testid="scm-error">{state.error ?? openError}</div>}
       {!state.isRepo && !state.loading ? (
         <div className="scm-no-repo" data-testid="scm-no-repo">
           <p>{CHANGES_STRINGS.noRepo}</p>
@@ -74,10 +105,25 @@ export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPanePr
             </a>
           </div>
         </div>
-      ) : (
+      ) : (<>
+        <CommitInput ref={inputRef} branch={state.branch} value={message} validation={validation} busy={busy}
+          onChange={(v) => { setMessage(v); if (validation) setValidation(null); }} onCommit={onCommitRequest} />
         <ChangesListLazy state={state} repoName={repoName} onRefresh={() => { void git.refreshNow(); }} onOpen={onOpen} onAction={onAction} onGroupAction={onGroupAction} />
-      )}
+      </>)}
       {discard && <ConfirmDialog request={discard} onConfirm={confirmDiscard} onCancel={() => setDiscard(null)} />}
+      {askStageAll && (
+        <AttachDialog kind="warning" testId="scm-commit-dialog" message={CHANGES_STRINGS.noStagedMessage} detail={CHANGES_STRINGS.noStagedDetail}
+          onCancel={() => setAskStageAll(false)}
+          buttons={[
+            { id: 'yes', label: CHANGES_STRINGS.yes, primary: true, onSelect: () => { setAskStageAll(false); void doCommit(true); } },
+            { id: 'cancel', label: CHANGES_STRINGS.cancel, onSelect: () => setAskStageAll(false) },
+          ]} />
+      )}
+      {commitError && (
+        <AttachDialog kind="warning" testId="scm-commit-error" message={CHANGES_STRINGS.commitFailed} detail={commitError}
+          onCancel={() => setCommitError(null)}
+          buttons={[{ id: 'close', label: CHANGES_STRINGS.close, primary: true, onSelect: () => setCommitError(null) }]} />
+      )}
     </div>
   );
 }
