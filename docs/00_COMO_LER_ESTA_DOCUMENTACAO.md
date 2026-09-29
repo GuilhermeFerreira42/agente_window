@@ -9,6 +9,8 @@ A regra geral é simples:
 - o conteúdo histórico já relevante foi absorvido nesta camada canônica;
 - a antiga linha `docs-1/` foi absorvida nesta consolidação e não é mais uma pasta operacional.
 
+> **2026-09-29:** o ponto de entrada rápido passou a ser **`00_COMECE_AQUI.md`** (estado, intocáveis, lixo, testes, regras — 1 página). Novos docs canônicos: `24` (plano FATIA-05), `25` (estado e pendências), `26` (suíte E2E e ambiente), `27` (regras de trabalho com IA), `28` (inventário de obsoletos). **`legacy/` foi removida do repositório em 2026-09-29** — menções a ela neste e em outros docs (01, 03, 03A, 05) são históricas; não restaurar.
+
 ## Ordem obrigatória de leitura
 Para qualquer pessoa ou IA que vá atuar no projeto, a leitura obrigatória é:
 
@@ -34,7 +36,7 @@ Para qualquer pessoa ou IA que vá atuar no projeto, a leitura obrigatória é:
 Depois da camada canônica acima, a consulta detalhada deve seguir esta ordem:
 
 1. `docs/engenharia_reversa/*`
-2. código atual do repositório em `platform/` e `legacy/`
+2. código atual do repositório em `platform/` (`legacy/` removida em 2026-09-29 — ver `docs/28 §1`)
 3. código atual do repositório e `docs/engenharia_reversa/*` como evidência operacional
 4. `code-server-main` apenas para esclarecer comportamento ou arquitetura de referência
 

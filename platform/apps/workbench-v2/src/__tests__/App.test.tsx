@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 
+// FATIA-05 5.1 c1: a Activity Bar (à direita) também expõe `role="tab"` com nome "Search (Ctrl+Shift+F)",
+// como no VS Code. As asserções sobre a ABA DO EDITOR ficam escopadas ao tablist do editor (só seletor).
+const editorTab = (name: string | RegExp) => within(document.querySelector('.editor-tabs') as HTMLElement).getByRole('tab', { name })
+
 // O layout é persistido em localStorage (visibilidade global + estado por
 // sessão). Cada teste começa com um estado limpo para não herdar layout de
 // outro — importante agora que a visibilidade da barra auxiliar é por sessão.
@@ -575,17 +579,17 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
     expect(screen.getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('button', { name: 'Abrir busca no editor' }))
-    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true')
+    expect(editorTab('Search')).toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('tab', { name: 'Branch Changes' }))
     expect(screen.getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
 
     await user.click(sessionRow('Revisar alterações do workbench'))
     expect(screen.queryByRole('tab', { name: 'Branch Changes' })).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true')
+    expect(editorTab('Search')).toHaveAttribute('aria-selected', 'true')
 
     await user.click(sessionRow('Replicar a Janela de Agentes'))
     expect(screen.getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Search' })).toBeInTheDocument()
+    expect(editorTab('Search')).toBeInTheDocument()
   })
 
   it('preserva Browser por sessão e remove todos os browsers ao arquivar ou excluir', async () => { 
@@ -648,7 +652,7 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir busca no editor' }))
     const searchInput = screen.getByRole('textbox', { name: 'Pesquisar no workspace' })
     expect(searchInput).toHaveFocus()
-    expect(screen.getByRole('tab', { name: /Search/ })).toHaveAttribute('aria-selected', 'true')
+    expect(editorTab(/Search/)).toHaveAttribute('aria-selected', 'true')
     expect(document.querySelector('.auxiliary-bar .search-view')).toBeNull()
     expect(screen.getByText('1 resultado')).toBeInTheDocument()
     expect(document.querySelector('.search-result-line mark')).toHaveTextContent('menubar')
@@ -686,7 +690,7 @@ describe('App session flows', () => {
     await user.click(browserTab)
     expect(screen.getByRole('textbox', { name: 'Endereço' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: /Search/ }))
+    await user.click(editorTab(/Search/))
     expect(screen.getByRole('textbox', { name: 'Pesquisar no workspace' })).toHaveValue('menubar')
   })
 
@@ -1067,7 +1071,7 @@ describe('App session flows', () => {
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true })
     expect(screen.getByRole('textbox', { name: 'Pesquisar no workspace' })).toHaveFocus()
-    expect(screen.getByRole('tab', { name: /Search/ })).toHaveAttribute('aria-selected', 'true')
+    expect(editorTab(/Search/)).toHaveAttribute('aria-selected', 'true')
   })
 
   it('alterna sidebar, terminal e barra auxiliar pela titlebar', async () => {

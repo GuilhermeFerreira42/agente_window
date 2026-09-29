@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // FATIA-04 (4.4): módulo explorer-search via Barrel único — App NUNCA importa
 // caminhos internos do módulo (fronteira LEGO, FT).
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
+// FATIA-05 5.1 c1 — chassi (docs/24): Activity Bar à direita; views vêm do viewRegistry.
+import { ActivityBar } from './shell/activityBar'
+import { SideBar } from './shell/sideBar'
+import { useLayoutState } from './shell/layoutState'
+import { viewsFor } from './shell/viewRegistry'
 import { createShellCommandRegistry } from './domain/shellCommandRegistry'
 import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './components/ExplorerContextMenuHost'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
@@ -186,6 +191,9 @@ export default function App() {
   const [partSizesBySession, setPartSizesBySession] = useState<Record<string, number[]>>(persistedLayout.current.partSizesBySession)
 
   const [auxiliaryTab, setAuxiliaryTab] = useState<'changes' | 'files'>('changes')
+  // FATIA-05 5.1 c2 — estado do chassi (view ativa, Side Bar visível/largura) persistido em workbench.layoutState.v1.
+  const layout = useLayoutState()
+  const rightViews = viewsFor('right')
   // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
   // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
   const [explorerModule, setExplorerModule] = useState<IExplorerSearchModule | null>(null)
@@ -2008,6 +2016,23 @@ export default function App() {
               onClose={() => setTerminalVisible(false)}
             />
           </div>
+          {/* FATIA-05 5.1 (docs/24 D1): chassi à DIREITA, depois de .right-section — [centro][AttachArea][Side Bar][Activity Bar]. Desktop only. */}
+          {!isSinglePane && !customViewActive && (
+            <>
+              <SideBar
+                side="right"
+                views={rightViews}
+                activeViewId={layout.state.activeView}
+                visible={layout.state.sideBarVisible}
+                width={layout.state.sideBarWidth}
+                onWidthChange={layout.setSideBarWidth}
+                onResetWidth={layout.resetSideBarWidth}
+                onClose={() => layout.setSideBarVisible(false)}
+                onToggle={layout.toggleSideBar}
+              />
+              <ActivityBar side="right" views={rightViews} activeViewId={layout.state.activeView} sideBarVisible={layout.state.sideBarVisible} onSelect={layout.selectView} />
+            </>
+          )}
         </div>
       </div>
       {toast && <div className="toast" role="status"><Info size={14} /><span>{toast}</span><button type="button" aria-label="Fechar aviso" title="Fechar aviso" onClick={() => setToast(undefined)}><X size={13} /></button></div>}

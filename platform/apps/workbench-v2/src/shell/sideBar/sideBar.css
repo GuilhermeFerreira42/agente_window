@@ -1,0 +1,90 @@
+/* FATIA-05 5.1 c2 — Side Bar. Régua: 05_01 §2 e §4 (direita). Só tokens --vscode-* (D20).
+ * Sem transição de largura/opacidade (RF-11: abre < 50 ms). */
+
+.part.sidebar {
+  flex: 0 0 auto;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  box-sizing: border-box;
+  flex-direction: column;
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-sideBar-foreground);
+  transition: none;
+}
+.part.sidebar.left { border-right: 1px solid var(--vscode-sideBar-border); }
+.part.sidebar.right { border-left: 1px solid var(--vscode-sideBar-border); }
+
+/* título da composite: 35 px, h2 11 px uppercase peso 400, padding-left 8 */
+.part.sidebar > .composite-title {
+  flex: 0 0 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  padding-right: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--vscode-sideBarTitle-foreground, var(--vscode-sideBar-foreground));
+}
+.part.sidebar > .composite-title .title-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.part.sidebar > .composite-title h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 35px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.part.sidebar > .composite-title .title-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.part.sidebar > .content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-bar-view-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* sash: 4 px, centrado na fronteira editor/Side Bar (05_01 §2: x = SideBar.x − 2) */
+.side-bar-sash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 35;
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+  background: transparent;
+  transition: background-color 0.1s ease-out;
+}
+.side-bar-sash.right { left: -2px; }
+.side-bar-sash.left { right: -2px; }
+.side-bar-sash:hover,
+.side-bar-sash.active,
+.side-bar-sash:focus-visible {
+  background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+}
+.side-bar-sash:hover { transition-delay: 0.3s; }
+.side-bar-sash.active { transition-delay: 0s; }

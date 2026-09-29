@@ -25,6 +25,15 @@
   --vscode-sideBar-foreground: #cccccc;
   --vscode-sideBar-border: #2b2b2b;
   --vscode-sideBarSectionHeader-background: #1f1f1f;
+  /* FATIA-05 5.1 (aditivo): Activity Bar — valores do tema Dark Modern (theme-defaults/dark_modern.json) */
+  --vscode-activityBar-background: #181818;
+  --vscode-activityBar-foreground: #d7d7d7;
+  --vscode-activityBar-inactiveForeground: #868686;
+  --vscode-activityBar-border: #2b2b2b;
+  --vscode-activityBar-activeBorder: #0078d4;
+  --vscode-activityBarBadge-background: #0078d4;
+  --vscode-activityBarBadge-foreground: #ffffff;
+  --vscode-sideBarTitle-foreground: #cccccc;
   --vscode-sideBarSectionHeader-foreground: #cccccc;
   --vscode-sideBarSectionHeader-border: #2b2b2b;
   --vscode-panel-background: #181818;
@@ -244,6 +253,15 @@
   --vscode-sideBar-foreground: #3b3b3b;
   --vscode-sideBar-border: #e5e5e5;
   --vscode-sideBarSectionHeader-background: #f3f3f3;
+  /* FATIA-05 5.1 (aditivo): Activity Bar — valores do tema Light Modern (theme-defaults/light_modern.json) */
+  --vscode-activityBar-background: #f8f8f8;
+  --vscode-activityBar-foreground: #1f1f1f;
+  --vscode-activityBar-inactiveForeground: #616161;
+  --vscode-activityBar-border: #e5e5e5;
+  --vscode-activityBar-activeBorder: #005fb8;
+  --vscode-activityBarBadge-background: #005fb8;
+  --vscode-activityBarBadge-foreground: #ffffff;
+  --vscode-sideBarTitle-foreground: #3b3b3b;
   --vscode-sideBarSectionHeader-foreground: #3b3b3b;
   --vscode-sideBarSectionHeader-border: #e5e5e5;
   --vscode-panel-background: #f8f8f8;

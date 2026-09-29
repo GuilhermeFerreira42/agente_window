@@ -1,0 +1,562 @@
+{
+ "theme": {
+  "body": "",
+  "workbench": "monaco-enable-motion monaco-workbench linux web chromium nopanel fullscreen panel-position-bottom panel-alignment-center file-icons-enabled vs vscode-theme-defaults-themes-2026-light-json"
+ },
+ "activityBar": {
+  "part": {
+   "x": 0,
+   "y": 35,
+   "w": 48,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "compositeBar": {
+   "x": 0,
+   "y": 70,
+   "w": 48,
+   "h": 240,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "items": [
+   {
+    "label": "Explorer (Ctrl+Shift+E)",
+    "y": 70,
+    "w": 48,
+    "h": 48,
+    "iconFont": "24px",
+    "padding": "3px",
+    "color": "rgb(32, 32, 32)",
+    "checked": true,
+    "ariaSelected": "true",
+    "indL": "2px",
+    "indR": "0px",
+    "indColor": "rgb(0, 0, 0)"
+   },
+   {
+    "label": "Search (Ctrl+Shift+F)",
+    "y": 118,
+    "w": 48,
+    "h": 48,
+    "iconFont": "24px",
+    "padding": "3px",
+    "color": "rgb(96, 96, 96)",
+    "checked": false,
+    "ariaSelected": "false",
+    "indL": "0px",
+    "indR": "0px",
+    "indColor": "rgb(32, 32, 32)"
+   },
+   {
+    "label": "Source Control (Ctrl+Shift+G)",
+    "y": 166,
+    "w": 48,
+    "h": 48,
+    "iconFont": "24px",
+    "padding": "3px",
+    "color": "rgb(96, 96, 96)",
+    "checked": false,
+    "ariaSelected": "false",
+    "indL": "0px",
+    "indR": "0px",
+    "indColor": "rgb(32, 32, 32)"
+   },
+   {
+    "label": "Run and Debug (Ctrl+Shift+D)",
+    "y": 214,
+    "w": 48,
+    "h": 48,
+    "iconFont": "24px",
+    "padding": "3px",
+    "color": "rgb(96, 96, 96)",
+    "checked": false,
+    "ariaSelected": "false",
+    "indL": "0px",
+    "indR": "0px",
+    "indColor": "rgb(32, 32, 32)"
+   },
+   {
+    "label": "Extensions (Ctrl+Shift+X)",
+    "y": 262,
+    "w": 48,
+    "h": 48,
+    "iconFont": "24px",
+    "padding": "3px",
+    "color": "rgb(96, 96, 96)",
+    "checked": false,
+    "ariaSelected": "false",
+    "indL": "0px",
+    "indR": "0px",
+    "indColor": "rgb(32, 32, 32)"
+   }
+  ],
+  "globalItems": [],
+  "borderBefore": {
+   "border-right-width": "1px",
+   "border-right-color": "rgb(240, 241, 242)",
+   "border-right-style": "solid"
+  },
+  "hoverColor": "rgb(32, 32, 32)",
+  "inactiveColor": "rgb(96, 96, 96)",
+  "activeColor": "rgb(32, 32, 32)",
+  "focus": {
+   "outline": {
+    "outline-color": "rgb(32, 32, 32)",
+    "outline-width": "0px",
+    "outline-style": "none"
+   },
+   "indicator": {
+    "border-left-width": "2px",
+    "border-left-color": "rgb(0, 105, 204)"
+   }
+  }
+ },
+ "sideBar": {
+  "part": {
+   "x": 48,
+   "y": 35,
+   "w": 300,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "title": {
+   "x": 48,
+   "y": 35,
+   "w": 299,
+   "h": 35,
+   "display": "flex",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "titleH2": {
+   "font-size": "11px",
+   "font-weight": "400",
+   "text-transform": "uppercase",
+   "line-height": "35px",
+   "color": "rgb(32, 32, 32)"
+  },
+  "titleLabel": {
+   "x": 56,
+   "y": 35,
+   "w": 69.75,
+   "h": 35,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "titleActions": [
+   {
+    "label": "Views and More Actions...",
+    "w": 22,
+    "h": 22,
+    "font": "16px",
+    "color": "rgb(96, 96, 96)",
+    "marginRight": "4px"
+   }
+  ],
+  "bg": {
+   "background-color": "rgb(250, 250, 253)"
+  },
+  "border": {
+   "border-right-width": "1px",
+   "border-right-color": "rgb(240, 241, 242)"
+  },
+  "paneHeaders": [
+   {
+    "title": "agente_window",
+    "h": 22,
+    "fs": "11px",
+    "fw": "700",
+    "tt": "uppercase",
+    "expanded": "true",
+    "bg": "rgb(250, 250, 253)"
+   },
+   {
+    "title": "Outline",
+    "h": 22,
+    "fs": "11px",
+    "fw": "700",
+    "tt": "uppercase",
+    "expanded": "false",
+    "bg": "rgb(250, 250, 253)"
+   },
+   {
+    "title": "Timeline",
+    "h": 22,
+    "fs": "11px",
+    "fw": "700",
+    "tt": "uppercase",
+    "expanded": "false",
+    "bg": "rgb(250, 250, 253)"
+   }
+  ],
+  "defaultWidth": 300,
+  "minWidthObserved": 0,
+  "maxWidthObserved": 1012,
+  "widthBeforeDbl": 352,
+  "widthAfterDblclickSash": 300
+ },
+ "sash": {
+  "x": 348,
+  "y": 335,
+  "w": 4,
+  "cursor": "ew-resize",
+  "cls": "monaco-sash vertical primary-sidebar-sash",
+  "beforeBg": "rgba(0, 0, 0, 0)",
+  "beforeW": "4px",
+  "transition": "background-color 0.1s ease-out",
+  "sashSizeVar": "4px",
+  "hoverSizeVar": "4px"
+ },
+ "sashHover": {
+  "x": 348,
+  "y": 335,
+  "w": 4,
+  "cursor": "ew-resize",
+  "cls": "monaco-sash vertical primary-sidebar-sash hover",
+  "beforeBg": "rgb(0, 105, 204)",
+  "beforeW": "4px",
+  "transition": "background-color 0.1s ease-out",
+  "sashSizeVar": "4px",
+  "hoverSizeVar": "4px"
+ },
+ "editorAtMax": {
+  "x": 1060,
+  "y": 35,
+  "w": 220,
+  "h": 743,
+  "display": "block",
+  "bg": "rgba(0, 0, 0, 0)"
+ },
+ "closed": {
+  "sideBar": {
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "activityBar": {
+   "x": 0,
+   "y": 61,
+   "w": 48,
+   "h": 717,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "editor": {
+   "x": 48,
+   "y": 61,
+   "w": 1232,
+   "h": 717,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "items": [
+   {
+    "checked": false,
+    "sel": "false",
+    "exp": "false",
+    "ind": "2px"
+   },
+   {
+    "checked": false,
+    "sel": "false",
+    "exp": "false",
+    "ind": "0px"
+   },
+   {
+    "checked": false,
+    "sel": "false",
+    "exp": "false",
+    "ind": "0px"
+   }
+  ]
+ },
+ "reopened": {
+  "sideBar": {
+   "x": 48,
+   "y": 61,
+   "w": 300,
+   "h": 717,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "items": [
+   {
+    "checked": true,
+    "exp": "true"
+   },
+   {
+    "checked": false,
+    "exp": "false"
+   },
+   {
+    "checked": false,
+    "exp": "false"
+   }
+  ]
+ },
+ "ctrlB_close": {
+  "x": 0,
+  "y": 0,
+  "w": 0,
+  "h": 0,
+  "display": "block",
+  "bg": "rgb(250, 250, 253)"
+ },
+ "ctrlB_open": {
+  "x": 48,
+  "y": 61,
+  "w": 300,
+  "h": 717,
+  "display": "block",
+  "bg": "rgb(250, 250, 253)"
+ },
+ "searchView": {
+  "title": "Search",
+  "input": {
+   "x": 68,
+   "y": 102,
+   "w": 267,
+   "h": 26,
+   "display": "block",
+   "bg": "rgb(255, 255, 255)"
+  },
+  "sideBarW": 300
+ },
+ "scmView": {
+  "title": "Source Control",
+  "welcome": "None of the registered source control providers work in Restricted Mode.Manage Workspace Trust"
+ },
+ "panelOpen": {
+  "panel": {
+   "x": 348,
+   "y": 511.328125,
+   "w": 932,
+   "h": 266.65625,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "sideBar": {
+   "x": 48,
+   "y": 61,
+   "w": 300,
+   "h": 717,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "editor": {
+   "x": 348,
+   "y": 61,
+   "w": 932,
+   "h": 450.328125,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "activityBar": {
+   "x": 0,
+   "y": 61,
+   "w": 48,
+   "h": 717,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "title": {
+   "x": 348,
+   "y": 511.328125,
+   "w": 932,
+   "h": 35,
+   "display": "flex",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "tabs": [
+   {
+    "label": "Problems",
+    "w": 84.046875,
+    "h": 35,
+    "fs": "11px",
+    "tt": "uppercase",
+    "checked": false
+   },
+   {
+    "label": "Output",
+    "w": 68.84375,
+    "h": 35,
+    "fs": "11px",
+    "tt": "uppercase",
+    "checked": false
+   },
+   {
+    "label": "Debug Console",
+    "w": 120.328125,
+    "h": 35,
+    "fs": "11px",
+    "tt": "uppercase",
+    "checked": false
+   },
+   {
+    "label": "Terminal",
+    "w": 79.9375,
+    "h": 35,
+    "fs": "11px",
+    "tt": "uppercase",
+    "checked": true
+   },
+   {
+    "label": "Ports",
+    "w": 59.84375,
+    "h": 35,
+    "fs": "11px",
+    "tt": "uppercase",
+    "checked": false
+   }
+  ],
+  "border": {
+   "border-top-width": "0px",
+   "border-top-color": "rgb(32, 32, 32)"
+  }
+ },
+ "panelMax": {
+  "panel": {
+   "x": 348,
+   "y": 511.328125,
+   "w": 932,
+   "h": 266.65625,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "sideBar": {
+   "x": 48,
+   "y": 35,
+   "w": 300,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "editor": {
+   "x": 348,
+   "y": 35,
+   "w": 932,
+   "h": 476.328125,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "activityBar": {
+   "x": 0,
+   "y": 35,
+   "w": 48,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "statusbar": {
+   "x": 0,
+   "y": 778,
+   "w": 1280,
+   "h": 22,
+   "display": "flex",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "cls": "panel-position-bottom panel-alignment-center"
+ },
+ "editorMax": {
+  "sideBar": {
+   "x": 48,
+   "y": 35,
+   "w": 300,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "panel": {
+   "x": 348,
+   "y": 511,
+   "w": 932,
+   "h": 267,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "activityBar": {
+   "x": 0,
+   "y": 35,
+   "w": 48,
+   "h": 743,
+   "display": "block",
+   "bg": "rgb(250, 250, 253)"
+  },
+  "editor": {
+   "x": 348,
+   "y": 35,
+   "w": 932,
+   "h": 476,
+   "display": "block",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  "cls": "panel-position-bottom panel-alignment-center"
+ },
+ "statusbar": {
+  "x": 0,
+  "y": 778,
+  "w": 1280,
+  "h": 22,
+  "display": "flex",
+  "bg": "rgb(250, 250, 253)"
+ },
+ "titlebar": {
+  "x": 0,
+  "y": 0,
+  "w": 1280,
+  "h": 35,
+  "display": "flex",
+  "bg": "rgb(250, 250, 253)"
+ },
+ "layoutControls": [
+  "Go Back (Ctrl+Alt+-)",
+  "Go Forward (Ctrl+Shift+-)",
+  "Toggle Chat",
+  "Customize Layout...",
+  "Toggle Primary Side Bar (Ctrl+B)",
+  "Toggle Panel (Ctrl+J)",
+  "Toggle Secondary Side Bar (Ctrl+Alt+B)"
+ ],
+ "badgeRule": {
+  "top": "24px",
+  "right": "8px",
+  "fontSize": "9px",
+  "height": "16px",
+  "lineHeight": "16px",
+  "minWidth": "8px",
+  "padding": "0px 4px",
+  "borderRadius": "20px",
+  "bg": "rgba(0, 0, 0, 0)",
+  "color": "rgb(32, 32, 32)"
+ },
+ "activityBarContextMenu": [
+  "Configure Keybinding",
+  "Hide 'Search'",
+  "Hide Badge",
+  "Move To",
+  "Menu",
+  "Explorer",
+  "Search",
+  "Source Control",
+  "Run and Debug",
+  "Extensions",
+  "Accounts",
+  "Activity Bar Position",
+  "Activity Bar Size",
+  "Move Primary Side Bar Right"
+ ],
+ "sideBarTitleContextMenu": [
+  "Open Editors",
+  "Folders",
+  "Outline",
+  "Timeline",
+  "Activity Bar Position",
+  "Move Primary Side Bar Right",
+  "Hide Primary Side Bar"
+ ]
+}

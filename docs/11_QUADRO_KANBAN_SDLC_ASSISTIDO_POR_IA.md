@@ -37,6 +37,8 @@ Atualizado para acompanhamento completo por fatias — AGENTE WINDOW
 | 2026-09-11 | 2026-09-27 | FATIA-04: **4.7-b Aba Changes (Git real) HOMOLOGADA NO WINDOWS** (c1–c3.2, HEAD `6c91289`): backend `/git/*` real, Source Control View no anexo, Stage/Unstage/Discard com diálogos oficiais, entrada pelo header do Explorer, maquete "Changes N" do shell escondida (Transição Temporária, `src/shell/gitTransition.ts`). Pendentes: c4 input de commit, c5 placar. **Aguardando diretriz do usuário** (4.7-c Diff · 4.8 Browser · UX). | Agente (loop fechado) | main + commits locais até `6c91289` |
 | 2026-09-11 | 2026-09-28 | FATIA-04: **4.7-c Diff mínimo HOMOLOGADA NO WINDOWS (Vídeo 6)** — c1 `9b8d26f` DiffPane read-only · c2 `0b7b7b1` clique Changes → diff + `/git/show` + badge/tooltip + fix sessionId · c3 docs. **4.7 (Editor Anexo + Git + Diff) = CONCLUÍDA.** vitest 382 · `sessao_14c` 6/6. | Agente (loop fechado) | main + commits locais até `0b7b7b1` |
 | 2026-09-11 | 2026-09-28 | FATIA-04: **4.7-c4 Input de Commit HOMOLOGADO NO WINDOWS** (`2d1b126`): `.scm-input` + botão ✓ Commit, Ctrl+Enter, validação vazia, diálogo stage-all [Yes][Cancel], diálogo de erro; spec `sessao_14d` 5/5; regressão total verde. **SUB-FATIA 4.7 ✅ CONCLUÍDA (Motor Git fechado).** Aguarda decisão: FATIA-05 Layout ou 4.8 UI do Browser. | Agente (loop fechado) | main + commits locais até `2d1b126` |
+| 2026-09-29 | 2026-09-29 | FATIA-05 5.1: **c1 activity-bar ✅ commitado** (`3fcc913`; §9 12/12, typecheck 0, vitest 708/717). **c2 side-bar implementado, não commitado** — bloqueado por decisão P1 (T14 sessão 14 × Side Bar, `docs/25 §3`). Auditoria externa incorporada (`05_02`); docs de handoff 00_COMECE_AQUI/25/26/27/28 criados; `legacy/` a remover. | Agente (5.1) | `0e36af4` + working tree |
+| 2026-09-29 | 2026-09-29 | FATIA-05 **Chassis-Right**: Gate 0 ✅ (raspagem 8080 com Side Bar à direita, auditoria de `src/`, confronto doc×código); plano `docs/24` corrigido para v1.1 (sash 4 px, largura pela régua, `flex/none`); aprovado pelo usuário. **Zero código.** Próximo: Passo 3 (carimbo) → 4 (spec 15) → 5 (c1–c3 da 5.1). | Agente (Gate 0) | `2eab62b` (sem commit) |
 
 ---
 
@@ -178,21 +180,28 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 ---
 
-### FATIA-05 — Consolidação e Layout Byte a Byte (NOVA — decisão estratégica 2026-09-27 "Motor vs. Layout")
-**Onda:** 6 (integração de views) | **Épico:** D2/F — Layout global | **Prioridade:** P0 após o c4 da 4.7 | **Status:** Planejado | **Depende de:** FATIA-04 (motores prontos: Explorer, Search, Git/Changes, Diff, Editor Anexo) | **Doc:** `docs/12` entrada "2026-09-27 — Decisão Estratégica: Separação Motor vs. Layout"; débitos D2.40, D2.41 (+ D2.29/D2.38 e itens "Fora de escopo da 4.7") em `docs/05`
+### FATIA-05 — Chassis-Right (plano `docs/24` v1.1; Gate 0 ✅ 2026-09-29)
+**Status 2026-09-29 (tarde):** **c1 `feat(activity-bar)` ✅ commitado (`3fcc913`) · c2 `feat(side-bar)` implementado em working tree, BLOQUEADO pela pendência P1 (T14 × Side Bar — `docs/25 §3`) · c3 não iniciado.** Estado detalhado e sequência de retomada: **`docs/25`**. (Status anterior:) Gate 0 ✅ concluído e aprovado. Próximo passo: "atualizar plano ✅ + reescrever spec 15 + começar c1" (Passos 3→5 do `docs/24 §1`, um por vez). Evidências: `docs/engenharia_reversa/FATIA-05_LAYOUT/05_00`, `05_01`, `raspagem_05_01/`. Decisões travadas: direita · inglês só no novo · sash 4 px · largura pela régua (170 / `min(300, largura/4)` / largura−220 / snap-to-close) · `display: flex/none` · 3 commits na 5.1 · parar após o c3. O bloco abaixo (plano "Byte a Byte") é **histórico** — vale o `docs/24`.
 
-**Objetivo:** reposicionar os componentes já prontos (o "Motor") no **chassi exato do VS Code** — Activity Bar + Side Bar reais — **sem retrabalho de lógica, só fiação (wiring) de UI**. Search e Source Control ("Changer") deixam de viver no anexo/coluna Files e passam a ter **ícone na Activity Bar + view na Side Bar independente**, permitindo **visualização simultânea** (abrir um arquivo NÃO fecha mais o Search nem o Changes).
+**Onda:** 5 | **Épico:** D2/F — Layout global | **Prioridade:** P0 (frente vigente) | **Status:** Planejada — docs prontos; **código da 5.1 aguarda autorização explícita** | **Depende de:** FATIA-04 ✅ (Motor 100 %: Explorer, Search, Source Control com Commit, Diff, Editor Anexo) | **Doc:** `docs/engenharia_reversa/FATIA-05_LAYOUT_BYTE_A_BYTE/` (`05_00`…`05_06`); débitos D2.40–D2.48 em `docs/05`
 
-| # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
-|---|---|---|---|---|---|
-| 5.1 | Activity Bar real (ícones Explorer / Search / Source Control / … com badges) + Side Bar independente com container de views (D2.40) | módulo de layout novo + slots mínimos no shell (exceções a autorizar) | contratos congelados intocados; novos slots aditivos | prints lado a lado vs 8080 (activitybar 48 px, sidebar) | Planejado |
-| 5.2 | Mover **Search** (motor 4.6) para a Side Bar — view simultânea ao editor | `ui/search/*` (só montagem), slot | `ISearchApi` intocado | `sessao_13_search` 14/14 continua verde + E2E simultaneidade | Planejado |
-| 5.3 | Mover **Source Control/Changes + Diff** (motores 4.7-b/4.7-c) para a Side Bar; remover Transição Temporária (D2.38) e maquete | `ui/attach/changes/*`, `ui/attach/diff/*` (só montagem), `src/shell/gitTransition.ts` (remoção) | `IEditorAttachApi` intocado | `sessao_14b_*`, `sessao_14c` verdes + E2E simultaneidade | Planejado |
-| 5.4 | **Drag & Drop de views** entre containers (Explorer/Search/Changes) e reordenação de seções | módulo de layout | — | E2E DnD (dispatchEvent com DataTransfer) | Planejado |
-| 5.5 | **Timeline e Outline** views reais (D2.41) | módulo de layout + views novas | — | prints vs 8080 | Planejado |
-| 5.6 | Polish visual avançado (animações, menus de contexto avançados) — reclassificado da 4.9 | — | — | prints vs 8080 | Planejado |
+**Objetivo:** remontar os motores da FATIA-04 no **chassi exato do VS Code (perfil agentsWindow)**: Activity Bar 48 px → Side Bar (Explorer / Search / Source Control, uma por vez, estado preservado) → Editor Group central (arquivos e diffs) → Panel inferior (Terminal homologado). **Só wiring de UI; zero lógica nova em `core/**`/`server/**`.** Dor resolvida: Search e Source Control deixam de sumir quando um arquivo abre.
 
-**Critério de pronto FATIA-05:** Search e Changes abertos ao mesmo tempo que um arquivo no editor (prova E2E); Activity Bar/Side Bar com medidas do 8080; zero regressão nas specs 12/13/14/14b/14c/terminal; nenhuma lógica de `core/**` ou `server/**` alterada (só wiring).
+| # | Sub-fatia | Arquivos-alvo | Validação | Status |
+|---|---|---|---|---|
+| 5.1 | **Auditoria de Layout + Slots** — `<ActivityBar>` (3 ícones + badges), `<SideBar>` (título 35, sash min 170), `<EditorGroup>` central vazio, `viewRegistry` + `layoutState` (persistência). 3 commits: c1 activity-bar · c2 side-bar · c3 view-registry | `src/components/{ActivityBar,SideBar,EditorGroup}.tsx`, `src/core/{viewRegistry,layoutState}.ts`, `App.tsx` (ponto único) | `sessao_15_activity_bar` 5/5 (falhando antes) · vitest ≥ 382 · anti-regressão completa · prints `auditoria_15/` | 🔜 **Próxima (aguarda autorização)** |
+| 5.2 | **Search → Side Bar** (mesmo `SearchPanel`; não fecha ao abrir arquivo; contagem — ver A0.5) | `ui/search/*` montagem, `index.ts`/`contract.ts` aditivos | `sessao_15_search_migration` 8/8 · `13_search` 14/14 + 6/6 | Planejada |
+| 5.3 | **Source Control → Side Bar + Diff no Editor Group** (badge = count; remover `gitTransition.ts` + maquete D2.38) | `ui/attach/{changes,diff}/*` montagem, `index.ts` aditivo, `EditorGroup.tsx`, `App.tsx` ponto único | `sessao_15_source_control_migration` 10/10 · 14b 11 · 14b_backend 7 · 14c 6 · 14d 5 | Planejada |
+| 5.4 | **Configurabilidade de posições** (Activity Bar / Panel + localStorage) — ⚠️ **DECISÃO ABERTA A0.1:** no perfil agentsWindow real essas posições são readOnly | `src/core/layoutPreferences.ts`, `ActivityBar.tsx`, `Panel.tsx` | `sessao_15_layout_configurable` 6/6 | Planejada (condicionada) |
+| 5.5 | **Drag & Drop de views** Side Bar ↔ Panel + reordenação + persistência | `viewRegistry.ts`, `SideBar.tsx`, `Panel.tsx` | `sessao_15_drag_drop_views` 5/5 | Planejada |
+| 5.6 | **Timeline e Outline** (D2.41) — ⚠️ A0.6 localização (Panel pedido vs seções do Explorer no real); precisa `POST /git/log` aditivo | `TimelineView.tsx`, `OutlineView.tsx`, `Panel.tsx` | `sessao_15_timeline_outline` 4/4 | Planejada |
+| 5.7 | **Polish visual** (hover, feedback DnD, tokens) — ⚠️ A0.5 animação 200 ms não existe no real | `ActivityBar.tsx`, `SideBar.tsx`, CSS | `sessao_15_polish` 3/3 | Planejada |
+
+**Ordem obrigatória:** 4.7 ✅ → **5.1 🔜** → 5.2 → 5.3 → 5.4 → 5.5 → 5.6 → 5.7 (cada uma só começa com a anterior homologada no Windows). **Fora de escopo:** 4.8 Browser (D2.39), smart commit/Always (D2.35), stage por linha, push/pull (D2.30), multi-root.
+
+**Critério de pronto FATIA-05 (DoD):** 5.1–5.7 homologadas · typecheck 0 · vitest ≥ 382 · E2E 15.x verdes · anti-regressão 14d/14c/14b/14b_backend/14/12/fs_backend/13/terminal · prints `auditoria_15/` · docs 11/12/05/16 + pasta FATIA-05 · zero alteração em `modules/explorer-search/{core,server}/**`.
+
+**Decisões abertas antes do código (05_05 §0):** A0.1 posições fixas no agentsWindow · A0.2 `index.ts`/`contract.ts` aditivos · A0.3 quando o Explorer migra · A0.4 `EditorGroup` novo ao lado do `EditorArea` intocável · A0.5 badge Search/animação · A0.6 Timeline/Outline no Panel ou no Explorer.
 
 ### FATIA-06 — Chat + Runtime de Agente
 **Onda:** 6 | **Épico:** E — Chat | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01,02,03
@@ -328,8 +337,8 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 01 | Fundação raiz única + contratos | Concluído | Etapa histórica consolidada |
 | 02 | Workbench Shell base | Concluído | Base estável |
 | 03 | Terminal PTY real | Em revisão comitê — 85% fiel, 03.1 a 03.10 concluídas | Aguardando decisão comitê: Opção A/B/C + nível aceite 85% vs 100% |
-| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.6 ✅ e **SUB-FATIA 4.7 ✅ CONCLUÍDA (a/b/c/c4, homologada Windows 2026-09-28, `2d1b126`)** — Explorer/Search/Git/Diff/Commit 100 % funcionais; Motor Git fechado | Próximo: **decisão do usuário — FATIA-05 Layout Byte a Byte ou 4.8 UI do Simple Browser**; placar final em `04_21 §6`. Medidas em `04_17`, plano em `04_18`, aceite em `04_13`, estado real em `docs/12` 2026-09-24 |
-| 05 | **Consolidação e Layout Byte a Byte** (Activity Bar + Side Bar reais; Search/Changes simultâneos; DnD de views; Timeline/Outline; polish) | Planejado (NOVA, 2026-09-27) | Depende do fechamento do Motor Git (4.7-c4) |
+| 04 | Explorer Completo + Editor em anexo + Browser com IA (9 sub-fatias) | Em execução — 4.1–4.6 ✅ e **SUB-FATIA 4.7 ✅ CONCLUÍDA (a/b/c/c4, homologada Windows 2026-09-28, `2d1b126`)** — Explorer/Search/Git/Diff/Commit 100 % funcionais; Motor Git fechado | **FATIA-04 CONCLUÍDA (Motor).** Próxima frente = **FATIA-05** (decidida em 2026-09-28); 4.8 UI do Browser fica após a FATIA-05; placar final em `04_21 §6`. Medidas em `04_17`, plano em `04_18`, aceite em `04_13`, estado real em `docs/12` 2026-09-24 |
+| 05 | **Chassis-Right** (`docs/24` v1.1: 5.1 chassi+Explorer · 5.2 Search · 5.3 SCM (remove maquete) · 5.4 Activity Bar movível · 5.5 DnD · 5.6 Timeline/Outline · 5.7 AttachArea no centro · 5.8 Alt+Z + menu de aba) — Gate 0 em `FATIA-05_LAYOUT/` | **Frente vigente — 5.1 em execução: c1 ✅ (`3fcc913`) · c2 bloqueado (P1) · c3 pendente** | Estado exato: `docs/25`; testes/ambiente: `docs/26` |
 | 06 | Chat + Runtime de Agente | Planejado | Aguardar decisão FATIA-03 + fechamento FATIA-04/05 |
 | 07 | Editor/Browser/Search | Planejado | Aguardar FATIAS 03, 04 e 05 |
 | 08 | Command + Theme | Planejado | Aguardar FATIAS 03 a 07 |

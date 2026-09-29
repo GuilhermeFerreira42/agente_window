@@ -1,0 +1,135 @@
+/* FATIA-05 5.1 c1 — Activity Bar. Régua: 05_01 §1 e §4 (Side Bar à direita) + 04_17.
+ * Só tokens --vscode-* (D20). Fonte 'codicon' = @font-face já declarado por
+ * modules/explorer-search/ui/explorer.css (mesmo codicon.ttf do Monaco). */
+
+.part.activitybar {
+  flex: 0 0 48px;
+  width: 48px;
+  min-width: 48px;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-activityBar-background, var(--vscode-sideBar-background));
+  color: var(--vscode-activityBar-foreground, var(--vscode-icon-foreground));
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* borda de 1 px no lado voltado para o editor (::before, como no VS Code) */
+.part.activitybar.bordered::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.part.activitybar.left.bordered::before { right: 0; border-right: 1px solid var(--vscode-activityBar-border, var(--vscode-sideBar-border)); }
+.part.activitybar.right.bordered::before { left: 0; border-left: 1px solid var(--vscode-activityBar-border, var(--vscode-sideBar-border)); }
+
+.part.activitybar > .content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.part.activitybar .composite-bar { flex: 0 0 auto; }
+
+.part.activitybar .monaco-action-bar.vertical .actions-container {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* item 48×48, ícone 24 px, padding 3 px (medido) */
+.part.activitybar .action-item {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  outline: none;
+}
+
+.part.activitybar .action-item .action-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  padding: 3px;
+  margin: 0;
+  font-family: 'codicon';
+  font-size: 24px;
+  line-height: 1;
+  font-weight: normal;
+  font-style: normal;
+  text-decoration: none;
+  text-rendering: auto;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  color: var(--vscode-activityBar-inactiveForeground, var(--vscode-icon-foreground));
+  background-color: transparent;
+}
+
+/* codepoints reais do codicon.ttf (04_17 §codicons) */
+.part.activitybar .codicon-files::before { content: '\eaf0'; }
+.part.activitybar .codicon-search::before { content: '\ea6d'; }
+.part.activitybar .codicon-source-control::before { content: '\ea68'; }
+
+.part.activitybar .action-item:hover .action-label,
+.part.activitybar .action-item:focus .action-label,
+.part.activitybar .action-item.checked .action-label,
+.part.activitybar .action-item.is-active-view .action-label {
+  color: var(--vscode-activityBar-foreground, var(--vscode-icon-foreground));
+}
+
+/* indicador de ativo: ::before de 2 px na FACE EXTERNA da tirinha (left 46 px no modo direito) */
+.part.activitybar .action-item .active-item-indicator {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.part.activitybar .action-item .active-item-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  border-left: 0 solid var(--vscode-activityBar-activeBorder, var(--vscode-focusBorder));
+}
+.part.activitybar.right .action-item .active-item-indicator::before { left: 46px; }
+.part.activitybar .action-item.is-active-view .active-item-indicator::before { border-left-width: 2px; }
+.part.activitybar .action-item:focus-visible .active-item-indicator::before {
+  border-left-width: 2px;
+  border-left-color: var(--vscode-focusBorder);
+}
+
+/* badge (regra medida: top 24 / right 8 / 9 px / 16 px) — vazio em 5.1 (RF-11) */
+.part.activitybar .action-item .badge { position: absolute; inset: 0; pointer-events: none; }
+.part.activitybar .action-item .badge .badge-content {
+  position: absolute;
+  top: 24px;
+  right: 8px;
+  min-width: 8px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: var(--vscode-activityBarBadge-foreground, var(--vscode-badge-foreground));
+  background: var(--vscode-activityBarBadge-background, var(--vscode-badge-background));
+}

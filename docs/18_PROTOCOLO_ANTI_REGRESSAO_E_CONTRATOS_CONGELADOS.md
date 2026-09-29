@@ -191,6 +191,8 @@ Qualquer alteração que toque direta ou indiretamente no terminal deve respeita
 
 ## 5. Checklist Obrigatório de Homologação Anti-Regressão
 
+> **2026-09-29:** a bateria E2E automatizada obrigatória da FATIA-05 é a do `docs/24 §9` (12 suítes). O **mapa completo da suíte** (31 arquivos, quais rodam em 5174 × 5175, os 13 testes mortos do `75c6686`, receita de ambiente e becos sem saída) está em **`docs/26`**. A porta `5173` citada abaixo era a da `legacy/` (removida); hoje o shell roda na **5174**.
+
 Antes de commitar ou aprovar qualquer mudança de nova fatia (ex.: FATIA-04 Explorer), a IA ou o desenvolvedor **DEVE** validar os seguintes pontos no navegador real (`http://localhost:5173`):
 
 ### 🧪 Bateria de Testes Rápidos (5 minutos) — Atualizado FATIA-03.11:
