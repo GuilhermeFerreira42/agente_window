@@ -189,8 +189,21 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 ---
 
-### FATIA-05 — Chassis-Right (plano `docs/24` v1.1; Gate 0 ✅ 2026-09-29)
-**Status 2026-10-01:** **5.1–5.6 ✅ homologadas · 5.7 ✅ CÓDIGO CONCLUÍDO `9a11319` (aguarda homologação; 5.8 só após OK).** Anterior — **Status 2026-09-30 (noite, 4):** 5.6 ✅ CÓDIGO CONCLUÍDO `7d05c7d`. Anterior — **5.5 ✅ CÓDIGO CONCLUÍDO `1f1ed79`.** Anterior — **5.4 ✅ CÓDIGO CONCLUÍDO `7bd528b` (aguarda homologação; 5.5 só após OK).** Anterior — **5.3 ✅ CÓDIGO CONCLUÍDO `2bd6cc3` (aguarda homologação; 5.4 só após OK + decisão A0.1).** Anterior — Anterior — **5.1 ✅ CÓDIGO CONCLUÍDO — c1 `3fcc913` · c2 `fd05507` (inclui RF-09) · c3 `1e9978f`; §9 12/12 em cada commit, typecheck 0, vitest 706/9 pré-existentes/2 skipped. Aguarda homologação manual no Windows; 5.2 não iniciada.** (Anterior:) c1 commitado, c2 bloqueado por P1. Estado detalhado e sequência de retomada: **`docs/25`**. (Status anterior:) Gate 0 ✅ concluído e aprovado. Próximo passo: "atualizar plano ✅ + reescrever spec 15 + começar c1" (Passos 3→5 do `docs/24 §1`, um por vez). Evidências: `docs/engenharia_reversa/FATIA-05_LAYOUT/05_00`, `05_01`, `raspagem_05_01/`. Decisões travadas: direita · inglês só no novo · sash 4 px · largura pela régua (170 / `min(300, largura/4)` / largura−220 / snap-to-close) · `display: flex/none` · 3 commits na 5.1 · parar após o c3. O bloco abaixo (plano "Byte a Byte") é **histórico** — vale o `docs/24`.
+### FATIA-05 — Chassis-Right (plano `docs/24` v1.4; Gate 0 ✅ 2026-09-29) — ✅ **100 % HOMOLOGADA NO WINDOWS 2026-10-02**
+**Status 2026-10-02 (FECHAMENTO):** **5.1 ✅ · 5.2 ✅ · 5.3 ✅ · 5.4 ✅ · 5.5 ✅ · 5.6 ✅ · 5.7 ✅ (vídeo 08:37:34) · 5.8 ✅ (`e93031d` docs v1.3 misto · `d0c2a8d` c1 Detalhes removido · `4ee0ed8` c3 tokens) — todas homologadas em 2026-10-02 no 5174 real.** P19 fechada. Pequenos ajustes de fidelidade visual → Fatia 10 Hardening (`docs/25 §Dívidas de layout pós-MVP`). **Fatia 6 = PRÓXIMO, não iniciado.**
+
+| Card | Status | Data |
+|---|---|---|
+| 5.1 | ✅ homologada Windows | 2026-10-02 |
+| 5.2 | ✅ homologada Windows | 2026-10-02 |
+| 5.3 | ✅ homologada Windows | 2026-10-02 |
+| 5.4 | ✅ homologada Windows | 2026-10-02 |
+| 5.5 | ✅ homologada Windows | 2026-10-02 |
+| 5.6 | ✅ homologada Windows | 2026-10-02 |
+| 5.7 | ✅ homologada Windows | 2026-10-02 |
+| 5.8 | ✅ homologada Windows | 2026-10-02 |
+
+**Histórico:** **Status 2026-10-01:** **5.1–5.6 ✅ homologadas · 5.7 ✅ CÓDIGO CONCLUÍDO `9a11319` (aguarda homologação; 5.8 só após OK).** Anterior — **Status 2026-09-30 (noite, 4):** 5.6 ✅ CÓDIGO CONCLUÍDO `7d05c7d`. Anterior — **5.5 ✅ CÓDIGO CONCLUÍDO `1f1ed79`.** Anterior — **5.4 ✅ CÓDIGO CONCLUÍDO `7bd528b` (aguarda homologação; 5.5 só após OK).** Anterior — **5.3 ✅ CÓDIGO CONCLUÍDO `2bd6cc3` (aguarda homologação; 5.4 só após OK + decisão A0.1).** Anterior — Anterior — **5.1 ✅ CÓDIGO CONCLUÍDO — c1 `3fcc913` · c2 `fd05507` (inclui RF-09) · c3 `1e9978f`; §9 12/12 em cada commit, typecheck 0, vitest 706/9 pré-existentes/2 skipped. Aguarda homologação manual no Windows; 5.2 não iniciada.** (Anterior:) c1 commitado, c2 bloqueado por P1. Estado detalhado e sequência de retomada: **`docs/25`**. (Status anterior:) Gate 0 ✅ concluído e aprovado. Próximo passo: "atualizar plano ✅ + reescrever spec 15 + começar c1" (Passos 3→5 do `docs/24 §1`, um por vez). Evidências: `docs/engenharia_reversa/FATIA-05_LAYOUT/05_00`, `05_01`, `raspagem_05_01/`. Decisões travadas: direita · inglês só no novo · sash 4 px · largura pela régua (170 / `min(300, largura/4)` / largura−220 / snap-to-close) · `display: flex/none` · 3 commits na 5.1 · parar após o c3. O bloco abaixo (plano "Byte a Byte") é **histórico** — vale o `docs/24`.
 
 **Onda:** 5 | **Épico:** D2/F — Layout global | **Prioridade:** P0 (frente vigente) | **Status:** Planejada — docs prontos; **código da 5.1 aguarda autorização explícita** | **Depende de:** FATIA-04 ✅ (Motor 100 %: Explorer, Search, Source Control com Commit, Diff, Editor Anexo) | **Doc:** `docs/engenharia_reversa/FATIA-05_LAYOUT_BYTE_A_BYTE/` (`05_00`…`05_06`); débitos D2.40–D2.48 em `docs/05`
 
@@ -205,7 +218,7 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 | 5.5 ✅ `1f1ed79` | **Drag & Drop de views** Side Bar ↔ Views Panel (novo `.part.panel` acima do terminal) + reordenação na Activity Bar + persistência `viewLayout` | `viewRegistry.ts`, `layoutState.ts`, `shell/dnd/`, `shell/panel/ViewsPanel.tsx`, `SideBar.tsx`, `ActivityBar(Item).tsx`, `App.tsx` (wiring) | `sessao_15_drag_drop_views` T20–T24 5/5 | Código concluído (homologar) |
 | 5.7 ✅ `9a11319` | **Editor fino default + maximizar/restaurar** (D6 corrigida A0.7; regra de larguras 2026-10-01) — chat ≥ 420/50 %, anexo ≤ 50 %, Detalhes colapsa; ⤢ toma o centro; `editorMaximized` persistido | `shell/layoutState.ts`, `App.tsx` (wiring), `components/AuxiliaryBar.tsx`, `styles/app.css`, `core/constants.ts` (1 constante, exceção) | `sessao_15_editor_maximize` T30–T32 3/3 · `sessao_14` 16/16 · `activity_bar` 21/21 | Código concluído (homologar) |
 | 5.6 ✅ `7d05c7d` | **Timeline e Outline reais** (D2.41) — A0.6: seções do Explorer, seguem o arquivo ativo do anexo; `POST /git/log` aditivo + `show(sha)` | `ui/ExplorerView.tsx`, `ui/activeFileApi.ts`, `ui/attach/monacoOutline.ts`, `core/outline/`, `core/timeline/`, `server/git/{gitHost,index}.ts` (aditivo), `index.ts` (wiring) | `sessao_15_outline_timeline` T26–T29 4/4 | Código concluído (homologar) |
-| 5.7 | **Polish visual** (hover, feedback DnD, tokens) — ⚠️ A0.5 animação 200 ms não existe no real | `ActivityBar.tsx`, `SideBar.tsx`, CSS | `sessao_15_polish` 3/3 | Planejada |
+| 5.8 ✅ `d0c2a8d`+`4ee0ed8` (homologada 2026-10-02) | **Misto: c1 remoção definitiva da coluna Detalhes + c3 polish de tokens** (16 tokens sem fallback adicionados; Alt+Z/menu de abas → 5.9/futura; Browser → 4.8). Antes: **Polish visual** (hover, feedback DnD, tokens) — ⚠️ A0.5 animação 200 ms não existe no real | `ActivityBar.tsx`, `SideBar.tsx`, CSS | `sessao_15_polish` 3/3 | Planejada |
 
 **Ordem obrigatória:** 4.7 ✅ → 5.1 ✅ → 5.2 ✅ → 5.3 ✅ → 5.4 ✅ → 5.5 ✅ → 5.6 ✅ (homologada 2026-09-30) → **5.7 🔜 (escopo corrigido A0.7: toggle maximizar/restaurar o editor da AuxiliaryBar; aguarda ordem)** → 5.8 (cada uma só começa com a anterior homologada no Windows). **Fora de escopo:** 4.8 Browser (D2.39), smart commit/Always (D2.35), stage por linha, push/pull (D2.30), multi-root.
 
@@ -213,8 +226,12 @@ Esta faixa é a fonte principal para você acompanhar evolução. Cada fatia = u
 
 **Decisões abertas antes do código (05_05 §0):** A0.1 posições fixas no agentsWindow · A0.2 `index.ts`/`contract.ts` aditivos · A0.3 quando o Explorer migra · A0.4 `EditorGroup` novo ao lado do `EditorArea` intocável · A0.5 badge Search/animação · A0.6 Timeline/Outline no Panel ou no Explorer.
 
-### FATIA-06 — Chat + Runtime de Agente
-**Onda:** 6 | **Épico:** E — Chat | **Prioridade:** P0 | **Status:** Planejado | **Depende de:** FATIA-01,02,03
+### FATIA-06 — Chat + Runtime de Agente — 🔜 **PRÓXIMO (NÃO INICIADO; aguarda autorização do usuário após homologação deste commit de docs)**
+| Card | Status | Data |
+|---|---|---|
+| **Chat Carcaça — histórico + workspace sync** | 🔜 PRÓXIMO (não iniciado) | criado 2026-10-02 |
+
+**Onda:** 6 | **Épico:** E — Chat | **Prioridade:** P0 | **Status:** Próximo (não iniciado) | **Depende de:** FATIA-01,02,03
 
 | # | Tarefa | Arquivos-alvo | Contrato | Validação | Status |
 |---|---|---|---|---|---|

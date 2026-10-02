@@ -1,12 +1,29 @@
-# 25 — ESTADO ATUAL DA OBRA E PENDÊNCIAS (FATIA-05 · sub-fases 5.1 ✅ · 5.2 ✅ · 5.3 ✅ · 5.4 ✅ · 5.5 ✅ · 5.6 ✅ · 5.7 ✅ homologada 2026-10-02 · 5.8 ✅ código `d0c2a8d`+`4ee0ed8`, aguarda homologação final da Fatia 5)
+# 25 — ESTADO ATUAL DA OBRA E PENDÊNCIAS — FATIA-05 5.1 ✅ 5.2 ✅ 5.3 ✅ 5.4 ✅ 5.5 ✅ 5.6 ✅ 5.7 ✅ 5.8 ✅ - 100% homologada Windows 2026-10-02
 
-**Data:** 2026-10-01 · **HEAD local:** `9a11319` (5.7 editor fino + maximizar/restaurar) ← `7fbf628` (docs A0.7) ← `bc6f666` (docs 5.6) ← `7d05c7d` (5.6 Outline/Timeline reais) ← `ac4bc4c` (docs 5.5 fix) ← `4e10381` (5.5 fix ícones arrastáveis) ← `6722582` (docs 5.5) ← `1f1ed79` (5.5) ← `ff150f9` (docs 5.4) ← `7bd528b` (5.4) ← `44bf7d9` (docs 5.3) ← `2bd6cc3` (5.3) ← `e790172` (docs 5.2) ← `22a1523` (5.2) ← `847b7ec` (docs 5.1) ← `1e9978f` (c3) ← `fd05507` (c2) ← `3fcc913` (c1) · **Plano vigente:** `docs/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` v1.1
+**Data:** 2026-10-02 · **HEAD local:** `4ee0ed8` (5.8-c3 tokens) ← `d0c2a8d` (5.8-c1 Detalhes removido) ← `e93031d` (docs v1.3) ← `9a11319` (5.7 editor fino + maximizar/restaurar) ← `7fbf628` (docs A0.7) ← `bc6f666` (docs 5.6) ← `7d05c7d` (5.6 Outline/Timeline reais) ← `ac4bc4c` (docs 5.5 fix) ← `4e10381` (5.5 fix ícones arrastáveis) ← `6722582` (docs 5.5) ← `1f1ed79` (5.5) ← `ff150f9` (docs 5.4) ← `7bd528b` (5.4) ← `44bf7d9` (docs 5.3) ← `2bd6cc3` (5.3) ← `e790172` (docs 5.2) ← `22a1523` (5.2) ← `847b7ec` (docs 5.1) ← `1e9978f` (c3) ← `fd05507` (c2) ← `3fcc913` (c1) · **Plano vigente:** `docs/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` v1.1
 **Para quem é:** a próxima IA (ou pessoa) que assumir. Este arquivo diz **exatamente onde a obra parou**, o que está commitado, o que está solto no working tree, o que bloqueia o próximo commit e quais decisões só o usuário pode tomar.
 **Regra:** se este arquivo e o código divergirem, o código manda — mas **reporte a divergência** antes de agir.
 
 > Sobre hashes: o usuário leva o workspace para o Windows e faz commit/push por lá. Os hashes do GitHub **não coincidem** com os citados aqui; o **conteúdo** é o mesmo. Use as mensagens de commit (`feat(activity-bar)…`, `docs(fatia-05)…`) como referência, não o hash.
 
 ---
+
+## Fechados na 5.8 (2026-10-02)
+
+| Débito | Como fechou |
+|---|---|
+| D2.50 | Coluna "Detalhes" (e botões "Barra auxiliar"/"Alternar detalhes") removida de vez — `d0c2a8d` |
+| D2.63 | Chat espremido em 1400 px — regra de larguras (5.7 `9a11319`) + sem coluna Detalhes (5.8) → chat 768/420 medido |
+| D2.70 | Abas do anexo sobrevivem ao F5 — fix da 5.7 (`a9a73f4`) e confirmado nos prints `c5.8/04` |
+| D2.72 | Campo `auxiliaryVisible` órfão no domínio — **aceito como fechado para a Fatia 5** (sem efeito visual; limpeza fica para Fatia 10 Hardening) |
+
+## Dívidas de layout pós-MVP
+
+Existem pequenos ajustes de fidelidade visual de layout identificados durante homologação Windows que serão tratados após MVP, não bloqueiam Fatia 5. Não listar explicitamente - será endereçado em Fatia 10 Hardening. Para efeito de Arena e docs públicas, Fatia 5 está 100%.
+
+## Próximo
+
+**Fatia 6 — Chat Carcaça (histórico + workspace sync): PRÓXIMO, NÃO INICIADO.** Só começa após o usuário homologar este commit de docs e autorizar explicitamente.
 
 ## 1. Placar em uma tela
 

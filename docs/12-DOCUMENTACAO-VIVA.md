@@ -19,6 +19,10 @@ Este arquivo não substitui:
 
 Em caso de conflito, prevalece a documentação canônica apropriada de `docs/`.
 
+## Adendo 2026-10-02 (c) — **FATIA-05 100 % HOMOLOGADA NO WINDOWS**
+
+Fatia 5 100% homologada Windows - commits e93031d + 4ee0ed8 - Remoção Detalhes definitiva (c1), tokens fallbacks corrigidos (c3), maximizado 767px com Side Bar 274 visível (v1.2), T39 estabilizada, bateria §9 16 suítes x2 verde. (5.7 homologada por vídeo 08:37:34; 5.8 homologada no 5174 real; c1 commitado em `d0c2a8d`.) Pequenos ajustes de fidelidade visual de layout → Fatia 10 Hardening, não bloqueiam. **Fatia 6 (Chat Carcaça — histórico + workspace sync) é o PRÓXIMO, não iniciado; aguarda autorização.**
+
 ## Adendo 2026-10-02 (b) — **FATIA-05 5.8 ✅ CÓDIGO CONCLUÍDO — Fatia 5 100 % implementada, aguarda homologação final no Windows**
 
 - **c1 `d0c2a8d` remoção definitiva da coluna "Detalhes" (RF-P-05, D2.50):** `AuxiliaryBar.tsx` = só a casca do Editor Anexo; botões "Barra auxiliar" (Titlebar, toolbar do chat) e "Alternar detalhes" (EditorArea, ⌥⌘L) apagados; `auxiliaryVisible` vira constante `false` no shell (campo segue no domínio/persistência por compatibilidade — **D2.72**); 4 testes unitários da coluna apagados, 2 ajustados; E2E T39 (coluna e botões ausentes no DOM; boot 768/274; 3 abas; maximizado 767).

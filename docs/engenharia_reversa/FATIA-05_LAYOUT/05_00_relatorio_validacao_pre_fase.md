@@ -119,3 +119,18 @@ g) Pendências herdadas da auditoria de vídeos (V1-R1, listas de "lixo visual"/
 - `05_01_raspagem_layout_vscode.md`
 - `raspagem_05_01/medidas_8080.json`, `medidas_8080_direita.json`, `medidas_8080_direita_v2.json`
 - `raspagem_05_01/01…11*.png` (01 inicial, 02 fechada, 03 Search, 04 SCM, 05 painel, 06/07 não-medidos, 08 menu de contexto, 09 direita, 10 direita+painel, 11 direita fechada)
+
+---
+
+## Estado final da FATIA-05 — ✅ 100 % homologada no Windows (2026-10-02)
+
+5.1–5.8 homologadas (5.7 vídeo 08:37:34; 5.8 `e93031d` + `d0c2a8d` + `4ee0ed8`). Layout final em 1400 px: boot chat 768 / Side Bar 274, sem coluna Detalhes; maximizado `[lista 300][EDITOR 767][Side Bar 274][Activity Bar 48]`; F5 mantém abas. Prints de prova:
+
+- [01_boot_chat_768_sb_274_sem_detalhes_sem_botao.png](auditoria_05/c5.8/01_boot_chat_768_sb_274_sem_detalhes_sem_botao.png)
+- [02_3_abas_chat_420_anexo_341.png](auditoria_05/c5.8/02_3_abas_chat_420_anexo_341.png)
+- [03_max_lista300_editor767_sb274_ab48.png](auditoria_05/c5.8/03_max_lista300_editor767_sb274_ab48.png)
+- [04_f5_igual_max_767.png](auditoria_05/c5.8/04_f5_igual_max_767.png)
+- [05_restaurado_420_341_274.png](auditoria_05/c5.8/05_restaurado_420_341_274.png)
+- [06_x_header_maximizado_chat_768_sb_274.png](auditoria_05/c5.8/06_x_header_maximizado_chat_768_sb_274.png)
+
+Próximo: Fatia 6 (Chat Carcaça) — aguardando autorização.

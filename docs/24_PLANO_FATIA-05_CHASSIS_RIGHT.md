@@ -1,7 +1,7 @@
 # docs_24 — FATIA-05 — Especificação Final (Chassis-Right)
 
 **Codinome:** Chassis-Right
-**Versão:** 1.3 (2026-10-02 — 5.8 redefinida como "misto": c1 remoção definitiva da coluna Detalhes + c3 polish de tokens; Alt+Z e menu de abas → 5.9/futura; Simple Browser continua 4.8). v1.2 (2026-10-02): D6/RF-09 — maximizado mantém a Side Bar 274. v1.1 (2026-09-29): decisões do Gate 0.
+**Versão:** 1.4 (2026-10-02 — **Fatia 5 encerrada**; ver rodapé). v1.3 (2026-10-02 — 5.8 redefinida como "misto": c1 remoção definitiva da coluna Detalhes + c3 polish de tokens; Alt+Z e menu de abas → 5.9/futura; Simple Browser continua 4.8). v1.2 (2026-10-02): D6/RF-09 — maximizado mantém a Side Bar 274. v1.1 (2026-09-29): decisões do Gate 0.
 **Data original:** 2026-09-28
 **Status:** PLANO APROVADO. Código só começa após o Passo 4 da ordem do Gate 0.
 **Autoridade:** este documento substitui `docs_21`, `docs_22`, `docs_23` e todos os rascunhos anteriores da FATIA-05.
@@ -497,3 +497,9 @@ Cada sub-fase só fecha quando:
 ---
 
 **Fim do documento v1.1.**
+
+---
+
+**Rodapé v1.4 — Fatia 5 encerrada 2026-10-02 - 5.8 misto (c1 + c3) homologada - Browser permanece 4.8 separada - Alt+Z + menu abas movido para 5.9/futura.** Commits: `e93031d` (docs v1.3) · `d0c2a8d` (c1) · `4ee0ed8` (c3). 5.1–5.8 homologadas no Windows (5174 real). Ajustes finos de fidelidade visual → Fatia 10 Hardening.
+
+**Fim do documento v1.4.**

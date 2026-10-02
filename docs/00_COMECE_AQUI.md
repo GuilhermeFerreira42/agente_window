@@ -1,12 +1,13 @@
 # 00 — COMECE AQUI (leia isto antes de gastar um token)
 
-**Atualizado:** 2026-09-30 · **HEAD local:** `2bd6cc3` (5.3) · 5.2 `22a1523` · 5.1 `1e9978f` · Projeto **AGENTE WINDOW** — réplica fiel do layout do VS Code 1.135 em React/Vite, em `platform/apps/workbench-v2/`.
+**Atualizado:** 2026-10-02 · **HEAD local:** `4ee0ed8` (5.8-c3) · **Onda 5 / FATIA-05 = 100 % ✅ homologada no Windows (5.1–5.8)** · **Próxima Onda 6 = Chat Carcaça (aguardando autorização)** · histórico: `2bd6cc3` (5.3) · 5.2 `22a1523` · 5.1 `1e9978f` · Projeto **AGENTE WINDOW** — réplica fiel do layout do VS Code 1.135 em React/Vite, em `platform/apps/workbench-v2/`.
 
 Esta página existe porque a documentação é grande (28 docs + engenharia reversa) e IAs novas gastavam turnos redescobrindo o que já era sabido. Em **5 minutos** você deve saber: onde a obra parou, o que não tocar, o que é lixo, como rodar testes sem destruir nada, e o que ler depois.
 
 ## 1. Onde a obra parou (detalhe: `docs/25`)
 - **FATIA-04 (Motor: Explorer, Search, Source Control, Diff, Editor anexo)** ✅ concluída e homologada no Windows.
-- **FATIA-05 "Chassis-Right"** (`docs/24` v1.1 = autoridade): Activity Bar (48 px) + Side Bar **à direita**, layout `[centro][AttachArea][Side Bar][Activity Bar]`.
+- **FATIA-05 "Chassis-Right" ✅ 100 % HOMOLOGADA 2026-10-02** (`docs/24` v1.4 = autoridade; estado final em `docs/25`). **Onda 6 = Chat Carcaça (histórico + workspace sync) — aguardando autorização; não iniciar.** Detalhe histórico abaixo:
+- (histórico) **FATIA-05 "Chassis-Right"** (`docs/24` v1.1 = autoridade): Activity Bar (48 px) + Side Bar **à direita**, layout `[centro][AttachArea][Side Bar][Activity Bar]`.
   - Gate 0 ✅ · 5.1 ✅ · 5.2 ✅ homologadas · **5.3 ✅ código concluído** (`2bd6cc3` Source Control na Side Bar, maquete "Changes N" removida) · **aguarda homologação manual do usuário no Windows** · 5.4 não iniciada (exige decisão A0.1).
 - **Próxima ação de qualquer IA:** ler `docs/25`; **não começar a 5.4 sem o OK de homologação da 5.3 e sem a decisão A0.1** (`docs/25 §7`). Pendências abertas: P3/P4/P7 (higiene de testes), P5 (`legacy/`), P9 (mobile).
 

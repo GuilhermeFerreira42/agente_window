@@ -18,8 +18,8 @@ Ordenar a construção do AGENTE WINDOW em ondas executáveis, preservando a mod
 | 2 | estabilizar Workbench Shell | onda 1 | layout base, partes, resize, persistência de layout, command registry básico | E2E de toggles, resize, maximize/restore |
 | 3 | entregar Terminal piloto real | onda 2 | PTY real, tabs, split, focus, clear, persistência por sessão | probe real + E2E do terminal |
 | 4 | entregar Explorer + Filesystem | ondas 1 e 2 | árvore, open file, lazy load, watcher, operações básicas | testes de integração de I/O + E2E de navegação |
-| 5 | consolidar Layout Byte a Byte (FATIA-05: Activity Bar + Side Bar reais, Search/Changes simultâneos, DnD de views, Timeline/Outline, polish) | onda 4 (motores prontos) | views reposicionadas só por wiring; zero mudança em core/server | E2E de simultaneidade + prints vs 8080 + specs 12/13/14/14b/14c verdes |
-| 6 | entregar Chat + Runtime de agente (FATIA-06) | ondas 1, 2 e 3 | sessões, streaming, tool gate, snapshots, artefatos | E2E do fluxo de conversa + aprovação de tool |
+| 5 ✅ **100 % (homologada Windows 2026-10-02)** | consolidar Layout Byte a Byte (FATIA-05: Activity Bar + Side Bar reais, Search/Changes simultâneos, DnD de views, Timeline/Outline, polish) | onda 4 (motores prontos) | views reposicionadas só por wiring; zero mudança em core/server | E2E de simultaneidade + prints vs 8080 + specs 12/13/14/14b/14c verdes |
+| 6 🔜 **PRÓXIMA — Chat Carcaça (aguardando autorização)** | entregar Chat + Runtime de agente (FATIA-06) | ondas 1, 2 e 3 | sessões, streaming, tool gate, snapshots, artefatos | E2E do fluxo de conversa + aprovação de tool |
 | 7 | integrar Editor / Browser / Search / Changes | ondas 2, 4 e 5 | abas, grupos, split central, views auxiliares e integração com explorer/chat | E2E de abertura de abas e navegação cruzada |
 | 8 | consolidar Command Menu + Theme | ondas 2, 4, 5, 6 e 7 | palette, context keys, tokens de tema e coerência visual | testes de comandos e regressão visual funcional |
 | 9 | hardening transversal | ondas 3 a 8 | correções de fidelidade, performance, reconexão, persistência e bordas | matriz de validação global sem blockers |
@@ -177,6 +177,7 @@ Uma fatia só avança quando tiver:
 - relato final no chat com concluído, pendências e validações executadas.
 
 ## Estado atual da execução
+- **2026-10-02 (FATIA-05 FECHADA):** **Onda 5 = 100 % ✅** — 5.1–5.8 homologadas no Windows (`e93031d` docs v1.3 · `d0c2a8d` c1 · `4ee0ed8` c3). D2.50/D2.63/D2.70/D2.72 fechados na 5.8 (`docs/25`). Ajustes finos de fidelidade visual → Onda 9/10 Hardening. **Próxima Onda 6 = Chat Carcaça (aguardando autorização).**
 - **2026-10-01 (FATIA-05 5.7):** **5.7 concluída** `9a11319` (editor fino default + regra de larguras + toggle maximizar/restaurar; bug do vídeo corrigido). D2.63 ✅ fechado; novos D2.70 (abas não persistem ao F5) e D2.71 (Detalhes exclusiva). Exceção autorizada: 1 constante no core (`ATTACH_MAX_WIDTH_RATIO` 0.5). Aguarda homologação; 5.8 proibida até OK.
 - **2026-09-30 (A0.7, só doc):** 5.6 **homologada no Windows**. Escopo da 5.7 corrigido: editor fino à direita é o default (chat = foco), maximizar toma o centro e esconde o chat, restaurar volta; migração permanente pro centro rejeitada (fontes oficiais em `docs/24 §4 5.7`). D2.51/D2.63/D2.68 reapontados.
 - **2026-09-30 (FATIA-05 5.6):** 5.5 homologada; A0.6 fechada. **5.6 concluída** `7d05c7d` (Outline/Timeline reais nas seções do Explorer). D2.41 fechado; novos **D2.67–D2.69**. Vitest 705/9/16/730. Próximo: homologar 5.6 → 5.7.
