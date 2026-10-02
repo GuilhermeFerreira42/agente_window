@@ -12,7 +12,7 @@ describe('AttachLayoutStore — maximizar (c6)', () => {
     expect(s.isMaximized()).toBe(false);
     expect(s.toggleMaximized()).toBe(true);
     expect(s.getWidth()).toBe(400);                 // largura do usuário intacta
-    expect(s.getMaximizedWidth()).toBe(750);        // teto do clamp: 75 % de 1000
+    expect(s.getMaximizedWidth()).toBe(500);        // teto do clamp: 50 % de 1000 (5.7; era 75 %)
     expect(JSON.parse(st.dump()[ATTACH_STORAGE_KEY])).toEqual({ width: 400, maximized: true });
     s.setMaximized(true);                           // idempotente: sem evento duplicado
     expect(s.toggleMaximized()).toBe(false);
@@ -24,7 +24,7 @@ describe('AttachLayoutStore — maximizar (c6)', () => {
     const s = new AttachLayoutStore(st); s.setContainerWidth(1000);
     expect(s.isMaximized()).toBe(true);
     expect(s.getWidth()).toBe(333);
-    expect(s.getMaximizedWidth()).toBe(750);
+    expect(s.getMaximizedWidth()).toBe(500); // 5.7: teto 50 %
     s.setContainerWidth(3000);
     expect(s.getMaximizedWidth()).toBe(1200);       // teto absoluto
     // resetWidth com maximizado mantém a flag persistida

@@ -34,6 +34,9 @@ export const ATTACH_DIFF_OPTIONS: Monaco.editor.IStandaloneDiffEditorConstructio
   renderLineHighlight: 'line',
   // 4.7-c: sem "revert"/inline actions — diff é só leitura
   renderMarginRevertIcon: false,
+  // FATIA-05 5.3 (docs/24 §4 5.3): perfil `agentsWindow` — sem menu da calha nem indicadores
+  renderGutterMenu: false,
+  renderIndicators: false,
   ignoreTrimWhitespace: false,
 };
 

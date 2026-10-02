@@ -35,6 +35,39 @@ export function viewsFor(container: ViewContainerSide): readonly ViewDescriptor[
   return VIEWS.filter((v) => v.container === container).sort((a, b) => a.order - b.order)
 }
 
+/** 5.5: onde a view mora em tempo de execução (persistido no layoutState). `'left'|'right'` continua sendo o LADO da Side Bar. */
+export type ViewContainer = 'sideBar' | 'panel'
+export interface ViewLayout {
+  readonly sideBar: readonly ViewId[]
+  readonly panel: readonly ViewId[]
+}
+export const ALL_VIEW_IDS: readonly ViewId[] = VIEWS.map((v) => v.id)
+export const DEFAULT_VIEW_LAYOUT: ViewLayout = { sideBar: viewsFor('right').map((v) => v.id), panel: [] }
+
+/** Válido = cada view registrada aparece exatamente 1× somando os dois containers. */
+export function isViewLayout(value: unknown): value is ViewLayout {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  if (!Array.isArray(v.sideBar) || !Array.isArray(v.panel)) return false
+  const all = [...v.sideBar, ...v.panel]
+  if (all.length !== ALL_VIEW_IDS.length) return false
+  return ALL_VIEW_IDS.every((id) => all.filter((x) => x === id).length === 1)
+}
+
+/** Move `id` para `container` na posição `index` (clampada); reordena se já estiver lá. Puro. */
+export function moveViewInLayout(layout: ViewLayout, id: ViewId, container: ViewContainer, index: number): ViewLayout {
+  const sideBar = layout.sideBar.filter((v) => v !== id)
+  const panel = layout.panel.filter((v) => v !== id)
+  const target = container === 'sideBar' ? sideBar : panel
+  const at = Math.max(0, Math.min(Math.floor(index), target.length))
+  target.splice(at, 0, id)
+  return { sideBar, panel }
+}
+
+export function viewsByIds(ids: readonly ViewId[]): readonly ViewDescriptor[] {
+  return ids.map((id) => getView(id))
+}
+
 export function getView(id: ViewId): ViewDescriptor {
   const view = VIEWS.find((v) => v.id === id)
   if (!view) throw new Error(`viewRegistry: view desconhecida "${id}"`)

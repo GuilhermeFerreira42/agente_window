@@ -18,8 +18,8 @@ declare global { interface Window { __explorerSearchModule?: { attach: { open(i:
 const WS_DIR = '/tmp/explorer-fs-fixture';
 const DIR = join(WS_DIR, 'e2e-fixture-root', 'gitcommit');
 const ATTACH = '.auxiliary-bar .explorer-attach-area';
-const SCM = `${ATTACH} .scm-view`;
-const CHANGES_URI = 'file:///.explorer-search/changes';
+// 5.3: a Source Control View mora na Side Bar (view `scm`) — só o endereço mudou.
+const SCM = '[data-testid="side-bar"] [data-testid="side-bar-view-scm"] .scm-view';
 const git = (...args: string[]) => execFileSync('git', args, { cwd: WS_DIR, encoding: 'utf-8', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } }).trim();
 
 test.describe.configure({ mode: 'serial' });
@@ -30,10 +30,11 @@ async function boot(page: Page) {
   await page.reload();
   await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' });
   await page.waitForTimeout(500);
-  await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+  if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
   await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
-  const sid = await page.evaluate(() => (document.querySelector('[id^="aux-tab-"][id$="-files"]')!.id).replace(/^aux-tab-/, '').replace(/-files$/, ''));
-  await page.evaluate(([s, u]) => window.__explorerSearchModule!.attach.open({ uri: u, kind: 'changes', sessionId: s }), [sid, CHANGES_URI]);
+  const sid = await page.evaluate(() => document.querySelector('.auxiliary-bar[data-session-id]')!.getAttribute('data-session-id')!);
+  // 5.3: a Source Control View vive na view `scm` da Side Bar (clique no ícone; já ativa → não fecha).
+  if ((await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').getAttribute('aria-selected')) !== 'true') await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').click();
   await expect(page.locator(`${SCM}[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
   return sid;
 }

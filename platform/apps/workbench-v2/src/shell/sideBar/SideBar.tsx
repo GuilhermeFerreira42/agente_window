@@ -2,8 +2,9 @@
 // DOM espelha o VS Code (05_01 §2): .part.sidebar.right > .composite-title (35 px, h2 11 px
 // uppercase) + .content (view panes). Sash próprio de 4 px na borda voltada ao editor.
 // Recolher = display flex/none (D17): React montado, box mensurável quando visível.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type DragEvent } from 'react'
 import { clampSideBarWidth, defaultSideBarWidth, maxSideBarWidth, SIDE_BAR_MIN_WIDTH } from '../layoutState'
+import { hasViewDrag, readViewDrag, setViewDrag } from '../dnd'
 import type { ViewContainerSide, ViewDescriptor, ViewId } from '../viewRegistry'
 import { resolveDrag, resolveKeyboard, SIDE_BAR_SASH_SIZE } from './sash'
 import { SideBarViewPane } from './SideBarViewPane'
@@ -23,6 +24,8 @@ export interface SideBarProps {
   readonly onToggle: () => void
   /** Conteúdo por view (c3 liga o Explorer real; Search/SCM chegam em 5.2/5.3). */
   readonly renderView?: (view: ViewDescriptor) => ReactNode
+  /** 5.5 (DnD): uma view foi solta na Side Bar (vinda do Panel ou reordenação) — `index` = fim da ordem. */
+  readonly onDropView?: (id: ViewId, index: number) => void
 }
 
 /** Largura da região do chassi (.main-region, inclui a Activity Bar) — é a "largura" da régua
@@ -40,7 +43,27 @@ function isEditableTarget(t: EventTarget | null): boolean {
   return t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !!t.closest('.xterm')
 }
 
-export function SideBar({ side, views, activeViewId, visible, width, onWidthChange, onResetWidth, onClose, onToggle, renderView }: SideBarProps) {
+export function SideBar({ side, views, activeViewId, visible, width, onWidthChange, onResetWidth, onClose, onToggle, renderView, onDropView }: SideBarProps) {
+  // 5.5: o header da view (composite-title) é a alça de arrasto; a Side Bar inteira aceita soltar (append).
+  const [dropOver, setDropOver] = useState(false)
+  const onHeaderDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
+    const id = (views.find((v) => v.id === activeViewId) ?? views[0])?.id
+    if (!id) { e.preventDefault(); return }
+    setViewDrag(e.dataTransfer, id)
+  }, [views, activeViewId])
+  const onRootDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!onDropView || !hasViewDrag(e.dataTransfer)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropOver(true)
+  }, [onDropView])
+  const onRootDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    setDropOver(false)
+    const id = readViewDrag(e.dataTransfer)
+    if (!id || !onDropView) return
+    e.preventDefault()
+    onDropView(id, views.length)
+  }, [onDropView, views.length])
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [available, setAvailable] = useState<number>(1200)
   const [region, setRegion] = useState<number>(1248)
@@ -114,12 +137,16 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
   return (
     <div
       ref={rootRef}
-      className={`part sidebar ${side}`}
+      className={`part sidebar ${side}${dropOver ? ' drop-target' : ''}`}
       data-testid="side-bar"
       role="none"
       style={{ display: visible ? 'flex' : 'none', width: effectiveWidth, flexBasis: effectiveWidth }}
+      onDragEnter={onRootDragOver}
+      onDragOver={onRootDragOver}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={onRootDrop}
     >
-      <div className="composite-title" data-testid="side-bar-title">
+      <div className="composite-title" data-testid="side-bar-title" draggable={!!active} onDragStart={onHeaderDragStart}>
         <div className="title-label"><h2 title={active?.title}>{active?.title}</h2></div>
         <div className="title-actions" />
       </div>

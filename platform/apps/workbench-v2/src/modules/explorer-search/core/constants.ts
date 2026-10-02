@@ -24,7 +24,10 @@ export const ATTACH_WIDTH_CSS_VAR = '--attach-width' as const;
 export const ATTACH_MIN_WIDTH_PX = 280 as const;
 export const ATTACH_MAX_WIDTH_PX = 1200 as const;
 export const ATTACH_MIN_WIDTH_RATIO = 0.25 as const;
-export const ATTACH_MAX_WIDTH_RATIO = 0.75 as const;
+// FATIA-05 5.7 (D6, regra A+2/420 de 2026-10-01 — exceção pontual ao "core intocável", 1 constante): o editor fino
+// nunca passa de 50 % da faixa chat+editor quando não maximizado (era 0.75 na 4.7 c1). O maximizado toma a faixa
+// inteira por CSS do shell (`.top-right-section.editor-maximized`), não por este clamp.
+export const ATTACH_MAX_WIDTH_RATIO = 0.5 as const;
 
 // ---------------------------------------------------------------------------
 // Explorer — `files.exclude` padrão (upstream files.contribution.ts, registro

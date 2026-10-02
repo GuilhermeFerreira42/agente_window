@@ -40,14 +40,23 @@ async function ensureFilesTab(page: import('@playwright/test').Page) {
     });
     await page.waitForTimeout(300);
   }
-  await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+  if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
   await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
   await page.waitForTimeout(300);
 }
-const sessionId = (page: import('@playwright/test').Page) => page.evaluate(() => (document.querySelector('[id^="aux-tab-"][id$="-files"]')!.id).replace(/^aux-tab-/, '').replace(/-files$/, ''));
+const sessionId = (page: import('@playwright/test').Page) => page.evaluate(() => document.querySelector('.auxiliary-bar[data-session-id]')!.getAttribute('data-session-id')!);
 const setVisible = async (page: import('@playwright/test').Page, visible: boolean) => {
   const sid = await sessionId(page);
   await page.evaluate(([s, v]) => window.__explorerSearchModule!.attach.setVisible({ sessionId: s as string, visible: v as boolean }), [sid, visible]);
+};
+/** 5.7 (D6): na faixa fina "Detalhes" e editor são EXCLUSIVOS; ao abrir a 1.ª aba ela colapsa sozinha, mas
+ *  `attach.setVisible(true)` sem abas (empty state) não dispara isso — o teste desliga a coluna pelo toggle do shell. */
+const collapseDetails = async (page: import('@playwright/test').Page) => {
+  if (await page.locator('.auxiliary-bar .auxiliary-column').isVisible().catch(() => false)) {
+    await page.locator('button[aria-label="Barra auxiliar"]').first().click();
+    await expect(page.locator('.auxiliary-bar .auxiliary-column')).toBeHidden();
+    await page.waitForTimeout(250); // transição de largura da barra (160 ms)
+  }
 };
 const rect = (loc: import('@playwright/test').Locator) => loc.evaluate((e) => { const b = e.getBoundingClientRect(); return { x: Math.round(b.x), right: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) }; });
 
@@ -58,14 +67,22 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     await expect(attach).toHaveCount(1);
     await expect(attach).toBeHidden();
     expect(await attach.evaluate((e) => getComputedStyle(e).display)).toBe('none');
+    await collapseDetails(page); // 5.7: Detalhes colapsada (0 px) — a barra passa a ser só o anexo
     const barBefore = await rect(page.locator('.auxiliary-bar'));
     await setVisible(page, true);
     await expect(attach).toBeVisible();
+    await page.waitForTimeout(250); // 5.7: a barra sai de 0 px (casca vazia) com transição de 160 ms
     const a = await rect(attach);
     const tree = await rect(page.locator('.explorer-folders-view'));
     const bar = await rect(page.locator('.auxiliary-bar'));
     expect(a.right, 'anexo termina antes da árvore (editor à esquerda, print editor/34)').toBeLessThanOrEqual(tree.x);
     expect(bar.w, 'barra alarga exatamente a largura do anexo').toBeGreaterThanOrEqual(barBefore.w + a.w - 2);
+    // 5.7 (D6): chat ≥ 420 px e ≥ 50 % da faixa chat+editor
+    const bandW = await page.locator('.top-right-section').evaluate((e) => e.getBoundingClientRect().width);
+    const chatW = (await rect(page.locator('.chat-pane'))).w;
+    expect(chatW).toBeGreaterThanOrEqual(420);
+    expect(chatW).toBeGreaterThanOrEqual(bandW * 0.5 - 2);
+    expect(a.w).toBeLessThanOrEqual(bandW * 0.5 + 1);
     const sash = attach.locator('.explorer-attach-sash');
     await expect(sash).toHaveAttribute('role', 'separator');
     await expect(sash).toHaveAttribute('aria-orientation', 'vertical');
@@ -73,28 +90,32 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     expect(s.w).toBe(6);
     expect(s.x, 'sash na borda direita do anexo (entre editor e árvore)').toBe(a.right - 6);
     expect(await sash.evaluate((e) => getComputedStyle(e).cursor)).toBe('ew-resize');
-    // clamp 280–1200 px e 25–75 % (viewport 1280 → 320…960)
+    // clamp 280–1200 px e 25–50 % (5.7: teto 50 % da faixa; era 75 % na 4.7)
     expect(a.w).toBeGreaterThanOrEqual(280);
-    expect(a.w).toBeLessThanOrEqual(960);
+    expect(a.w).toBeLessThanOrEqual(700);
     // container sem position:fixed (A5.7)
     expect(await attach.evaluate((e) => getComputedStyle(e).position)).not.toBe('fixed');
   });
 
   test('T2 (c1): sash arrasta (→ aumenta), respeita o clamp, dblclick volta ao padrão e a largura sobrevive ao reload (localStorage explorer-search.attach.v1)', async ({ page }) => {
     await openFilesTab(page);
+    await collapseDetails(page); // 5.7
     await setVisible(page, true);
     const attach = page.locator(ATTACH);
     const sash = attach.locator('.explorer-attach-sash');
+    const sid0 = await sessionId(page);
+    // 5.7: o padrão (46 %) já encosta no teto (50 % / piso do chat 420); parte do mínimo (280 px) para o arrasto ter curso
+    await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 280 }), sid0);
     const w0 = (await rect(attach)).w;
     const s = await rect(sash);
     await page.mouse.move(s.x + 3, 400);
     await page.mouse.down();
+    await page.mouse.move(s.x + 3 + 30, 400, { steps: 6 });
     await page.mouse.move(s.x + 3 + 60, 400, { steps: 6 });
-    await page.mouse.move(s.x + 3 + 120, 400, { steps: 6 });
     await page.mouse.up();
     const w1 = (await rect(attach)).w;
-    expect(w1 - w0).toBeGreaterThanOrEqual(100);
-    expect(w1 - w0).toBeLessThanOrEqual(130);
+    expect(w1 - w0).toBeGreaterThanOrEqual(50);
+    expect(w1 - w0).toBeLessThanOrEqual(70);
     // persistiu
     const saved = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null'), STORAGE);
     expect(saved?.width).toBe(w1);
@@ -102,31 +123,35 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     const sid = await sessionId(page);
     await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 5000 }), sid);
     const wMax = (await rect(attach)).w;
-    expect(wMax).toBeLessThanOrEqual(960);
+    const bandW = await page.locator('.top-right-section').evaluate((e) => e.getBoundingClientRect().width);
+    expect(wMax).toBeLessThanOrEqual(Math.round(bandW * 0.5) + 1); // 5.7: teto 50 %
     await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 10 }), sid);
     expect((await rect(attach)).w).toBeGreaterThanOrEqual(280);
-    // reload preserva a última largura válida
-    await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 500 }), sid);
+    // reload preserva a última largura válida (5.7: 330 px cabe no teto de 50 %; era 500)
+    await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 330 }), sid);
     await page.reload();
     await ensureFilesTab(page);
     await page.waitForSelector(ATTACH, { state: 'attached' });
+    await collapseDetails(page);
     await setVisible(page, true);
-    expect((await rect(attach)).w).toBe(500);
-    // dblclick → padrão (46 % da área útil, dentro do clamp) ≠ 500
+    expect((await rect(attach)).w).toBe(330);
+    // dblclick → padrão (46 % da área útil, dentro do clamp) ≠ 330
     await sash.dblclick();
     const wDef = (await rect(attach)).w;
-    expect(wDef).not.toBe(500);
+    expect(wDef).not.toBe(330);
     expect(wDef).toBeGreaterThanOrEqual(280);
-    // teclado: foco no sash + ← → ajusta 10 px
+    // teclado: foco no sash + ← → ajusta 10 px (5.7: o padrão encosta no teto → parte de 300 px, abaixo do teto)
+    await page.evaluate((sidv) => window.__explorerSearchModule!.attach.setWidth({ sessionId: sidv, pixels: 300 }), sid);
     await sash.focus();
     await page.keyboard.press('ArrowRight');
-    expect((await rect(attach)).w).toBe(wDef + 10);
+    expect((await rect(attach)).w).toBe(310);
     await page.keyboard.press('ArrowLeft');
-    expect((await rect(attach)).w).toBe(wDef);
+    expect((await rect(attach)).w).toBe(300);
   });
 
   test('T3 (c1): recolher = display:none sem desmontar (mesmo nó DOM, 0 unmounts) e reabrir restaura a largura; hover do sash acende após 300 ms', async ({ page }) => {
     await openFilesTab(page);
+    await collapseDetails(page); // 5.7
     await setVisible(page, true);
     const attach = page.locator(ATTACH);
     const mountId = await attach.getAttribute('data-mount-id');
@@ -542,20 +567,20 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     return out;
   };
 
-  test('T14 (c6): ⤢ maximiza SÓ dentro da sessão — anexo vai ao teto do clamp (≤ 75 % da banda / 1200 px), árvore recolhe, titlebar/sidebar de sessões/chat ficam com as MESMAS medidas; sem position:fixed; ⤢ de novo restaura a largura anterior', async ({ page, request }) => {
+  test('T14 (c6→5.7 v1.2): ⤢ maximiza — anexo toma a faixa chat+editor inteira (chat some, Side Bar FICA, lista de sessões/titlebar iguais); Detalhes colapsada por default; sem position:fixed; ⤢ de novo restaura a largura anterior', async ({ page, request }) => {
     await seedFiles(request);
     await openFilesTab(page);
     const sid = await sessionId(page);
     await openIn(page, sid, `${FX}/srch/a.ts`, true);
     const attach = page.locator(ATTACH);
     await expect(attach).toBeVisible();
-    await page.evaluate((s) => window.__explorerSearchModule!.attach.setWidth({ sessionId: s, pixels: 420 }), sid);
+    await page.evaluate((s) => window.__explorerSearchModule!.attach.setWidth({ sessionId: s, pixels: 330 }), sid); // 5.7: ≤ 50 % e piso do chat 420 (era 420)
     await page.waitForTimeout(300);
     const before = await rect(attach);
-    expect(before.w).toBe(420);
+    expect(before.w).toBe(330);
     const shellBefore = await shellRects(page);
     const column = page.locator('.auxiliary-bar > .auxiliary-column');
-    await expect(column).toBeVisible();
+    await expect(column, '5.7 (D6): Detalhes colapsa ao abrir a 1.ª aba — não fica ao lado do editor').toBeHidden();
     const btn = attach.locator('[data-testid="attach-maximize"]');
     await expect(btn).toHaveAttribute('aria-pressed', 'false');
     expect(await btn.evaluate((e) => e.className)).toContain('codicon-screen-full');
@@ -567,18 +592,16 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     const band = await page.locator('.auxiliary-bar').evaluate((e) => e.parentElement!.getBoundingClientRect().width);
     const after = await rect(attach);
     expect(after.w).toBeGreaterThan(before.w);
-    expect(after.w).toBeLessThanOrEqual(Math.min(1200, Math.round(band * 0.75)) + 1);
-    expect(after.w).toBe(Math.round(Math.min(1200, band * 0.75)));
-    await expect(column, 'árvore recolhe enquanto maximizado').toBeHidden();
-    // shell intocado: titlebar e sidebar de sessões idênticos; chat continua
-    // visível/no lugar (só cede largura ao lado do editor central — flex do shell)
+    // 5.7 (D6/RF-07): maximizado = toma a faixa chat+editor inteira (CSS do shell), chat some; Side Bar FICA (docs/24 v1.2, 2026-10-02)
+    expect(after.w).toBeGreaterThanOrEqual(band - 12);
+    await expect(column, 'Detalhes recolhida enquanto maximizado').toBeHidden();
+    await expect(page.locator('.chat-pane')).toBeHidden();
+    await expect(page.locator('[data-testid="side-bar"]')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('workbench.layoutState.v1') || '{}').editorMaximized)).toBe(true);
+    // shell: titlebar e sidebar de sessões idênticos (lista sempre visível)
     const shellAfter = await shellRects(page);
     expect(shellAfter['.titlebar']).toEqual(shellBefore['.titlebar']);
     expect(shellAfter['.sessions-sidebar']).toEqual(shellBefore['.sessions-sidebar']);
-    expect(shellAfter['.chat-pane'].x).toBe(shellBefore['.chat-pane'].x);
-    expect(shellAfter['.chat-pane'].h).toBe(shellBefore['.chat-pane'].h);
-    expect(shellAfter['.chat-pane'].w).toBeGreaterThanOrEqual(240);
-    await expect(page.locator('.chat-pane textarea, .chat-pane [contenteditable]').first()).toBeVisible();
     expect(await attach.evaluate((e) => getComputedStyle(e).position)).toBe('relative');
     expect(await attach.evaluate((e) => [e, ...e.querySelectorAll('*')].some((n) => getComputedStyle(n).position === 'fixed'))).toBe(false);
     expect(await attach.evaluate((e) => Math.max(0, ...[e, ...e.querySelectorAll('*')].map((n) => Number(getComputedStyle(n).zIndex) || 0)))).toBeLessThan(1000);
@@ -590,8 +613,9 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     await btn.click();
     await expect(attach).not.toHaveClass(/is-maximized/);
     await page.waitForTimeout(350);
-    expect((await rect(attach)).w).toBe(420);
-    await expect(column).toBeVisible();
+    expect((await rect(attach)).w).toBe(330);
+    await expect(column, '5.7: Detalhes continua colapsada após restaurar (volta só pelo toggle)').toBeHidden();
+    await expect(page.locator('.chat-pane')).toBeVisible();
     expect(await shellRects(page)).toEqual(shellBefore);
   });
 
@@ -603,6 +627,7 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     const empty = attach.locator('[data-testid="attach-empty-state"]');
     // escondido → nada visível
     await expect(attach).toBeHidden();
+    await collapseDetails(page); // 5.7: exclusiva com Detalhes na faixa fina
     // visível explicitamente (API/⤢) sem abas → letterpress
     await setVisible(page, true);
     await expect(attach).toBeVisible();
@@ -642,11 +667,11 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     const sid = await sessionId(page);
     await openIn(page, sid, `${FX}/srch/a.ts`, true);
     const attach = page.locator(ATTACH);
-    await page.evaluate((s) => window.__explorerSearchModule!.attach.setWidth({ sessionId: s, pixels: 400 }), sid);
+    await page.evaluate((s) => window.__explorerSearchModule!.attach.setWidth({ sessionId: s, pixels: 330 }), sid); // 5.7: ≤ 50 % e piso do chat 420 (era 400)
     await attach.locator('[data-testid="attach-maximize"]').click();
     await expect(attach).toHaveClass(/is-maximized/);
     const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), STORAGE);
-    expect(stored).toMatchObject({ width: 400, maximized: true });
+    expect(stored).toMatchObject({ width: 330, maximized: true });
     await page.reload();
     await ensureFilesTab(page);
     const sid2 = await sessionId(page);
@@ -659,7 +684,7 @@ test.describe('FATIA-04 · 4.7 — Editor Anexo Lateral (módulo explorer-search
     await page.keyboard.press('Escape');
     await expect(attach).not.toHaveClass(/is-maximized/);
     await page.waitForTimeout(350);
-    expect((await rect(attach)).w).toBe(400);
-    expect(await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), STORAGE)).toMatchObject({ width: 400, maximized: false });
+    expect((await rect(attach)).w).toBe(330);
+    expect(await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), STORAGE)).toMatchObject({ width: 330, maximized: false });
   });
 });

@@ -21,7 +21,9 @@ const WS = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'); // r
 const NAME = `e2e-smoke-${process.pid}.txt`;
 const FILE = join(WS, NAME);
 const OUT = process.env.SMOKE_SHOTS_DIR; // opcional: pasta para prints da validação humana
-const ATTACH = '.auxiliary-bar .explorer-attach-area';
+// 5.3: o anexo não participa mais deste smoke (Source Control na Side Bar).
+// 5.3: a Source Control View mora na Side Bar (view `scm`) — só o endereço mudou.
+const SCM = '[data-testid="side-bar"] [data-testid="side-bar-view-scm"]';
 const git = (...a: string[]) => execFileSync('git', a, { cwd: WS, encoding: 'utf-8', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
 const porcelainOf = (name: string) => git('status', '--porcelain', '--', name).trim();
 
@@ -54,7 +56,7 @@ test.describe('FATIA-04 · 4.7-b — smoke REAL: aba Changes contra o workspace 
     // 1. Transição 4.7-b: com o módulo real de pé, a aba "Changes N" simulada do shell NÃO existe
     //    e a aba Files é a ativa. (Fallback: só sem módulo a maquete voltaria.)
     await expect(page.locator('[id^="aux-tab-"][id$="-changes"]')).toHaveCount(0);
-    await expect(page.locator('[id^="aux-tab-"][id$="-files"]').first()).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first(), 'c3: a árvore (Explorer) é o conteúdo padrão — agora na Side Bar').toBeVisible(); // decisão 1-a (2026-09-29)
     await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
     await shot(page, '01_boot_files_padrao_sem_mock');
 
@@ -67,19 +69,21 @@ test.describe('FATIA-04 · 4.7-b — smoke REAL: aba Changes contra o workspace 
     await shot(page, '02_hover_header_folders_botao_source_control');
     await btn.click();
 
-    // 3. Changes REAL: anexo visível, aba fixa "Changes", provider = nome da raiz real, branch real
-    await expect(page.locator(`${ATTACH}[data-visible="true"]`)).toBeVisible();
-    await expect(page.locator(`${ATTACH} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 20_000 });
-    await expect(page.locator(`${ATTACH} [data-testid="scm-error"]`)).toHaveCount(0);
-    await expect(page.locator(`${ATTACH} [data-testid="scm-provider"] .label-name`)).toHaveText(WS.split('/').pop()!);
+    // 3. Source Control REAL: 5.3 — vive na Side Bar (view `scm`), não mais na aba fixa do anexo.
+    //    (decisão 1-a, mesmo precedente do c3: "anexo visível" → "view scm visível na Side Bar")
+    await expect(page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(SCM)).toBeVisible();
+    await expect(page.locator(`${SCM} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 20_000 });
+    await expect(page.locator(`${SCM} [data-testid="scm-error"]`)).toHaveCount(0);
+    await expect(page.locator(`${SCM} [data-testid="scm-provider"] .label-name`)).toHaveText(WS.split('/').pop()!);
     const branch = git('rev-parse', '--abbrev-ref', 'HEAD').trim();
-    if (branch !== 'HEAD') await expect(page.locator(`${ATTACH} [data-testid="scm-provider"] .label-description`)).toHaveText(branch);
-    await expect(page.locator(`${ATTACH} .scm-view [data-testid="scm-no-repo"]`)).toHaveCount(0);
+    if (branch !== 'HEAD') await expect(page.locator(`${SCM} [data-testid="scm-provider"] .label-description`)).toHaveText(branch);
+    await expect(page.locator(`${SCM} .scm-view [data-testid="scm-no-repo"]`)).toHaveCount(0);
     await shot(page, '03_changes_real_aberta');
 
     // 4. Criar arquivo NO DISCO (equivale ao `echo teste > arquivo` no terminal) → aparece sem refresh
     writeFileSync(FILE, 'teste\n');
-    const row = page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="workingTree"]`).filter({ hasText: NAME });
+    const row = page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="workingTree"]`).filter({ hasText: NAME });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(row.locator('.monaco-icon-label')).toHaveAttribute('data-letter', 'U');
     expect(porcelainOf(NAME)).toBe(`?? ${NAME}`);
@@ -90,7 +94,7 @@ test.describe('FATIA-04 · 4.7-b — smoke REAL: aba Changes contra o workspace 
     await expect(row.locator('[data-testid="scm-action-stage"]')).toBeVisible();
     await shot(page, '05_hover_acoes_inline');
     await row.locator('[data-testid="scm-action-stage"]').click();
-    const staged = page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: NAME });
+    const staged = page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: NAME });
     await expect(staged).toBeVisible({ timeout: 15_000 });
     await expect(staged.locator('.monaco-icon-label')).toHaveAttribute('data-letter', 'A');
     await expect.poll(() => porcelainOf(NAME)).toBe(`A  ${NAME}`);

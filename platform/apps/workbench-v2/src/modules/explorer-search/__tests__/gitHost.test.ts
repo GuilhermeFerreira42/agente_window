@@ -154,6 +154,25 @@ describe('GitHost — git real em tmpdir', () => {
     expect(await host.show(repo, U('st.txt'), 'HEAD')).toEqual({ content: '' });
     expect(await host.show(repo, U('st.txt'), 'index')).toEqual({ content: 's\n' });
   });
+  it('5.6 log: 2 commits do arquivo, mais novo primeiro, com pais/autor/epoch ms; untracked/sem repo → []; show(sha) devolve a versão do commit', async () => {
+    seed();
+    const first = git('rev-parse', 'HEAD').trim();
+    writeFileSync(join(repoDir, 'mod.txt'), 'v2\n'); git('add', '-A'); git('commit', '-q', '-m', 'second version');
+    const second = git('rev-parse', 'HEAD').trim();
+    const { entries } = await host.log(repo, U('mod.txt'));
+    expect(entries.map((e) => e.sha)).toEqual([second, first]);
+    expect(entries[0]).toMatchObject({ parents: [first], author: 't', message: 'second version' });
+    expect(entries[1].parents).toEqual([]);
+    expect(entries[0].timestamp).toBeGreaterThan(1_600_000_000_000);
+    writeFileSync(join(repoDir, 'new.txt'), 'n\n');
+    expect((await host.log(repo, U('new.txt'))).entries).toEqual([]);
+    expect(await host.show(repo, U('mod.txt'), first)).toEqual({ content: 'v1\n' });
+    expect(await host.show(repo, U('mod.txt'), second)).toEqual({ content: 'v2\n' });
+    expect(await host.show(repo, U('mod.txt'), 'f'.repeat(40))).toEqual({ content: '' });
+    // pasta sem repo → []
+    const other = join(ws, 'plain'); execFileSync('mkdir', [other]); writeFileSync(join(other, 'a.txt'), 'a');
+    expect((await host.log(toWorkspaceUri(ws, other), toWorkspaceUri(ws, join(other, 'a.txt')))).entries).toEqual([]);
+  });
   it('show: uri fora do repo → forbidden_path', async () => {
     seed();
     await expect(host.show(repo, toWorkspaceUri(ws, join(ws, 'fora.txt')) as WorkspaceUri, 'HEAD')).rejects.toMatchObject({ code: 'forbidden_path' });

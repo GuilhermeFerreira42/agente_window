@@ -13,7 +13,7 @@
 // ============================================================================
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { WorkspaceUri } from '../../contract';
-import { GitHost, GitHostError, type ExecLike } from './gitHost';
+import { GitHost, GitHostError, isCommitSha, type ExecLike } from './gitHost';
 
 export const GIT_HTTP_PREFIX = '/git/';
 
@@ -100,8 +100,14 @@ export function createExplorerGitServer(options: ExplorerGitServerOptions): Expl
             return true;
           case 'show': {
             const ref = body.ref;
-            if (typeof body.uri !== 'string' || (ref !== 'HEAD' && ref !== 'index' && ref !== 'worktree')) throw new GitHostError('io', 'uri/ref inválidos');
+            // 5.6 (A0.6, aditivo): ref também pode ser um sha de commit (Timeline → diff pai:arquivo × sha:arquivo).
+            if (typeof body.uri !== 'string' || (ref !== 'HEAD' && ref !== 'index' && ref !== 'worktree' && !isCommitSha(ref))) throw new GitHostError('io', 'uri/ref inválidos');
             sendJson(res, 200, await host.show(repo, body.uri as WorkspaceUri, ref));
+            return true;
+          }
+          case 'log': { // 5.6 (A0.6, aditivo): POST /git/log { root, uri, limit? } → { entries }
+            if (typeof body.uri !== 'string') throw new GitHostError('io', 'uri inválida');
+            sendJson(res, 200, await host.log(repo, body.uri as WorkspaceUri, typeof body.limit === 'number' ? body.limit : undefined));
             return true;
           }
           default:

@@ -5,11 +5,13 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
+    alias: [
+      // 5.6 — internos ESM (Outline lê o DocumentSymbolProvider via StandaloneServices) → stub vazio.
+      { find: /^monaco-editor\/esm\/vs\/.*$/, replacement: fileURLToPath(new URL('./src/__tests__/stubs/monaco-internals.ts', import.meta.url)) },
       // monaco-editor só tem entry ESM de browser; em jsdom usamos um stub
       // (FATIA-04 4.7 — o Monaco real é coberto pelos E2E).
-      'monaco-editor': fileURLToPath(new URL('./src/__tests__/stubs/monaco-editor.ts', import.meta.url)),
-    },
+      { find: /^monaco-editor$/, replacement: fileURLToPath(new URL('./src/__tests__/stubs/monaco-editor.ts', import.meta.url)) },
+    ],
   },
   test: {
     globals: true,

@@ -27,10 +27,11 @@ const WS_DIR = '/tmp/explorer-fs-fixture';
 const WS = 'file:///tmp/explorer-fs-fixture';
 const DIR = join(WS_DIR, 'e2e-fixture-root', 'gitui');
 const U = (p: string) => `${WS}/e2e-fixture-root/gitui/${p}`;
-const CHANGES_URI = 'file:///.explorer-search/changes';
 const ATTACH = '.auxiliary-bar .explorer-attach-area';
 const TAB = `${ATTACH} .tabs-container > .tab`;
-const ROW = `${ATTACH} .scm-view .monaco-list-row`;
+// 5.3: a Source Control View mora na Side Bar (view `scm`), não mais na aba "Changes" do anexo — só o endereço mudou.
+const SCM = '[data-testid="side-bar"] [data-testid="side-bar-view-scm"]';
+const ROW = `${SCM} .scm-view .monaco-list-row`;
 
 const git = (...args: string[]) => execFileSync('git', args, { cwd: WS_DIR, encoding: 'utf-8', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
 
@@ -51,22 +52,23 @@ async function openFilesTab(page: import('@playwright/test').Page) {
     });
     await page.waitForTimeout(300);
   }
-  await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+  if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
   await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
   await page.waitForTimeout(300);
 }
-const sessionId = (page: import('@playwright/test').Page) => page.evaluate(() => (document.querySelector('[id^="aux-tab-"][id$="-files"]')!.id).replace(/^aux-tab-/, '').replace(/-files$/, ''));
+const sessionId = (page: import('@playwright/test').Page) => page.evaluate(() => document.querySelector('.auxiliary-bar[data-session-id]')!.getAttribute('data-session-id')!);
 async function openChanges(page: import('@playwright/test').Page) {
   const sid = await sessionId(page);
-  await page.evaluate(([s, u]) => window.__explorerSearchModule!.attach.open({ uri: u, kind: 'changes', sessionId: s }), [sid, CHANGES_URI]);
-  await expect(page.locator(`${ATTACH} .scm-view`)).toBeVisible();
-  await expect(page.locator(`${ATTACH} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
+  // 5.3: a Source Control View vive na view `scm` da Side Bar (clique no ícone; já ativa → não fecha).
+  if ((await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').getAttribute('aria-selected')) !== 'true') await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').click();
+  await expect(page.locator(`${SCM} .scm-view`)).toBeVisible();
+  await expect(page.locator(`${SCM} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
   return sid;
 }
 /** ações inline só aparecem no hover da linha (fidelidade SCM View) */
 async function clickRefresh(page: import('@playwright/test').Page) {
-  await page.locator(`${ATTACH} .scm-view [data-testid="scm-provider"]`).hover();
-  await page.locator(`${ATTACH} .scm-view [data-testid="scm-refresh"]`).click();
+  await page.locator(`${SCM} .scm-view [data-testid="scm-provider"]`).hover();
+  await page.locator(`${SCM} .scm-view [data-testid="scm-refresh"]`).click();
 }
 const rowByName = (page: import('@playwright/test').Page, name: string) => page.locator(`${ROW} .resource`).filter({ has: page.locator(`.label-name:text-is("${name}")`) }).first();
 /** cor computada de `var(token, var(fallback))` no mesmo documento (sem hex no teste).
@@ -82,7 +84,7 @@ const tokenColor = (page: import('@playwright/test').Page, token: string) => pag
   const c = getComputedStyle(el).color; el.remove(); return c;
 }, [token, FALLBACK[token] ?? ''] as const);
 
-test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro do Editor Anexo)', () => {
+test.describe('FATIA-04 · 4.7-b — Source Control View (5.3: dentro da Side Bar)', () => {
   test.beforeAll(() => {
     if (existsSync(join(WS_DIR, '.git'))) rmSync(join(WS_DIR, '.git'), { recursive: true, force: true });
     rmSync(DIR, { recursive: true, force: true });
@@ -99,7 +101,8 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     rmSync(DIR, { recursive: true, force: true });
   });
 
-  test('T1: aba "Changes" fixa — 35 px, primeira posição, ícone source-control, sem ✕, não-preview; fica primeira mesmo abrindo arquivos; Close All não a fecha', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T1: aba "Changes" fixa — 35 px, primeira posição, ícone source-control, sem ✕, não-preview; fica primeira mesmo abrindo arquivos; Close All não a fecha', async ({ page }) => {
     await openFilesTab(page);
     const sid = await openChanges(page);
     const tab = page.locator(TAB).first();
@@ -173,7 +176,8 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
   });
 
   // 4.7-c c2: clique num recurso abre a aba fixa DIFF (não mais o arquivo em preview) — inclusive D (lado modificado vazio).
-  test('T5: clique em M abre a aba fixa Diff "(Working Tree)" mantendo Changes primeira; clique em D abre o diff na MESMA aba; sem repo → frase oficial + "Initialize Repository" (git init real)', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T5: clique em M abre a aba fixa Diff "(Working Tree)" mantendo Changes primeira; clique em D abre o diff na MESMA aba; sem repo → frase oficial + "Initialize Repository" (git init real)', async ({ page }) => {
     await openFilesTab(page);
     const sid = await openChanges(page);
     await rowByName(page, 'mod.txt').click();
@@ -192,7 +196,7 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     // pasta sem repositório
     rmSync(join(WS_DIR, '.git'), { recursive: true, force: true });
     await clickRefresh(page);
-    const empty = page.locator(`${ATTACH} .scm-view [data-testid="scm-no-repo"]`);
+    const empty = page.locator(`${SCM} .scm-view [data-testid="scm-no-repo"]`);
     await expect(empty).toContainText("The folder currently open doesn't have a Git repository.");
     await empty.getByRole('button', { name: 'Initialize Repository' }).click();
     await expect(empty).toHaveCount(0, { timeout: 10_000 });
@@ -236,7 +240,7 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     expect(await row.locator('.monaco-icon-label').evaluate((el) => getComputedStyle(el, '::after').content)).toBe('"M"');
     await ACT('mod.txt', 'stage').click();
     await expect(page.locator(`${ROW}[data-group="index"] ~ .monaco-list-row .resource`).filter({ hasText: 'mod.txt' }).first()).toBeAttached();
-    const staged = page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="index"]`);
+    const staged = page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="index"]`);
     await expect(staged.filter({ hasText: 'mod.txt' })).toHaveCount(1);
     await expect(staged.filter({ hasText: 'mod.txt' }).locator('.monaco-icon-label')).toHaveAttribute('data-letter', 'M');
   });
@@ -244,7 +248,7 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
   test('T7 (c3): hover em Staged mostra só Unstage (codicon-remove); Unstage → volta para Changes', async ({ page }) => {
     page0 = page; reseed();
     await openFilesTab(page); await openChanges(page);
-    const staged = page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: 'staged.txt' });
+    const staged = page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: 'staged.txt' });
     await expect(staged).toHaveCount(1);
     await staged.hover();
     const acts = staged.locator('.actions .action-label');
@@ -260,7 +264,7 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     await openFilesTab(page); const sid = await openChanges(page);
     await page.evaluate(([s, u]) => window.__explorerSearchModule!.attach.open({ uri: u, kind: 'code', sessionId: s, pinned: true }), [sid, U('mod.txt')]);
     await expect(page.locator(`${ATTACH} .attach-monaco-host .view-lines`)).toContainText('v2');
-    await page.locator(TAB).first().click();
+    // 5.3: a lista fica sempre visível na Side Bar — não há aba "Changes" para voltar
     await rowByName(page, 'mod.txt').hover();
     await ACT('mod.txt', 'discard').click();
     await expect(dlg()).toBeVisible();
@@ -277,9 +281,10 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     await expect(rowByName(page, 'mod.txt')).toHaveCount(0);
     expect(readFileSync(join(DIR, 'mod.txt'), 'utf-8')).toBe('v1\n');
     // Monaco recarregou via watcher (arquivo limpo → reload silencioso)
-    await page.locator(TAB).nth(1).click();
+    // 5.3: o arquivo é a ÚNICA aba do anexo (a aba fixa "Changes" não existe mais) — só o índice mudou
+    await page.locator(TAB).first().click();
     await expect(page.locator(`${ATTACH} .attach-monaco-host .view-lines`)).toContainText('v1', { timeout: 10_000 });
-    await expect(page.locator(TAB).nth(1)).not.toHaveClass(/dirty/);
+    await expect(page.locator(TAB).first()).not.toHaveClass(/dirty/);
   });
 
   test('T9 (c3): Discard untracked → diálogo "DELETE … untracked file" [Delete File] → arquivo some do disco e da lista', async ({ page }) => {
@@ -301,11 +306,11 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     await groupRow('workingTree').hover();
     await groupRow('workingTree').locator('[data-testid="scm-group-stage-all"]').click();
     await expect(page.locator(`${ROW} .resource-group`).filter({ hasText: 'Changes' }).last().locator('.monaco-count-badge')).toHaveText('0');
-    await expect(page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="index"]`)).toHaveCount(5);
+    await expect(page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="index"]`)).toHaveCount(5);
     await groupRow('index').hover();
     await groupRow('index').locator('[data-testid="scm-group-unstage-all"]').click();
     await expect(page.locator(`${ROW} .resource-group > .name`)).toHaveText(['Changes']);
-    await expect(page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="workingTree"]`)).toHaveCount(5);
+    await expect(page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="workingTree"]`)).toHaveCount(5);
     await groupRow('workingTree').hover();
     await groupRow('workingTree').locator('[data-testid="scm-group-discard-all"]').click();
     await expect(dlg().locator('.dialog-message')).toContainText('discard ALL changes in');
@@ -325,7 +330,7 @@ test.describe('FATIA-04 · 4.7-b — aba "Changes" (Source Control View dentro d
     await page.keyboard.press('Tab');
     await expect(page.locator(':focus')).toHaveClass(/codicon-add/);
     await page.keyboard.press('Enter');
-    await expect(page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: 'deep.ts' })).toHaveCount(1);
+    await expect(page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="index"]`).filter({ hasText: 'deep.ts' })).toHaveCount(1);
     const row2 = rowByName(page, 'mod.txt').locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " monaco-list-row ")]');
     await row2.focus();
     await page.keyboard.press('Delete');

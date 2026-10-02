@@ -29,7 +29,7 @@ npm run dev
 ```powershell
 cd agente_window/platform/apps/workbench-v2
 npm run typecheck          # esperado: 0 erros
-npx vitest run             # esperado: 708 passed / 9 failed (9 pré-existentes, ver docs/26 §2.5)
+npx vitest run             # esperado: 692 passed / 9 failed / 16 skipped (ver docs/26 §2.5)
 ```
 E2E (Playwright) — **leia `docs/26 §1` antes**: as specs de módulo (12/13/14*) só podem rodar contra o servidor de **fixture na 5175**; contra a 5174 elas apagam arquivos reais.
 ```powershell

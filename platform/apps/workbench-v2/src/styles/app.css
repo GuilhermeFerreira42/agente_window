@@ -3053,6 +3053,63 @@ svg {
   display: contents;
 }
 
+/* ==========================================================================
+   FATIA-05 5.7 — editor FINO por padrão + maximizar/restaurar (docs/24 §4 5.7, D6 corrigida,
+   regra A+2/420 autorizada em 2026-10-01).
+   Faixa chat+editor = .top-right-section = [.main-surface (chat)][.auxiliary-bar (anexo | Detalhes)].
+   • chat: piso 420 px E ≥ 50 % da faixa; o anexo nunca passa de 50 % quando não maximizado
+     (o módulo reclampa a própria largura pelo ResizeObserver do container — core intocado).
+   • "Detalhes" colapsa (display:none) quando só o anexo está aberto; o toggle devolve.
+   • maximizado (.top-right-section.editor-maximized): o centro some e o anexo toma a faixa inteira.
+     Sem position:fixed; lista de sessões, terminal e Status Bar seguem no fluxo (D6/RF-07/RF-09).
+   ========================================================================== */
+.top-right-section > .main-surface {
+  /* 420 px de chat + 2 px de borda do .main-surface */
+  min-width: max(422px, 50%);
+}
+.top-right-section > .auxiliary-bar.has-attach-slot {
+  /* teto 50 % E o piso do chat (422 px + gap 4 px): em faixas < 852 px o piso vence e o anexo cede. */
+  max-width: min(50%, calc(100% - 426px));
+}
+.top-right-section > .auxiliary-bar.has-attach-slot .explorer-attach-area {
+  /* o módulo clampa pelo 50 % da faixa (core); o piso de 420 do chat ele não conhece → encolhe para caber na barra */
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.auxiliary-bar.has-attach-slot.details-collapsed > .auxiliary-column {
+  display: none;
+}
+/* casca vazia: Detalhes colapsada e anexo recolhido (display:none pelo módulo) → não ocupa 1 px da faixa */
+.auxiliary-bar.has-attach-slot.details-collapsed:not(:has(.explorer-attach-area[data-visible="true"])) {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  flex-basis: 0;
+}
+/* "Detalhes" ligada pelo toggle com o editor fino aberto: os dois não cabem nos 50 % (ex.: 1400 px → faixa 774,
+   anexo 356 + Detalhes 333 > 387). Regra 5.7 (a homologar): na faixa fina são EXCLUSIVOS — Detalhes ocupa o lugar
+   do editor; desligar o toggle devolve o editor (as abas ficam no módulo). Nunca os dois espremidos. */
+.top-right-section:not(.editor-maximized) > .auxiliary-bar.has-attach-slot:not(.details-collapsed) .explorer-attach-area {
+  display: none;
+}
+.top-right-section.editor-maximized > .main-surface {
+  display: none;
+}
+.top-right-section.editor-maximized > .auxiliary-bar.has-attach-slot {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+}
+.top-right-section.editor-maximized > .auxiliary-bar.has-attach-slot .explorer-attach-area {
+  /* (o anexo vive dentro do AttachModuleSlot `display:contents` — por isso descendente, não filho) */
+  flex: 1 1 auto;
+  width: auto;
+}
+.top-right-section.editor-maximized > .auxiliary-bar.has-attach-slot > .auxiliary-column {
+  display: none;
+}
+
 .auxiliary-header {
   padding: 0 8px;
 }

@@ -29,6 +29,9 @@ import {
 } from '../core/menus/viewTitleMenus';
 import type { ExplorerViewId, ExplorerViewsVisibility } from '../core/menus/viewTitleMenus';
 import { saveBlob } from './transfer/saveBlob';
+import type { ExplorerActiveFileApi } from './activeFileApi';
+import type { OutlineRow } from '../core/outline/outlineModel';
+import type { TimelineItem } from '../core/timeline/timelineModel';
 import './explorer.css';
 
 export interface ExplorerViewProps {
@@ -42,6 +45,9 @@ export interface ExplorerViewProps {
   /** 4.7-b (transição): abre a aba "Changes" (Source Control) no Editor Anexo a partir
    *  do header da view Folders — ponto de entrada visível SEM precisar abrir um arquivo. */
   onOpenChanges?: () => void;
+  /** 5.6 (A0.6): arquivo ativo do anexo → Outline (símbolos do Monaco) e Timeline (git log).
+   *  Opcional/aditivo: sem ele as seções mostram só a mensagem padrão. */
+  activeFile?: ExplorerActiveFileApi;
 }
 
 const DND_MIME = 'application/vnd.code.tree.explorer';
@@ -256,7 +262,6 @@ class ViewRenderTick {
 interface TransferStatus { kind: 'upload' | 'download'; text: string }
 interface ConflictState { name: string; resolve: (action: 'replace' | 'skip' | 'cancel') => void }
 interface OpenEditorEntry { uri: WorkspaceUri }
-interface TimelineEntry { id: string; label: string; timestampMs: number }
 type PaneId = 'folders' | 'openEditors' | 'outline' | 'timeline';
 const VIEWS_VISIBILITY_STORAGE_KEY = 'explorer-search.viewsVisibility.v1';
 
@@ -271,7 +276,7 @@ const FOLDER_ACTIONS: HeaderAction[] = [
 // ---------------------------------------------------------------------------
 // ExplorerView
 // ---------------------------------------------------------------------------
-export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges }: ExplorerViewProps): React.ReactElement {
+export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges, activeFile }: ExplorerViewProps): React.ReactElement {
   const tickRef = React.useRef<ViewRenderTick | null>(null);
   if (!tickRef.current) tickRef.current = new ViewRenderTick();
   const tick = tickRef.current;
@@ -300,7 +305,12 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   const [transferStatus, setTransferStatus] = React.useState<TransferStatus | null>(null);
   const [conflict, setConflict] = React.useState<ConflictState | null>(null);
   const [openEditors, setOpenEditors] = React.useState<OpenEditorEntry[]>([]);
-  const [timeline, setTimeline] = React.useState<TimelineEntry[]>([]);
+  // 5.6 — Outline/Timeline REAIS (A0.6): seguem o arquivo ativo do anexo.
+  const [activeUri, setActiveUri] = React.useState<WorkspaceUri | null>(() => activeFile?.getActiveUri() ?? null);
+  const [outlineRows, setOutlineRows] = React.useState<OutlineRow[]>(() => activeFile?.outline.rows() ?? []);
+  const [outlineSelected, setOutlineSelected] = React.useState<string | null>(null);
+  const [timeline, setTimeline] = React.useState<TimelineItem[]>([]);
+  const [timelineSelected, setTimelineSelected] = React.useState<string | null>(null);
   const [listFocused, setListFocused] = React.useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
   const dragData = React.useRef<DndData | null>(null);
@@ -328,19 +338,36 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
     if (e.type === 'explorer.fileOpened') {
       setOpenEditors((prev) => (prev.some((o) => o.uri === e.uri) ? prev : [...prev, { uri: e.uri }]));
     }
-    if (e.type === 'fs.changed') {
-      const now = Date.now();
-      setTimeline((prev) => [
-        ...e.changes.map((c, i) => ({
-          id: `${now}-${i}`,
-          label: `${uriBasename(c.uri)} ${c.kind === 'added' ? 'adicionado' : c.kind === 'removed' ? 'removido' : 'alterado'}`,
-          timestampMs: now,
-        })),
-        ...prev,
-      ].slice(0, 20));
-    }
     tick.bump();
   }), [service, tick]);
+
+  // 5.6 — arquivo ativo do anexo (aba `code`) → Outline + Timeline.
+  React.useEffect(() => {
+    if (!activeFile) return;
+    setActiveUri(activeFile.getActiveUri());
+    return activeFile.onActiveChanged((uri) => setActiveUri(uri));
+  }, [activeFile]);
+  React.useEffect(() => {
+    if (!activeFile) return;
+    const sync = () => { setOutlineRows(activeFile.outline.rows()); setOutlineSelected(null); };
+    sync();
+    return activeFile.outline.onChanged(sync);
+  }, [activeFile]);
+  React.useEffect(() => {
+    if (!activeFile || !activeUri) { setTimeline([]); setTimelineSelected(null); return; }
+    let alive = true;
+    setTimeline([]); setTimelineSelected(null);
+    void activeFile.timeline.load(activeUri).then((items) => { if (alive) setTimeline(items); });
+    return () => { alive = false; };
+  }, [activeFile, activeUri]);
+  const onOutlineClick = (row: OutlineRow) => { setOutlineSelected(row.id); activeFile?.outline.reveal(row.line, row.column); };
+  const onTimelineClick = (item: TimelineItem) => {
+    if (!activeFile || !activeUri) return;
+    setTimelineSelected(item.id);
+    void activeFile.timeline.openDiff(activeUri, item).catch(() => undefined);
+  };
+  // Outline só faz sentido quando os símbolos são do arquivo ativo (o tracker zera ao trocar de modelo).
+  const outlineVisibleRows = activeUri ? outlineRows : [];
 
   // ---- context keys (04_03 §7) publicadas via menus.setContext ----
   const computeContext = React.useCallback((contextUri?: WorkspaceUri | null): ExplorerContextValues => {
@@ -942,7 +969,43 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
 
               {/* ---- Outline ---- */}
               {viewsVisibility.outline && <Pane id="outline" title="Outline" ariaLabel="Outline Section" expanded={expandedPanes.outline} onToggle={() => togglePane('outline')} onHeaderContextMenu={onPaneHeaderContextMenu('outline')}>
-                <div className="outline-pane"><div className="pane-message">No symbols found in document</div></div>
+                <div className="outline-pane">
+                  {outlineVisibleRows.length === 0
+                    ? <div className="pane-message">No symbols found in document</div>
+                    : (
+                      <div className="monaco-list" role="tree" aria-label="Outline">
+                        <div className="monaco-scrollable-element" role="presentation">
+                          <div className="monaco-list-rows" style={{ height: outlineVisibleRows.length * ROW_HEIGHT }}>
+                            {outlineVisibleRows.map((r, i) => (
+                              <div
+                                key={r.id}
+                                className={`monaco-list-row${outlineSelected === r.id ? ' selected focused' : ''}`}
+                                role="treeitem"
+                                aria-level={r.depth + 1}
+                                aria-label={r.name}
+                                data-symbol-kind={r.kind}
+                                title={r.detail ? `${r.name} ${r.detail}` : r.name}
+                                style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px`, paddingLeft: 8 + r.depth * 8 }}
+                                onClick={() => onOutlineClick(r)}
+                              >
+                                <div className="monaco-tl-row">
+                                  <div className="monaco-tl-indent" style={{ width: 8 }} />
+                                  <div className="monaco-tl-twistie" style={{ paddingRight: 6 }} />
+                                  <div className="monaco-tl-contents">
+                                    <div className="outline-element">
+                                      <span className={`codicon codicon-symbol-${r.kind} outline-element-icon`} aria-hidden="true" />
+                                      <span className="outline-label">{r.name}</span>
+                                      {r.detail && <span className="outline-detail">{r.detail}</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
               </Pane>}
 
               {/* ---- Timeline ---- */}
@@ -951,12 +1014,32 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                   {timeline.length === 0
                     ? <div className="pane-message">The active editor cannot provide timeline information.</div>
                     : (
-                      <div className="monaco-list" role="list">
+                      <div className="monaco-list" role="tree" aria-label="Timeline">
                         <div className="monaco-scrollable-element" role="presentation">
                           <div className="monaco-list-rows" style={{ height: timeline.length * ROW_HEIGHT }}>
                             {timeline.map((t, i) => (
-                              <div key={t.id} className="monaco-list-row" role="listitem" style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px`, paddingLeft: 20 }}>
-                                <span className="timeline-label">{t.label}</span>
+                              <div
+                                key={t.id}
+                                className={`monaco-list-row${timelineSelected === t.id ? ' selected focused' : ''}`}
+                                role="treeitem"
+                                aria-level={1}
+                                aria-label={`${t.label}, ${t.author}, ${t.relative}`}
+                                data-sha={t.sha}
+                                title={`${t.label}\n${t.author} • ${new Date(t.timestamp).toLocaleString()}`}
+                                style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px`, paddingLeft: 8 }}
+                                onClick={() => onTimelineClick(t)}
+                              >
+                                <div className="monaco-tl-row">
+                                  <div className="monaco-tl-twistie" style={{ paddingRight: 6 }} />
+                                  <div className="monaco-tl-contents">
+                                    <div className="timeline-item">
+                                      <span className="codicon codicon-git-commit timeline-icon" aria-hidden="true" />
+                                      <span className="timeline-label">{t.label}</span>
+                                      <span className="timeline-author">{t.author}</span>
+                                      <span className="timeline-timestamp">{t.relative}</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>

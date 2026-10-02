@@ -21,11 +21,8 @@ import { useEditorVersion } from './useEditorVersion';
 import { AttachDialog } from './AttachDialog';
 import { ATTACH_STRINGS } from './attachStrings';
 import { AttachEmptyState } from './AttachEmptyState';
-import { ChangesPane } from './changes/ChangesPane';
 import { DiffPane } from './diff/DiffPane';
 import type { GitService } from '../../core/git/gitService';
-import { ATTACH_DIFF_URI, ATTACH_CHANGES_URI } from '../../core/editor/editorService';
-import { CHANGES_STRINGS } from './changes/changesStrings';
 import { uriBasename } from '../../core/uri';
 import '../explorer.css';
 import './attach.css';
@@ -46,7 +43,8 @@ export interface AttachAreaProps {
   onSave?: (uri: WorkspaceUri) => Promise<void>;
   /** c5: recarrega do disco (conflito externo → "Recarregar"). */
   onReload?: (uri: WorkspaceUri) => Promise<void>;
-  /** 4.7-b c2: serviço Git (aba fixa "Changes"). Ausente → sem botão/aba. */
+  /** 4.7-b c2: serviço Git. 5.3: a Source Control View saiu do anexo (vive na Side Bar);
+   *  mantido só para o EditorTabs (contagem em tooltips). */
   git?: GitService;
   children?: React.ReactNode;
 }
@@ -167,18 +165,13 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
   // c6 — maximizado: largura = teto do clamp (dentro da banda da sessão); a
   // largura do usuário fica intacta no store e volta no restore.
   const style = { [ATTACH_WIDTH_CSS_VAR]: `${maximized ? maxWidth : width}px`, display: visible ? undefined : 'none' } as React.CSSProperties;
-  const isChangesActive = activeTab?.kind === 'changes';
+  // 5.3 (decisão A): a aba fixa "Changes" NÃO mora mais no anexo — a Source Control View
+  // vive na view `scm` da Side Bar (mountScm). Aqui só sobram arquivos e a aba fixa Diff.
   // 4.7-c c1: aba fixa Diff (sem breadcrumbs — a uri é sintética)
   const isDiffActive = activeTab?.kind === 'diff';
   const diffPayload = isDiffActive ? editor.getDiff(sessionId) : null;
-  const openChanges = () => editor.open({ sessionId, uri: ATTACH_CHANGES_URI, kind: 'changes', pinned: true });
   const headerActions = (
     <>
-      {git && (
-        <button type="button" className="action-label codicon codicon-source-control" data-testid="attach-open-changes"
-          aria-pressed={isChangesActive} title={CHANGES_STRINGS.openChanges} aria-label={CHANGES_STRINGS.openChanges}
-          onClick={openChanges} />
-      )}
       <button type="button" className={`action-label codicon ${maximized ? 'codicon-screen-normal' : 'codicon-screen-full'}`}
         data-testid="attach-maximize" aria-pressed={maximized}
         title={maximized ? ATTACH_STRINGS.restore : ATTACH_STRINGS.maximize} aria-label={maximized ? ATTACH_STRINGS.restore : ATTACH_STRINGS.maximize}
@@ -207,17 +200,13 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
           {activeTab ? (
             <div className="title tabs show-file-icons">
               <EditorTabs editor={editor} sessionId={sessionId} onCloseBlocked={requestClose} actions={headerActions} git={git} />
-              {!isChangesActive && !isDiffActive && <Breadcrumbs root={root} uri={activeTab.uri} />}
+              {!isDiffActive && <Breadcrumbs root={root} uri={activeTab.uri} />}
             </div>
           ) : (
             <div className="title tabs attach-empty-title-bar"><div className="tabs-and-actions-container"><div className="monaco-scrollable-element" /><div className="editor-actions">{headerActions}</div></div></div>
           )}
           <div className="editor-container">
             {!activeTab && <AttachEmptyState />}
-            {isChangesActive && git && (
-              <ChangesPane git={git} root={root} onOpenFile={(uri) => editor.open({ sessionId, uri, kind: 'code' })}
-                onOpenDiff={(item, sides) => editor.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })} />
-            )}
             {isDiffActive && diffPayload && <DiffPane sessionId={sessionId} payload={diffPayload} />}
             <CodeEditorPane editor={editor} sessionId={sessionId} fs={fs} onEditorReady={onEditorReady}
               onSaveRequest={(uri) => { void doSave(uri); }}

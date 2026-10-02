@@ -66,7 +66,7 @@ Os 3 commits da §7. Ao final do c3, **PARE**. Não comece a 5.2.
 | D3 | Idioma da UI | **Inglês** nas peças novas/migradas. Resto do shell **não é traduzido** — fica como está |
 | D4 | Porta | **Single Port 5174** (sem `.env`; caminhos relativos `/fs/*` e `/git/*`) |
 | D5 | Ícones na Activity Bar em 5.1 | **3** (Explorer, Search, Source Control). Browser só em 4.8 |
-| D6 | AttachArea (editor real) | **Direita da árvore em 5.1–5.3, migra pro centro em 5.7** |
+| D6 (v1.2 — 2026-10-02) | AttachArea (editor real) | **Permanece fino à direita (AuxiliaryBar) como default — o chat é o foco principal.** Na 5.7 ganha o estado `editorMaximized` (A0.7, 2026-09-30): o botão maximizar do editor faz ele **tomar o centro e esconder o chat**; restaurar volta para `[chat][editor fino]`; persistido em `workbench.layoutState.v1`. **Maximizado = `[lista 300][EDITOR flex][Side Bar 274][Activity Bar 48]` — a Side Bar NÃO recolhe no maximize, só o chat some (decisão do usuário, homologação 2026-10-02; em 1400 px o editor mede ~767).** **Nunca** migra permanentemente para o centro (corrigido em A0.7 — a redação anterior "migra pro centro em 5.7" estava errada; ver §4 5.7 e fontes) |
 | D7 | Timeline/Outline | **Seções internas do Explorer**. Vazias em 5.1, reais em 5.6. **Não** são abas do painel inferior |
 | D8 | Numeração das fatias | **FATIA-06 = Chat + Runtime de Agente** (canônica) |
 | D9 | Gerenciador de pacotes | **npm** (não pnpm) |
@@ -194,11 +194,30 @@ Comparado ao rascunho v1.0, esta versão corrige:
 
 ---
 
-### 5.7 — AttachArea migra pro centro
+### 5.7 — Toggle maximizar/restaurar o editor da AuxiliaryBar (RF-09 ampliado) — escopo corrigido em A0.7 (2026-09-30)
 
-**Entrega:** o editor real migra para o centro da tela. O EditorArea do shell fica só com Browser e Customizations. O AttachArea vira o editor central de código.
+> **Correção de produto (A0.7):** a redação original ("AttachArea migra pro centro permanentemente") **estava errada** para a Agents Window. No original, o chat é a superfície principal e o editor de código é um painel **docado ao lado do chat**, que só toma a tela inteira pelo toggle **Maximize Editor Area / Restore Editor Area** (doc oficial "Configure the Agents window → Use the single-pane editor panel": *"Files and diffs open in the docked editor next to the chat … Use Hide Editor, Toggle Details, and Maximize Editor Area or Restore Editor Area to adjust the layout"*; "Use the Agents window → Interface overview": *"Files and diffs open in an editor beside the chat or in a modal window"*). O VS Code geral tem o mesmo padrão em **View: Toggle Maximize Editor Group** (`Ctrl+K Ctrl+M`), que esconde os outros grupos e volta ao clicar de novo. Fontes: https://code.visualstudio.com/docs/agents/run/agents-window-configuration · https://code.visualstudio.com/docs/agents/run/agents-window · https://code.visualstudio.com/docs/configure/custom-layout#_maximize-and-expand-an-editor-group
 
-**DoD:** E2E provando que abrir arquivo abre no centro; Browser e Customizations continuam funcionando; terminal continua embaixo; lista de conversas continua na esquerda.
+> **Regra de larguras autorizada em 2026-10-01 ("A + 2 com piso 420")** — achado da auditoria antes do código: em 1400 px, abrir arquivo deixava o chat com **72 px** (print `auditoria_05/c5.7/00_antes…`): a coluna "Detalhes" (330 px) era forçada a aparecer junto do anexo e ninguém garantia largura mínima ao chat. Regra:
+> 1. **Chat ≥ 420 px e ≥ 50 % da faixa chat+editor** (`.top-right-section`); **editor fino ≤ 50 %** quando não maximizado (`ATTACH_MAX_WIDTH_RATIO` 0.75 → **0.5** — exceção pontual de 1 constante no `core`, autorizada). Default do anexo continua 46 % (≈ 356 px em 1400 px).
+> 2. **"Detalhes" colapsa sozinha (0 px) na 1.ª aba do anexo**; continua acessível pelo toggle "Barra auxiliar". Na faixa fina os dois são **exclusivos** (Detalhes ligada mostra a coluna no lugar do editor; desligar devolve o editor) — evita o colapso de 47 px que apareceria se os dois dividissem os 50 %.
+> 3. Quando o piso de 420 vence os 50 % (faixa < 852 px), a barra fica em `min(50 %, 100 % − 426 px)` e o anexo cede (CSS do shell; o módulo só conhece o 50 %).
+> 4. Maximizado = `[lista][EDITOR][Side Bar][Activity Bar]`, Side Bar **= 274 visível** (RF-09 revogado para a 5.7 — decisão 2026-10-02, v1.2; substitui a confirmação de 2026-10-01 que mantinha Side Bar = 0).
+
+**Comportamento-alvo:**
+- **Default:** `[lista de sessões 300] [CHAT flex, min 420 e ≥ 50 %] [editor fino ≈ 360 (min 280, max 50 %) na AuxiliaryBar] [Side Bar 274] [Activity Bar 48]` + terminal embaixo. Coluna "Detalhes" = 0 px com arquivo aberto (toggle devolve).
+- **Maximizar** (botão `codicon-screen-full` que o AttachArea já tem desde o c6 da 4.7, hoje só alarga dentro da AuxiliaryBar): o editor **toma o centro** (largura do chat + da AuxiliaryBar) e o **chat fica escondido**; a lista de sessões e o terminal continuam visíveis; Side Bar **fica visível (274)** — v1.2 revogou o RF-09 para a 5.7. Layout: `[lista] [EDITOR] [Side Bar] [Activity Bar]` + terminal.
+- **Restaurar** (`codicon-screen-normal`, mesmo botão): volta exatamente para `[chat][editor fino]` com a largura anterior.
+- Estado `editorMaximized` persistido em `workbench.layoutState.v1` (F5 mantém); por sessão não — é global do layout, como `sideBarVisible`.
+- O chat **nunca** deixa de ser o foco principal no default.
+
+**Não faz:** mover AttachArea/Browser/Customizations permanentemente; mexer no `EditorArea.tsx` do shell além do necessário (ele continua só com Browser/Customizations); tocar terminal, `core/**`, `server/**`.
+
+**Como (indicativo):** `layoutState` ganha `editorMaximized` (+ `toggleEditorMaximized`); `App.tsx` (wiring aditivo via barrel) ouve o evento `attach.maximizedChanged` do módulo — ou passa um callback — e aplica a classe/estado que esconde o chat e estica a AuxiliaryBar sobre o centro; Side Bar intocada pelo maximizar/restaurar (v1.2). O módulo continua dono do botão; o shell decide a geometria.
+
+**DoD:** E2E (spec falhando antes) provando: clicar maximizar → chat escondido, editor ocupa o centro, lista de sessões visível, terminal visível, Side Bar escondida; clicar restaurar → chat volta e o editor volta fino com a largura anterior; F5 mantém o estado; Browser e Customizations continuam funcionando no EditorArea; abrir arquivo no Explorer **continua** abrindo no editor fino (não maximiza sozinho).
+
+**Entregue (`9a11319`, 2026-10-01)** — spec `sessao_15_editor_maximize` T30–T32 (falhou antes: `chat 72 px`, chat visível no maximizado, **0 abas com Browser ativo**; passa depois 3/3). Causas reais do "bug do vídeo": (a) `setAuxiliaryVisible(true)` ao abrir arquivo forçava a "Detalhes"; (b) `resolveDetailPanelVisible` escondia a AuxiliaryBar inteira com o Browser ativo → anexo desmontado → `attach.open` ficava em `pendingAttachOpen` até o F5. Correção: AuxiliaryBar **sempre montada** com o módulo (Regra 10), `detailsVisible` governa só a coluna; `attachExpandedSessions` por eventos `editor.attachExpanded/Collapsed`; `layoutState.editorMaximized` espelha `editor.attachMaximized/Restored`; CSS em `.top-right-section` (`.editor-maximized` esconde `.main-surface` e estica o anexo). Specs antigas atualizadas com autorização: `sessao_14` T1/T2/T3/T14/T15/T16 (teto 50 %, Detalhes colapsa/exclusiva), `activity_bar` T4b (chat some no maximizado); T8/T9 ganharam espera de foco (flake de digitar antes do painel). O módulo **não** persiste abas abertas (fato da 4.7): após F5 o arquivo precisa ser reaberto e volta maximizado. Efeito colateral aceito: com todas as abas fechadas e Detalhes colapsada o chat centraliza em 950 px (estado `closed` do side pane).
 
 ---
 
@@ -259,9 +278,9 @@ Regra: se não foi medido, escrever literalmente **"não medido — validar na h
 | RF-04 | Search migra para o painel largo na 5.2 com debounce 250 ms | Search no painel largo; requisição anterior cancelada | Must |
 | RF-05 | SCM migra para o painel largo na 5.3; maquete removida | `gitTransition.ts`, `initialDiffFiles`, `buildProjectDiffFiles` deletados; `/git/*` real funciona | Must |
 | RF-06 | Abrir arquivo **não fecha** Search nem Changes | E2E: abrir Search → abrir arquivo → Search visível | Must |
-| RF-07 | AttachArea faseado | Direita em 5.1–5.3; centro em 5.7 | Must |
+| RF-07 | AttachArea fino à direita (default) | Direita sempre; na 5.7 só ganha o toggle maximizado (A0.7) | Must |
 | RF-08 | Outline/Timeline como seções do Explorer | Colapsáveis em 5.1 (vazias), reais em 5.6 | Should |
-| RF-09 | Maximizar esconde a Side Bar, mantém lista de conversas e terminal | E2E: maximize → Side Bar hidden, lista visível, terminal visível | Must |
+| RF-09 | ~~Maximizar esconde a Side Bar~~ **Revogado para a 5.7 (v1.2, 2026-10-02): maximizar mantém a Side Bar 274**, lista de conversas e terminal | E2E: maximize → Side Bar visível 274 ±2, chat hidden, lista visível, terminal visível (15_editor_maximize T30, 15_activity_bar T4b) | Must |
 | RF-10 | Activity Bar movível (left/right/top/bottom) na 5.4 | menu de contexto muda posição; persiste após reload | Should |
 | RF-11 | Sem badge numérico no ícone do Search; sem animação de 200 ms na Side Bar | badge inexistente; Side Bar abre < 50 ms | Must |
 | RF-12 | Terminal intocável | `npm run typecheck` 0; `sessao_11_terminal_pty_real` 6/6 | Must |
@@ -293,7 +312,7 @@ Regra: se não foi medido, escrever literalmente **"não medido — validar na h
 | ADR | Decisão | Alternativa rejeitada |
 |---|---|---|
 | 01 | Activity Bar + Side Bar **à direita** | Esquerda — quebra fluxo atual |
-| 02 | AttachArea **faseado** (direita 5.1–5.3 → centro 5.7) | Mover já na 5.1 — quebra E2E |
+| 02 | AttachArea **fino à direita como default**; centro só no toggle maximizado (5.7, A0.7) | Migração permanente pro centro — rejeitada em A0.7 (contraria o original: chat é o foco) |
 | 03 | `viewRegistry` + `layoutState` em `src/shell/` | `src/modules/` — não é domínio do módulo; `src/core/` — pasta nova sem precedente |
 | 04 | Remover maquete + `gitTransition.ts` em 5.3 | Manter — código morto bloqueia o SCM real |
 | 05 | Timeline/Outline como **seções do Explorer** | Abas do painel — diverge do VS Code |
@@ -332,7 +351,7 @@ src/
 │  ├─ editor/                      (vazio em 5.1 — Breadcrumbs vive no módulo)
 │  ├─ layoutState.ts               (chave `workbench.layoutState.v1`)
 │  ├─ viewRegistry.ts              (3 views em 5.1; aceita container: 'left'|'right')
-│  ├─ EditorArea.tsx               (legado — só Browser/Custom após 5.7)
+│  ├─ EditorArea.tsx               (legado — só Browser/Custom; 5.7 NÃO o substitui)
 │  └─ Workbench.tsx                (orquestra lista + centro + sideBar + activityBar + terminal)
 └─ modules/explorer-search/
    ├─ index.ts                     (só aditivo)
@@ -340,12 +359,12 @@ src/
    ├─ core/                        (INTOCÁVEL na FATIA-05)
    ├─ server/                      (INTOCÁVEL na FATIA-05)
    └─ ui/
-      ├─ attach/AttachArea.tsx     (direita em 5.1–5.3; migra pro centro em 5.7)
+      ├─ attach/AttachArea.tsx     (direita sempre; 5.7 = toggle maximizar toma o centro / restaurar)
       ├─ attach/Breadcrumbs.tsx    (JÁ EXISTE desde 4.7)
       ├─ attach/EditorTabs.tsx     (JÁ EXISTE desde 4.7; menu cresce em 5.8)
       ├─ attach/CodeEditorPane.tsx (Monaco; Alt+Z entra em 5.8)
       ├─ attach/changes/           (migra pro painel largo em 5.3)
-      ├─ attach/diff/              (migra pro editor central em 5.3; ajuste fino em 5.7)
+      ├─ attach/diff/              (aba fixa Diff no anexo; acompanha o toggle maximizado em 5.7)
       └─ search/                   (migra pro painel largo em 5.2)
 ```
 
@@ -420,7 +439,7 @@ Cada sub-fase só fecha quando:
 
 | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|
-| Mover Explorer quebra abertura de arquivo | Média | Alta | Faseamento direita→centro na 5.7 |
+| Mover Explorer quebra abertura de arquivo | Média | Alta | AttachArea não se move (A0.7); só o toggle maximizado na 5.7 |
 | Migrar o slot do Explorer remonta o módulo e some o estado da árvore | Média | Alta | `module.mount` idempotente por design; E2E obrigatório no c3 "expandir → migrar → continua expandido" |
 | Testes 12/13/14 usam seletores dentro de `.auxiliary-bar` | Alta | Alta | `grep` antes do c3; ajustar **só seletor**, nunca lógica |
 | Tocar `Workbench.tsx` quebra terminal | Baixa | Alta | Terminal intocável; E2E 6/6 obrigatório em cada commit |

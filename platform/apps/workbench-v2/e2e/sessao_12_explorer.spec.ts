@@ -64,7 +64,7 @@ async function openExplorerTab(page: import('@playwright/test').Page) {
     });
     await page.waitForTimeout(300);
   }
-  await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+  if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
   await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
   // expande a pasta-semente para expor os itens dos testes (e seleção fica nela:
   // criar arquivo/pasta cai DENTRO da semente, não na raiz do workspace)
@@ -854,7 +854,7 @@ test.describe('FATIA-04 · 4.4 — Explorer real na barra auxiliar (dev server f
         b?.click();
       });
     }
-    await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+    if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
     await expect(view).toBeVisible();
     await expect(header('Timeline Section'), 'oculto após reload').toHaveCount(0);
     await expect(header('Outline Section')).toBeVisible();

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { initialDiffFiles, initialSessions } from '../data'
+import { initialSessions } from '../data'
+import type { DiffFile } from '../types'
+
+// FATIA-05 5.3: `initialDiffFiles` (maquete "Changes N") saiu de `data.ts`. Este teste é do MOTOR
+// (`setDiffAccepted`/`setAllDiffsAccepted` do domínio), não da maquete — só a massa de dados virou
+// fixture local com os mesmos ids; nenhuma asserção mudou.
+const initialDiffFiles: DiffFile[] = [
+  { id: 'diff-1', path: 'src/browser/parts/titlebarPart.ts', status: 'modified', added: 54, removed: 12, original: 'a', modified: 'b' },
+  { id: 'diff-2', path: 'src/browser/parts/media/titlebarpart.css', status: 'added', added: 20, removed: 0, original: '', modified: 'c' },
+]
 import {
   assertBrowserOwnership,
   getBrowserTabForView,

@@ -26,13 +26,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ExplorerView } from './ui/ExplorerView';
 import { SearchPanel } from './ui/search/SearchPanel';
 import { AttachArea, type AttachAreaProps } from './ui/attach/AttachArea';
+import { ChangesPane } from './ui/attach/changes/ChangesPane';
 import type { CodeEditorPaneApi } from './ui/attach/CodeEditorPane';
 import { AttachLayoutStore } from './core/attach/attachLayout';
-import { ATTACH_CHANGES_URI, EditorService } from './core/editor/editorService';
+import { ATTACH_DIFF_URI, EditorService } from './core/editor/editorService';
 import { GitService } from './core/git/gitService';
 import { BrowserGitPort } from './core/git/browserGitPort';
 import { saveBlob } from './ui/transfer/saveBlob';
-import { uriDirname } from './core/uri';
+import { uriBasename, uriDirname } from './core/uri';
+import { createMonacoOutlineTracker } from './ui/attach/monacoOutline';
+import { BrowserTimelinePort } from './core/timeline/browserTimelinePort';
+import { resolveCommitDiff, toTimelineItems } from './core/timeline/timelineModel';
+import type { ExplorerActiveFileApi } from './ui/activeFileApi';
 
 // ---------------------------------------------------------------------------
 // Stubs (4.6/4.7): interfaces assimiladas agora, implementação nas sub-fatias
@@ -79,6 +84,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let slotContainer: HTMLElement | null = null;
   let searchRoot: Root | null = null;
   let searchContainer: HTMLElement | null = null;
+  let scmRoot: Root | null = null;
+  let scmContainer: HTMLElement | null = null;
   const unmountAttach = () => {
     const root = attachRoot;
     attachRoot = null;
@@ -92,8 +99,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // 4.7 c1 — Editor Anexo: layout puro + root React no `attachSlot` da barra.
   const attachLayout = new AttachLayoutStore(typeof localStorage === 'undefined' ? null : localStorage);
   const editorService = new EditorService();
-  // 4.7-b c2 — Git (aba fixa "Changes"): raiz = raiz do workspace (decisão do usuário);
-  // o primeiro status só acontece quando a aba é aberta (setRoot no ChangesPane).
+  // 4.7-b c2 — Git: raiz = raiz do workspace (decisão do usuário); o primeiro status
+  // acontece quando o ChangesPane monta (setRoot). 5.3: o pane vive na view `scm` da
+  // Side Bar (montada 1× pelo shell), então o status — e o badge — nascem no boot.
   const gitService = new GitService(new BrowserGitPort());
   const offGitEvents = gitService.onEvent((e) => events.fire(e));
   // c5 — save ATÔMICO: conteúdo do modelo → fs.writeFile({atomic:true}) (temp +
@@ -122,9 +130,22 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     const sessionId = attachSessionId ?? '';
     events.fire(e.maximized ? { type: 'editor.attachMaximized', sessionId } : { type: 'editor.attachRestored', sessionId });
   });
+  // 5.7 fix (BUG 5.7-02, homologação 2026-10-01, X do HEADER = recolher): anexo recolhido com o editor maximizado
+  // deixava chat 0 / Side Bar 0 (tela preta). Recolher restaura primeiro — vale para o X do header e para a API setVisible.
+  const offLayoutVis = attachLayout.onEvent((e) => {
+    if (e.type === 'attach.visibilityChanged' && !e.visible && attachLayout.isMaximized()) attachLayout.setMaximized(false);
+  });
   const offEditor = editorService.onEvent((e) => {
     if (e.type === 'editor.attachExpanded') attachLayout.setVisible(e.sessionId, true);
-    if (e.type === 'editor.attachCollapsed') attachLayout.setVisible(e.sessionId, false);
+    // 5.7 fix (BUG 5.7-02): após o X do header (recolher, abas vivas) um clique num arquivo JÁ aberto só muda a ativa —
+    // o serviço só dispara `attachExpanded` na 1.ª aba. Abrir/ativar com o anexo recolhido reexibe o anexo.
+    if ((e.type === 'editor.tabOpened' || (e.type === 'editor.activeChanged' && e.uri !== null)) && !attachLayout.isVisible(e.sessionId)) attachLayout.setVisible(e.sessionId, true);
+    if (e.type === 'editor.attachCollapsed') {
+      attachLayout.setVisible(e.sessionId, false);
+      // 5.7 fix (BUG 5.7-02/04): sem abas não existe "editor maximizado" — restaura antes de recolher, senão o shell
+      // fica com chat escondido/Side Bar recolhida e a próxima aba já nasce maximizada.
+      if (attachLayout.isMaximized()) attachLayout.setMaximized(false);
+    }
     events.fire(e);
   });
   let attachRoot: Root | null = null;
@@ -132,7 +153,38 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let attachSessionId: string | null = null;
   let attachMonaco: import('monaco-editor').editor.IStandaloneCodeEditor | null = null;
   let attachPaneApi: CodeEditorPaneApi | null = null;
-  const onEditorReady: AttachAreaProps['onEditorReady'] = (ed, api) => { attachMonaco = ed; attachPaneApi = api; };
+  // 5.6 (A0.6) — Outline lê os símbolos do modelo ativo do Monaco do anexo; Timeline
+  // fala com /git/log + /git/show(sha). Tudo aditivo: ExplorerView recebe `activeFile`.
+  const outlineTracker = createMonacoOutlineTracker();
+  const timelinePort = new BrowserTimelinePort();
+  const onEditorReady: AttachAreaProps['onEditorReady'] = (ed, api) => { attachMonaco = ed; attachPaneApi = api; outlineTracker.attach(ed); };
+  const activeCodeUri = (): WorkspaceUri | null => {
+    if (!attachSessionId) return null;
+    const t = editorService.getActive(attachSessionId);
+    return t && t.kind === 'code' ? t.uri : null;
+  };
+  const activeFileApi: ExplorerActiveFileApi = {
+    getActiveUri: activeCodeUri,
+    onActiveChanged(cb) {
+      let last = activeCodeUri();
+      return editorService.onEvent((e) => {
+        if (e.type !== 'editor.activeChanged' && e.type !== 'editor.tabClosed' && e.type !== 'editor.tabOpened') return;
+        const cur = activeCodeUri();
+        if (cur !== last) { last = cur; cb(cur); }
+      });
+    },
+    outline: { rows: () => outlineTracker.rows(), onChanged: (cb) => outlineTracker.onChanged(cb), reveal: (l, c) => outlineTracker.reveal(l, c) },
+    timeline: {
+      async load(uri) {
+        try { return toTimelineItems(await timelinePort.log(deps.workspaceRoot, uri), uriBasename(uri)); }
+        catch { return []; } // fora do workspace / servidor sem git → sem timeline (mensagem padrão)
+      },
+      async openDiff(uri, item) {
+        const sides = await resolveCommitDiff(timelinePort, deps.workspaceRoot, uri, item);
+        openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: uri, title: sides.title, original: sides.original, modified: sides.modified } }));
+      },
+    },
+  };
   const attachProps = (sessionId: string): AttachAreaProps => ({ store: attachLayout, sessionId, editor: editorService, root: deps.workspaceRoot, fs: deps.fs, onEditorReady, onSave: attachSave, onReload: attachReload, git: gitService });
   // c6 — abrir match: mesmo caminho do Explorer (reveal + open → emite
   // `explorer.fileOpened`, seleciona na árvore). Se a árvore não resolver o
@@ -151,6 +203,23 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const onOpenMatch = (m: SearchMatch) => {
     openInAttachSession((sessionId) => editorService.open({ sessionId, uri: m.uri, kind: 'code', line: m.line, column: m.column }));
     void service.reveal({ uri: m.uri }).catch(() => undefined);
+  };
+  // 5.3 — Source Control View na Side Bar: mesmo ChangesPane da 4.7-b; clique num
+  // recurso abre o diff read-only NO ANEXO (aba fixa Diff — até a 5.7).
+  const scmElement = () => createElement('div', { className: 'explorer-viewlet scm-viewlet', 'data-testid': 'scm-viewlet' },
+    createElement(ChangesPane, {
+      git: gitService, root: deps.workspaceRoot,
+      onOpenFile: (uri: WorkspaceUri) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri, kind: 'code' })),
+      onOpenDiff: (item, sides) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })),
+    }));
+  const unmountScm = () => {
+    const root = scmRoot;
+    scmRoot = null;
+    if (scmContainer) {
+      scmContainer.remove();
+      scmContainer = null;
+    }
+    if (root) setTimeout(() => root.unmount(), 0); // ver comentário em unmountSearch
   };
   const unmountSearch = () => {
     // O shell chama isto no cleanup de um effect (troca de aba) — desmontar um
@@ -226,8 +295,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       reactRoot.render(
         createElement(ExplorerView, {
           service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
-          // 4.7-b: entrada visível da aba Changes (header Folders) — mesma sessão do anexo.
-          onOpenChanges: () => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_CHANGES_URI, kind: 'changes', pinned: true })),
+          // 5.3: "Open Source Control" (header Folders) → view `scm` da Side Bar (o shell decide onde ela vive).
+          onOpenChanges: deps.openSourceControl,
+          activeFile: activeFileApi, // 5.6
         }),
       );
     },
@@ -248,6 +318,19 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     },
 
     unmountSearch,
+
+    mountScm(root: HTMLElement): void {
+      if (scmRoot && scmContainer && scmContainer.parentElement === root) return; // mesmo host → nada a fazer (mount 1×)
+      unmountScm();
+      const container = root.ownerDocument.createElement('div');
+      container.style.display = 'contents';
+      root.appendChild(container);
+      scmContainer = container;
+      scmRoot = createRoot(container);
+      scmRoot.render(scmElement());
+    },
+
+    unmountScm,
 
     mountAttach(root: HTMLElement, opts: { sessionId: string }): void {
       // mesmo host → só re-render (sessão trocou); host novo → remonta.
@@ -299,9 +382,11 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
         slotContainer = null;
       }
       unmountSearch();
+      unmountScm();
       unmountAttach();
       offEditor();
-      offLayoutMax();
+      offLayoutMax(); offLayoutVis();
+      outlineTracker.dispose(); // 5.6
       editorService.dispose();
       attachLayout.dispose();
       offGitEvents();

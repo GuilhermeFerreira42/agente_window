@@ -185,6 +185,10 @@ export interface IExplorerSearchModuleDeps {
     }> }): void;
   };
   workspaceRoot: WorkspaceUri;   // raiz única (Q4: single-root nesta fase)
+  /** FATIA-05 5.3 (aditivo): o shell decide onde a Source Control View vive (view `scm`
+   *  da Side Bar). "Open Source Control" (header do Explorer) chama isto em vez de abrir
+   *  uma aba no anexo. OPCIONAL — ausente = a ação não é exibida. */
+  openSourceControl?: () => void;
 }
 
 export interface IExplorerSearchModule {
@@ -204,6 +208,11 @@ export interface IExplorerSearchModule {
    *  árvore). `attach.setVisible` só alterna display:none — nunca desmonta. */
   mountAttach(root: HTMLElement, opts: { sessionId: string }): void;
   unmountAttach(): void;
+  /** FATIA-05 5.3 (evolução ADITIVA, decisão A 2026-09-30): renderiza a Source Control
+   *  View (ChangesPane real da 4.7-b) dentro do slot dado — o shell a coloca na view
+   *  `scm` da Side Bar. Clique num recurso abre o diff no anexo. Só DOM dentro de `root`. */
+  mountScm(root: HTMLElement): void;
+  unmountScm(): void;
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void;
   dispose(): void;               // libera watchers, comandos registrados, listeners
 }

@@ -1,4 +1,4 @@
-import type { DiffFile, SearchResult, Session } from './types'
+import type { SearchResult, Session } from './types'
 
 const setupMessages = [
   {
@@ -336,77 +336,7 @@ export const customGroupLabels: Record<string, string> = {
   a11y: 'Acessibilidade',
 }
 
-export const initialDiffFiles: DiffFile[] = [
-  {
-    id: 'diff-1',
-    path: 'src/browser/parts/titlebarPart.ts',
-    status: 'modified',
-    added: 54,
-    removed: 12,
-    original: `export class TitlebarPart {\n  readonly hasMenubar = true;\n\n  render() {\n    return this.createMenuBar();\n  }\n}`,
-    modified: `export class TitlebarPart {\n  readonly hasMenubar = false;\n\n  render() {\n    return this.createCommandCenter();\n  }\n}`,
-  },
-  {
-    id: 'diff-2',
-    path: 'src/contrib/sessions/browser/media/sessionsList.css',
-    status: 'modified',
-    added: 28,
-    removed: 6,
-    original: `.session-title {\n  font-size: 14px;\n  color: var(--vscode-foreground);\n}`,
-    modified: `.session-title {\n  font-size: var(--vscode-fontSize-body1);\n  color: var(--vscode-strongForeground);\n}`,
-  },
-  {
-    id: 'diff-3',
-    path: 'src/contrib/browserView/browser/sessionBrowserView.ts',
-    status: 'added',
-    added: 66,
-    removed: 0,
-    original: '',
-    modified: `export interface BrowserOwner {\n  sessionId: string;\n  history: string[];\n}\n\nexport const browserViews = new Map<string, BrowserOwner>();`,
-  },
-  {
-    id: 'diff-4',
-    path: 'src/contrib/changes/browser/changesView.ts',
-    status: 'deleted',
-    added: 0,
-    removed: 36,
-    original: `export function openChangesEditor() {\n  return openMultiDiff();\n}`,
-    modified: '',
-  },
-]
-
-// (R-060/R-063) Changeset produzido ao enviar "build the project" no chat —
-// espelha os cenários e2e 02-chat-with-changes / 05-full-workflow: package.json,
-// build.ts e index.ts aparecem na changes view; index.ts abre no diff editor.
-export const buildProjectDiffFiles: DiffFile[] = [
-  {
-    id: 'build-package-json',
-    path: 'package.json',
-    status: 'modified',
-    added: 3,
-    removed: 1,
-    original: `{\n  "name": "agents-window",\n  "scripts": {\n    "start": "vite"\n  }\n}`,
-    modified: `{\n  "name": "agents-window",\n  "scripts": {\n    "start": "vite",\n    "build": "tsc -b && node build.ts"\n  }\n}`,
-  },
-  {
-    id: 'build-ts',
-    path: 'build.ts',
-    status: 'added',
-    added: 18,
-    removed: 0,
-    original: '',
-    modified: `import { build } from 'vite'\n\nasync function main() {\n  await build()\n  console.log('build complete')\n}\n\nmain()`,
-  },
-  {
-    id: 'build-index-ts',
-    path: 'src/index.ts',
-    status: 'modified',
-    added: 6,
-    removed: 2,
-    original: `export function main() {\n  console.log('hello')\n}`,
-    modified: `import { bootstrap } from './bootstrap'\n\nexport function main() {\n  bootstrap()\n  console.log('agents window ready')\n}`,
-  },
-]
+// FATIA-05 5.3: `initialDiffFiles` e `buildProjectDiffFiles` (maquete "Changes N") removidos (docs/24 §4 5.3, RF-05).
 
 export const searchResults: SearchResult[] = [
   { path: 'src/browser/parts/titlebarPart.ts', line: 44, content: 'No menubar, no editor actions, no layout controls.', match: 'No menubar' },

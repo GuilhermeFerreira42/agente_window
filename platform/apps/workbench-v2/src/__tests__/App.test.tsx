@@ -531,18 +531,24 @@ describe('App session flows', () => {
     expect(tabByTitle('Browser')).toHaveAttribute('aria-selected', 'true')
     await close('Browser')
     // CAT-A1/A2: ao fechar a última aba, a área do editor desaparece — não fica
-    // mais um editor vazio fixo em 50%. Com a barra de detalhes ainda visível, o
-    // estado é "detail-only"; o chat absorve a largura do editor.
+    // mais um editor vazio fixo em 50%. 5.7 fix (homologação 2026-10-01): a barra
+    // "Detalhes" não nasce aberta, então o chat centraliza direto (CAT-H5).
     expect(screen.queryByTestId('editor-empty-state')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Área principal do editor' })).not.toBeInTheDocument()
-    expect(document.querySelector('.desktop-surface-group.side-pane-detail-only')).not.toBeNull()
-
-    // Ao ocultar também os detalhes, o side pane fecha e o chat centraliza (CAT-H5).
-    await user.click(screen.getByRole('button', { name: 'Alternar barra auxiliar' }))
     expect(document.querySelector('.desktop-surface-group.chat-centered')).not.toBeNull()
+
+    // Ao mostrar os detalhes pelo toggle, o estado vira "detail-only"; o chat absorve a largura do editor.
+    await user.click(screen.getByRole('button', { name: 'Alternar barra auxiliar' }))
+    expect(document.querySelector('.desktop-surface-group.side-pane-detail-only')).not.toBeNull()
   })
 
-  it('navega pelas tabs por teclado e cria Files, Search e Changes no menu de nova aba', async () => {
+  // 5.2 moveu a busca para a Side Bar; a aba "Search" do editor foi
+  // removida de propósito. Estes testes interagiam com a busca demo
+  // (maquete pré-4.6), nunca vista pelo usuário. Destino: D2.60, junto
+  // dos 2 skips do c3. Cobertura equivalente: E2E sessao_13_search
+  // (14/14) + sessao_13_search_backend (6/6) + sessao_14 T9/T15 +
+  // sessao_15 T6–T9 (nova, RF-06).
+  it.skip('navega pelas tabs por teclado e cria Files, Search e Changes no menu de nova aba', async () => {
     const user = userEvent.setup()
     render(<App />)
     await openInitialBrowser(user)
@@ -572,7 +578,13 @@ describe('App session flows', () => {
     expect(within(editorPane).getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('restaura a tab ativa própria da sessão sem remover Search ou arquivos compartilhados', async () => {
+  // 5.2 moveu a busca para a Side Bar; a aba "Search" do editor foi
+  // removida de propósito. Estes testes interagiam com a busca demo
+  // (maquete pré-4.6), nunca vista pelo usuário. Destino: D2.60, junto
+  // dos 2 skips do c3. Cobertura equivalente: E2E sessao_13_search
+  // (14/14) + sessao_13_search_backend (6/6) + sessao_14 T9/T15 +
+  // sessao_15 T6–T9 (nova, RF-06).
+  it.skip('restaura a tab ativa própria da sessão sem remover Search ou arquivos compartilhados', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -644,7 +656,13 @@ describe('App session flows', () => {
     expect(screen.queryByText('Revisar alterações do workbench')).not.toBeInTheDocument()
   })
 
-  it('abre Search no Editor com foco, filtra, conta, destaca, mostra vazio e abre arquivo', async () => {
+  // 5.2 moveu a busca para a Side Bar; a aba "Search" do editor foi
+  // removida de propósito. Estes testes interagiam com a busca demo
+  // (maquete pré-4.6), nunca vista pelo usuário. Destino: D2.60, junto
+  // dos 2 skips do c3. Cobertura equivalente: E2E sessao_13_search
+  // (14/14) + sessao_13_search_backend (6/6) + sessao_14 T9/T15 +
+  // sessao_15 T6–T9 (nova, RF-06).
+  it.skip('abre Search no Editor com foco, filtra, conta, destaca, mostra vazio e abre arquivo', async () => {
     const user = userEvent.setup()
     render(<App />)
     await openInitialBrowser(user)
@@ -694,7 +712,10 @@ describe('App session flows', () => {
     expect(screen.getByRole('textbox', { name: 'Pesquisar no workspace' })).toHaveValue('menubar')
   })
 
-  it('abre Branch Changes como aba do Editor, lista arquivos, seleciona o diff e preserva a seleção por sessão', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('abre Branch Changes como aba do Editor, lista arquivos, seleciona o diff e preserva a seleção por sessão', async () => {
     const user = userEvent.setup()
     render(<App />)
     await openInitialBrowser(user)
@@ -742,7 +763,10 @@ describe('App session flows', () => {
     expect(document.querySelector('.diff-selected-editor[data-selected-diff-id="diff-3"]')).toBeInTheDocument()
   })
 
-  it('executa as ações de Diff por arquivo e em lote com feedback observável e isolamento por sessão', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('executa as ações de Diff por arquivo e em lote com feedback observável e isolamento por sessão', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -800,7 +824,11 @@ describe('App session flows', () => {
     expect(document.querySelectorAll('.diff-resolution.reverted')).toHaveLength(4)
   })
 
-  it('audita Changes, Files e Checks da barra auxiliar com ações reais e isolamento por sessão', async () => {
+  // c3 da FATIA-05 removeu a aba "Files" da barra auxiliar (a árvore
+  // migrou para a Side Bar). Este teste clicava na maquete "Workspace
+  // Files", já aposentada na FATIA-04. Destino junto com D2.54 (docs/05).
+  // Cobertura equivalente: E2E sessao_15_activity_bar T5 + sessao_12_explorer.
+  it.skip('audita Changes, Files e Checks da barra auxiliar com ações reais e isolamento por sessão', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -871,7 +899,10 @@ describe('App session flows', () => {
     expect(auxiliary()).toBeInTheDocument()
   })
 
-  it('build the project → changes view (package.json/build.ts/index.ts) + Merge + Abrir terminal (R-060/R-063)', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('build the project → changes view (package.json/build.ts/index.ts) + Merge + Abrir terminal (R-060/R-063)', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -922,7 +953,10 @@ describe('App session flows', () => {
     expect(screen.queryByText('4 arquivos')).not.toBeInTheDocument()
   })
 
-  it('mantém Branch Changes no Editor quando o layout entra em single-pane', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('mantém Branch Changes no Editor quando o layout entra em single-pane', async () => {
     const user = userEvent.setup()
     const originalWidth = window.innerWidth
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 760 })
@@ -977,7 +1011,10 @@ describe('App session flows', () => {
 
   // E15 (MOBILE_DIFF_EDITORS.md / R-049): em single-pane, a aba de Detalhes
   // apresenta a revisão de diff full-screen unificada (MobileDiffView).
-  it('mostra o diff unificado full-screen na aba Detalhes em single-pane', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('mostra o diff unificado full-screen na aba Detalhes em single-pane', async () => {
     const user = userEvent.setup()
     const originalWidth = window.innerWidth
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 560 })
@@ -1066,7 +1103,13 @@ describe('App session flows', () => {
     expect(document.querySelector('.sessions-part-grid')).toBeNull()
   })
 
-  it('abre Search pelo atalho Ctrl ou Cmd mais Shift mais F', async () => {
+  // 5.2 moveu a busca para a Side Bar; a aba "Search" do editor foi
+  // removida de propósito. Estes testes interagiam com a busca demo
+  // (maquete pré-4.6), nunca vista pelo usuário. Destino: D2.60, junto
+  // dos 2 skips do c3. Cobertura equivalente: E2E sessao_13_search
+  // (14/14) + sessao_13_search_backend (6/6) + sessao_14 T9/T15 +
+  // sessao_15 T6–T9 (nova, RF-06).
+  it.skip('abre Search pelo atalho Ctrl ou Cmd mais Shift mais F', async () => {
     render(<App />)
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true })
@@ -1181,7 +1224,10 @@ describe('App session flows', () => {
     expect(screen.queryByRole('dialog', { name: 'Buscar sessões' })).not.toBeInTheDocument()
   })
 
-  it('a Changes pill do cabeçalho abre o diff e revela o editor (E10/R-083)', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('a Changes pill do cabeçalho abre o diff e revela o editor (E10/R-083)', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)
@@ -1515,7 +1561,11 @@ describe('App session flows', () => {
     expect(after.indexOf(a)).toBeGreaterThan(after.indexOf(b))
   })
 
-  it('anexa ao chat um arquivo arrastado da árvore do workspace', async () => {
+  // c3 da FATIA-05 removeu a aba "Files" da barra auxiliar (a árvore
+  // migrou para a Side Bar). Este teste clicava na maquete "Workspace
+  // Files", já aposentada na FATIA-04. Destino junto com D2.54 (docs/05).
+  // Cobertura equivalente: E2E sessao_15_activity_bar T5 + sessao_12_explorer.
+  it.skip('anexa ao chat um arquivo arrastado da árvore do workspace', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)
@@ -1613,7 +1663,10 @@ describe('App session flows', () => {
     expect(screen.getByRole('button', { name: 'Alternar barra auxiliar' }).classList.contains('is-active')).toBe(wasActive)
   })
 
-  it('Toggle Details (Alt+Cmd+L) alterna o detalhe numa aba de diff', async () => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
+  // ChangesDetails, Branch Changes com dados simulados) foi REMOVIDA de vez (docs/24 §4 5.3, RF-05). Este teste exercitava
+  // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
+  it.skip('Toggle Details (Alt+Cmd+L) alterna o detalhe numa aba de diff', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
     render(<App />)

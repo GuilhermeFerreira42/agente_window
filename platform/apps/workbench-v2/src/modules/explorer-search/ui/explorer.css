@@ -53,6 +53,29 @@
 .explorer-viewlet .codicon-close-all:before { content: '\eac1'; }
 .explorer-viewlet .codicon-close:before { content: '\ea76'; }
 .explorer-viewlet .codicon-ellipsis:before { content: '\ea7c'; }
+/* 5.6 — Outline/Timeline (codiconsLibrary.ts) */
+.explorer-viewlet .codicon-git-commit:before { content: '\eafc'; }
+.explorer-viewlet .codicon-symbol-event:before { content: '\ea86'; }
+.explorer-viewlet .codicon-symbol-variable:before { content: '\ea88'; }
+.explorer-viewlet .codicon-symbol-array:before { content: '\ea8a'; }
+.explorer-viewlet .codicon-symbol-module:before, .explorer-viewlet .codicon-symbol-package:before, .explorer-viewlet .codicon-symbol-namespace:before, .explorer-viewlet .codicon-symbol-object:before { content: '\ea8b'; }
+.explorer-viewlet .codicon-symbol-method:before, .explorer-viewlet .codicon-symbol-function:before, .explorer-viewlet .codicon-symbol-constructor:before { content: '\ea8c'; }
+.explorer-viewlet .codicon-symbol-boolean:before, .explorer-viewlet .codicon-symbol-null:before { content: '\ea8f'; }
+.explorer-viewlet .codicon-symbol-number:before { content: '\ea90'; }
+.explorer-viewlet .codicon-symbol-struct:before { content: '\ea91'; }
+.explorer-viewlet .codicon-symbol-type-parameter:before { content: '\ea92'; }
+.explorer-viewlet .codicon-symbol-key:before { content: '\ea93'; }
+.explorer-viewlet .codicon-symbol-enum:before { content: '\ea95'; }
+.explorer-viewlet .codicon-symbol-class:before { content: '\eb5b'; }
+.explorer-viewlet .codicon-symbol-constant:before { content: '\eb5d'; }
+.explorer-viewlet .codicon-symbol-enum-member:before { content: '\eb5e'; }
+.explorer-viewlet .codicon-symbol-field:before { content: '\eb5f'; }
+.explorer-viewlet .codicon-symbol-file:before { content: '\eb60'; }
+.explorer-viewlet .codicon-symbol-interface:before { content: '\eb61'; }
+.explorer-viewlet .codicon-symbol-misc:before { content: '\eb63'; }
+.explorer-viewlet .codicon-symbol-operator:before { content: '\eb64'; }
+.explorer-viewlet .codicon-symbol-property:before { content: '\eb65'; }
+.explorer-viewlet .codicon-symbol-string:before { content: '\eb8d'; }
 
 /* ---------------------------------------------------------------------------
  * paneview.css
@@ -356,5 +379,20 @@
 .explorer-viewlet .monaco-button:hover { background: var(--vscode-button-hoverBackground); }
 .explorer-viewlet .monaco-button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
 .explorer-viewlet .monaco-button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
-.explorer-viewlet .timeline-label { padding-left: 0; }
+/* 5.6 — Outline (outlinePane.css) e Timeline (timelinePane.css) reais */
+.explorer-viewlet .outline-pane .monaco-list, .explorer-viewlet .timeline-pane .monaco-list { position: relative; width: 100%; }
+.explorer-viewlet .outline-pane .monaco-list-rows, .explorer-viewlet .timeline-pane .monaco-list-rows { position: relative; }
+.explorer-viewlet .outline-pane .monaco-list-row, .explorer-viewlet .timeline-pane .monaco-list-row { position: absolute; left: 0; right: 0; box-sizing: border-box; cursor: pointer; overflow: hidden; white-space: nowrap; display: flex; align-items: center; }
+.explorer-viewlet .outline-pane .monaco-tl-row, .explorer-viewlet .timeline-pane .monaco-tl-row { display: flex; align-items: center; height: 100%; width: 100%; min-width: 0; }
+.explorer-viewlet .outline-pane .monaco-tl-contents, .explorer-viewlet .timeline-pane .monaco-tl-contents { flex: 1; min-width: 0; overflow: hidden; }
+.explorer-viewlet .outline-element, .explorer-viewlet .timeline-item { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.explorer-viewlet .outline-element-icon, .explorer-viewlet .timeline-icon { flex: none; font-size: 16px; width: 16px; height: 22px; line-height: 22px; text-align: center; color: var(--vscode-symbolIcon-colorForeground, inherit); }
+.explorer-viewlet .outline-label, .explorer-viewlet .timeline-label { padding-left: 0; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.explorer-viewlet .outline-detail, .explorer-viewlet .timeline-author { opacity: 0.7; font-size: 0.9em; margin-left: 0.5em; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.explorer-viewlet .timeline-timestamp { flex: none; margin-left: auto; padding: 0 12px 0 6px; opacity: 0.7; font-size: 0.9em; }
+.explorer-viewlet .codicon-symbol-class { color: var(--vscode-symbolIcon-classForeground, #ee9d28); }
+.explorer-viewlet .codicon-symbol-method, .explorer-viewlet .codicon-symbol-function, .explorer-viewlet .codicon-symbol-constructor { color: var(--vscode-symbolIcon-methodForeground, #b180d7); }
+.explorer-viewlet .codicon-symbol-property, .explorer-viewlet .codicon-symbol-field, .explorer-viewlet .codicon-symbol-variable { color: var(--vscode-symbolIcon-variableForeground, #75beff); }
+.explorer-viewlet .codicon-symbol-interface { color: var(--vscode-symbolIcon-interfaceForeground, #75beff); }
+.explorer-viewlet .codicon-symbol-enum, .explorer-viewlet .codicon-symbol-enum-member { color: var(--vscode-symbolIcon-enumeratorForeground, #ee9d28); }
 .explorer-viewlet .monaco-action-bar .action-item.disabled .action-label { color: var(--vscode-disabledForeground); cursor: default; }

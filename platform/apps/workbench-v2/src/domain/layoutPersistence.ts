@@ -37,7 +37,8 @@ export const SESSION_LAYOUTS_STORAGE_KEY = 'workbench.sessions.layouts.v1'
 
 export const DEFAULT_SHELL: ShellVisibility = {
   sidebarVisible: true,
-  auxiliaryVisible: true,
+  // 5.7 fix (BUG 5.7-03, D2.50): a coluna "Detalhes" (vazia) não nasce aberta — só pelo toggle "Barra auxiliar".
+  auxiliaryVisible: false,
   terminalVisible: false,
   editorHidden: false,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,

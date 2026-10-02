@@ -3,15 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // caminhos internos do módulo (fronteira LEGO, FT).
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 // FATIA-05 5.1 c1 — chassi (docs/24): Activity Bar à direita; views vêm do viewRegistry.
-import { ActivityBar } from './shell/activityBar'
-import { SideBar } from './shell/sideBar'
+import { ActivityBar, buildActivityBarMenuItems, activityBarPositionFromMenuId } from './shell/activityBar'
+import { SideBar, ExplorerView, SearchView, ScmView } from './shell/sideBar'
 import { useLayoutState } from './shell/layoutState'
-import { viewsFor } from './shell/viewRegistry'
+import { viewsByIds, type ViewDescriptor } from './shell/viewRegistry'
+import { ViewsPanel } from './shell/panel'
 import { createShellCommandRegistry } from './domain/shellCommandRegistry'
 import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './components/ExplorerContextMenuHost'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
-import { buildProjectDiffFiles, initialDiffFiles, initialProviders, initialSessions, searchResults as allSearchResults } from './data'
+import { initialProviders, initialSessions, searchResults as allSearchResults } from './data'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -83,7 +84,6 @@ import { SessionSidebar } from './components/SessionSidebar'
 import { SessionsPicker } from './components/SessionsPicker'
 import { TerminalPanel } from './components/TerminalPanel'
 import { Titlebar } from './components/Titlebar'
-import { useMockChangesTransition } from './shell/gitTransition'
 import {
   readNewSessionViewState,
   writeNewSessionViewState,
@@ -123,11 +123,10 @@ const firstSession = initialSessions[0]
 const initialEditorTabs: EditorTab[] = []
 const initialBrowserViews: BrowserViewState[] = []
 
-const initialDiffFilesBySession: Record<string, DiffFile[]> = Object.fromEntries(
-  initialSessions
-    .filter((session) => !session.archived)
-    .map((session) => [session.id, initialDiffFiles.map((file) => ({ ...file }))]),
-)
+// FATIA-05 5.3 (RF-05): a maquete "Changes N" (`initialDiffFiles`/`buildProjectDiffFiles`) foi removida.
+// O estado `diffFilesBySession` continua existindo só porque o `EditorArea` (intocável até a 5.7)
+// ainda recebe `diffFiles`; nasce e permanece vazio.
+const initialDiffFilesBySession: Record<string, DiffFile[]> = {}
 
 function timeLabel() {
   return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date())
@@ -164,8 +163,50 @@ function SearchModuleSlot({ module, focusRequest }: { module: IExplorerSearchMod
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="search-module-slot" />
 }
 
+/** FATIA-05 5.3: slot da view `scm` da Side Bar → Source Control View real do módulo.
+ *  Mesmo padrão do SearchModuleSlot (mount 1×; troca de view = display flex/none). */
+function ScmModuleSlot({ module }: { module: IExplorerSearchModule }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hostRef.current) module.mountScm(hostRef.current)
+  }, [module])
+  useEffect(() => () => module.unmountScm(), [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="scm-module-slot" />
+}
+
 /** FATIA-04 4.7 c1 (exceção autorizada 2026-09-26): slot do Editor Anexo na
  *  barra auxiliar → módulo real. Mesmo padrão do SearchModuleSlot. */
+// FATIA-05 5.7 fix (DoD "F5 mantém as 3 abas", 2026-10-01): o módulo persiste largura/maximizado, mas NÃO as abas
+// (fato da 4.7, D2.70). O shell guarda a lista por sessão e reabre no boot — só `kind: 'code'` (diff/changes têm payload).
+const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
+type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
+function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
+  try {
+    const raw = window.localStorage.getItem(ATTACH_TABS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, PersistedAttachTab[]>) : {}
+  } catch { return {} }
+}
+function snapshotAttachTabs(module: IExplorerSearchModule, sessionId: string): void {
+  try {
+    const tabs = module.attach.getTabs({ sessionId })
+      .filter((t) => t.kind === 'code')
+      .map((t): PersistedAttachTab => ({ uri: t.uri, pinned: !t.preview, active: !!t.active }))
+    const all = loadAttachTabs()
+    if (tabs.length) all[sessionId] = tabs
+    else delete all[sessionId]
+    window.localStorage.setItem(ATTACH_TABS_KEY, JSON.stringify(all))
+  } catch { /* quota/privado: ignora */ }
+}
+function restoreAttachTabs(module: IExplorerSearchModule): void {
+  const all = loadAttachTabs()
+  for (const [sessionId, tabs] of Object.entries(all)) {
+    if (!Array.isArray(tabs)) continue
+    const ordered = [...tabs.filter((t) => !t.active), ...tabs.filter((t) => t.active)] // ativa por último = fica ativa
+    for (const t of ordered) void module.attach.open({ uri: t.uri, kind: 'code', sessionId, pinned: t.pinned })
+  }
+}
+
 function AttachModuleSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -193,16 +234,29 @@ export default function App() {
   const [auxiliaryTab, setAuxiliaryTab] = useState<'changes' | 'files'>('changes')
   // FATIA-05 5.1 c2 — estado do chassi (view ativa, Side Bar visível/largura) persistido em workbench.layoutState.v1.
   const layout = useLayoutState()
-  const rightViews = viewsFor('right')
+  // RF-09 (docs/24 §6.1, P1=A): anexo maximizado recolhe a Side Bar; restaurar devolve o estado anterior.
+  // Ref porque o listener do módulo é registrado uma vez (boot) e precisa ver a API mais recente.
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
+  // FATIA-05 5.7 (D6): sessões cujo Editor Anexo tem abas (`editor.attachExpanded/attachCollapsed`).
+  // A AuxiliaryBar fica montada enquanto o anexo tiver abas, independente da coluna "Detalhes"
+  // (`auxiliaryVisible`) e do gate do Browser — senão o clique no Explorer cai em `pendingAttachOpen`
+  // e só abre após F5 (bug do vídeo, docs/25 P20).
+  const [attachExpandedSessions, setAttachExpandedSessions] = useState<readonly string[]>([])
+  // 5.5: ordem/container das views vêm do layoutState (Side Bar = Activity Bar; Panel = abas do Views Panel)
+  const rightViews = useMemo(() => viewsByIds(layout.state.viewLayout.sideBar), [layout.state.viewLayout.sideBar])
+  const panelViews = useMemo(() => viewsByIds(layout.state.viewLayout.panel), [layout.state.viewLayout.panel])
   // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
   // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
   const [explorerModule, setExplorerModule] = useState<IExplorerSearchModule | null>(null)
-  // Transição Temporária 4.7-b (docs/12): com o módulo real de pé, a aba "Changes" simulada some.
-  const hideMockChanges = useMockChangesTransition(explorerModule, auxiliaryTab, setAuxiliaryTab)
+  // FATIA-05 5.3: badge do ícone Source Control = `git.count()` do módulo (evento `git.statusChanged`).
+  const [scmBadge, setScmBadge] = useState(0)
   const explorerFsRef = useRef<BrowserFsPort | null>(null)
   const handleExplorerFileOpenedRef = useRef<(uri: WorkspaceUri) => void>()
   const explorerMenusRef = useRef(createShellCommandRegistry())
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
+  // FATIA-05 5.4 (RF-10): menu "Move Activity Bar …" — segundo host do mesmo menu de contexto do shell.
+  const [activityBarMenu, setActivityBarMenu] = useState<ExplorerContextMenuState | null>(null)
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -216,13 +270,28 @@ export default function App() {
           menus: explorerMenusRef.current,
           contextMenu: { open: (input) => setExplorerContextMenu(input) },
           workspaceRoot: root,
+          // 5.3: "Open Source Control" (header do Explorer) → view `scm` da Side Bar.
+          openSourceControl: () => layoutRef.current.showView('scm'),
         })
         await module.explorer.openFolder({ uri: root })
         if (cancelled) { module.dispose(); return }
         module.onEvent((e) => {
           if (e.type === 'error') console.warn('[explorer-search]', e.code, e.message)
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
+          if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
+          if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed') snapshotAttachTabs(module, e.sessionId)
+          if (e.type === 'editor.attachExpanded') {
+            setAttachExpandedSessions((cur) => (cur.includes(e.sessionId) ? cur : [...cur, e.sessionId]))
+            // 5.7 (D6): 1.ª aba no anexo (Explorer, Search, Timeline, SCM…) → a coluna "Detalhes" colapsa; o editor fino assume.
+            setAuxiliaryVisible(false)
+          }
+          if (e.type === 'editor.attachCollapsed') setAttachExpandedSessions((cur) => cur.filter((id) => id !== e.sessionId))
+          // 5.7 (D6/RF-07) + docs/24 v1.2 (2026-10-02, RF-09 revogado para a 5.7): maximizar/restaurar NÃO mexem na
+          // Side Bar — ela fica 274 como estava; só o chat some e o editor toma o centro. Persiste (F5 mantém).
+          if (e.type === 'editor.attachMaximized') layoutRef.current.setEditorMaximized(true)
+          if (e.type === 'editor.attachRestored') layoutRef.current.setEditorMaximized(false)
         })
+        restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
         setExplorerModule(module)
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
@@ -239,6 +308,14 @@ export default function App() {
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
   }, [explorerContextMenu])
+  useEffect(() => {
+    if (!activityBarMenu) return
+    const onDown = (ev: MouseEvent) => {
+      if (!(ev.target as HTMLElement).closest('[data-explorer-context-menu]')) setActivityBarMenu(null)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [activityBarMenu])
   // E4 — estado de layout por sessão: ao sair capturamos auxiliaryVisible +
   // activeViewContainerId; ao voltar restauramos. Working sets (abas/browser)
   // são preservados separadamente e nunca limpos ao alternar de sessão.
@@ -356,6 +433,15 @@ export default function App() {
   const [browserViews, setBrowserViews] = useState<BrowserViewState[]>(initialBrowserViews)
   const [searchQuery, setSearchQuery] = useState('menubar')
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+
+  // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
+  const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
+    ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} />
+    : view.id === 'search'
+      ? <SearchView slot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined} />
+      : view.id === 'scm'
+        ? <ScmView slot={explorerModule ? <ScmModuleSlot module={explorerModule} /> : undefined} />
+        : null)
   // Changes are resolved from the active session, matching the reference
   // SessionChangesEditor input instead of sharing accept/view state globally.
   const [diffFilesBySession, setDiffFilesBySession] = useState<Record<string, DiffFile[]>>(initialDiffFilesBySession)
@@ -483,8 +569,10 @@ export default function App() {
   const detailsToggleGated = activeTabType === 'diff' || activeTabType === 'file'
   // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed".
+  // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
+  const attachExpanded = hasSessions && !!explorerModule && attachExpandedSessions.includes(activeSession.id)
   const sidePaneInputs = hasSessions
-    ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible }
+    ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
     : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
   const sidePaneState = resolveSidePaneState(sidePaneInputs)
   const editorContentVisible = isEditorContentVisible(sidePaneInputs)
@@ -935,16 +1023,24 @@ export default function App() {
   // (FATIA-04 4.7 c4 — exceção autorizada) Arquivo REAL clicado na árvore abre
   // no EDITOR ANEXO do módulo (`attach.open`, 04_05 §10), não mais no editor
   // central. Leitura, Image Preview e ERROR EDITOR vivem no módulo.
+  // (FATIA-05 5.7, D6 — regra A+2/420 de 2026-10-01) Ao abrir arquivo a coluna "Detalhes" colapsa
+  // sozinha (segue acessível pelo toggle "Barra auxiliar"); o anexo é quem fica à direita do chat.
+  // 5.7 fix (BUG 5.7-01, homologação 2026-10-01): clique no Explorer abre aba FIXA (`pinned`) — 3 cliques = 3 abas.
+  // O modo preview (clique simples substitui, itálico) continua disponível pela API `attach.open` sem `pinned` (T6 da 14).
   handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
     setExplorerContextMenu(null)
-    void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id })
+    setAuxiliaryVisible(false)
+    void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
   }
 
   const openBrowser = () => createBrowser()
+  // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
+  // menu "+" ativam a view `search` (sem alternar) e pedem foco ao módulo. A aba "Search"
+  // do editor central não é mais criada.
   const openSearch = useCallback(() => {
     setSearchFocusRequest((current) => current + 1)
-    openEditorTab('search', { title: 'Search' })
-  }, [openEditorTab])
+    layout.showView('search')
+  }, [layout])
   const openDiff = (sessionId: string = activeSession.id, diffFileId?: string) => {
     if (sessionId !== activeSession.id) selectSession(sessionId)
     if (diffFileId) {
@@ -1454,21 +1550,10 @@ export default function App() {
       const response = isBuildRequest
         ? 'Compilei o projeto. Atualizei **package.json**, adicionei **build.ts** e ajustei **src/index.ts** — veja a changes view; abra **index.ts** para revisar o diff, ou use **Abrir terminal** para acompanhar a saída do build.'
         : `Estou trabalhando em **${requestLabel.slice(0, 72)}**. A resposta fica vinculada à sessão e pode abrir Browser, Search ou Changes na área do editor.`
-      if (isBuildRequest) {
-        // Semeia o changeset de build na sessão e reflete os stats no cabeçalho.
-        setDiffFilesBySession((current) => ({
-          ...current,
-          [sessionId]: buildProjectDiffFiles.map((file) => ({ ...file })),
-        }))
-      }
+      // 5.3: o changeset simulado de "build" (maquete "Changes N") não existe mais.
       updateSession(sessionId, (session) => {
         const next = completeChatRun(session, chatId)
-        const buildStats = isBuildRequest
-          ? {
-              diffAdded: buildProjectDiffFiles.reduce((sum, file) => sum + file.added, 0),
-              diffRemoved: buildProjectDiffFiles.reduce((sum, file) => sum + file.removed, 0),
-            }
-          : {}
+        const buildStats = {}
         return {
           ...next,
           ...buildStats,
@@ -1779,7 +1864,6 @@ export default function App() {
       searchQuery={searchQuery}
       searchResults={filteredSearchResults}
       searchFocusRequest={searchFocusRequest}
-      searchSlot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined}
       diffFiles={activeDiffFiles}
       selectedDiffFileId={selectedDiffFileId}
       onSelectTab={selectEditorTab}
@@ -1902,9 +1986,11 @@ export default function App() {
             onDoubleClick={resetSidebarWidth}
           />
         )}
-        <div className="main-region">
+        <div className="main-region" data-activity-bar-position={layout.state.activityBarPosition}>
           <div className="right-section">
-            <div className="top-right-section">
+            {/* 5.7 (D6/RF-07): `editor-maximized` = anexo maximizado COM abas → o centro (chat + EditorArea) some e a
+                AuxiliaryBar toma a faixa inteira; lista de sessões e terminal seguem (fora desta div). Só CSS — nada é desmontado. */}
+            <div className={`top-right-section${attachExpanded && layout.state.editorMaximized ? ' editor-maximized' : ''}`} data-editor-maximized={attachExpanded && layout.state.editorMaximized}>
               <div className="main-surface" ref={surfaceGroupRef}>
             <div className="mobile-dock-tabs" role="tablist" aria-label="Navegação single-pane">
               {isPhone && topLayer(navStack) && (
@@ -1956,7 +2042,7 @@ export default function App() {
                       onClose={() => setMobilePane('chat')}
                     />
                   ) : (
-                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} visible diffFiles={activeDiffFiles} tab={auxiliaryTab} hideChangesTab={hideMockChanges} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setMobilePane('chat')} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} /></div>
+                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemRootName={fileSystemRootName} visible onClose={() => setMobilePane('chat')} /></div>
                   )
                 )}
               </div>
@@ -2006,8 +2092,22 @@ export default function App() {
               </>
             )}
               </div>
-              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar} fileSystemEntries={fileSystemEntries} fileSystemRootName={fileSystemRootName} fileSystemLoading={fileSystemLoading} isFileSystemSupported={fileSystemSupported} onPickDirectory={handlePickDirectory} onClearDirectory={handleClearDirectory} onOpenFileHandle={handleOpenFileHandle} diffFiles={activeDiffFiles} tab={auxiliaryTab} hideChangesTab={hideMockChanges} checksExpanded={checksExpanded} expandedFolders={expandedFolders} onChangeTab={setAuxiliaryTab} onOpenDiff={(fileId) => openDiff(activeSession.id, fileId)} onOpenFile={(path) => openEditorTab('file', { title: path.split('/').pop() ?? path, path })} onToggleChecks={toggleChecks} onToggleFolder={toggleFolder} onRerunChecks={rerunChecks} onOpenCheck={openCheck} onPreparePr={preparePullRequest} onMerge={mergeChanges} onOpenTerminal={openTerminalFromChanges} onClose={() => setAuxiliaryVisible(false)} filesSlot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
+              {/* 5.7 (D6): com o módulo carregado a barra fica SEMPRE montada (Regra 10 docs/18: o anexo nunca desmonta,
+                  só display:none — senão `attach.open` cai em pendingAttachOpen até o F5). `detailsVisible` governa só a coluna "Detalhes";
+                  a casca vazia (sem Detalhes e anexo recolhido) zera padding/borda via CSS. */}
+              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar || !!explorerModule} detailsVisible={renderDesktopAuxiliaryBar} fileSystemRootName={fileSystemRootName} onClose={() => setAuxiliaryVisible(false)} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
             </div>
+            {/* FATIA-05 5.5 (docs/25 O14): Views Panel = `.part.panel` NOVO acima do terminal, dentro de .right-section.
+                Recebe views arrastadas da Side Bar; `display: none` sem views. O terminal abaixo não é tocado. */}
+            {!isSinglePane && !customViewActive && (
+              <ViewsPanel
+                views={panelViews}
+                activeViewId={layout.state.panelActiveView}
+                onSelect={layout.selectPanelView}
+                onDropView={(id, index) => layout.moveView(id, 'panel', index)}
+                renderView={renderShellView}
+              />
+            )}
             <TerminalPanel
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
@@ -2016,11 +2116,12 @@ export default function App() {
               onClose={() => setTerminalVisible(false)}
             />
           </div>
-          {/* FATIA-05 5.1 (docs/24 D1): chassi à DIREITA, depois de .right-section — [centro][AttachArea][Side Bar][Activity Bar]. Desktop only. */}
+          {/* FATIA-05 5.1 (docs/24 D1): chassi à DIREITA, depois de .right-section — [centro][AttachArea][Side Bar][Activity Bar]. Desktop only.
+              5.4 (RF-10): `activityBarPosition` = left reordena por CSS `order` (activityBar.css) — o DOM não muda. */}
           {!isSinglePane && !customViewActive && (
             <>
               <SideBar
-                side="right"
+                side={layout.state.activityBarPosition}
                 views={rightViews}
                 activeViewId={layout.state.activeView}
                 visible={layout.state.sideBarVisible}
@@ -2029,8 +2130,19 @@ export default function App() {
                 onResetWidth={layout.resetSideBarWidth}
                 onClose={() => layout.setSideBarVisible(false)}
                 onToggle={layout.toggleSideBar}
+                renderView={renderShellView}
+                onDropView={(id, index) => layout.moveView(id, 'sideBar', index)}
               />
-              <ActivityBar side="right" views={rightViews} activeViewId={layout.state.activeView} sideBarVisible={layout.state.sideBarVisible} onSelect={layout.selectView} />
+              <ActivityBar
+                side={layout.state.activityBarPosition}
+                views={rightViews}
+                activeViewId={layout.state.activeView}
+                sideBarVisible={layout.state.sideBarVisible}
+                onSelect={layout.selectView}
+                badges={{ scm: scmBadge }}
+                onContextMenu={(x, y) => { setExplorerContextMenu(null); setActivityBarMenu({ x, y, items: buildActivityBarMenuItems(layout.state.activityBarPosition) }) }}
+                onDropView={(id, index) => layout.moveView(id, 'sideBar', index)}
+              />
             </>
           )}
         </div>
@@ -2041,6 +2153,13 @@ export default function App() {
           state={explorerContextMenu}
           onClose={() => setExplorerContextMenu(null)}
           onExecute={(id) => void explorerMenusRef.current.execute(id)}
+        />
+      )}
+      {activityBarMenu && (
+        <ExplorerContextMenuHost
+          state={activityBarMenu}
+          onClose={() => setActivityBarMenu(null)}
+          onExecute={(id) => { const p = activityBarPositionFromMenuId(id); if (p) layout.setActivityBarPosition(p) }}
         />
       )}
       <SessionsPicker

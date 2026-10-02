@@ -163,13 +163,21 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
   })
 })
 
-describe('P8.2 AuxiliaryBar — ações de checks e diff', () => {
+// FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" da AuxiliaryBar
+// (ChangesDetails: Revisar / Merge / multi-diff / widget Checks) foi REMOVIDA de vez (docs/24 §4 5.3,
+// RF-05). Este describe testava só a maquete (não o motor Git real, que vive no módulo explorer-search
+// e é coberto por `sessao_14b/14c/14d` + spec 15 T10–T14). Mantido como `describe.skip` com a lógica
+// intacta; a tipagem foi afrouxada apenas para o arquivo continuar compilando sem as props removidas.
+describe.skip('P8.2 AuxiliaryBar — ações de checks e diff (maquete removida na 5.3)', () => {
   const diffFiles: DiffFile[] = [
     { id: 'f1', path: 'src/App.tsx', status: 'modified', added: 3, removed: 1, original: 'const a = 1', modified: 'const a = 2' },
   ]
 
-  function renderAux(overrides: Partial<React.ComponentProps<typeof AuxiliaryBar>> = {}) {
-    const props: React.ComponentProps<typeof AuxiliaryBar> = {
+  type LegacyAuxProps = React.ComponentProps<typeof AuxiliaryBar> & Record<string, unknown> & {
+    onOpenDiff: ReturnType<typeof vi.fn>; onRerunChecks: ReturnType<typeof vi.fn>; onOpenCheck: ReturnType<typeof vi.fn>
+  }
+  function renderAux(overrides: Partial<LegacyAuxProps> = {}) {
+    const props = {
       session,
       visible: true,
       diffFiles,
@@ -188,7 +196,7 @@ describe('P8.2 AuxiliaryBar — ações de checks e diff', () => {
       onOpenTerminal: vi.fn(),
       onClose: vi.fn(),
       ...overrides,
-    }
+    } as unknown as LegacyAuxProps
     return { ...render(<AuxiliaryBar {...props} />), props }
   }
 

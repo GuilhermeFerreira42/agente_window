@@ -45,6 +45,18 @@ export class GitHostError extends Error {
 const EXEC_TIMEOUT_MS = 15_000;
 
 export type GitShowRef = 'HEAD' | 'index' | 'worktree';
+/** 5.6 (A0.6): `show` também aceita um sha de commit (hex 7–40) → `git show <sha>:./rel`. */
+export const isCommitSha = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{7,40}$/i.test(v);
+
+/** 5.6 — uma entrada de `git log` de UM arquivo (Timeline; mais novo primeiro). */
+export interface GitLogEntry {
+  sha: string;
+  parents: string[];
+  author: string;
+  /** epoch em ms (author date). */
+  timestamp: number;
+  message: string;
+}
 
 export interface ExecLike {
   (cwd: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number }>;
@@ -241,17 +253,36 @@ export class GitHost {
   /** 4.7-c c2 — conteúdo de UM arquivo num dos três lados do diff (04_21 §7):
    *  'HEAD' → `git show HEAD:rel` · 'index' → `git show :rel` · 'worktree' → disco.
    *  Ausente em qualquer lado (untracked, deletado, sem HEAD) → '' (nunca erro). */
-  async show(repo: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef): Promise<{ content: string }> {
+  async show(repo: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef | string): Promise<{ content: string }> {
     const cwd = this.repoPath(repo);
     const [rel] = this.relPaths(repo, [uri]);
     if (ref === 'worktree') {
       try { return { content: await this.readWorktree(toFsPath(this.rootPath, uri, this.p)) }; }
       catch { return { content: '' }; }
     }
-    const spec = ref === 'HEAD' ? `HEAD:${rel}` : `:${rel}`;
+    const spec = ref === 'HEAD' ? `HEAD:${rel}` : ref === 'index' ? `:${rel}` : `${ref}:./${rel}`;
     const r = await this.exec(cwd, ['show', spec]);
     if (r.code === -1) throw new GitHostError('git_unavailable', 'git não encontrado no PATH');
     return { content: r.code === 0 ? r.stdout : '' };
+  }
+
+  /** 5.6 (A0.6) — histórico de UM arquivo para a Timeline: `git log --follow` com
+   *  separador \x1f; fora de repo / sem commits / untracked → `[]` (nunca erro). */
+  async log(repo: WorkspaceUri, uri: WorkspaceUri, limit = 50): Promise<{ entries: GitLogEntry[] }> {
+    const cwd = this.repoPath(repo);
+    const [rel] = this.relPaths(repo, [uri]);
+    const n = Math.max(1, Math.min(500, Math.floor(limit)));
+    const r = await this.exec(cwd, ['log', '--follow', `--max-count=${n}`, '--pretty=format:%H%x1f%P%x1f%an%x1f%at%x1f%s', '--', rel]);
+    if (r.code === -1) throw new GitHostError('git_unavailable', 'git não encontrado no PATH');
+    if (r.code !== 0) return { entries: [] };
+    const entries: GitLogEntry[] = [];
+    for (const line of r.stdout.split('\n')) {
+      if (!line) continue;
+      const [sha, parents, author, at, message] = line.split('\x1f');
+      if (!sha) continue;
+      entries.push({ sha, parents: (parents ?? '').split(' ').filter(Boolean), author: author ?? '', timestamp: Number(at ?? 0) * 1000, message: message ?? '' });
+    }
+    return { entries };
   }
 
   async commit(repo: WorkspaceUri, message: string): Promise<{ oid: string }> {

@@ -19,6 +19,11 @@
   -webkit-user-select: none;
 }
 
+/* 5.4 (RF-10): posição via `order` flex — sem grade nova, sem position fixed. `right` (default) mantém a
+ * ordem do DOM ([centro][Side Bar][Activity Bar]); `left` traz [Activity Bar][Side Bar] para antes de .right-section. */
+.main-region[data-activity-bar-position='left'] > .part.activitybar { order: -2; }
+.main-region[data-activity-bar-position='left'] > .part.sidebar { order: -1; }
+
 /* borda de 1 px no lado voltado para o editor (::before, como no VS Code) */
 .part.activitybar.bordered::before {
   content: '';
@@ -116,7 +121,7 @@
   border-left-color: var(--vscode-focusBorder);
 }
 
-/* badge (regra medida: top 24 / right 8 / 9 px / 16 px) — vazio em 5.1 (RF-11) */
+/* badge (regra medida: top 24 / right 8 / 9 px / 16 px) — 5.3: `scm` = git.count() */
 .part.activitybar .action-item .badge { position: absolute; inset: 0; pointer-events: none; }
 .part.activitybar .action-item .badge .badge-content {
   position: absolute;
@@ -133,3 +138,18 @@
   color: var(--vscode-activityBarBadge-foreground, var(--vscode-badge-foreground));
   background: var(--vscode-activityBarBadge-background, var(--vscode-badge-background));
 }
+
+/* 5.5 (DnD de views): feedback de drop — linha de 2 px "inserir antes" no item e realce da tirinha (só tokens). */
+.part.activitybar.drop-target { background: var(--vscode-list-dropBackground, var(--vscode-activityBar-background)); }
+.part.activitybar .action-item.drop-before::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -1px;
+  height: 2px;
+  background: var(--vscode-focusBorder, var(--vscode-activityBar-activeBorder));
+  pointer-events: none;
+}
+.part.activitybar .action-item[draggable='true'] { cursor: grab; }
+.part.activitybar .action-item[draggable='true']:active { cursor: grabbing; }

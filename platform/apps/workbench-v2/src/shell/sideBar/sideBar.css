@@ -88,3 +88,24 @@
 }
 .side-bar-sash:hover { transition-delay: 0.3s; }
 .side-bar-sash.active { transition-delay: 0s; }
+
+/* c3 — host de view: ocupa o pane inteiro; o viewlet do módulo (height 100 %) preenche. */
+.side-bar-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.side-bar-view-empty {
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  opacity: 0.8;
+}
+
+/* 5.5 (DnD de views): header é a alça de arrasto; Side Bar inteira aceita soltar (feedback só com tokens). */
+.part.sidebar > .composite-title[draggable='true'] { cursor: grab; }
+.part.sidebar > .composite-title[draggable='true']:active { cursor: grabbing; }
+.part.sidebar.drop-target { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-dropBackground, var(--vscode-sideBar-background)); }

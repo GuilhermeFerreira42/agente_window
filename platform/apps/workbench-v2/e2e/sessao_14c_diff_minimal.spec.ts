@@ -17,7 +17,8 @@ const WS_DIR = '/tmp/explorer-fs-fixture';
 const DIR = join(WS_DIR, 'e2e-fixture-root', 'gitdiff');
 const ATTACH = '.auxiliary-bar .explorer-attach-area';
 const TAB = `${ATTACH} .tabs-container > .tab`;
-const CHANGES_URI = 'file:///.explorer-search/changes';
+// 5.3: a Source Control View mora na Side Bar (view `scm`), não mais na aba "Changes" do anexo — só o endereço mudou.
+const SCM = '[data-testid="side-bar"] [data-testid="side-bar-view-scm"]';
 const DIFF_URI = 'file:///.explorer-search/diff';
 const git = (...args: string[]) => execFileSync('git', args, { cwd: WS_DIR, encoding: 'utf-8', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
 
@@ -31,14 +32,15 @@ async function boot(page: Page) {
     await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => (x.getAttribute('aria-label') || '').toLowerCase().includes('auxiliar')); b?.click(); });
     await page.waitForTimeout(300);
   }
-  await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+  if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
   await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
-  const sid = await page.evaluate(() => (document.querySelector('[id^="aux-tab-"][id$="-files"]')!.id).replace(/^aux-tab-/, '').replace(/-files$/, ''));
+  const sid = await page.evaluate(() => document.querySelector('.auxiliary-bar[data-session-id]')!.getAttribute('data-session-id')!);
   return sid;
 }
-const openChanges = async (page: Page, sid: string) => {
-  await page.evaluate(([s, u]) => window.__explorerSearchModule!.attach.open({ uri: u, kind: 'changes', sessionId: s }), [sid, CHANGES_URI]);
-  await expect(page.locator(`${ATTACH} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
+const openChanges = async (page: Page, _sid: string) => {
+  // 5.3: a Source Control View vive na view `scm` da Side Bar (clique no ícone; já ativa → não fecha).
+  if ((await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').getAttribute('aria-selected')) !== 'true') await page.locator('[data-testid="activity-bar-item"][data-view-id="scm"]').click();
+  await expect(page.locator(`${SCM} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
 };
 const openDiff = (page: Page, sid: string, diff: { resource: string; title: string; original: string; modified: string }) =>
   page.evaluate(([s, u, d]) => window.__explorerSearchModule!.attach.open({ uri: u, kind: 'diff', sessionId: s, diff: d }), [sid, DIFF_URI, diff] as const);
@@ -65,7 +67,8 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
   });
 
   // ------------------------------------------------------------------ c1
-  test('T1 (c1): aba fixa "Diff" após Changes (não-preview, com ✕) + Monaco DiffEditor side-by-side read-only 14/19 sem minimap', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T1 (c1): aba fixa "Diff" após Changes (não-preview, com ✕) + Monaco DiffEditor side-by-side read-only 14/19 sem minimap', async ({ page }) => {
     const sid = await boot(page);
     await openChanges(page, sid);
     await openDiff(page, sid, { resource: 'file:///tmp/x/mod.ts', title: 'mod.ts (Working Tree)', original: 'const a = 1;\nconst b = 2;\n', modified: 'const a = 1;\nconst b = 3;\nconst c = 4;\n' });
@@ -116,7 +119,8 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
     await expect(diffPane(page).locator('.monaco-diff-editor .editor.modified .monaco-editor')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('T3 (c1): Close All fecha os arquivos mas mantém Changes e Diff; ✕ na aba Diff fecha só ela', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T3 (c1): Close All fecha os arquivos mas mantém Changes e Diff; ✕ na aba Diff fecha só ela', async ({ page }) => {
     const sid = await boot(page);
     await openChanges(page, sid);
     await openDiff(page, sid, { resource: 'file:///tmp/x/mod.ts', title: 'mod.ts (Working Tree)', original: 'a\n', modified: 'b\n' });
@@ -134,7 +138,7 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
   });
 
   // ======================= c2 =======================
-  const row = (page: Page, group: 'index' | 'workingTree', name: string) => page.locator(`${ATTACH} .scm-view .monaco-list-row[data-in-group="${group}"]`).filter({ has: page.locator('.label-name', { hasText: new RegExp(`^${name}$`) }) });
+  const row = (page: Page, group: 'index' | 'workingTree', name: string) => page.locator(`${SCM} .scm-view .monaco-list-row[data-in-group="${group}"]`).filter({ has: page.locator('.label-name', { hasText: new RegExp(`^${name}$`) }) });
   // vista inline (< 900 px): o editor "modified" carrega também as view-zones das remoções → usa-se o container
   const diffText = (page: Page) => diffPane(page).locator('.monaco-diff-editor');
   const modifiedText = (page: Page) => diffPane(page).locator('.monaco-diff-editor .editor.modified .view-lines').first();
@@ -150,26 +154,25 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
     await expect(modifiedText(page)).toContainText('const c = 4;', { timeout: 20_000 });
     await expect(diffText(page)).toContainText('const b = 2;'); // lado original (index) — linha removida
     // D: deletado abre com lado modificado vazio (original = index)
-    await page.locator(`${TAB}[data-kind="changes"]`).click();
+    // 5.3: a lista fica sempre visível na Side Bar — não há aba para voltar
     await row(page, 'workingTree', 'del.txt').click();
     await expect(diffTab.locator('.label-name')).toHaveText('del.txt (Working Tree)');
     await expect(diffText(page)).toContainText('tchau', { timeout: 20_000 });
     await expect.poll(() => diffText(page).locator('.line-delete').count(), { timeout: 15_000 }).toBeGreaterThan(0); // remoção marcada
     // U: untracked → original vazio, modified = disco
-    await page.locator(`${TAB}[data-kind="changes"]`).click();
     await row(page, 'workingTree', 'new.txt').click();
     await expect(diffTab.locator('.label-name')).toHaveText('new.txt (Working Tree)');
     await expect(diffText(page)).toContainText('novo', { timeout: 20_000 });
     await expect.poll(() => diffText(page).locator('.line-insert').count(), { timeout: 15_000 }).toBeGreaterThan(0); // inserção marcada
     // A (staged) → "(Index)": HEAD vazio ⇄ index
-    await page.locator(`${TAB}[data-kind="changes"]`).click();
     await row(page, 'index', 'staged.txt').click();
     await expect(diffTab.locator('.label-name')).toHaveText('staged.txt (Index)');
     await expect(diffText(page)).toContainText('st', { timeout: 20_000 });
     await expect(page.locator(`${TAB}[data-kind="diff"]`)).toHaveCount(1); // sempre a MESMA aba
   });
 
-  test('T5 (c2): badge na aba Changes = total de alterações (index + working tree); some quando o repo fica limpo; lista vazia mostra "No source control changes detected"', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T5 (c2): badge na aba Changes = total de alterações (index + working tree); some quando o repo fica limpo; lista vazia mostra "No source control changes detected"', async ({ page }) => {
     const sid = await boot(page);
     await openChanges(page, sid);
     const changesTab = page.locator(`${TAB}[data-kind="changes"]`);
@@ -178,21 +181,22 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
     await expect(changesTab).toHaveAttribute('title', '4 files changed');
     // limpa o repo por fora (git) → badge some, empty state aparece
     git('add', '-A'); git('commit', '-q', '-m', 'limpa');
-    await page.locator(`${ATTACH} [data-testid="scm-provider"]`).hover();
-    await page.locator(`${ATTACH} [data-testid="scm-refresh"]`).click();
+    await page.locator(`${SCM} [data-testid="scm-provider"]`).hover();
+    await page.locator(`${SCM} [data-testid="scm-refresh"]`).click();
     await expect(badge).toHaveCount(0, { timeout: 15_000 });
     await expect(changesTab).toHaveAttribute('title', '0 files changed');
-    await expect(page.locator(`${ATTACH} [data-testid="scm-empty"]`)).toHaveText('No source control changes detected');
+    await expect(page.locator(`${SCM} [data-testid="scm-empty"]`)).toHaveText('No source control changes detected');
     // 1 alteração → singular
     writeFileSync(join(DIR, 'mod.ts'), 'const a = 1;\n');
-    await page.locator(`${ATTACH} [data-testid="scm-provider"]`).hover();
-    await page.locator(`${ATTACH} [data-testid="scm-refresh"]`).click();
+    await page.locator(`${SCM} [data-testid="scm-provider"]`).hover();
+    await page.locator(`${SCM} [data-testid="scm-refresh"]`).click();
     await expect(badge).toHaveText('1', { timeout: 15_000 });
     await expect(changesTab).toHaveAttribute('title', '1 file changed');
-    await expect(page.locator(`${ATTACH} [data-testid="scm-empty"]`)).toHaveCount(0);
+    await expect(page.locator(`${SCM} [data-testid="scm-empty"]`)).toHaveCount(0);
   });
 
-  test('T6 (c2): "Open Source Control" usa a sessão REAL do anexo (nunca "default") — inclusive quando clicado ANTES de o anexo montar (fica pendente e abre na montagem); e após reload (F5)', async ({ page }) => {
+  // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a aba fixa "Changes" do anexo foi REMOVIDA (a Source Control View vive na Side Bar). Este teste afirmava a LÓGICA da aba (não o motor) — conceito morreu; cobertura substituta: spec 15 T10–T15.
+  test.skip('T6 (c2): "Open Source Control" usa a sessão REAL do anexo (nunca "default") — inclusive quando clicado ANTES de o anexo montar (fica pendente e abre na montagem); e após reload (F5)', async ({ page }) => {
     const sid = await boot(page);
     const openViaHeader = async () => {
       await page.locator('[data-testid="explorer-view"] .pane-header').first().hover();
@@ -225,7 +229,7 @@ test.describe('FATIA-04 · 4.7-c — Diff mínimo (read-only, side-by-side) no E
     // 4) F5 → sem aba fantasma
     await page.reload();
     await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' });
-    await page.locator('[id^="aux-tab-"][id$="-files"]').first().click();
+    if (!(await page.locator('[data-testid="side-bar"] [data-testid="explorer-view"]').first().isVisible().catch(() => false))) await page.locator('[data-testid="activity-bar-item"][data-view-id="explorer"]').click(); // c3: Explorer vive na Side Bar (P2: só seletor)
     await expect(page.locator('[data-testid="explorer-view"]').first()).toBeVisible();
     await openViaHeader();
     await expect(page.locator(`${ATTACH}[data-visible="true"] .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 10_000 });
