@@ -128,7 +128,6 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
       activeChatId: 'chat-cov',
       model: 'Claude Sonnet 4',
       mode: 'agent',
-      auxiliaryVisible: false,
       onSelectChat: vi.fn(),
       onChangeModel: vi.fn(),
       onChangeMode: vi.fn(),
@@ -143,7 +142,6 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
       onReport: vi.fn(),
       onOpenBrowser: vi.fn(),
       onOpenDiff: vi.fn(),
-      onToggleAuxiliary: vi.fn(),
       ...overrides,
     }
     return { ...render(<ChatPanel {...props} />), props }

@@ -71,7 +71,6 @@ describe('P7.3 icon and label contracts', () => {
       'Abrir busca no editor',
       'Alternar terminal',
       'Alternar lista de sessões',
-      'Alternar barra auxiliar',
       'Conta',
     ]) {
       expect(titlebarSource).toContain(`aria-label="${label}"`)
@@ -94,9 +93,9 @@ describe('P7.3 icon and label contracts', () => {
   })
 
   it('imports terminal icons from lucide-react via dedicated subcomponents', () => {
+    // 5.8-c1 (RF-P-05): AuxiliaryBar virou só a casca do Editor Anexo — sem botões nem ícones.
     for (const source of [
       titlebarSource,
-      auxiliarySource,
       editorSource,
       chatPanelSource,
       terminalActionBarSource,
@@ -120,7 +119,7 @@ describe('P7.3 icon and label contracts', () => {
   })
 
   it('keeps at least one title tooltip on each primary toolbar surface', () => {
-    for (const source of [titlebarSource, editorSource, chatInputSource, auxiliarySource, terminalActionBarSource]) {
+    for (const source of [titlebarSource, editorSource, chatInputSource, terminalActionBarSource]) {
       const tags = buttonTags(source)
       expect(tags.some((t) => t.includes('title='))).toBe(true)
     }

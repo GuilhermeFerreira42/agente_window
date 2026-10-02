@@ -46,7 +46,6 @@ function renderPanel() {
     activeChatId: chat.id,
     model: 'Claude Sonnet 4',
     mode: 'agent',
-    auxiliaryVisible: true,
     onSelectChat: vi.fn(),
     onChangeModel: vi.fn(),
     onChangeMode: vi.fn(),
@@ -61,7 +60,6 @@ function renderPanel() {
     onReport: vi.fn(),
     onOpenBrowser: vi.fn(),
     onOpenDiff: vi.fn(),
-    onToggleAuxiliary: vi.fn(),
   }
   return { ...render(<ChatPanel {...props} />), props }
 }

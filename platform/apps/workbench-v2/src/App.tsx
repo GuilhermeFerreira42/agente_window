@@ -226,7 +226,9 @@ export default function App() {
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>([firstSession.id])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSessions.map((session) => [session.id, session.mainChatId])))
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
-  const [auxiliaryVisible, setAuxiliaryVisible] = useState(persistedLayout.current.shell.auxiliaryVisible)
+  // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
+  // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
+  const auxiliaryVisible = false
   const [terminalVisible, setTerminalVisible] = useState(persistedLayout.current.shell.terminalVisible)
   const [sidebarWidth, setSidebarWidth] = useState(persistedLayout.current.shell.sidebarWidth)
   const [partSizesBySession, setPartSizesBySession] = useState<Record<string, number[]>>(persistedLayout.current.partSizesBySession)
@@ -282,8 +284,6 @@ export default function App() {
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed') snapshotAttachTabs(module, e.sessionId)
           if (e.type === 'editor.attachExpanded') {
             setAttachExpandedSessions((cur) => (cur.includes(e.sessionId) ? cur : [...cur, e.sessionId]))
-            // 5.7 (D6): 1.ª aba no anexo (Explorer, Search, Timeline, SCM…) → a coluna "Detalhes" colapsa; o editor fino assume.
-            setAuxiliaryVisible(false)
           }
           if (e.type === 'editor.attachCollapsed') setAttachExpandedSessions((cur) => cur.filter((id) => id !== e.sessionId))
           // 5.7 (D6/RF-07) + docs/24 v1.2 (2026-10-02, RF-09 revogado para a 5.7): maximizar/restaurar NÃO mexem na
@@ -498,13 +498,6 @@ export default function App() {
   // (R-BUG/Val2) Sincroniza o newSessionViewState com a preferência atual de
   // aux bar. Assim, quando o usuário for para a landing (excluir todas as
   // sessões), a próxima sessão criada herda a preferência deixada.
-  useEffect(() => {
-    const next: NewSessionViewState = { ...newSessionState, auxiliaryVisible }
-    if (next.auxiliaryVisible !== newSessionState.auxiliaryVisible) {
-      writeNewSessionViewState(next)
-      setNewSessionState(next)
-    }
-  }, [auxiliaryVisible])
   const handleToggleTheme = useCallback(() => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
   }, [])
@@ -566,7 +559,6 @@ export default function App() {
   // em abas com painel de detalhes acoplado: Changes/Files, nunca Browser/Search).
   const activeVisibleTabId = resolveVisibleEditorTabId(visibleEditorTabs, activeTabId)
   const activeTabType = visibleEditorTabs.find((tab) => tab.id === activeVisibleTabId)?.type
-  const detailsToggleGated = activeTabType === 'diff' || activeTabType === 'file'
   // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed".
   // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
@@ -613,7 +605,6 @@ export default function App() {
         },
         restoreIncoming: (resource) => {
           const restored = restoreSessionLayout(sessionLayouts.current, resource)
-          setAuxiliaryVisible(restored.auxiliaryVisible)
           setAuxiliaryTab(restored.activeViewContainerId)
         },
         clearVisibleSessionState: (resources) => {
@@ -732,7 +723,6 @@ export default function App() {
     // parts cobertas ao estado que o usuário tinha escolhido.
     if (customView.activeView !== null) {
       const desired = restoredPartVisibility(customView)
-      setAuxiliaryVisible(desired.auxiliaryBar)
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissCustomViewOnSessionOpen(customView))
@@ -770,7 +760,6 @@ export default function App() {
     const dismissed = dismissCustomViewOnBack(customView)
     if (dismissed.handled) {
       const desired = restoredPartVisibility(customView)
-      setAuxiliaryVisible(desired.auxiliaryBar)
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissed.state)
@@ -856,14 +845,8 @@ export default function App() {
     activateEditorTab(tab)
     // (R-069) Ao trocar a aba do editor, a barra auxiliar reflete o conteúdo
     // correspondente: Changes abre → aux mostra changes; Files abre → aux mostra files.
-    if (tab.type === 'diff') {
-      setAuxiliaryTab('changes')
-      if (!auxiliaryVisible) setAuxiliaryVisible(true)
-    }
-    if (tab.type === 'file') {
-      setAuxiliaryTab('files')
-      if (!auxiliaryVisible) setAuxiliaryVisible(true)
-    }
+    if (tab.type === 'diff') setAuxiliaryTab('changes')
+    if (tab.type === 'file') setAuxiliaryTab('files')
   }
 
   const updateSession = (id: string, updater: (session: Session) => Session) => {
@@ -1029,7 +1012,6 @@ export default function App() {
   // O modo preview (clique simples substitui, itálico) continua disponível pela API `attach.open` sem `pinned` (T6 da 14).
   handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
     setExplorerContextMenu(null)
-    setAuxiliaryVisible(false)
     void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
   }
 
@@ -1048,7 +1030,6 @@ export default function App() {
     }
     openEditorTab('diff', { title: 'Branch Changes', sessionId })
     setAuxiliaryTab('changes')
-    setAuxiliaryVisible(true)
     // (E10/R-083) A Changes pill revela explicitamente o editor mesmo se o side
     // pane estava fechado ou em detail-only — nunca apenas ativa a aba.
     setEditorHidden(false)
@@ -1084,7 +1065,6 @@ export default function App() {
     setCustomView((current) => {
       if (current.activeView === null) return current
       const desired = restoredPartVisibility(current)
-      setAuxiliaryVisible(desired.auxiliaryBar)
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setNavStack((stack) => dismissLayer(stack, 'custom-view-aiCustomizations'))
@@ -1142,7 +1122,6 @@ export default function App() {
     setEditorHidden((current) => {
       const next = !current
       if (next) {
-        setAuxiliaryVisible(true)
         setEditorTabs((tabs) => {
           const result = enterDetailOnly(tabs, activeSession.id)
           dockedController.current = result.state
@@ -1196,14 +1175,6 @@ export default function App() {
   // Toggle Details (⌥⌘L). "Gated": só atua quando a aba ativa tem detalhe
   // acoplado (Changes/Files). Esconder o detalhe com o editor oculto revelaria um
   // painel vazio — nesse caso, revela o editor de volta.
-  const handleToggleDetails = useCallback(() => {
-    if (!detailsToggleGated) return
-    setAuxiliaryVisible((current) => {
-      const next = !current
-      if (!next && editorHidden) setEditorHidden(false)
-      return next
-    })
-  }, [detailsToggleGated, editorHidden])
 
   useEffect(() => {
     const handleShortcuts = (event: KeyboardEvent) => {
@@ -1231,17 +1202,11 @@ export default function App() {
         handleToggleEditorHidden()
         return
       }
-      // ⌥⌘L (Alt+mod+L) → alterna painel de detalhes (gated por tipo de aba).
-      if (event.altKey && key === 'l') {
-        event.preventDefault()
-        handleToggleDetails()
-        return
-      }
     }
 
     window.addEventListener('keydown', handleShortcuts)
     return () => window.removeEventListener('keydown', handleShortcuts)
-  }, [openSearch, handleToggleEditorHidden, handleToggleDetails, handleMobileBack, isPhone])
+  }, [openSearch, handleToggleEditorHidden, handleMobileBack, isPhone])
 
   const closeEditorTab = (id: string) => {
     const closing = editorTabs.find((tab) => tab.id === id)
@@ -1297,7 +1262,6 @@ export default function App() {
     // evitando que "Novo Chat" esconda as laterais quando o usuário tinha a aux
     // bar aberta na sessão anterior.
     const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryVisible(seededLayout.auxiliaryVisible)
     setAuxiliaryTab(seededLayout.activeViewContainerId)
     const next: Session = {
       id,
@@ -1335,7 +1299,6 @@ export default function App() {
     // (R-BUG/Val2) Sessão criada da landing herda o estado de aux bar do
     // newSessionViewState.
     const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryVisible(seededLayout.auxiliaryVisible)
     setAuxiliaryTab(seededLayout.activeViewContainerId)
     const next: Session = {
       id,
@@ -1773,7 +1736,6 @@ export default function App() {
         activeChatId={sessionChatId}
         model={modelByChat[sessionChatKey] ?? selectedModel}
         mode={modeByChat[sessionChatKey] ?? selectedMode}
-        auxiliaryVisible={auxiliaryVisible}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
         onChangeModel={(nextModel) => setModelByChat((current) => ({ ...current, [sessionChatKey]: nextModel }))}
         onChangeMode={(nextMode) => setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))}
@@ -1796,7 +1758,6 @@ export default function App() {
         onReport={handleReport}
         onOpenBrowser={openBrowser}
         onOpenDiff={() => openDiff(session.id)}
-        onToggleAuxiliary={() => setAuxiliaryVisible((current) => !current)}
       />
     )
   }
@@ -1897,8 +1858,6 @@ export default function App() {
       editorContentVisible={editorContentVisible}
       sidePaneState={sidePaneState}
       onToggleEditorHidden={handleToggleEditorHidden}
-      onToggleDetails={handleToggleDetails}
-      detailsVisible={auxiliaryVisible}
       theme={theme}
     />
   )
@@ -1940,13 +1899,11 @@ export default function App() {
         activeSession={activeSession}
         unreadCount={unreadCount}
         sidebarVisible={sidebarVisible}
-        auxiliaryVisible={auxiliaryVisible}
         terminalVisible={terminalVisible}
         approved={approved}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onToggleSidebar={handleToggleSidebar}
-        onToggleAuxiliary={() => setAuxiliaryVisible((current) => !current)}
         onToggleTerminal={() => setTerminalVisible((current) => !current)}
         onOpenSearch={openSearch}
         onOpenBrowser={openBrowser}
@@ -2042,7 +1999,7 @@ export default function App() {
                       onClose={() => setMobilePane('chat')}
                     />
                   ) : (
-                    <div className="mobile-detail-wrapper"><AuxiliaryBar session={activeSession} fileSystemRootName={fileSystemRootName} visible onClose={() => setMobilePane('chat')} /></div>
+                    null /* 5.8-c1: o painel "Detalhes" mobile saiu junto com a coluna (RF-P-05) */
                   )
                 )}
               </div>
@@ -2095,7 +2052,7 @@ export default function App() {
               {/* 5.7 (D6): com o módulo carregado a barra fica SEMPRE montada (Regra 10 docs/18: o anexo nunca desmonta,
                   só display:none — senão `attach.open` cai em pendingAttachOpen até o F5). `detailsVisible` governa só a coluna "Detalhes";
                   a casca vazia (sem Detalhes e anexo recolhido) zera padding/borda via CSS. */}
-              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={renderDesktopAuxiliaryBar || !!explorerModule} detailsVisible={renderDesktopAuxiliaryBar} fileSystemRootName={fileSystemRootName} onClose={() => setAuxiliaryVisible(false)} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
+              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={!!explorerModule} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
             </div>
             {/* FATIA-05 5.5 (docs/25 O14): Views Panel = `.part.panel` NOVO acima do terminal, dentro de .right-section.
                 Recebe views arrastadas da Side Bar; `display: none` sem views. O terminal abaixo não é tocado. */}

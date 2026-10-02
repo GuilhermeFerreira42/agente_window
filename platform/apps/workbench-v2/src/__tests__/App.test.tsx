@@ -536,10 +536,8 @@ describe('App session flows', () => {
     expect(screen.queryByTestId('editor-empty-state')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Área principal do editor' })).not.toBeInTheDocument()
     expect(document.querySelector('.desktop-surface-group.chat-centered')).not.toBeNull()
-
-    // Ao mostrar os detalhes pelo toggle, o estado vira "detail-only"; o chat absorve a largura do editor.
-    await user.click(screen.getByRole('button', { name: 'Alternar barra auxiliar' }))
-    expect(document.querySelector('.desktop-surface-group.side-pane-detail-only')).not.toBeNull()
+    // 5.8-c1 (RF-P-05): não há mais coluna "Detalhes" nem toggle — o estado "detail-only" deixou de existir.
+    expect(screen.queryByRole('button', { name: 'Alternar barra auxiliar' })).not.toBeInTheDocument()
   })
 
   // 5.2 moveu a busca para a Side Bar; a aba "Search" do editor foi
@@ -1117,7 +1115,7 @@ describe('App session flows', () => {
     expect(editorTab(/Search/)).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('alterna sidebar, terminal e barra auxiliar pela titlebar', async () => {
+  it('alterna sidebar e terminal pela titlebar (sem botão de barra auxiliar — 5.8-c1)', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -1136,11 +1134,8 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Alternar lista de sessões' }))
     expect(document.querySelector('.sessions-sidebar')).not.toHaveClass('is-hidden')
 
-    // Barra auxiliar: alternar deve mudar o estado is-active do botão.
-    const auxToggle = screen.getByRole('button', { name: 'Alternar barra auxiliar' })
-    const auxWasActive = auxToggle.classList.contains('is-active')
-    await user.click(auxToggle)
-    expect(screen.getByRole('button', { name: 'Alternar barra auxiliar' }).classList.contains('is-active')).toBe(!auxWasActive)
+    // 5.8-c1 (RF-P-05): o botão "Alternar barra auxiliar" não existe mais.
+    expect(screen.queryByRole('button', { name: 'Alternar barra auxiliar' })).not.toBeInTheDocument()
 
     // Terminal: alternar liga o estado is-active.
     const terminalToggle = screen.getByRole('button', { name: 'Alternar terminal' })
@@ -1407,29 +1402,6 @@ describe('App session flows', () => {
     expect(toast).toHaveTextContent('Largura da barra de sessões restaurada')
   })
 
-  it('protege abas gerenciadas (Files) de fechamento em detail-only', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-    await openInitialBrowser(user)
-
-    // Abre uma aba Files (gerenciada) e oculta o editor → estado detail-only.
-    await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Files' }))
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
-
-    // A aba Files agora exibe o marcador de gerenciada, sem botão de fechar.
-    const filesTab = Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
-      .find((tab) => tab.querySelector('.editor-tab-title')?.textContent === 'Files')
-    expect(filesTab).toBeTruthy()
-    expect(within(filesTab as HTMLElement).queryByRole('button', { name: 'Fechar Files' })).not.toBeInTheDocument()
-    expect((filesTab as HTMLElement).querySelector('.editor-tab-managed')).not.toBeNull()
-
-    // (E13/R-081) Reforço: o menu de contexto também desabilita "Fechar aba".
-    fireEvent.contextMenu(filesTab as HTMLElement)
-    const closeItem = within(screen.getByRole('menu')).getByRole('menuitem', { name: /Fechar aba/ })
-    expect(closeItem).toHaveAttribute('aria-disabled', 'true')
-  })
-
   it('exclui até a última sessão, cai na tela inicial e recria uma sessão ao enviar', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -1589,30 +1561,6 @@ describe('App session flows', () => {
     expect(within(chips).getByText(filePath.split('/').pop()!)).toBeInTheDocument()
   })
 
-  it('esconde o detalhe transitoriamente sob a aba Browser e o restaura em Changes (R-044)', async () => {
-    window.localStorage.clear()
-    const user = userEvent.setup()
-    render(<App />)
-    await openInitialBrowser(user)
-
-    // Aba padrão = Browser → o painel de detalhes está oculto transitoriamente.
-    expect(document.querySelector('.auxiliary-bar')).toBeNull()
-
-    // Ativar Changes revela o detalhe...
-    await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
-    expect(document.querySelector('.auxiliary-bar')).toBeInTheDocument()
-
-    // ...e voltar ao Browser volta a escondê-lo (regra transiente, sem perder a intenção).
-    const browserTab = document.querySelector<HTMLElement>('.editor-tab[role="tab"][data-browser-id]')
-    if (!browserTab) throw new Error('Browser editor tab not found')
-    await user.click(browserTab)
-    expect(document.querySelector('.auxiliary-bar')).toBeNull()
-
-    // Ocultar o editor com Browser ativo mostra o fallback (não fica em branco).
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
-    expect(document.querySelector('.auxiliary-bar')).toBeInTheDocument()
-  })
-
   it('reordena abas do editor da mesma sessão por drag & drop', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
@@ -1649,18 +1597,6 @@ describe('App session flows', () => {
 
     fireEvent.keyDown(window, { key: 'e', metaKey: true, altKey: true })
     expect(screen.queryByTestId('editor-hidden-content')).not.toBeInTheDocument()
-  })
-
-  it('Toggle Details (Alt+Cmd+L) é gated: não faz nada numa aba Browser', async () => {
-    window.localStorage.clear()
-    render(<App />)
-
-    // A sessão inicial abre numa aba Browser — sem detalhe acoplado.
-    const auxToggle = screen.getByRole('button', { name: 'Alternar barra auxiliar' })
-    const wasActive = auxToggle.classList.contains('is-active')
-    fireEvent.keyDown(window, { key: 'l', metaKey: true, altKey: true })
-    // Estado da barra auxiliar não muda numa aba Browser (ação inibida pelo gate).
-    expect(screen.getByRole('button', { name: 'Alternar barra auxiliar' }).classList.contains('is-active')).toBe(wasActive)
   })
 
   // FATIA-05 5.3 (decisão A do usuário, 2026-09-30 — D2.60): a maquete "Changes N" (initialDiffFiles/buildProjectDiffFiles,
@@ -1729,25 +1665,5 @@ describe('App session flows', () => {
     expect(within(surface).queryByText('changelog')).not.toBeInTheDocument()
   })
 
-  // E4 (LAYOUT_CONTROLLER.md): a visibilidade da barra auxiliar é estado por
-  // sessão. Ao sair de uma sessão o estado é capturado; ao voltar, restaurado —
-  // sem vazar para as demais sessões.
-  it('preserva a visibilidade da barra auxiliar por sessão', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-
-    // Na sessão ativa (s1), revela o detalhe abrindo as alterações.
-    await user.click(sessionRow('Replicar a Janela de Agentes'))
-    await user.click(screen.getByRole('button', { name: 'Revisar alterações' }))
-    expect(document.querySelector('.auxiliary-bar')).toBeInTheDocument()
-
-    // Vai para outra sessão nunca aberta: herda o padrão (detalhe oculto).
-    await user.click(sessionRow('Ajustar layout single-pane'))
-    expect(document.querySelector('.auxiliary-bar')).not.toBeInTheDocument()
-
-    // Volta à primeira: o estado capturado é restaurado (detalhe visível).
-    await user.click(sessionRow('Replicar a Janela de Agentes'))
-    expect(document.querySelector('.auxiliary-bar')).toBeInTheDocument()
-  })
 })
 

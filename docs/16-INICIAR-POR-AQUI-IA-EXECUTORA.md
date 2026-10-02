@@ -21,7 +21,8 @@ Depois disso, você deve esperar a confirmação explícita do usuário antes de
 
 ## 3. Ordem obrigatória de leitura
 
-> **Estado 2026-10-01:** FATIA-05 **5.1–5.6 homologadas · 5.7 código concluído `9a11319`** (editor fino default com regra de larguras chat ≥ 420/50 %, bug do vídeo corrigido, toggle maximizar/restaurar com `editorMaximized`) — **aguarda homologação no Windows**; 5.8 só após OK. Bateria §9 agora tem **16 suítes** (+`sessao_15_editor_maximize`). Detalhe: `docs/25` e topo do `docs/12`.
+> **Estado 2026-10-02 (fim do dia):** FATIA-05 **5.1–5.7 homologadas · 5.8 código concluído** (`d0c2a8d` c1 coluna Detalhes removida · `4ee0ed8` c3 tokens; docs/24 v1.3) → **Fatia 5 100 % implementada, aguarda homologação final no Windows**. Fatia 6 proibida até o OK.
+> (anterior) **Estado 2026-10-01:** FATIA-05 **5.1–5.6 homologadas · 5.7 código concluído `9a11319`** (editor fino default com regra de larguras chat ≥ 420/50 %, bug do vídeo corrigido, toggle maximizar/restaurar com `editorMaximized`) — **aguarda homologação no Windows**; 5.8 só após OK. Bateria §9 agora tem **16 suítes** (+`sessao_15_editor_maximize`). Detalhe: `docs/25` e topo do `docs/12`.
 > (anterior) **Estado 2026-09-30 (noite, 4):** 5.6 código concluído `7d05c7d`.
 
 > **Passo 0 (2026-09-29):** antes de tudo leia **`docs/00_COMECE_AQUI.md`** (1 página) e **`docs/25`** (estado exato da obra e decisões pendentes). Se estiver retomando a FATIA-05, a cadeia curta é 00_COMECE_AQUI → 25 → 24 → 27 → 26 → 18; a lista abaixo é a cadeia completa de arquitetura.

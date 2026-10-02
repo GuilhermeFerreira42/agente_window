@@ -7,7 +7,6 @@ import {
   Globe2,
   Moon,
   PanelLeft,
-  PanelRight,
   Plus,
   Search,
   Sun,
@@ -19,13 +18,11 @@ interface TitlebarProps {
   activeSession: Session
   unreadCount: number
   sidebarVisible: boolean
-  auxiliaryVisible: boolean
   terminalVisible: boolean
   approved: boolean
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onToggleSidebar: () => void
-  onToggleAuxiliary: () => void
   onToggleTerminal: () => void
   onOpenSearch: () => void
   onOpenBrowser: () => void
@@ -39,13 +36,11 @@ export function Titlebar({
   activeSession,
   unreadCount,
   sidebarVisible,
-  auxiliaryVisible,
   terminalVisible,
   approved,
   theme,
   onToggleTheme,
   onToggleSidebar,
-  onToggleAuxiliary,
   onToggleTerminal,
   onOpenSearch,
   onOpenBrowser,
@@ -116,9 +111,6 @@ export function Titlebar({
           </button>
           <button className={`titlebar-button is-secondary${terminalVisible ? ' is-active' : ''}`} type="button" aria-label="Alternar terminal" title="Terminal" onClick={onToggleTerminal}>
             <TerminalSquare size={15} />
-          </button>
-          <button className={`titlebar-button${auxiliaryVisible ? ' is-active' : ''}`} type="button" aria-label="Alternar barra auxiliar" title="Barra auxiliar" onClick={onToggleAuxiliary}>
-            <PanelRight size={15} />
           </button>
           <button className="titlebar-button" type="button" aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={onToggleTheme}>
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}

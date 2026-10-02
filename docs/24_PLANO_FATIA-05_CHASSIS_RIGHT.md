@@ -1,7 +1,7 @@
 # docs_24 — FATIA-05 — Especificação Final (Chassis-Right)
 
 **Codinome:** Chassis-Right
-**Versão:** 1.1 (decisões do Gate 0 aplicadas em 2026-09-29)
+**Versão:** 1.3 (2026-10-02 — 5.8 redefinida como "misto": c1 remoção definitiva da coluna Detalhes + c3 polish de tokens; Alt+Z e menu de abas → 5.9/futura; Simple Browser continua 4.8). v1.2 (2026-10-02): D6/RF-09 — maximizado mantém a Side Bar 274. v1.1 (2026-09-29): decisões do Gate 0.
 **Data original:** 2026-09-28
 **Status:** PLANO APROVADO. Código só começa após o Passo 4 da ordem do Gate 0.
 **Autoridade:** este documento substitui `docs_21`, `docs_22`, `docs_23` e todos os rascunhos anteriores da FATIA-05.
@@ -221,13 +221,16 @@ Comparado ao rascunho v1.0, esta versão corrige:
 
 ---
 
-### 5.8 — Polish (Alt+Z e menu de abas)
+### 5.8 — Polish / Hardening "misto" (v1.3, decisão do usuário 2026-10-02 — 5.1–5.7 homologadas no Windows)
 
-**Entrega:**
-- `Alt+Z` alterna word wrap no editor.
-- Menu de contexto da aba do editor com 5 itens: Close / Close Others / Close All / Copy Path / Copy Relative Path. (Subconjunto consciente do real — o restante entra em fase futura.)
+**Entrega (2 commits atômicos, parar após o c3):**
+- **c1 `feat(5.8-c1)`: remoção definitiva da coluna "Detalhes"** (D2.50): apagar `DetailsView`/`FilesDetails`/`ChangesDetails`/`hideChangesTab`/`useMockChangesTransition` e o estado `auxiliaryVisible`; apagar os 2 botões "Barra auxiliar" (Titlebar e toolbar do chat — não existem no VS Code real; não há toggle na Command Palette); `aside.auxiliary-bar` passa a hospedar só o `attachSlot` (editor fino), sem coluna 330 px. Testes unitários que dependiam da maquete são **apagados/ajustados no mesmo commit** (decisão "apagar", não "esconder"). Spec: `sessao_15_editor_maximize` T39 — `.auxiliary-column` ausente do DOM no boot e com 3 abas; nenhum botão `aria-label="Barra auxiliar"`.
+- **c3 `feat(5.8-c3)`: polish de tokens e medidas**: `theme.css` ganha os tokens `--vscode-badge-*`, `--vscode-gitDecoration-*`, `--vscode-sash-hoverBorder` que faltarem; Activity Bar item radius 6 px; X da aba com `codicon-close-small` se a fonte tiver o glifo (senão documentar); sash da Side Bar 4 px, `cursor: col-resize`, hover `--vscode-sash-hoverBorder`; `ExplorerContextMenuHost` item 24 px e separadores por grupo. (`shot.tmp.mjs` citado no kickoff **não existe** no repo.)
+- **Fora da 5.8 (registrado):** Alt+Z (RF-P-02) e menu de contexto da aba (RF-P-04) → **5.9/fase futura**; Simple Browser (UI visual, D2.39) → **4.8** separada.
 
-**DoD:** E2E de Alt+Z e do menu.
+**Medidas congeladas (1400 px, D6 v1.2):** boot chat **768** / Side Bar **274** / Detalhes **0 e sem botão no DOM** · 3 abas chat **420** / anexo **341** · maximizado **`[lista 300][EDITOR 767][Side Bar 274][AB 48]`** (não 1041 — esse número era da regra antiga com Side Bar 0) · F5 igual.
+
+**DoD:** bateria §9 16 suítes (15 + T39) ×2 verdes em 5175/5174 · typecheck 0 · vitest sem falhas novas · prints `auditoria_05/c5.8/01–06` · `docs/25` 5.8 ✅, `docs/12` entrada "Fatia 5 100 %", `docs/11` Kanban "Fatia 5 ✅" · 5174 de pé para homologação final.
 
 ---
 
@@ -287,12 +290,14 @@ Regra: se não foi medido, escrever literalmente **"não medido — validar na h
 | **RF-13** | **Indicador de ícone ativo 2 px na face externa, permanece com Side Bar fechada** | `getBoundingClientRect()` do indicador com `left ≈ 46` no modo direito; sobrevive a toggle da Side Bar | Must |
 | **RF-14** | **Ícone ativo clicado de novo fecha a Side Bar; clicar em outro troca a view** | toggle fecha; troca ativa nova view | Must |
 
-### 6.2 Polish 5.8
+### 6.2 Polish 5.8 (v1.3)
 
 | ID | Requisito | Critério binário | MoSCoW |
 |---|---|---|---|
-| RF-P-02 | Alt+Z alterna word wrap no Monaco | `monacoEditor.getOption(wordWrap)` alterna | Should |
-| RF-P-04 | Menu de contexto da aba com 5 itens | clique direito numa aba abre menu com Close / Close Others / Close All / Copy Path / Copy Relative Path | Should |
+| RF-P-05 | Coluna "Detalhes" e botões "Barra auxiliar" removidos do DOM | E2E T39: `.auxiliary-column` count 0 (boot e com 3 abas); `[aria-label="Barra auxiliar"]` count 0 | Must |
+| RF-P-06 | Tokens `--vscode-badge-*`, `--vscode-gitDecoration-*`, `--vscode-sash-hoverBorder` em `theme.css`; sash 4 px `col-resize` com hover | grep dos tokens + E2E existente do sash (spec 15 T4) | Should |
+| RF-P-02 | Alt+Z alterna word wrap no Monaco | **movido para 5.9/futura (v1.3)** | — |
+| RF-P-04 | Menu de contexto da aba com 5 itens | **movido para 5.9/futura (v1.3)** | — |
 
 ### 6.3 Cancelados (documentados)
 

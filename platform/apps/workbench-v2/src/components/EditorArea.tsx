@@ -17,7 +17,6 @@ import {
   ListPlus,
   Maximize2,
   Minimize2,
-  PanelRight,
   RefreshCw,
   RotateCcw,
   Search,
@@ -79,8 +78,6 @@ interface EditorAreaProps {
   editorContentVisible: boolean
   sidePaneState: SidePaneState
   onToggleEditorHidden: () => void
-  onToggleDetails: () => void
-  detailsVisible: boolean
   onNewCustomizations: () => void
   customizationsSurface: ReactNode
   /** (R-087) Tema ativo — controla o tema do Monaco Editor. */
@@ -445,8 +442,6 @@ export function EditorArea({
   editorContentVisible,
   sidePaneState,
   onToggleEditorHidden,
-  onToggleDetails,
-  detailsVisible,
   theme = 'dark',
 }: EditorAreaProps) {
   const monacoTheme = theme === 'light' ? 'vs' : 'vs-dark'
@@ -601,9 +596,6 @@ export function EditorArea({
         <div className="editor-toolbar">
           <button className="toolbar-button" type="button" title="Dividir editor" aria-label="Dividir editor" onClick={onSplit}><SplitSquareHorizontal size={14} /></button>
           <button className="toolbar-button" type="button" title={editorContentVisible ? 'Ocultar editor' : 'Mostrar editor'} aria-label={editorContentVisible ? 'Ocultar editor' : 'Mostrar editor'} aria-pressed={!editorContentVisible} onClick={onToggleEditorHidden}>{editorContentVisible ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-          {(activeTab?.type === 'diff' || activeTab?.type === 'file') && (
-            <button className={`toolbar-button${detailsVisible ? ' is-active' : ''}`} type="button" title="Alternar detalhes (Alt+Cmd+L)" aria-label="Alternar detalhes" aria-pressed={detailsVisible} onClick={onToggleDetails}><PanelRight size={14} /></button>
-          )}
           <button className={`toolbar-button${editorMaximized ? ' is-active' : ''}`} type="button" title={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-label={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-pressed={editorMaximized} onClick={onToggleMaximize}>{editorMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
         </div>
       </div>

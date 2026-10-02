@@ -72,11 +72,8 @@ test.describe('5.7 — editor fino default + maximizar/restaurar', () => {
     await open(page);
     await clickSeed(page);
     await expectThinDefault(page);
-    // o toggle da barra auxiliar continua abrindo a coluna "Detalhes"
-    await page.locator('button[aria-label="Barra auxiliar"]').first().click();
-    await expect(page.locator(DETAILS)).toBeVisible();
-    await page.locator('button[aria-label="Barra auxiliar"]').first().click();
-    await expect(page.locator(DETAILS)).toBeHidden();
+    // 5.8-c1: a coluna "Detalhes" e o toggle "Barra auxiliar" foram removidos (RF-P-05, T39)
+    await expect(page.locator(DETAILS)).toHaveCount(0);
     await expect(page.locator(ATTACH_TAB)).toHaveCount(1);
   });
 
@@ -214,13 +211,11 @@ test.describe('5.7 — editor fino default + maximizar/restaurar', () => {
     await expectThinDefault(page);
   });
 
-  test('T36 (5.7-03) — boot limpo: nenhuma coluna "Detalhes" (0 px) e nenhum Browser automático no centro; toggle ainda abre Detalhes', async ({ page }) => {
+  test('T36 (5.7-03 → 5.8-c1) — boot limpo: nenhuma coluna "Detalhes" no DOM e nenhum Browser automático no centro', async ({ page }) => {
     await open(page);
-    await expect(page.locator(DETAILS)).toBeHidden();
+    await expect(page.locator(DETAILS)).toHaveCount(0);
     await expect(page.locator(`${CENTER} .editor-tab`)).toHaveCount(0);
     expect(await width(page, CHAT)).toBeGreaterThanOrEqual(CHAT_MIN);
-    await page.locator('button[aria-label="Barra auxiliar"]').first().click();
-    await expect(page.locator(DETAILS)).toBeVisible();
   });
 
   test('T32 — Browser ativo no EditorArea não bloqueia o anexo: arquivo abre no editor fino sem F5', async ({ page }) => {
@@ -269,5 +264,24 @@ test.describe('5.7 — editor fino default + maximizar/restaurar', () => {
     await clickFile(page, 'seed.txt');
     await expect(page.locator(ATTACH)).toHaveAttribute('data-maximized', 'false');
     await expectThinDefault(page);
+  });
+
+  test('T39 (5.8-c1, RF-P-05) — coluna "Detalhes" e botões "Barra auxiliar" NÃO existem no DOM (boot, 3 abas, maximizado); boot chat 768 / Side Bar 274', async ({ page }) => {
+    await open(page);
+    const details = page.locator('.auxiliary-column');
+    const auxButtons = page.locator('[aria-label="Barra auxiliar"], [aria-label="Alternar barra auxiliar"]');
+    await expect(details).toHaveCount(0);
+    await expect(auxButtons).toHaveCount(0);
+    expect(await width(page, CHAT)).toBeGreaterThanOrEqual(760);
+    expect(Math.abs((await width(page, SB)) - 274)).toBeLessThanOrEqual(2);
+    for (const f of ['seed.txt', ...FILES]) await clickFile(page, f);
+    await expect(page.locator(ATTACH_TAB)).toHaveCount(3);
+    await expect(details).toHaveCount(0);
+    await expectThinDefault(page);
+    await page.locator(MAX_BTN).click();
+    await expect(page.locator(ATTACH)).toHaveAttribute('data-maximized', 'true');
+    await expect(details).toHaveCount(0);
+    expect(Math.abs((await width(page, SB)) - 274)).toBeLessThanOrEqual(2);
+    await page.locator(MAX_BTN).click();
   });
 });

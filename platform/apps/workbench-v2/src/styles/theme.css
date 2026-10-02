@@ -109,6 +109,23 @@
   --vscode-terminal-tab-activeBorder: #0078d4;
   --vscode-terminal-tab-activeBackground: transparent;
   --vscode-sash-hoverBorder: #0078d4;
+  /* FATIA-05 5.8-c3 (RF-P-06): tokens usados sem fallback que não existiam (valores Dark Modern / defaults do VS Code) */
+  --vscode-menu-selectionBackground: #0078d4;
+  --vscode-menu-selectionForeground: #ffffff;
+  --vscode-menu-separatorBackground: #454545;
+  --vscode-list-focusOutline: #0078d4;
+  --vscode-list-inactiveFocusOutline: transparent;
+  --vscode-list-focusForeground: var(--vscode-foreground);
+  --vscode-list-hoverForeground: var(--vscode-foreground);
+  --vscode-list-activeSelectionIconForeground: #ffffff;
+  --vscode-tree-indentGuidesStroke: #585858;
+  --vscode-editorGroup-border: rgba(255, 255, 255, 0.09);
+  --vscode-inputOption-hoverBackground: rgba(90, 93, 94, 0.5);
+  --vscode-inputValidation-errorBackground: #5a1d1d;
+  --vscode-inputValidation-errorBorder: #be1100;
+  --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.2);
+  --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.2);
+  --vscode-problemsInfoIcon-foreground: #3794ff;
   --vscode-terminal-ansiBlack: #000000;
   --vscode-terminal-ansiRed: #cd3131;
   --vscode-terminal-ansiGreen: #0dbc79;
@@ -327,6 +344,23 @@
   --vscode-terminal-tab-activeBorder: #0078d4;
   --vscode-terminal-tab-activeBackground: transparent;
   --vscode-sash-hoverBorder: #0078d4;
+  /* FATIA-05 5.8-c3 (RF-P-06): tokens usados sem fallback que não existiam (valores Light Modern / defaults do VS Code) */
+  --vscode-menu-selectionBackground: #005fb8;
+  --vscode-menu-selectionForeground: #ffffff;
+  --vscode-menu-separatorBackground: #d4d4d4;
+  --vscode-list-focusOutline: #005fb8;
+  --vscode-list-inactiveFocusOutline: transparent;
+  --vscode-list-focusForeground: var(--vscode-foreground);
+  --vscode-list-hoverForeground: var(--vscode-foreground);
+  --vscode-list-activeSelectionIconForeground: #ffffff;
+  --vscode-tree-indentGuidesStroke: #a9a9a9;
+  --vscode-editorGroup-border: #e5e5e5;
+  --vscode-inputOption-hoverBackground: rgba(184, 184, 184, 0.31);
+  --vscode-inputValidation-errorBackground: #f2dede;
+  --vscode-inputValidation-errorBorder: #be1100;
+  --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.4);
+  --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.4);
+  --vscode-problemsInfoIcon-foreground: #1a85ff;
   --vscode-terminal-ansiBlack: #000000;
   --vscode-terminal-ansiRed: #cd3131;
   --vscode-terminal-ansiGreen: #00bc00;

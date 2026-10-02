@@ -52,11 +52,8 @@ const setVisible = async (page: import('@playwright/test').Page, visible: boolea
 /** 5.7 (D6): na faixa fina "Detalhes" e editor são EXCLUSIVOS; ao abrir a 1.ª aba ela colapsa sozinha, mas
  *  `attach.setVisible(true)` sem abas (empty state) não dispara isso — o teste desliga a coluna pelo toggle do shell. */
 const collapseDetails = async (page: import('@playwright/test').Page) => {
-  if (await page.locator('.auxiliary-bar .auxiliary-column').isVisible().catch(() => false)) {
-    await page.locator('button[aria-label="Barra auxiliar"]').first().click();
-    await expect(page.locator('.auxiliary-bar .auxiliary-column')).toBeHidden();
-    await page.waitForTimeout(250); // transição de largura da barra (160 ms)
-  }
+  // 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais — o helper só garante isso.
+  await expect(page.locator('.auxiliary-bar .auxiliary-column')).toHaveCount(0);
 };
 const rect = (loc: import('@playwright/test').Locator) => loc.evaluate((e) => { const b = e.getBoundingClientRect(); return { x: Math.round(b.x), right: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) }; });
 

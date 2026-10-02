@@ -9,7 +9,6 @@ import {
   GitCompareArrows,
   MessageCircle,
   MoreHorizontal,
-  PanelRight,
   RotateCcw,
   Sparkles,
   ThumbsDown,
@@ -32,7 +31,6 @@ interface ChatPanelProps {
   activeChatId: string
   model: string
   mode: string
-  auxiliaryVisible: boolean
   onSelectChat: (chatId: string) => void
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
@@ -47,7 +45,6 @@ interface ChatPanelProps {
   onReport: (chatId: string, messageId: string) => void
   onOpenBrowser: () => void
   onOpenDiff: () => void
-  onToggleAuxiliary: () => void
   composerDrafts?: Record<string, ComposerDraft>
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
@@ -240,7 +237,6 @@ export function ChatPanel({
   activeChatId,
   model,
   mode,
-  auxiliaryVisible,
   onSelectChat,
   onChangeModel,
   onChangeMode,
@@ -255,7 +251,6 @@ export function ChatPanel({
   onReport,
   onOpenBrowser,
   onOpenDiff,
-  onToggleAuxiliary,
   composerDrafts,
   onChangeComposerDraft,
   composerHistory,
@@ -287,7 +282,6 @@ export function ChatPanel({
         <div className="sessions-header-actions">
           <button className="toolbar-button" type="button" title="Abrir navegador no editor" aria-label="Abrir navegador" onClick={onOpenBrowser}><Globe2 size={14} /></button>
           <button className="toolbar-button" type="button" title="Revisar alterações" aria-label="Revisar alterações" onClick={onOpenDiff}><GitCompareArrows size={14} /></button>
-          <button className={`toolbar-button${auxiliaryVisible ? ' is-active' : ''}`} type="button" title="Barra auxiliar" aria-label="Barra auxiliar" onClick={onToggleAuxiliary}><PanelRight size={14} /></button>
         </div>
       </div>
       {session.chats.length > 1 && (
