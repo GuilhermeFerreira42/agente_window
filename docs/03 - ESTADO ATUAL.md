@@ -1,13 +1,13 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-03 · HEAD de código: `4ee0ed8` (5.8-c3) · docs reorganizadas em 9 arquivos (ver `01`)**
+**ATUALIZADO EM: 2026-10-03 · HEAD de código: `4ee0ed8` (5.8-c3) · Especificações completas das Fatias 6 a 10 concluídas (ver docs/arquivo_morto/pesquisa_bruta/INDICE_GERAL.md)**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
 
 ## Status
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
-- **Próxima: Fatia 6 — Chat Carcaça (histórico + workspace sync) — PAUSADA, aguardando autorização explícita do usuário.** Não iniciar.
+- **Fatias 6 a 10 (Engenharia Reversa e Especificações):** Mapeamento completo de layout, medidas em pixels, comportamento de botões e regras de negócio concluídos em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para codificação fase a fase.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
 
 ## Placar FATIA-05
