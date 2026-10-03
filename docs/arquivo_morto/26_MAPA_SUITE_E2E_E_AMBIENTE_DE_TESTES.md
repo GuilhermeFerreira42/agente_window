@@ -1,7 +1,9 @@
+> **Nota 2026-10-02 (migração Context Engineering):** fonte da verdade agora é `/AGENTS.md` → `/PROJECT-STATE.md` → `/DECISIONS.md`. Caminhos de docs movidos foram atualizados neste arquivo; referências a `docs/12`/`docs/11` como "docs vivos a atualizar" valem agora para `CHANGELOG.md`/`PROJECT-STATE.md`.
+
 # 26 — MAPA DA SUÍTE E2E, AMBIENTE DE TESTES E BECOS SEM SAÍDA
 
 **Data:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `0e36af4` + c2 em working tree.
-**Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
+**Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `memory-bank/context/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 
 ---
 
@@ -21,7 +23,7 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 
 ## 2. Inventário completo — 31 arquivos / 186 testes
 
-### 2.1 Anti-regressão OBRIGATÓRIA em todo commit da FATIA-05 (`docs/24 §9`) — 12 suítes / 115 testes
+### 2.1 Anti-regressão OBRIGATÓRIA em todo commit da FATIA-05 (`memory-bank/planning/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §9`) — 12 suítes / 115 testes
 | Spec | Testes | Mundo | Observação |
 |---|---|---|---|
 | `sessao_11_terminal_pty_real` | 6 | 5174 ou 5175 (não usa fs) | terminal homologado — **intocável** |
@@ -58,7 +60,7 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 | `sessao_11f_context_menu` | 2/2 | ações do menu de contexto do terminal |
 
 Todos testam rótulos/atributos do terminal **anteriores** à homologação `COMITE_HOMOLOGACAO_TERMINAL_V2` (`75c6686`). Mesma família das **9 falhas do Vitest** em `src/components/terminal/__tests__/TerminalPanel.test.tsx` (espera `role="region"` "Terminal"; `VSCodeTerminal.tsx` renderiza `aria-label="Painel Inferior"`).
-**Regra:** não corrigir código do terminal (intocável). Destino dos testes = decisão do usuário (`docs/25 §6 P3/P4`). Até lá: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
+**Regra:** não corrigir código do terminal (intocável). Destino dos testes = decisão do usuário (`memory-bank/archive/docs/25_ESTADO_ATUAL_E_PENDENCIAS_FATIA-05.md (histórico; estado vivo em PROJECT-STATE.md) §6 P3/P4`). Até lá: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
 
 ### 2.5 Números esperados hoje
 - **Vitest:** `npx vitest run` → **692 passed / 9 failed / 16 skipped / 717** desde a 5.3 `2bd6cc3` (os 9 = `TerminalPanel.test.tsx`; os 16 skipped = D2.60: 2 "Workspace Files" (c3) + 4 aba Search (5.2) + 10 maquete "Changes N" (5.3: App.test 7, iconLabels 2, coverageIntegration 1)). Antes: 702/9/6 (5.2), 706/9/2 (c3). Qualquer número diferente de 9 falhas ou 16 skips é regressão.
@@ -105,7 +107,7 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - **Dois Vite (5174+5175) + suíte com Monaco (14, 14c) → "Page crashed" / timeout em `page.reload`.** Parece regressão, é OOM. Rode com um Vite só.
 - `--workers=2` → thrashing (46 s → 7 min por teste) e Chromium órfão.
 - code-server (~900 MB com 2 extension hosts) não cabe junto com a bateria. Abrir pasta no 8080 via Playwright dispara extension hosts e trava.
-- **Proibido** buildar VS Code/code-server da fonte (`docs/16`). Runtime pronto em `.cache` via script de restore; `/tmp` (tmpfs 1 GB) enche → `TMPDIR=/home/user/.cache/tmp`.
+- **Proibido** buildar VS Code/code-server da fonte (`memory-bank/architecture/16-INICIAR-POR-AQUI-IA-EXECUTORA.md`). Runtime pronto em `.cache` via script de restore; `/tmp` (tmpfs 1 GB) enche → `TMPDIR=/home/user/.cache/tmp`.
 
 ### 4.2 Playwright
 - `addInitScript` roda também no `page.reload` — limpar `localStorage` só com flag em `sessionStorage` quando o teste precisa reler persistência.

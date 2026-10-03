@@ -1,3 +1,5 @@
+> **Nota 2026-10-02 (migração Context Engineering):** fonte da verdade agora é `/AGENTS.md` → `/PROJECT-STATE.md` → `/DECISIONS.md`. Este arquivo continua operacional em `docs/`.
+
 # 08 — CRITÉRIOS DE HOMOLOGAÇÃO
 
 ## Objetivo
