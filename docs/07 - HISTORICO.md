@@ -2,6 +2,14 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-04 - Alinhamento da Fatia 6 com a máquina real (VS Code 1.135.0)
+- Recalibração da documentação da Fatia 6 (`docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`):
+  - Referência oficial travada no **VS Code 1.135.0 (perfil Janela Agentes no Windows 11)**, eliminando referências obsoletas a 1.140.0.
+  - Zonas sagradas travadas: chassi direito (`Side Bar` 274px, `Activity Bar` 48px, Explorer, Busca, Git) e `TerminalPanel` (PTY real inferior) são **INTOCÁVEIS** (zero linhas alteradas). Removida qualquer menção a colunas paralelas de "Alterações".
+  - Regra do Empty State centralizado (768px): tela vazia centralizada; ao enviar mensagem ou selecionar sessão, transita automaticamente para histórico flex com input ancorado no rodapé.
+  - Planejamento de remoção de mocks em `src/data.ts` (`initialSessions`, `setupMessages`, etc.) para conexão com o serviço real de sessões.
+- Atualizados `docs/03 - ESTADO ATUAL.md` e `docs/05 - DECISOES.md` (D26–D29).
+
 ## 2026-10-03 - Documentação reorganizada: Engenharia de Contexto HÍBRIDA (9 arquivos em `docs/`)
 - Decisão do dono (conversa Meta + Arena): manter o ganho da migração (um lugar só para cada coisa) mas voltar para **pasta única `docs/` numerada**, por causa do fluxo por voz com várias IAs. Mapeamento completo e motivo no `01 §0–§2`.
 - Raiz: só `AGENTS.md` de 1 linha. Removidos da raiz (conteúdo absorvido): `PROJECT-STATE.md`→`03`, `DECISIONS.md`→`05`, `CHANGELOG.md`→`07`, `CLAUDE.md`, `.cursorrules`; pastas `memory-bank/` e `context/` → `docs/arquivo_morto/`.

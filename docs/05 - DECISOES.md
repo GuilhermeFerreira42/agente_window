@@ -57,3 +57,12 @@
 
 ## 5. Decisões de documentação (2026-10-03)
 - **Engenharia de Contexto híbrida:** pasta única `docs/` com 9 arquivos numerados e travados; `AGENTS.md` de 1 linha na raiz; um lugar só para cada informação (estado=03, decisões=05, futuro/dívidas=06, histórico=07). Não criar o 10.º arquivo. Motivo e mapeamento no `01 §0–§2`.
+
+## 6. Decisões da FATIA-06 (2026-10-04)
+
+| # | Decisão | Valor travado |
+|---|---|---|
+| D26 | Referência oficial da Fatia 6 | **VS Code 1.135.0 (perfil Janela Agentes no Windows 11)** medido na máquina real do usuário. Substitui referências obsoletas a 1.140.0. |
+| D27 | Chassi direito e terminal na Fatia 6 | **Intocáveis.** Zero criação de colunas paralelas ou abas "Alterações/Changes" no lado direito; Side Bar 274px, Activity Bar 48px e TerminalPanel inferior permanecem sem alterações de código. |
+| D28 | Empty State Central | **Largura máxima travada em 768 px**, centralizado; ao submeter mensagem ou carregar sessão, transita automaticamente para histórico flex com input fixado no rodapé. |
+| D29 | Remoção de Mocks da Fatia 6 | Mocks estáticos de chat e sessão em `src/data.ts` (`initialSessions`, `setupMessages`, `waitingMessages`, etc.) serão desconectados para implementação do serviço real de sessões. |

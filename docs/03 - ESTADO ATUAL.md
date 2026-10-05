@@ -1,13 +1,14 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-03 · HEAD de código: `4ee0ed8` (5.8-c3) · Especificações completas das Fatias 6 a 10 concluídas (ver docs/arquivo_morto/pesquisa_bruta/INDICE_GERAL.md)**
+**ATUALIZADO EM: 2026-10-04 · HEAD de código: `4ee0ed8` (5.8-c3) · Especificação da Fatia 6 alinhada ao VS Code 1.135.0 real do Windows (ver docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/)**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
 
 ## Status
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
-- **Fatias 6 a 10 (Engenharia Reversa e Especificações):** Mapeamento completo de layout, medidas em pixels, comportamento de botões e regras de negócio concluídos em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para codificação fase a fase.
+- **Fatia 6 (Alinhamento de Documentação - 2026-10-04):** Especificação recalibrada para a versão real do Windows (**VS Code 1.135.0**, perfil Janela Agentes). Travados: chassi direito (Side Bar 274 + Activity Bar 48) e terminal como intocáveis; transição do empty state de 768px para thread ativa; e substituição de mocks de chat/sessões de `src/data.ts` por serviço real.
+- **Fatias 7 a 10 (Engenharia Reversa e Especificações):** Mapeamento em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para fases subsequentes.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
 
 ## Placar FATIA-05
@@ -41,4 +42,4 @@ typecheck 0 · vitest 701 pass / 9 fail (`TerminalPanel.test.tsx`, pré-existent
 
 ## Para a próxima IA
 1. Ler `docs/01` → `02` → este arquivo → `05 - DECISOES`.
-2. Não começar a Fatia 6 sem ordem. Quando autorizada, o ponto de partida é a raspagem do chat do VS Code original (agrupamento de chats por pasta, empty state 768 px, sync com Explorer, badge "N conversas") em `docs/arquivo_morto/pesquisa_bruta/` (não em `docs/`).
+2. A Fatia 6 toma como base o código atual (workbench-v2 com Fatia 5 homologada). Não encostar no chassi direito (Explorer/Search/Git/Activity Bar) nem no terminal. Implementar sessões reais e transição do empty state de 768px sem recriar layouts paralelos nem colunas extras (ver `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`).
