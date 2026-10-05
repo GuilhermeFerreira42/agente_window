@@ -30,20 +30,23 @@ No CLI do OpenClaude:
 
 ---
 
-## 2. Decisão e Especificação para o Agente Window (Fatia 06 e 09)
+## 2. Decisão e Especificação para a Fatia 06 (06.2 e 06.3)
 
 O Agente Window opera com uma interface gráfica visual com Explorer à direita e Terminal na parte inferior. Por isso, precisa de um diretório de arquivos real para exibir na árvore do Explorer e rodar o terminal.
 
-### Regra do Workspace Vazio:
-1. **Boot Inicial:**
-   - Se o usuário abrir o Agente Window sem nenhuma pasta selecionada, a interface abre no **Empty State Central de 768px**.
-   - A Side Bar (Explorer) exibe o estado padrão de boas-vindas com botão "Open Folder" / "Abrir Pasta".
-2. **Ao Submeter Mensagem sem Pasta Aberta:**
-   - O Agente Window cria automaticamente uma pasta de projeto temporária/dedicada em:
-     - **Windows:** `%USERPROFILE%\agente_window\projects\untitled-<timestamp>\`
-     - **Linux/Mac:** `~/agente_window/projects/untitled-<timestamp>/`
-   - Essa pasta é automaticamente definida como a raiz ativa do Explorer e a raiz do terminal pty.
-   - Qualquer arquivo criado pela IA (`write_file`, anexo, `upload/`) é salvo dentro desse diretório.
-   - O usuário pode renomear ou migrar a pasta posteriormente sem perder o histórico do chat.
-3. **Se o Usuário já tem Pasta Selecionada (ou Worktree):**
-   - Usa diretamente a pasta selecionada ou a pasta da worktree criada na Fatia 06.
+### Regra do Empty State Central de 768px (Fatia 06.3):
+1. **Componente Já Existente no Workbench:**
+   - A tela vazia central de 768px com a mensagem *"Como posso ajudar?"* e atalhos rápidos **JÁ EXISTE** implementada em `platform/apps/workbench-v2/src/components/chat/SessionLanding.tsx`.
+   - **Não precisa de print externo ou recriação:** sua fidelidade visual foi 100% validada no **Vídeo 1** enviado pelo usuário ao apagar todas as conversas. O trabalho é estritamente **plugar** a lógica real de sessões e worktree a esse componente.
+2. **Acionamento pelo `+` GLOBAL:**
+   - O botão `+` GLOBAL localizado no topo do shell ou na barra superior do chat dispara a desmontagem da thread ativa e exibe imediatamente o Empty State de 768px.
+3. **Criação de Worktree Isolado ao Submeter Prompt (Fatia 06.2):**
+   - Ao digitar o primeiro prompt no Empty State de 768px e submeter:
+     - O sistema gera automaticamente um slug com timestamp: `untitled-<timestamp>` (ex: `untitled-20261005-173000`).
+     - Executa `git worktree add -b untitled-<timestamp> <path> HEAD` para criar uma pasta de trabalho completamente isolada.
+     - Persiste a nova sessão e seu slug no SQLite (`~/.agente_window/agente_window.db`).
+     - Transita fluidamente do Empty State para a thread ativa de chat com o input ancorado no rodapé.
+     - Atualiza a raiz do Explorer e chaveia o `cwd` do Terminal PTY para a nova pasta da worktree.
+4. **`+` Dentro do Projeto Existente:**
+   - Quando o usuário clica em `+` na pasta de um projeto já aberto na barra lateral, ele **não** cria novo worktree; cria uma nova sessão vinculada ao mesmo worktree/slug existente, gerando um novo arquivo JSONL no mesmo diretório do projeto.
+

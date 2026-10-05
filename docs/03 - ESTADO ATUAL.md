@@ -1,14 +1,20 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-05 · HEAD de código: `4ee0ed8` (5.8-c3) · Documentação da raspagem movida para pesquisa_bruta/fatia-06-chat/ · Aguardando autorização Fatia 06**
+**ATUALIZADO EM: 2026-10-05 · HEAD de código: `4ee0ed8` (5.8-c3) · Documentação da Fatia 06 atualizada com achados dos vídeos e prints · Fatia 06 PAUSADA aguardando autorização**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
 
 ## Status
-- **Raspagem OpenClaude + Cline (2026-10-05):** Raspagem completa do repositório `openclaude` (TypeScript/Bun) e da extensão Cline 4.1.22. Conteúdo de pesquisa arquivado em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/` e pasta temporária `docs_atualizada/` removida. Decisões D30–D35 consolidadas no `05` e compatibilidade de stack documentada no `04`. **Fatia 6 permanece PAUSADA aguardando autorização do usuário.**
+- **Fatia 06 (Especificação Completa das Subfatias 06.1–06.6 - 2026-10-05):** Mapeamento refinado com base nos vídeos (00:10–01:17) e prints do usuário:
+  - **06.1 Persistência Híbrida:** Remoção de mocks (`initialSessions`), exclusão de botões velhos do rodapé esquerdo (*"Buscar personalizações"*, *"Base de..."*), implementação de SQLite (`agente_window.db`) + JSONL (`~/.agente_window/projects/<slug>/<sessionId>.jsonl`), persistência ao recarregar (F5).
+  - **06.2 Worktree Isolado:** Criação de `untitled-<timestamp>` via `git worktree add` acionado pelo `+` GLOBAL, salvando slug no SQLite.
+  - **06.3 Empty State 768px:** Reutilização do componente `SessionLanding.tsx` (já existente no `workbench-v2`, validado no vídeo), acionado pelo `+` GLOBAL.
+  - **06.4 Listagem e Buscador:** Distinção entre `+` GLOBAL (novo worktree) e `+` NO PROJETO (múltiplos chats sob o mesmo slug); modal central Session Picker com grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS unificado ao filtro lateral; criação do doc `SESSION_PICKER.md`.
+  - **06.5 Terminal e Contexto:** Chaveamento automático de `cwd` do Terminal PTY ao trocar de sessão.
+  - **06.6 Homologação e Testes:** Roteiro de smoke tests na porta 5174 real documentado no `09 §6`.
+  - **Fatia 06 permanece PAUSADA aguardando autorização para iniciar código.**
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
-- **Fatia 6 (Alinhamento de Documentação - 2026-10-04):** Especificação recalibrada para a versão real do Windows (**VS Code 1.135.0**, perfil Janela Agentes). Travados: chassi direito (Side Bar 274 + Activity Bar 48) e terminal como intocáveis; transição do empty state de 768px para thread ativa; e substituição de mocks de chat/sessões de `src/data.ts` por serviço real.
 - **Fatias 7 a 10 (Engenharia Reversa e Especificações):** Mapeamento em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para fases subsequentes.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
 

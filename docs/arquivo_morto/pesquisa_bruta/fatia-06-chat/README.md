@@ -31,6 +31,7 @@
 | [**`PERMISSOES.md`**](./PERMISSOES.md) | Modos de permissão (`default`, `acceptEdits`, `plan`, `fullAccess`), card inline com botões [Permitir], [Não] e [Sempre na Sessão] (HTML/CSS de `chatRenderer.js`) e `checkDoomLoop` |
 | [**`ERRO_HANDLING.md`**](./ERRO_HANDLING.md) | Classes de erro (`ClaudeError`, `ShellError`, `AbortError`), protocolo NDJSON (`api_retry`, `rate_limit`, `compact_boundary` 128k) e tratamento de chave expirada e Ollama offline |
 | [**`RESET_SESSAO.md`**](./RESET_SESSAO.md) | Confirmação de que **não há botão "Clear Chat"**. O sistema opera com Nova Conversa (`new_session`) e Retomar Conversa (`resume_session`) |
+| [**`SESSION_PICKER.md`**](./SESSION_PICKER.md) | Especificação do Buscador Central `@Nova sessão` (grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS) e distinção entre `+` GLOBAL vs `+` NO PROJETO |
 | [**`WORKSPACE_VAZIO.md`**](./WORKSPACE_VAZIO.md) | Comportamento com workspace vazio: empty state de 768px no boot e criação automática de pasta padrão (`~/agente_window/projects/untitled-<timestamp>/`) ao submeter prompt |
 | [**`GUI_PROVEDORES_CLONE.md`**](./GUI_PROVEDORES_CLONE.md) | Formulário de provedores estilo Cline integrado aos provedores nativos suportados pelo OpenClaude (`.openclaude-profile.json` e `providerConfig.ts`) |
 | [**`PROVIDERS_EXEMPLO.json`**](./PROVIDERS_EXEMPLO.json) | Configuração modelo JSON pronta para uso com OpenAI, Gemini, NVIDIA, Helicone, Ollama e OpenCode Zen |

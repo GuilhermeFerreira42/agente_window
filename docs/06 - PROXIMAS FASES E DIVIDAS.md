@@ -2,9 +2,16 @@
 
 > Só entra aqui o que **ainda não começou** (fases futuras) e o que **ficou devendo** (dívidas). Começou → sai daqui e entra no `03`. Terminou → vira linha no `07`. Backlog histórico completo: `docs/arquivo_morto/05_BACKLOG_MESTRE.md`.
 
-## 1. Próxima fase — Fatia 6 "Worktree & Isolamento" — PAUSADA, aguardando autorização
-- Escopo atualizado (Decisões Finais 2026-10-05): Worktree (caixinha/sala isolada por sessão) + troca da raiz do terminal pty-server ao trocar a pasta da sessão.
-- Ponto de partida quando autorizada: documentação em `docs_atualizada/` e alinhamento com chassi da Fatia 05.
+## 1. Próxima fase — Fatia 6 "Workbench / Sessões / Worktree" — PAUSADA, aguardando autorização
+- **Objetivo Geral:** Fazer o chat lateral sair do estado de "enfeite" e funcionar real, com worktree isolado, persistência real e empty state 768px.
+- **Subfatias estruturadas:**
+  - **06.1 Persistência Híbrida:** Remover mock `initialSessions`, remover botões legados do rodapé da lateral (*"Buscar personalizações"*, *"Base de..."*), SQLite `agente_window.db` + JSONL `~/.agente_window/projects/<slug>/<sessionId>.jsonl`.
+  - **06.2 Worktree Isolado:** `+` GLOBAL cria `untitled-<timestamp>` via `git worktree add`, salva slug no SQLite.
+  - **06.3 Empty State 768px:** Plugar o componente `SessionLanding.tsx` (já existente no `workbench-v2`), acionado pelo `+` GLOBAL.
+  - **06.4 Listagem e Buscador:** Distinção de `+` GLOBAL vs `+` NO PROJETO (3 chats na mesma pasta = 3 `.jsonl` no mesmo slug); Session Picker (modal central `@Nova sessão` com grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS); doc `SESSION_PICKER.md`.
+  - **06.5 Terminal e Contexto:** Chaveamento automático de `cwd` do Terminal PTY ao trocar de sessão ativa.
+  - **06.6 Homologação e Testes:** Smoke tests da persistência, worktree e busca na porta 5174 real (`09 §6`).
+- Ponto de partida quando autorizada: documentação em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`.
 - Também fora da Fatia 5 por decisão: **Alt+Z (word wrap) e menu de contexto da aba → 5.9/futura**; **Simple Browser → 4.8 separada** (D2.39: só UI, sem runtime IA/CDP).
 
 ## 2. Ondas e Fatias Atualizadas (visão macro - Decisões Finais 2026-10-05)

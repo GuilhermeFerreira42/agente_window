@@ -143,3 +143,34 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 | `/home/user/restore-code-server.sh` | restaurar runtime do code-server em `.cache` e subir 8080 | fora do repo (cópia em `uploads/restore-code-server.sh.txt`) |
 | `e2e_05_00/e2e_canonical_5175.sh`, `kill_orphans.sh` | driver de bateria e limpeza, do agente externo | **não estão neste clone** — só citados em `05_02`; recriar se necessário a partir de §3 |
 | `platform/apps/workbench-v2/probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas antigas (FATIA-03/04) | sim; não usadas na FATIA-05 |
+
+---
+
+## 6. Homologação e Testes da FATIA-06 (Fatia 06.6)
+
+A homologação da Fatia 06 valida o funcionamento real de sessões, persistência híbrida e worktree sem dados mockados.
+
+### 6.1 Ambiente de Teste
+- **Servidor:** Vite na porta **5174 real** (`platform/apps/workbench-v2/`).
+- **Validação de Tipos:** `npm run typecheck` com 0 erros.
+
+### 6.2 Bateria de Testes de Fumaça (Smoke Tests da 06.6):
+1. **Criação via `+` GLOBAL:**
+   - Clicar no botão `+` GLOBAL no topo;
+   - Validar abertura do Empty State de 768px ("Como posso ajudar?");
+   - Digitar mensagem inicial e submeter;
+   - Verificar criação da pasta isolada `untitled-<timestamp>` via `git worktree add`;
+   - Validar registro no SQLite (`agente_window.db`) e criação do primeiro arquivo `.jsonl`.
+2. **Persistência e Recarga (F5):**
+   - Recarregar a página (F5);
+   - Verificar que a conversa recém-criada continua listada na barra lateral com seu título e que as mensagens são restauradas do JSONL.
+3. **Múltiplas Conversas no Mesmo Projeto (`+` Dentro da Pasta):**
+   - Na lista lateral, clicar no `+` dentro do projeto criado;
+   - Criar uma 2ª e uma 3ª conversa;
+   - Inspecionar o sistema de arquivos e validar que existem 3 arquivos `.jsonl` distintos dentro do mesmo diretório `<slug>/` (`~/.agente_window/projects/<slug>/`).
+4. **Session Picker (Buscador Central):**
+   - Clicar na barra superior `@Nova sessão` ou acionar a busca;
+   - Validar renderização do modal com os 3 grupos: **NEEDS INPUT**, **RECENTLY OPENED** e **OTHER SESSIONS**;
+   - Digitar termo no filtro e conferir que filtra tanto no modal quanto na lista lateral;
+   - Clicar em um item: validar `setActiveSession()`, carga do JSONL, fechamento do modal e **chaveamento automático do `cwd` do Terminal PTY** para a pasta da worktree ativa.
+

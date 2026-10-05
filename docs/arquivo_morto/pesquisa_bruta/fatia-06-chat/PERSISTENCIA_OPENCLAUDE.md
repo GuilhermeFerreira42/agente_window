@@ -77,11 +77,26 @@ Schema do banco de conhecimento:
 
 ---
 
-## 5. Recomendação e Decisão para o Agente Window
+## 5. Implementação da Persistência Híbrida na Fatia 06 (Fatia 06.1)
 
-Para o Agente Window, a melhor solução arquitetural consolida o aprendizado de ambos os projetos:
-1. **Banco Central SQLite (`~/.agente_window/agente_window.db`):**
-   - Utilizado para indexação instantânea de sessões, filtros por projeto (`workspace_path`), contadores de mensagens e metadados de layout.
-2. **Histórico Transcrito em JSONL (`~/.agente_window/sessions/<id>.jsonl`):**
-   - Compatível com o padrão do OpenClaude e VS Code 1.109+ (`{"kind":0,...}`).
-   - Suporta streaming direto via append e previne corrupção de banco em respostas longas.
+Para o Agente Window, a implementação real da persistência na Fatia 06.1 resolve definitivamente o chat como funcional:
+
+### 1. Limpeza de Mocks e Resíduos Visuais (Vídeo 00:10–00:30):
+- **Remoção de Mocks:** Desconectar e remover o array simulado `initialSessions` e mensagens estáticas de `src/data.ts`.
+- **Remoção de Botões Legados do Rodapé:** Excluir os botões obsoletos no rodapé da barra lateral esquerda observados no vídeo do usuário (*"Buscar personalizações"*, *"Base de..."*), mantendo apenas o botão padrão de Personalizações (28px) conforme D6/D27.
+
+### 2. Estrutura Híbrida SQLite + JSONL:
+- **Banco Central SQLite (`~/.agente_window/agente_window.db`):**
+  - Tabela `sessions`: `id`, `slug`, `title`, `workspace_path`, `worktree_path`, `message_count`, `created_at`, `updated_at`.
+  - Utilizado para alimentação do Session Picker, busca instantânea e agrupamento de projetos.
+- **Transcripts em JSONL por Projeto:**
+  - Caminho estruturado: `~/.agente_window/projects/<slug>/<sessionId>.jsonl`
+  - Métodos extraídos do OpenClaude:
+    - `getProjectsDir()`: Retorna o caminho base `~/.agente_window/projects/`.
+    - `sanitizePath(workspace_path)`: Converte o caminho da pasta em slug seguro de até 80 caracteres.
+    - `_allProjectDirs()`: Varre os diretórios de projeto para listar todas as sessões disponíveis.
+- **Múltiplos Chats por Pasta:**
+  - Se o usuário criar 3 conversas no mesmo projeto (`+` dentro do projeto), são gerados 3 arquivos `.jsonl` dentro do mesmo diretório `<slug>/`.
+- **Critério de Saída da 06.1:**
+  - Ao recarregar a aplicação (F5 / restart do Vite 5174), a lista de conversas, mensagens e sessões anteriores persistem e são restauradas perfeitamente.
+
