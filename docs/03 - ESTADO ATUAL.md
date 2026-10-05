@@ -1,11 +1,12 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-04 · HEAD de código: `4ee0ed8` (5.8-c3) · Especificação da Fatia 6 alinhada ao VS Code 1.135.0 real do Windows (ver docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/)**
+**ATUALIZADO EM: 2026-10-05 · HEAD de código: `4ee0ed8` (5.8-c3) · Documentação da raspagem movida para pesquisa_bruta/fatia-06-chat/ · Aguardando autorização Fatia 06**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
 
 ## Status
+- **Raspagem OpenClaude + Cline (2026-10-05):** Raspagem completa do repositório `openclaude` (TypeScript/Bun) e da extensão Cline 4.1.22. Conteúdo de pesquisa arquivado em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/` e pasta temporária `docs_atualizada/` removida. Decisões D30–D35 consolidadas no `05` e compatibilidade de stack documentada no `04`. **Fatia 6 permanece PAUSADA aguardando autorização do usuário.**
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
 - **Fatia 6 (Alinhamento de Documentação - 2026-10-04):** Especificação recalibrada para a versão real do Windows (**VS Code 1.135.0**, perfil Janela Agentes). Travados: chassi direito (Side Bar 274 + Activity Bar 48) e terminal como intocáveis; transição do empty state de 768px para thread ativa; e substituição de mocks de chat/sessões de `src/data.ts` por serviço real.
 - **Fatias 7 a 10 (Engenharia Reversa e Especificações):** Mapeamento em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para fases subsequentes.

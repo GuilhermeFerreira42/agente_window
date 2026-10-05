@@ -66,3 +66,15 @@
 | D27 | Chassi direito e terminal na Fatia 6 | **Intocáveis.** Zero criação de colunas paralelas ou abas "Alterações/Changes" no lado direito; Side Bar 274px, Activity Bar 48px e TerminalPanel inferior permanecem sem alterações de código. |
 | D28 | Empty State Central | **Largura máxima travada em 768 px**, centralizado; ao submeter mensagem ou carregar sessão, transita automaticamente para histórico flex com input fixado no rodapé. |
 | D29 | Remoção de Mocks da Fatia 6 | Mocks estáticos de chat e sessão em `src/data.ts` (`initialSessions`, `setupMessages`, `waitingMessages`, etc.) serão desconectados para implementação do serviço real de sessões. |
+
+## 7. Decisões da Raspagem OpenClaude (2026-10-05)
+
+| # | Decisão | Valor travado |
+|---|---|---|
+| D30 | Stack do OpenClaude e Persistência Híbrida | O OpenClaude real é **TypeScript / Bun / Node**. Persistência híbrida travada para o Agente Window: indexação e metadados rápidos no SQLite `~/.agente_window/agente_window.db` + transcripts streaming em JSONL (`<sessionId>.jsonl`) organizados por projeto (`~/.agente_window/projects/<slug>/`). |
+| D31 | Modelo de Permissões e Proteção contra Loops | Modos `default`, `acceptEdits`, `plan`, `fullAccess`. Ações `allow`, `deny`, `ask`. Interface no chat com card inline e botões: **[Permitir]**, **[Não]**, **[Sempre na Sessão]** (`allow-session`). Implementação de `checkDoomLoop` travando loops repetitivos na **3.ª chamada idêntica**. |
+| D32 | Reset de Sessão | **Sem botão "Clear Chat" no MVP.** O OpenClaude opera estritamente com **Nova Conversa** (emite `session_cleared`, aloca novo UUID e zera a interface) e **Retomar Conversa** (carrega transcript do disco sem perder histórico). |
+| D33 | Provedores e Configuração | Arquivo de configuração em `~/.agente_window/providers.json`. Formulário estilo Cline integrado aos provedores nativos suportados (OpenAI, Gemini, NVIDIA, Mistral, Codex, Helicone, Ollama local e OpenCode Zen). |
+| D34 | Worktree e Isolamento (Fatia 06) | Criação de salas de trabalho isoladas via `git worktree add` em `.agente_window/worktrees/<slug>` com proteção contra path traversal. Symlinks automáticos para diretórios pesados (`node_modules`). **Chaveamento automático da raiz do terminal pty** para a pasta da worktree ativa. |
+| D35 | Workspace Vazio (Fatia 06/09) | Boot inicial com tela central vazia de **768 px**. Ao submeter mensagem sem workspace aberto, criação automática de pasta padrão em `~/agente_window/projects/untitled-<timestamp>/` como raiz do Explorer e do terminal. |
+

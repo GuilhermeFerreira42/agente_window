@@ -2,6 +2,20 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-05 - Arquivamento da Pesquisa Bruta OpenClaude em fatia-06-chat/ e Limpeza (Antigravity)
+- Raspagem profunda do repositório `openclaude` em `C:\Users\Usuario\Desktop\ARENA\a\openclaude\` (TypeScript/Bun).
+- Todo o conteúdo de pesquisa foi arquivado em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`:
+  - `PERSISTENCIA_OPENCLAUDE.md`, `PERSISTENCIA_OPENCODE.md`, `WORKTREE_OPENCLAUDE.md`, `PERMISSOES.md`, `ERRO_HANDLING.md`, `RESET_SESSAO.md`, `WORKSPACE_VAZIO.md`, `GUI_PROVEDORES_CLONE.md`, `PROVIDERS_EXEMPLO.json`.
+  - O índice geral foi integrado ao `README.md` da pasta de pesquisa com links relativos.
+  - Pasta temporária `docs_atualizada/` na raiz apagada (zero arquivos soltos fora do padrão).
+- Regra dos 9 arquivos oficiais mantida rigorosamente.
+- `04 - ARQUITETURA E REGRAS DURAS.md`: documentada compatibilidade nativa de stack TypeScript/Bun do OpenClaude com o workbench React+Vite+TS (D30).
+- `05 - DECISOES.md`: consolidadas decisões D30–D35 (persistência híbrida SQLite+JSONL, worktree git + symlink + pty switch, permissões Allow/Deny/Allow-session + doomLoop, sem Clear Chat, providers.json estilo Cline, workspace vazio 768px + untitled auto).
+- `PERMISSOES.md` atualizado com o CSS e HTML exatos do card `.perm-card` de `chatRenderer.js` para replicação pela Arena na Fatia 08.
+- **Status:** Fatia 06 pausada aguardando autorização para início de código.
+
+
+
 ## 2026-10-04 - Alinhamento da Fatia 6 com a máquina real (VS Code 1.135.0)
 - Recalibração da documentação da Fatia 6 (`docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`):
   - Referência oficial travada no **VS Code 1.135.0 (perfil Janela Agentes no Windows 11)**, eliminando referências obsoletas a 1.140.0.

@@ -2,14 +2,21 @@
 
 > Só entra aqui o que **ainda não começou** (fases futuras) e o que **ficou devendo** (dívidas). Começou → sai daqui e entra no `03`. Terminou → vira linha no `07`. Backlog histórico completo: `docs/arquivo_morto/05_BACKLOG_MESTRE.md`.
 
-## 1. Próxima fase — Fatia 6 "Chat Carcaça" — PAUSADA, aguardando autorização
-- Escopo esperado (a confirmar com raspagem do VS Code original): agrupamento de chats por pasta, empty state 768 px, sync com Explorer, badge "N conversas", histórico + workspace sync.
-- Ponto de partida quando autorizada: raspagem em `docs/arquivo_morto/pesquisa_bruta/` (artefato bruto, não doc), depois plano curto no `03`.
+## 1. Próxima fase — Fatia 6 "Worktree & Isolamento" — PAUSADA, aguardando autorização
+- Escopo atualizado (Decisões Finais 2026-10-05): Worktree (caixinha/sala isolada por sessão) + troca da raiz do terminal pty-server ao trocar a pasta da sessão.
+- Ponto de partida quando autorizada: documentação em `docs_atualizada/` e alinhamento com chassi da Fatia 05.
 - Também fora da Fatia 5 por decisão: **Alt+Z (word wrap) e menu de contexto da aba → 5.9/futura**; **Simple Browser → 4.8 separada** (D2.39: só UI, sem runtime IA/CDP).
 
-## 2. Ondas (visão macro)
-| Onda | Objetivo | Dependências | Entregas mínimas | Validação de saída |
-|
+## 2. Ondas e Fatias Atualizadas (visão macro - Decisões Finais 2026-10-05)
+| Fatia | Objetivo | Entregas principais | Dependências |
+|---|---|---|---|
+| **Fatia 06** | Worktree & Isolamento | Worktree (criar sala isolada por sessão) + troca de raiz do terminal pty-server | Fatia 05 (homologada) |
+| **Fatia 07** | Onde mora a Skill | Bom Vizinho (`%USERPROFILE%\.claude\skills\`, `%APPDATA%\Code\User\`, `~/.config/opencode/`) + descoberta automática | Fatia 06 |
+| **Fatia 08** | Tools CRUD & Permissões | Tools básicas (`read_file`, `write_file`, etc.) + pasta `upload/` + permissões (Grant/GrantPersistant/Deny) + Reset/Delete de sessão + telemetria básica | Fatia 07 |
+| **Fatia 09** | Runtime IA & Provedores | MCP Server + persistência SQLite OpenCode (`sessions`, `messages`, `files`) + tela provedores estilo Cline (`providers.json`) + tratamento de erros + workspace vazio | Fatia 08 |
+| **Fatia 10** | Worktree Avançado & Memória | Worktree avançado + HAG/memória hierárquica (`CLAUDE.md` + `MEMORY.md`) | Fatia 09 |
+| **Fase 11** | Polish Visual & Ruflo | Só layout: refinamento visual, animação sash, medidas finais + suporte completo a Ruflo | Fatia 10 |
+
 
 ## 3. Dívidas técnicas abertas
 ### 3.1 Prioritárias (decisão do usuário pendente)
