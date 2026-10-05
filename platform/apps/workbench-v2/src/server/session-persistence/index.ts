@@ -25,13 +25,17 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
 
 function transcriptEntries(session: Session): TranscriptEntry[] {
   let timestamp = Date.now() - session.chats.reduce((total, chat) => total + chat.messages.length, 0)
-  return session.chats.flatMap((chat) => chat.messages.map((message) => ({
-    type: message.role,
-    chatId: chat.id,
-    message,
-    uuid: message.id,
-    timestamp: timestamp += 1,
-  })))
+  return session.chats.flatMap((chat) => chat.messages
+    // Respostas ainda em streaming são estado transitório de UI. Persisti-las
+    // faria um F5 restaurar para sempre uma bolha vazia em `running: true`.
+    .filter((message) => !message.running)
+    .map((message) => ({
+      type: message.role,
+      chatId: chat.id,
+      message,
+      uuid: message.id,
+      timestamp: timestamp += 1,
+    })))
 }
 
 function restoreMessages(session: Session, entries: TranscriptEntry[]): Session {
