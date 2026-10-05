@@ -48,6 +48,10 @@ export interface Session {
   title: string
   workspace: string
   workspacePath: string
+  /** Stable filesystem-safe project key used by SQLite and JSONL storage. */
+  slug?: string
+  /** Real isolated working directory. Populated by Fatia 06.2. */
+  worktreePath?: string
   section: SessionSection
   status: SessionStatus
   updated: string

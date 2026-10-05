@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { initialSessions } from '../data'
+import { testSessions } from './fixtures/sessions'
 import type { DiffFile } from '../types'
 
 // FATIA-05 5.3: `initialDiffFiles` (maquete "Changes N") saiu de `data.ts`. Este teste é do MOTOR
@@ -94,7 +94,7 @@ const secondBrowserTab: EditorTab = {
 }
 
 function sessionWith(changes: Partial<Session>): Session {
-  return { ...initialSessions[0], ...changes }
+  return { ...testSessions[0], ...changes }
 }
 
 describe('session state machine and ownership', () => {
@@ -107,7 +107,7 @@ describe('session state machine and ownership', () => {
   })
 
   it('resolves the requested chat while falling back to the session main chat', () => {
-    const session = initialSessions[0]
+    const session = testSessions[0]
     expect(resolveActiveChatId(session, { [session.id]: 's1-ui' })).toBe('s1-ui')
     expect(resolveActiveChatId(session, { [session.id]: 'missing-chat' })).toBe(session.mainChatId)
     expect(getChat(session, 's1-browser')?.title).toBe('Browser por sessão')
@@ -115,7 +115,7 @@ describe('session state machine and ownership', () => {
   })
 
   it('updates session and chat status together without mutating the source', () => {
-    const session = initialSessions[0]
+    const session = testSessions[0]
     const next = updateSessionAndChatStatus(session, session.mainChatId, 'completed')
 
     expect(next).not.toBe(session)
@@ -216,27 +216,27 @@ describe('session state machine and ownership', () => {
   })
 
   it('validates session, browser and editor invariants at runtime', () => {
-    initialSessions.forEach(assertSessionInvariants)
+    testSessions.forEach(assertSessionInvariants)
     assertBrowserViewInvariants(browser)
     assertEditorTabInvariants(browserTab)
     assertEditorTabInvariants(fileTab)
     assertEditorTabInvariants(diffTab)
     expect(() => assertEditorTabInvariants({ ...diffTab, sessionId: undefined })).toThrow('Diff editor tab')
     assertWorkbenchInvariants(
-      initialSessions,
+      testSessions,
       [browser],
       [browserTab, fileTab],
       's1',
-      Object.fromEntries(initialSessions.map((session) => [session.id, session.mainChatId])),
+      Object.fromEntries(testSessions.map((session) => [session.id, session.mainChatId])),
     )
 
     expect(() => assertSessionInvariants(sessionWith({ mainChatId: 'missing-chat' }))).toThrow('main chat is missing')
     expect(() => assertBrowserViewInvariants({ ...browser, historyIndex: 2 })).toThrow('out of range')
     expect(() => assertEditorTabInvariants({ ...browserTab, browserId: undefined })).toThrow('must identify')
-    expect(() => assertWorkbenchInvariants(initialSessions, [{ ...browser, sessionId: 'missing' }], [], 's1', {})).toThrow('unknown session')
-    expect(() => assertWorkbenchInvariants(initialSessions, [browser], [], 's1', {})).toThrow('has no editor tab')
+    expect(() => assertWorkbenchInvariants(testSessions, [{ ...browser, sessionId: 'missing' }], [], 's1', {})).toThrow('unknown session')
+    expect(() => assertWorkbenchInvariants(testSessions, [browser], [], 's1', {})).toThrow('has no editor tab')
     expect(() => assertWorkbenchInvariants(
-      [sessionWith({ archived: true, section: 'archived' }), initialSessions[1]],
+      [sessionWith({ archived: true, section: 'archived' }), testSessions[1]],
       [browser],
       [browserTab],
       's1',

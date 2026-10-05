@@ -2,6 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import { testSessions } from './fixtures/sessions'
+
+vi.mock('../services/sessions/sessionsClient', () => ({
+  loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
+  persistSession: vi.fn(async () => undefined),
+  removePersistedSession: vi.fn(async () => undefined),
+}))
 
 // FATIA-05 5.1 c1: a Activity Bar (à direita) também expõe `role="tab"` com nome "Search (Ctrl+Shift+F)",
 // como no VS Code. As asserções sobre a ABA DO EDITOR ficam escopadas ao tablist do editor (só seletor).
@@ -68,7 +75,7 @@ function nestedChat(title: string): HTMLElement {
 describe('App session flows', () => {
   it('aplica unread, pin/unpin e rename no estado real da sidebar', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const waitingRow = sessionRow('Revisar alterações do workbench')
     expect(waitingRow).toHaveClass('is-unread')
@@ -97,7 +104,7 @@ describe('App session flows', () => {
 
   it('aprova uma ação e atualiza o status da sessão sem depender só da aparência', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const waitingRow = sessionRow('Revisar alterações do workbench')
     await user.click(within(waitingRow).getByRole('button', { name: 'Permitir' }))
@@ -109,7 +116,7 @@ describe('App session flows', () => {
 
   it('arquiva e restaura, destrói Browser da sessão e faz fallback ao excluir a sessão ativa', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     expect(browserEditorTab()).toBeInTheDocument()
@@ -134,7 +141,7 @@ describe('App session flows', () => {
 
   it('conecta regenerar e feedback ao estado persistido da mensagem', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const responseText = screen.getByText(/A composição visual está pronta para revisão/)
     const responseRow = responseText.closest<HTMLElement>('.chat-message')
@@ -169,7 +176,7 @@ describe('App session flows', () => {
 
   it('interrompe uma resposta em andamento e não deixa o timer concluir depois', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
@@ -187,7 +194,7 @@ describe('App session flows', () => {
 
   it('cancela o request da sessão mesmo após trocar para outro nested chat', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     const layoutRow = sessionRow('Ajustar layout single-pane')
@@ -211,7 +218,7 @@ describe('App session flows', () => {
 
   it('persiste o modo selecionado por sessão sem cruzar ao trocar de sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Agente' }))
     await user.click(screen.getByRole('button', { name: /Editar/ }))
@@ -231,7 +238,7 @@ describe('App session flows', () => {
 
   it('persiste o modelo por sessão e nested chat e usa a seleção no envio', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Claude Sonnet 4' }))
     await user.click(screen.getByRole('button', { name: /^GPT-5 mini Resposta/ }))
@@ -258,7 +265,7 @@ describe('App session flows', () => {
 
   it('envia o payload com anexo local, exibe o contexto e limpa o chip após submit', async () => {
     const user = userEvent.setup()
-    const { container } = render(<App />)
+    const { container } = render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     await user.click(screen.getByRole('button', { name: 'Agente' }))
@@ -302,7 +309,7 @@ describe('App session flows', () => {
     })) as unknown as typeof window.matchMedia
 
     try {
-      const { container } = render(<App />)
+      const { container } = render(<App initialSessionSnapshot={testSessions} />)
       const fileInput = container.querySelector('input[type="file"]')
       if (!(fileInput instanceof HTMLInputElement)) throw new Error('File input not found')
 
@@ -343,7 +350,7 @@ describe('App session flows', () => {
     })) as unknown as typeof window.matchMedia
 
     try {
-      render(<App />)
+      render(<App initialSessionSnapshot={testSessions} />)
 
       // Sem camadas, não há botão Voltar.
       expect(screen.queryByRole('button', { name: 'Voltar navegação' })).not.toBeInTheDocument()
@@ -366,7 +373,7 @@ describe('App session flows', () => {
 
   it('mantém histórico do composer isolado por sessão e nested chat', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
@@ -391,7 +398,7 @@ describe('App session flows', () => {
 
   it('propaga Ctrl+Enter do composer para o request real da sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
@@ -409,7 +416,7 @@ describe('App session flows', () => {
 
   it('preserva seleção de chat e oculta/mostra Browser conforme ownership da sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     const nestedUiChat = Array.from(document.querySelectorAll<HTMLElement>('.nested-chat-title'))
@@ -427,7 +434,7 @@ describe('App session flows', () => {
 
   it('cria, seleciona, navega, recarrega, reporta erro e fecha múltiplas abas Browser no Editor', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
@@ -505,7 +512,7 @@ describe('App session flows', () => {
 
   it('seleciona a próxima aba correta ao fechar e expõe o tabpanel ativo', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
@@ -548,7 +555,7 @@ describe('App session flows', () => {
   // sessao_15 T6–T9 (nova, RF-06).
   it.skip('navega pelas tabs por teclado e cria Files, Search e Changes no menu de nova aba', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     await createBrowserTab(user)
@@ -584,7 +591,7 @@ describe('App session flows', () => {
   // sessao_15 T6–T9 (nova, RF-06).
   it.skip('restaura a tab ativa própria da sessão sem remover Search ou arquivos compartilhados', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
     expect(screen.getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
@@ -604,7 +611,7 @@ describe('App session flows', () => {
 
   it('preserva Browser por sessão e remove todos os browsers ao arquivar ou excluir', async () => { 
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     const editorTabs = () => Array.from(document.querySelectorAll<HTMLElement>('.editor-tab[role="tab"]'))
@@ -662,7 +669,7 @@ describe('App session flows', () => {
   // sessao_15 T6–T9 (nova, RF-06).
   it.skip('abre Search no Editor com foco, filtra, conta, destaca, mostra vazio e abre arquivo', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Abrir busca no editor' }))
@@ -715,7 +722,7 @@ describe('App session flows', () => {
   // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
   it.skip('abre Branch Changes como aba do Editor, lista arquivos, seleciona o diff e preserva a seleção por sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
@@ -766,7 +773,7 @@ describe('App session flows', () => {
   // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
   it.skip('executa as ações de Diff por arquivo e em lote com feedback observável e isolamento por sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
 
@@ -828,7 +835,7 @@ describe('App session flows', () => {
   // Cobertura equivalente: E2E sessao_15_activity_bar T5 + sessao_12_explorer.
   it.skip('audita Changes, Files e Checks da barra auxiliar com ações reais e isolamento por sessão', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // A aba padrão é Browser, que oculta o detalhe transitoriamente (R-044).
     // Ativa a aba Changes do editor para revelar o painel de detalhes.
@@ -902,7 +909,7 @@ describe('App session flows', () => {
   // só a maquete do shell (não o motor Git real — coberto por sessao_14b/14c/14d + spec 15 T10–T15). Lógica intacta, pulado.
   it.skip('build the project → changes view (package.json/build.ts/index.ts) + Merge + Abrir terminal (R-060/R-063)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // Envia "build the project" no chat de uma sessão com composer visível.
     await user.click(sessionRow('Ajustar layout single-pane'))
@@ -939,7 +946,7 @@ describe('App session flows', () => {
 
   it('mostra empty state coerente quando a sessão não possui alterações', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const newSessionButton = document.querySelector<HTMLButtonElement>('.titlebar [aria-label="Nova sessão"]')
     if (!newSessionButton) throw new Error('New session button not found')
@@ -960,7 +967,7 @@ describe('App session flows', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 760 })
 
     try {
-      render(<App />)
+      render(<App initialSessionSnapshot={testSessions} />)
       await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
 
       expect(document.querySelector('.editor-pane .diff-view')).toBeInTheDocument()
@@ -992,7 +999,7 @@ describe('App session flows', () => {
     })) as unknown as typeof window.matchMedia
 
     try {
-      render(<App />)
+      render(<App initialSessionSnapshot={testSessions} />)
       // Abre o navegador (a toolbar do editor com "Dividir editor" aparece).
       await user.click(screen.getAllByRole('button', { name: 'Abrir navegador no editor' })[0])
       await user.click(screen.getByRole('button', { name: 'Dividir editor' }))
@@ -1031,7 +1038,7 @@ describe('App session flows', () => {
     })) as unknown as typeof window.matchMedia
 
     try {
-      render(<App />)
+      render(<App initialSessionSnapshot={testSessions} />)
       // A sessão ativa (s1) tem arquivos alterados. Vai para a aba Detalhes.
       await user.click(screen.getByRole('button', { name: /Detalhes/ }))
       const overlay = screen.getByRole('dialog', { name: 'Revisão de alterações' })
@@ -1053,7 +1060,7 @@ describe('App session flows', () => {
   // R-076 (LEIA-ME §5): navegação por teclado com setas move o foco entre as
   // linhas de sessão (roving focus), sem wrap.
   it('navega entre sessões com as setas do teclado', () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.session-row[data-session-nav="true"]'))
     expect(rows.length).toBeGreaterThan(1)
 
@@ -1079,7 +1086,7 @@ describe('App session flows', () => {
   // lado a lado quando o usuário abre uma "ao lado"; fechar volta ao single.
   it('abre e fecha uma sessão peer no Sessions Part grid', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // Sem grid inicialmente (uma única sessão visível).
     expect(document.querySelector('.sessions-part-grid')).toBeNull()
@@ -1108,7 +1115,7 @@ describe('App session flows', () => {
   // (14/14) + sessao_13_search_backend (6/6) + sessao_14 T9/T15 +
   // sessao_15 T6–T9 (nova, RF-06).
   it.skip('abre Search pelo atalho Ctrl ou Cmd mais Shift mais F', async () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true })
     expect(screen.getByRole('textbox', { name: 'Pesquisar no workspace' })).toHaveFocus()
@@ -1117,7 +1124,7 @@ describe('App session flows', () => {
 
   it('alterna sidebar e terminal pela titlebar (sem botão de barra auxiliar — 5.8-c1)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const workbench = document.querySelector('.workbench') ?? document.body
 
@@ -1148,7 +1155,7 @@ describe('App session flows', () => {
 
   it('cria nova sessão pela titlebar e fecha o aviso (toast)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const newSessionButtons = screen.getAllByRole('button', { name: 'Nova sessão' })
     await user.click(newSessionButtons[0])
@@ -1168,7 +1175,7 @@ describe('App session flows', () => {
   // do texto enviado (SESSIONS.md §Drafts / §New session).
   it('commita o draft de nova sessão no primeiro envio e deriva o título', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const newSessionButtons = screen.getAllByRole('button', { name: 'Nova sessão' })
     await user.click(newSessionButtons[0])
@@ -1190,7 +1197,7 @@ describe('App session flows', () => {
 
   it('o pill do Command Center abre o seletor flutuante de sessões (não cria sessão)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Mostrar sessões' }))
 
@@ -1202,7 +1209,7 @@ describe('App session flows', () => {
 
   it('filtra, navega por teclado e abre uma sessão pelo seletor flutuante (E9)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Mostrar sessões' }))
     const dialog = screen.getByRole('dialog', { name: 'Buscar sessões' })
@@ -1225,7 +1232,7 @@ describe('App session flows', () => {
   it.skip('a Changes pill do cabeçalho abre o diff e revela o editor (E10/R-083)', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     // Oculta o editor (detail-only) para provar que a pill o revela de novo.
@@ -1243,7 +1250,7 @@ describe('App session flows', () => {
 
   it('cria uma nova sessão pela ação New Session do seletor flutuante (E9)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Mostrar sessões' }))
     const dialog = screen.getByRole('dialog', { name: 'Buscar sessões' })
@@ -1254,7 +1261,7 @@ describe('App session flows', () => {
 
   it('abre o menu da conta e dispara uma ação real', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getByRole('button', { name: 'Conta' }))
     await user.click(screen.getByRole('menuitem', { name: 'Perfil' }))
@@ -1265,7 +1272,7 @@ describe('App session flows', () => {
 
   it('maximiza e restaura a área do editor', async () => {
     const user = userEvent.setup()
-    const { container } = render(<App />)
+    const { container } = render(<App initialSessionSnapshot={testSessions} />)
 
     // Abre uma superfície de editor para o toolbar aparecer.
     await user.click(screen.getAllByRole('button', { name: 'Abrir navegador no editor' })[0])
@@ -1278,7 +1285,7 @@ describe('App session flows', () => {
 
   it('divide o editor abrindo uma segunda superfície de arquivos', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(screen.getAllByRole('button', { name: 'Abrir navegador no editor' })[0])
     await user.click(screen.getByRole('button', { name: 'Dividir editor' }))
@@ -1289,7 +1296,7 @@ describe('App session flows', () => {
 
   it('oculta e mostra o conteúdo do editor mantendo a barra de abas (detail-only)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     // A sessão inicial já tem uma aba Browser aberta.
@@ -1311,7 +1318,7 @@ describe('App session flows', () => {
   // (Browser) e restaurando-as ao mostrar o editor de novo.
   it('Detail-only fecha a aba Browser não-acoplada e a restaura ao mostrar o editor (R-040)', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     // Abre a aba acoplada Changes (docked) além da Browser inicial.
@@ -1332,7 +1339,7 @@ describe('App session flows', () => {
   it('persiste a visibilidade do terminal entre reloads (remontagem)', async () => {
     const user = userEvent.setup()
     window.localStorage.clear()
-    const first = render(<App />)
+    const first = render(<App initialSessionSnapshot={testSessions} />)
 
     // Liga o terminal (parte oculto por padrão) e desmonta (simula fechar a aba).
     const terminalToggle = screen.getByRole('button', { name: 'Alternar terminal' })
@@ -1341,13 +1348,13 @@ describe('App session flows', () => {
     first.unmount()
 
     // Nova montagem (reload) restaura o terminal ligado a partir do storage.
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     expect(screen.getByRole('button', { name: 'Alternar terminal' })).toHaveClass('is-active')
     window.localStorage.clear()
   })
 
   it('redistribui os tamanhos com duplo-clique no sash', async () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(userEvent.setup())
 
     // A sessão inicial tem editor visível → o sash existe.
@@ -1363,7 +1370,7 @@ describe('App session flows', () => {
   // no storage, sobrevivendo a um reload (flicker-free: lido de uma vez no boot).
   it('persiste os tamanhos do split por sessão no storage', async () => {
     window.localStorage.clear()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(userEvent.setup())
 
     const handle = document.querySelector('.panel-resize-handle') as HTMLElement | null
@@ -1388,7 +1395,7 @@ describe('App session flows', () => {
       'workbench.sessions.layout.v1',
       JSON.stringify({ shell: { sidebarVisible: true, auxiliaryVisible: true, terminalVisible: false, editorHidden: false, sidebarWidth: 360 }, partSizesBySession: {} }),
     )
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const body = document.querySelector('.workbench-body') as HTMLElement
     const handle = document.querySelector('.sidebar-resize-handle') as HTMLElement | null
@@ -1404,7 +1411,7 @@ describe('App session flows', () => {
 
   it('exclui até a última sessão, cai na tela inicial e recria uma sessão ao enviar', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // Expande todas as seções colapsadas para que todos os botões de excluir fiquem acessíveis.
     for (const label of [/Fixadas/, /Semana passada/, /Anteriores/, /Arquivadas/]) {
@@ -1440,7 +1447,7 @@ describe('App session flows', () => {
   // não uma tela separada — as colunas laterais permanecem montadas.
   it('mantém a lista de sessões (esquerda) visível na tela inicial vazia', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     for (const label of [/Fixadas/, /Semana passada/, /Anteriores/, /Arquivadas/]) {
       const header = screen.queryByRole('button', { name: label })
@@ -1470,7 +1477,7 @@ describe('App session flows', () => {
 
   // ── Onda 2 / E1 — menu de contexto (botão direito) ──────────────────────────
   it('abre menu de contexto na linha de sessão com as ações esperadas', async () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     fireEvent.contextMenu(sessionRow('Replicar a Janela de Agentes'))
 
@@ -1487,7 +1494,7 @@ describe('App session flows', () => {
   })
 
   it('abre menu de contexto numa aba do editor com Fechar/Dividir', async () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(userEvent.setup())
 
     const tab = browserEditorTab()
@@ -1500,7 +1507,7 @@ describe('App session flows', () => {
   })
 
   it('abre menu de contexto num chat aninhado da lista de sessões', async () => {
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     const chat = nestedChat('Ajustes de UI').closest<HTMLElement>('.nested-chat-row')
     if (!chat) throw new Error('Nested chat row not found')
@@ -1514,7 +1521,7 @@ describe('App session flows', () => {
   // ── Onda 3 / E3 — drag & drop ───────────────────────────────────────────────
   it('reordena sessões da mesma seção por drag & drop', async () => {
     window.localStorage.clear()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // Duas sessões do mesmo workspace/seção (grupo de reordenação válido).
     const a = 'Revisar alterações do workbench'
@@ -1540,7 +1547,7 @@ describe('App session flows', () => {
   it.skip('anexa ao chat um arquivo arrastado da árvore do workspace', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // A aba padrão é Browser (detalhe oculto, R-044). Ativa Changes para revelar
     // a barra de detalhes e então abre a aba Files para expor a árvore de arquivos.
@@ -1564,7 +1571,7 @@ describe('App session flows', () => {
   it('reordena abas do editor da mesma sessão por drag & drop', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     // Cria uma 2ª aba Browser para ter o que reordenar.
@@ -1586,7 +1593,7 @@ describe('App session flows', () => {
   // ── Onda 2 / E2 — atalhos de teclado + ações "gated" ────────────────────────
   it('oculta e reexibe o editor pelo atalho Alt+Cmd+E', async () => {
     window.localStorage.clear()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(userEvent.setup())
 
     // Editor visível inicialmente.
@@ -1605,7 +1612,7 @@ describe('App session flows', () => {
   it.skip('Toggle Details (Alt+Cmd+L) alterna o detalhe numa aba de diff', async () => {
     window.localStorage.clear()
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
 
     // Abre a aba de diff (Changes) a partir do painel de chat.
     await user.click(screen.getByRole('button', { name: 'Revisar alterações' }))
@@ -1626,7 +1633,7 @@ describe('App session flows', () => {
   // built-in alterna; skill runnable dispara ação real (toast).
   it('abre AI Customizations, troca harness, alterna enablement e executa skill', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
 
     await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
