@@ -7,6 +7,7 @@ import { testSessions } from './fixtures/sessions'
 vi.mock('../services/sessions/sessionsClient', () => ({
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),
+  createSessionWorktree: vi.fn(async (_slug: string, sessionId: string) => ({ slug: 'workspace-local', path: `/worktrees/${sessionId}`, branch: `agente-window/${sessionId}` })),
   removePersistedSession: vi.fn(async () => undefined),
 }))
 
@@ -948,9 +949,6 @@ describe('App session flows', () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
 
-    const newSessionButton = document.querySelector<HTMLButtonElement>('.titlebar [aria-label="Nova sessão"]')
-    if (!newSessionButton) throw new Error('New session button not found')
-    await user.click(newSessionButton)
     await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
 
     expect(screen.getByTestId('diff-empty-state')).toHaveTextContent('Sem alterações pendentes')
@@ -1160,13 +1158,14 @@ describe('App session flows', () => {
     const newSessionButtons = screen.getAllByRole('button', { name: 'Nova sessão' })
     await user.click(newSessionButtons[0])
 
-    // A nova sessão vira a ativa (como draft) e um toast é exibido.
+    // O + GLOBAL abre o SessionLanding e só cria a sessão no primeiro envio.
+    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
     const toast = await screen.findByRole('status')
-    expect(toast).toHaveTextContent('Rascunho de sessão criado')
+    expect(toast).toHaveTextContent('Nova sessão pronta para escolher contexto')
 
     await user.click(within(toast).getByRole('button', { name: 'Fechar aviso' }))
     await waitFor(() => {
-      expect(screen.queryByText('Rascunho de sessão criado')).not.toBeInTheDocument()
+      expect(screen.queryByText('Nova sessão pronta para escolher contexto')).not.toBeInTheDocument()
     })
   })
 
@@ -1180,11 +1179,11 @@ describe('App session flows', () => {
     const newSessionButtons = screen.getAllByRole('button', { name: 'Nova sessão' })
     await user.click(newSessionButtons[0])
 
-    // Enquanto draft, o título permanece "Nova sessão".
-    expect(within(sessionRow('Nova sessão')).getByText('Nova sessão')).toBeInTheDocument()
+    // Antes do primeiro envio não há sessão fictícia na lista: há somente o landing.
+    expect(screen.queryByText('Nova sessão', { selector: '.session-title-text' })).not.toBeInTheDocument()
 
-    // Primeiro envio: commita o draft e deriva o título do texto.
-    const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
+    // Primeiro envio cria worktree, sessão e deriva o título do texto.
+    const input = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
     await user.type(input, 'implementar o fluxo de rascunho de sessão')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
@@ -1255,7 +1254,8 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Mostrar sessões' }))
     const dialog = screen.getByRole('dialog', { name: 'Buscar sessões' })
     await user.click(within(dialog).getByRole('option', { name: /New Session/ }))
-    expect(screen.getByText('Rascunho de sessão criado')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
+    expect(screen.getByText('Nova sessão pronta para escolher contexto')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Buscar sessões' })).not.toBeInTheDocument()
   })
 

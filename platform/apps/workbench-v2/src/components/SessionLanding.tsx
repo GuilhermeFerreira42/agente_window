@@ -9,10 +9,11 @@ interface SessionLandingProps {
   onAddContext?: () => void
   onDictate?: () => void
   onPickWorkspace?: () => void
+  workspaceSelectionDisabledReason?: string
   isFileSystemSupported?: boolean
 }
 
-export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, isFileSystemSupported = true }: SessionLandingProps) {
+export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, workspaceSelectionDisabledReason, isFileSystemSupported = true }: SessionLandingProps) {
   const [text, setText] = useState('')
 
   const submit = (event?: FormEvent) => {
@@ -35,13 +36,14 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
       <div className="session-landing-center">
         <h1 className="session-landing-title">
           <span className="session-landing-title-lead">Nova sessão em</span>
-          {onPickWorkspace ? (
+          {onPickWorkspace || workspaceSelectionDisabledReason ? (
             <button
               className="session-landing-chip is-clickable"
               type="button"
-              title={isFileSystemSupported ? "Escolher pasta real do disco (como no vídeo original 06:13)" : "File System API não suportada"}
-              aria-label={`Workspace atual: ${workspace}. Clique para escolher pasta real`}
+              title={workspaceSelectionDisabledReason ?? (isFileSystemSupported ? "Escolher pasta real do disco (como no vídeo original 06:13)" : "File System API não suportada")}
+              aria-label={workspaceSelectionDisabledReason ? `Workspace atual: ${workspace}. ${workspaceSelectionDisabledReason}` : `Workspace atual: ${workspace}. Clique para escolher pasta real`}
               onClick={onPickWorkspace}
+              disabled={Boolean(workspaceSelectionDisabledReason)}
             >
               <FolderGit2 size={14} aria-hidden="true" />{workspace}<ChevronDown size={13} aria-hidden="true" />
             </button>
@@ -52,9 +54,9 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
           <span className="session-landing-chip"><Bot size={14} aria-hidden="true" />Copilot<ChevronDown size={13} aria-hidden="true" /></span>
         </h1>
 
-        {onPickWorkspace && isFileSystemSupported && (
-          <p style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)', marginBottom: 16, textAlign: 'center' }}>
-            Clique em <strong>{workspace}</strong> para escolher pasta real do disco — como no original [06:13]
+        {(workspaceSelectionDisabledReason || (onPickWorkspace && isFileSystemSupported)) && (
+          <p className="session-landing-workspace-hint">
+            {workspaceSelectionDisabledReason ?? <>Clique em <strong>{workspace}</strong> para escolher pasta real do disco — como no original [06:13]</>}
           </p>
         )}
 

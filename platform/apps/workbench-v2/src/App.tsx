@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { loadPersistedSessions, persistSession, removePersistedSession } from './services/sessions/sessionsClient'
+import { createSessionWorktree, loadPersistedSessions, persistSession, removePersistedSession } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -234,6 +234,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
+  const [newSessionLanding, setNewSessionLanding] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -563,6 +564,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // A landing depende da lista primária (visível ao usuário) estar vazia; runs de
   // automação ficam fora da lista e, portanto, não contam para "há sessões".
   const hasSessions = sessions.some((session) => !session.automation)
+  const landingVisible = newSessionLanding || !hasSessions
   const draftSession = useMemo<Session>(() => ({
     id: 'draft-empty',
     title: 'Nova sessão',
@@ -605,7 +607,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed".
   // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
   const attachExpanded = hasSessions && !!explorerModule && attachExpandedSessions.includes(activeSession.id)
-  const sidePaneInputs = hasSessions
+  const sidePaneInputs = hasSessions && !landingVisible
     ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
     : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
   const sidePaneState = resolveSidePaneState(sidePaneInputs)
@@ -761,6 +763,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const selectSession = (id: string) => {
+    setNewSessionLanding(false)
     // (LAYOUT.md) Abrir uma sessão dispensa a custom view ativa e devolve as
     // parts cobertas ao estado que o usuário tinha escolhido.
     if (customView.activeView !== null) {
@@ -1285,89 +1288,51 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const setBrowserViewport = (id: string, viewport: BrowserViewport) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserViewportState(view, viewport) : view))
 
   const handleNewSession = () => {
-    const id = `new-${Date.now()}`
-    const chatId = `${id}-main`
-    // (R-002) O Management resolve o workspace (herda o da sessão ativa) e
-    // seleciona o provider dono para a nova sessão.
-    const workspace = activeSession.workspace || 'workspace-local'
-    const provider = selectProviderForNewSession(management.current, workspace)?.id ?? activeSession.provider ?? 'local'
-    // (R-003) A nova sessão nasce como DRAFT não-commitado: o Management passa a
-    // possuir o rascunho pendente (SESSIONS.md §Drafts / §New session). Ela só
-    // entra no catálogo commitado no primeiro envio (handleSend → commitDraft).
-    management.current = openDraft(management.current, {
-      id,
-      kind: 'workspace-session',
-      providerId: provider,
-      workspace,
-    })
-    // (R-BUG/Val2) Nova sessão herda o estado de aux bar do newSessionViewState,
-    // evitando que "Novo Chat" esconda as laterais quando o usuário tinha a aux
-    // bar aberta na sessão anterior.
-    const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryTab(seededLayout.activeViewContainerId)
-    const next: Session = {
-      id,
-      title: 'Nova sessão',
-      workspace,
-      workspacePath: activeSession.workspacePath || '~/workspace-local',
-      section: 'today',
-      status: 'completed',
-      updated: 'agora',
-      diffAdded: 0,
-      diffRemoved: 0,
-      branch: 'main',
-      provider,
-      isDraft: true,
-      chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-      mainChatId: chatId,
-    }
-    setSessions((current) => [next, ...current])
-    setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
-    setActiveSessionId(id)
-    // R-030 — criar sessão é uma transição "passiva" de layout: rebaseia o
-    // previous para a nova sessão, para o autorun não restaurar layout salvo
-    // (paridade com o comportamento anterior, em que criar não mexia na aux bar).
-    layoutSyncRef.current?.setPreviousResource(id)
+    // FATIA-06.2: o + GLOBAL abre sempre o mesmo SessionLanding validado.
+    // O rascunho e o worktree só passam a existir após a primeira mensagem.
+    setNewSessionLanding(true)
     setMobilePane('chat')
-    notify('Rascunho de sessão criado')
+    notify('Nova sessão pronta para escolher contexto')
   }
 
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
-  const handleLandingSubmit = (text: string) => {
+  const handleLandingSubmit = async (text: string) => {
     const id = `new-${Date.now()}`
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
-    // (R-BUG/Val2) Sessão criada da landing herda o estado de aux bar do
-    // newSessionViewState.
-    const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryTab(seededLayout.activeViewContainerId)
-    const next: Session = {
-      id,
-      title,
-      workspace: 'workspace-local',
-      workspacePath: '~/workspace-local',
-      section: 'today',
-      status: 'completed',
-      updated: 'agora',
-      diffAdded: 0,
-      diffRemoved: 0,
-      branch: 'main',
-      chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-      mainChatId: chatId,
+    try {
+      const worktree = await createSessionWorktree('workspace-local', id)
+      const seededLayout = seedCreatedFromNewSession(newSessionState)
+      setAuxiliaryTab(seededLayout.activeViewContainerId)
+      const next: Session = {
+        id,
+        title,
+        workspace: 'workspace-local',
+        workspacePath: worktree.path,
+        worktreePath: worktree.path,
+        slug: worktree.slug,
+        section: 'today',
+        status: 'completed',
+        updated: 'agora',
+        diffAdded: 0,
+        diffRemoved: 0,
+        branch: worktree.branch,
+        chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
+        mainChatId: chatId,
+      }
+      setSessions((current) => [next, ...current])
+      setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
+      setActiveSessionId(id)
+      setVisibleSessionIds([id])
+      setNewSessionLanding(false)
+      layoutSyncRef.current?.setPreviousResource(id)
+      setMobilePane('chat')
+      window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
+    } catch (error) {
+      console.error('[sessions] worktree creation failed', error)
+      notify(error instanceof Error ? error.message : 'Falha ao criar worktree da sessão')
     }
-    setSessions([next])
-    // A landing recria a lista do zero: descarta o mapa de chats ativos antigo
-    // (incluindo entradas de runs de automação) para não deixar referências órfãs.
-    setActiveChatBySession({ [id]: chatId })
-    setActiveSessionId(id)
-    // R-030 — landing recria a sessão do zero: transição passiva (sem restore).
-    layoutSyncRef.current?.setPreviousResource(id)
-    setMobilePane('chat')
-    // Após criar, envia a primeira mensagem para a sessão recém-criada. Passamos
-    // o alvo explícito porque o estado (activeSession) só reflete a nova sessão
-    // no próximo render — sem isso, a 1ª mensagem cairia no rascunho vazio.
-    window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
   }
 
   const handleToggleArchived = (id: string) => {
@@ -1806,10 +1771,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const renderChat = () => (
-    !hasSessions ? (
-      // Sessão vazia: o próprio painel central mostra o input centralizado
-      // (landing), mantendo sidebar e barra auxiliar intactas ao redor.
-      <SessionLanding workspace={activeSession.workspace} onSubmit={handleLandingSubmit} onPickWorkspace={handlePickDirectory} isFileSystemSupported={fileSystemSupported}
+    landingVisible ? (
+      // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
+      // servido pelo Vite; outros repositórios entram na 06.3.
+      <SessionLanding workspace="workspace-local" onSubmit={(text) => void handleLandingSubmit(text)} workspaceSelectionDisabledReason="Outros repositórios em 06.3" isFileSystemSupported={fileSystemSupported}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -2109,10 +2074,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               />
             )}
             <TerminalPanel
+              key={activeSession.id}
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={activeSession.workspace}
+              workspace={activeSession.worktreePath ?? activeSession.workspace}
               onClose={() => setTerminalVisible(false)}
             />
           </div>

@@ -26,6 +26,22 @@ export async function persistSession(session: Session): Promise<void> {
   }))
 }
 
+export interface CreatedWorktree {
+  slug: string
+  path: string
+  branch: string
+}
+
+export async function createSessionWorktree(slug: string, sessionId: string): Promise<CreatedWorktree> {
+  const response = await expectOk(await fetch('/api/worktrees', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, sessionId }),
+  }))
+  const body = await response.json() as { worktree: CreatedWorktree }
+  return body.worktree
+}
+
 export async function removePersistedSession(sessionId: string): Promise<void> {
   await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }))
 }

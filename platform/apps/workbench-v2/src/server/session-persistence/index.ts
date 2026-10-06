@@ -4,8 +4,14 @@ import type { ChatMessage, Session } from '../../types'
 import { deleteSessionRecord, listSessionRecords, upsertSessionRecord } from './database'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
+import { createWorktree } from './worktrees'
 
 const API_PREFIX = '/api/sessions'
+const WORKTREES_ENDPOINT = '/api/worktrees'
+
+export interface SessionPersistencePluginOptions {
+  repoRoot: string
+}
 
 interface PersistedSessionPayload {
   session: Session
@@ -83,9 +89,16 @@ async function saveSession(session: Session): Promise<void> {
   await writeTranscript(slug, session.id, entries)
 }
 
-async function handleRequest(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
+async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX)) return false
+  if (!url.pathname.startsWith(API_PREFIX) && url.pathname !== WORKTREES_ENDPOINT) return false
+
+  if (url.pathname === WORKTREES_ENDPOINT && request.method === 'POST') {
+    const input = await readJson<{ slug: string; sessionId: string }>(request)
+    const worktree = await createWorktree(repoRoot, input.slug, input.sessionId)
+    sendJson(response, 201, { worktree })
+    return true
+  }
 
   if (url.pathname === API_PREFIX && request.method === 'GET') {
     sendJson(response, 200, { sessions: await listSessions() })
@@ -112,13 +125,13 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   return true
 }
 
-export function sessionPersistencePlugin(): Plugin {
+export function sessionPersistencePlugin(options: SessionPersistencePluginOptions): Plugin {
   return {
     name: 'session-persistence-single-port',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        void handleRequest(request, response)
+        void handleRequest(request, response, options.repoRoot)
           .then((handled) => { if (!handled) next() })
           .catch((error: unknown) => sendJson(response, 500, {
             code: 'session_persistence_error',
