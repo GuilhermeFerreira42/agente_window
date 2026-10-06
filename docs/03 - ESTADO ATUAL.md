@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-06 · HEAD de código: commit `feat(06.2): worktree real + fix divisão nova sessão` · 06.1 homologada no Windows real · 06.2 concluída localmente e aguardando homologação Windows**
+**ATUALIZADO EM: 2026-10-06 · HEAD de código: `f1afebd` (06.2) · 06.1 e 06.2 homologadas no Windows real · 06.3 autorizada somente para planejamento**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
@@ -8,12 +8,13 @@
 ## Status
 - **Fatia 06 em execução estrita por subfatia:**
   - **06.1 Persistência Híbrida — ✅ homologada no Windows real 5174 em 2026-10-06:** commits `c9e1f0c` + reparo `9ba48db`; SQLite em `~/.agente_window/agente_window.db`, JSONL por sessão e restauração após F5 comprovados pelo usuário.
-  - **06.2 Worktree + troca de diretório + fix UI — ✅ implementação e validação local concluídas; aguardando homologação Windows:** `+` global abre `SessionLanding` sem draft; primeiro envio cria branch `agente-window/<id>` e worktree `~/.agente_window/worktrees/<slug>/<id>` a partir da raiz Git servida pelo Vite; `worktree_path` persiste no SQLite; terminal recebe `workspace={activeSession.worktreePath ?? activeSession.workspace}` e remonta por sessão; landing contínua validada em 1400×900. Seletor de outro repositório fica desabilitado até 06.3.
+  - **06.2 Worktree + troca de diretório + fix UI — ✅ homologada no Windows real 5174 em 2026-10-06:** commit `f1afebd`; vídeo 12:06 comprovou `+` abrindo a landing contínua, duas sessões com `pwd` em worktrees distintos, troca automática de cwd pelo picker e restauração de sessões/worktrees após F5.
+  - **06.3 — autorizada somente para planejamento:** limpeza de worktree ao excluir sessão, tratamento de sujeira no PWD inicial e suporte a outros repositórios pela Opção C (servidor). Nenhum código iniciado; áreas intocáveis permanecem preservadas.
   - **06.3 Empty State 768px:** Reutilização do componente `SessionLanding.tsx` (já existente no `workbench-v2`, validado no vídeo), acionado pelo `+` GLOBAL.
   - **06.4 Listagem e Buscador:** Distinção entre `+` GLOBAL (novo worktree) e `+` NO PROJETO (múltiplos chats sob o mesmo slug); modal central Session Picker com grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS unificado ao filtro lateral; criação do doc `SESSION_PICKER.md`.
   - **06.5 Terminal e Contexto:** Chaveamento automático de `cwd` do Terminal PTY ao trocar de sessão.
   - **06.6 Homologação e Testes:** Roteiro de smoke tests na porta 5174 real documentado no `09 §6`.
-  - **Próximo gate:** homologação da 06.2 no Windows real 5174; não iniciar 06.3 antes da aprovação do usuário.
+  - **Próximo gate:** apresentar e aprovar o plano fechado da 06.3; não iniciar código antes de nova autorização explícita do usuário.
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
 - **Fatias 7 a 10 (Engenharia Reversa e Especificações):** Mapeamento em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para fases subsequentes.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.

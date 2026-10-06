@@ -2,9 +2,10 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
-## 2026-10-06 - FATIA 06.1 homologada e FATIA 06.2 implementada
+## 2026-10-06 - FATIAS 06.1 e 06.2 homologadas no Windows real
 - **06.1 homologada pelo usuário no Windows real, porta 5174:** persistência SQLite + JSONL e restauração após F5 comprovadas; commits `c9e1f0c` e reparo de respostas transitórias `9ba48db`.
-- **06.2 concluída localmente e parada no gate de homologação Windows:** `+` global abre o `SessionLanding` sem criar draft; o primeiro envio cria branch `agente-window/<id>` e worktree real em `~/.agente_window/worktrees/<slug>/<id>` usando a raiz Git servida pelo Vite.
+- **06.2 homologada pelo usuário no Windows real, porta 5174, por vídeo 12:06:** commit `f1afebd`; `+` abriu a landing sem divisão; duas sessões exibiram `pwd` em worktrees distintos; a troca pelo picker alterou automaticamente o cwd do terminal; F5 restaurou worktrees e sessões.
+- **06.3 autorizada somente para planejamento:** limpeza ao excluir sessão, sujeira do PWD inicial e outros repositórios pela Opção C servidor; código ainda não iniciado.
 - `worktree_path` persistido no SQLite; terminal ligado pela prop pública `workspace={activeSession.worktreePath ?? activeSession.workspace}` e remontado na troca de sessão para aplicar o novo cwd.
 - Landing sem divisão de cor, seletor de outros repositórios desabilitado até 06.3 e inspeção visual 1400×900 concluída.
 - Validação local: typecheck verde; App 45/45 executados; worktrees 3/3; suíte Vitest 704 pass / 9 falhas preexistentes de `TerminalPanel.test.tsx` / 16 skip; Playwright terminal real 3/3; SQLite, `git worktree list`, diretórios, `pwd`, troca de sessão e F5 comprovados.
