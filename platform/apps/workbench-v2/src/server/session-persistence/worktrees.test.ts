@@ -11,7 +11,7 @@ vi.mock('./paths', async (importOriginal) => {
   return { ...original, getAppDir: () => mocked.appDir }
 })
 
-import { createWorktree } from './worktrees'
+import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim()
@@ -59,9 +59,44 @@ describe('createWorktree', () => {
     const destination = join(mocked.appDir, 'worktrees', 'workspace', 'sessao-3')
     await mkdir(destination, { recursive: true })
     await writeFile(join(destination, 'sentinela.txt'), 'não remover')
-
-    await expect(createWorktree(repo, 'workspace', 'sessao-3'))
-      .rejects.toThrow('Worktree destination already exists')
+    await expect(createWorktree(repo, 'workspace', 'sessao-3')).rejects.toThrow('Worktree destination already exists')
     expect(await readFile(join(destination, 'sentinela.txt'), 'utf8')).toBe('não remover')
+  })
+
+  it('remove worktree limpo e sua branch gerenciada', async () => {
+    const value = await createWorktree(repo, 'workspace', 'limpa')
+    await removeWorktree(repo, value.path, 'limpa')
+    expect(git(repo, 'branch', '--list', 'agente-window/limpa')).toBe('')
+    expect(git(repo, 'worktree', 'list', '--porcelain')).not.toContain(value.path)
+  })
+
+  it('bloqueia remoção de caminho fora da raiz gerenciada', async () => {
+    await expect(removeWorktree(repo, join(root, 'externo'), 'externo')).rejects.toThrow('outside the managed directory')
+  })
+
+  it('recusa worktree sujo sem remover seus arquivos', async () => {
+    const value = await createWorktree(repo, 'workspace', 'suja')
+    await writeFile(join(value.path, 'novo.txt'), 'mudança')
+    await expect(removeWorktree(repo, value.path, 'suja')).rejects.toBeInstanceOf(WorktreeDirtyError)
+    expect(await readFile(join(value.path, 'novo.txt'), 'utf8')).toBe('mudança')
+  })
+
+  it('remove worktree sujo somente quando force é confirmado', async () => {
+    const value = await createWorktree(repo, 'workspace', 'forcada')
+    await writeFile(join(value.path, 'novo.txt'), 'mudança')
+    await removeWorktree(repo, value.path, 'forcada', true)
+    expect(git(repo, 'worktree', 'list', '--porcelain')).not.toContain(value.path)
+  })
+
+  it('é idempotente quando o diretório gerenciado já desapareceu', async () => {
+    const value = await createWorktree(repo, 'workspace', 'ausente')
+    await rm(value.path, { recursive: true, force: true })
+    await expect(removeWorktree(repo, value.path, 'ausente')).resolves.toBeUndefined()
+  })
+
+  it('descobre a origem por git-common-dir para registros antigos 06.2', async () => {
+    const value = await createWorktree(repo, 'workspace', 'legada')
+    await removeWorktree(value.path, value.path, 'legada')
+    expect(git(repo, 'worktree', 'list', '--porcelain')).not.toContain(value.path)
   })
 })

@@ -12,7 +12,14 @@
 7. RAM ~1,9 GB: **um Vite por vez**; proibido buildar VS Code/code-server; runtimes/clones em `~/.cache`.
 8. Princípio **LEGO**: módulos prontos são reposicionados, nunca reescritos. Nada em `legacy/` (removida pelo usuário; não restaurar).
 
-## 1.1 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
+## 1.1 Decisão 06.3 — seletor nativo de repositório (2026-10-06)
+- **Inspeção técnica:** `workbench-v2` é Vite/React puro; não há `tauri.conf`, pacote `@tauri-apps` nem runtime Tauri. Portanto, `plugin-dialog` não se aplica.
+- **Opção C servidor:** no Windows, o plugin Vite chama `powershell.exe` via `child_process.execFile`, em modo STA, e abre `System.Windows.Forms.FolderBrowserDialog`. O caminho absoluto volta somente ao backend e passa obrigatoriamente por `realpath` + `git rev-parse --show-toplevel` antes de chegar à UI.
+- A operação fica em `src/server/session-persistence/`; a UI usa endpoint single-port dedicado. Cancelamento retorna resultado explícito, não cria draft e não altera a seleção atual.
+- **Proibido:** usar `FileSystemDirectoryHandle`/File System Access API para inferir caminho absoluto; aceitar caminho sem validação canônica; implementar o diálogo dentro de Explorer ou terminal.
+- Fora do Windows, o endpoint de diálogo responde “não suportado”; a validação de caminho e os testes backend continuam multiplataforma.
+
+## 1.2 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
 - **OpenClaude como referência nativa de Runtime:** O repositório de referência `openclaude` é 100% **TypeScript / Bun / Node**, alinhando-se perfeitamente à stack do nosso produto (`platform/apps/workbench-v2/` em React + Vite + TypeScript).
 - **Sem necessidade de sidecar Go:** A raspagem prévia de `opencode` (Go + sqlc + goose) apontava para a necessidade de compilação de binários Go e processos sidecar em background. Com o OpenClaude, todos os serviços de persistência (`sessionStorage`), controle de chamadas (`doomLoop`), segurança (`permissions`), worktrees e providers são TypeScript nativo, permitindo integração direta via contratos na camada 2.1 (Motor / Agent Runtime), eliminando pontes IPC pesadas.
 

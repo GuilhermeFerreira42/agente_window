@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { createSessionWorktree, loadPersistedSessions, persistSession, removePersistedSession } from './services/sessions/sessionsClient'
+import { createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -235,6 +235,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
   const [newSessionLanding, setNewSessionLanding] = useState(false)
+  const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
+  const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -1295,6 +1297,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify('Nova sessão pronta para escolher contexto')
   }
 
+  const handlePickWorkspace = async () => {
+    setWorkspacePickerPending(true)
+    try {
+      const workspace = await pickSessionWorkspace()
+      if (workspace) setSelectedWorkspace(workspace)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Falha ao escolher repositório')
+    } finally {
+      setWorkspacePickerPending(false)
+    }
+  }
+
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
   const handleLandingSubmit = async (text: string) => {
@@ -1302,14 +1316,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
     try {
-      const worktree = await createSessionWorktree('workspace-local', id)
+      const workspaceLabel = selectedWorkspace?.name ?? 'workspace-local'
+      const worktree = await createSessionWorktree(selectedWorkspace?.path ?? '', selectedWorkspace?.slug ?? 'workspace-local', id)
       const seededLayout = seedCreatedFromNewSession(newSessionState)
       setAuxiliaryTab(seededLayout.activeViewContainerId)
       const next: Session = {
         id,
         title,
-        workspace: 'workspace-local',
-        workspacePath: worktree.path,
+        workspace: workspaceLabel,
+        workspacePath: worktree.repoRoot,
         worktreePath: worktree.path,
         slug: worktree.slug,
         section: 'today',
@@ -1326,6 +1341,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setActiveSessionId(id)
       setVisibleSessionIds([id])
       setNewSessionLanding(false)
+      setSelectedWorkspace(undefined)
       layoutSyncRef.current?.setPreviousResource(id)
       setMobilePane('chat')
       window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
@@ -1367,9 +1383,25 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify(`Sessão removida do grupo "${groupName}"`)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    try {
+      await removePersistedSession(id)
+    } catch (error) {
+      if (error instanceof SessionPersistenceError && error.code === 'worktree_dirty') {
+        const confirmed = window.confirm('Este worktree possui alterações locais. Excluir a sessão e descartar essas alterações?')
+        if (!confirmed) return
+        try {
+          await removePersistedSession(id, true)
+        } catch (forcedError) {
+          notify(forcedError instanceof Error ? forcedError.message : 'Falha ao remover worktree')
+          return
+        }
+      } else {
+        notify(error instanceof Error ? error.message : 'Falha ao excluir sessão')
+        return
+      }
+    }
     clearPendingTimersForSession(id)
-    void removePersistedSession(id).catch((error: unknown) => console.error('[sessions] delete failed', error))
     // (R-003) Excluir um draft abandonado descarta o rascunho pendente do
     // Management (deleteNewSession dispose — SESSIONS.md §Drafts).
     management.current = discardDraft(management.current, id)
@@ -1774,7 +1806,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace="workspace-local" onSubmit={(text) => void handleLandingSubmit(text)} workspaceSelectionDisabledReason="Outros repositórios em 06.3" isFileSystemSupported={fileSystemSupported}
+      <SessionLanding workspace={selectedWorkspace?.name ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={fileSystemSupported}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}

@@ -1,13 +1,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, listSessionRecords, upsertSessionRecord } from './database'
+import { deleteSessionRecord, getSessionRecord, listSessionRecords, upsertSessionRecord } from './database'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
-import { createWorktree } from './worktrees'
+import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
+import { pickWorkspaceDirectory, validateWorkspace } from './workspaces'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
+const WORKSPACES_VALIDATE_ENDPOINT = '/api/workspaces/validate'
+const WORKSPACES_PICK_ENDPOINT = '/api/workspaces/pick'
 
 export interface SessionPersistencePluginOptions {
   repoRoot: string
@@ -91,11 +94,24 @@ async function saveSession(session: Session): Promise<void> {
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && url.pathname !== WORKTREES_ENDPOINT) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT) return false
+
+  if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {
+    const input = await readJson<{ path: string }>(request)
+    sendJson(response, 200, { workspace: await validateWorkspace(input.path) })
+    return true
+  }
+
+  if (url.pathname === WORKSPACES_PICK_ENDPOINT && request.method === 'POST') {
+    const selectedPath = await pickWorkspaceDirectory()
+    sendJson(response, 200, selectedPath ? { workspace: await validateWorkspace(selectedPath) } : { workspace: null })
+    return true
+  }
 
   if (url.pathname === WORKTREES_ENDPOINT && request.method === 'POST') {
-    const input = await readJson<{ slug: string; sessionId: string }>(request)
-    const worktree = await createWorktree(repoRoot, input.slug, input.sessionId)
+    const input = await readJson<{ repoRoot?: string; slug: string; sessionId: string }>(request)
+    const workspace = await validateWorkspace(input.repoRoot || repoRoot)
+    const worktree = await createWorktree(workspace.path, input.slug || workspace.slug, input.sessionId)
     sendJson(response, 201, { worktree })
     return true
   }
@@ -115,8 +131,20 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   const match = url.pathname.match(/^\/api\/sessions\/([^/]+)$/)
   if (match && request.method === 'DELETE') {
     const id = decodeURIComponent(match[1])
-    const record = deleteSessionRecord(id)
-    if (record) await deleteTranscript(record.slug, id)
+    const record = getSessionRecord(id)
+    if (record) {
+      try {
+        await removeWorktree(record.workspacePath, record.worktreePath, id, url.searchParams.get('force') === 'true')
+      } catch (error) {
+        if (error instanceof WorktreeDirtyError) {
+          sendJson(response, 409, { code: 'worktree_dirty', message: error.message })
+          return true
+        }
+        throw error
+      }
+      await deleteTranscript(record.slug, id)
+      deleteSessionRecord(id)
+    }
     sendJson(response, 200, { ok: true })
     return true
   }

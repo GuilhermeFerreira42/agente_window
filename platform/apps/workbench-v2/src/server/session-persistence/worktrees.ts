@@ -10,6 +10,7 @@ export interface WorktreeDescriptor {
   slug: string
   path: string
   branch: string
+  repoRoot: string
 }
 
 function resolveWorktreePath(slug: string, sessionId: string): string {
@@ -55,7 +56,52 @@ export async function createWorktree(repoRootInput: string, slugInput: string, s
     throw error
   }
 
-  return { slug, path: destination, branch }
+  return { slug, path: destination, branch, repoRoot }
+}
+
+export class WorktreeDirtyError extends Error {
+  constructor() {
+    super('Worktree has uncommitted changes')
+    this.name = 'WorktreeDirtyError'
+  }
+}
+
+function assertManagedWorktreePath(worktreePath: string): void {
+  const managedRoot = resolve(getAppDir(), 'worktrees')
+  const candidate = resolve(worktreePath)
+  if (!candidate.startsWith(`${managedRoot}${sep}`)) throw new Error('Refusing to remove a worktree outside the managed directory')
+}
+
+export async function removeWorktree(repoRootInput: string, worktreePath: string, sessionId: string, force = false): Promise<void> {
+  assertManagedWorktreePath(worktreePath)
+  let repoRoot = repoRootInput
+  try {
+    repoRoot = await realpath(repoRootInput)
+  } catch {
+    // Registros 06.2 antigos gravavam o próprio worktree como workspacePath.
+    // Se ele ainda existe, a descoberta do common-dir abaixo encontra a origem.
+  }
+
+  try {
+    const commonDir = await git(worktreePath, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+    if (commonDir.endsWith(`${sep}.git`) || commonDir.endsWith('/.git')) repoRoot = dirname(commonDir)
+  } catch {
+    // Diretório ausente: prune idempotente ainda pode ser executado pela origem persistida.
+  }
+
+  const status = await git(worktreePath, ['status', '--porcelain']).catch(() => '')
+  if (status && !force) throw new WorktreeDirtyError()
+  await git(repoRoot, ['worktree', 'remove', ...(force ? ['--force'] : []), worktreePath]).catch(async (error) => {
+    try {
+      await access(worktreePath)
+      throw error
+    } catch (accessError) {
+      if ((accessError as NodeJS.ErrnoException).code !== 'ENOENT') throw accessError
+    }
+  })
+  await git(repoRoot, ['worktree', 'prune'])
+  const branch = `agente-window/${sanitizePath(sessionId)}`
+  await git(repoRoot, ['branch', '-D', branch]).catch(() => undefined)
 }
 
 export async function listWorktrees(repoRootInput: string): Promise<string> {

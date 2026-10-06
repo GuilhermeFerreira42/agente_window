@@ -5,7 +5,9 @@
 ## 2026-10-06 - FATIAS 06.1 e 06.2 homologadas no Windows real
 - **06.1 homologada pelo usuário no Windows real, porta 5174:** persistência SQLite + JSONL e restauração após F5 comprovadas; commits `c9e1f0c` e reparo de respostas transitórias `9ba48db`.
 - **06.2 homologada pelo usuário no Windows real, porta 5174, por vídeo 12:06:** commit `f1afebd`; `+` abriu a landing sem divisão; duas sessões exibiram `pwd` em worktrees distintos; a troca pelo picker alterou automaticamente o cwd do terminal; F5 restaurou worktrees e sessões.
-- **06.3 autorizada somente para planejamento:** limpeza ao excluir sessão, sujeira do PWD inicial e outros repositórios pela Opção C servidor; código ainda não iniciado.
+- **06.3 implementada localmente e aguardando homologação Windows:** inspeção confirmou Vite puro, sem Tauri; decisão registrada em `docs/04`: `powershell.exe -STA` + `System.Windows.Forms.FolderBrowserDialog`, sem `FileSystemDirectoryHandle`.
+- Acrescentados validação server-side da raiz Git, criação a partir de outros repositórios, origem persistida separada do worktree e exclusão protegida/idempotente. Worktree sujo retorna 409, permanece íntegro e exige confirmação explícita para force.
+- Loop 5174 com repo-a/repo-b: PWD limpo e distinto, troca por sessão, F5, exclusão limpa e suja, SQLite/branches/diretórios zerados no fim. Gates: typecheck 0; backend 14/14; UI 11/11; App 45 pass; suíte 721 pass + 9 falhas antigas do terminal; Playwright terminal 3/3.
 - `worktree_path` persistido no SQLite; terminal ligado pela prop pública `workspace={activeSession.worktreePath ?? activeSession.workspace}` e remontado na troca de sessão para aplicar o novo cwd.
 - Landing sem divisão de cor, seletor de outros repositórios desabilitado até 06.3 e inspeção visual 1400×900 concluída.
 - Validação local: typecheck verde; App 45/45 executados; worktrees 3/3; suíte Vitest 704 pass / 9 falhas preexistentes de `TerminalPanel.test.tsx` / 16 skip; Playwright terminal real 3/3; SQLite, `git worktree list`, diretórios, `pwd`, troca de sessão e F5 comprovados.

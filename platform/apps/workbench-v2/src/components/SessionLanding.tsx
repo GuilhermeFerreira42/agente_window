@@ -10,10 +10,11 @@ interface SessionLandingProps {
   onDictate?: () => void
   onPickWorkspace?: () => void
   workspaceSelectionDisabledReason?: string
+  workspacePickerPending?: boolean
   isFileSystemSupported?: boolean
 }
 
-export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, workspaceSelectionDisabledReason, isFileSystemSupported = true }: SessionLandingProps) {
+export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
   const [text, setText] = useState('')
 
   const submit = (event?: FormEvent) => {
@@ -43,7 +44,8 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
               title={workspaceSelectionDisabledReason ?? (isFileSystemSupported ? "Escolher pasta real do disco (como no vídeo original 06:13)" : "File System API não suportada")}
               aria-label={workspaceSelectionDisabledReason ? `Workspace atual: ${workspace}. ${workspaceSelectionDisabledReason}` : `Workspace atual: ${workspace}. Clique para escolher pasta real`}
               onClick={onPickWorkspace}
-              disabled={Boolean(workspaceSelectionDisabledReason)}
+              disabled={Boolean(workspaceSelectionDisabledReason) || workspacePickerPending}
+              aria-busy={workspacePickerPending}
             >
               <FolderGit2 size={14} aria-hidden="true" />{workspace}<ChevronDown size={13} aria-hidden="true" />
             </button>

@@ -72,13 +72,17 @@ export function upsertSessionRecord(record: SessionRecord): void {
   `).run(record)
 }
 
-export function deleteSessionRecord(id: string): SessionRecord | undefined {
-  const existing = getDatabase().prepare(`
+export function getSessionRecord(id: string): SessionRecord | undefined {
+  return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions WHERE id = ?
   `).get(id) as SessionRecord | undefined
+}
+
+export function deleteSessionRecord(id: string): SessionRecord | undefined {
+  const existing = getSessionRecord(id)
   if (existing) getDatabase().prepare('DELETE FROM sessions WHERE id = ?').run(id)
   return existing
 }

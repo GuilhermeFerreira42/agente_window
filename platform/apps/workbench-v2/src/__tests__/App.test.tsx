@@ -5,9 +5,11 @@ import App from '../App'
 import { testSessions } from './fixtures/sessions'
 
 vi.mock('../services/sessions/sessionsClient', () => ({
+  SessionPersistenceError: class SessionPersistenceError extends Error {},
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),
-  createSessionWorktree: vi.fn(async (_slug: string, sessionId: string) => ({ slug: 'workspace-local', path: `/worktrees/${sessionId}`, branch: `agente-window/${sessionId}` })),
+  pickSessionWorkspace: vi.fn(async () => undefined),
+  createSessionWorktree: vi.fn(async (_repoRoot: string, _slug: string, sessionId: string) => ({ slug: 'workspace-local', path: `/worktrees/${sessionId}`, branch: `agente-window/${sessionId}`, repoRoot: '/repo' })),
   removePersistedSession: vi.fn(async () => undefined),
 }))
 
