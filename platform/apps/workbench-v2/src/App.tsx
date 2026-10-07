@@ -237,6 +237,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [newSessionLanding, setNewSessionLanding] = useState(false)
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
+  const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
+    ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -306,8 +308,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [activityBarMenu, setActivityBarMenu] = useState<ExplorerContextMenuState | null>(null)
   useEffect(() => {
     let cancelled = false
+    let mountedModule: IExplorerSearchModule | undefined
     void (async () => {
       try {
+        if (explorerWorkspacePath) {
+          const response = await fetch('/fs/workspace', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: explorerWorkspacePath }),
+          })
+          if (!response.ok) throw new Error(`Falha ao ativar workspace no Explorer (${response.status})`)
+        }
         const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
@@ -337,14 +347,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (e.type === 'editor.attachRestored') layoutRef.current.setEditorMaximized(false)
         })
         restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
+        mountedModule = module
         setExplorerModule(module)
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
         console.warn('[explorer-search] boot: raiz não descoberta', err)
       }
     })()
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+      mountedModule?.dispose()
+    }
+  }, [explorerWorkspacePath])
   useEffect(() => {
     if (!explorerContextMenu) return
     const onDown = (ev: MouseEvent) => {
@@ -1806,7 +1820,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.name ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={fileSystemSupported}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={fileSystemSupported}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -2110,7 +2124,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={activeSession.worktreePath ?? activeSession.workspace}
+              workspace={activeSession.worktreePath ?? activeSession.workspacePath}
               onClose={() => setTerminalVisible(false)}
             />
           </div>

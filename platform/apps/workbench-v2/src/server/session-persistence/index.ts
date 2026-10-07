@@ -5,12 +5,13 @@ import { deleteSessionRecord, getSessionRecord, listSessionRecords, upsertSessio
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
-import { pickWorkspaceDirectory, validateWorkspace } from './workspaces'
+import { listRecentWorkspaces, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, WorktreeRequiresGitError } from './workspaces'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
 const WORKSPACES_VALIDATE_ENDPOINT = '/api/workspaces/validate'
 const WORKSPACES_PICK_ENDPOINT = '/api/workspaces/pick'
+const WORKSPACES_RECENT_ENDPOINT = '/api/workspaces/recent'
 
 export interface SessionPersistencePluginOptions {
   repoRoot: string
@@ -75,7 +76,7 @@ async function saveSession(session: Session): Promise<void> {
   const metadata: Session = {
     ...session,
     slug,
-    worktreePath: session.worktreePath || session.workspacePath,
+    worktreePath: session.worktreePath ?? null,
     chats: session.chats.map((chat) => ({ ...chat, messages: [] })),
   }
   upsertSessionRecord({
@@ -83,7 +84,7 @@ async function saveSession(session: Session): Promise<void> {
     slug,
     title: session.title,
     workspacePath: session.workspacePath,
-    worktreePath: metadata.worktreePath || session.workspacePath,
+    worktreePath: metadata.worktreePath ?? null,
     messageCount: entries.length,
     createdAt: session.createdSeq ?? now,
     updatedAt: now,
@@ -98,21 +99,36 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {
     const input = await readJson<{ path: string }>(request)
-    sendJson(response, 200, { workspace: await validateWorkspace(input.path) })
+    const workspace = await validateWorkspace(input.path, url.searchParams.get('requireGit') === 'true')
+    await rememberWorkspace(workspace.path)
+    sendJson(response, 200, { workspace })
     return true
   }
 
   if (url.pathname === WORKSPACES_PICK_ENDPOINT && request.method === 'POST') {
     const selectedPath = await pickWorkspaceDirectory()
-    sendJson(response, 200, selectedPath ? { workspace: await validateWorkspace(selectedPath) } : { workspace: null })
+    if (!selectedPath) sendJson(response, 200, { workspace: null })
+    else {
+      const workspace = await validateWorkspace(selectedPath)
+      await rememberWorkspace(workspace.path)
+      sendJson(response, 200, { workspace })
+    }
+    return true
+  }
+
+  if (url.pathname === WORKSPACES_RECENT_ENDPOINT && request.method === 'GET') {
+    sendJson(response, 200, { paths: await listRecentWorkspaces() })
     return true
   }
 
   if (url.pathname === WORKTREES_ENDPOINT && request.method === 'POST') {
-    const input = await readJson<{ repoRoot?: string; slug: string; sessionId: string }>(request)
-    const workspace = await validateWorkspace(input.repoRoot || repoRoot)
-    const worktree = await createWorktree(workspace.path, input.slug || workspace.slug, input.sessionId)
-    sendJson(response, 201, { worktree })
+    const input = await readJson<{ workspacePath?: string; useWorktree?: boolean; slug?: string; sessionId: string }>(request)
+    const workspace = await validateWorkspace(input.workspacePath || repoRoot, input.useWorktree === true)
+    await rememberWorkspace(workspace.path)
+    const prepared = input.useWorktree === true
+      ? await createWorktree(workspace.path, input.slug || workspace.slug, input.sessionId)
+      : { slug: input.slug || workspace.slug, path: null, branch: null, repoRoot: workspace.path }
+    sendJson(response, 201, { worktree: prepared })
     return true
   }
 
@@ -133,14 +149,16 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     const id = decodeURIComponent(match[1])
     const record = getSessionRecord(id)
     if (record) {
-      try {
-        await removeWorktree(record.workspacePath, record.worktreePath, id, url.searchParams.get('force') === 'true')
-      } catch (error) {
-        if (error instanceof WorktreeDirtyError) {
-          sendJson(response, 409, { code: 'worktree_dirty', message: error.message })
-          return true
+      if (record.worktreePath) {
+        try {
+          await removeWorktree(record.workspacePath, record.worktreePath, id, url.searchParams.get('force') === 'true')
+        } catch (error) {
+          if (error instanceof WorktreeDirtyError) {
+            sendJson(response, 409, { code: 'worktree_dirty', message: error.message })
+            return true
+          }
+          throw error
         }
-        throw error
       }
       await deleteTranscript(record.slug, id)
       deleteSessionRecord(id)
@@ -161,8 +179,8 @@ export function sessionPersistencePlugin(options: SessionPersistencePluginOption
       server.middlewares.use((request, response, next) => {
         void handleRequest(request, response, options.repoRoot)
           .then((handled) => { if (!handled) next() })
-          .catch((error: unknown) => sendJson(response, 500, {
-            code: 'session_persistence_error',
+          .catch((error: unknown) => sendJson(response, error instanceof WorktreeRequiresGitError ? 400 : 500, {
+            code: error instanceof WorktreeRequiresGitError ? error.code : 'session_persistence_error',
             message: error instanceof Error ? error.message : String(error),
           }))
       })

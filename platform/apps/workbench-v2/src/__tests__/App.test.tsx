@@ -9,7 +9,7 @@ vi.mock('../services/sessions/sessionsClient', () => ({
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),
   pickSessionWorkspace: vi.fn(async () => undefined),
-  createSessionWorktree: vi.fn(async (_repoRoot: string, _slug: string, sessionId: string) => ({ slug: 'workspace-local', path: `/worktrees/${sessionId}`, branch: `agente-window/${sessionId}`, repoRoot: '/repo' })),
+  createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
   removePersistedSession: vi.fn(async () => undefined),
 }))
 

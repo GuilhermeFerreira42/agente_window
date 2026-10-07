@@ -14,10 +14,12 @@
 
 ## 1.1 Decisão 06.3 — seletor nativo de repositório (2026-10-06)
 - **Inspeção técnica:** `workbench-v2` é Vite/React puro; não há `tauri.conf`, pacote `@tauri-apps` nem runtime Tauri. Portanto, `plugin-dialog` não se aplica.
-- **Opção C servidor:** no Windows, o plugin Vite chama `powershell.exe` via `child_process.execFile`, em modo STA, e abre `System.Windows.Forms.FolderBrowserDialog`. O caminho absoluto volta somente ao backend e passa obrigatoriamente por `realpath` + `git rev-parse --show-toplevel` antes de chegar à UI.
+- **Opção C servidor:** no Windows, o plugin Vite chama `powershell.exe` via `child_process.execFile`, em modo STA, e abre `System.Windows.Forms.FolderBrowserDialog`.
+- **Fluxo padrão 06.4a:** o caminho deve existir, ser diretório e resolver por `realpath`. Git não é obrigatório. `git rev-parse --show-toplevel` só pode ser exigido quando a chamada explícita usar `requireGit=true`/`useWorktree=true` (worktree opcional da Fatia 11).
 - A operação fica em `src/server/session-persistence/`; a UI usa endpoint single-port dedicado. Cancelamento retorna resultado explícito, não cria draft e não altera a seleção atual.
 - **Proibido:** usar `FileSystemDirectoryHandle`/File System Access API para inferir caminho absoluto; aceitar caminho sem validação canônica; implementar o diálogo dentro de Explorer ou terminal.
 - Fora do Windows, o endpoint de diálogo responde “não suportado”; a validação de caminho e os testes backend continuam multiplataforma.
+- **D38 / exceção mínima autorizada:** `POST /fs/workspace { path }` pode recriar os hosts FS/Git com uma raiz canônica por sessão após validar `realpath` e diretório. Apenas o servidor e o wiring de `App.tsx` mudam; componentes visuais de Explorer/Search/SCM permanecem congelados.
 
 ## 1.2 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
 - **OpenClaude como referência nativa de Runtime:** O repositório de referência `openclaude` é 100% **TypeScript / Bun / Node**, alinhando-se perfeitamente à stack do nosso produto (`platform/apps/workbench-v2/` em React + Vite + TypeScript).

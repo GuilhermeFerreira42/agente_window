@@ -33,8 +33,8 @@ export async function persistSession(session: Session): Promise<void> {
   }))
 }
 
-export interface WorkspaceDescriptor { path: string; slug: string; name: string }
-export interface CreatedWorktree { slug: string; path: string; branch: string; repoRoot: string }
+export interface WorkspaceDescriptor { path: string; slug: string; name: string; isGit: boolean }
+export interface CreatedWorktree { slug: string; path: string | null; branch: string | null; repoRoot: string }
 
 export async function validateSessionWorkspace(path: string): Promise<WorkspaceDescriptor> {
   const response = await expectOk(await fetch('/api/workspaces/validate', {
@@ -48,9 +48,9 @@ export async function pickSessionWorkspace(): Promise<WorkspaceDescriptor | unde
   return ((await response.json()) as { workspace: WorkspaceDescriptor | null }).workspace ?? undefined
 }
 
-export async function createSessionWorktree(repoRoot: string, slug: string, sessionId: string): Promise<CreatedWorktree> {
+export async function createSessionWorktree(workspacePath: string, slug: string, sessionId: string, useWorktree = false): Promise<CreatedWorktree> {
   const response = await expectOk(await fetch('/api/worktrees', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repoRoot, slug, sessionId }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspacePath, slug, sessionId, useWorktree }),
   }))
   return ((await response.json()) as { worktree: CreatedWorktree }).worktree
 }

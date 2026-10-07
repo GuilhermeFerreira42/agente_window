@@ -2,6 +2,13 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-07 - FATIA 06.4a — correção de rota para workspace simples
+- Fluxo padrão passou a aceitar qualquer diretório com ou sem Git; `useWorktree=false`, sem branch/cópia, `worktree_path=NULL`, terminal direto e recentes em `~/.agente_window/recent-workspaces.json`.
+- Migração automática remove `NOT NULL` de `worktree_path`; exclusão sem worktree remove apenas persistência. `useWorktree=true` sem Git retorna HTTP 400 `worktree_requires_git`; implementação 06.2/06.3 foi preservada para a Fatia 11.
+- D38 autorizou alteração aditiva mínima no servidor FS: `POST /fs/workspace { path }` valida `realpath` e diretório, troca a raiz e recarrega Explorer/Search/SCM por sessão sem alterar componentes visuais.
+- Documentação reorganizou Fatias 07–12 sem implementar escopo futuro; referência de worktree arquivada em `docs/arquivo_morto/fatia-06-worktree/`.
+- Gates locais: typecheck 0; alvo 71 pass; suíte 722 pass + 9 falhas antigas de TerminalPanel; Playwright terminal 3/3; loop 5174 comprovou pastas Git/não-Git, PWD, Explorer, troca, F5, SQLite, exclusão e ausência de worktrees/branches.
+
 ## 2026-10-06 - FATIAS 06.1 e 06.2 homologadas no Windows real
 - **06.1 homologada pelo usuário no Windows real, porta 5174:** persistência SQLite + JSONL e restauração após F5 comprovadas; commits `c9e1f0c` e reparo de respostas transitórias `9ba48db`.
 - **06.2 homologada pelo usuário no Windows real, porta 5174, por vídeo 12:06:** commit `f1afebd`; `+` abriu a landing sem divisão; duas sessões exibiram `pwd` em worktrees distintos; a troca pelo picker alterou automaticamente o cwd do terminal; F5 restaurou worktrees e sessões.

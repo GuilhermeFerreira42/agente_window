@@ -8,7 +8,7 @@ export interface SessionRecord {
   slug: string
   title: string
   workspacePath: string
-  worktreePath: string
+  worktreePath: string | null
   messageCount: number
   createdAt: number
   updatedAt: number
@@ -30,7 +30,7 @@ function getDatabase(): Database.Database {
       slug TEXT NOT NULL,
       title TEXT NOT NULL,
       workspace_path TEXT NOT NULL,
-      worktree_path TEXT NOT NULL,
+      worktree_path TEXT,
       message_count INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -39,6 +39,25 @@ function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions(updated_at DESC);
     CREATE INDEX IF NOT EXISTS sessions_slug_idx ON sessions(slug);
   `)
+  const columns = database.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string; notnull: number }>
+  if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
+    database.transaction(() => {
+      database!.exec(`
+        ALTER TABLE sessions RENAME TO sessions_legacy_064a;
+        CREATE TABLE sessions (
+          id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
+          workspace_path TEXT NOT NULL, worktree_path TEXT,
+          message_count INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+          session_json TEXT NOT NULL
+        );
+        INSERT INTO sessions SELECT * FROM sessions_legacy_064a;
+        DROP TABLE sessions_legacy_064a;
+        CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
+        CREATE INDEX sessions_slug_idx ON sessions(slug);
+      `)
+    })()
+  }
   return database
 }
 

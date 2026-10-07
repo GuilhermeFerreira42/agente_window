@@ -2,28 +2,35 @@
 
 > Só entra aqui o que **ainda não começou** (fases futuras) e o que **ficou devendo** (dívidas). Começou → sai daqui e entra no `03`. Terminou → vira linha no `07`. Backlog histórico completo: `docs/arquivo_morto/05_BACKLOG_MESTRE.md`.
 
-## 1. Próxima fase — Fatia 6 "Workbench / Sessões / Worktree" — PAUSADA, aguardando autorização
-- **Objetivo Geral:** Fazer o chat lateral sair do estado de "enfeite" e funcionar real, com worktree isolado, persistência real e empty state 768px.
-- **Subfatias estruturadas:**
-  - **06.1 Persistência Híbrida:** Remover mock `initialSessions`, remover botões legados do rodapé da lateral (*"Buscar personalizações"*, *"Base de..."*), SQLite `agente_window.db` + JSONL `~/.agente_window/projects/<slug>/<sessionId>.jsonl`.
-  - **06.2 Worktree Isolado:** `+` GLOBAL cria `untitled-<timestamp>` via `git worktree add`, salva slug no SQLite.
-  - **06.3 Empty State 768px:** Plugar o componente `SessionLanding.tsx` (já existente no `workbench-v2`), acionado pelo `+` GLOBAL.
-  - **06.4 Listagem e Buscador:** Distinção de `+` GLOBAL vs `+` NO PROJETO (3 chats na mesma pasta = 3 `.jsonl` no mesmo slug); Session Picker (modal central `@Nova sessão` com grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS); doc `SESSION_PICKER.md`.
-  - **06.5 Terminal e Contexto:** Chaveamento automático de `cwd` do Terminal PTY ao trocar de sessão ativa.
-  - **06.6 Homologação e Testes:** Smoke tests da persistência, worktree e busca na porta 5174 real (`09 §6`).
-- Ponto de partida quando autorizada: documentação em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`.
-- Também fora da Fatia 5 por decisão: **Alt+Z (word wrap) e menu de contexto da aba → 5.9/futura**; **Simple Browser → 4.8 separada** (D2.39: só UI, sem runtime IA/CDP).
+## 1. Fatia 06 — Workspace Simples & Chat Real
 
-## 2. Ondas e Fatias Atualizadas (visão macro - Decisões Finais 2026-10-05)
-| Fatia | Objetivo | Entregas principais | Dependências |
-|---|---|---|---|
-| **Fatia 06** | Worktree & Isolamento | Worktree (criar sala isolada por sessão) + troca de raiz do terminal pty-server | Fatia 05 (homologada) |
-| **Fatia 07** | Onde mora a Skill | Bom Vizinho (`%USERPROFILE%\.claude\skills\`, `%APPDATA%\Code\User\`, `~/.config/opencode/`) + descoberta automática | Fatia 06 |
-| **Fatia 08** | Tools CRUD & Permissões | Tools básicas (`read_file`, `write_file`, etc.) + pasta `upload/` + permissões (Grant/GrantPersistant/Deny) + Reset/Delete de sessão + telemetria básica | Fatia 07 |
-| **Fatia 09** | Runtime IA & Provedores | MCP Server + persistência SQLite OpenCode (`sessions`, `messages`, `files`) + tela provedores estilo Cline (`providers.json`) + tratamento de erros + workspace vazio | Fatia 08 |
-| **Fatia 10** | Worktree Avançado & Memória | Worktree avançado + HAG/memória hierárquica (`CLAUDE.md` + `MEMORY.md`) | Fatia 09 |
-| **Fase 11** | Polish Visual & Ruflo | Só layout: refinamento visual, animação sash, medidas finais + suporte completo a Ruflo | Fatia 10 |
+### Passo zero 06.4a — levantamento do contrato existente (2026-10-07, antes do código)
+- **Criação atual:** não existe um único endpoint que crie a sessão completa. A UI chama primeiro `POST /api/worktrees` em `src/server/session-persistence/index.ts`; depois persiste a sessão com `PUT /api/sessions`. Portanto, a correção deve atuar nesses dois contratos, sem editar o plugin errado.
+- **Exclusão atual:** `DELETE /api/sessions/:id`, no mesmo plugin. Se há registro, chama a limpeza de worktree e só depois remove JSONL e SQLite.
+- **Validação atual:** `POST /api/workspaces/validate`, implementado em `src/server/session-persistence/index.ts` e `workspaces.ts`. Antes da 06.4a exige caminho não vazio, `realpath`, diretório e igualdade exata com `git rev-parse --show-toplevel`; logo bloqueia pasta sem Git.
+- **Schema SQLite atual:** `workspace_path TEXT NOT NULL` e `worktree_path TEXT NOT NULL`. Não existe coluna `branch`; branch vive dentro de `session_json`. No tipo `Session`, `worktreePath` e `branch` são opcionais, mas não anuláveis. A 06.4a precisa migrar `worktree_path` para aceitar `NULL` e manter branch ausente/null no JSON.
+- **Consumo da raiz ativa:** o terminal público em `App.tsx` usa `activeSession.worktreePath ?? activeSession.workspace`; a criação grava `workspacePath`, mas Explorer/Search/SCM/Diff/Editor não leem hoje `workspacePath`/`worktreePath` por sessão — o módulo Explorer usa a raiz global descoberta em `/fs/root`. Nesta subfatia, áreas internas permanecem intocáveis; o wiring público passa a preferir `worktreePath ?? workspacePath` onde há contrato por sessão.
 
+### Subfatias
+- **06.1 — Persistência híbrida:** concluída e homologada.
+- **06.2/06.3 — worktree obrigatório:** código preservado como rota opcional futura; referência arquivada em `docs/arquivo_morto/fatia-06-worktree/`.
+- **06.4a — Workspace simples sem worktree obrigatório:** fluxo padrão aceita qualquer diretório, terminal direto, recentes e persistência nullable.
+- **06.4b — Empty State 768 px centralizado + transição para histórico.**
+- **06.4c — Tela de Provedores:** OpenAI, Gemini e Ollama local.
+
+## 2. Ondas e fatias reorganizadas (decisão 2026-10-07)
+
+| Fatia | Objetivo | Conteúdo preservado/reorganizado |
+|---|---|---|
+| **06** | Workspace Simples & Chat Real | 06.4a workspace simples; 06.4b Empty State; 06.4c provedores. |
+| **07** | Tools CRUD & Filesystem | `read_file`, `write_file`, `edit_file`, `glob`, `grep`; `upload/`; `ensureParentDirs`; Explorer em tempo real. Era parte da 08 antiga. |
+| **08** | Permissões & Proteção | Modos `default`, `acceptEdits`, `plan`, `fullAccess`; card Permitir/Não/Sempre; Doom Loop na 3ª chamada idêntica. Era parte da 08 antiga. |
+| **09** | Runtime IA & Erros & Reset | MCP + NDJSON (`api_retry`, `rate_limit`), erros, Nova Conversa + Retomar sem Clear Chat. Runtime permanece na 09. |
+| **10** | Skills & Memória | `~/.agent/skills`, descoberta automática, `CLAUDE.md` + `MEMORY.md`. Skills saiu da 07; memória veio da 10 antiga. |
+| **11** | Worktree Opcional | Botão “Nova Árvore de Trabalho > main” somente com Git e opção explícita; branch/worktree, symlinks anti-bloat, troca de PTY e exclusão 409. Código 06.2/06.3 preservado. |
+| **12** | Polish Visual & Ruflo | Layout final, sash, medidas, Ruflo, Alt+Z e menu de contexto da aba. Era a 11 antiga. |
+
+Regras: nenhuma fatia perde conteúdo; worktree sai da 06/10 e vai à 11; Skills vai à 10; Tools e Permissões viram 07/08; Runtime continua 09; Polish passa de 11 para 12. A reorganização é exclusivamente documental nesta entrega.
 
 ## 3. Dívidas técnicas abertas
 ### 3.1 Prioritárias (decisão do usuário pendente)
