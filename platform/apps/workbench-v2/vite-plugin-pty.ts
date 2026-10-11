@@ -38,7 +38,19 @@ export function ptyPlugin(): Plugin {
             try {
               const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { sessionId?: string; path?: string }
               if (!input.sessionId || !input.path) throw new Error('sessionId and path are required')
-              const changed = bridge.ptyManager.sendCwd(input.sessionId, input.path)
+              let changed = 0
+              for (let index = 0; index < 32; index += 1) {
+                const terminalId = `${input.sessionId}:${index}`
+                const session = bridge.ptyManager.getSession(terminalId)
+                if (!session) continue
+                const path = input.path
+                const command = session.profile.id === 'powershell' || session.profile.id === 'pwsh'
+                  ? `Set-Location -LiteralPath '${path.replace(/'/g, "''")}'\r`
+                  : session.profile.id === 'cmd'
+                    ? `cd /d "${path.replace(/"/g, '""')}"\r`
+                    : `cd -- '${path.replace(/'/g, `'\\''`)}'\r`
+                if (bridge.ptyManager.writeInput(terminalId, command)) changed += 1
+              }
               res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, changed }))
             } catch (error) {
               res.statusCode = 400; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }))
