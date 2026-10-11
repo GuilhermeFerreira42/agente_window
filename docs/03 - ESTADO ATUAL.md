@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-11 · HEAD: `a39315d` · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 6.1 — FECHAMENTO DE DÍVIDAS CRÍTICAS**
+**ATUALIZADO EM: 2026-10-11 · HEAD: `c74d8be` · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 6.1 — FECHAMENTO DE DÍVIDAS CRÍTICAS**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
