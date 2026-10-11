@@ -2,30 +2,23 @@
 
 > Só entra aqui o que **ainda não começou** (fases futuras) e o que **ficou devendo** (dívidas). Começou → sai daqui e entra no `03`. Terminou → vira linha no `07`. Backlog histórico completo: `docs/arquivo_morto/05_BACKLOG_MESTRE.md`.
 
-## 1. Fatia 06 — Workspace Simples & Chat Real
+## 1. Dívidas remanescentes da Fatia 06 — Workspace Simples & Chat Real
 
-### Passo zero 06.4a — levantamento do contrato existente (2026-10-07, antes do código)
-- **Criação atual:** não existe um único endpoint que crie a sessão completa. A UI chama primeiro `POST /api/worktrees` em `src/server/session-persistence/index.ts`; depois persiste a sessão com `PUT /api/sessions`. Portanto, a correção deve atuar nesses dois contratos, sem editar o plugin errado.
-- **Exclusão atual:** `DELETE /api/sessions/:id`, no mesmo plugin. Se há registro, chama a limpeza de worktree e só depois remove JSONL e SQLite.
-- **Validação atual:** `POST /api/workspaces/validate`, implementado em `src/server/session-persistence/index.ts` e `workspaces.ts`. Antes da 06.4a exige caminho não vazio, `realpath`, diretório e igualdade exata com `git rev-parse --show-toplevel`; logo bloqueia pasta sem Git.
-- **Schema SQLite atual:** `workspace_path TEXT NOT NULL` e `worktree_path TEXT NOT NULL`. Não existe coluna `branch`; branch vive dentro de `session_json`. No tipo `Session`, `worktreePath` e `branch` são opcionais, mas não anuláveis. A 06.4a precisa migrar `worktree_path` para aceitar `NULL` e manter branch ausente/null no JSON.
-- **Consumo da raiz ativa:** o terminal público em `App.tsx` usa `activeSession.worktreePath ?? activeSession.workspace`; a criação grava `workspacePath`, mas Explorer/Search/SCM/Diff/Editor não leem hoje `workspacePath`/`worktreePath` por sessão — o módulo Explorer usa a raiz global descoberta em `/fs/root`. Nesta subfatia, áreas internas permanecem intocáveis; o wiring público passa a preferir `worktreePath ?? workspacePath` onde há contrato por sessão.
+> A implementação 06.1–06.5 saiu deste backlog: estado em `03`, decisões em `05`, histórico em `07` e relatório em `docs/arquivo_morto/relatorio_fatia06_final.md`.
 
-### Subfatias
-- **06.1 — Persistência híbrida:** concluída e homologada.
-- **06.2/06.3 — worktree obrigatório:** código preservado como rota opcional futura; referência arquivada em `docs/arquivo_morto/fatia-06-worktree/`.
-- **06.4a — Workspace simples:** concluída; Git opcional, terminal direto, recentes e persistência nullable.
-- **06.4b — Empty State 768 px:** concluída e homologada no Windows.
-- **06.4c — Provedores multiplataforma:** concluída localmente; OpenAI/Gemini/Ollama, JSON sem segredos.
-- **06.4d — Picker e fallback:** concluída localmente; `CommonOpenFileDialog IsFolderPicker=true`/`IFileOpenDialog` moderno no Windows e, no Linux/web, input com autocomplete real de diretórios (`/`, `/home/` etc.) por endpoint dedicado.
-- **06.4e — Wiring integrado:** concluído localmente; raiz por sessão em Explorer/Search/SCM e PWD terminal por API pública, sem editar terminal.
-- **06.5 — hardening/gate:** concluído localmente; contratos, testes e documentação consolidados. Aguarda homologação humana Windows/Linux.
+- **Gate humano pendente:** homologar no Windows real 5174 o `CommonOpenFileDialog`, a troca simultânea de título/Explorer/terminal e Conta > Provedores. A validação Linux/Playwright já passou.
+- **Fatia 12 — polish do Workspace Switcher:** narrow layout, sombras/animação e paridade visual fina com o Command Palette original.
+- **Fatia 12 — picker unificado avançado:** busca em históricos/hosts, grupos, remoção de recentes e opção Chat/sem workspace observadas em versões posteriores do Agent Window.
+- **Fatia 12 — landing:** alinhar texto/apresentação final ao original sem remover a personalização de 768 px.
+- **Fatia 08/futura — credenciais:** migrar env vars para cofre seguro somente após decisão D42; a Fatia 06 não persiste chaves.
+- **Fatias 09/13 — runtime de provedores:** teste de conexão, catálogo de modelos, execução real e Agent Host permanecem fora da Fatia 06.
+- **Fatia 11 — worktree opcional:** código 06.2/06.3 está preservado, mas desligado por padrão; não reativar no fluxo simples.
 
 ## 2. Ondas e fatias reorganizadas (decisão 2026-10-07)
 
 | Fatia | Objetivo | Conteúdo preservado/reorganizado |
 |---|---|---|
-| **06** | Workspace Simples & Chat Real | 06.4a workspace simples; 06.4b Empty State; **06.4c tela de provedores OpenAI/Gemini/Ollama e base da seleção de modelo**. |
+| **06 — implementada; gate Windows pendente** | Workspace Simples & Chat Real | Persistência híbrida; workspace simples; Empty State 768 px; Provedores OpenAI/Gemini/Ollama; picker Windows/Linux; Workspace Switcher; sincronia sessão/Explorer/terminal. |
 | **07** | Tools CRUD & Filesystem | Registry e execução real de `read_file`, `write_file`, `edit_file`, `glob`, `grep`; `upload/`; schemas; progresso/cancelamento; grupos de tools; `ensureParentDirs`; Explorer em tempo real. Era parte da 08 antiga. |
 | **08** | Permissões & Proteção | Modos `default`, `acceptEdits`, `plan`, `fullAccess`; workspace trust; credential store/segredos; avaliação de risco; card Permitir/Não/Sempre; Doom Loop na 3ª chamada idêntica; sandbox e policy/supply chain para hooks, MCP, plugins, skills e tools. Era parte da 08 antiga. |
 | **09** | Runtime IA & Erros & Reset | Runtime IA; lifecycle e enablement propagado de tools; MCP real por `.vscode/mcp.json`; NDJSON (`api_retry`, `rate_limit`); tools conectadas; autenticação, status e logs MCP; execução de hooks; Browser Runtime IA/CDP (D2.39); estados reais; erros; Nova Conversa + Retomar sem Clear Chat. |
@@ -150,5 +143,3 @@ Regras: nenhuma fatia perde conteúdo; worktree sai da 06/10 e vai à 11; Tools 
 | D2.71 | **"Detalhes" e editor fino exclusivos na faixa fina** (regra 5.7 autorizada) — reavaliar quando a coluna "Detalhes" ganhar conteúdo real (hoje vazia, D2.50) | PENDENTE (decisão registrada) | FATIA-05 5.8+ |
 | D2.72 | **Campo `auxiliaryVisible` órfão** — após a 5.8-c1 o shell usa constante `false`, mas o campo continua em `layoutPersistence`/`sessionLayout`/`newSessionViewState`/`layoutController`/`sidePane` e seus testes | **PENDENTE (2026-10-02)** — remover do domínio em fase futura (refatoração sem efeito visual) | Fatia 12 |
 | D2.59 | Medidas ainda abertas do chassi (tooltip/hover dos ícones, menu do título da Side Bar, foco após Ctrl+B) | **PENDENTE — validar na homologação** | FATIA-05 5.8 |
-
-- **Dívida Fatia 12 — Workspace Switcher:** polish visual final em narrow layout e paridade fina de animação/sombra; picker avançado unificado com históricos/hosts continua fora da Fatia 06.

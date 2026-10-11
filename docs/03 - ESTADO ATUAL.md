@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-11 · BASE: `f2ff5a3` + working tree · FATIA 06 com Workspace Switcher de topo validado no Linux; aguarda homologação Windows 5174**
+**ATUALIZADO EM: 2026-10-11 · HEAD: `a65a246` · FATIA 06 implementada e validada localmente no Linux; aguarda gate final no Windows real 5174**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
@@ -37,7 +37,7 @@
 Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximizado `[lista 300][EDITOR 767][SB 274][AB 48]`; F5 mantém abas. Prints: `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c5.8/01–07`.
 
 ## Qualidade (último estado medido)
-06.4a: typecheck 0 · alvo 71 pass / 13 skip · suíte completa 722 pass / 9 fail (`TerminalPanel.test.tsx`, preexistentes) / 16 skip · Playwright terminal 3/3 · loop físico com pasta sem Git e pasta Git confirmou `worktree_path=NULL`, zero worktrees/branches, PWD direto, F5, exclusão limpa, migração nullable e troca de Explorer/Search/SCM por D38.
+Fatia 06 consolidada no checkpoint `a65a246`: typecheck 0 · `WorkspaceSwitcher` 3/3 · `SessionLanding` 11/11 · workspaces 7/7 · providers 2/2 · `App.test.tsx` 46 pass / 13 skip. Playwright Linux comprovou listagem de `/`, estado vazio de `/mnt/`, troca para `/tmp`, `/fs/root=file:///tmp`, `document.title=/tmp`, `pwd=/tmp`, Provedores com 3 cards e zero `pageerror`. A suíte global histórica anterior permanece em 722 pass / 9 falhas P4 preexistentes de terminal / 16 skip.
 
 ## Pendências abertas
 - **P3 / P4 / P7** — higiene de testes (specs mortas, skips, flakes de digitação em `sessao_13_search` T6/T10 e `sessao_14` T9).
@@ -49,7 +49,8 @@ Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximiz
 
 ## Para a próxima IA
 1. Ler `docs/01` → `02` → este arquivo → `05 - DECISOES`.
-2. A Fatia 6 toma como base o código atual (workbench-v2 com Fatia 5 homologada). Não encostar no chassi direito (Explorer/Search/Git/Activity Bar) nem no terminal. Implementar sessões reais e transição do empty state de 768px sem recriar layouts paralelos nem colunas extras (ver `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`).
+2. A Fatia 06 já está implementada; não reabrir 06.4a–06.5 nem iniciar a Fatia 07 antes do gate humano final no Windows 5174.
+3. Preservar chassi da Fatia 05, Empty State 768 px, Provedores por env var e TerminalPanel/xterm. O único wiring terminal autorizado é o já entregue em `/api/pty/cwd`.
 
 
 ## Checkpoint final da Fatia 06 — barra superior

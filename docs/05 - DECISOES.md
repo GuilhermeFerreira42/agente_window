@@ -52,7 +52,7 @@
 ## 4. Decisões de processo (vigentes)
 - Fonte da verdade = repo/preview real; prints e vídeo do Windows prevalecem sobre doc.
 - `legacy/` removida pelo usuário (tag `legacy-backup-2026-09`): não restaurar, não referenciar.
-- Numeração canônica atual: FATIA-06 = **Workspace Simples & Chat Real**. Está **em execução por subfatia**; 06.4a foi homologada com ressalvas no Windows em 2026-10-10; 06.4b está liberada como próxima subfatia.
+- Numeração canônica atual: FATIA-06 = **Workspace Simples & Chat Real**. A implementação 06.4a–06.5 foi consolidada nos checkpoints `98c783b`, `ace0811`, `00eda23`, `1f531ce` e `a65a246`; gates locais/Linux passaram e falta somente a homologação final no Windows real 5174.
 - Testes de fixture (`12*/13*/14*`) nunca contra a 5174 (apagam arquivos reais).
 
 ## 5. Decisões de documentação (2026-10-03)

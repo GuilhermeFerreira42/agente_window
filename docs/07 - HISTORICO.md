@@ -19,7 +19,7 @@
 - Linux ganhou entrada manual de pasta na landing, validada no servidor por `realpath` + diretório, sem bloquear a criação quando o picker nativo não existe.
 - Provedores foi confirmado como fluxo independente e multiplataforma: menu da conta > aba no editor, GET/PUT reais, gravação atômica em `~/.agente_window/providers.json`, env vars sem segredo persistido e Ollama configurável.
 - Comparação com `microsoft/vscode main` identificou como dívida de fidelidade para a Fatia 12 o picker unificado interno com busca/grupos/remoção de recentes e opção Chat/sem workspace das versões posteriores; não substituir a decisão atual de picker de pasta.
-- Gates locais: typecheck 0; SessionLanding 11/11; App 46 pass/13 skip; providers 2/2; workspaces 6/6. API real no Debian comprovou GET/PUT, arquivo sem chave e validação de `/tmp` sem Git. Playwright foi tentado, mas o Chromium do sandbox não abriu por ausência de `libnspr4.so`; cobertura UI ficou em Vitest e checklist humano.
+- Gates locais finais: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; App 46 pass/13 skip; providers 2/2; workspaces 7/7. API real no Debian comprovou os contratos entregues; após uma tentativa bloqueada por `libnspr4.so`, o Playwright Linux real passou para `/`, `/mnt/` vazia e `/tmp`, com Explorer, título e `pwd` sincronizados e zero `pageerror`.
 
 ## 2026-10-10 - FATIA 06.4c implementada localmente
 - Menu da conta ganhou “Provedores”, abrindo uma aba na área principal sem alterar a Activity Bar nem o chassi da Fatia 05.

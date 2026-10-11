@@ -109,7 +109,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 - Prints antes/depois da FATIA-05 vivem em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). São versionados (prints antes/depois exigidos pelo protocolo Opção C).
 
 ## Fatia 06 consolidada — fronteiras multiplataforma
-- `TerminalPanel.tsx`, xterm e PTY não recebem implementação da Fatia 06. O PWD vem de `activeSession.worktreePath ?? activeSession.workspacePath` pelo contrato público existente e a troca de sessão remonta/retargeta a sessão terminal.
+- `TerminalPanel.tsx` e xterm permanecem intocáveis. O PWD inicial vem de `activeSession.worktreePath ?? activeSession.workspacePath`; a troca em uma sessão viva usa apenas o wiring aditivo `/api/pty/cwd`, que escreve `cd`/`Set-Location` no PTY existente sem recriar a UI do terminal.
 - Picker nativo é exclusivamente Windows e roda no servidor por `powershell.exe -STA`, usando COM `IFileOpenDialog` com `FOS_PICKFOLDERS`; Provedores não importam nem chamam código Windows.
 - Em sistemas sem picker, caminho manual oferece autocomplete por `GET /api/fs/list?path=` (somente diretórios reais, ordenados) e a confirmação passa por `POST /api/workspaces/validate`: `realpath`, existência e diretório. Nunca confiar apenas no input do navegador.
 - `providers.json` não contém `apiKey`; OpenAI/Gemini usam apenas status das env vars e Ollama guarda somente `baseUrl` HTTP(S).

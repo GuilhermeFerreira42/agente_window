@@ -3,7 +3,7 @@
 > **Leia a §1 antes de rodar qualquer spec.** Specs de fixture (`12*`, `13*`, `14*` menos `14b_git_smoke`) **só na 5175**; na 5174 elas apagam arquivos reais do repo. Um Vite por vez (RAM). Reseed antes de cada spec de fixture.
 
 
-**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-11 · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `f2ff5a3` (06.4a). Números mais recentes medidos: 722 pass / 9 falhas preexistentes / 16 skip.
+**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-11 · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `a65a246` (Fatia 06 consolidada). Placar focado atual: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspaces 7/7; providers 2/2; App 46 pass / 13 skip. Placar global histórico: 722 pass / 9 falhas P4 preexistentes / 16 skip.
 **Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 
 ---
@@ -64,7 +64,7 @@ Todos testam rótulos/atributos do terminal **anteriores** à homologação `COM
 **Regra:** não corrigir código do terminal (intocável). Destino dos testes = decisão do usuário (`docs/arquivo_morto/25_ESTADO_ATUAL_E_PENDENCIAS_FATIA-05.md (histórico) §6 P3/P4`). Até lá: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
 
 ### 2.5 Números esperados hoje
-- **Vitest no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas continuam preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos.
+- **Baseline global histórico no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas eram preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos. Os gates focados atuais do HEAD `a65a246` estão no cabeçalho e na §7.
 - **Bateria §9 (14 suítes):** 5175 → 15 (16) · 13_search (14) · 13_search_backend (6) · 14 (16) · 14c (2 + 4 skip) · 14d (5) · 14b_git_changes (9 + 2 skip) · 14b_git_backend (7) · 12_explorer_fs_backend (10) · 11_terminal_pty_real (6) · 12_explorer (30); 5174 → 11_terminal_interactive_v2 (3) · 14b_git_smoke (1). **Verde duas vezes** na 5.2 e na 5.3 (pré e pós-commit).
 - **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
 - **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
@@ -176,9 +176,9 @@ A homologação humana está no `08`. Esta seção registra somente o que a IA d
 - `SessionLanding.test.tsx`: 11/11.
 - `App.test.tsx`: 46 pass / 13 skip.
 - `providers.test.ts`: 2/2; garante escrita sem `apiKey`, env status e validação de URL.
-- `workspaces.test.ts`: 6/6; inclui Git/não-Git, `realpath`, recentes e plataforma do picker.
-- Servidor Debian 5174: GET/PUT `/api/providers`, arquivo real e POST `/api/workspaces/validate` para `/tmp` passaram.
-- Playwright Chromium no sandbox: bloqueado antes da abertura por dependência do SO ausente (`libnspr4.so`), não por falha da aplicação. O fluxo UI equivalente passou no App.test; o gate humano está no `08`.
+- `workspaces.test.ts`: 7/7; inclui Git/não-Git, `realpath`, recentes, listagem de diretórios e plataforma do picker.
+- Servidor Debian 5174: GET/PUT `/api/providers`, arquivo real e contratos de workspace passaram.
+- Uma primeira tentativa de Playwright foi bloqueada por `libnspr4.so`; após instalar as dependências no ambiente efêmero, a execução real passou conforme §§8–9 abaixo.
 - `git diff --check`: sem erro de conteúdo. Documentos canônicos: 9.
 
 ## 8. Revalidação final 06.4c/Fatia 06 (2026-10-11)

@@ -42,7 +42,7 @@ Roteiro usado no Windows real, porta 5174:
 6. **Recentes:** abrir novamente o seletor e confirmar as pastas em recentes, sem duplicatas e na ordem mais recente.
 7. **Exclusão segura:** excluir uma sessão e confirmar que a pasta real permanece intacta; não pode apagar arquivos do usuário nem criar/remover worktree ou branch.
 
-**Resultado:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo. Itens **2, 6 e 7** não foram gravados, mas foram aceitos pelo usuário com base na validação local. A 06.4b está liberada. Dívidas: seletor pequeno/somente pasta → Fatia 12; texto/apresentação da landing → Fatia 12.
+**Resultado histórico da 06.4a:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo; itens **2, 6 e 7** foram aceitos com base na validação local. A dívida do seletor pequeno foi posteriormente corrigida pela consolidação 06.4d/06.5; permanecem para a Fatia 12 o polish do Workspace Switcher e o texto/apresentação final da landing.
 
 # PARTE A — O que cada coisa precisa provar (antigo 07 — Matriz de Validação)
 ## Objetivo
