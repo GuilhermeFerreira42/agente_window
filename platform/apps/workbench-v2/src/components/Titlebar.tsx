@@ -13,6 +13,7 @@ import {
   TerminalSquare,
 } from 'lucide-react'
 import type { Session } from '../types'
+import { WorkspaceSwitcher } from './TopBar/WorkspaceSwitcher'
 
 interface TitlebarProps {
   activeSession: Session
@@ -29,6 +30,10 @@ interface TitlebarProps {
   onOpenDiff: () => void
   onNewSession: () => void
   onShowSessions: () => void
+  workspacePath: string
+  workspaceChangePending?: boolean
+  onChangeWorkspace: (path: string) => Promise<void>
+  onBrowseWorkspace: () => void
   onAccountAction: (action: string) => void
 }
 
@@ -47,6 +52,10 @@ export function Titlebar({
   onOpenDiff,
   onNewSession,
   onShowSessions,
+  workspacePath,
+  workspaceChangePending,
+  onChangeWorkspace,
+  onBrowseWorkspace,
   onAccountAction,
 }: TitlebarProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
@@ -81,19 +90,8 @@ export function Titlebar({
         </div>
 
         <div className="titlebar-center">
-          <div className={`command-center${approved ? ' is-approved' : ''}`} role="button" tabIndex={0} aria-label="Command Center">
-            {approved ? (
-              <span className="command-center-approved-label">Ação aprovada</span>
-            ) : (
-              <button className={`command-center-pill${activeSession.status === 'needs-input' ? ' is-needs-input' : ''}`} type="button" aria-label="Mostrar sessões" title="Mostrar sessões" onClick={onShowSessions}>
-                {activeSession.status === 'needs-input'
-                  ? <CircleAlert className="command-center-status-icon" size={12} aria-label="Sessão aguardando resposta" />
-                  : <Bot size={12} />}
-                <span className="command-center-label">{activeSession.title}</span>
-                <span className="command-center-path">{activeSession.workspace}</span>
-              </button>
-            )}
-          </div>
+          {approved ? <div className="command-center is-approved"><span className="command-center-approved-label">Ação aprovada</span></div> : <WorkspaceSwitcher currentPath={workspacePath} pending={workspaceChangePending} onConfirm={onChangeWorkspace} onBrowse={onBrowseWorkspace}/>} 
+          <button className="workspace-switcher-sessions" type="button" aria-label="Mostrar sessões" title={activeSession.title} onClick={onShowSessions}>{activeSession.status === 'needs-input' ? <CircleAlert size={12}/> : <Bot size={12}/>}</button>
         </div>
 
         <div className="titlebar-right">

@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { createSessionWorktree, listSessionWorkspaceDirectories, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { changeSessionWorkspace, createSessionWorktree, listSessionWorkspaceDirectories, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -238,6 +238,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [newSessionLanding, setNewSessionLanding] = useState(false)
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
+  const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
   const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
     ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
@@ -1338,6 +1339,39 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }
   }
 
+  const handleChangeActiveWorkspace = async (path: string) => {
+    if (!hasSessions || workspaceChangePending) return
+    const previousPath = activeSession.worktreePath ?? activeSession.workspacePath
+    setWorkspaceChangePending(true)
+    try {
+      const { session } = await changeSessionWorkspace(activeSession.id, path)
+      const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
+      if (!fsResponse.ok) throw new Error(`Falha ao atualizar Explorer (${fsResponse.status})`)
+      const ptyResponse = await fetch('/api/pty/cwd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: activeSession.id, path: session.workspacePath }) })
+      if (!ptyResponse.ok) throw new Error(`Falha ao atualizar terminal (${ptyResponse.status})`)
+      setSessions((current) => current.map((candidate) => candidate.id === session.id ? session : candidate))
+      document.title = session.workspacePath
+      notify(`Workspace alterado para ${session.workspacePath}`)
+    } catch (error) {
+      // Compensação: se a persistência já mudou antes de FS/PTY falhar, restaura o
+      // workspace anterior para não deixar sessão, Explorer e terminal divergentes.
+      try {
+        await changeSessionWorkspace(activeSession.id, previousPath)
+        await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
+        await fetch('/api/pty/cwd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: activeSession.id, path: previousPath }) })
+      } catch { /* o erro original é o relevante para o usuário */ }
+      throw error
+    } finally { setWorkspaceChangePending(false) }
+  }
+
+  const handleBrowseActiveWorkspace = async () => {
+    setWorkspacePickerPending(true)
+    try {
+      const workspace = await pickSessionWorkspace()
+      if (workspace) await handleChangeActiveWorkspace(workspace.path)
+    } finally { setWorkspacePickerPending(false) }
+  }
+
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
   const handleLandingSubmit = async (text: string) => {
@@ -1980,6 +2014,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
+        workspacePath={activeSession.worktreePath ?? activeSession.workspacePath}
+        workspaceChangePending={workspaceChangePending || workspacePickerPending}
+        onChangeWorkspace={handleChangeActiveWorkspace}
+        onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : notify(action)}
       />
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
