@@ -113,3 +113,5 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 - Picker nativo é exclusivamente Windows e roda no servidor por `powershell.exe -STA`, usando COM `IFileOpenDialog` com `FOS_PICKFOLDERS`; Provedores não importam nem chamam código Windows.
 - Em sistemas sem picker, caminho manual oferece autocomplete por `GET /api/fs/list?path=` (somente diretórios reais, ordenados) e a confirmação passa por `POST /api/workspaces/validate`: `realpath`, existência e diretório. Nunca confiar apenas no input do navegador.
 - `providers.json` não contém `apiKey`; OpenAI/Gemini usam apenas status das env vars e Ollama guarda somente `baseUrl` HTTP(S).
+
+- A troca de workspace em sessão existente usa identidade explícita `{ sessionId, path }`; nunca há “sessão ativa global” no backend. UI coordena persistência, `/fs/workspace` e `/api/pty/cwd`, com compensação para o caminho anterior se uma etapa falhar.

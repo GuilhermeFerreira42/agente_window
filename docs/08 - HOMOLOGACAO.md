@@ -154,3 +154,9 @@ A V1 só pode ser declarada pronta quando:
 - o plano de deploy tiver sido exercitado em ambiente de staging;
 - existir smoke test pós-deploy executável;
 - o runbook operacional estiver publicado.
+
+
+## Gate da barra superior da Fatia 06
+- Linux: `/` lista diretórios; `/mnt/` lista ou mostra pasta vazia; `/tmp` deve aparecer simultaneamente no título, Explorer e `pwd`.
+- Windows 5174: Procurar abre seletor Explorer moderno; escolha deve atualizar título, Explorer e `Get-Location`.
+- Em ambos: Conta > Provedores continua independente do picker e não persiste chaves.

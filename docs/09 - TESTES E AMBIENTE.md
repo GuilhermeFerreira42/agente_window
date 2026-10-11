@@ -188,3 +188,8 @@ A homologação humana está no `08`. Esta seção registra somente o que a IA d
 - Providers: 2/2.
 - App: 46 pass / 13 skip.
 - Playwright Chromium real no Debian, 1400×900: `/` listou raiz; seleção navegou até `/home/user/`; criação da sessão passou; comando `pwd` no xterm retornou `/home/user`; Conta > Provedores abriu 3 cards; zero `pageerror`. Evidência local não versionada: `/home/user/fatia06-linux-playwright.png`.
+
+
+## 9. Gate Workspace Switcher
+- Typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspace/providers 9/9.
+- Playwright Debian 1400×900: raiz listou home/mnt/tmp; `/mnt/` mostrou pasta vazia; `/tmp` sincronizou `/fs/root=file:///tmp`, `document.title=/tmp` e `pwd=/tmp`; zero page errors.

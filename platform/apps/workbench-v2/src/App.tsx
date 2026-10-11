@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { changeSessionWorkspace, createSessionWorktree, listSessionWorkspaceDirectories, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -1318,13 +1318,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify('Nova sessão pronta para escolher contexto')
   }
 
-  const handleValidateWorkspacePath = async (path: string) => {
-    const workspace = await validateSessionWorkspace(path)
-    setSelectedWorkspace(workspace)
-    notify(`Workspace selecionado: ${workspace.path}`)
-  }
-  const handleListWorkspaceDirectories = useCallback(async (path: string) => (await listSessionWorkspaceDirectories(path)).folders, [])
-
   const handlePickWorkspace = async () => {
     setWorkspacePickerPending(true)
     try {
@@ -1340,9 +1333,21 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const handleChangeActiveWorkspace = async (path: string) => {
-    if (!hasSessions || workspaceChangePending) return
-    const previousPath = activeSession.worktreePath ?? activeSession.workspacePath
+    if (workspaceChangePending) return
     setWorkspaceChangePending(true)
+    if (landingVisible) {
+      try {
+        const workspace = await validateSessionWorkspace(path)
+        setSelectedWorkspace(workspace)
+        const response = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: workspace.path }) })
+        if (!response.ok) throw new Error(`Falha ao atualizar Explorer (${response.status})`)
+        document.title = workspace.path
+        notify(`Workspace selecionado: ${workspace.path}`)
+        return
+      } finally { setWorkspaceChangePending(false) }
+    }
+    if (!hasSessions) { setWorkspaceChangePending(false); return }
+    const previousPath = activeSession.worktreePath ?? activeSession.workspacePath
     try {
       const { session } = await changeSessionWorkspace(activeSession.id, path)
       const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
@@ -1869,7 +1874,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} onValidateWorkspacePath={handleValidateWorkspacePath} onListWorkspaceDirectories={handleListWorkspaceDirectories} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -2014,7 +2019,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
-        workspacePath={activeSession.worktreePath ?? activeSession.workspacePath}
+        workspacePath={landingVisible ? (selectedWorkspace?.path ?? activeSession.workspacePath) : (activeSession.worktreePath ?? activeSession.workspacePath)}
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}

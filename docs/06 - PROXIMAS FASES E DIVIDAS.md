@@ -150,3 +150,5 @@ Regras: nenhuma fatia perde conteúdo; worktree sai da 06/10 e vai à 11; Tools 
 | D2.71 | **"Detalhes" e editor fino exclusivos na faixa fina** (regra 5.7 autorizada) — reavaliar quando a coluna "Detalhes" ganhar conteúdo real (hoje vazia, D2.50) | PENDENTE (decisão registrada) | FATIA-05 5.8+ |
 | D2.72 | **Campo `auxiliaryVisible` órfão** — após a 5.8-c1 o shell usa constante `false`, mas o campo continua em `layoutPersistence`/`sessionLayout`/`newSessionViewState`/`layoutController`/`sidePane` e seus testes | **PENDENTE (2026-10-02)** — remover do domínio em fase futura (refatoração sem efeito visual) | Fatia 12 |
 | D2.59 | Medidas ainda abertas do chassi (tooltip/hover dos ícones, menu do título da Side Bar, foco após Ctrl+B) | **PENDENTE — validar na homologação** | FATIA-05 5.8 |
+
+- **Dívida Fatia 12 — Workspace Switcher:** polish visual final em narrow layout e paridade fina de animação/sombra; picker avançado unificado com históricos/hosts continua fora da Fatia 06.

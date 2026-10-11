@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-11 · BASE: `f2ff5a3` + working tree · FATIA 06 consolidada e validada localmente; aguarda homologação Windows/Linux**
+**ATUALIZADO EM: 2026-10-11 · BASE: `f2ff5a3` + working tree · FATIA 06 com Workspace Switcher de topo validado no Linux; aguarda homologação Windows 5174**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
@@ -50,3 +50,9 @@ Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximiz
 ## Para a próxima IA
 1. Ler `docs/01` → `02` → este arquivo → `05 - DECISOES`.
 2. A Fatia 6 toma como base o código atual (workbench-v2 com Fatia 5 homologada). Não encostar no chassi direito (Explorer/Search/Git/Activity Bar) nem no terminal. Implementar sessões reais e transição do empty state de 768px sem recriar layouts paralelos nem colunas extras (ver `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`).
+
+
+## Checkpoint final da Fatia 06 — barra superior
+- `WorkspaceSwitcher.tsx` na Title Bar, estilo Command Palette, lista `/`, `/mnt/`, `/home/`, inclui ocultas e suporta mouse/setas/Enter/Tab/Esc.
+- `POST /api/session/change-workspace { sessionId, path }` persiste workspace simples; Explorer e PTY recebem o mesmo caminho com compensação em falha.
+- Playwright Debian confirmou `/tmp` simultaneamente em título, `/fs/root` e `pwd`. Relatório: `arquivo_morto/relatorio_fatia06_final.md`.

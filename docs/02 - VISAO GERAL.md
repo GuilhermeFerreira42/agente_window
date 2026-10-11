@@ -30,3 +30,6 @@ Réplica fiel do layout do **VS Code 1.135 (perfil Agents Window)** em React + V
 Workspace simples multiplataforma, landing 768 px, persistência de sessões e tela personalizada de Provedores formam um fluxo único. Runtime real de IA, credenciais em cofre e worktree opcional continuam nas Fatias 08/09/11/13.
 
 O seletor multiplataforma da Fatia 06 usa diálogo nativo moderno no Windows e combobox web alimentado pelo filesystem real no Linux; ambos convergem para o mesmo `workspacePath` validado e restaurável.
+
+## Estrutura documental: canônicos e relatórios
+A raiz `docs/` mantém **exatamente 9 arquivos físicos canônicos numerados, de `01` a `09`**. Relatórios de execução, auditorias e evidências não-canônicas ficam em `docs/arquivo_morto/`; por isso, o relatório final da Fatia 06 está em `docs/arquivo_morto/relatorio_fatia06_final.md` e não cria um décimo canônico.

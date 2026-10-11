@@ -2,6 +2,11 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-11 - Workspace Switcher na Title Bar e sincronia real
+- Adicionado campo estilo Command Palette no topo; endpoint FS retorna contrato path/realpath/parent/folders e estados permission/vazio.
+- Troca identificada por sessionId persiste sessão simples, recentes e sincroniza Explorer + PTY; Playwright confirmou `/tmp` em `/fs/root`, título e `pwd`, zero page errors.
+- Checkpoints: `ace0811` backend, `00eda23` barra superior e `1f531ce` cwd PTY. Relatório não-canônico em `arquivo_morto/relatorio_fatia06_final.md`.
+
 ## 2026-10-11 - Correção final 06.4c/Fatia 06 — autocomplete Linux e PWD real
 - Criado `GET /api/fs/list?path=`: resolve a pasta no servidor, lista somente subdiretórios reais e os ordena. A landing usa combobox/listbox com debounce; `/` lista a raiz e selecionar `home` permite navegar em seguida por `/home/`.
 - A confirmação continua passando por `realpath` + diretório; o `workspacePath` confirmado chega à sessão e ao terminal pelo wiring existente. TerminalPanel, xterm e PTY permaneceram sem alterações.
