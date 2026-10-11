@@ -126,6 +126,7 @@ export function Titlebar({
                   <span className="account-menu-email">dev@agents.local</span>
                 </div>
                 <button type="button" role="menuitem" onClick={() => runAccountAction('Perfil aberto')}>Perfil</button>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('open-providers')}>Provedores</button>
                 <button type="button" role="menuitem" onClick={() => runAccountAction('Configurações da conta abertas')}>Configurações da conta</button>
                 <button type="button" role="menuitem" onClick={() => runAccountAction('Sessão encerrada')}>Sair</button>
               </div>

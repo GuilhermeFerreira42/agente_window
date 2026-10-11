@@ -82,15 +82,15 @@ Contratos de layout das Fatias 01/02 (`.right-section` relativo, Titlebar 35 px,
 Qualquer IA que "consertar", mover ou apagar esses arquivos viola regra dura (`AGENTS.md §4.1`). Destino final só por ordem do usuário (P3/P4 em `docs/03 - ESTADO ATUAL.md`).
 
 ## 2b. Arquivados em `docs/arquivo_morto/` (2026-10-02)
-Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/00_COMO_LER…`, `docs/12-DOCUMENTACAO-VIVA`, `docs/14`, `docs/15`, histórico do terminal (`ANALISE_…`, `CORRECAO_…`, `comparacao-terminal/`, `historico_migracao_temporaria/`), `platform/apps/workbench-v2/tsc` e `test-results-debug/`. `shot.tmp.mjs` não existia; `legacy/` já não existe.
+Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquivo_morto/00_COMO_LER_ESTA_DOCUMENTACAO.md`, `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`, `docs/arquivo_morto/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/arquivo_morto/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`, histórico do terminal (`ANALISE_…`, `CORRECAO_…`, `comparacao-terminal/`, `historico_migracao_temporaria/`), `platform/apps/workbench-v2/tsc` e `test-results-debug/`. `shot.tmp.mjs` não existia; `legacy/` já não existe.
 
 ## 3. Planos superados (histórico, não autoridade)
 | Caminho | Substituído por |
 |---|---|
 | `docs/arquivo_morto/FATIA-05_LAYOUT_BYTE_A_BYTE/05_00…05_06` (plano "Byte a Byte", Side Bar à esquerda, decisões A0.x) | `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` v1.1 (Chassis-Right) + `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/` |
 | Rascunhos "docs 21–23" citados em conversas | nunca entraram no repo; `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` os absorveu |
-| `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md` | ponto de entrada atual é `docs/00_COMECE_AQUI.md` → `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md` |
-| `docs/historico_migracao_temporaria/`, `docs/comparacao-terminal/`, `docs/ANALISE_TERMINAL_CODE_SERVER_CLONE.md`, `docs/CORRECAO_REGRESSAO_TERMINAL_V2.md` | histórico do terminal (FATIA-03), congelado em `docs/arquivo_morto/17_COMITE_TERMINAL_FIDELIDADE_2026-09-14.md`/`docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)` |
+| `docs/arquivo_morto/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/arquivo_morto/15_HANDOFF_PROMPT_PARA_NOVA_IA.md` | ponto de entrada atual é `docs/01 - COMECE AQUI.md` → `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md` |
+| `docs/arquivo_morto/historico_migracao_temporaria/`, `docs/arquivo_morto/comparacao-terminal/`, `docs/arquivo_morto/ANALISE_TERMINAL_CODE_SERVER_CLONE.md`, `docs/arquivo_morto/CORRECAO_REGRESSAO_TERMINAL_V2.md` | histórico do terminal (FATIA-03), congelado em `docs/arquivo_morto/17_COMITE_TERMINAL_FIDELIDADE_2026-09-14.md`/`docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)` |
 
 ## 4. Arquivos soltos em `platform/apps/workbench-v2/`
 | Arquivo | O que é | Destino |
@@ -107,3 +107,9 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/00_COM
 - `/home/user/uploads/05_00_relatorio_validacao_pre_fase.md` (auditoria externa) → copiado em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 - `/home/user/restore-code-server.sh` e o tarball do code-server → ambiente de medição; não fazem parte do produto.
 - Prints antes/depois da FATIA-05 vivem em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). São versionados (prints antes/depois exigidos pelo protocolo Opção C).
+
+## Fatia 06 consolidada — fronteiras multiplataforma
+- `TerminalPanel.tsx`, xterm e PTY não recebem implementação da Fatia 06. O PWD vem de `activeSession.worktreePath ?? activeSession.workspacePath` pelo contrato público existente e a troca de sessão remonta/retargeta a sessão terminal.
+- Picker nativo é exclusivamente Windows e roda no servidor por `powershell.exe -STA`, usando COM `IFileOpenDialog` com `FOS_PICKFOLDERS`; Provedores não importam nem chamam código Windows.
+- Em sistemas sem picker, caminho manual oferece autocomplete por `GET /api/fs/list?path=` (somente diretórios reais, ordenados) e a confirmação passa por `POST /api/workspaces/validate`: `realpath`, existência e diretório. Nunca confiar apenas no input do navegador.
+- `providers.json` não contém `apiKey`; OpenAI/Gemini usam apenas status das env vars e Ollama guarda somente `baseUrl` HTTP(S).

@@ -5,7 +5,8 @@ import { deleteSessionRecord, getSessionRecord, listSessionRecords, upsertSessio
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
-import { listRecentWorkspaces, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, WorktreeRequiresGitError } from './workspaces'
+import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, WorktreeRequiresGitError } from './workspaces'
+import { readProvidersConfig, writeProvidersConfig } from '../providers'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -95,7 +96,23 @@ async function saveSession(session: Session): Promise<void> {
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && url.pathname !== '/api/providers' && url.pathname !== '/api/fs/list') return false
+
+  if (url.pathname === '/api/fs/list' && request.method === 'GET') {
+    sendJson(response, 200, await listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
+    return true
+  }
+
+  if (url.pathname === '/api/providers' && request.method === 'GET') {
+    sendJson(response, 200, await readProvidersConfig())
+    return true
+  }
+
+  if (url.pathname === '/api/providers' && request.method === 'PUT') {
+    const input = await readJson<{ config: unknown }>(request)
+    sendJson(response, 200, await writeProvidersConfig(input.config))
+    return true
+  }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {
     const input = await readJson<{ path: string }>(request)

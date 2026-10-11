@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowUp, Bot, ChevronDown, FolderGit2, Mic, MessageSquare, Plus, ShieldCheck, Wand2 } from 'lucide-react'
 
 interface SessionLandingProps {
@@ -9,13 +9,47 @@ interface SessionLandingProps {
   onAddContext?: () => void
   onDictate?: () => void
   onPickWorkspace?: () => void
+  onValidateWorkspacePath?: (path: string) => Promise<void>
+  onListWorkspaceDirectories?: (path: string) => Promise<Array<{ name: string; path: string }>>
   workspaceSelectionDisabledReason?: string
   workspacePickerPending?: boolean
   isFileSystemSupported?: boolean
 }
 
-export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
+export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, onValidateWorkspacePath, onListWorkspaceDirectories, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
   const [text, setText] = useState('')
+  const [manualPathOpen, setManualPathOpen] = useState(!isFileSystemSupported)
+  const [manualPath, setManualPath] = useState('')
+  const [manualPathError, setManualPathError] = useState('')
+  const [manualPathPending, setManualPathPending] = useState(false)
+  const [directoryOptions, setDirectoryOptions] = useState<Array<{ name: string; path: string }>>([])
+  const [directoryListPending, setDirectoryListPending] = useState(false)
+  useEffect(() => { if (!isFileSystemSupported) setManualPathOpen(true) }, [isFileSystemSupported])
+  useEffect(() => {
+    if (!manualPathOpen || !onListWorkspaceDirectories || !manualPath.trim()) { setDirectoryOptions([]); return }
+    const path = manualPath.endsWith('/') || manualPath.endsWith('\\') ? manualPath : manualPath.replace(/[\\/][^\\/]*$/, '') || '/'
+    const timer = window.setTimeout(() => {
+      setDirectoryListPending(true)
+      void onListWorkspaceDirectories(path)
+        .then(setDirectoryOptions)
+        .catch(() => setDirectoryOptions([]))
+        .finally(() => setDirectoryListPending(false))
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [manualPath, manualPathOpen, onListWorkspaceDirectories])
+
+  const chooseDirectory = (path: string) => {
+    const separator = path.includes('\\') && !path.includes('/') ? '\\' : '/'
+    setManualPath(path.endsWith(separator) ? path : `${path}${separator}`)
+  }
+
+  const validateManualPath = async () => {
+    if (!manualPath.trim() || !onValidateWorkspacePath) return
+    setManualPathPending(true); setManualPathError('')
+    try { await onValidateWorkspacePath(manualPath.trim()); setManualPathOpen(false) }
+    catch (error) { setManualPathError(error instanceof Error ? error.message : 'Pasta inválida') }
+    finally { setManualPathPending(false) }
+  }
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
@@ -56,10 +90,24 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
           <span className="session-landing-chip"><Bot size={14} aria-hidden="true" />Copilot<ChevronDown size={13} aria-hidden="true" /></span>
         </h1>
 
-        {(workspaceSelectionDisabledReason || (onPickWorkspace && isFileSystemSupported)) && (
-          <p className="session-landing-workspace-hint">
-            {workspaceSelectionDisabledReason ?? <>Clique em <strong>{workspace}</strong> para escolher pasta real do disco — como no original [06:13]</>}
-          </p>
+        {(workspaceSelectionDisabledReason || onPickWorkspace || onValidateWorkspacePath) && (
+          <div className="session-landing-workspace-choice">
+            <p className="session-landing-workspace-hint">
+              {workspaceSelectionDisabledReason ?? (isFileSystemSupported ? <>Clique em <strong>{workspace}</strong> para escolher pasta real do disco</> : <>O seletor nativo não está disponível neste sistema.</>)}
+              {onValidateWorkspacePath && <button type="button" className="session-landing-manual-toggle" onClick={() => setManualPathOpen((value) => !value)}>Digitar caminho</button>}
+            </p>
+            {manualPathOpen && onValidateWorkspacePath && <div className="session-landing-manual-path">
+              <div className="session-landing-path-combobox">
+                <input role="combobox" aria-expanded={directoryOptions.length > 0} aria-controls="workspace-directory-options" aria-autocomplete="list" value={manualPath} onChange={(event) => { setManualPath(event.target.value); setManualPathError('') }} placeholder="/caminho/da/pasta" aria-label="Caminho manual do workspace" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void validateManualPath() } }}/>
+                {(directoryOptions.length > 0 || directoryListPending) && <div id="workspace-directory-options" className="session-landing-directory-options" role="listbox" aria-label="Pastas disponíveis">
+                  {directoryListPending && <div className="session-landing-directory-loading">Listando pastas…</div>}
+                  {!directoryListPending && directoryOptions.map((directory) => <button type="button" role="option" aria-selected="false" key={directory.path} onClick={() => chooseDirectory(directory.path)}><FolderGit2 size={13}/><span>{directory.name}</span><small>{directory.path}</small></button>)}
+                </div>}
+              </div>
+              <button type="button" onClick={() => void validateManualPath()} disabled={manualPathPending || !manualPath.trim()}>{manualPathPending ? 'Validando…' : 'Usar pasta'}</button>
+              {manualPathError && <span role="alert">{manualPathError}</span>}
+            </div>}
+          </div>
         )}
 
         <form className="session-landing-input" onSubmit={submit}>
@@ -69,6 +117,7 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
             aria-label="Mensagem para a nova sessão"
             value={text}
             rows={1}
+            autoFocus
             onChange={(event) => setText(event.target.value)}
             onKeyDown={handleKeyDown}
           />

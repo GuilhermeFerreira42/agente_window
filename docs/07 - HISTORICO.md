@@ -2,6 +2,51 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-11 - Correção final 06.4c/Fatia 06 — autocomplete Linux e PWD real
+- Criado `GET /api/fs/list?path=`: resolve a pasta no servidor, lista somente subdiretórios reais e os ordena. A landing usa combobox/listbox com debounce; `/` lista a raiz e selecionar `home` permite navegar em seguida por `/home/`.
+- A confirmação continua passando por `realpath` + diretório; o `workspacePath` confirmado chega à sessão e ao terminal pelo wiring existente. TerminalPanel, xterm e PTY permaneceram sem alterações.
+- Picker Windows passou a expor explicitamente `CommonOpenFileDialog` com `IsFolderPicker=true`, implementado sobre `IFileOpenDialog/FOS_PICKFOLDERS` e PowerShell STA; não há `FolderBrowserDialog`.
+- Playwright real no Debian: navegou `/` → `/home/` → `/home/user/`, criou sessão, executou `pwd` no xterm e encontrou `/home/user`; abriu Conta > Provedores, encontrou 3 cards e zero page errors.
+- Gates: typecheck 0; SessionLanding 11/11; App 46 pass/13 skip; workspace 7/7; providers 2/2.
+
+## 2026-10-11 - FATIA 06 consolidada (06.4a–06.5), correções Windows/Linux
+- Substituído `FolderBrowserDialog` pelo `IFileOpenDialog` moderno com `FOS_PICKFOLDERS`, ainda via `powershell.exe -STA`; `TerminalPanel.tsx`, xterm e PTY não foram editados.
+- Linux ganhou entrada manual de pasta na landing, validada no servidor por `realpath` + diretório, sem bloquear a criação quando o picker nativo não existe.
+- Provedores foi confirmado como fluxo independente e multiplataforma: menu da conta > aba no editor, GET/PUT reais, gravação atômica em `~/.agente_window/providers.json`, env vars sem segredo persistido e Ollama configurável.
+- Comparação com `microsoft/vscode main` identificou como dívida de fidelidade para a Fatia 12 o picker unificado interno com busca/grupos/remoção de recentes e opção Chat/sem workspace das versões posteriores; não substituir a decisão atual de picker de pasta.
+- Gates locais: typecheck 0; SessionLanding 11/11; App 46 pass/13 skip; providers 2/2; workspaces 6/6. API real no Debian comprovou GET/PUT, arquivo sem chave e validação de `/tmp` sem Git. Playwright foi tentado, mas o Chromium do sandbox não abriu por ausência de `libnspr4.so`; cobertura UI ficou em Vitest e checklist humano.
+
+## 2026-10-10 - FATIA 06.4c implementada localmente
+- Menu da conta ganhou “Provedores”, abrindo uma aba na área principal sem alterar a Activity Bar nem o chassi da Fatia 05.
+- Tela com cards OpenAI, Gemini e Ollama local; GET/PUT `/api/providers` leem e gravam atomicamente `~/.agente_window/providers.json`. OpenAI/Gemini usam somente variáveis de ambiente, exibem status mascarado e nunca persistem `apiKey`; Ollama aceita URL HTTP(S).
+- Sem chamada real, teste de conexão ou uso no chat; esses itens continuam nas Fatias 08/09/13. Typecheck verde; testes focados do domínio de configuração 2/2.
+- Próximo gate: homologação da 06.4c no Windows real 5174.
+
+## 2026-10-10 - FATIA 06.4b homologada no Windows real 5174
+- Usuário homologou Empty State 768 px centralizado, `autoFocus`, realce `focus-within` com token e transição ao histórico após o primeiro envio.
+- Gates informados: typecheck 0; `SessionLanding.test.tsx` 11/11; `App.test.tsx` 44 pass / 1 falha P4 preexistente / 13 skip; `git diff --check` apenas LF/CRLF; 9 canônicos consistentes.
+
+## 2026-10-10 - FATIA 06.4b implementada localmente
+- Reutilizado `SessionLanding.tsx` no Empty State já centralizado com `max-width: 768px`; composer ganhou foco inicial e borda de foco por token do VS Code.
+- O teste de integração agora comprova a transição: o primeiro envio desmonta a região “Nova sessão”, cria a sessão e exibe a mensagem inicial no histórico flexível.
+- Gates: typecheck verde; `SessionLanding.test.tsx` 11/11; teste focado de transição em `App.test.tsx` 1/1. Uma execução ampla de `App.test.tsx` também expôs uma falha intermitente preexistente no cancelamento entre nested chats; a asserção nova foi corrigida e passou isoladamente.
+- Próximo gate: homologação da 06.4b no Windows real 5174; 06.4c não iniciada.
+
+## 2026-10-10 - FATIA 06.4a homologada com ressalvas no Windows
+- Usuário homologou a 06.4a: vídeo comprovou itens 1, 3, 4 e 5 do roteiro (`Downloads`, `Imagens`, `Desktop`, PWD direto, Explorer acompanhando a troca e F5 restaurando). Itens 2, 6 e 7 não foram gravados e foram aceitos com base nos testes locais.
+- Duas dívidas visuais registradas: seletor atual pequeno e restrito a pastas → Fatia 12; texto/apresentação da landing deve ser alinhado ao original → Fatia 12.
+- **06.4b liberada** como próximo passo. Nenhum código foi alterado neste registro.
+
+## 2026-10-10 - Coerência canônica de estado, roadmap e homologação
+- Alinhados `01`–`09` ao estado real da Fatia 06: 06.4a aguarda homologação Windows e bloqueia o início da 06.4b. O roteiro humano está no `08`; estado, roadmap e decisões pendentes ficam no `03` e `06`.
+- D39–D55 saíram do arquivo de decisões fechadas e passaram a “Decisões a deliberar” em `06 §2.3`. A Fatia 13 permanece proposta até deliberação D55. Especificação de layout e inventário de gaps continuam em `pesquisa_bruta/`.
+- Skills/Instruções e caminhos foram verificados no `microsoft/vscode main` commit `cc3fec8`; o comportamento no VS Code 1.135 **não foi confirmado**. Pastas de pesquisa 07–10 foram marcadas como numeração antiga.
+
+## 2026-10-09 - Auditoria documental e referência bruta de Personalizações
+- Recebido e preservado em `docs/arquivo_morto/pesquisa_bruta/personalizacoes/` o mockup `vscode_agents_mockup_interativo (1).html` como ideia estrutural do usuário, sem tratá-lo como prova do VS Code original.
+- Corrigidas divergências entre a numeração antiga e a tabela oficial 06–12: removidos do estado atual o bloco obsoleto 06.3–06.6 e a ordem de criar `SESSION_PICKER.md`; Command Menu + Theme, Hardening e Release foram absorvidos pela Fatia 12, e Browser Runtime IA/CDP pela Fatia 09. Detalhes e mapeamento ficam no `06 §2.1`.
+- Naquele momento, Skills e Instruções no VS Code 1.135 ficaram **não verificadas**. A auditoria posterior confirmou caminhos no `microsoft/vscode main` commit `cc3fec8`, mas o comportamento no 1.135 continua não confirmado; as propostas resultantes estão no `06`, não no arquivo de decisões fechadas.
+
 ## 2026-10-07 - FATIA 06.4a — correção de rota para workspace simples
 - Fluxo padrão passou a aceitar qualquer diretório com ou sem Git; `useWorktree=false`, sem branch/cópia, `worktree_path=NULL`, terminal direto e recentes em `~/.agente_window/recent-workspaces.json`.
 - Migração automática remove `NOT NULL` de `worktree_path`; exclusão sem worktree remove apenas persistência. `useWorktree=true` sem Git retorna HTTP 400 `worktree_requires_git`; implementação 06.2/06.3 foi preservada para a Fatia 11.

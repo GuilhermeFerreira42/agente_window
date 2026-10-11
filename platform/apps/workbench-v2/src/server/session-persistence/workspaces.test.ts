@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { pickWorkspaceDirectory, validateWorkspace } from './workspaces'
+import { listWorkspaceDirectories, pickWorkspaceDirectory, validateWorkspace } from './workspaces'
 
 function git(cwd: string, ...args: string[]): void { execFileSync('git', ['-C', cwd, ...args]) }
 
@@ -36,6 +36,13 @@ describe('workspace server contract', () => {
   it('exige Git somente quando requireGit está ativo', async () => {
     const plain = join(root, 'pasta-sem-git'); await mkdir(plain)
     await expect(validateWorkspace(plain, true)).rejects.toMatchObject({ code: 'worktree_requires_git' })
+  })
+  it('lista somente diretórios reais para o autocomplete Linux/web', async () => {
+    await mkdir(join(root, 'alpha')); await mkdir(join(root, 'Beta')); await writeFile(join(root, 'arquivo.txt'), 'x')
+    const result = await listWorkspaceDirectories(root)
+    expect(result.path).toBe(resolve(root))
+    expect(result.directories.map((entry) => entry.name)).toEqual(['alpha', 'Beta', 'Repo Com Espaço'])
+    expect(result.directories.every((entry) => entry.path.startsWith(resolve(root)))).toBe(true)
   })
   it('não tenta usar FileSystemDirectoryHandle e declara diálogo não suportado fora do Windows', async () => {
     if (process.platform !== 'win32') await expect(pickWorkspaceDirectory()).rejects.toThrow('only available on Windows')

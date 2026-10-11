@@ -1192,6 +1192,15 @@ describe('App session flows', () => {
     await waitFor(() => {
       expect(sessionRow('implementar o fluxo de rascunho de sessão')).toBeTruthy()
     })
+    // 06.4b: o primeiro envio desmonta o Empty State e revela o histórico
+    // flexível da sessão, já contendo a mensagem que iniciou a conversa.
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Nova sessão' })).not.toBeInTheDocument()
+      expect(
+        screen.getAllByText('implementar o fluxo de rascunho de sessão')
+          .some((node) => node.closest('.chat-message.is-request')),
+      ).toBe(true)
+    })
     // O título antigo do draft não sobra na lista.
     expect(screen.queryByText('Nova sessão', { selector: '.session-title-text' })).not.toBeInTheDocument()
   })
@@ -1270,6 +1279,26 @@ describe('App session flows', () => {
 
     const toast = await screen.findByRole('status')
     expect(toast).toHaveTextContent('Perfil aberto')
+  })
+
+  it('abre Provedores pelo menu da conta na área principal', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input) === '/api/providers') return new Response(JSON.stringify({
+        config: { openai: { enabled: false, apiKeySource: 'environment' }, gemini: { enabled: false, apiKeySource: 'environment' }, ollama: { enabled: true, baseUrl: 'http://localhost:11434' } },
+        environment: { openaiConfigured: false, geminiConfigured: false },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response('{}', { status: 404 })
+    })
+    render(<App initialSessionSnapshot={testSessions} />)
+
+    await user.click(screen.getByRole('button', { name: 'Conta' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
+
+    expect(await screen.findByRole('region', { name: 'Provedores' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Provedores' })).toHaveAttribute('data-tab-type', 'providers')
+    expect(screen.getByText('Não configurada — use OPENAI_API_KEY')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Provedores' })).not.toBeInTheDocument()
   })
 
   it('maximiza e restaura a área do editor', async () => {

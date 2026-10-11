@@ -80,6 +80,7 @@ interface EditorAreaProps {
   onToggleEditorHidden: () => void
   onNewCustomizations: () => void
   customizationsSurface: ReactNode
+  providersSurface: ReactNode
   /** (R-087) Tema ativo — controla o tema do Monaco Editor. */
   theme?: 'dark' | 'light'
 }
@@ -420,6 +421,7 @@ export function EditorArea({
   onNewDiff,
   onNewCustomizations,
   customizationsSurface,
+  providersSurface,
   onNavigateBrowser,
   onBrowserBack,
   onBrowserForward,
@@ -607,6 +609,7 @@ export function EditorArea({
         {editorContentVisible && activeTab?.type === 'search' && !searchSlot && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
         {editorContentVisible && activeTab?.type === 'diff' && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
+        {editorContentVisible && activeTab?.type === 'providers' && providersSurface}
         {editorContentVisible && activeTab?.type === 'file' && activeTab.imagePreview && (
           <ImagePreview
             path={activeTab.path}

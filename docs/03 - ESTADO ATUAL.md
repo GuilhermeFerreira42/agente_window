@@ -1,23 +1,21 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-07 · BASE: `1f12a93` · 06.4a implementada e validada localmente · aguardando homologação Windows**
+**ATUALIZADO EM: 2026-10-11 · BASE: `f2ff5a3` + working tree · FATIA 06 consolidada e validada localmente; aguarda homologação Windows/Linux**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
 
 ## Status
-- **Fatia 06 em execução estrita por subfatia:**
-  - **06.1 Persistência Híbrida — ✅ homologada no Windows real 5174 em 2026-10-06:** commits `c9e1f0c` + reparo `9ba48db`; SQLite em `~/.agente_window/agente_window.db`, JSONL por sessão e restauração após F5 comprovados pelo usuário.
-  - **06.2 Worktree + troca de diretório + fix UI — ✅ homologada no Windows real 5174 em 2026-10-06:** commit `f1afebd`; vídeo 12:06 comprovou `+` abrindo a landing contínua, duas sessões com `pwd` em worktrees distintos, troca automática de cwd pelo picker e restauração de sessões/worktrees após F5.
-  - **06.3 — concluída tecnicamente; rota revisada pela 06.4a:** seletor nativo do servidor preservado; worktree deixa de ser obrigatório e fica desligado por padrão para reativação opcional na Fatia 11.
-  - **06.4a — ✅ implementação e validação local concluídas; aguardando homologação Windows:** qualquer pasta com/sem Git, `worktree_path=NULL`, branch nula, terminal direto, recentes em `recent-workspaces.json`, exclusão simples e migração SQLite. D38 autoriza `POST /fs/workspace` aditivo: Explorer/Search/SCM trocam a raiz real ao mudar sessão, sem alterações visuais.
-  - **06.3 Empty State 768px:** Reutilização do componente `SessionLanding.tsx` (já existente no `workbench-v2`, validado no vídeo), acionado pelo `+` GLOBAL.
-  - **06.4 Listagem e Buscador:** Distinção entre `+` GLOBAL (novo worktree) e `+` NO PROJETO (múltiplos chats sob o mesmo slug); modal central Session Picker com grupos NEEDS INPUT / RECENTLY OPENED / OTHER SESSIONS unificado ao filtro lateral; criação do doc `SESSION_PICKER.md`.
-  - **06.5 Terminal e Contexto:** Chaveamento automático de `cwd` do Terminal PTY ao trocar de sessão.
-  - **06.6 Homologação e Testes:** Roteiro de smoke tests na porta 5174 real documentado no `09 §6`.
-  - **Próximo gate:** homologação da 06.4a no Windows real 5174; não iniciar 06.4b antes da aprovação explícita do usuário.
+- **Fatia 06 consolidada (06.4a–06.5) — ✅ implementação e gates locais concluídos:**
+  - workspace simples Git/não-Git com `realpath`, persistência, recentes, exclusão segura e raiz por sessão; terminal intocável recebe o PWD pelo contrato público existente;
+  - Empty State personalizado em 768 px, foco e transição para histórico;
+  - Windows usa `CommonOpenFileDialog { IsFolderPicker=true }` sobre `IFileOpenDialog`/`FOS_PICKFOLDERS` via `powershell.exe -STA`, sem `FolderBrowserDialog`; Linux possui caminho manual com autocomplete real por `GET /api/fs/list?path=`, validado no servidor e sem bloqueio;
+  - confirmar a pasta alimenta `workspacePath`; a sessão, Explorer e terminal recebem o PWD real pelo wiring público existente, sem editar TerminalPanel/xterm/PTY;
+  - Menu da conta > Provedores abre no editor em Linux/Windows; GET/PUT `/api/providers`, JSON sem segredo, env vars e Ollama configurável; sem runtime real;
+  - gates: typecheck 0; SessionLanding 11/11; App 46 pass/13 skip; providers 2/2; workspaces 7/7; Playwright Linux comprovou `/` → `/home/` → `/home/user/`, PWD `/home/user`, 3 cards de Provedores e zero page errors; `git diff --check` verde.
+  - **Próximo gate:** checklist humano de 5 minutos no Windows 5174 e Linux; não iniciar Fatia 07 antes do resultado.
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
-- **Fatias 7 a 10 (Engenharia Reversa e Especificações):** Mapeamento em `docs/arquivo_morto/pesquisa_bruta/`. Prontas para fases subsequentes.
+- **Fatias 07 a 12 + proposta de Fatia 13:** escopos **mapeados**, ainda não prontos nem iniciados. A Fatia 13 é proposta para Agent Host & Multi-host e depende da deliberação D55 no `06`. A especificação construtível de Personalizações está em `docs/arquivo_morto/pesquisa_bruta/especificacao-layout-personalizacoes-2026-10-10.md`; D39–D55 permanecem pendentes de deliberação no `06`. Pastas `fatia-07-input` a `fatia-10-polish` em `pesquisa_bruta/` usam a numeração antiga e não definem os donos atuais.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
 
 ## Placar FATIA-05
@@ -45,8 +43,8 @@ Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximiz
 - **P3 / P4 / P7** — higiene de testes (specs mortas, skips, flakes de digitação em `sessao_13_search` T6/T10 e `sessao_14` T9).
 - **P5** — `legacy/`: removida pelo usuário no Windows (tag `legacy-backup-2026-09`); não restaurar.
 - **P9** — layout mobile/single-pane (D2.61) não revisitado.
-- **D2.72** — campo `auxiliaryVisible` órfão no domínio (`layoutPersistence`, `sessionLayout`, `newSessionViewState`, `layoutController`, `sidePane`): **aceito como fechado para a Fatia 5**; limpeza sem efeito visual fica para Hardening.
-- Dívidas de layout pós-MVP: pequenos ajustes de fidelidade visual vistos na homologação Windows → Fatia 10 Hardening (não listar; não bloqueiam).
+- **D2.72** — campo `auxiliaryVisible` órfão no domínio (`layoutPersistence`, `sessionLayout`, `newSessionViewState`, `layoutController`, `sidePane`): **aceito como fechado para a Fatia 5**; limpeza sem efeito visual fica para a Fatia 12 — Polish Visual & Ruflo.
+- Dívidas de layout pós-MVP: pequenos ajustes de fidelidade visual vistos na homologação Windows → Fatia 12 — Polish Visual & Ruflo (não listar; não bloqueiam).
 - Fora da Fatia 5 por decisão: Alt+Z e menu de abas → 5.9/futura; Simple Browser → 4.8 separada (só UI, sem runtime IA/CDP).
 
 ## Para a próxima IA

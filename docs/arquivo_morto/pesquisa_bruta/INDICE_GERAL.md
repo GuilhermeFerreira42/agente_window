@@ -3,7 +3,9 @@
 > **Data de Conclusão:** 2026-10-03  
 > **Fonte Oficial:** Janela Nativa do VS Code Desktop (*Agentes* - `sessions.html` / `agent-sessions-workbench`)
 
-Este diretório contém o mapeamento completo, réguas de medidas, comportamento dos botões e regras de negócio para a construção do **Agente Window** nas Fatias 6 a 10.
+Este diretório contém pesquisa histórica, réguas, comportamento e regras levantadas para o **Agente Window**.
+
+> **⚠️ NUMERAÇÃO ANTIGA:** as pastas `fatia-07-input`, `fatia-08-streaming`, `fatia-09-tools` e `fatia-10-polish` usam a organização anterior a 2026-10-07. Elas são pesquisa bruta e **não definem os donos atuais**. A numeração vigente/proposta está em `docs/06`: 07 Tools CRUD, 08 Permissões, 09 Runtime, 10 Personalizações, 11 Worktree, 12 Polish e 13 Agent Host (proposta). Não executar trabalho pelo número dessas pastas sem remapear o conteúdo.
 
 ---
 

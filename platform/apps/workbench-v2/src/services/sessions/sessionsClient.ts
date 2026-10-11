@@ -34,6 +34,7 @@ export async function persistSession(session: Session): Promise<void> {
 }
 
 export interface WorkspaceDescriptor { path: string; slug: string; name: string; isGit: boolean }
+export interface WorkspaceDirectoryEntry { name: string; path: string }
 export interface CreatedWorktree { slug: string; path: string | null; branch: string | null; repoRoot: string }
 
 export async function validateSessionWorkspace(path: string): Promise<WorkspaceDescriptor> {
@@ -46,6 +47,11 @@ export async function validateSessionWorkspace(path: string): Promise<WorkspaceD
 export async function pickSessionWorkspace(): Promise<WorkspaceDescriptor | undefined> {
   const response = await expectOk(await fetch('/api/workspaces/pick', { method: 'POST' }))
   return ((await response.json()) as { workspace: WorkspaceDescriptor | null }).workspace ?? undefined
+}
+
+export async function listSessionWorkspaceDirectories(path: string): Promise<{ path: string; directories: WorkspaceDirectoryEntry[] }> {
+  const response = await expectOk(await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`))
+  return response.json() as Promise<{ path: string; directories: WorkspaceDirectoryEntry[] }>
 }
 
 export async function createSessionWorktree(workspacePath: string, slug: string, sessionId: string, useWorktree = false): Promise<CreatedWorktree> {

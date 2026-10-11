@@ -11,6 +11,39 @@
 5. Diga "homologada" ou liste o que falhou. A IA registra no `03` e no `07`.
 
 ---
+
+## Gate final FATIA 06 — roteiro de 5 minutos (Windows 5174 + Linux)
+
+### Windows 5174
+1. `+` > pasta: confirmar janela Explorer grande, redimensionável, com favoritos e barra de endereço; escolher uma pasta comum sem Git.
+2. Enviar a primeira mensagem: confirmar landing 768 px > histórico; no terminal executar `pwd`/`Get-Location` e conferir a pasta escolhida.
+3. Criar sessão em outra pasta, alternar sessões e conferir Explorer/Search/SCM e terminal; F5 deve restaurar cada raiz.
+4. Conta > Provedores: ativar cards, alterar Ollama, salvar, reabrir e confirmar persistência. O arquivo `~/.agente_window/providers.json` não pode conter `apiKey`.
+5. Excluir uma sessão: a pasta real permanece; não criar worktree/branch. Confirmar que Activity Bar e terminal continuam visualmente iguais.
+
+### Linux
+1. `+` > escolher pasta: se o seletor nativo falhar, deve aparecer “Digitar caminho”, sem bloquear a landing. Digitar `/` deve listar as pastas da raiz.
+2. Selecionar `home`, confirmar que `/home/` lista seu conteúdo e escolher uma pasta sem Git. Caminho inexistente/arquivo deve mostrar erro; pasta válida deve ser aceita.
+3. Enviar, alternar duas sessões e confirmar raiz do Explorer e `pwd` real no terminal; repetir após F5.
+4. Conta > Provedores deve abrir na área principal; salvar e reabrir OpenAI/Gemini/Ollama.
+5. Confirmar `~/.agente_window/providers.json` sem segredos e que a aplicação não chamou PowerShell no Linux.
+
+**Aceite:** os dez passos passam; qualquer falha deve citar sistema, passo e mensagem observada.
+
+## Resultado do gate — 06.4a homologada com ressalvas no Windows (2026-10-10)
+
+Roteiro usado no Windows real, porta 5174:
+
+1. **Pasta sem Git:** criar sessão apontando para uma pasta comum; confirmar que abre sem criar Git, branch, cópia ou worktree.
+2. **Pasta com Git:** criar sessão apontando diretamente para um repositório; confirmar que continua na pasta original e não cria branch/worktree no fluxo padrão.
+3. **Terminal:** em cada sessão, executar `pwd` e confirmar o caminho direto da pasta escolhida.
+4. **Troca de sessão:** alternar entre as duas sessões e confirmar que Explorer, Search e SCM passam a usar a raiz da sessão ativa.
+5. **F5:** recarregar e confirmar que sessões, pasta ativa e raízes corretas voltam sem duplicação.
+6. **Recentes:** abrir novamente o seletor e confirmar as pastas em recentes, sem duplicatas e na ordem mais recente.
+7. **Exclusão segura:** excluir uma sessão e confirmar que a pasta real permanece intacta; não pode apagar arquivos do usuário nem criar/remover worktree ou branch.
+
+**Resultado:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo. Itens **2, 6 e 7** não foram gravados, mas foram aceitos pelo usuário com base na validação local. A 06.4b está liberada. Dívidas: seletor pequeno/somente pasta → Fatia 12; texto/apresentação da landing → Fatia 12.
+
 # PARTE A — O que cada coisa precisa provar (antigo 07 — Matriz de Validação)
 ## Objetivo
 Definir como cada subsistema e cada onda do backlog serão validados, com prioridade para typecheck, testes focados, probes e E2E real.

@@ -13,12 +13,13 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { createSessionWorktree, listSessionWorkspaceDirectories, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
+import { ProvidersView } from './components/ProvidersView'
 import {
   closeCustomView,
   customViewTitle,
@@ -237,6 +238,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [newSessionLanding, setNewSessionLanding] = useState(false)
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
+  const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
   const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
     ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
@@ -1077,6 +1079,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const openBrowser = () => createBrowser()
+  const openProviders = () => {
+    openEditorTab('providers', { title: 'Provedores' })
+    setEditorHidden(false)
+  }
   // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
   // menu "+" ativam a view `search` (sem alternar) e pedem foco ao módulo. A aba "Search"
   // do editor central não é mais criada.
@@ -1311,13 +1317,22 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify('Nova sessão pronta para escolher contexto')
   }
 
+  const handleValidateWorkspacePath = async (path: string) => {
+    const workspace = await validateSessionWorkspace(path)
+    setSelectedWorkspace(workspace)
+    notify(`Workspace selecionado: ${workspace.path}`)
+  }
+  const handleListWorkspaceDirectories = useCallback(async (path: string) => (await listSessionWorkspaceDirectories(path)).directories, [])
+
   const handlePickWorkspace = async () => {
     setWorkspacePickerPending(true)
     try {
       const workspace = await pickSessionWorkspace()
       if (workspace) setSelectedWorkspace(workspace)
+      setWorkspaceNativePickerAvailable(true)
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Falha ao escolher repositório')
+      setWorkspaceNativePickerAvailable(false)
+      notify('Seletor nativo indisponível. Digite o caminho da pasta manualmente.')
     } finally {
       setWorkspacePickerPending(false)
     }
@@ -1820,7 +1835,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={fileSystemSupported}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} onValidateWorkspacePath={handleValidateWorkspacePath} onListWorkspaceDirectories={handleListWorkspaceDirectories} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -1890,6 +1905,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onNewDiff={() => openDiff(activeSession.id)}
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
+      providersSurface={<ProvidersView />}
       onNavigateBrowser={navigateBrowser}
       onBrowserBack={browserBack}
       onBrowserForward={browserForward}
@@ -1964,7 +1980,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
-        onAccountAction={notify}
+        onAccountAction={(action) => action === 'open-providers' ? openProviders() : notify(action)}
       />
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
         <SessionSidebar

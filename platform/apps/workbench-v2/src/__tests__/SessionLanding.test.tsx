@@ -8,7 +8,10 @@ describe('SessionLanding (estado inicial vazio)', () => {
     render(<SessionLanding workspace="vscode-main" onSubmit={() => {}} />)
     expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
     expect(screen.getByText('vscode-main')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toBeInTheDocument()
+    const composer = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    expect(composer).toBeInTheDocument()
+    expect(composer).toHaveFocus()
+    expect(document.querySelector('.session-landing-center')).toBeInTheDocument()
   })
 
   it('mantém o botão enviar desabilitado enquanto o input está vazio', () => {
@@ -73,9 +76,16 @@ describe('SessionLanding (estado inicial vazio)', () => {
     expect(input).toHaveValue('mensagem preservada')
   })
 
-  it('explica que a escolha é de pasta real do disco', () => {
-    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={() => {}} />)
-    expect(screen.getByText(/escolher pasta real do disco/i)).toBeInTheDocument()
+  it('explica a escolha e permite caminho manual validado quando o diálogo não existe', async () => {
+    const user = userEvent.setup(); const onValidateWorkspacePath = vi.fn().mockResolvedValue(undefined)
+    const onListWorkspaceDirectories = vi.fn().mockResolvedValue([{ name: 'home', path: '/home' }, { name: 'tmp', path: '/tmp' }])
+    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={() => {}} onValidateWorkspacePath={onValidateWorkspacePath} onListWorkspaceDirectories={onListWorkspaceDirectories} isFileSystemSupported={false} />)
+    expect(screen.getByText(/seletor nativo não está disponível/i)).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox', { name: 'Caminho manual do workspace' }), '/')
+    await user.click(await screen.findByRole('option', { name: /home/ }))
+    expect(screen.getByRole('combobox', { name: 'Caminho manual do workspace' })).toHaveValue('/home/')
+    await user.click(screen.getByRole('button', { name: 'Usar pasta' }))
+    expect(onValidateWorkspacePath).toHaveBeenCalledWith('/home/')
   })
 
   it('suporta bloqueio explícito com motivo sem chamar o seletor', async () => {
