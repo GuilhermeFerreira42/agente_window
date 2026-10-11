@@ -116,4 +116,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-FATIA-05 "Chassis-Right" **100 % homologada no Windows em 2026-10-02**. **Fatia 06 — Workspace Simples & Chat Real — EM EXECUÇÃO por subfatia:** 06.4a implementada e aguardando homologação no Windows real; não iniciar 06.4b antes dessa aprovação explícita.
+FATIA-05 "Chassis-Right" **100 % homologada no Windows em 2026-10-02**. **Fatia 06 — Workspace Simples & Chat Real — EM EXECUÇÃO por subfatia:** 06.4a homologada com ressalvas no Windows real em 2026-10-10; 06.4b está liberada como próxima subfatia.

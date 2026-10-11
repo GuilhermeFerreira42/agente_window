@@ -12,9 +12,9 @@
 
 ---
 
-## Gate atual — homologação manual da 06.4a no Windows
+## Resultado do gate — 06.4a homologada com ressalvas no Windows (2026-10-10)
 
-A 06.4b só pode começar depois que este roteiro passar no Windows real, porta 5174:
+Roteiro usado no Windows real, porta 5174:
 
 1. **Pasta sem Git:** criar sessão apontando para uma pasta comum; confirmar que abre sem criar Git, branch, cópia ou worktree.
 2. **Pasta com Git:** criar sessão apontando diretamente para um repositório; confirmar que continua na pasta original e não cria branch/worktree no fluxo padrão.
@@ -24,7 +24,7 @@ A 06.4b só pode começar depois que este roteiro passar no Windows real, porta 
 6. **Recentes:** abrir novamente o seletor e confirmar as pastas em recentes, sem duplicatas e na ordem mais recente.
 7. **Exclusão segura:** excluir uma sessão e confirmar que a pasta real permanece intacta; não pode apagar arquivos do usuário nem criar/remover worktree ou branch.
 
-**Passou:** todos os sete itens funcionam. **Falhou:** anotar item, pasta e comportamento observado. Até o usuário declarar “06.4a homologada”, o próximo passo continua bloqueado.
+**Resultado:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo. Itens **2, 6 e 7** não foram gravados, mas foram aceitos pelo usuário com base na validação local. A 06.4b está liberada. Dívidas: seletor pequeno/somente pasta → Fatia 12; texto/apresentação da landing → Fatia 12.
 
 # PARTE A — O que cada coisa precisa provar (antigo 07 — Matriz de Validação)
 ## Objetivo

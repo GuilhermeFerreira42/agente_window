@@ -1192,6 +1192,15 @@ describe('App session flows', () => {
     await waitFor(() => {
       expect(sessionRow('implementar o fluxo de rascunho de sessão')).toBeTruthy()
     })
+    // 06.4b: o primeiro envio desmonta o Empty State e revela o histórico
+    // flexível da sessão, já contendo a mensagem que iniciou a conversa.
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Nova sessão' })).not.toBeInTheDocument()
+      expect(
+        screen.getAllByText('implementar o fluxo de rascunho de sessão')
+          .some((node) => node.closest('.chat-message.is-request')),
+      ).toBe(true)
+    })
     // O título antigo do draft não sobra na lista.
     expect(screen.queryByText('Nova sessão', { selector: '.session-title-text' })).not.toBeInTheDocument()
   })

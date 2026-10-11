@@ -1313,6 +1313,10 @@ svg {
   border-radius: var(--vscode-cornerRadius-large);
 }
 
+.session-landing-input:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+
 .session-landing-textarea {
   width: 100%;
   min-height: 24px;

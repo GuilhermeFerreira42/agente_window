@@ -169,4 +169,4 @@ A homologação humana está no `08`. Esta seção registra somente o que a IA d
 - Alvo da 06.4a: 71 pass / 13 skip.
 - Suíte completa: **722 pass / 9 falhas preexistentes / 16 skip**.
 - Playwright terminal: 3/3.
-- Homologação no Windows real: **ainda falta**; até passar, 06.4b permanece bloqueada.
+- Homologação no Windows real: **concluída com ressalvas em 2026-10-10**; itens 1/3/4/5 comprovados em vídeo e 2/6/7 aceitos pelo usuário com base na validação local. 06.4b liberada.

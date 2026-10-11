@@ -14,7 +14,7 @@
 ### Subfatias
 - **06.1 — Persistência híbrida:** concluída e homologada.
 - **06.2/06.3 — worktree obrigatório:** código preservado como rota opcional futura; referência arquivada em `docs/arquivo_morto/fatia-06-worktree/`.
-- **06.4a — Workspace simples sem worktree obrigatório:** fluxo padrão aceita qualquer diretório, terminal direto, recentes e persistência nullable.
+- **06.4a — Workspace simples sem worktree obrigatório:** concluída e homologada com ressalvas no Windows em 2026-10-10; fluxo padrão aceita qualquer diretório, terminal direto, recentes e persistência nullable.
 - **06.4b — Empty State 768 px centralizado + transição para histórico.**
 - **06.4c — Tela de Provedores:** OpenAI, Gemini e Ollama local.
 
@@ -87,6 +87,8 @@ Regras: nenhuma fatia perde conteúdo; worktree sai da 06/10 e vai à 11; Tools 
 - **P9 — mobile/single-pane** sem Explorer (D2.61): não revisitado.
 - **D2.72 — campo `auxiliaryVisible` órfão** no domínio (aceito como fechado para a Fatia 5; limpeza sem efeito visual na Fatia 12 — Polish Visual & Ruflo).
 - **Dívidas de layout pós-MVP:** pequenos ajustes de fidelidade visual vistos na homologação Windows → Fatia 12 — Polish Visual & Ruflo (não listar; não bloqueiam).
+- **Dívida visual 06.4a — seletor de pasta:** diálogo atual é pequeno e aceita somente pasta; referência original permite arquivo ou pasta → Fatia 12.
+- **Dívida visual 06.4a — landing:** alinhar texto/apresentação ao original → Fatia 12.
 
 ### 3.2 Débitos D2.x ainda abertos (copiados do backlog, para não perder)
 | # | Item | Status | Fase |

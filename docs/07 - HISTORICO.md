@@ -2,6 +2,17 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-10 - FATIA 06.4b implementada localmente
+- Reutilizado `SessionLanding.tsx` no Empty State já centralizado com `max-width: 768px`; composer ganhou foco inicial e borda de foco por token do VS Code.
+- O teste de integração agora comprova a transição: o primeiro envio desmonta a região “Nova sessão”, cria a sessão e exibe a mensagem inicial no histórico flexível.
+- Gates: typecheck verde; `SessionLanding.test.tsx` 11/11; teste focado de transição em `App.test.tsx` 1/1. Uma execução ampla de `App.test.tsx` também expôs uma falha intermitente preexistente no cancelamento entre nested chats; a asserção nova foi corrigida e passou isoladamente.
+- Próximo gate: homologação da 06.4b no Windows real 5174; 06.4c não iniciada.
+
+## 2026-10-10 - FATIA 06.4a homologada com ressalvas no Windows
+- Usuário homologou a 06.4a: vídeo comprovou itens 1, 3, 4 e 5 do roteiro (`Downloads`, `Imagens`, `Desktop`, PWD direto, Explorer acompanhando a troca e F5 restaurando). Itens 2, 6 e 7 não foram gravados e foram aceitos com base nos testes locais.
+- Duas dívidas visuais registradas: seletor atual pequeno e restrito a pastas → Fatia 12; texto/apresentação da landing deve ser alinhado ao original → Fatia 12.
+- **06.4b liberada** como próximo passo. Nenhum código foi alterado neste registro.
+
 ## 2026-10-10 - Coerência canônica de estado, roadmap e homologação
 - Alinhados `01`–`09` ao estado real da Fatia 06: 06.4a aguarda homologação Windows e bloqueia o início da 06.4b. O roteiro humano está no `08`; estado, roadmap e decisões pendentes ficam no `03` e `06`.
 - D39–D55 saíram do arquivo de decisões fechadas e passaram a “Decisões a deliberar” em `06 §2.3`. A Fatia 13 permanece proposta até deliberação D55. Especificação de layout e inventário de gaps continuam em `pesquisa_bruta/`.

@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-10 · BASE: `f2ff5a3` · 06.4a implementada, validada localmente e commitada · aguardando homologação Windows**
+**ATUALIZADO EM: 2026-10-10 · BASE: `f2ff5a3` · 06.4a homologada no Windows · 06.4b implementada localmente, aguardando homologação**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
@@ -10,10 +10,10 @@
   - **06.1 Persistência Híbrida — ✅ homologada no Windows real 5174 em 2026-10-06:** commits `c9e1f0c` + reparo `9ba48db`; SQLite em `~/.agente_window/agente_window.db`, JSONL por sessão e restauração após F5 comprovados pelo usuário.
   - **06.2 Worktree + troca de diretório + fix UI — ✅ homologada no Windows real 5174 em 2026-10-06:** commit `f1afebd`; vídeo 12:06 comprovou `+` abrindo a landing contínua, duas sessões com `pwd` em worktrees distintos, troca automática de cwd pelo picker e restauração de sessões/worktrees após F5.
   - **06.3 — concluída tecnicamente; rota revisada pela 06.4a:** seletor nativo do servidor preservado; worktree deixa de ser obrigatório e fica desligado por padrão para reativação opcional na Fatia 11.
-  - **06.4a — ✅ implementação e validação local concluídas; aguardando homologação Windows:** qualquer pasta com/sem Git, `worktree_path=NULL`, branch nula, terminal direto, recentes em `recent-workspaces.json`, exclusão simples e migração SQLite. D38 autoriza `POST /fs/workspace` aditivo: Explorer/Search/SCM trocam a raiz real ao mudar sessão, sem alterações visuais.
-  - **06.4b — próxima somente após gate:** Empty State 768 px centralizado + transição para histórico, reutilizando `SessionLanding.tsx`.
+  - **06.4a — ✅ homologada com ressalvas no Windows real em 2026-10-10:** vídeo comprovou itens 1, 3, 4 e 5 do `08` (Downloads/Imagens/Desktop, PWD direto, Explorer acompanhando a sessão e restauração após F5). Itens 2, 6 e 7 não foram gravados; aceitos pelo usuário com base na validação local. Fluxo mantém `worktree_path=NULL`, branch nula, recentes e exclusão simples.
+  - **06.4b — ✅ validada localmente, pronta para homologação no Windows 5174:** `SessionLanding.tsx` reutilizado no Empty State centralizado de largura máxima 768 px; composer recebe foco inicial e realce por `focus-within`; primeiro envio desmonta a landing e revela o histórico flexível já com a mensagem inicial. Typecheck verde e testes focados 12/12. Commit `acdcf39` valida implementação; próximo passo = homologar no Windows real 5174.
   - **06.4c — futura:** Tela de Provedores OpenAI, Gemini e Ollama local; não confundir Provedores com Agentes.
-  - **Próximo gate:** homologação da 06.4a no Windows real 5174; não iniciar 06.4b antes da aprovação explícita do usuário.
+  - **Próximo gate:** homologar a 06.4b no Windows real 5174 e parar; não iniciar a 06.4c antes dessa autorização.
 - **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
 - **Fatias 07 a 12 + proposta de Fatia 13:** escopos **mapeados**, ainda não prontos nem iniciados. A Fatia 13 é proposta para Agent Host & Multi-host e depende da deliberação D55 no `06`. A especificação construtível de Personalizações está em `docs/arquivo_morto/pesquisa_bruta/especificacao-layout-personalizacoes-2026-10-10.md`; D39–D55 permanecem pendentes de deliberação no `06`. Pastas `fatia-07-input` a `fatia-10-polish` em `pesquisa_bruta/` usam a numeração antiga e não definem os donos atuais.
 - Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
