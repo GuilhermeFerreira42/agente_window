@@ -2,16 +2,20 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { ptyPlugin } from './vite-plugin-pty'
 import { fsPlugin } from './src/modules/explorer-search/server'
+import { sessionPersistencePlugin } from './src/server/session-persistence'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
 
 export default defineConfig({
   plugins: [
     react(),
     ptyPlugin(),
+    sessionPersistencePlugin({ repoRoot }),
     // FATIA-04 (4.3): FileSystemPort no Single Port (Q7). Raiz = repo
     // (relativa ao próprio config — NUNCA hardcoded); FS_TEST_ROOT E2E ganha.
-    fsPlugin({ root: fileURLToPath(new URL('../../..', import.meta.url)) }),
+    fsPlugin({ root: repoRoot }),
   ],
   resolve: {
     alias: {

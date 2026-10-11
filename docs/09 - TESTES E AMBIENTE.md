@@ -3,7 +3,7 @@
 > **Leia a §1 antes de rodar qualquer spec.** Specs de fixture (`12*`, `13*`, `14*` menos `14b_git_smoke`) **só na 5175**; na 5174 elas apagam arquivos reais do repo. Um Vite por vez (RAM). Reseed antes de cada spec de fixture.
 
 
-**Reorganizado:** 2026-10-03 (antigo `26`, conteúdo íntegro; números de testes atualizados em 2026-10-02: vitest 701/9/16, bateria 15 suítes + T39) · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `0e36af4` + c2 em working tree.
+**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-10 · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `f2ff5a3` (06.4a). Números mais recentes medidos: 722 pass / 9 falhas preexistentes / 16 skip.
 **Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 
 ---
@@ -64,7 +64,7 @@ Todos testam rótulos/atributos do terminal **anteriores** à homologação `COM
 **Regra:** não corrigir código do terminal (intocável). Destino dos testes = decisão do usuário (`docs/arquivo_morto/25_ESTADO_ATUAL_E_PENDENCIAS_FATIA-05.md (histórico) §6 P3/P4`). Até lá: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
 
 ### 2.5 Números esperados hoje
-- **Vitest:** `npx vitest run` → **692 passed / 9 failed / 16 skipped / 717** desde a 5.3 `2bd6cc3` (os 9 = `TerminalPanel.test.tsx`; os 16 skipped = D2.60: 2 "Workspace Files" (c3) + 4 aba Search (5.2) + 10 maquete "Changes N" (5.3: App.test 7, iconLabels 2, coverageIntegration 1)). Antes: 702/9/6 (5.2), 706/9/2 (c3). Qualquer número diferente de 9 falhas ou 16 skips é regressão.
+- **Vitest no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas continuam preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos.
 - **Bateria §9 (14 suítes):** 5175 → 15 (16) · 13_search (14) · 13_search_backend (6) · 14 (16) · 14c (2 + 4 skip) · 14d (5) · 14b_git_changes (9 + 2 skip) · 14b_git_backend (7) · 12_explorer_fs_backend (10) · 11_terminal_pty_real (6) · 12_explorer (30); 5174 → 11_terminal_interactive_v2 (3) · 14b_git_smoke (1). **Verde duas vezes** na 5.2 e na 5.3 (pré e pós-commit).
 - **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
 - **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
@@ -146,31 +146,27 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 
 ---
 
-## 6. Homologação e Testes da FATIA-06 (Fatia 06.6)
+## 6. Validação técnica atual da FATIA 06.4a
 
-A homologação da Fatia 06 valida o funcionamento real de sessões, persistência híbrida e worktree sem dados mockados.
+A homologação humana está no `08`. Esta seção registra somente o que a IA deve conferir antes de entregar o gate Windows.
 
-### 6.1 Ambiente de Teste
-- **Servidor:** Vite na porta **5174 real** (`platform/apps/workbench-v2/`).
-- **Validação de Tipos:** `npm run typecheck` com 0 erros.
+### 6.1 Ambiente
+- Vite na porta **5174 real**.
+- `npm run typecheck` com 0 erros.
+- Specs de fixture nunca apontam para 5174.
 
-### 6.2 Bateria de Testes de Fumaça (Smoke Tests da 06.6):
-1. **Criação via `+` GLOBAL:**
-   - Clicar no botão `+` GLOBAL no topo;
-   - Validar abertura do Empty State de 768px ("Como posso ajudar?");
-   - Digitar mensagem inicial e submeter;
-   - Verificar criação da pasta isolada `untitled-<timestamp>` via `git worktree add`;
-   - Validar registro no SQLite (`agente_window.db`) e criação do primeiro arquivo `.jsonl`.
-2. **Persistência e Recarga (F5):**
-   - Recarregar a página (F5);
-   - Verificar que a conversa recém-criada continua listada na barra lateral com seu título e que as mensagens são restauradas do JSONL.
-3. **Múltiplas Conversas no Mesmo Projeto (`+` Dentro da Pasta):**
-   - Na lista lateral, clicar no `+` dentro do projeto criado;
-   - Criar uma 2ª e uma 3ª conversa;
-   - Inspecionar o sistema de arquivos e validar que existem 3 arquivos `.jsonl` distintos dentro do mesmo diretório `<slug>/` (`~/.agente_window/projects/<slug>/`).
-4. **Session Picker (Buscador Central):**
-   - Clicar na barra superior `@Nova sessão` ou acionar a busca;
-   - Validar renderização do modal com os 3 grupos: **NEEDS INPUT**, **RECENTLY OPENED** e **OTHER SESSIONS**;
-   - Digitar termo no filtro e conferir que filtra tanto no modal quanto na lista lateral;
-   - Clicar em um item: validar `setActiveSession()`, carga do JSONL, fechamento do modal e **chaveamento automático do `cwd` do Terminal PTY** para a pasta da worktree ativa.
+### 6.2 Checklist técnico da 06.4a
+1. Pasta sem Git é aceita com `useWorktree=false`, `worktree_path=NULL`, branch ausente e PWD direto.
+2. Pasta Git também usa o diretório original no fluxo padrão; não cria branch/worktree.
+3. Trocar sessão chama `POST /fs/workspace { path }` e atualiza Explorer/Search/SCM para a raiz ativa.
+4. F5 restaura sessões e workspace ativo sem duplicação.
+5. Recentes ficam em `~/.agente_window/recent-workspaces.json`, máximo 10 e sem duplicatas.
+6. Excluir sessão sem worktree remove apenas persistência; nunca remove a pasta real.
+7. `useWorktree=true` em pasta sem Git falha com `worktree_requires_git`, sem fallback silencioso.
 
+### 6.3 Último resultado medido
+- Typecheck: 0.
+- Alvo da 06.4a: 71 pass / 13 skip.
+- Suíte completa: **722 pass / 9 falhas preexistentes / 16 skip**.
+- Playwright terminal: 3/3.
+- Homologação no Windows real: **ainda falta**; até passar, 06.4b permanece bloqueada.

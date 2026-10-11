@@ -1264,13 +1264,13 @@ svg {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  /* Sem bordas laterais: o fundo é contínuo quando não há painéis. */
-  background: var(--vscode-editor-background);
+  /* FATIA-06.2: herda a superfície do chat para não criar uma faixa de cor. */
+  background: transparent;
 }
 
 .session-landing-center {
   width: 100%;
-  max-width: 720px;
+  max-width: 768px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -4564,6 +4564,17 @@ svg {
 }
 .session-landing-chip.is-clickable:active {
   transform: translateY(0px);
+}
+.session-landing-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
+}
+.session-landing-workspace-hint {
+  margin: 0 0 16px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  text-align: center;
 }
 
 /* Browser real - error banners honestos */

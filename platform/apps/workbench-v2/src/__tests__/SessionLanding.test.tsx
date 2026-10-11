@@ -8,7 +8,10 @@ describe('SessionLanding (estado inicial vazio)', () => {
     render(<SessionLanding workspace="vscode-main" onSubmit={() => {}} />)
     expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
     expect(screen.getByText('vscode-main')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toBeInTheDocument()
+    const composer = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    expect(composer).toBeInTheDocument()
+    expect(composer).toHaveFocus()
+    expect(document.querySelector('.session-landing-center')).toBeInTheDocument()
   })
 
   it('mantém o botão enviar desabilitado enquanto o input está vazio', () => {
@@ -45,6 +48,44 @@ describe('SessionLanding (estado inicial vazio)', () => {
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), '   ')
     await user.keyboard('{Enter}')
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('aciona o seletor de workspace do servidor', async () => {
+    const user = userEvent.setup(); const onPickWorkspace = vi.fn()
+    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
+    await user.click(screen.getByRole('button', { name: /Workspace atual: workspace-local/ }))
+    expect(onPickWorkspace).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra o nome do repositório selecionado', () => {
+    render(<SessionLanding workspace="repo-b" onSubmit={() => {}} onPickWorkspace={() => {}} />)
+    expect(screen.getByRole('button', { name: /Workspace atual: repo-b/ })).toBeInTheDocument()
+  })
+
+  it('bloqueia novos cliques enquanto o diálogo nativo está pendente', () => {
+    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={() => {}} workspacePickerPending />)
+    const button = screen.getByRole('button', { name: /Workspace atual: workspace-local/ })
+    expect(button).toBeDisabled(); expect(button).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('mantém o composer utilizável enquanto há seletor de workspace', async () => {
+    const user = userEvent.setup()
+    render(<SessionLanding workspace="repo-a" onSubmit={() => {}} onPickWorkspace={() => {}} />)
+    const input = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    await user.type(input, 'mensagem preservada')
+    expect(input).toHaveValue('mensagem preservada')
+  })
+
+  it('explica que a escolha é de pasta real do disco', () => {
+    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={() => {}} />)
+    expect(screen.getByText(/escolher pasta real do disco/i)).toBeInTheDocument()
+  })
+
+  it('suporta bloqueio explícito com motivo sem chamar o seletor', async () => {
+    const user = userEvent.setup(); const onPickWorkspace = vi.fn()
+    render(<SessionLanding workspace="workspace-local" onSubmit={() => {}} onPickWorkspace={onPickWorkspace} workspaceSelectionDisabledReason="Política administrativa" />)
+    const button = screen.getByRole('button', { name: /Política administrativa/ })
+    expect(button).toBeDisabled(); await user.click(button); expect(onPickWorkspace).not.toHaveBeenCalled()
   })
 })
 

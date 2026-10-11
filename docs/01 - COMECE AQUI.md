@@ -21,8 +21,8 @@ agente_window/
     ├── 02 - VISAO GERAL.md               ← o que é o projeto, stack, onde está cada coisa (curto)
     ├── 03 - ESTADO ATUAL.md              ← onde a obra parou: HEAD, placar, pendências, próximo passo
     ├── 04 - ARQUITETURA E REGRAS DURAS.md← como é construído + o que é intocável (terminal, core/server, App.tsx)
-    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D25, A0.x, O13/O14) — não reabrir
-    ├── 06 - PROXIMAS FASES E DIVIDAS.md  ← o que ainda não começou (Fatia 6+) e dívidas técnicas
+    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D38, A0.x, O13/O14) — não reabrir
+    ├── 06 - PROXIMAS FASES E DIVIDAS.md  ← próximas subfatias/fatias, dívidas e decisões ainda a deliberar
     ├── 07 - HISTORICO.md                 ← changelog + diário de sessão (único lugar de histórico)
     ├── 08 - HOMOLOGACAO.md               ← DO HUMANO: o que cada fatia prova e quando está "pronto" (curto, sem comando)
     ├── 09 - TESTES E AMBIENTE.md         ← DA IA: 5174 × 5175, reseed, flakes, bateria, becos sem saída
@@ -116,4 +116,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-FATIA-05 "Chassis-Right" **100 % homologada no Windows em 2026-10-02** (HEAD de código `4ee0ed8`). **Fatia 6 — Chat Carcaça — PAUSADA, aguardando autorização explícita do dono.** Não iniciar.
+FATIA-05 "Chassis-Right" **100 % homologada no Windows em 2026-10-02**. **Fatia 06 — Workspace Simples & Chat Real — EM EXECUÇÃO por subfatia:** 06.4a implementada e aguardando homologação no Windows real; não iniciar 06.4b antes dessa aprovação explícita.

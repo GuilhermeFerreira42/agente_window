@@ -11,6 +11,21 @@
 5. Diga "homologada" ou liste o que falhou. A IA registra no `03` e no `07`.
 
 ---
+
+## Gate atual — homologação manual da 06.4a no Windows
+
+A 06.4b só pode começar depois que este roteiro passar no Windows real, porta 5174:
+
+1. **Pasta sem Git:** criar sessão apontando para uma pasta comum; confirmar que abre sem criar Git, branch, cópia ou worktree.
+2. **Pasta com Git:** criar sessão apontando diretamente para um repositório; confirmar que continua na pasta original e não cria branch/worktree no fluxo padrão.
+3. **Terminal:** em cada sessão, executar `pwd` e confirmar o caminho direto da pasta escolhida.
+4. **Troca de sessão:** alternar entre as duas sessões e confirmar que Explorer, Search e SCM passam a usar a raiz da sessão ativa.
+5. **F5:** recarregar e confirmar que sessões, pasta ativa e raízes corretas voltam sem duplicação.
+6. **Recentes:** abrir novamente o seletor e confirmar as pastas em recentes, sem duplicatas e na ordem mais recente.
+7. **Exclusão segura:** excluir uma sessão e confirmar que a pasta real permanece intacta; não pode apagar arquivos do usuário nem criar/remover worktree ou branch.
+
+**Passou:** todos os sete itens funcionam. **Falhou:** anotar item, pasta e comportamento observado. Até o usuário declarar “06.4a homologada”, o próximo passo continua bloqueado.
+
 # PARTE A — O que cada coisa precisa provar (antigo 07 — Matriz de Validação)
 ## Objetivo
 Definir como cada subsistema e cada onda do backlog serão validados, com prioridade para typecheck, testes focados, probes e E2E real.

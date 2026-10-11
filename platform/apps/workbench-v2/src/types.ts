@@ -48,12 +48,16 @@ export interface Session {
   title: string
   workspace: string
   workspacePath: string
+  /** Stable filesystem-safe project key used by SQLite and JSONL storage. */
+  slug?: string
+  /** Optional isolated directory; null/absent means direct workspace mode. */
+  worktreePath?: string | null
   section: SessionSection
   status: SessionStatus
   updated: string
   diffAdded: number
   diffRemoved: number
-  branch: string
+  branch: string | null
   pinned?: boolean
   unread?: boolean
   archived?: boolean

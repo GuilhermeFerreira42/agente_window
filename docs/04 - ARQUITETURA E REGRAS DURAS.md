@@ -12,7 +12,16 @@
 7. RAM ~1,9 GB: **um Vite por vez**; proibido buildar VS Code/code-server; runtimes/clones em `~/.cache`.
 8. Princípio **LEGO**: módulos prontos são reposicionados, nunca reescritos. Nada em `legacy/` (removida pelo usuário; não restaurar).
 
-## 1.1 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
+## 1.1 Decisão 06.3 — seletor nativo de repositório (2026-10-06)
+- **Inspeção técnica:** `workbench-v2` é Vite/React puro; não há `tauri.conf`, pacote `@tauri-apps` nem runtime Tauri. Portanto, `plugin-dialog` não se aplica.
+- **Opção C servidor:** no Windows, o plugin Vite chama `powershell.exe` via `child_process.execFile`, em modo STA, e abre `System.Windows.Forms.FolderBrowserDialog`.
+- **Fluxo padrão 06.4a:** o caminho deve existir, ser diretório e resolver por `realpath`. Git não é obrigatório. `git rev-parse --show-toplevel` só pode ser exigido quando a chamada explícita usar `requireGit=true`/`useWorktree=true` (worktree opcional da Fatia 11).
+- A operação fica em `src/server/session-persistence/`; a UI usa endpoint single-port dedicado. Cancelamento retorna resultado explícito, não cria draft e não altera a seleção atual.
+- **Proibido:** usar `FileSystemDirectoryHandle`/File System Access API para inferir caminho absoluto; aceitar caminho sem validação canônica; implementar o diálogo dentro de Explorer ou terminal.
+- Fora do Windows, o endpoint de diálogo responde “não suportado”; a validação de caminho e os testes backend continuam multiplataforma.
+- **D38 / exceção mínima autorizada:** `POST /fs/workspace { path }` pode recriar os hosts FS/Git com uma raiz canônica por sessão após validar `realpath` e diretório. Apenas o servidor e o wiring de `App.tsx` mudam; componentes visuais de Explorer/Search/SCM permanecem congelados.
+
+## 1.2 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
 - **OpenClaude como referência nativa de Runtime:** O repositório de referência `openclaude` é 100% **TypeScript / Bun / Node**, alinhando-se perfeitamente à stack do nosso produto (`platform/apps/workbench-v2/` em React + Vite + TypeScript).
 - **Sem necessidade de sidecar Go:** A raspagem prévia de `opencode` (Go + sqlc + goose) apontava para a necessidade de compilação de binários Go e processos sidecar em background. Com o OpenClaude, todos os serviços de persistência (`sessionStorage`), controle de chamadas (`doomLoop`), segurança (`permissions`), worktrees e providers são TypeScript nativo, permitindo integração direta via contratos na camada 2.1 (Motor / Agent Runtime), eliminando pontes IPC pesadas.
 
@@ -73,15 +82,15 @@ Contratos de layout das Fatias 01/02 (`.right-section` relativo, Titlebar 35 px,
 Qualquer IA que "consertar", mover ou apagar esses arquivos viola regra dura (`AGENTS.md §4.1`). Destino final só por ordem do usuário (P3/P4 em `docs/03 - ESTADO ATUAL.md`).
 
 ## 2b. Arquivados em `docs/arquivo_morto/` (2026-10-02)
-Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/00_COMO_LER…`, `docs/12-DOCUMENTACAO-VIVA`, `docs/14`, `docs/15`, histórico do terminal (`ANALISE_…`, `CORRECAO_…`, `comparacao-terminal/`, `historico_migracao_temporaria/`), `platform/apps/workbench-v2/tsc` e `test-results-debug/`. `shot.tmp.mjs` não existia; `legacy/` já não existe.
+Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquivo_morto/00_COMO_LER_ESTA_DOCUMENTACAO.md`, `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`, `docs/arquivo_morto/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/arquivo_morto/15_HANDOFF_PROMPT_PARA_NOVA_IA.md`, histórico do terminal (`ANALISE_…`, `CORRECAO_…`, `comparacao-terminal/`, `historico_migracao_temporaria/`), `platform/apps/workbench-v2/tsc` e `test-results-debug/`. `shot.tmp.mjs` não existia; `legacy/` já não existe.
 
 ## 3. Planos superados (histórico, não autoridade)
 | Caminho | Substituído por |
 |---|---|
 | `docs/arquivo_morto/FATIA-05_LAYOUT_BYTE_A_BYTE/05_00…05_06` (plano "Byte a Byte", Side Bar à esquerda, decisões A0.x) | `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` v1.1 (Chassis-Right) + `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/` |
 | Rascunhos "docs 21–23" citados em conversas | nunca entraram no repo; `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md` os absorveu |
-| `docs/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/15_HANDOFF_PROMPT_PARA_NOVA_IA.md` | ponto de entrada atual é `docs/00_COMECE_AQUI.md` → `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md` |
-| `docs/historico_migracao_temporaria/`, `docs/comparacao-terminal/`, `docs/ANALISE_TERMINAL_CODE_SERVER_CLONE.md`, `docs/CORRECAO_REGRESSAO_TERMINAL_V2.md` | histórico do terminal (FATIA-03), congelado em `docs/arquivo_morto/17_COMITE_TERMINAL_FIDELIDADE_2026-09-14.md`/`docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)` |
+| `docs/arquivo_morto/14_PRIMEIRA_FATIA_RECOMENDADA.md`, `docs/arquivo_morto/15_HANDOFF_PROMPT_PARA_NOVA_IA.md` | ponto de entrada atual é `docs/01 - COMECE AQUI.md` → `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md` |
+| `docs/arquivo_morto/historico_migracao_temporaria/`, `docs/arquivo_morto/comparacao-terminal/`, `docs/arquivo_morto/ANALISE_TERMINAL_CODE_SERVER_CLONE.md`, `docs/arquivo_morto/CORRECAO_REGRESSAO_TERMINAL_V2.md` | histórico do terminal (FATIA-03), congelado em `docs/arquivo_morto/17_COMITE_TERMINAL_FIDELIDADE_2026-09-14.md`/`docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)` |
 
 ## 4. Arquivos soltos em `platform/apps/workbench-v2/`
 | Arquivo | O que é | Destino |

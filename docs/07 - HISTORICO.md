@@ -2,6 +2,33 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-10 - Coerência canônica de estado, roadmap e homologação
+- Alinhados `01`–`09` ao estado real da Fatia 06: 06.4a aguarda homologação Windows e bloqueia o início da 06.4b. O roteiro humano está no `08`; estado, roadmap e decisões pendentes ficam no `03` e `06`.
+- D39–D55 saíram do arquivo de decisões fechadas e passaram a “Decisões a deliberar” em `06 §2.3`. A Fatia 13 permanece proposta até deliberação D55. Especificação de layout e inventário de gaps continuam em `pesquisa_bruta/`.
+- Skills/Instruções e caminhos foram verificados no `microsoft/vscode main` commit `cc3fec8`; o comportamento no VS Code 1.135 **não foi confirmado**. Pastas de pesquisa 07–10 foram marcadas como numeração antiga.
+
+## 2026-10-09 - Auditoria documental e referência bruta de Personalizações
+- Recebido e preservado em `docs/arquivo_morto/pesquisa_bruta/personalizacoes/` o mockup `vscode_agents_mockup_interativo (1).html` como ideia estrutural do usuário, sem tratá-lo como prova do VS Code original.
+- Corrigidas divergências entre a numeração antiga e a tabela oficial 06–12: removidos do estado atual o bloco obsoleto 06.3–06.6 e a ordem de criar `SESSION_PICKER.md`; Command Menu + Theme, Hardening e Release foram absorvidos pela Fatia 12, e Browser Runtime IA/CDP pela Fatia 09. Detalhes e mapeamento ficam no `06 §2.1`.
+- Naquele momento, Skills e Instruções no VS Code 1.135 ficaram **não verificadas**. A auditoria posterior confirmou caminhos no `microsoft/vscode main` commit `cc3fec8`, mas o comportamento no 1.135 continua não confirmado; as propostas resultantes estão no `06`, não no arquivo de decisões fechadas.
+
+## 2026-10-07 - FATIA 06.4a — correção de rota para workspace simples
+- Fluxo padrão passou a aceitar qualquer diretório com ou sem Git; `useWorktree=false`, sem branch/cópia, `worktree_path=NULL`, terminal direto e recentes em `~/.agente_window/recent-workspaces.json`.
+- Migração automática remove `NOT NULL` de `worktree_path`; exclusão sem worktree remove apenas persistência. `useWorktree=true` sem Git retorna HTTP 400 `worktree_requires_git`; implementação 06.2/06.3 foi preservada para a Fatia 11.
+- D38 autorizou alteração aditiva mínima no servidor FS: `POST /fs/workspace { path }` valida `realpath` e diretório, troca a raiz e recarrega Explorer/Search/SCM por sessão sem alterar componentes visuais.
+- Documentação reorganizou Fatias 07–12 sem implementar escopo futuro; referência de worktree arquivada em `docs/arquivo_morto/fatia-06-worktree/`.
+- Gates locais: typecheck 0; alvo 71 pass; suíte 722 pass + 9 falhas antigas de TerminalPanel; Playwright terminal 3/3; loop 5174 comprovou pastas Git/não-Git, PWD, Explorer, troca, F5, SQLite, exclusão e ausência de worktrees/branches.
+
+## 2026-10-06 - FATIAS 06.1 e 06.2 homologadas no Windows real
+- **06.1 homologada pelo usuário no Windows real, porta 5174:** persistência SQLite + JSONL e restauração após F5 comprovadas; commits `c9e1f0c` e reparo de respostas transitórias `9ba48db`.
+- **06.2 homologada pelo usuário no Windows real, porta 5174, por vídeo 12:06:** commit `f1afebd`; `+` abriu a landing sem divisão; duas sessões exibiram `pwd` em worktrees distintos; a troca pelo picker alterou automaticamente o cwd do terminal; F5 restaurou worktrees e sessões.
+- **06.3 implementada localmente e aguardando homologação Windows:** inspeção confirmou Vite puro, sem Tauri; decisão registrada em `docs/04`: `powershell.exe -STA` + `System.Windows.Forms.FolderBrowserDialog`, sem `FileSystemDirectoryHandle`.
+- Acrescentados validação server-side da raiz Git, criação a partir de outros repositórios, origem persistida separada do worktree e exclusão protegida/idempotente. Worktree sujo retorna 409, permanece íntegro e exige confirmação explícita para force.
+- Loop 5174 com repo-a/repo-b: PWD limpo e distinto, troca por sessão, F5, exclusão limpa e suja, SQLite/branches/diretórios zerados no fim. Gates: typecheck 0; backend 14/14; UI 11/11; App 45 pass; suíte 721 pass + 9 falhas antigas do terminal; Playwright terminal 3/3.
+- `worktree_path` persistido no SQLite; terminal ligado pela prop pública `workspace={activeSession.worktreePath ?? activeSession.workspace}` e remontado na troca de sessão para aplicar o novo cwd.
+- Landing sem divisão de cor, seletor de outros repositórios desabilitado até 06.3 e inspeção visual 1400×900 concluída.
+- Validação local: typecheck verde; App 45/45 executados; worktrees 3/3; suíte Vitest 704 pass / 9 falhas preexistentes de `TerminalPanel.test.tsx` / 16 skip; Playwright terminal real 3/3; SQLite, `git worktree list`, diretórios, `pwd`, troca de sessão e F5 comprovados.
+
 ## 2026-10-05 - Arquivamento da Pesquisa Bruta OpenClaude em fatia-06-chat/ e Limpeza (Antigravity)
 - Raspagem profunda do repositório `openclaude` em `C:\Users\Usuario\Desktop\ARENA\a\openclaude\` (TypeScript/Bun).
 - Todo o conteúdo de pesquisa foi arquivado em `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/`:

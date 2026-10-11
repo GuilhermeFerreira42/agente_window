@@ -13,7 +13,7 @@
 | D5 | Ícones na Activity Bar em 5.1 | **3** (Explorer, Search, Source Control). Browser só em 4.8 |
 | D6 (v1.2 — 2026-10-02) | AttachArea (editor real) | **Permanece fino à direita (AuxiliaryBar) como default — o chat é o foco principal.** Na 5.7 ganha o estado `editorMaximized` (A0.7, 2026-09-30): o botão maximizar do editor faz ele **tomar o centro e esconder o chat**; restaurar volta para `[chat][editor fino]`; persistido em `workbench.layoutState.v1`. **Maximizado = `[lista 300][EDITOR flex][Side Bar 274][Activity Bar 48]` — a Side Bar NÃO recolhe no maximize, só o chat some (decisão do usuário, homologação 2026-10-02; em 1400 px o editor mede ~767).** **Nunca** migra permanentemente para o centro (corrigido em A0.7 — a redação anterior "migra pro centro em 5.7" estava errada; ver §4 5.7 e fontes) |
 | D7 | Timeline/Outline | **Seções internas do Explorer**. Vazias em 5.1, reais em 5.6. **Não** são abas do painel inferior |
-| D8 | Numeração das fatias | **FATIA-06 = Chat + Runtime de Agente** (canônica) |
+| D8 | Numeração das fatias (histórica, superada) | Em 2026-10-03, **FATIA-06 = Chat + Runtime de Agente**. **SUPERADA** pela reorganização aprovada em 2026-10-07: Fatia 06 = **Workspace Simples & Chat Real**; runtime foi redistribuído, sem apagar o registro histórico. |
 | D9 | Gerenciador de pacotes | **npm** (não pnpm) |
 | D10 | Maquete "Changes N" + `src/shell/gitTransition.ts` | **Removidos na 5.3** |
 | D11 | Inversão futura da lista de conversas | **Chassi assimétrico**, mas `layoutState.position` já é gravado e `viewRegistry` aceita `container: 'left' \| 'right'` desde a 5.1 |
@@ -52,7 +52,7 @@
 ## 4. Decisões de processo (vigentes)
 - Fonte da verdade = repo/preview real; prints e vídeo do Windows prevalecem sobre doc.
 - `legacy/` removida pelo usuário (tag `legacy-backup-2026-09`): não restaurar, não referenciar.
-- Numeração canônica: FATIA-06 = Chat + Runtime de Agente (D8). Fatia 6 **pausada** até autorização.
+- Numeração canônica atual: FATIA-06 = **Workspace Simples & Chat Real**. Está **em execução por subfatia**; 06.4a aguarda homologação Windows e 06.4b continua bloqueada até aprovação explícita.
 - Testes de fixture (`12*/13*/14*`) nunca contra a 5174 (apagam arquivos reais).
 
 ## 5. Decisões de documentação (2026-10-03)
@@ -75,6 +75,8 @@
 | D31 | Modelo de Permissões e Proteção contra Loops | Modos `default`, `acceptEdits`, `plan`, `fullAccess`. Ações `allow`, `deny`, `ask`. Interface no chat com card inline e botões: **[Permitir]**, **[Não]**, **[Sempre na Sessão]** (`allow-session`). Implementação de `checkDoomLoop` travando loops repetitivos na **3.ª chamada idêntica**. |
 | D32 | Reset de Sessão | **Sem botão "Clear Chat" no MVP.** O OpenClaude opera estritamente com **Nova Conversa** (emite `session_cleared`, aloca novo UUID e zera a interface) e **Retomar Conversa** (carrega transcript do disco sem perder histórico). |
 | D33 | Provedores e Configuração | Arquivo de configuração em `~/.agente_window/providers.json`. Formulário estilo Cline integrado aos provedores nativos suportados (OpenAI, Gemini, NVIDIA, Mistral, Codex, Helicone, Ollama local e OpenCode Zen). |
-| D34 | Worktree e Isolamento (Fatia 06) | Criação de salas de trabalho isoladas via `git worktree add` em `.agente_window/worktrees/<slug>` com proteção contra path traversal. Symlinks automáticos para diretórios pesados (`node_modules`). **Chaveamento automático da raiz do terminal pty** para a pasta da worktree ativa. |
-| D35 | Workspace Vazio (Fatia 06/09) | Boot inicial com tela central vazia de **768 px**. Ao submeter mensagem sem workspace aberto, criação automática de pasta padrão em `~/agente_window/projects/untitled-<timestamp>/` como raiz do Explorer e do terminal. |
-
+| D34 | Worktree e Isolamento (revisada) | Worktree deixa de ser obrigatório no fluxo padrão. O código seguro de branch, path traversal, troca de PTY e exclusão 409 fica preservado, desligado por padrão, para a **Fatia 11 — Worktree Opcional**. |
+| D35 | Workspace Vazio (Fatia 06) | Boot inicial com tela central vazia de **768 px** e transição para histórico fica na 06.4b; provedores ficam na 06.4c. Não acoplar essas entregas à 06.4a. |
+| D36 | Workspace simples por padrão | Fluxo igual ao VS Code: aceita qualquer pasta com ou sem Git, sem cópia isolada e sem branch obrigatória. Worktree será opção futura na Fatia 11, somente com `useWorktree=true` e pasta Git. |
+| D37 | Concorrência no mesmo workspace | Múltiplas sessões podem apontar para o mesmo `workspacePath`. Não há lock nem isolamento no fluxo padrão; como no VS Code, o último que salvar vence. |
+| D38 | Raiz dinâmica por sessão | Autorizada raiz dinâmica por sessão no servidor FS para suportar workspace simples, via `POST /fs/workspace { path }`, com validação de existência, diretório e `realpath`. Alteração aditiva restrita ao servidor; UI do Explorer/Search/SCM permanece intocada. |

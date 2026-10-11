@@ -12,7 +12,8 @@ import { createShellCommandRegistry } from './domain/shellCommandRegistry'
 import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './components/ExplorerContextMenuHost'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
-import { initialProviders, initialSessions, searchResults as allSearchResults } from './data'
+import { initialProviders, searchResults as allSearchResults } from './data'
+import { createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -115,7 +116,7 @@ function isSinglePaneWidth(width: number): boolean {
   return viewportClass === 'phone' || viewportClass === 'tablet'
 }
 
-const firstSession = initialSessions[0]
+const BOOT_SESSION_ID = 'draft-empty'
 // 4.8-B3 (hotfix): o Browser NÃO abre por padrão — começar com uma aba Browser
 // ativa escondia a barra auxiliar (regra Browser→aux bar oculta) e cobria o
 // Explorer no boot. O estado "sem abas / sem browsers" já é válido (é o que
@@ -216,15 +217,28 @@ function AttachModuleSlot({ module, sessionId }: { module: IExplorerSearchModule
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="attach-module-slot" />
 }
 
-export default function App() {
-  const [sessions, setSessions] = useState<Session[]>(initialSessions)
+interface AppProps {
+  /** Test-only dependency injection; production always hydrates from SQLite. */
+  initialSessionSnapshot?: Session[]
+}
+
+export default function App({ initialSessionSnapshot }: AppProps = {}) {
+  const initialSnapshot = useRef(initialSessionSnapshot ?? [])
+  const initialSnapshotFirst = initialSnapshot.current[0]
+  const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
+  const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
   const persistedLayout = useRef(loadLayoutState())
-  const [activeSessionId, setActiveSessionId] = useState(firstSession.id)
+  const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? BOOT_SESSION_ID)
   // (E14/R-022/R-026) Sessions Part grid: ids das sessões visíveis lado a lado.
   // Por padrão só a sessão ativa é visível (arranjo single). Abrir uma sessão
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
-  const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>([firstSession.id])
-  const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSessions.map((session) => [session.id, session.mainChatId])))
+  const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
+  const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
+  const [newSessionLanding, setNewSessionLanding] = useState(false)
+  const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
+  const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
+  const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
+    ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -256,13 +270,54 @@ export default function App() {
   const explorerFsRef = useRef<BrowserFsPort | null>(null)
   const handleExplorerFileOpenedRef = useRef<(uri: WorkspaceUri) => void>()
   const explorerMenusRef = useRef(createShellCommandRegistry())
+
+  // FATIA-06.1: SQLite mantém o catálogo e um JSONL por sessão mantém o
+  // transcript. O primeiro render nasce vazio para nunca reintroduzir mocks.
+  useEffect(() => {
+    if (initialSessionSnapshot) return
+    const controller = new AbortController()
+    void loadPersistedSessions(controller.signal)
+      .then((restored) => {
+        if (controller.signal.aborted) return
+        setSessions(restored)
+        const first = restored[0]
+        setActiveSessionId(first?.id ?? BOOT_SESSION_ID)
+        setVisibleSessionIds(first ? [first.id] : [])
+        setActiveChatBySession(Object.fromEntries(restored.map((session) => [session.id, session.mainChatId])))
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) console.error('[sessions] hydration failed', error)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSessionsHydrated(true)
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!sessionsHydrated) return
+    const timer = window.setTimeout(() => {
+      void Promise.all(sessions.filter((session) => !session.isDraft).map(persistSession))
+        .catch((error: unknown) => console.error('[sessions] persistence failed', error))
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [sessions, sessionsHydrated])
+
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
   // FATIA-05 5.4 (RF-10): menu "Move Activity Bar …" — segundo host do mesmo menu de contexto do shell.
   const [activityBarMenu, setActivityBarMenu] = useState<ExplorerContextMenuState | null>(null)
   useEffect(() => {
     let cancelled = false
+    let mountedModule: IExplorerSearchModule | undefined
     void (async () => {
       try {
+        if (explorerWorkspacePath) {
+          const response = await fetch('/fs/workspace', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: explorerWorkspacePath }),
+          })
+          if (!response.ok) throw new Error(`Falha ao ativar workspace no Explorer (${response.status})`)
+        }
         const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
@@ -292,14 +347,18 @@ export default function App() {
           if (e.type === 'editor.attachRestored') layoutRef.current.setEditorMaximized(false)
         })
         restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
+        mountedModule = module
         setExplorerModule(module)
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
         console.warn('[explorer-search] boot: raiz não descoberta', err)
       }
     })()
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+      mountedModule?.dispose()
+    }
+  }, [explorerWorkspacePath])
   useEffect(() => {
     if (!explorerContextMenu) return
     const onDown = (ev: MouseEvent) => {
@@ -407,9 +466,9 @@ export default function App() {
   // abaixo são as fontes observáveis; um `autorun` (instalado no effect adiante)
   // detecta a troca real e dispara capturar/restaurar/suprimir. `liveLayoutRef`
   // espelha o estado renderizado da sessão que sai, para a captura lê-lo.
-  const activeSessionResourceObs = useRef(observableValue<string | undefined>('activeSessionResource', firstSession.id))
+  const activeSessionResourceObs = useRef(observableValue<string | undefined>('activeSessionResource', BOOT_SESSION_ID))
   const multipleSessionsVisibleObs = useRef(observableValue('multipleSessionsVisible', false))
-  const visibleSessionResourcesObs = useRef(observableValue<readonly string[]>('visibleSessionResources', [firstSession.id]))
+  const visibleSessionResourcesObs = useRef(observableValue<readonly string[]>('visibleSessionResources', [BOOT_SESSION_ID]))
   const liveLayoutRef = useRef<{ auxiliaryVisible: boolean; activeViewContainerId: 'changes' | 'files' }>({ auxiliaryVisible: persistedLayout.current.shell.auxiliaryVisible, activeViewContainerId: 'changes' })
   // E16 — AI Customizations: harness ativo + enablement dos built-ins (store
   // separado da descoberta). Estado por janela, como no original.
@@ -511,7 +570,7 @@ export default function App() {
   // The reference editor group remembers its active editor while a session is
   // swapped. Keep that memory for owned tabs and a separate pointer for shared
   // Search/file tabs that remain visible across sessions.
-  const activeTabBySession = useRef<Record<string, string>>(initialEditorTabs[0] ? { [firstSession.id]: initialEditorTabs[0].id } : {})
+  const activeTabBySession = useRef<Record<string, string>>(initialEditorTabs[0] ? { [BOOT_SESSION_ID]: initialEditorTabs[0].id } : {})
   const activeGlobalTabId = useRef<string | undefined>()
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
@@ -521,6 +580,7 @@ export default function App() {
   // A landing depende da lista primária (visível ao usuário) estar vazia; runs de
   // automação ficam fora da lista e, portanto, não contam para "há sessões".
   const hasSessions = sessions.some((session) => !session.automation)
+  const landingVisible = newSessionLanding || !hasSessions
   const draftSession = useMemo<Session>(() => ({
     id: 'draft-empty',
     title: 'Nova sessão',
@@ -563,7 +623,7 @@ export default function App() {
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed".
   // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
   const attachExpanded = hasSessions && !!explorerModule && attachExpandedSessions.includes(activeSession.id)
-  const sidePaneInputs = hasSessions
+  const sidePaneInputs = hasSessions && !landingVisible
     ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
     : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
   const sidePaneState = resolveSidePaneState(sidePaneInputs)
@@ -614,7 +674,7 @@ export default function App() {
           saveSessionLayouts(map)
         },
       },
-      { initialPreviousResource: firstSession.id },
+      { initialPreviousResource: BOOT_SESSION_ID },
     )
     layoutSyncRef.current = handle
     return () => {
@@ -719,6 +779,7 @@ export default function App() {
   }
 
   const selectSession = (id: string) => {
+    setNewSessionLanding(false)
     // (LAYOUT.md) Abrir uma sessão dispensa a custom view ativa e devolve as
     // parts cobertas ao estado que o usuário tinha escolhido.
     if (customView.activeView !== null) {
@@ -1243,89 +1304,65 @@ export default function App() {
   const setBrowserViewport = (id: string, viewport: BrowserViewport) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserViewportState(view, viewport) : view))
 
   const handleNewSession = () => {
-    const id = `new-${Date.now()}`
-    const chatId = `${id}-main`
-    // (R-002) O Management resolve o workspace (herda o da sessão ativa) e
-    // seleciona o provider dono para a nova sessão.
-    const workspace = activeSession.workspace || 'workspace-local'
-    const provider = selectProviderForNewSession(management.current, workspace)?.id ?? activeSession.provider ?? 'local'
-    // (R-003) A nova sessão nasce como DRAFT não-commitado: o Management passa a
-    // possuir o rascunho pendente (SESSIONS.md §Drafts / §New session). Ela só
-    // entra no catálogo commitado no primeiro envio (handleSend → commitDraft).
-    management.current = openDraft(management.current, {
-      id,
-      kind: 'workspace-session',
-      providerId: provider,
-      workspace,
-    })
-    // (R-BUG/Val2) Nova sessão herda o estado de aux bar do newSessionViewState,
-    // evitando que "Novo Chat" esconda as laterais quando o usuário tinha a aux
-    // bar aberta na sessão anterior.
-    const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryTab(seededLayout.activeViewContainerId)
-    const next: Session = {
-      id,
-      title: 'Nova sessão',
-      workspace,
-      workspacePath: activeSession.workspacePath || '~/workspace-local',
-      section: 'today',
-      status: 'completed',
-      updated: 'agora',
-      diffAdded: 0,
-      diffRemoved: 0,
-      branch: 'main',
-      provider,
-      isDraft: true,
-      chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-      mainChatId: chatId,
-    }
-    setSessions((current) => [next, ...current])
-    setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
-    setActiveSessionId(id)
-    // R-030 — criar sessão é uma transição "passiva" de layout: rebaseia o
-    // previous para a nova sessão, para o autorun não restaurar layout salvo
-    // (paridade com o comportamento anterior, em que criar não mexia na aux bar).
-    layoutSyncRef.current?.setPreviousResource(id)
+    // FATIA-06.2: o + GLOBAL abre sempre o mesmo SessionLanding validado.
+    // O rascunho e o worktree só passam a existir após a primeira mensagem.
+    setNewSessionLanding(true)
     setMobilePane('chat')
-    notify('Rascunho de sessão criado')
+    notify('Nova sessão pronta para escolher contexto')
+  }
+
+  const handlePickWorkspace = async () => {
+    setWorkspacePickerPending(true)
+    try {
+      const workspace = await pickSessionWorkspace()
+      if (workspace) setSelectedWorkspace(workspace)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Falha ao escolher repositório')
+    } finally {
+      setWorkspacePickerPending(false)
+    }
   }
 
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
-  const handleLandingSubmit = (text: string) => {
+  const handleLandingSubmit = async (text: string) => {
     const id = `new-${Date.now()}`
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
-    // (R-BUG/Val2) Sessão criada da landing herda o estado de aux bar do
-    // newSessionViewState.
-    const seededLayout = seedCreatedFromNewSession(newSessionState)
-    setAuxiliaryTab(seededLayout.activeViewContainerId)
-    const next: Session = {
-      id,
-      title,
-      workspace: 'workspace-local',
-      workspacePath: '~/workspace-local',
-      section: 'today',
-      status: 'completed',
-      updated: 'agora',
-      diffAdded: 0,
-      diffRemoved: 0,
-      branch: 'main',
-      chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-      mainChatId: chatId,
+    try {
+      const workspaceLabel = selectedWorkspace?.name ?? 'workspace-local'
+      const worktree = await createSessionWorktree(selectedWorkspace?.path ?? '', selectedWorkspace?.slug ?? 'workspace-local', id)
+      const seededLayout = seedCreatedFromNewSession(newSessionState)
+      setAuxiliaryTab(seededLayout.activeViewContainerId)
+      const next: Session = {
+        id,
+        title,
+        workspace: workspaceLabel,
+        workspacePath: worktree.repoRoot,
+        worktreePath: worktree.path,
+        slug: worktree.slug,
+        section: 'today',
+        status: 'completed',
+        updated: 'agora',
+        diffAdded: 0,
+        diffRemoved: 0,
+        branch: worktree.branch,
+        chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
+        mainChatId: chatId,
+      }
+      setSessions((current) => [next, ...current])
+      setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
+      setActiveSessionId(id)
+      setVisibleSessionIds([id])
+      setNewSessionLanding(false)
+      setSelectedWorkspace(undefined)
+      layoutSyncRef.current?.setPreviousResource(id)
+      setMobilePane('chat')
+      window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
+    } catch (error) {
+      console.error('[sessions] worktree creation failed', error)
+      notify(error instanceof Error ? error.message : 'Falha ao criar worktree da sessão')
     }
-    setSessions([next])
-    // A landing recria a lista do zero: descarta o mapa de chats ativos antigo
-    // (incluindo entradas de runs de automação) para não deixar referências órfãs.
-    setActiveChatBySession({ [id]: chatId })
-    setActiveSessionId(id)
-    // R-030 — landing recria a sessão do zero: transição passiva (sem restore).
-    layoutSyncRef.current?.setPreviousResource(id)
-    setMobilePane('chat')
-    // Após criar, envia a primeira mensagem para a sessão recém-criada. Passamos
-    // o alvo explícito porque o estado (activeSession) só reflete a nova sessão
-    // no próximo render — sem isso, a 1ª mensagem cairia no rascunho vazio.
-    window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
   }
 
   const handleToggleArchived = (id: string) => {
@@ -1360,7 +1397,24 @@ export default function App() {
     notify(`Sessão removida do grupo "${groupName}"`)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    try {
+      await removePersistedSession(id)
+    } catch (error) {
+      if (error instanceof SessionPersistenceError && error.code === 'worktree_dirty') {
+        const confirmed = window.confirm('Este worktree possui alterações locais. Excluir a sessão e descartar essas alterações?')
+        if (!confirmed) return
+        try {
+          await removePersistedSession(id, true)
+        } catch (forcedError) {
+          notify(forcedError instanceof Error ? forcedError.message : 'Falha ao remover worktree')
+          return
+        }
+      } else {
+        notify(error instanceof Error ? error.message : 'Falha ao excluir sessão')
+        return
+      }
+    }
     clearPendingTimersForSession(id)
     // (R-003) Excluir um draft abandonado descarta o rascunho pendente do
     // Management (deleteNewSession dispose — SESSIONS.md §Drafts).
@@ -1763,10 +1817,10 @@ export default function App() {
   }
 
   const renderChat = () => (
-    !hasSessions ? (
-      // Sessão vazia: o próprio painel central mostra o input centralizado
-      // (landing), mantendo sidebar e barra auxiliar intactas ao redor.
-      <SessionLanding workspace={activeSession.workspace} onSubmit={handleLandingSubmit} onPickWorkspace={handlePickDirectory} isFileSystemSupported={fileSystemSupported}
+    landingVisible ? (
+      // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
+      // servido pelo Vite; outros repositórios entram na 06.3.
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={fileSystemSupported}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -2066,10 +2120,11 @@ export default function App() {
               />
             )}
             <TerminalPanel
+              key={activeSession.id}
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={activeSession.workspace}
+              workspace={activeSession.worktreePath ?? activeSession.workspacePath}
               onClose={() => setTerminalVisible(false)}
             />
           </div>
