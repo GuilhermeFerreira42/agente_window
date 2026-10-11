@@ -1322,7 +1322,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setSelectedWorkspace(workspace)
     notify(`Workspace selecionado: ${workspace.path}`)
   }
-  const handleListWorkspaceDirectories = useCallback(async (path: string) => (await listSessionWorkspaceDirectories(path)).directories, [])
+  const handleListWorkspaceDirectories = useCallback(async (path: string) => (await listSessionWorkspaceDirectories(path)).folders, [])
 
   const handlePickWorkspace = async () => {
     setWorkspacePickerPending(true)

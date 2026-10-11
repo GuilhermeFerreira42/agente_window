@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
-import { readFile, readdir, realpath, stat, writeFile, mkdir } from 'node:fs/promises'
+import { readdirSync, realpathSync, statSync } from 'node:fs'
+import { readFile, realpath, stat, writeFile, mkdir } from 'node:fs/promises'
 import { basename, dirname, join, parse, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { getAppDir, sanitizePath } from './paths'
@@ -35,7 +36,10 @@ export async function validateWorkspace(pathInput: string, requireGit = false): 
 export async function rememberWorkspace(path: string): Promise<string[]> {
   let current: string[] = []
   try { current = JSON.parse(await readFile(recentPath(), 'utf8')) as string[] } catch { /* first use */ }
-  const next = [path, ...current.filter((item) => item !== path)].slice(0, 10)
+  const existing = current.filter((item) => {
+    try { return statSync(item).isDirectory() } catch { return false }
+  })
+  const next = [path, ...existing.filter((item) => item !== path)].slice(0, 10)
   await mkdir(dirname(recentPath()), { recursive: true })
   await writeFile(recentPath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8')
   return next
@@ -45,24 +49,34 @@ export async function listRecentWorkspaces(): Promise<string[]> {
   try { return (JSON.parse(await readFile(recentPath(), 'utf8')) as string[]).slice(0, 10) } catch { return [] }
 }
 
-export interface WorkspaceDirectoryEntry { name: string; path: string }
+export interface WorkspaceDirectoryEntry { name: string; path: string; isDir: true }
+export interface WorkspaceDirectoryListing { path: string; realpath: string; parent: string; folders: WorkspaceDirectoryEntry[]; error?: 'permission' | 'not_found' | 'not_directory' }
 
-/** Lista somente diretórios reais para o autocomplete do picker web.
- * O caminho pode ser absoluto ou `~`; erros/permissões são devolvidos ao cliente,
- * sem fallback sintético que esconda uma raiz inválida. */
-export async function listWorkspaceDirectories(pathInput: string): Promise<{ path: string; directories: WorkspaceDirectoryEntry[] }> {
-  const expanded = pathInput.trim().startsWith('~')
-    ? join(getAppDir(), '..', pathInput.trim().slice(1))
-    : pathInput.trim()
-  const requested = expanded || parse(resolve('.')).root
-  const directory = await realpath(requested)
-  if (!(await stat(directory)).isDirectory()) throw new Error('Workspace list path is not a directory')
-  const entries = await readdir(directory, { withFileTypes: true })
-  const directories = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, path: join(directory, entry.name) }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-  return { path: directory, directories }
+/** Contrato síncrono e pequeno usado pelo Command-Palette-like workspace switcher. */
+export function listWorkspaceDirectories(pathInput: string): WorkspaceDirectoryListing {
+  const requested = pathInput.trim() || parse(resolve('.')).root
+  try {
+    const canonical = realpathSync(requested)
+    if (!statSync(canonical).isDirectory()) return { path: requested, realpath: canonical, parent: dirname(canonical), folders: [], error: 'not_directory' }
+    const folders = readdirSync(canonical, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({ name: entry.name, path: join(canonical, entry.name), isDir: true as const }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    return { path: requested, realpath: canonical, parent: dirname(canonical), folders }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    return { path: requested, realpath: requested, parent: dirname(requested), folders: [], error: code === 'EACCES' || code === 'EPERM' ? 'permission' : 'not_found' }
+  }
+}
+
+export function validateWorkspacePath(pathInput: string): { valid: boolean; realpath: string; exists: boolean; isDir: boolean } {
+  try {
+    const canonical = realpathSync(pathInput.trim())
+    const isDir = statSync(canonical).isDirectory()
+    return { valid: isDir, realpath: canonical, exists: true, isDir }
+  } catch {
+    return { valid: false, realpath: pathInput.trim(), exists: false, isDir: false }
+  }
 }
 
 export async function pickWorkspaceDirectory(): Promise<string | undefined> {

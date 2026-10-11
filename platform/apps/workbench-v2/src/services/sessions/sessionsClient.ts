@@ -34,7 +34,8 @@ export async function persistSession(session: Session): Promise<void> {
 }
 
 export interface WorkspaceDescriptor { path: string; slug: string; name: string; isGit: boolean }
-export interface WorkspaceDirectoryEntry { name: string; path: string }
+export interface WorkspaceDirectoryEntry { name: string; path: string; isDir: true }
+export interface WorkspaceDirectoryListing { path: string; realpath: string; parent: string; folders: WorkspaceDirectoryEntry[]; error?: string }
 export interface CreatedWorktree { slug: string; path: string | null; branch: string | null; repoRoot: string }
 
 export async function validateSessionWorkspace(path: string): Promise<WorkspaceDescriptor> {
@@ -49,9 +50,16 @@ export async function pickSessionWorkspace(): Promise<WorkspaceDescriptor | unde
   return ((await response.json()) as { workspace: WorkspaceDescriptor | null }).workspace ?? undefined
 }
 
-export async function listSessionWorkspaceDirectories(path: string): Promise<{ path: string; directories: WorkspaceDirectoryEntry[] }> {
+export async function listSessionWorkspaceDirectories(path: string): Promise<WorkspaceDirectoryListing> {
   const response = await expectOk(await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`))
-  return response.json() as Promise<{ path: string; directories: WorkspaceDirectoryEntry[] }>
+  return response.json() as Promise<WorkspaceDirectoryListing>
+}
+
+export async function changeSessionWorkspace(sessionId: string, path: string): Promise<{ session: Session; workspace: WorkspaceDescriptor }> {
+  const response = await expectOk(await fetch('/api/session/change-workspace', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, path }),
+  }))
+  return response.json() as Promise<{ session: Session; workspace: WorkspaceDescriptor }>
 }
 
 export async function createSessionWorktree(workspacePath: string, slug: string, sessionId: string, useWorktree = false): Promise<CreatedWorktree> {

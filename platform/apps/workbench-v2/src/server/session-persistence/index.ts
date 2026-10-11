@@ -5,7 +5,7 @@ import { deleteSessionRecord, getSessionRecord, listSessionRecords, upsertSessio
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
-import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, WorktreeRequiresGitError } from './workspaces'
+import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
 import { readProvidersConfig, writeProvidersConfig } from '../providers'
 
 const API_PREFIX = '/api/sessions'
@@ -96,10 +96,29 @@ async function saveSession(session: Session): Promise<void> {
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && url.pathname !== '/api/providers' && url.pathname !== '/api/fs/list') return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && url.pathname !== '/api/providers' && !url.pathname.startsWith('/api/fs/')) return false
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
-    sendJson(response, 200, await listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
+    sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
+    return true
+  }
+
+  if (url.pathname === '/api/fs/validate' && request.method === 'GET') {
+    sendJson(response, 200, validateWorkspacePath(url.searchParams.get('path') ?? ''))
+    return true
+  }
+
+  if (url.pathname === '/api/session/change-workspace' && request.method === 'POST') {
+    const input = await readJson<{ sessionId: string; path: string }>(request)
+    if (!input.sessionId) throw new Error('sessionId is required')
+    const workspace = await validateWorkspace(input.path)
+    const sessions = await listSessions()
+    const current = sessions.find((session) => session.id === input.sessionId)
+    if (!current) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
+    const session: Session = { ...current, workspace: workspace.name, workspacePath: workspace.path, worktreePath: null, branch: null }
+    await saveSession(session)
+    await rememberWorkspace(workspace.path)
+    sendJson(response, 200, { session, workspace })
     return true
   }
 

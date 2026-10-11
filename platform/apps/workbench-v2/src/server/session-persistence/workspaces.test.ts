@@ -40,9 +40,10 @@ describe('workspace server contract', () => {
   it('lista somente diretórios reais para o autocomplete Linux/web', async () => {
     await mkdir(join(root, 'alpha')); await mkdir(join(root, 'Beta')); await writeFile(join(root, 'arquivo.txt'), 'x')
     const result = await listWorkspaceDirectories(root)
-    expect(result.path).toBe(resolve(root))
-    expect(result.directories.map((entry) => entry.name)).toEqual(['alpha', 'Beta', 'Repo Com Espaço'])
-    expect(result.directories.every((entry) => entry.path.startsWith(resolve(root)))).toBe(true)
+    expect(result.realpath).toBe(resolve(root))
+    expect(result.parent).toBe(resolve(root, '..'))
+    expect(result.folders.map((entry) => entry.name)).toEqual(['alpha', 'Beta', 'Repo Com Espaço'])
+    expect(result.folders.every((entry) => entry.isDir && entry.path.startsWith(resolve(root)))).toBe(true)
   })
   it('não tenta usar FileSystemDirectoryHandle e declara diálogo não suportado fora do Windows', async () => {
     if (process.platform !== 'win32') await expect(pickWorkspaceDirectory()).rejects.toThrow('only available on Windows')

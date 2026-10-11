@@ -153,6 +153,24 @@ export class PtyManager {
     return true;
   }
 
+  /** Wiring aditivo: muda o cwd dos terminais vivos da sessão sem recriar UI/xterm. */
+  sendCwd(workbenchSessionId: string, cwd: string): number {
+    let changed = 0;
+    for (const [sessionId, session] of this.sessions) {
+      if (sessionId !== workbenchSessionId && !sessionId.startsWith(`${workbenchSessionId}:`)) continue;
+      const quoted = cwd.replace(/'/g, "''");
+      const command = session.profile.id === 'powershell' || session.profile.id === 'pwsh'
+        ? `Set-Location -LiteralPath '${quoted}'\r`
+        : session.profile.id === 'cmd'
+          ? `cd /d "${cwd.replace(/"/g, '""')}"\r`
+          : `cd -- '${cwd.replace(/'/g, `'\\''`)}'\r`;
+      session.ptyProcess.write(command);
+      this.resetIdleTimer(session);
+      changed += 1;
+    }
+    return changed;
+  }
+
   resize(sessionId: string, cols: number, rows: number): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;

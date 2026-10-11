@@ -29,8 +29,24 @@ export function ptyPlugin(): Plugin {
         disposeBridge = undefined
       })
 
-      // BUG-02 FIX: endpoint dinâmico de portas para aba Portas
+      // Wiring Fatia 06: encaminha cwd ao PTY já aberto sem tocar TerminalPanel/xterm.
       server.middlewares.use((req, res, next) => {
+        if (req.url === '/api/pty/cwd' && req.method === 'POST') {
+          const chunks: Buffer[] = []
+          req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+          req.on('end', () => {
+            try {
+              const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { sessionId?: string; path?: string }
+              if (!input.sessionId || !input.path) throw new Error('sessionId and path are required')
+              const changed = bridge.ptyManager.sendCwd(input.sessionId, input.path)
+              res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, changed }))
+            } catch (error) {
+              res.statusCode = 400; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }))
+            }
+          })
+          return
+        }
+        // BUG-02 FIX: endpoint dinâmico de portas para aba Portas
         if (req.url && req.url.startsWith('/api/ports')) {
           res.setHeader('Content-Type', 'application/json')
           res.setHeader('Access-Control-Allow-Origin', '*')
