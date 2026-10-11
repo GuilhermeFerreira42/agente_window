@@ -2,6 +2,14 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-11 - Transição oficial para Spec-Driven / Stream Coding & Criação da Fatia 6.1
+- **Carta Oficial do Usuário:** Recebida e aprovada formalmente. Encerramento definitivo do modo "vibe coding".
+- **Adoção do Padrão Spec-Driven:** 40 % de esforço focado em especificação prévia antes de codar; fatias verticais; tolerância zero a dívidas técnicas empurradas com a barriga.
+- **Auditoria do Vídeo:** Identificadas 10 dívidas técnicas (DEBT-01 a DEBT-10) consolidadas na Matriz Canônica de Dívidas em `docs/06 - PROXIMAS FASES E DIVIDAS.md`.
+- **Criação da FATIA 6.1 — Fechamento de Dívidas Críticas:** Escopo focado nas 4 dívidas bloqueantes (sincronização atômica de workspace, purga do visualizador legado, abertura de Provedores na landing e fix do buffer do terminal). A Fatia 07 não inicia sem homologação da 6.1.
+- **Replanejamento do Roadmap (Fatias 6.1 a 14):** Estruturação do roadmap sob a régua 90 % VS Code / 10 % customizado.
+- **Canônicos mantidos:** Atualizados os 9 arquivos canônicos sem criação de arquivos extras soltos na raiz.
+
 ## 2026-10-11 - Workspace Switcher na Title Bar e sincronia real
 - Adicionado campo estilo Command Palette no topo; endpoint FS retorna contrato path/realpath/parent/folders e estados permission/vazio.
 - Troca identificada por sessionId persiste sessão simples, recentes e sincroniza Explorer + PTY; Playwright confirmou `/tmp` em `/fs/root`, título e `pwd`, zero page errors.

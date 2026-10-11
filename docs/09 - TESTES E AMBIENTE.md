@@ -193,3 +193,15 @@ A homologação humana está no `08`. Esta seção registra somente o que a IA d
 ## 9. Gate Workspace Switcher
 - Typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspace/providers 9/9.
 - Playwright Debian 1400×900: raiz listou home/mnt/tmp; `/mnt/` mostrou pasta vazia; `/tmp` sincronizou `/fs/root=file:///tmp`, `document.title=/tmp` e `pwd=/tmp`; zero page errors.
+
+## 10. Bateria e Gates de Teste — FATIA 6.1: Fechamento de Dívidas Críticas (Spec-Driven)
+Para a entrega da Fatia 6.1, os seguintes testes automatizados devem ser adicionados/validados antes da homologação humana:
+1. **Teste de Sincronização Atômica (`App.test.tsx`):**
+   - Disparo de seleção de pasta deve chamar imediatamente o recarregamento do Explorer e a notificação de `cd` ao PTY, sem necessidade de despacho de mensagem no chat.
+2. **Teste de Abertura de Provedores na Landing (`SessionLanding.test.tsx` / `App.test.tsx`):**
+   - Disparo da ação de abrir Provedores a partir do estado inicial (zero sessões / landing vazia) deve montar a tela no editor moderno com sucesso.
+3. **Teste de Purga do Visualizador Legado:**
+   - Teste estático/unitário confirmando que nenhum componente de `components/legacy/` é instanciado na árvore React.
+4. **Teste de Limpeza de Buffer do Terminal:**
+   - Validação da emissão da sequência de escape de clear para o xterm, garantindo viewport zerado.
+5. **Pré-requisito para Fatia 07:** A Fatia 07 não inicia sem typecheck 0 e aprovação deste gate.

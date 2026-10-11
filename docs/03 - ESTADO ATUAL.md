@@ -1,22 +1,21 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-11 · HEAD: `a65a246` · FATIA 06 implementada e validada localmente no Linux; aguarda gate final no Windows real 5174**
+**ATUALIZADO EM: 2026-10-11 · HEAD: `a39315d` · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 6.1 — FECHAMENTO DE DÍVIDAS CRÍTICAS**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
-
-## Status
-- **Fatia 06 consolidada (06.4a–06.5) — ✅ implementação e gates locais concluídos:**
-  - workspace simples Git/não-Git com `realpath`, persistência, recentes, exclusão segura e raiz por sessão; terminal intocável recebe o PWD pelo contrato público existente;
-  - Empty State personalizado em 768 px, foco e transição para histórico;
-  - Windows usa `CommonOpenFileDialog { IsFolderPicker=true }` sobre `IFileOpenDialog`/`FOS_PICKFOLDERS` via `powershell.exe -STA`, sem `FolderBrowserDialog`; Linux possui caminho manual com autocomplete real por `GET /api/fs/list?path=`, validado no servidor e sem bloqueio;
-  - confirmar a pasta alimenta `workspacePath`; a sessão, Explorer e terminal recebem o PWD real pelo wiring público existente, sem editar TerminalPanel/xterm/PTY;
-  - Menu da conta > Provedores abre no editor em Linux/Windows; GET/PUT `/api/providers`, JSON sem segredo, env vars e Ollama configurável; sem runtime real;
-  - gates: typecheck 0; SessionLanding 11/11; App 46 pass/13 skip; providers 2/2; workspaces 7/7; Playwright Linux comprovou `/` → `/home/` → `/home/user/`, PWD `/home/user`, 3 cards de Provedores e zero page errors; `git diff --check` verde.
-  - **Próximo gate:** checklist humano de 5 minutos no Windows 5174 e Linux; não iniciar Fatia 07 antes do resultado.
-- **FATIA-05 "Chassis-Right" = 100 % homologada no Windows (5174 real) em 2026-10-02.** 5.7 por vídeo 08:37:34; 5.8 por teste no 5174.
-- **Fatias 07 a 12 + proposta de Fatia 13:** escopos **mapeados**, ainda não prontos nem iniciados. A Fatia 13 é proposta para Agent Host & Multi-host e depende da deliberação D55 no `06`. A especificação construtível de Personalizações está em `docs/arquivo_morto/pesquisa_bruta/especificacao-layout-personalizacoes-2026-10-10.md`; D39–D55 permanecem pendentes de deliberação no `06`. Pastas `fatia-07-input` a `fatia-10-polish` em `pesquisa_bruta/` usam a numeração antiga e não definem os donos atuais.
-- Servidor de homologação: Vite **5174** (repo real), subir via processo em background.
+## Status Atual
+- **Transição Spec-Driven / Stream Coding (2026-10-11):** O projeto encerrou o modo "vibe coding". Todas as fatias são especificadas antes da codificação, e dívidas técnicas abertas bloqueiam o avanço de novas fatias.
+- **FATIA 6.1 — Fechamento de Dívidas Críticas (Ativa / Em Andamento):**
+  - **Bloqueio de avanço:** A Fatia 07 (File Ops & Monaco) **não será iniciada** enquanto as 4 dívidas bloqueantes levantadas na auditoria do vídeo não forem fechadas:
+    1. **Sincronização atômica de Workspace (DEBT-06):** Selecionar uma pasta no diálogo deve atualizar simultaneamente a árvore do Explorer e emitir `cd` para o PTY/Terminal imediatamente, sem exigir envio de mensagem no chat nem F5.
+    2. **Remoção do Visualizador Legado (DEBT-04):** Eliminar resquícios do visualizador antigo; a aba de Provedores e demais superfícies devem abrir exclusivamente no editor moderno.
+    3. **Abertura de Provedores na Landing (DEBT-09):** O item Conta > Provedores deve abrir na área do editor mesmo quando a sessão estiver vazia (Empty State / Landing), sem depender de chat ativo.
+    4. **Limpeza do Terminal (DEBT-01):** O comando `clear`/`cls` deve resetar o viewport do xterm sem deixar fantasmas ou resíduos de texto.
+    5. **Lista de Recentes (DEBT-07):** Diálogo de pastas deve listar histórico recente para troca ágil.
+- **FATIA-05 "Chassis-Right":** 100 % homologada no Windows (5174 real) em 2026-10-02.
+- **Fatias 07 a 14:** Replanejadas e detalhadas no padrão Spec-Driven dentro de `docs/06 - PROXIMAS FASES E DIVIDAS.md`.
+- Servidor de homologação: Vite **5174** (repo real). Régua comparativa oficial: **VS Code Server (8080)** e VS Code real.
 
 ## Placar FATIA-05
 | Etapa | Commit | O quê |
@@ -48,9 +47,10 @@ Fatia 06 consolidada no checkpoint `a65a246`: typecheck 0 · `WorkspaceSwitcher`
 - Fora da Fatia 5 por decisão: Alt+Z e menu de abas → 5.9/futura; Simple Browser → 4.8 separada (só UI, sem runtime IA/CDP).
 
 ## Para a próxima IA
-1. Ler `docs/01` → `02` → este arquivo → `05 - DECISOES`.
-2. A Fatia 06 já está implementada; não reabrir 06.4a–06.5 nem iniciar a Fatia 07 antes do gate humano final no Windows 5174.
-3. Preservar chassi da Fatia 05, Empty State 768 px, Provedores por env var e TerminalPanel/xterm. O único wiring terminal autorizado é o já entregue em `/api/pty/cwd`.
+1. Ler `docs/01` → `02` → este arquivo → `05 - DECISOES` → `06 - PROXIMAS FASES E DIVIDAS.md`.
+2. O foco exclusivo atual é a **FATIA 6.1 — Fechamento de Dívidas Críticas**. Não iniciar a Fatia 07 nem fatias futuras antes de fechar e homologar a 6.1.
+3. Seguir o padrão **Spec-Driven / Stream Coding**: 40 % de pensamento/especificação antes de codar; só commits funcionais pequenos com typecheck 0 e testes verdes.
+4. Preservar a identidade de produto: 90 % VS Code original (régua: code-server 8080) e 10 % customizado (chassi direito + Provedores Cline). O visualizador antigo deve ser purgado, abrindo tudo no editor moderno.
 
 
 ## Checkpoint final da Fatia 06 — barra superior

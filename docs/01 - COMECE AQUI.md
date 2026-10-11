@@ -46,13 +46,18 @@ agente_window/
 | `09 - TESTES E AMBIENTE` | antigo `26_MAPA_SUITE_E2E_E_AMBIENTE_DE_TESTES` (inteiro — foi escrito depois que uma IA apagou 206 arquivos reais) |
 | `arquivo_morto/` | todo o resto: `01, 02, 03, 04, 06, 09, 10, 11 (Kanban), 13, 14, 15, 16, 17, 18, 24, 25, 27, 28` (originais, como referência), `engenharia_reversa/` (raspagens e prints), `referencias_visuais/`, `historico_homologacao/`, histórico do terminal, plano BYTE_A_BYTE, resíduos de `platform/` |
 
-## 3. Como trabalhar com o humano e neste projeto (antigo `27`, mantido na íntegra — nada novo)
+## 3. Como trabalhar com o humano e neste projeto — Padrão Spec-Driven / Stream Coding
 
-> Fluxo com várias IAs (Arena, Meta, Cursor, outras), cada uma com recursos diferentes — **não engessar formato**. Regras duras de código estão detalhadas no `04`; como testar sem apagar arquivos reais, no `09`.
+> **Novo padrão mandatório (2026-10-11): Spec-Driven Development / Stream Coding (Documentation-First).**
+> - **40 % pensando e especificando antes de codar:** nenhuma linha de código é escrita sem uma SPEC clara de 1 página com objetivos, arquivos, critérios testáveis e o que NÃO fazer.
+> - **Zero tolerância com dívidas técnicas:** é estritamente proibido iniciar uma fatia nova empurrando dívidas de fatias anteriores com a barriga. Dívidas abertas bloqueiam avanço.
+> - **Identidade do Produto (90 % / 10 %):**
+>   - **90 % Réplica Fiel do VS Code / Code Server (Agent Mode):** o centro (chat, landing page, fluxo de pastas, comandos) segue rigidamente o original (régua: code-server 8080 e VS Code real).
+>   - **10 % Modificado por Decisão do Usuário:** Chassi lateral à direita com terminal integrado avançado + página de Provedores baseada na experiência do **Cline**.
 
 ## A. Contexto humano (por que as coisas são como são)
 - O usuário **dita por voz** — as mensagens têm frases soltas e palavras trocadas. Interprete a intenção; em dúvida real, pergunte com opções curtas. Responda em **PT-BR, linguagem simples**, sem jargão desnecessário.
-- **Fluxo de entrega:** a IA trabalha no sandbox da Arena; o usuário **baixa o workspace, roda no Windows 11, valida manualmente e faz commit/push no GitHub**. Por isso os hashes dos commits no GitHub **não coincidem** com os citados nos docs; o conteúdo é o mesmo. Referencie commits pela **mensagem**, não pelo hash.
+- **Fluxo de entrega:** a IA trabalha no sandbox ou IDE; o usuário **valida manualmente no Windows 11 real (porta 5174), grava prints/vídeo e faz commit/push no GitHub**. Por isso os hashes dos commits no GitHub **não coincidem** com os citados nos docs; o conteúdo é o mesmo. Referencie commits pela **mensagem**, não pelo hash.
 - O sandbox é **recriado a cada mensagem** do usuário (`docs/09 - TESTES E AMBIENTE.md §3`). Só arquivos em `/home/user` sobrevivem.
 - Podem existir **outras IAs** trabalhando a partir de clones do GitHub, sem este contexto. **Tudo que for descoberto ou decidido tem de ir para `docs/`** — a conversa não é memória do projeto.
 - Homologação de fase = **validação manual do usuário no Windows**, nunca só o teste verde da IA.
@@ -87,23 +92,22 @@ agente_window/
 - Conferir perímetro antes de commitar: `git diff --name-only` **não** pode listar `modules/explorer-search/{core,server}/**`, `EditorArea.tsx` (até 5.7), `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, `components/terminal/**`, specs `sessao_11*`.
 - Não commitar utilitários temporários (`shot.tmp.mjs`), `test-results/`, prints fora de `auditoria_*/`.
 
-## F. Escopo e arquitetura (resumo operacional; detalhe em `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md`, `docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)`, `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §11`)
+## F. Escopo e arquitetura
 - Princípio **LEGO**: módulos prontos são **reposicionados**, não reescritos.
-- **Intocáveis:** Terminal homologado (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server`), contratos congelados (`docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)`), `modules/explorer-search/{core,server}/**`, `EditorArea.tsx` (até 5.7).
+- **Intocáveis:** Terminal homologado (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server`), contratos congelados (`docs/04 - ARQUITETURA E REGRAS DURAS.md`), `modules/explorer-search/{core,server}/**`, `EditorArea.tsx` (até 5.7).
 - `App.tsx` só **wiring aditivo** via barrel único (`src/shell/index.ts` e `modules/explorer-search/index.ts`); `index.ts`/`contract.ts` do módulo **apenas aditivos**; `ui/**` só montagem; **módulo nunca importa do shell**.
 - `.env` não existe e não deve existir; npm (não pnpm/yarn); rodar E2E com `npx playwright test` (não há script `npm run e2e`).
-- **Inglês só em peças novas/migradas** (lista em `docs/arquivo_morto/25_ESTADO_ATUAL_E_PENDENCIAS_FATIA-05.md (histórico) §5 O7`). Nada existente é traduzido.
-- Nada em `position: fixed`. Recolher container com box = `display: flex/none`; `contents/none` só em wrapper transparente (Regra 10 do `docs/04 - ARQUITETURA E REGRAS DURAS.md (protocolo completo em docs/arquivo_morto/18_PROTOCOLO_ANTI_REGRESSAO_E_CONTRATOS_CONGELADOS.md)`).
+- **Inglês só em peças novas/migradas**. Nada existente é traduzido.
+- Nada em `position: fixed`. Recolher container com box = `display: flex/none`; `contents/none` só em wrapper transparente (Regra 10 do `docs/04`).
 
 ## G. Documentação
-- Viva em `docs/` (markdown). Atualizar ao fim de cada sub-fase: `docs/07 - HISTORICO.md` (topo cronológico), `docs/03 - ESTADO ATUAL.md` (Kanban), `docs/06 - PROXIMAS FASES E DIVIDAS.md (backlog completo antigo em docs/arquivo_morto/05_BACKLOG_MESTRE.md)` (débitos), `docs/03 - ESTADO ATUAL.md` (estado), `docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md` quando muda o protocolo.
-- Sem citar vídeos ou pessoas; sem cor hex (usar tokens `--vscode-*`); medidas só de fontes reais: `04_17`, `05_01`, `05_02`, vscode.dev, 8080. **"Não confie na doc, confie no preview real"**: checar atributos reais no 8080 antes de codar. Prints do Windows do usuário prevalecem sobre o 8080 do sandbox.
-- Cada doc novo com **data + HEAD válido + "substitui X"** no cabeçalho. Doc superado recebe aviso de OBSOLETO no topo (não se apaga histórico sem ordem).
-- Gaps de fidelidade → `docs/07 - HISTORICO.md` "Débito Técnico do Shell"; pendências herdadas de fases anteriores → backlog `docs/06 - PROXIMAS FASES E DIVIDAS.md (backlog completo antigo em docs/arquivo_morto/05_BACKLOG_MESTRE.md)`, não entram na sub-fase corrente.
-- Protocolo **Opção C**: prints antes/depois em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3` provando fidelidade vs. 8080.
+- Viva em `docs/` (markdown). Atualizar ao fim de cada sub-fase: `docs/07 - HISTORICO.md` (topo cronológico), `docs/03 - ESTADO ATUAL.md` (Kanban), `docs/06 - PROXIMAS FASES E DIVIDAS.md` (débitos e roadmap), `docs/03 - ESTADO ATUAL.md` (estado).
+- Sem citar vídeos ou pessoas; sem cor hex (usar tokens `--vscode-*`); medidas só de fontes reais: `04_17`, `05_01`, `05_02`, vscode.dev, 8080. Prints do Windows do usuário prevalecem sobre o 8080 do sandbox.
+- Cada doc novo com **data + HEAD válido + "substitui X"** no cabeçalho. Doc superado recebe aviso de OBSOLETO no topo.
+- Gaps de fidelidade e dívidas técnicas → `docs/06 - PROXIMAS FASES E DIVIDAS.md` (Matriz canônica de Dívidas Técnicas).
 
 ## H. Regra final
-Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar, preservar, reinspecionar, perguntar**. Se surgir imprevisto (conflito de teste, medida nova, erro não previsto): **parar e reportar antes de improvisar**.
+Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar, preservar, reinspecionar, perguntar**. Se surgir imprevisto: **parar e reportar antes de improvisar**.
 
 ## 4. Rotina obrigatória ao TERMINAR qualquer tarefa
 
@@ -116,6 +120,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-FATIA-05 "Chassis-Right" **100 % homologada no Windows em 2026-10-02**. **Fatia 06 — Workspace Simples & Chat Real — IMPLEMENTADA E VALIDADA LOCALMENTE:** consolidação 06.4a–06.5 pronta; aguarda gate humano final no Windows 5174 e Linux.
-
-> Atualização 2026-10-11: a consolidação da Fatia 06 inclui autocomplete Linux por `/api/fs/list`, PWD real da sessão e picker moderno Windows; gate final está no `08`.
+FATIA-05 "Chassis-Right" **100 % homologada**. Fatia 06 implementada. **Fase ativa atual: FATIA 6.1 — Fechamento de Dívidas Críticas (Spec-Driven)**. A Fatia 07 não inicia antes de zerar as dívidas da 6.1.

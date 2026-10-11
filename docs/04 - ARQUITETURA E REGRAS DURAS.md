@@ -10,7 +10,8 @@
 5. Sem `position: fixed`. Recolher superfície com box = `display: flex/none` (`contents/none` só em wrapper transparente — Regra 10 do 18). Sem transição CSS de largura em Side Bar/sash (o VS Code não anima).
 6. Chassi à **direita**: `[lista 300][centro: chat | editor anexo][Side Bar 274][Activity Bar 48]`; sash da Side Bar 4 px; maximizado do editor **mantém** Side Bar 274 (D6 v1.2).
 7. RAM ~1,9 GB: **um Vite por vez**; proibido buildar VS Code/code-server; runtimes/clones em `~/.cache`.
-8. Princípio **LEGO**: módulos prontos são reposicionados, nunca reescritos. Nada em `legacy/` (removida pelo usuário; não restaurar).
+8. Princípio **LEGO**: módulos prontos são reposicionados, nunca reescritos. Nada em `legacy/` (removida pelo usuário; não restaurar). **Eliminação definitiva do visualizador legado:** qualquer componente de visualizador antigo é banido da arquitetura; todas as abas e superfícies auxiliares (inclusive Provedores) abrem exclusivamente no editor moderno.
+9. **Padrão Spec-Driven / Stream Coding:** 40 % de especificação prévia obrigatória antes de codar; fatias verticais pequenas; proibido iniciar nova fatia com dívida técnica aberta.
 
 ## 1.1 Decisão 06.3 — seletor nativo de repositório (2026-10-06)
 - **Inspeção técnica:** `workbench-v2` é Vite/React puro; não há `tauri.conf`, pacote `@tauri-apps` nem runtime Tauri. Portanto, `plugin-dialog` não se aplica.
@@ -24,6 +25,15 @@
 ## 1.2 Compatibilidade de Stack com o Runtime de Agente (D30 - 2026-10-05)
 - **OpenClaude como referência nativa de Runtime:** O repositório de referência `openclaude` é 100% **TypeScript / Bun / Node**, alinhando-se perfeitamente à stack do nosso produto (`platform/apps/workbench-v2/` em React + Vite + TypeScript).
 - **Sem necessidade de sidecar Go:** A raspagem prévia de `opencode` (Go + sqlc + goose) apontava para a necessidade de compilação de binários Go e processos sidecar em background. Com o OpenClaude, todos os serviços de persistência (`sessionStorage`), controle de chamadas (`doomLoop`), segurança (`permissions`), worktrees e providers são TypeScript nativo, permitindo integração direta via contratos na camada 2.1 (Motor / Agent Runtime), eliminando pontes IPC pesadas.
+
+## 1.3 Contratos de Sincronização e Visualização da Fatia 6.1 (2026-10-11)
+- **Sincronização atômica de Workspace (DEBT-06):** Ao confirmar a escolha de uma pasta (Windows Explorer moderno ou entrada manual Linux), o estado `workspacePath` deve atualizar imediatamente e de forma atômica:
+  1. O cliente do Explorer (recarrega a árvore raiz sem exigir reload de página);
+  2. O PTY do Terminal (emite `cd` e sincroniza o PWD sem exigir envio de mensagem no chat);
+  3. O arquivo de recentes (`~/.agente_window/recent-workspaces.json`).
+- **Desacoplamento de Provedores (DEBT-09):** O menu da conta > Provedores deve abrir o painel de configuração independentemente do estado do chat. Funciona tanto na landing page vazia quanto com sessões ativas.
+- **Limpeza de buffer do Terminal (DEBT-01):** Execução de `clear`/`cls` no PTY deve disparar limpeza completa do viewport do xterm sem deixar resíduos visuais no topo.
+- **Purga de componentes legados (DEBT-04):** Baniu-se qualquer montagem ou referência ao visualizador antigo; todas as telas auxiliares usam a infraestrutura do editor moderno.
 
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |

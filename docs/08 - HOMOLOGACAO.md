@@ -12,7 +12,39 @@
 
 ---
 
-## Gate final FATIA 06 — roteiro de 5 minutos (Windows 5174 + Linux)
+## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
+
+> **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
+
+### 1. Teste da Troca Atômica de Workspace (DEBT-06)
+- Subir o servidor na porta 5174 e abrir no navegador no Windows.
+- Clicar no seletor de pasta (`+` ou "Open Folder").
+- Selecionar uma pasta qualquer do seu computador.
+- **Critério de aceite:** No mesmo instante, **sem digitar nada no chat ("oi") e sem apertar F5**:
+  - A árvore do Explorer atualiza e mostra os arquivos da pasta escolhida.
+  - O terminal executa `cd` para essa pasta e o comando `pwd` / `Get-Location` mostra o caminho exato da pasta selecionada.
+
+### 2. Teste da Lista de Recentes (DEBT-07)
+- Clicar novamente no seletor de pasta.
+- **Critério de aceite:** O diálogo lista as pastas abertas recentemente para seleção direta com um clique.
+
+### 3. Teste dos Provedores na Landing Page Vazia (DEBT-09)
+- Com o aplicativo aberto na tela inicial (sem nenhuma conversa ou mensagem enviada no chat).
+- Clicar no ícone de Conta / Perfil > **Provedores**.
+- **Critério de aceite:** A aba de configuração de Provedores abre imediatamente na área do editor moderno, sem travar nem dar erro de console.
+
+### 4. Teste de Limpeza de Buffer do Terminal (DEBT-01)
+- No painel do terminal, digitar comandos com saída extensa (ex: `dir`, `git status`).
+- Digitar `clear` ou `cls` e pressionar Enter.
+- **Critério de aceite:** O terminal limpa completamente a tela, sem deixar resíduos visuais, caracteres cortados ou fantasmas de texto no topo do viewport.
+
+### 5. Teste de Purga do Visualizador Legado (DEBT-04)
+- Abrir arquivos e painéis auxiliares.
+- **Critério de aceite:** Nenhuma interface utiliza o visualizador legado antigo; todas as telas usam o editor moderno.
+
+---
+
+## Gate histórico FATIA 06 — roteiro anterior (Windows 5174 + Linux)
 
 ### Windows 5174
 1. `+` > pasta: confirmar janela Explorer grande, redimensionável, com favoritos e barra de endereço; escolher uma pasta comum sem Git.
