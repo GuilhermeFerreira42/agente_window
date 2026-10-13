@@ -3,7 +3,7 @@
 > **Leia a §1 antes de rodar qualquer spec.** Specs de fixture (`12*`, `13*`, `14*` menos `14b_git_smoke`) **só na 5175**; na 5174 elas apagam arquivos reais do repo. Um Vite por vez (RAM). Reseed antes de cada spec de fixture.
 
 
-**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-11 · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `a65a246` (Fatia 06 consolidada). Placar focado atual: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspaces 7/7; providers 2/2; App 46 pass / 13 skip. Placar global histórico: 722 pass / 9 falhas P4 preexistentes / 16 skip.
+**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-12 (acrescentada a §11 — análise de vídeos do usuário) · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `a65a246` (Fatia 06 consolidada). Placar focado atual: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspaces 7/7; providers 2/2; App 46 pass / 13 skip. Placar global histórico: 722 pass / 9 falhas P4 preexistentes / 16 skip.
 **Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 
 ---
@@ -205,3 +205,17 @@ Para a entrega da Fatia 6.1, os seguintes testes automatizados devem ser adicion
 4. **Teste de Limpeza de Buffer do Terminal:**
    - Validação da emissão da sequência de escape de clear para o xterm, garantindo viewport zerado.
 5. **Pré-requisito para Fatia 07:** A Fatia 07 não inicia sem typecheck 0 e aprovação deste gate.
+
+## 11. Análise de vídeos do usuário (método validado em 2026-10-12)
+O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e **imagem** antes de concluir qualquer coisa. Pipeline validado em um MP4 de 4min02s (1904×1076, H.264, AAC).
+
+1. **Nunca ler como texto:** o arquivo pode chegar como `.mp4.txt`. Renomear, confirmar com `file` (deve dizer ISO Media/MP4) e medir com `ffprobe` (duração, streams, resolução). Ler bytes de MP4 como texto não ajuda.
+2. **Instalação (por turno — não persiste entre mensagens):** `sudo apt-get install -y ffmpeg` + `python3 -m pip install faster-whisper` (~25 s no apt+pip; `sudo -n` funciona e o Hugging Face é acessível do sandbox).
+3. **Áudio:** `ffmpeg -i video.mp4 -vn -ar 16000 -ac 1 -c:a pcm_s16le audio.wav`.
+4. **Transcrição:** faster-whisper **small**, `device='cpu'`, `compute_type='int8'`, `cpu_threads=2`, `language='pt'`, `beam_size=5`, `vad_filter=True`, `word_timestamps=True`. ~84 s para 4 min de áudio. Conferir idioma detectado, probabilidade e se os segmentos cobrem a duração.
+   - **PyAV quebra** em `transcribe('audio.wav')` com `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. Não abandonar: carregar o WAV como array NumPy (`wave` + `astype(np.float32)/32768.0`) e passar o array.
+5. **Frames:** periódicos (`fps=1/15,scale=1280:-2`), de cena (`select='gt(scene,0.18)'`) e **dirigidos por timestamp** (`-ss T -frames:v 1`) nos pontos que a fala marca. Folhas de contato com `drawtext` (`%{pts\:hms}`) + `tile` dão panorama rápido; **atenção**: em clipes extraídos com `-ss`, o rótulo `pts` reinicia em zero — somar o offset do corte.
+6. **Timestamps exatos sem perder tempo:** extrair `fps=1` do vídeo inteiro (242 JPEGs) e casar cada frame periódico por comparação de pixels (MSE) — MSE=0 identifica o segundo exato. Não estimar por aproximação em trecho que vá para doc.
+7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
+8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão.
+9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).

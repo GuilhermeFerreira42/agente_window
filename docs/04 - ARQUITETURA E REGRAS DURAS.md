@@ -106,7 +106,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 | Arquivo | O que é | Destino |
 |---|---|---|
 | `shot.tmp.mjs` | utilitário de print da FATIA-05 | **não existe mais** (verificado 2026-10-02) |
-| `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/` |
+| `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/`; removido em 2026-10-12 na limpeza de espaço (recuperável no histórico do Git) |
 | `probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas manuais da FATIA-03/04 | não usadas; manter até decisão |
 | `manual_evidence/`, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; `manual_evidence/` é histórico da FATIA-03 |
 | `Data Nesta` (se aparecer no `ls`) | não é arquivo — artefato de exibição | ignorar |
@@ -116,7 +116,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 - `/home/user/uploads/meu_documento.txt` (aprovação do Gate 0, decisões a–g) → incorporado em `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §2` e `docs/07 - HISTORICO.md`.
 - `/home/user/uploads/05_00_relatorio_validacao_pre_fase.md` (auditoria externa) → copiado em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 - `/home/user/restore-code-server.sh` e o tarball do code-server → ambiente de medição; não fazem parte do produto.
-- Prints antes/depois da FATIA-05 vivem em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). São versionados (prints antes/depois exigidos pelo protocolo Opção C).
+- Prints antes/depois da FATIA-05 viviam em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). Eram versionados (exigidos pelo protocolo Opção C). **Removidos em 2026-10-12 a pedido do usuário para liberar espaço (46 MB); recuperáveis pelo histórico do Git.**
 
 ## Fatia 06 consolidada — fronteiras multiplataforma
 - `TerminalPanel.tsx` e xterm permanecem intocáveis. O PWD inicial vem de `activeSession.worktreePath ?? activeSession.workspacePath`; a troca em uma sessão viva usa apenas o wiring aditivo `/api/pty/cwd`, que escreve `cd`/`Set-Location` no PTY existente sem recriar a UI do terminal.

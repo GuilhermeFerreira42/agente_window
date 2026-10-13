@@ -2,6 +2,19 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-12 - Limpeza de espaço: 194 arquivos de mídia removidos do arquivo_morto (46 MB)
+- A pedido do usuário, removidos **194 arquivos** de `docs/arquivo_morto/`: prints das Fatias 04/05 (prints, raspagens `04_17` e `05_01`, auditorias `c1`–`c5.8`), `comparacao-terminal/`, `historico_homologacao/evidencias/`, `referencias_visuais/` e resíduos de `platform-residuos/` (inclusive o arquivo vazio `tsc`).
+- Resultado: repositório de **107 MB → 61 MB** (46 MB liberados; 23 pastas que esvaziaram foram removidas). **Nada foi perdido:** os arquivos continuam no **histórico do Git** (restauráveis via `git restore`).
+- Ponteiros que ficaram sem destino foram anotados em `docs/03` e `docs/04`. **Nenhum commit feito** — exclusões aparecem em `git status` aguardando o usuário.
+
+## 2026-10-12 - Análise do vídeo do usuário (4min02s): DEBT-11 aberta e método de leitura de vídeo documentado
+- Vídeo `Gravar_2026_10_11_20_00_45_554.mp4` (1904×1076, H.264 30fps, AAC, 4min02s) analisado por transcrição + frames: faster-whisper **small** (pt, prob. 1.00, 25 segmentos), 16 frames periódicos (timestamps calibrados por MSE), 4 de cena, 17 dirigidos e folhas de contato. Fala e imagem cruzadas em todos os achados.
+- **O vídeo confirma dívidas já registradas:** DEBT-05 (janela de seleção de pasta no clique), DEBT-06 (troca "não atômica" — "tinha que ser atômico, muda na hora"), DEBT-07 (lista de recentes do original, t=97 s), DEBT-09 (Provedores não abre na landing vazia), DEBT-04 (Provedores no visualizador legado) e DEBT-10 (referência Cline: Ollama, URL custom, Plan/Act, contexto, timeout). O **terminal não aparece** na gravação: DEBT-01/02/03 sem evidência nova.
+- **Achado novo → `DEBT-11`:** a faixa de caminho + "Usar esta pasta" ocupou o lugar da **pesquisa / centro de comando** no topo; o usuário quer a troca de pasta **integrada dentro da pesquisa** ("era integrar essa função dentro da pesquisa… mas a pesquisa some"). Registrada como **a deliberar** (entra na 6.1 ou vira fatia futura).
+- **Também registrados no `06` (não fatiados):** pedido de "raspar o código original", página "Personalizações" do original, histórico de chats na sidebar de Sessões, diferença de chips da Landing e o "botão que abre navegador" ainda **não identificado** (usuário mostrará depois).
+- Método de análise de vídeo documentado em `docs/09 §11`, incluindo o **fallback NumPy** para o erro de PyAV (`metadata_errors`) e o cuidado de não confundir o VS Code original com o clone.
+- **Nenhum código alterado; nenhum commit.** Registro apenas documental, autorizado pelo usuário. Relatório auxiliar (fora do repo): `/home/user/video_analysis/RELATORIO_ANALISE.md`.
+
 ## 2026-10-11 - Transição oficial para Spec-Driven / Stream Coding & Criação da Fatia 6.1
 - **Carta Oficial do Usuário:** Recebida e aprovada formalmente. Encerramento definitivo do modo "vibe coding".
 - **Adoção do Padrão Spec-Driven:** 40 % de esforço focado em especificação prévia antes de codar; fatias verticais; tolerância zero a dívidas técnicas empurradas com a barriga.

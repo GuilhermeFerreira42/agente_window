@@ -1,6 +1,6 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-11 · HEAD: `c74d8be` · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 6.1 — FECHAMENTO DE DÍVIDAS CRÍTICAS**
+**ATUALIZADO EM: 2026-10-12 · HEAD: `76a9ed6` · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 6.1 — FECHAMENTO DE DÍVIDAS CRÍTICAS**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 
@@ -33,12 +33,13 @@
 | 5.8 c1 | `d0c2a8d` | **Coluna "Detalhes" removida de vez** (+ botões "Barra auxiliar"/"Alternar detalhes"); T39 |
 | 5.8 c3 | `4ee0ed8` | 16 tokens `--vscode-*` usados sem fallback adicionados (dark + light) |
 
-Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximizado `[lista 300][EDITOR 767][SB 274][AB 48]`; F5 mantém abas. Prints: `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c5.8/01–07`.
+Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximizado `[lista 300][EDITOR 767][SB 274][AB 48]`; F5 mantém abas. Prints: `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c5.8/01–07` *(prints e demais mídias do arquivo_morto removidos em 2026-10-12 a pedido do usuário para liberar espaço — recuperáveis no histórico do Git)*.
 
 ## Qualidade (último estado medido)
 Fatia 06 consolidada no checkpoint `a65a246`: typecheck 0 · `WorkspaceSwitcher` 3/3 · `SessionLanding` 11/11 · workspaces 7/7 · providers 2/2 · `App.test.tsx` 46 pass / 13 skip. Playwright Linux comprovou listagem de `/`, estado vazio de `/mnt/`, troca para `/tmp`, `/fs/root=file:///tmp`, `document.title=/tmp`, `pwd=/tmp`, Provedores com 3 cards e zero `pageerror`. A suíte global histórica anterior permanece em 722 pass / 9 falhas P4 preexistentes de terminal / 16 skip.
 
 ## Pendências abertas
+- **DEBT-11 (nova, do vídeo de 2026-10-12) — a deliberar:** a pesquisa/centro de comando saiu do topo e o caminho fixo ocupou o lugar; decidir se entra na 6.1 ou em fatia futura. Após a decisão, sai daqui e entra no `06`. Itens do mesmo vídeo ainda não fatiados (Personalizações, histórico de chats, "raspar o código original", chips da Landing, "botão que abre navegador" não identificado) e evidências: `06 - PROXIMAS FASES E DIVIDAS.md`.
 - **P3 / P4 / P7** — higiene de testes (specs mortas, skips, flakes de digitação em `sessao_13_search` T6/T10 e `sessao_14` T9).
 - **P5** — `legacy/`: removida pelo usuário no Windows (tag `legacy-backup-2026-09`); não restaurar.
 - **P9** — layout mobile/single-pane (D2.61) não revisitado.
