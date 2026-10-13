@@ -2,10 +2,17 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-12 - Habilidade de podcast adotada; Episódio 01 "Estado da Obra" gerado como texto
+- Pacote **`skills_podcast 4.0.1 (Greenforged Edition)`** recebido em `.rar` (renomeado e extraído; `inicializador.txt` lido). Conteúdo mantido em `uploads/` — **fora do repositório**.
+- **Episódio 01** produzido: *"Onde a obra parou e como fechar a Fatia 6.1"* — 134 falas, 8 segmentos, **50 disfluências**, balanceamento ≤ 20 % em todos os segmentos, ~5.100 palavras, em linguagem simples (regra da casa: termo técnico sempre traduzido). **Áudio dispensado** pelo usuário nesta rodada; `roteiro_podcast.json` fica pronto para geração futura.
+- Validação adaptada (agente único; MARCH cego multiagente não é executável aqui): **35/35 afirmações confirmadas** contra os arquivos do repositório — `_resultado_validacao.json`.
+- Gênero novo `GENERO_ESTADO_DA_OBRA.md` (8 segmentos) e método registrado em `docs/09 §12`. Artefatos em `/home/user/podcast/` (fora do repo).
+- **Autorização nova do usuário (D62):** a IA passa a commitar cada mudança no sandbox para reversibilidade.
+
 ## 2026-10-12 - Limpeza de espaço: 194 arquivos de mídia removidos do arquivo_morto (46 MB)
 - A pedido do usuário, removidos **194 arquivos** de `docs/arquivo_morto/`: prints das Fatias 04/05 (prints, raspagens `04_17` e `05_01`, auditorias `c1`–`c5.8`), `comparacao-terminal/`, `historico_homologacao/evidencias/`, `referencias_visuais/` e resíduos de `platform-residuos/` (inclusive o arquivo vazio `tsc`).
 - Resultado: repositório de **107 MB → 61 MB** (46 MB liberados; 23 pastas que esvaziaram foram removidas). **Nada foi perdido:** os arquivos continuam no **histórico do Git** (restauráveis via `git restore`).
-- Ponteiros que ficaram sem destino foram anotados em `docs/03` e `docs/04`. **Nenhum commit feito** — exclusões aparecem em `git status` aguardando o usuário.
+- Ponteiros que ficaram sem destino foram anotados em `docs/03` e `docs/04`. **Commits locais do sandbox criados em 2026-10-12** (`chore(arquivo_morto): remover 194 mídias obsoletas` e `docs: análise do vídeo…`), a partir da autorização registrada em `docs/05` D62. No GitHub os hashes diferem (ver `docs/01 §E`).
 
 ## 2026-10-12 - Análise do vídeo do usuário (4min02s): DEBT-11 aberta e método de leitura de vídeo documentado
 - Vídeo `Gravar_2026_10_11_20_00_45_554.mp4` (1904×1076, H.264 30fps, AAC, 4min02s) analisado por transcrição + frames: faster-whisper **small** (pt, prob. 1.00, 25 segmentos), 16 frames periódicos (timestamps calibrados por MSE), 4 de cena, 17 dirigidos e folhas de contato. Fala e imagem cruzadas em todos os achados.

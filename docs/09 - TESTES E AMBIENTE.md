@@ -219,3 +219,12 @@ O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e
 7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
 8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão.
 9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).
+
+## 12. Habilidade de podcast (skills_podcast 4.0.1 — Greenforged Edition)
+Pacote de produção de podcast (orquestrador → escritor → atomizador/validador → produtor de áudio) extraído em `uploads/skills_podcast 4.0.1 (Greenforged Edition)/` — **fora do repositório; não versionar** (regra do `§11 item 8`). Entrada: `inicializador.txt` → `README.md` + `orquestrador/BOOT_ORQUESTRADOR.md` + `orquestrador/SKILL_ORQUESTRADOR.md`.
+
+- **Uso neste projeto:** transformar o estado da obra em conversa em linguagem simples para o usuário (contextualizar antes de decidir). Corpus = repo + conversas + análise do vídeo.
+- **Adaptação validada em 2026-10-12** (Episódio 01): gênero novo **`GENERO_ESTADO_DA_OBRA`** (8 segmentos, adaptado do Detalhado); roteiro, JSON e estado em `/home/user/podcast/` (fora do repo). Áudio opcional (o usuário dispensou nesta rodada; JSON pronto para gerar depois).
+- **Regras da casa mantidas:** balanceamento ≤ 20% entre speakers (trava dura), disfluências ≥ 1 a cada 3 falas, Speaker B elabora (não só pergunta), termo técnico sempre traduzido, fecho com gancho.
+- **Validação adaptada:** o MARCH cego multiagente exige agentes separados; quando não for possível, validar **em agente único** cruzando cada afirmação com os arquivos do repositório (resultado em `_resultado_validacao.json`; exigir 0 não-encontradas para aprovar).
+- **Cuidado:** a fatia só aceita roteiro com acentuação PT-BR correta (primeira passada saiu sem acento e foi corrigida — não repetir).
