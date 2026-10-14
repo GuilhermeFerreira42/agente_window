@@ -10,6 +10,15 @@ Até 2026-10-02 a pasta `docs/` tinha 373 arquivos e a mesma informação vivia 
 
 O dono do projeto trabalha por voz, com várias IAs, e pensa em "arquivo 00, arquivo 25". Pastas espalhadas em inglês pioraram o mapa mental dele. Então **ficou decidida a forma híbrida**: mantém o ganho da Engenharia de Contexto (um lugar só para cada coisa, arquivo de entrada curto, histórico separado de estado) e volta para **pasta única `docs/` com numeração**. Os commits da migração não foram revertidos; os arquivos foram **movidos de novo com `git mv`** (histórico preservado).
 
+## 0.1 Linguagem do projeto — Dicionário do Condomínio (D68, 2026-10-14)
+
+> O projeto é **Monolito Modular**: uma casa grande com cômodos separados — **não** microserviço, **nem** "tudo num arquivo só". Detalhe, justificativas e migração: `04 §2.2`.
+
+- **Condomínio** = o projeto inteiro · **Bairro** = grupo de casas (**1** Workbench sem IA · **2** Inteligência · **3** Ponte · **4** Agent Host · **5** Extensões) — **bairro não importa bairro**.
+- **Casa** = módulo com **memória + porta (contrato) + teste próprio** (ex.: `modules/explorer-search`) · **Móvel** = peça só visual dentro da casa · **Corredor** = só layout (Titlebar) · **Síndico** = `App.tsx` (meta: ~200 linhas, só cola) · **Prefeitura** = serviços centrais (no MVP: a "caderneta" `shellCommandRegistry`) · **Prédio** = processo separado (MVP: 1 prédio; futuro **Condomínio Robusto**: 5 — `04 §2.2`).
+- **Regra de ouro do desenho:** **Bairro 1 funciona sem IA** — desligue a IA e o Workbench continua um editor completo (verificado por teste automático).
+- **"Casa muda de endereço quando a fatia mexer nela"** (D69): sem big-bang, sem pasta vazia; áreas congeladas só mudam com ordem expressa do dono.
+
 ## 1. Estrutura travada — 9 arquivos ativos, NUNCA aumentar
 
 ```
@@ -30,6 +39,8 @@ agente_window/
 ```
 
 **Regra de ouro:** são **9 arquivos**. O `08` é do humano (homologar), o `09` é da IA (operar testes). **Nenhum outro arquivo é criado por motivo nenhum** — nem "é longo", nem "é importante", nem "é só um log" (nada de `10 - LOG`, `11 - TODO`). Se precisa anotar algo, entra em um dos 9. Coisa técnica de teste vai no `09`, nunca no `08`. O que fecha vai para `arquivo_morto/` na hora, não acumula.
+
+**Kit de contexto para IA colaboradora (D67, 2026-10-13):** quando o dono convida uma IA externa para **opinar** (sequência, riscos, dívidas), ela recebe uma **carta de contexto avulsa, FORA do repositório** — a regra dos 9 permanece intacta. A carta traz: resumo do projeto e do estado real, decisões recentes, dívidas, **perguntas em aberto**, kit de leitura (estes 9 canônicos + **índice curado do `arquivo_morto`**, com a regra **"história ≠ norma"**) e armadilhas (as 4 numerações que circulam: nova 07–16 · antiga 6.1–14 · pastas `pesquisa_bruta/fatia-XX` · docs do arquivo morto `00`–`28`). O registro das conversas de alinhamento também vive **fora do repo**.
 
 ## 2. De onde veio cada arquivo (mapeamento real, com os nomes que existiam no repo)
 
@@ -95,7 +106,7 @@ agente_window/
 ## F. Escopo e arquitetura
 - Princípio **LEGO**: módulos prontos são **reposicionados**, não reescritos.
 - **Intocáveis:** Terminal homologado (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server`), contratos congelados (`docs/04 - ARQUITETURA E REGRAS DURAS.md`), `modules/explorer-search/{core,server}/**`, `EditorArea.tsx` (até 5.7).
-- `App.tsx` só **wiring aditivo** via barrel único (`src/shell/index.ts` e `modules/explorer-search/index.ts`); `index.ts`/`contract.ts` do módulo **apenas aditivos**; `ui/**` só montagem; **módulo nunca importa do shell**.
+- `App.tsx` só **wiring aditivo** via barrel único (`src/shell/index.ts` e `modules/explorer-search/index.ts`); `index.ts`/`contract.ts` do módulo **apenas aditivos**; `ui/**` só montagem; **módulo nunca importa do shell**. *Diagnóstico de acoplamento e rumo de modularização (2026-10-13): `04 §2.1`.*
 - `.env` não existe e não deve existir; npm (não pnpm/yarn); rodar E2E com `npx playwright test` (não há script `npm run e2e`).
 - **Inglês só em peças novas/migradas**. Nada existente é traduzido.
 - Nada em `position: fixed`. Recolher container com box = `display: flex/none`; `contents/none` só em wrapper transparente (Regra 10 do `docs/04`).
@@ -120,4 +131,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-FATIA-05 "Chassis-Right" **100 % homologada**. Fatia 06 implementada. **Fase ativa atual: FATIA 6.1 — Fechamento de Dívidas Críticas (Spec-Driven)**. A Fatia 07 não inicia antes de zerar as dívidas da 6.1.
+FATIA-05 "Chassis-Right" **100 % homologada** · Fatia 06 implementada · **fases renumeradas e reordenadas em 2026-10-13 (D63–D67)**: **fase ativa = FATIA 07 — Destravar** (SPEC pronta na Parte 2 do `06`), seguida por **08 Conectar → 09 Conversar → 10 Agir, onde o MVP fecha (D65)**; refinamentos foram para a FATIA 13. Referência oficial de fidelidade: **"Agents Window" do VS Code** (D66; régua code-server 8080).

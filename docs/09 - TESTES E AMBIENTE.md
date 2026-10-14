@@ -61,10 +61,11 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 | `sessao_11f_context_menu` | 2/2 | ações do menu de contexto do terminal |
 
 Todos testam rótulos/atributos do terminal **anteriores** à homologação `COMITE_HOMOLOGACAO_TERMINAL_V2` (`75c6686`). Mesma família das **9 falhas do Vitest** em `src/components/terminal/__tests__/TerminalPanel.test.tsx` (espera `role="region"` "Terminal"; `VSCodeTerminal.tsx` renderiza `aria-label="Painel Inferior"`).
-**Regra:** não corrigir código do terminal (intocável). Destino dos testes = decisão do usuário (`docs/arquivo_morto/25_ESTADO_ATUAL_E_PENDENCIAS_FATIA-05.md (histórico) §6 P3/P4`). Até lá: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
+**Destino decidido (2026-10-14, D74 — faxina em 2 ondas):** **onda 1** — os 13 E2E mortos são marcados como `skip` na **FATIA 07** (registro preservado; **não apagar**); **onda 2** — as **9 falhas do Vitest** (`TerminalPanel.test.tsx`, P4) são consertadas na **FATIA 12 — Terminal 2.0**, junto do transplante. Até as fatias correspondentes abrirem: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
 
 ### 2.5 Números esperados hoje
 - **Baseline global histórico no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas eram preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos. Os gates focados atuais do HEAD `a65a246` estão no cabeçalho e na §7.
+- **Ondas de limpeza (D74, 2026-10-14):** os **13 mortos** → `skip` na FATIA 07 (onda 1, registro preservado); as **9 falhas P4** do terminal → conserto na FATIA 12 (onda 2). Baseline a reconferir na abertura de cada fatia.
 - **Bateria §9 (14 suítes):** 5175 → 15 (16) · 13_search (14) · 13_search_backend (6) · 14 (16) · 14c (2 + 4 skip) · 14d (5) · 14b_git_changes (9 + 2 skip) · 14b_git_backend (7) · 12_explorer_fs_backend (10) · 11_terminal_pty_real (6) · 12_explorer (30); 5174 → 11_terminal_interactive_v2 (3) · 14b_git_smoke (1). **Verde duas vezes** na 5.2 e na 5.3 (pré e pós-commit).
 - **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
 - **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
@@ -194,17 +195,17 @@ A homologação humana está no `08`. Esta seção registra somente o que a IA d
 - Typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspace/providers 9/9.
 - Playwright Debian 1400×900: raiz listou home/mnt/tmp; `/mnt/` mostrou pasta vazia; `/tmp` sincronizou `/fs/root=file:///tmp`, `document.title=/tmp` e `pwd=/tmp`; zero page errors.
 
-## 10. Bateria e Gates de Teste — FATIA 6.1: Fechamento de Dívidas Críticas (Spec-Driven)
-Para a entrega da Fatia 6.1, os seguintes testes automatizados devem ser adicionados/validados antes da homologação humana:
+## 10. Bateria e Gates de Teste — FATIA 07: Destravar (ex-"6.1", renumerada por D64)
+Para a entrega da **FATIA 07 — Destravar** (SPEC na Parte 2 do `06`), os seguintes testes automatizados devem ser adicionados/validados antes da homologação humana:
 1. **Teste de Sincronização Atômica (`App.test.tsx`):**
    - Disparo de seleção de pasta deve chamar imediatamente o recarregamento do Explorer e a notificação de `cd` ao PTY, sem necessidade de despacho de mensagem no chat.
 2. **Teste de Abertura de Provedores na Landing (`SessionLanding.test.tsx` / `App.test.tsx`):**
    - Disparo da ação de abrir Provedores a partir do estado inicial (zero sessões / landing vazia) deve montar a tela no editor moderno com sucesso.
 3. **Teste de Purga do Visualizador Legado:**
    - Teste estático/unitário confirmando que nenhum componente de `components/legacy/` é instanciado na árvore React.
-4. **Teste de Limpeza de Buffer do Terminal:**
-   - Validação da emissão da sequência de escape de clear para o xterm, garantindo viewport zerado.
-5. **Pré-requisito para Fatia 07:** A Fatia 07 não inicia sem typecheck 0 e aprovação deste gate.
+4. *(movido)* **Teste de Limpeza de Buffer do Terminal (`clear`):** saiu desta fatia — agora integra a **FATIA 12 — Terminal 2.0** (DEBT-01, por D64).
+5. **Higiene — onda 1 (D74):** marcar como `skip` os 13 E2E mortos (§2.4), preservando o registro (**não apagar**).
+6. **Pré-requisito em cascata:** a **FATIA 08 não inicia** sem typecheck 0 e aprovação deste gate.
 
 ## 11. Análise de vídeos do usuário (método validado em 2026-10-12)
 O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e **imagem** antes de concluir qualquer coisa. Pipeline validado em um MP4 de 4min02s (1904×1076, H.264, AAC).
@@ -217,7 +218,7 @@ O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e
 5. **Frames:** periódicos (`fps=1/15,scale=1280:-2`), de cena (`select='gt(scene,0.18)'`) e **dirigidos por timestamp** (`-ss T -frames:v 1`) nos pontos que a fala marca. Folhas de contato com `drawtext` (`%{pts\:hms}`) + `tile` dão panorama rápido; **atenção**: em clipes extraídos com `-ss`, o rótulo `pts` reinicia em zero — somar o offset do corte.
 6. **Timestamps exatos sem perder tempo:** extrair `fps=1` do vídeo inteiro (242 JPEGs) e casar cada frame periódico por comparação de pixels (MSE) — MSE=0 identifica o segundo exato. Não estimar por aproximação em trecho que vá para doc.
 7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
-8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão.
+8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py`.)*
 9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).
 
 ## 12. Habilidade de podcast (skills_podcast 4.0.1 — Greenforged Edition)
