@@ -17,7 +17,10 @@ test.describe('Sessão 10 — Custom View Grid', () => {
     await resetApp(page)
   })
 
-  test('T1: AI Customizations cobre Sessions Part, Editor, Aux e Panel — só Titlebar e Sidebar ficam', async ({ page }) => {
+  // MORTO (D74 + D80 — FATIA 07, 15/10, a pedido do dono): espera a coluna "Detalhes" da AuxiliaryBar visível ao abrir alterações.
+  // A coluna foi REMOVIDA DE VEZ na 5.8-c1 (D2.50) — hoje a `.auxiliary-bar` é a casca do Editor Anexo (largura 0 quando recolhida).
+  // Ver docs/09 §2.6 (investigação 15/10, sonda_05_aux_bar.cjs). Registro preservado — NÃO apagar; expectativa morta, sem conserto previsto.
+  test.skip('T1: AI Customizations cobre Sessions Part, Editor, Aux e Panel — só Titlebar e Sidebar ficam', async ({ page }) => {
     // Estado de partida com TODAS as parts visíveis, para o "sumiço" ser real.
     await page.getByRole('button', { name: BTN.abrirAlteracoes }).click()
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()

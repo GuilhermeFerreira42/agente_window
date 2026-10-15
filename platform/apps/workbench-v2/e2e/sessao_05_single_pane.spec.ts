@@ -18,7 +18,10 @@ test.describe('Sessão 05 — Single Pane', () => {
     await shot(page, 'sessao05_T1_desktop_encolhido')
   })
 
-  test('T2: a aba Browser esconde o detail panel de forma transiente', async ({ page }) => {
+  // MORTO (D74 + D80 — FATIA 07, 15/10, a pedido do dono): espera a coluna "Detalhes" DESMONTADA (count 0) ao abrir a aba Browser.
+  // A coluna foi REMOVIDA DE VEZ na 5.8-c1 (D2.50) e a casca do Editor Anexo NUNCA desmonta (homologação 5.7 + Regra 10).
+  // Ver docs/09 §2.6 (investigação 15/10, sonda_05_aux_bar.cjs). Registro preservado — NÃO apagar; expectativa morta, sem conserto previsto.
+  test.skip('T2: a aba Browser esconde o detail panel de forma transiente', async ({ page }) => {
     await page.getByRole('button', { name: BTN.abrirAlteracoes }).click()
     await page.waitForTimeout(400)
     expect(await page.locator(SEL.auxiliaryBar).count(), 'com Changes ativo a aux fica visível').toBe(1)
