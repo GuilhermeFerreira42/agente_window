@@ -71,19 +71,38 @@ A dependência desce nesta ordem:
 
 > **Decisão do dono (2026-10-14).** Vocabulário criado na conversa com a IA colaboradora (Meta, 14/10). **Não é microserviço e nem "tudo num arquivo só"** — é uma casa grande com cômodos separados: manutenção isolada sem a complexidade de rede/debug dos microserviços.
 
-### Vocabulário oficial (dicionário)
-| Termo | O que é | Exemplo no nosso código |
-|---|---|---|
-| **Condomínio** | O projeto inteiro | `agente_window` |
-| **Bairro** | Grupo de casas que trabalham juntas; **bairro NÃO importa bairro** | 1 Workbench sem IA · 2 Inteligência · 3 Ponte · 4 Agent Host · 5 Extensões |
-| **Casa** | Módulo com **memória (estado) + porta (contrato) + ciclo de vida + teste próprio**; pode ser trocada sem quebrar o resto | `modules/explorer-search` (exemplo que funciona — 0 violações) |
-| **Móvel** | Peça **só visual**, sem estado próprio; vive DENTRO de uma casa | `WorkspaceSwitcher` (móvel da Casa do Command Center) |
-| **Corredor** | Só junta casas; não tem estado (é layout) | Titlebar |
-| **Síndico** | `App.tsx` — só cola (wiring); meta: ~200 linhas | `src/App.tsx` (hoje: 2.247 linhas — a ser encolhido) |
-| **Prefeitura** | Serviços centrais que todas as casas usam (no MVP: a "caderneta" `shellCommandRegistry`) | `domain/shellCommandRegistry.ts` |
-| **Prédio** | Processo separado do SO; se um cai, o outro fica de pé | MVP: 1 prédio · Robusto: 5 prédios |
+### Vocabulário oficial (dicionário — D76)
+
+> Esta tabela é a **tradução oficial**: qualquer inteligência, pessoa ou máquina que abrir a documentação entende cada termo **sem ter participado da conversa**. O apelido de alto nível anda SEMPRE acompanhado do nome técnico.
+
+| Termo | Em palavras simples | Equivalente técnico | Exemplo no nosso código |
+|---|---|---|---|
+| **Condomínio** | O projeto inteiro | a aplicação | `agente_window` |
+| **Bairro** | Grupo de casas que trabalham juntas; **bairro não importa bairro** | agrupamento de módulos isolado | 1 Workbench sem IA · 2 Inteligência · 3 Ponte · 4 Agent Host · 5 Extensões |
+| **Casa** | Cômodo que pode ser trocado sem quebrar o resto | módulo com **estado + contrato (porta) + teste próprio** | `modules/explorer-search` (exemplo que funciona — 0 violações) |
+| **Móvel** | Peça só visual, mora dentro de uma casa | componente de interface sem estado próprio | `WorkspaceSwitcher` (móvel da Casa do Command Center) |
+| **Corredor** | Só junta casas; não guarda nada | composição/layout sem estado | Titlebar |
+| **Síndico** | Só cola as partes (meta: ~200 linhas) | arquivo de composição (wiring) | `src/App.tsx` (hoje: 2.247 linhas — a ser encolhido) |
+| **Prefeitura** | Serviços centrais que todas as casas usam | serviços compartilhados (no MVP: a "caderneta") | `domain/shellCommandRegistry.ts` |
+| **Prédio** | Processo separado; um cai e o outro fica de pé | processo do sistema operacional | MVP: 1 prédio · Robusto: 5 prédios (referências: `arquivo_morto/referencias/vs-code-1.135/01`) |
+
+**Quem pode falar com quem (a regra de uma olhada):**
+- **Casa** → fala com outra casa **só pela porta** (`index.ts`); o resto da casa é privado.
+- **Bairro** → **não** importa outro bairro; o Bairro 1, em especial, **funciona sem IA**.
+- **Móvel** → mora dentro de **uma** casa; não tem estado próprio e não fala com outras casas.
+- **Corredor** → só posiciona; **não** guarda estado nem regra de negócio.
 
 **Critério "Casa ou Móvel?"** (para não exagerar e virar micropedaço): é **CASA** se tem estado + contrato + pode ser trocada + teste próprio. Senão, é **MÓVEL**.
+
+### A língua em três lugares (D76) — para o projeto se explicar sozinho
+O nome de alto nível existe para o dono orquestrar. Para que **ninguém** dependa de ter lido uma conversa, cada termo vive em **três lugares**:
+1. **Dicionário** — esta tabela (+ resumo no `01 §0.1`);
+2. **Pastas do código** — `src/bairros/<n>-<nome>/casas/<casa>/…` (estrutura abaixo);
+3. **Cartão de visita por casa** — um README **curto** dentro da pasta da casa ("eu sou a casa X; só me chame pela porta `index.ts`"), criado **na migração da casa** (D69), nunca em arqueologia no fim.
+
+**Regra do registro:** todo termo novo que o dono nomear numa conversa entra neste dicionário — senão a língua se perde.
+
+**Apelidos (não oficiais — registrados por fidelidade, D76):** a IA colaboradora usou nomes diferentes para os mesmos bairros na conversa de 14/10 — **Provedores** (= 2 Inteligência) · **Cérebro** (= 3 Ponte) · **Runtime** (= 4 Agent Host). São sinônimos de leitura; a nomenclatura **oficial é a da tabela acima**.
 
 ### Estrutura de pastas (destino)
 ```

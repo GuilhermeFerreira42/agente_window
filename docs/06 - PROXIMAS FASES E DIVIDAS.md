@@ -95,6 +95,8 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 
 Todas as fatias estruturadas sob o padrão **especificação prévia, escopo vertical e critérios rígidos de aceitação**. **Cada fatia agora tem duas tarefas: a FUNÇÃO (o que entrega) e a CASA (o que muda de endereço no `App.tsx`)** — a fila e a arquitetura andam juntas (D68/D69; condomínio no `04 §2.2`).
 
+> **Referências raspadas (14/10, D77):** `docs/arquivo_morto/referencias/` — VS Code 1.135 · OpenClaude · Cline (Provedores) · Arquitetura limpa; **índice + 12 notas** (`00_INDICE.md`), cada uma dizendo **para qual fatia serve**. Consultar antes de redescobrir.
+
 ### FATIA 07 — Destravar (Dívidas Estruturais) — era a 6.1
 - **Objetivo:** Sincronização atômica Workspace-Explorer-Terminal + Provedores na landing + eliminação do visualizador legado (só as 3 estruturais).
 - **Bloqueio:** bloqueia a FATIA 08 (e todo o caminho do MVP). **SPEC completa na PARTE 2.**
@@ -103,20 +105,20 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Objetivo:** Gestão rica de múltiplos provedores de IA, inspirada no Cline.
 - **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.**
 - **Critério de aceite:** configurar múltiplos provedores, testar conexão com sucesso e persistir entre reloads.
-- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`.
+- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`; **e a nota nova:** `arquivo_morto/referencias/cline/01_tela_de_provedores.md` (campo a campo, com os caminhos do repo do Cline) + `referencias/openclaude/04_provedores_descriptor_first.md` (o esqueleto de dados por trás da tela).
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
-- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-08-streaming/`, `fatia-07-input/`.
+- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-08-streaming/`, `fatia-07-input/`; **nota nova:** `referencias/openclaude/01_loop_do_agente_e_ferramentas.md` (limites, guardas anti-loop).
 
 ### FATIA 10 — Agir (Tools + Permissões) — era a 11 — **FECHA O MVP**
 - **Objetivo:** o agente age no sistema de arquivos (e, conforme recorte a decidir, no terminal) com autorização do usuário.
 - **Escopo:** ferramentas ligadas ao servidor existente (`/fs/*` — escrita atômica já pronta) + card **[Permitir] / [Negar] / [Permitir na Sessão]** + trava anti-loop (3 chamadas idênticas).
 - **Critério de aceite:** o agente propõe uma ação (ex.: criar arquivo) e **só executa após autorização** — é o teste final do MVP.
 - **Em aberto (Q6):** no MVP o agente mexe **só em arquivos** ou também **roda comandos no terminal**?
-- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md`, `fatia-09-tools/`.
+- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md`, `fatia-09-tools/`; **nota nova:** `referencias/openclaude/03_sessoes_e_permissoes.md` (o desenho exato do "Permitir / Negar / Permitir na Sessão").
 
 ### FATIA 11 — Conferir (File Ops + SCM/Diff) — eram as 07 + 08
 - **Objetivo:** edição real de arquivos no editor + visualização das alterações (a "lupa" para auditar o agente).
@@ -132,6 +134,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Casa (D69):** o Terminal — área de **endereço congelado** — é a **única área protegida que muda de endereço, e só nesta fatia**: `components/terminal` + `services/pty-server` → `1-workbench/casas/terminal` (**com ordem expressa do dono**).
 - **Critério de aceite:** mover o terminal entre painel inferior e lateral preservando as sessões abertas; `clear` sem artefatos; suíte do terminal **verde** (0 falhas — fim do P4).
 - **Em aberto:** a aba "Portas" é real ou simulação? (verificar contra o code-server 8080.)
+- **Referência raspada (14/10):** `referencias/vs-code-1.135/04_terminal_e_pty.md` (pty host, batimento, capacidades, menu de contexto, terminal-como-aba; e o achado do agente usando terminal na 1.135 — a fronteira da D72).
 
 ### FATIA 13 — Refinamentos + Casas Sessões & Command Center — absorve DEBT-05/07/11 + D2.23
 - **Objetivo:** fechar o que ficou fora do caminho crítico do MVP + extrair as duas casas da barra lateral/topo.
@@ -156,6 +159,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Objetivo:** acabamento estético, atalhos globais e paridade final de 90 % com o original — **o navegador entra aqui, por último** (acordo com a Meta, 14/10).
 - **Escopo:** posição da Activity Bar (topo/lateral — DEBT-08, Baixa) · Command Palette (Ctrl+Shift+P) · fidelidade de animações · temas dark/light · atalhos · **botão que abre navegador** (apontado pelo dono no vídeo de 12/10, ~2:18 — "é outro, mostro depois") + **Casa Navegador** (`1-workbench/casas/navegador`, extraída do `BrowserPreview` de `EditorArea.tsx`; padrão do `simple-browser` do VS Code).
 - **Critério de aceite:** inspeção lado a lado com o code-server (8080) comprovando paridade visual e funcional de 90 %; o botão do navegador funcionando.
+- **Entrega (D78):** a padronização final do código + o pacote de documentação de entrega **não** entram aqui — viram a **etapa ENCERRAMENTO**, logo depois desta fatia (ver PARTE 4).
 
 ---
 
@@ -171,3 +175,11 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### Nota de fronteira (D70)
 - As dívidas **DEBT-ROBUST-01..04** (migração MVP → **Condomínio Robusto**) **não pertencem a este roadmap** — vivem no `04 §2.2` (gatilhos e custos) e no `05` (D70). Só migram **com gatilho + ordem expressa do dono**, nunca no meio de uma fatia.
+
+### ENCERRAMENTO — Padronização & Entrega (após a FATIA 16 — D78)
+> **Não é fatia numerada** (a numeração segue 07–16); é a **etapa de entrega**, feita quando o dono mandar, depois do polimento.
+- **Padronização do código (o "pente-fino"):** revisar nomes, comentários e o uso da língua de alto nível em todo o código (D76) — o objetivo é o projeto **se explicar sozinho** para qualquer pessoa/IA que pegue o código sem ler documento.
+- **Pacote de documentação de entrega (alvo enxuto ~6 arquivos):** README da raiz · `AGENTS.md` atualizado · **cartões de visita por casa** (revisados) · glossário curto dentro do repo · decisões destiladas (versão enxuta do `05`).
+- **Destino dos canônicos da obra:** viram `arquivo_morto` — são a **planta da construção**, não o manual do prédio.
+- **Candidatos registrados na raspagem (D77):** fiscal automático de fronteiras (dependency-cruiser/ts-arch — receita em `referencias/arquitetura-limpa/02…`); avaliar junto com o gatilho do Robusto.
+- **Kit de testes:** bateria final verde (typecheck 0; suítes de terminal já consertadas na FATIA 12; E2E mortos já em `skip` desde a FATIA 07).

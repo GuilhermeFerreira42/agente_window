@@ -18,6 +18,8 @@ O dono do projeto trabalha por voz, com várias IAs, e pensa em "arquivo 00, arq
 - **Casa** = módulo com **memória + porta (contrato) + teste próprio** (ex.: `modules/explorer-search`) · **Móvel** = peça só visual dentro da casa · **Corredor** = só layout (Titlebar) · **Síndico** = `App.tsx` (meta: ~200 linhas, só cola) · **Prefeitura** = serviços centrais (no MVP: a "caderneta" `shellCommandRegistry`) · **Prédio** = processo separado (MVP: 1 prédio; futuro **Condomínio Robusto**: 5 — `04 §2.2`).
 - **Regra de ouro do desenho:** **Bairro 1 funciona sem IA** — desligue a IA e o Workbench continua um editor completo (verificado por teste automático).
 - **"Casa muda de endereço quando a fatia mexer nela"** (D69): sem big-bang, sem pasta vazia; áreas congeladas só mudam com ordem expressa do dono.
+- **A língua em três lugares (D76):** dicionário (aqui e no `04 §2.2`) + pastas do código + **cartão de visita por casa** (README curto criado na migração de cada casa) — para que o projeto **se explique sozinho**, sem depender de quem participou da conversa. Todo termo novo nomeado pelo dono entra no dicionário.
+- **Apelidos registrados (D76):** **Provedores / Cérebro / Runtime** são sinônimos de 2 Inteligência / 3 Ponte / 4 Agent Host (vocabulário da IA colaboradora); os nomes oficiais são os de cima.
 
 ## 1. Estrutura travada — 9 arquivos ativos, NUNCA aumentar
 

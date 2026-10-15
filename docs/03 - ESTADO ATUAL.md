@@ -7,6 +7,7 @@
 
 ## Status Atual
 - **2026-10-14 — 2.ª rodada com a IA colaboradora (Meta):** decisões **D68–D75** (arquitetura "Condomínio", régua 1.135, recortes do MVP, faxina de testes em 2 ondas) registradas e canônicos atualizados (`01`–`09`). Fonte única = **os canônicos deste repositório** (D75). **Código intocado** — próxima ordem esperada: início da FATIA 07.
+- **2026-10-14 — Raspagem Total concluída (D77):** VS Code 1.135 · OpenClaude · Cline · Arquitetura limpa → **índice + 12 notas** em `docs/arquivo_morto/referencias/` (com prova de origem; nada de código de terceiros guardado). Dicionário detalhado no `04 §2.2`; língua em **três lugares** (D76); documentação em dois tempos + **etapa ENCERRAMENTO** (D78).
 - **Transição Spec-Driven / Stream Coding (2026-10-11):** O projeto encerrou o modo "vibe coding". Todas as fatias são especificadas antes da codificação, e dívidas técnicas abertas bloqueiam o avanço de novas fatias.
 - **FATIA 07 — Destravar (Ativa / aprovada em 2026-10-13 · D64/D65; SPEC na PARTE 2 do `06`):** só as **3 dívidas estruturais** — o resto da antiga "6.1" foi redistribuído:
   1. **Sincronização atômica de Workspace (DEBT-06):** selecionar uma pasta deve atualizar **na hora** a árvore do Explorer **e** emitir `cd` para o PTY/Terminal, sem exigir mensagem no chat nem F5.
