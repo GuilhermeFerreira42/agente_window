@@ -162,6 +162,14 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - A tela **não** valida faturamento/limites de conta — só conexão/autenticação de chave.
 - **Revelar a chave (D83)** manda o segredo do servidor para a aba **sob clique do dono**: aceitável para uso local; fica registrado que, com o app exposto na rede, quem alcança a tela pode revelar a chave (mitigado: só sob clique, `no-store`, sem log, sem URL).
 
+## 8. Estado da implementação (2026-10-15) — IMPLEMENTADA, aguardando a validação do dono
+- **Código:** `bairros/2-inteligencia/casas/provedores` — `contract.ts` · `descritores/{nativos,registro}.ts` · `server/{providersRepo,probe,rotas}.ts` · `ui/{ProvidersView.tsx,client/api.ts}` · `providers.css` · `README.md`. **Legado removido:** `src/server/providers.ts` (+ teste), `src/components/ProvidersView.tsx`, `src/styles/providers.css`. `App.tsx` importa **só o barrel**; o plugin do dev server delega as rotas (`rotaPertenceAoModulo`, D71).
+- **Commits (sem push):** `f87981c` · `2b371c2` · `fde5f0f`.
+- **§6 (plano de prova) atendido:** (a) unit da casa **37/37** + suíte completa **765✓/12✗/16 skip** com typecheck 0; (b) Playwright `e2e/provedores_fatia08.spec.ts` **6/6** contra stub local; (c) evidências (prints + saída) em `validacao_fatia08/` — **fora do repo**; (e) mocks de `App.test.tsx` e `fatia07_destravar.test.tsx` atualizados para o formato **v2**.
+- **§6(d) pendente:** roteiro do dono com **chave real** — escrito em `08` **PARTE C**.
+- **Defeitos reais corrigidos durante a prova:** Salvar enviava a lista antiga; `nome` do genérico se perdia no 2.º salvamento (ambos em `fde5f0f`, com teste).
+- **Critérios de pronto (§4) — status:** todos verdes na prova automatizada; a **homologação** exige o roteiro do dono (chave real) e o aceite dele.
+
 ---
 
 # PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 16 — renumeração D64 de 2026-10-13)
@@ -176,7 +184,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 08 — Conectar (Provedores estilo Cline) — era a 09
 - **Objetivo:** Gestão rica de múltiplos provedores de IA, inspirada no Cline.
-- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.** **SPEC detalhada: PARTE 2B** (escrita em 15/10; 2 pontos da §4 aguardam o dono). **Casa:** `2-inteligencia/casas/provedores` nasce aqui (1.º módulo extraído, D68/D69).
+- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.** **SPEC detalhada: PARTE 2B** (escrita em 15/10; D81–D84 fechadas com o dono). **IMPLEMENTADA em 15/10** (`f87981c`/`2b371c2`/`fde5f0f`; estado e prova na PARTE 2B §8) — falta a **validação do dono com chave real** (`08` PARTE C). **Casa:** `2-inteligencia/casas/provedores` nasceu aqui (1.º módulo extraído, D68/D69).
 - **Critério de aceite:** configurar múltiplos provedores, testar conexão com sucesso e persistir entre reloads.
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`; **e a nota nova:** `arquivo_morto/referencias/cline/01_tela_de_provedores.md` (campo a campo, com os caminhos do repo do Cline) + `referencias/openclaude/04_provedores_descriptor_first.md` (o esqueleto de dados por trás da tela).
 

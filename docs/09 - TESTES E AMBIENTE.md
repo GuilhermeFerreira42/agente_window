@@ -73,6 +73,10 @@ Todos testam rótulos/atributos do terminal **anteriores** à homologação `COM
 - **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
 - **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
 
+### 2.5.1 Baseline FATIA 08 (HEAD `fde5f0f`, 2026-10-15)
+- `npx vitest run` → **765 passed / 12 failed / 16 skipped (793)** · typecheck **0**. As 12 falhas são **exatamente as mesmas** da linha anterior (9 `TerminalPanel` + `iconLabels` + `themeTokens` + `visualStates`). O `pass` subiu 730 → 765: **+37** dos testes da casa nova (registro 6, repositório 13, sonda 13, fronteira LEGO 5) **−2** do `src/server/providers.test.ts`, removido junto com o código legado.
+- **E2E da fatia:** `provedores_fatia08.spec.ts` **6/6** (ver §13).
+
 ### 2.6 Falhas pré-existentes FORA do §2.4 — triagem 2026-10-15 (decisão do dono pendente)
 Encontradas ao rodar a suíte com o seed de sessões correto (ver §3.6). **Não** estão na lista canônica do §2.4, então **não** foram marcadas como `skip` (seria estender a onda 1, D74). Cada uma foi conferida no **A/B `e02e486`** (falha idêntica nos dois estados → pré-existente, não regressão da FATIA 07):
 
@@ -267,3 +271,28 @@ Pacote de produção de podcast (orquestrador → escritor → atomizador/valida
 - **Regras da casa mantidas:** balanceamento ≤ 20% entre speakers (trava dura), disfluências ≥ 1 a cada 3 falas, Speaker B elabora (não só pergunta), termo técnico sempre traduzido, fecho com gancho.
 - **Validação adaptada:** o MARCH cego multiagente exige agentes separados; quando não for possível, validar **em agente único** cruzando cada afirmação com os arquivos do repositório (resultado em `_resultado_validacao.json`; exigir 0 não-encontradas para aprovar).
 - **Cuidado:** a fatia só aceita roteiro com acentuação PT-BR correta (primeira passada saiu sem acento e foi corrigida — não repetir).
+
+## 13. Bateria e prova — FATIA 08: Conectar (Provedores) (2026-10-15)
+> Baseline no HEAD `fde5f0f`: typecheck **0** · unit **765✓ / 12✗ (pré-existentes) / 16 skip** (§2.5.1) · E2E da fatia **6/6**.
+
+**Unit da casa** (`src/bairros/2-inteligencia/casas/provedores/__tests__/`, **37/37**):
+| Arquivo | Testes | Cobre |
+|---|---|---|
+| `registro.test.ts` | 6 | 8 descritores, ids únicos, protocolos com adaptador, endereços padrão, o genérico |
+| `providersRepo.test.ts` | 13 | máscara, precedência **arquivo > ambiente** (D84), migração v1→v2 com `.bak`, `validarEntrada`, gravação 0600, revelar chave, id desconhecido |
+| `probe.test.ts` | 13 | `fetch` mockado: ok · 401 · endereço · tempo (timeout 10 s) · http · resposta · catálogo e ping de conversa |
+| `frontier.test.ts` | 5 | fronteira LEGO: fora da casa só o barrel (exceção estreita do plugin), deps permitidas, `contract.ts` sem `any`, `as unknown as` confinado, dono único das regras |
+
+**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`validacao_fatia08/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
+| Teste | Prova |
+|---|---|
+| T1 | Conta ▸ Provedores: 8 itens + endereços padrão por provedor (NVIDIA = `integrate.api.nvidia.com/v1`) |
+| T2 | Genérico: conexão de verdade (200 + 5 modelos), buscar modelos, escolher, salvar, **F5** e tudo no lugar |
+| T3 | Máscara no campo + **olhinho** (D83): revela a chave inteira sob clique e volta a ocultar |
+| T4 | **Falhas honestas:** 401 ("Chave inválida") e endereço inalcançável ("Não deu para alcançar") |
+| T5 | Serviço que não lista modelos (405): aviso honesto + **modelo digitado à mão valendo** |
+| T6 | **Provedor ativo:** chip verde, persiste após F5 |
+
+**Contrato anti-trapaça:** a spec nova nasceu com asserções e na convenção exigida — `e2eAssertionContract.test.ts` **verde** (na 1.ª tentativa ele reprovou por indentação; corrigido e virou lição para specs futuras).
+**Evidências:** `/home/user/validacao_fatia08/` (prints `f08_T*.png` + `e2e_saida.txt`) — pasta **externa** ao repositório.
+**Limitação registrada (honesta):** a prova automatizada usa **serviço simulado**; a validação com **provedor real** é o roteiro do dono (`08` PARTE C). A migração do v1 real só será exercitada no primeiro uso do dono (o sandbox não tem o arquivo dele).

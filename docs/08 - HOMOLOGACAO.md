@@ -199,3 +199,29 @@ A V1 só pode ser declarada pronta quando:
 - Linux: `/` lista diretórios; `/mnt/` lista ou mostra pasta vazia; `/tmp` deve aparecer simultaneamente no título, Explorer e `pwd`.
 - Windows 5174: Procurar abre seletor Explorer moderno; escolha deve atualizar título, Explorer e `Get-Location`.
 - Em ambos: Conta > Provedores continua independente do picker e não persiste chaves.
+
+
+# PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono
+
+> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/`.
+
+## C.1 Caminho rápido (5 minutos, sem chave paga)
+1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
+2. **Conta ▸ Provedores**.
+3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `validacao_fatia08/stub_provider.cjs` no ar.
+4. Chave: qualquer texto · **Modelo**: digite um à mão · **[Testar conexão]** → faixa verde · **[Salvar provedores]** → "Configuração salva".
+5. **F5** → reabrir Provedores → o serviço continua lá, com o nome no título; o campo da chave vem **mascarado** (o olhinho mostra só sob clique).
+6. Marcar **usar este provedor no chat** → chip "provedor ativo do chat" → **F5** → continua ativo.
+
+## C.2 Caminho com chave real (NVIDIA — grátis em build.nvidia.com)
+1. Crie a chave (`nvapi-…`) em build.nvidia.com.
+2. Em **NVIDIA** → cole a chave → **[Buscar modelos]** (o catálogo aparece) → escolha um modelo → **[Testar conexão]** (faixa verde com a contagem).
+3. **[Salvar provedores]** → **F5** → reabrir: a chave volta **mascarada** e o rodapé diz **"guardada em ~/.agente_window/providers.json (fora do projeto) — nunca entra no Git"**.
+4. No repo, `git status`: **nenhuma** menção a chave (a segunda tranca é o `.gitignore`).
+
+## C.3 O que observar (falhas honestas, sem erro genérico)
+- Chave errada → "Chave inválida (erro 401)" · endereço que não existe → "Não deu para alcançar o endereço" · serviço sem catálogo → aviso de **405** e o **modelo digitado continua valendo**.
+- Nenhuma chave em log, URL ou no carregamento da tela; o **olhinho** é o único caminho que traz a chave inteira (D83) — limite consciente registrado em `06 §7`.
+
+## C.4 Se algo falhar
+Anote **tela + texto do aviso** e traga: a validação vale como **reprovado com evidência**. Nada é declarado verde sem o aceite do dono.

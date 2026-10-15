@@ -32,9 +32,10 @@ A porta **5174** atende tudo integrado: aplicativo + `/fs` + `/pty` (arquitetura
 ```bash
 cd platform/apps/workbench-v2
 npm run typecheck        # esperado: 0 erros
-npx vitest run           # baseline: 722 passed / 9 failed / 16 skipped (docs/09 §2.5)
+npx vitest run           # baseline: 765 passed / 12 failed / 16 skipped (docs/09 §2.5 e §2.5.1)
 ```
-- As **9 falhas são pré-existentes** (terminal — débito P4) e têm conserto agendado para a FATIA 12 (D74).
+- As **12 falhas são pré-existentes** (9 do terminal — débito P4 — + `iconLabels` + `themeTokens` + `visualStates`) e têm conserto agendado para a FATIA 12 (D74). Baselines por fatia em `docs/09`.
+- **FATIA 08 (Provedores):** unit da casa `2-inteligencia/casas/provedores` = 37/37 e E2E `e2e/provedores_fatia08.spec.ts` = 6/6 (contra um provedor simulado local; ver `docs/09 §13`).
 - **E2E (Playwright):** ⚠️ specs de módulo (12/13/14…) só rodam contra o servidor de **fixture na 5175** — contra a 5174 elas **apagam arquivos reais**. **Leia `docs/09 §1` antes.**
 - Bateria anti-regressão: `platform/apps/workbench-v2/run-antiregressao.sh` (ver `docs/09 §2.1`).
 
