@@ -5,6 +5,14 @@
 .providers-head>p{color:var(--vscode-descriptionForeground);font-size:13px;line-height:1.5;margin:0;max-width:860px}
 .providers-loading{color:var(--vscode-descriptionForeground)}
 .providers-cols{display:grid;grid-template-columns:300px minmax(0,1fr);gap:22px;align-items:start}
+/* Painel estreito (ex.: editor fino com o chat aberto): a lista vai para cima e o
+   formulário embaixo — melhor que espremer o formulário em 46 px. Vale pelo
+   tamanho DESTA tela (container), não da janela. */
+.providers-view{container-type:inline-size}
+@container (max-width:620px){
+  .providers-cols{grid-template-columns:minmax(0,1fr)}
+  .providers-rail{position:static;max-height:236px;overflow:auto}
+}
 
 .providers-rail{background:var(--vscode-sideBar-background);border:1px solid var(--vscode-widget-border);border-radius:8px;padding:10px 8px;position:sticky;top:0}
 .providers-search{display:flex;align-items:center;gap:7px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,var(--vscode-widget-border));border-radius:5px;padding:6px 8px;color:var(--vscode-descriptionForeground)}
