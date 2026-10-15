@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test'
 import { BTN, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11D — split com sash redimensionável', () => {
-  test('cria o sash, redimensiona as panes e preserva o terminal funcional', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera role=separator "Redimensionar split do terminal".
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('cria o sash, redimensiona as panes e preserva o terminal funcional', async ({ page }) => {
     await resetApp(page)
 
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()

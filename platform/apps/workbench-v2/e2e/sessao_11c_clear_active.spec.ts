@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test'
 import { BTN, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11C — clear ativo sem ressuscitar output', () => {
-  test('faz split, limpa só a pane focada e o conteúdo limpo não volta após toggle do painel', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera o marcador MAIN_CLEAR_* no xterm ativo.
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('faz split, limpa só a pane focada e o conteúdo limpo não volta após toggle do painel', async ({ page }) => {
     await resetApp(page)
 
     const toggleTerminalBtn = page.getByRole('button', { name: BTN.toggleTerminal })

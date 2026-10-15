@@ -1,16 +1,17 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
-**ATUALIZADO EM: 2026-10-13 · HEAD público: `76a9ed6` + commits locais do sandbox (limpeza do arquivo_morto, docs, podcast, análise dos 2 vídeos, decisões D63–D67) · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 07 — DESTRAVAR (aprovada em 2026-10-13; aguardando ordem de início)**
+**ATUALIZADO EM: 2026-10-15 · HEAD público: `76a9ed6` + commits locais do sandbox (até `9985b9e`: decisões D63–D79, raspagem, handoff e a FATIA 07 em execução) · PADRÃO SPEC-DRIVEN ATIVO · FASE ATUAL: FATIA 07 — DESTRAVAR (EM EXECUÇÃO desde 2026-10-15; aguardando a validação/homologação do dono)**
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
 > **Nota de ambiente:** os hashes de commits **locais do sandbox da IA não sobrevivem à troca de sessão** — a fonte durável é o **conteúdo dos arquivos**. O fluxo oficial (validar no Windows → commit/push pelo dono) segue sendo o que fixa de verdade.
 
 ## Status Atual
+- **2026-10-15 — FATIA 07 EM EXECUÇÃO (ordem do dono):** **DEBT-09** (`a69137d`, Provedores pela Conta na landing) e **DEBT-06 modo "caminho C"** (`62cf055`, troca de pasta atômica — Explorer na hora; terminal **renasce na pasta nova**; a decisão fina `cd` fica para a FATIA 12) entregues; **DEBT-04** conferido — **nada a expurgar**; **onda 1 da faxina D74** executada (`9985b9e` — 13 E2E mortos em `test.skip`, skips 6→19, contrato anti-trapaça com quarentena documentada → **D79**). Números: typecheck **0** · unit **730✓ / 12✗ (todas pré-existentes) / 16 skip** · E2E **sem regressão** (todas as falhas conferidas no A/B em `e02e486`). Evidências Playwright (3 sondas + prints) em `validacao_fatia07/` — **pasta externa ao repositório**. Pendências: 7 falhas E2E pré-existentes fora do §2.4 (`09 §2.6`, decisão do dono), PTYs órfãos até a FATIA 12, e a **homologação do dono**.
 - **2026-10-14 — 2.ª rodada com a IA colaboradora (Meta):** decisões **D68–D75** (arquitetura "Condomínio", régua 1.135, recortes do MVP, faxina de testes em 2 ondas) registradas e canônicos atualizados (`01`–`09`). Fonte única = **os canônicos deste repositório** (D75). **Código intocado** — próxima ordem esperada: início da FATIA 07.
 - **2026-10-14 — Raspagem Total concluída (D77):** VS Code 1.135 · OpenClaude · Cline · Arquitetura limpa → **índice + 12 notas** em `docs/arquivo_morto/referencias/` (com prova de origem; nada de código de terceiros guardado). Dicionário detalhado no `04 §2.2`; língua em **três lugares** (D76); documentação em dois tempos + **etapa ENCERRAMENTO** (D78).
 - **Transição Spec-Driven / Stream Coding (2026-10-11):** O projeto encerrou o modo "vibe coding". Todas as fatias são especificadas antes da codificação, e dívidas técnicas abertas bloqueiam o avanço de novas fatias.
-- **FATIA 07 — Destravar (Ativa / aprovada em 2026-10-13 · D64/D65; SPEC na PARTE 2 do `06`):** só as **3 dívidas estruturais** — o resto da antiga "6.1" foi redistribuído:
-  1. **Sincronização atômica de Workspace (DEBT-06):** selecionar uma pasta deve atualizar **na hora** a árvore do Explorer **e** emitir `cd` para o PTY/Terminal, sem exigir mensagem no chat nem F5.
+- **FATIA 07 — Destravar (Ativa / EM EXECUÇÃO desde 2026-10-15 · D64/D65; SPEC na PARTE 2 do `06`):** só as **3 dívidas estruturais** — o resto da antiga "6.1" foi redistribuído:
+  1. **Sincronização atômica de Workspace (DEBT-06):** selecionar uma pasta deve atualizar **na hora** a árvore do Explorer **e** o PTY/Terminal, sem exigir mensagem no chat nem F5. **(Modo homologado em 15/10 — "caminho C", escolha do dono: o terminal renasce já na pasta nova; o `cd` num shell vivo fica para a FATIA 12.)**
   2. **Remoção do Visualizador Legado (DEBT-04):** a aba de Provedores e demais superfícies abrem exclusivamente no editor moderno; sem resquício de visualizador antigo.
   3. **Abertura de Provedores na Landing (DEBT-09):** Conta > Provedores abre com a sessão vazia (Empty State / Landing), sem depender de chat ativo.
   - **Higiene (onda 1 da D74):** marcar como `skip` os 13 E2E mortos do `09 §2.4` (registro preservado — não apagar).
@@ -61,7 +62,7 @@ Fatia 06 consolidada no checkpoint `a65a246`: typecheck 0 · `WorkspaceSwitcher`
   4. **Barra lateral esquerda fiel:** entra na **FATIA 13** (Casas Sessões + Command Center); detalhes finos (contador 29/29, "Novo Grupo", "+1 mais workspace") se fecham com a fatia aberta, contra o mockup.
   5. **Higiene de testes:** **2 ondas** (D74) — `skip` nos 13 E2E mortos (FATIA 07); conserto das 9 falhas do terminal (FATIA 12).
   6. **Escopo do "Agir" (FATIA 10):** no MVP o agente **só mexe em arquivos** (D72); terminal fica para a FATIA 12.
-- **🟡 Próximo passo imediato:** o dono pode dar a **ordem de início da FATIA 07** a qualquer momento (a SPEC já está na Parte 2 do `06`).
+- **🟡 Próximo passo imediato:** **validação própria do dono** das 3 dívidas da FATIA 07 (as sondas e prints estão em `validacao_fatia07/`; o passo a passo está no resumo entregue no chat) → homologação para declarar a fatia fechada; só então a **FATIA 08 (Conectar/Provedores)** pode iniciar (D65).
 - **🟡 Botão "abre navegador" (vídeo de 2026-10-12, ~2:18):** o dono disse "é outro — mostro depois". **Decidido (14/10): tratado por último — FATIA 16** (o "qual é" continua aguardando o dono mostrar; não adivinhar).
 - **DEBT-11 (pesquisa/centro de comando):** destino **FATIA 13**; **forma decidida (D73/E9): a pesquisa volta ao lugar e a troca de pasta vira seletor dentro dela.** Itens dos vídeos: Personalizações → **FATIA 11**; histórico de chats → **FATIA 13**; navegador → **FATIA 16**; demais itens seguem mapeados com dono no `06`.
 - **P3 / P4 / P7** — higiene de testes (specs mortas, skips, flakes de digitação em `sessao_13_search` T6/T10 e `sessao_14` T9).

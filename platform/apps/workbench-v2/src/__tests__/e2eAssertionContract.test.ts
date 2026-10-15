@@ -10,6 +10,13 @@ import { describe, expect, it } from 'vitest'
  *
  * Este teste unitário lê os arquivos .spec.ts e reprova o build se algum
  * bloco `test(...)` não contiver ao menos uma asserção.
+ *
+ * Evolução 15/10 (D74 onda 1 — FAXINA, FATIA 07): testes mortos passam a ser
+ * postos em quarentena com `test.skip(...)` e 2 linhas de comentário acima,
+ * citando o registro em docs/09 §2.4. Quarentena não é trapaça: o teste
+ * continua declarado e com o corpo preservado. Para não abrir porta a "sumir
+ * com a spec", a regra da spec não-vazia aceita o skip e, em troca, passou a
+ * exigir: spec com 100 % dos testes em quarentena precisa citar `docs/09`.
  */
 // Lê as specs pelo próprio Vite (nada de node:fs) para o arquivo continuar
 // dentro do tsconfig da app, sem depender de @types/node.
@@ -33,6 +40,15 @@ function testBlocks(source: string): { title: string; body: string }[] {
   return blocks
 }
 
+/** Blocos `test.skip(...)`: testes declarados, porém postos em quarentena (ver docs/09 §2.4). */
+function skippedBlocks(source: string): { title: string }[] {
+  const titles: { title: string }[] = []
+  const regex = /\n\s{2}test\.skip\(\s*'([^']+)'/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(source))) titles.push({ title: match[1] })
+  return titles
+}
+
 describe('Contrato da suíte E2E', () => {
   const entries = Object.entries(SPEC_SOURCES)
 
@@ -50,9 +66,23 @@ describe('Contrato da suíte E2E', () => {
     expect(semAssert, 'testes E2E sem assert passam sempre e mascaram bugs').toEqual([])
   })
 
-  it('cada spec declara ao menos um teste', () => {
-    const vazias = entries.filter(([, source]) => testBlocks(source).length === 0).map(([file]) => file)
+  it('cada spec declara ao menos um teste (ativo ou em quarentena)', () => {
+    const vazias = entries
+      .filter(([, source]) => testBlocks(source).length + skippedBlocks(source).length === 0)
+      .map(([file]) => file)
     expect(vazias).toEqual([])
+  })
+
+  it('quarentena nunca é silenciosa: spec 100 % pulada cita o registro (docs/09)', () => {
+    const mudas = entries
+      .filter(
+        ([, source]) =>
+          testBlocks(source).length === 0 &&
+          skippedBlocks(source).length > 0 &&
+          !/docs\/09/.test(source),
+      )
+      .map(([file]) => file)
+    expect(mudas, 'pular a spec inteira sem apontar o registro é apagar o teste por omissão').toEqual([])
   })
 
   it('nenhuma spec hardcoda host/porta fora do helpers', () => {

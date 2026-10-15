@@ -63,12 +63,43 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 Todos testam rótulos/atributos do terminal **anteriores** à homologação `COMITE_HOMOLOGACAO_TERMINAL_V2` (`75c6686`). Mesma família das **9 falhas do Vitest** em `src/components/terminal/__tests__/TerminalPanel.test.tsx` (espera `role="region"` "Terminal"; `VSCodeTerminal.tsx` renderiza `aria-label="Painel Inferior"`).
 **Destino decidido (2026-10-14, D74 — faxina em 2 ondas):** **onda 1** — os 13 E2E mortos são marcados como `skip` na **FATIA 07** (registro preservado; **não apagar**); **onda 2** — as **9 falhas do Vitest** (`TerminalPanel.test.tsx`, P4) são consertadas na **FATIA 12 — Terminal 2.0**, junto do transplante. Até as fatias correspondentes abrirem: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
 
+**Onda 1 ✅ EXECUTADA (2026-10-15, FATIA 07, commit `9985b9e`):** os 13 viraram `test.skip` com 2 linhas de comentário acima de cada um (apontando este §2.4 e a FATIA 12). Skips da suíte: **6 → 19**. O contrato anti-trapaça (`src/__tests__/e2eAssertionContract.test.ts`) passou a aceitar `test.skip` como declaração de teste — e **endureceu**: spec com 100 % dos testes em quarentena precisa citar `docs/09` (senão reprova) — quarentena nunca silenciosa (**D79**). Confirmação Playwright: `sessao_08`+`sessao_10` = 3✓/6 skip/2✗ e `sessao_11*`+`sessao_05` = 13✓/7 skip/2✗ (as ✗ são as pré-existentes da §2.6).
+
 ### 2.5 Números esperados hoje
 - **Baseline global histórico no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas eram preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos. Os gates focados atuais do HEAD `a65a246` estão no cabeçalho e na §7.
-- **Ondas de limpeza (D74, 2026-10-14):** os **13 mortos** → `skip` na FATIA 07 (onda 1, registro preservado); as **9 falhas P4** do terminal → conserto na FATIA 12 (onda 2). Baseline a reconferir na abertura de cada fatia.
+- **Baseline 2026-10-15 (HEAD `9985b9e`, pós-FATIA 07 parcial):** `npx vitest run` → **730 passed / 12 failed / 16 skipped (758)** · typecheck **0**. As 12 falhas são todas pré-existentes (provadas com `git stash` no início da FATIA 07): **9** em `TerminalPanel.test.tsx` (P4 — onda 2 da D74 na FATIA 12) + **1** `iconLabels.test.ts` + **1** `themeTokens.test.ts` + **1** `visualStates.test.ts`. Os 16 skips são os débitos D2.60. O `pass` subiu 722 → 730 (4 testes novos da FATIA 07 + 1 do contrato + 3 de outra origem); nenhum teste novo falhando.
+- **Falhas E2E pré-existentes FORA da lista §2.4 (triagem 2026-10-15) → §2.6:** 7 testes que falham **igual** no HEAD e em `e02e486` (A/B) mas **não** estão no §2.4 — portanto **não** foram marcados (marcá-los seria estender a onda 1, decisão do dono pendente).
 - **Bateria §9 (14 suítes):** 5175 → 15 (16) · 13_search (14) · 13_search_backend (6) · 14 (16) · 14c (2 + 4 skip) · 14d (5) · 14b_git_changes (9 + 2 skip) · 14b_git_backend (7) · 12_explorer_fs_backend (10) · 11_terminal_pty_real (6) · 12_explorer (30); 5174 → 11_terminal_interactive_v2 (3) · 14b_git_smoke (1). **Verde duas vezes** na 5.2 e na 5.3 (pré e pós-commit).
 - **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
 - **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
+
+### 2.6 Falhas pré-existentes FORA do §2.4 — triagem 2026-10-15 (decisão do dono pendente)
+Encontradas ao rodar a suíte com o seed de sessões correto (ver §3.6). **Não** estão na lista canônica do §2.4, então **não** foram marcadas como `skip` (seria estender a onda 1, D74). Cada uma foi conferida no **A/B `e02e486`** (falha idêntica nos dois estados → pré-existente, não regressão da FATIA 07):
+
+| Spec | Teste | Sintoma (15/10) |
+|---|---|---|
+| `sessao_01_sessions_core` | T2 — "Nova sessão cria exatamente uma" | o clique em "Nova sessão" **abre a landing** e a linha nasce só no envio; o teste espera a linha na hora (expectativa anterior à landing atual) |
+| `sessao_01_sessions_core` | T3 — "ativa persiste após F5" | com 5 sessões no banco, o ativo volta para outra sessão após o F5 (passa com 3 – sensível à composição do seed/timing de persistência) |
+| `sessao_08_filesystem` | T1 — "detecção da File System Access API" | espera uma aba **"Files"** que não existe desde o Explorer da FATIA-04 (mesma família do T2–T4 do §2.4) |
+| `sessao_09_bugs_criticos` | T5 — "arrastáveis + fixar/arquivar (R-085)" | timeout de 30 s no caminho do menu de contexto |
+| `sessao_10_custom_view_grid` | T1 — "AI Customizations cobre Aux" | a `.auxiliary-bar` fica **hidden** após "Abrir alterações"; o teste espera visível |
+| `sessao_05_single_pane` | T2 — "aba Browser esconde o detail panel" | a `.auxiliary-bar` **continua montada** (count 1, esperado 0) |
+| `sessao_05_single_pane` | T6 — "resize só na Sessions Part" | o chat não absorve o delta de 240 px (absorveu menos de 200) |
+
+**Leitura:** T1 do `sessao_08` parece da mesma família morta do §2.4 (aba "Files" pré-FATIA-04); T1 do `sessao_10` e T2 do `sessao_05` discutem a **visibilidade da Aux** — podem ser a **mesma causa raiz** (uma real, a investigar). T2/T3 do `sessao_01` e T5 do `sessao_09` parecem **expectativa desatualizada/timing**. Nada disso é da FATIA 07; decidir quando abrir a fatia que tocar cada área (**FATIA 12/13**) — ou marcar como `skip` com registro, se o dono autorizar a extensão da onda 1.
+
+#### Investigação dos 2 suspeitos da Aux (2026-10-15, ordem do dono — "opção C"): **veredito = expectativa morta, não bug**
+Método: leitura do código + sonda `validacao_fatia07/sonda_05_aux_bar.cjs` (Playwright, observação pura) + decisões homologadas. **Fatos medidos ao vivo** (0 pageerrors):
+| Passo | `.auxiliary-bar` | Abas do editor |
+|---|---|---|
+| boot | no DOM, `display:flex`, **largura 0 px** | nenhuma |
+| "Abrir alterações no editor" | igual (largura 0) | abre **aba** `diff` "Branch Changes" (selecionada) |
+| "Abrir navegador no editor" | **continua montada** | abre **aba** `browser` "Browser" (selecionada) |
+
+**Por que os testes estão velhos:** a coluna "Detalhes" da `AuxiliaryBar` foi **removida de vez** (5.8-c1, 2026-10-02 — D2.50), a homologação 5.7 fixou "**fechar aba nunca desmonta a AuxiliaryBar**; **sem 'Detalhes' com 0 arquivos"** e o campo `auxiliaryVisible` é hoje **constante `false`** no shell (D2.72 — limpeza reservada à FATIA 14, "só limpeza"). Hoje a `.auxiliary-bar` é **a casca do Editor Anexo**: sempre montada quando o módulo existe (Regra 10: `display`), recolhida com largura 0. E "Abrir alterações" abre **aba** no editor por decisão (E10/R-083: "a Changes pill revela explicitamente o editor"). Os dois specs são de **17/09** (`75c6686`) — **anteriores** à remoção.
+→ **`sessao_10 T1`** espera a coluna antiga **visível** ao abrir alterações; **`sessao_05 T2`** espera a coluna antiga **desmontada** ao abrir o navegador. Ambos contradizem decisões já homologadas.
+
+**Aplicado (15/10, D80 — decisão do dono, opção "só os 2"):** `sessao_10 T1` e `sessao_05 T2` estão em **quarentena `test.skip`** com nota (registro preservado; "expectativa morta, sem conserto previsto"). Os **5 restantes continuam vermelhos** e registrados nesta §2.6 — dois deles podem ser problema real (`sessao_09 T5` arrastar/fixar e `sessao_01 T3` sessão ativa após F5) e por isso **não** foram silenciados. Skips da suíte E2E: **19 → 21**.
 
 ---
 
@@ -100,6 +131,13 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - Sempre `timeout ≤ 700` no wrapper e saída para arquivo de log quando a suíte for longa (o pipe morre com o wrapper e perde o resumo).
 - Órfãos após interrupção: `pgrep -f "playwright test|workerProcessEntry|chrome-headless-shell"` e matar por PID (**nunca** `pkill -f` com padrão que case o próprio shell).
 - Print de tela sem travar: `node shot.tmp.mjs <url> <png>` (utilitário local, não versionado) ou Playwright com `clip` e esperando `.agent-sessions-workbench` — `networkidle` nunca fica idle com o Vite.
+
+### 3.6 Seed de sessões para os specs de 5174 (descoberto em 2026-10-15) — senão, falha em massa
+`resetApp` (`helpers.ts:58`) espera `.session-row`: **sem ≥1 sessão no banco, toda spec falha** (foi a causa das "18 falhas" da triagem da FATIA 07). Receita que ficou verde:
+1. **5 sessões** (o `sessao_01 T1` exige **≥5** linhas), **todas na mesma pasta** e essa pasta **dentro da raiz do 5174** (`repoRoot = /home/user/agente_window` — `vite.config.ts`; na prática usei `platform/apps/workbench-v2`).
+2. **Por que a mesma pasta:** a raiz ativa do `explorer-search` é a pasta da **sessão ativa**; pasta de outra sessão fora dela → `GET /fs/list` responde **403** e specs que conferem o console (`sessao_01 T5`, `sessao_11_terminal_pty_real T1`) falham por tabela. Com o seed em `/tmp` isso acontecia — **não** é bug do produto.
+3. **Persistência atrasada:** depois do Enter na landing, esperar **~2,5–3 s** antes de fechar o navegador, senão o `PUT /api/sessions` **não sai** e o banco fica vazio. Com sessões já existentes, abrir a landing exige clicar em **"Nova sessão"** (`landingVisible = newSessionLanding || !hasSessions`).
+4. **Banco:** `~/.agente_window/agente_window.db` (tabela `sessions`); conferir com `GET /api/sessions`; limpar com `DELETE /api/sessions/<id>?force=true`. **Cuidado:** `sessao_09 T3` apaga uma sessão no meio da rodada — re-semear entre lotes.
 
 ---
 

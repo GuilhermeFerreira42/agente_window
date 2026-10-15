@@ -58,7 +58,9 @@
 
 # PARTE 2 — SPEC: FATIA 07 — Destravar (Dívidas Estruturais)
 
-> **STATUS:** APROVADA (aguardando ordem de início). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64).
+> **STATUS:** **EM EXECUÇÃO desde 2026-10-15** (ordem do dono). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64). Fechamento **só** com os critérios de §3 verdes + evidências registradas (sondas Playwright em `validacao_fatia07/` — pasta externa ao repo — e entradas em `07`).
+> **DECISÕES DA EXECUÇÃO (15/10):** **DEBT-06 — caminho C** (escolha expressa do dono): o terminal **renasce já na pasta nova** em vez de receber `cd` num shell vivo; a decisão fina "cd real × renascer" fica para a **FATIA 12**, contra o code-server (8080). **DEBT-09 — feito** (`a69137d`): as abas globais do editor deixaram de depender de sessão, então Provedores abre pela Conta na landing. **DEBT-04 — nada a expurgar:** busca no código não encontra resquício do visualizador legado (sem `legacy/`, `ProvidersView` é a única superfície, via `providersSurface`).
+> **Limitação registrada (DEBT-06):** os PTYs das abas antigas ficam **órfãos até o idle de 30 min** ao trocar de pasta (o motor do terminal não se toca nesta fatia — `04 §1` e §4); anotado no código para a FATIA 12.
 > **REGRA DE OURO:** A **FATIA 08 não inicia** enquanto os critérios testáveis abaixo não estiverem verdes e homologados pelo humano.
 > **Mudança de escopo (D63/D64):** só as 3 dívidas estruturais ficaram aqui. Saíram para fatias próprias: `clear` do terminal (**DEBT-01** → FATIA 12), lista de recentes (**DEBT-07** → FATIA 13) e picker nativo (**DEBT-05** → FATIA 13).
 
@@ -77,6 +79,7 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 1. **Troca Atômica (DEBT-06):**
    - Clicar em "Open Folder" / seletor de pasta; escolher uma pasta (Windows; fallback Linux).
    - **Resultado imediato (sem digitar nada no chat e sem F5):** o Explorer exibe os arquivos na hora **e** o Terminal executa `cd` com o prompt refletindo o caminho.
+   - **Modo homologado em 15/10 (caminho C, escolha do dono):** o terminal **renasce na pasta nova** (mesma entrega visível: prompt no caminho novo, sem F5 e sem digitar nada); o `cd` num shell vivo fica para a FATIA 12. Provado por sonda Playwright: PID do PTY muda e `readlink /proc/<pid>/cwd` = pasta nova (`sonda_03_debt06_sessao.cjs`).
 2. **Provedores em qualquer estado (DEBT-09):**
    - Com a tela inicial vazia (Landing, sem chat), clicar em Conta > Provedores.
    - A tela abre imediatamente no editor novo, sem erros no console.
@@ -166,9 +169,10 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 # PARTE 4 — Débitos Técnicos Secundários & Históricos
 
 ### Higiene de Testes — faxina em 2 ondas (D74, 2026-10-14)
-- **Onda 1 — skip:** os **13 E2E mortos históricos** são marcados como `skip` na **FATIA 07** (registro preservado — **não apagar**).
+- **Onda 1 — skip: ✅ EXECUTADA (2026-10-15, FATIA 07, commit `9985b9e`).** Os **13 E2E mortos históricos** estão em `test.skip` com 2 linhas de comentário apontando o registro (`09 §2.4`) e o conserto na FATIA 12. Skips da suíte E2E: **6 → 19**. O contrato anti-trapaça (`e2eAssertionContract.test.ts`) passou a contar `skip` como declaração e, em troca, exige que spec 100 % pulada cite `docs/09` (**D79**).
 - **Onda 2 — conserto:** as **9 falhas de unit do terminal** (P4) são consertadas na **FATIA 12**, junto do transplante.
-- **Baseline de referência:** typecheck 0 · 722 pass · 9 falhas (P4, terminal) · 16 skip.
+- **Baseline atualizado (2026-10-15, HEAD `9985b9e`):** typecheck 0 · `vitest run` → **730 pass / 12 falhas / 16 skip** (12 = 9 P4 do terminal + `iconLabels` + `themeTokens` + `visualStates`; todas pré-existentes, provadas com `git stash`). Baseline histórico anterior: 722/9/16 em `f2ff5a3`.
+- **Falhas E2E pré-existentes FORA da lista §2.4 (triagem 15/10):** 7 testes — `sessao_01` T2/T3, `sessao_08` T1, `sessao_09` T5, `sessao_10` T1, `sessao_05_single_pane` T2/T6 — conferidos no A/B em `e02e486` (falham igual nos dois estados). **Destino (D80, 15/10):** os **2 investigados** (`sessao_10` T1 e `sessao_05` T2 — expectativa morta da coluna "Detalhes") entram em **quarentena com nota** (skips 19 → **21**); os **5 restantes seguem vermelhos** e registrados em `09 §2.6` até a fatia da área (12/13).
 - **P7 — Flakes de digitação:** latência em testes de search/explorer — tratar na fatia que mexer nesses testes (a partir da 11/13).
 - **D2.72 — Campo `auxiliaryVisible` órfão:** limpeza de código sem impacto visual reservada para a **FATIA 14 (Painéis)**.
 - **D2.1 a D2.13:** itens de acabamento de árvore e decorators — absorvidos pelo roadmap acima; revisar quando a fatia correspondente abrir.
