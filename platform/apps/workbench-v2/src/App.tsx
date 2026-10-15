@@ -240,8 +240,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
+  // FATIA 07 (DEBT-06, opção C aprovada 15/10): na tela inicial (nenhuma sessão),
+  // a pasta escolhida em "Usar esta pasta" já comanda o Explorer — o efeito de boot
+  // abaixo reage a esta dependência, então a árvore troca na hora (sem mensagem no
+  // chat e sem F5). Com sessão ativa, a pasta continua vindo da sessão (inalterado).
   const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
     ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
+    ?? (sessions.length === 0 ? selectedWorkspace?.path : undefined)
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -2185,8 +2190,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                 renderView={renderShellView}
               />
             )}
+            {/* FATIA 07 (DEBT-06, opção C aprovada 15/10): a chave inclui a pasta da
+                sessão — ao trocar de pasta o painel remonta e o shell novo já nasce na
+                pasta nova (o servidor usa o `cwd` enviado no `open`). A decisão
+                "cd em shell vivo × shell novo" será reavaliada na FATIA 12, com
+                inspeção lado a lado do code-server 8080. */}
             <TerminalPanel
-              key={activeSession.id}
+              key={`${activeSession.id}|${activeSession.worktreePath ?? activeSession.workspacePath}`}
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
