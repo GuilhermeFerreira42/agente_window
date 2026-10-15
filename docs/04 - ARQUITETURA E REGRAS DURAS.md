@@ -26,7 +26,7 @@
 - **OpenClaude como referência nativa de Runtime:** O repositório de referência `openclaude` é 100% **TypeScript / Bun / Node**, alinhando-se perfeitamente à stack do nosso produto (`platform/apps/workbench-v2/` em React + Vite + TypeScript).
 - **Sem necessidade de sidecar Go:** A raspagem prévia de `opencode` (Go + sqlc + goose) apontava para a necessidade de compilação de binários Go e processos sidecar em background. Com o OpenClaude, todos os serviços de persistência (`sessionStorage`), controle de chamadas (`doomLoop`), segurança (`permissions`), worktrees e providers são TypeScript nativo, permitindo integração direta via contratos na camada 2.1 (Motor / Agent Runtime), eliminando pontes IPC pesadas.
 
-## 1.3 Contratos de Sincronização e Visualização da Fatia 6.1 (2026-10-11)
+## 1.3 Contratos de Sincronização e Visualização da Fatia 6.1 (2026-10-11; hoje **FATIA 07** por D64)
 - **Sincronização atômica de Workspace (DEBT-06):** Ao confirmar a escolha de uma pasta (Windows Explorer moderno ou entrada manual Linux), o estado `workspacePath` deve atualizar imediatamente e de forma atômica:
   1. O cliente do Explorer (recarrega a árvore raiz sem exigir reload de página);
   2. O PTY do Terminal (emite `cd` e sincroniza o PWD sem exigir envio de mensagem no chat);
@@ -53,6 +53,109 @@ A dependência desce nesta ordem:
 - Runtime conhecer componentes de UI;
 - um subsistema acessar estado interno de outro sem passar por serviço/contrato;
 - camadas pularem contratos para “ganhar velocidade”.
+
+## 2.1 Modularização — diagnóstico verificado (2026-10-13; decisão consolidada na §2.2 em 2026-10-14)
+> **Pedido do dono:** confirmar se a arquitetura está sendo construída em **módulos separados, com responsabilidades bem definidas e baixo acoplamento** (ex.: mexer no terminal deve afetar **só** o terminal; o mesmo princípio para sessões e demais componentes). **Resposta honesta: parcialmente** — a direção está certa e comprovada em um subsistema, mas **ainda não é o padrão de todo o código**.
+
+**O que já está no padrão (comprovado no código em 13/10):**
+- `modules/explorer-search` é um **módulo de verdade**: `contract.ts` (fronteira congelada em 2026-09-20) + `index.ts` (barrel único) + **teste automático de fronteira** (`__tests__/frontier.test.ts`) + 32 arquivos de teste. Auditoria de 13/10: **nenhuma violação** — nada fora do módulo importa `core/`/`ui/`/`server/` diretamente, e o `App.tsx` importa o módulo **uma única vez** pelo barrel.
+- O terminal já tem o **backend como pacote separado**: `platform/services/pty-server` (com `package.json`/`tsconfig` próprios).
+
+**O que ainda NÃO está no padrão:**
+- **`App.tsx` — 2.247 linhas** — é a "cola" central do sistema: 22 imports de `domain/`, 12 de `components/`, 5 de `shell/`; contém, por exemplo, a **sincronização sessão → terminal** (`fetch('/api/pty/cwd')`). Hoje, mexer nessa sincronização toca o mesmo arquivo que mexe em sessões/chat.
+- Chat/sessões, provedores e editor ainda vivem em **pastas por tipo** (`components/`, `domain/`, `server/`), não como módulos com contrato/fronteira próprios.
+
+**Rumo DECIDIDO (2026-10-14 — D68/D69/D70, detalhe na §2.2):** espalhar a receita do explorer-search (contrato + barrel + teste de fronteira) aos próximos módulos e encolher o `App.tsx` até a **composição fina (~200 linhas)**. A ordem é a das próprias fatias: **Provedores (08) → Chat (09) → Agente (10, novo) → Editor + Personalizações (11) → Terminal (12 — endereço congelado, exige ordem) → Sessões + Command Center + Navegador (13)**. **Nada foi alterado no código.**
+
+## 2.2 Arquitetura oficial — Monolito Modular ("Condomínio") — D68/D69/D70 (2026-10-14)
+
+> **Decisão do dono (2026-10-14).** Vocabulário criado na conversa com a IA colaboradora (Meta, 14/10). **Não é microserviço e nem "tudo num arquivo só"** — é uma casa grande com cômodos separados: manutenção isolada sem a complexidade de rede/debug dos microserviços.
+
+### Vocabulário oficial (dicionário — D76)
+
+> Esta tabela é a **tradução oficial**: qualquer inteligência, pessoa ou máquina que abrir a documentação entende cada termo **sem ter participado da conversa**. O apelido de alto nível anda SEMPRE acompanhado do nome técnico.
+
+| Termo | Em palavras simples | Equivalente técnico | Exemplo no nosso código |
+|---|---|---|---|
+| **Condomínio** | O projeto inteiro | a aplicação | `agente_window` |
+| **Bairro** | Grupo de casas que trabalham juntas; **bairro não importa bairro** | agrupamento de módulos isolado | 1 Workbench sem IA · 2 Inteligência · 3 Ponte · 4 Agent Host · 5 Extensões |
+| **Casa** | Cômodo que pode ser trocado sem quebrar o resto | módulo com **estado + contrato (porta) + teste próprio** | `modules/explorer-search` (exemplo que funciona — 0 violações) |
+| **Móvel** | Peça só visual, mora dentro de uma casa | componente de interface sem estado próprio | `WorkspaceSwitcher` (móvel da Casa do Command Center) |
+| **Corredor** | Só junta casas; não guarda nada | composição/layout sem estado | Titlebar |
+| **Síndico** | Só cola as partes (meta: ~200 linhas) | arquivo de composição (wiring) | `src/App.tsx` (hoje: 2.247 linhas — a ser encolhido) |
+| **Prefeitura** | Serviços centrais que todas as casas usam | serviços compartilhados (no MVP: a "caderneta") | `domain/shellCommandRegistry.ts` |
+| **Prédio** | Processo separado; um cai e o outro fica de pé | processo do sistema operacional | MVP: 1 prédio · Robusto: 5 prédios (referências: `arquivo_morto/referencias/vs-code-1.135/01_os_cinco_predios.md`) |
+
+**Quem pode falar com quem (a regra de uma olhada):**
+- **Casa** → fala com outra casa **só pela porta** (`index.ts`); o resto da casa é privado.
+- **Bairro** → **não** importa outro bairro; o Bairro 1, em especial, **funciona sem IA**.
+- **Móvel** → mora dentro de **uma** casa; não tem estado próprio e não fala com outras casas.
+- **Corredor** → só posiciona; **não** guarda estado nem regra de negócio.
+
+**Critério "Casa ou Móvel?"** (para não exagerar e virar micropedaço): é **CASA** se tem estado + contrato + pode ser trocada + teste próprio. Senão, é **MÓVEL**.
+
+### A língua em três lugares (D76) — para o projeto se explicar sozinho
+O nome de alto nível existe para o dono orquestrar. Para que **ninguém** dependa de ter lido uma conversa, cada termo vive em **três lugares**:
+1. **Dicionário** — esta tabela (+ resumo no `01 §0.1`);
+2. **Pastas do código** — `src/bairros/<n>-<nome>/casas/<casa>/…` (estrutura abaixo);
+3. **Cartão de visita por casa** — um README **curto** dentro da pasta da casa ("eu sou a casa X; só me chame pela porta `index.ts`"), criado **na migração da casa** (D69), nunca em arqueologia no fim.
+
+**Regra do registro:** todo termo novo que o dono nomear numa conversa entra neste dicionário — senão a língua se perde.
+
+**Apelidos (não oficiais — registrados por fidelidade, D76):** a IA colaboradora usou nomes diferentes para os mesmos bairros na conversa de 14/10 — **Provedores** (= 2 Inteligência) · **Cérebro** (= 3 Ponte) · **Runtime** (= 4 Agent Host). São sinônimos de leitura; a nomenclatura **oficial é a da tabela acima**.
+
+### Estrutura de pastas (destino)
+```
+src/bairros/
+  1-workbench/casas/     → editor, terminal*, explorer-search*, navegador, command-center, sessoes, personalizacoes
+  2-inteligencia/casas/  → provedores
+  3-ponte/casas/         → chat
+  4-agent-host/casas/    → agente (runtime, sessões, ferramentas)
+  5-extensoes/casas/     → skills, plugins
+```
+`*` **Endereço congelado:** área com contrato congelado **não muda de pasta** até a fatia que abrir a área **com ordem expressa do dono** — o **Terminal** muda na **FATIA 12**; o **Explorer/Search** pode ficar onde está (já é casa de verdade). Cada casa por dentro segue o desenho que já funciona: `contract.ts` (porta tipada) · `index.ts` (barrel) · `ui/`, `core/`, `server/` internos.
+
+### Regras do Condomínio (valem para o MVP e para o Robusto)
+1. **Bairro 1 não importa Bairro 2–5** — desligue a IA e o Workbench continua um editor completo (igual VS Code sem Copilot). **Verificado por teste automático** (não é promessa).
+2. Cada casa tem **porta única**: de fora, **só se importa pelo `index.ts`** — `frontier.test.ts` por casa (modelo já existente).
+3. **Mover uma casa por vez**, na fatia que já ia mexer nela ("a casa muda de endereço quando a fatia mexer nela") — sem big-bang, sem renomear por renomear, **sem pasta vazia**.
+4. **Apelidos de caminho** (`@workbench/…`, `@ia/…`) para evitar `../../..`.
+5. **Um padrão de nome só** (o desenho acima); endereços antigos esvaziam aos poucos — **sem renomear por renomear**.
+
+### Registro das Casas (onde mora cada coisa)
+| Casa | Bairro | Endereço hoje | Destino | Situação |
+|---|---|---|---|---|
+| Explorer/Search | 1 | `modules/explorer-search` | (pode ficar) | ✅ verde — exemplo a copiar |
+| Terminal | 1 | `components/terminal` + `services/pty-server` | `1-workbench/casas/terminal` | 🔒 congelado — muda na FATIA 12 (ordem expressa) |
+| Provedores | 2 | `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` | `2-inteligencia/casas/provedores` | 🟠 nasce na FATIA 08 |
+| Chat | 3 | `components/ChatPanel.tsx` + `handleSend` no `App.tsx` | `3-ponte/casas/chat` | 🟠 nasce na FATIA 09 |
+| Agente (runtime/sessões/ferramentas) | 4 | (novo) | `4-agent-host/casas/…` | 🆕 nasce na FATIA 10 |
+| Editor | 1 | `components/EditorArea.tsx` + gestão de abas no `App.tsx` | `1-workbench/casas/editor` | 🟠 nasce na FATIA 11 |
+| Personalizações | 1 | `components/CustomizationsView.tsx` + dados no `App.tsx` | `1-workbench/casas/personalizacoes` | 🟠 nasce na FATIA 11 (E4) |
+| Sessões | 1 | `components/SessionSidebar.tsx` + lógica no `App.tsx` | `1-workbench/casas/sessoes` | 🟠 nasce na FATIA 13 |
+| Command Center | 1 | `components/TopBar/WorkspaceSwitcher.tsx` + centro da Titlebar | `1-workbench/casas/command-center` | 🟠 nasce na FATIA 13 |
+| Navegador | 1 | `BrowserPreview` dentro de `EditorArea.tsx` | `1-workbench/casas/navegador` | 🟠 nasce na FATIA 16 — **por último** (padrão `simple-browser`; acordo com a Meta, 14/10) |
+| Skills (agnósticas) | 5 | (novo) | `5-extensoes/casas/skills` | 🆕 pós-MVP (padrão `loadSkillsDir` do OpenClaude) |
+
+### Escolhas do MVP — justificativa e "quando revisitar"
+| Escolha | Por quê | Quando revisitar |
+|---|---|---|
+| **Comandos: caderneta simples** | ~30 comandos hoje, 36 linhas de código, já verde. A "central da prefeitura" custa **~10 linhas por comando**; benefício só aparece com 100+ comandos, menus e atalhos | **100+ comandos** ou precisar de atalho/menu/condicional (→ DEBT-ROBUST-01) |
+| **Processos: mesmo prédio** | Sem ponte (IPC), debug fácil, é o que já existe; custo aceito **de propósito** | Agente **travar a tela** · **mesma sessão em 2 janelas** · **vários agentes** (→ DEBT-ROBUST-02) |
+| **Titlebar = corredor** | Não tem estado próprio; o estado (pasta atual, sessões) fica na Casa do Command Center | Layout ficar complexo (→ DEBT-ROBUST-03) |
+| **Bairro 1 independente** | Garante "desligue a IA e o editor continua completo"; protege o que já foi aprovado | Nunca (regra dura; no Robusto ganha DI) |
+
+### Condomínio Robusto (pós-MVP) — quando migrar
+> **Regra de ouro:** só migrar **depois do MVP pronto, funcionando e com o dono usando** — e **sempre por decisão do dono**. Nunca no meio do caminho. **Não é outro programa:** as casas, portas, regra do Bairro 1 e testes continuam; muda a **fundação**.
+
+| Dívida | O que muda | Gatilho (o "sinal") | Custo estimado |
+|---|---|---|---|
+| **DEBT-ROBUST-01** | Comandos: caderneta → CommandsRegistry + MenuRegistry + Keybindings + DI | Querer **atalhos/menus/comandos condicionais** em tudo, ou **100+ comandos** | 3–4 dias |
+| **DEBT-ROBUST-02** | Processos: mesmo prédio → **5 prédios** (Main · Workbench · Extension Host · Agent Host (AHP) · Pty Host) | **Tela travar com o agente** · **mesma sessão em 2 janelas** · **vários agentes ao mesmo tempo** | 1–2 semanas |
+| **DEBT-ROBUST-03** | Layout: Titlebar corredor → **LayoutService com Parts** (Command Center desmembrado: QuickOpen Ctrl+P · CommandPalette Ctrl+Shift+P · CommandCenter) | **Layout complexo** (esconder/mostrar partes, comandos de layout) | 2–3 dias |
+| **DEBT-ROBUST-04** | Bairro 1 ganha **DI** (peças trocáveis via `accessor.get`) | **Trocar uma peça sem quebrar** (ex.: arquivos local ↔ nuvem) | 2 dias |
+
+**O que NUNCA muda (nem no Robusto):** o vocabulário (condomínio/bairro/casa/móvel/corredor/síndico/prédio) · **Bairro 1 funciona sem IA** · cada casa com **porta única** + teste de fronteira · o fluxo de trabalho (conversar → especificar → implementar → testar → reportar).
 
 Contratos por subsistema (runtime do agente, model provider, tools, terminal, filesystem, explorer, editor, layout, sessões de chat, persistência, comandos, tema) → `docs/arquivo_morto/04_CONTRATOS_TECNICOS.md`. ADRs → `docs/arquivo_morto/13_ADRS_E_DECISOES_TECNICAS.md`.
 
@@ -106,7 +209,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 | Arquivo | O que é | Destino |
 |---|---|---|
 | `shot.tmp.mjs` | utilitário de print da FATIA-05 | **não existe mais** (verificado 2026-10-02) |
-| `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/` |
+| `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/`; removido em 2026-10-12 na limpeza de espaço (recuperável no histórico do Git) |
 | `probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas manuais da FATIA-03/04 | não usadas; manter até decisão |
 | `manual_evidence/`, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; `manual_evidence/` é histórico da FATIA-03 |
 | `Data Nesta` (se aparecer no `ls`) | não é arquivo — artefato de exibição | ignorar |
@@ -116,7 +219,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 - `/home/user/uploads/meu_documento.txt` (aprovação do Gate 0, decisões a–g) → incorporado em `docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §2` e `docs/07 - HISTORICO.md`.
 - `/home/user/uploads/05_00_relatorio_validacao_pre_fase.md` (auditoria externa) → copiado em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 - `/home/user/restore-code-server.sh` e o tarball do code-server → ambiente de medição; não fazem parte do produto.
-- Prints antes/depois da FATIA-05 vivem em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). São versionados (prints antes/depois exigidos pelo protocolo Opção C).
+- Prints antes/depois da FATIA-05 viviam em `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/auditoria_05/c1|c2|c3/` (movidos da raiz do repo em 2026-09-29 — a pasta solta `auditoria_05/` na raiz **não deve existir**). Eram versionados (exigidos pelo protocolo Opção C). **Removidos em 2026-10-12 a pedido do usuário para liberar espaço (46 MB); recuperáveis pelo histórico do Git.**
 
 ## Fatia 06 consolidada — fronteiras multiplataforma
 - `TerminalPanel.tsx` e xterm permanecem intocáveis. O PWD inicial vem de `activeSession.worktreePath ?? activeSession.workspacePath`; a troca em uma sessão viva usa apenas o wiring aditivo `/api/pty/cwd`, que escreve `cd`/`Set-Location` no PTY existente sem recriar a UI do terminal.
