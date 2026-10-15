@@ -622,13 +622,20 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // em abas com painel de detalhes acoplado: Changes/Files, nunca Browser/Search).
   const activeVisibleTabId = resolveVisibleEditorTabId(visibleEditorTabs, activeTabId)
   const activeTabType = visibleEditorTabs.find((tab) => tab.id === activeVisibleTabId)?.type
+  // FATIA 07 (DEBT-09, 15/10): abas GLOBAIS (sem dono de sessão — ex.: Provedores)
+  // também abrem o editor central na landing. Abas com dono continuam invisíveis
+  // fora da sessão dona (regra do `getEditorTabsVisibleForSession`).
+  const globalEditorTabs = useMemo(() => editorTabs.filter((tab) => !tab.sessionId), [editorTabs])
   // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
-  // centraliza (landing). Forçamos os inputs do side pane para o estado "closed".
+  // centraliza (landing). Forçamos os inputs do side pane para o estado "closed" —
+  // exceto quando há aba global aberta (DEBT-09): aí o editor abre ao lado da landing.
   // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
   const attachExpanded = hasSessions && !!explorerModule && attachExpandedSessions.includes(activeSession.id)
   const sidePaneInputs = hasSessions && !landingVisible
     ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
-    : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
+    : globalEditorTabs.length > 0
+      ? { hasEditorTabs: true, editorHidden, auxVisible: false }
+      : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
   const sidePaneState = resolveSidePaneState(sidePaneInputs)
   const editorContentVisible = isEditorContentVisible(sidePaneInputs)
   const tabBarVisible = isTabBarVisible(sidePaneInputs)
