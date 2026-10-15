@@ -296,3 +296,18 @@ Pacote de produção de podcast (orquestrador → escritor → atomizador/valida
 **Contrato anti-trapaça:** a spec nova nasceu com asserções e na convenção exigida — `e2eAssertionContract.test.ts` **verde** (na 1.ª tentativa ele reprovou por indentação; corrigido e virou lição para specs futuras).
 **Evidências:** `/home/user/validacao_fatia08/` (prints `f08_T*.png` + `e2e_saida.txt`) — pasta **externa** ao repositório.
 **Limitação registrada (honesta):** a prova automatizada usa **serviço simulado**; a validação com **provedor real** é o roteiro do dono (`08` PARTE C). A migração do v1 real só será exercitada no primeiro uso do dono (o sandbox não tem o arquivo dele).
+
+### 13.1 A/B da suíte E2E completa (2026-10-15) — **zero regressão da FATIA 08** (com ressalva honesta)
+Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 failed / 21 skipped / 87 passed (33,4 min)** — muito pior que a auditoria histórica (166/180 em `ba571dd`), e **não** é da FATIA 08.
+
+**Método (D"/A-B contra estado anterior"):** as **21 specs que falharam** foram rodadas também no estado **anterior** (`e182960`, worktree `/tmp/ab_pre`, mesmo seed, mesmo servidor, 5174) → **88 failed / 10 skipped / 49 passed (31,3 min)**.
+
+**Comparação por ID de teste:** 88 falhas nos dois estados; divergem apenas **2 para cada lado** — e **trocando de teste dentro do mesmo arquivo**, o que caracteriza **instabilidade**, não regressão:
+| Spec | Estado NOVO (`fde5f0f`) | Estado ANTIGO (`e182960`) |
+|---|---|---|
+| `sessao_14d_commit_input` | falha `:90` (T3) na rodada completa; `:58` (T1) na rodada isolada | falha `:58` (T1) |
+| `sessao_15_activity_bar` | falha `:265` (T5) | falha `:71` (T1) |
+
+**Prova direta com spec isolado:** `sessao_15_editor_maximize` (10 testes) = **9✗/1✓ nos DOIS estados** (rodado isolado, servidor limpo e seed de 5 sessões em cada) — falha idêntica, pré-existente.
+
+**Leitura honesta:** a suíte E2E completa **não é régua neste sandbox** (40 falhas por *timeout* de 30 s em áreas congeladas que a fatia não toca: explorer, search, git, editor, activity bar). A régua usada continua sendo: (a) as baterias focadas já registradas (§2.4/§2.5/§2.6) e (b) o A/B por spec. **Nenhuma falha exclusiva da FATIA 08**; a bateria da fatia é **6/6** (§13).
