@@ -1,49 +1,24 @@
-# Agent Sessions — réplica web da Janela de Agentes
+# workbench-v2 — a aplicação (Agent Window)
 
-Réplica frontend autônoma construída com React 18, TypeScript, Vite 5, Tailwind CSS 3, Monaco Editor, xterm, react-resizable-panels, lucide-react e react-markdown.
+Aplicação principal do projeto: **React 18 + TypeScript + Vite 5 + Tailwind CSS 3 + Monaco Editor + xterm + react-resizable-panels**. É a réplica da "Agents Window" do VS Code 1.135 (`docs/02` dos canônicos).
 
-As fontes restauradas em `/home/user/projeto_restaurado/sessions` e `/home/user/projeto_restaurado/vscode-main` foram usadas apenas como referência. Não são importadas nem modificadas pela aplicação.
+> ⚠️ **Não instale dependências nesta pasta.** A instalação oficial é na raiz dos workspaces (`agente_window/platform`) — ver `platform/README.md`.
 
-## Executar
-
+## Rodar / testar
 ```bash
-npm install
-npm run dev
+# na raiz dos workspaces (agente_window/platform):
+npm install --include=dev && npm run dev     # app integrado na 5174
+
+# nesta pasta:
+npm run typecheck    # esperado: 0 erros
+npx vitest run       # baseline: 722 passed / 9 failed / 16 skipped (docs/09 §2.5)
+npx playwright test  # ⚠️ specs de módulo só contra a fixture na 5175 — leia docs/09 §1 antes
 ```
 
-Validações:
+## O que é de verdade × o que ainda é simulado (2026-10-14)
+- **De verdade:** terminal (PTY próprio, *Single Port*), sistema de arquivos (`/fs/*`, com escrita atômica), Explorer/Search (casa com contrato e teste de fronteira), Controle de Código-Fonte com **diff real** (`git.getDiff`), layout, sessões.
+- **Simulado / simplificado (por decisão de fatia):** o **chat** responde com resposta fixa — IA real entra nas FATIAS 08–10; o **navegador embutido** usa conteúdo interno representativo (`srcDoc`); a **Trilha de Navegação** é visual, sem menus (D2.23 → FATIA 13).
+- Estado detalhado e o porquê de cada coisa: `docs/03`; trabalho em andamento: `docs/06`.
 
-```bash
-npm run typecheck
-npm run lint
-npm run build
-npm test
-npm run test:coverage
-```
-
-A cobertura está configurada com metas finais de 90% para linhas/funções/statements e 85% para branches. A suíte atual possui **83 testes em 9 arquivos**; a última execução V8 registrada antes da P6.8 registrou 95,75% em statements/lines, 87,80% em functions e 89,49% em branches. Functions ainda está abaixo da meta final; a cobertura global da suíte ampliada será atualizada em P8.4.
-
-## Fluxos disponíveis
-
-- selecione uma sessão e observe o badge não lido desaparecer;
-- expanda as sessões com a seta para ver chats filhos e guias de árvore;
-- use `Permitir` em uma sessão aguardando input;
-- abra Browser, Search e Branch Changes na área principal do editor;
-- em Search, confirme o foco inicial, filtre por caminho/conteúdo, observe a contagem, o `<mark>` e o estado vazio; use Ctrl/Cmd+Shift+F para reabrir/focar a busca;
-- clique em um resultado Search para abrir o arquivo como uma aba real do Editor;
-- crie várias abas Browser e teste histórico, recarregar e viewports;
-- no multi-diff, inspecione a lista, selecione arquivos e compare Original/Modificado; as ações `Viewed`, aceitar/reverter, Commit e Criar PR têm efeitos observáveis mockados e foram auditadas em P6.5;
-- alterne Files/Changes na barra auxiliar; em Files recolha/expanda pastas e abra um arquivo no Editor;
-- em Changes use Revisar, Abrir multi-diff, clique uma alteração para selecioná-la no Editor e teste Checks, rerun e Preparar PR mockados;
-- feche/reabra a barra auxiliar pelo botão da própria barra ou pelo titlebar;
-- abra o Terminal no titlebar; use limpar, maximizar/restaurar e fechar; a saída mockada é mantida por sessão ao trocar de sessão ou reabrir;
-- redimensione para menos de 900px para ativar single-pane e abas docked;
-- use `@` ou o clip para anexar contexto, selecione modo/modelo e teste ditado;
-- envie uma mensagem e interrompa com o botão Parar, Ctrl/Cmd+Escape ou Alt+Backspace;
-- depois de enviar, use ArrowUp no início do composer para restaurar o histórico e ArrowDown no fim para retornar ao rascunho; texto, anexos, modo e modelo permanecem isolados por sessão/chat.
-
-
-## Limites da réplica
-
-A aparência, estados e interações são reproduzidos com dados em memória. O Browser usa um `iframe` local `srcDoc` para funcionar sem rede; por isso o conteúdo de páginas externas é representativo, embora load/error, histórico e viewport sejam reais no fluxo do componente. O histórico do composer é real durante a vida do App, mas não sobrevive a recargas e não recupera bytes de imagens. O catálogo do model picker é mockado e não resolve providers/entitlements reais. O Terminal instancia xterm e preserva snapshots de saída por sessão, mas não cria shell/PTY nem executa comandos reais. Commit, PR e checks são ações visuais mockadas, sem backend.
-
+## Regras
+Este app segue a arquitetura e o dicionário do `docs/04` (condomínio) e as decisões fechadas do `docs/05`. Roadmap e dívidas vivem **somente** no `docs/06` — nada de listas paralelas aqui.

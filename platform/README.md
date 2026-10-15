@@ -45,7 +45,7 @@ de dev — por isso a decisão Opcão 3 (2026-09-22) rebaixou o antigo
 
 - Não reintroduzir `concurrently` no script `dev` — contexto: sandbox de CI tem
   1,9 GB de RAM e dois servidores derrubavam o Vite por OOM (registrado em
-  `docs/12`, porta política 2026-09-21).
+  `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`, porta política 2026-09-21).
 - O workbench em dev **nunca** deve depender da porta 7681: os e2e de terminal
   (`sessao_11_terminal_interactive_v2` + `sessao_11_terminal_pty_real`) rodam
   **sem** nada na 7681 — se falharem "só quando o pty-server não está no ar", a

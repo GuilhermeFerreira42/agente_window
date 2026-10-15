@@ -84,7 +84,7 @@ A dependência desce nesta ordem:
 | **Corredor** | Só junta casas; não guarda nada | composição/layout sem estado | Titlebar |
 | **Síndico** | Só cola as partes (meta: ~200 linhas) | arquivo de composição (wiring) | `src/App.tsx` (hoje: 2.247 linhas — a ser encolhido) |
 | **Prefeitura** | Serviços centrais que todas as casas usam | serviços compartilhados (no MVP: a "caderneta") | `domain/shellCommandRegistry.ts` |
-| **Prédio** | Processo separado; um cai e o outro fica de pé | processo do sistema operacional | MVP: 1 prédio · Robusto: 5 prédios (referências: `arquivo_morto/referencias/vs-code-1.135/01`) |
+| **Prédio** | Processo separado; um cai e o outro fica de pé | processo do sistema operacional | MVP: 1 prédio · Robusto: 5 prédios (referências: `arquivo_morto/referencias/vs-code-1.135/01_os_cinco_predios.md`) |
 
 **Quem pode falar com quem (a regra de uma olhada):**
 - **Casa** → fala com outra casa **só pela porta** (`index.ts`); o resto da casa é privado.
