@@ -88,6 +88,17 @@ Encontradas ao rodar a suíte com o seed de sessões correto (ver §3.6). **Não
 
 **Leitura:** T1 do `sessao_08` parece da mesma família morta do §2.4 (aba "Files" pré-FATIA-04); T1 do `sessao_10` e T2 do `sessao_05` discutem a **visibilidade da Aux** — podem ser a **mesma causa raiz** (uma real, a investigar). T2/T3 do `sessao_01` e T5 do `sessao_09` parecem **expectativa desatualizada/timing**. Nada disso é da FATIA 07; decidir quando abrir a fatia que tocar cada área (**FATIA 12/13**) — ou marcar como `skip` com registro, se o dono autorizar a extensão da onda 1.
 
+#### Investigação dos 2 suspeitos da Aux (2026-10-15, ordem do dono — "opção C"): **veredito = expectativa morta, não bug**
+Método: leitura do código + sonda `validacao_fatia07/sonda_05_aux_bar.cjs` (Playwright, observação pura) + decisões homologadas. **Fatos medidos ao vivo** (0 pageerrors):
+| Passo | `.auxiliary-bar` | Abas do editor |
+|---|---|---|
+| boot | no DOM, `display:flex`, **largura 0 px** | nenhuma |
+| "Abrir alterações no editor" | igual (largura 0) | abre **aba** `diff` "Branch Changes" (selecionada) |
+| "Abrir navegador no editor" | **continua montada** | abre **aba** `browser` "Browser" (selecionada) |
+
+**Por que os testes estão velhos:** a coluna "Detalhes" da `AuxiliaryBar` foi **removida de vez** (5.8-c1, 2026-10-02 — D2.50), a homologação 5.7 fixou "**fechar aba nunca desmonta a AuxiliaryBar**; **sem 'Detalhes' com 0 arquivos"** e o campo `auxiliaryVisible` é hoje **constante `false`** no shell (D2.72 — limpeza reservada à FATIA 14, "só limpeza"). Hoje a `.auxiliary-bar` é **a casca do Editor Anexo**: sempre montada quando o módulo existe (Regra 10: `display`), recolhida com largura 0. E "Abrir alterações" abre **aba** no editor por decisão (E10/R-083: "a Changes pill revela explicitamente o editor"). Os dois specs são de **17/09** (`75c6686`) — **anteriores** à remoção.
+→ **`sessao_10 T1`** espera a coluna antiga **visível** ao abrir alterações; **`sessao_05 T2`** espera a coluna antiga **desmontada** ao abrir o navegador. Ambos contradizem decisões já homologadas → são candidatos a **quarentena com registro** (mesmo tratamento dos 13), pendente de OK do dono.
+
 ---
 
 ## 3. Receita do ambiente (por turno — o sandbox é recriado a cada mensagem do usuário)
