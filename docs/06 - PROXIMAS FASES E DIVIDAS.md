@@ -137,6 +137,8 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 
 **D84 — precedência da chave: arquivo > ambiente.** Chave **salva no app manda**; variável de ambiente (`OPENAI_API_KEY`, `NVIDIA_API_KEY`…) é usada **apenas quando não há chave salva** — e a tela mostra a **origem** ("salva no app" / "ambiente do sistema"). Sem variável nenhuma, nada muda: vale sempre o arquivo.
 
+**D82a — o genérico é UM espaço só (opção A, escolha do dono em 15/10):** existe um único slot "Compatível com OpenAI"; o dono troca o serviço (Groov/LM Studio/xAI…) quando quiser. Múltiplos slots = evolução pequena, se um dia precisar.
+
 **Decididas pela IA (registradas para não virar susto):** descritor é **dado, não tela**; busca de modelos por provedor (OpenAI/NVIDIA/OpenRouter/DeepSeek `GET /v1/models` · Anthropic `GET /v1/models` · Gemini `GET /v1beta/models` · Ollama `GET /api/tags`) com modelo manual sempre liberado; endpoints no servidor (`POST /api/providers/test`, `/models`, `/reveal`) com timeout de 10 s; sem *headers* customizados neste recorte; teste E2E contra **servidor de fixture** (`AGENTE_WINDOW_PROVIDERS_PATH`) — **nunca** o arquivo real do dono; o payload traz `storage: 'fixture'|'repo-home'` para a spec se auto-verificar.
 
 ## 5. O que NÃO fazer na FATIA 08
