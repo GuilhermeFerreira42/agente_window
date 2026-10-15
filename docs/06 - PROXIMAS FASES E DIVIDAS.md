@@ -96,7 +96,7 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 
 # PARTE 2B — SPEC: FATIA 08 — Conectar (Provedores estilo Cline)
 
-> **STATUS:** **proposta escrita em 2026-10-15** (reconhecimento feito: código atual, notas do Cline/OpenClaude e matriz DEBT-10 lidas). **Aguarda o OK do dono nos 2 pontos da §4** antes de a implementação começar (regra do dono: "primeiro o plano, depois o OK").
+> **STATUS:** **proposta escrita em 2026-10-15; decisões D81–D84 fechadas com o dono no mesmo dia** (chave em arquivo local + segunda tranca no `.gitignore`; olhinho para revelar; arquivo manda sobre ambiente; 7 nativos + "Compatível com OpenAI"). A **implementação começa ao sinal do dono** (a conversa de arquitetura segue em andamento).
 > **REGRA DE OURO:** a **FATIA 09 (Conversar)** não inicia sem os critérios da §3 verdes e homologados. A **FATIA 07 foi homologada pelo dono em 15/10** — a base está liberada.
 
 ## 1. Objetivo em 1 frase
@@ -112,34 +112,32 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | Registro da rota | dentro de `src/server/session-persistence/index.ts` | **fica onde está** (é a "prefeitura" do dev server) — passa só a **delegar** ao handler da casa |
 | `App.tsx` (síndico) | `providersSurface={<ProvidersView/>}` + import de `./components/ProvidersView` | importa **só a porta única** `./bairros/2-inteligencia/casas/provedores` (diff ~2 linhas) |
 
-**Nascem dentro da casa:** `contract.ts` (tipos da porta) · `index.ts` (**porta única** do cliente) · `descritores/` (**um arquivo de DADO por provedor** — openai, anthropic, gemini, ollama, openrouter, deepseek + `registro.ts`; princípio "descritor primeiro" do OpenClaude) · `ui/` (formulário + campos comuns: chave, URL base, modelo) · `client/api.ts` (chamadas ao servidor) · `server/probe.ts` (adaptadores de protocolo: `openai-chat`, `anthropic`, `gemini`, `ollama`) · `README.md` (**cartão de visita da casa** — D76/D78) · `__tests__/`.
+**Nascem dentro da casa:** `contract.ts` (tipos da porta) · `index.ts` (**porta única** do cliente) · `descritores/` (**um arquivo de DADO por provedor** — openai, nvidia, anthropic, gemini, ollama, openrouter, deepseek, openai-compat + `registro.ts`; princípio "descritor primeiro" do OpenClaude) · `ui/` (formulário + campos comuns: chave, URL base, modelo) · `client/api.ts` (chamadas ao servidor) · `server/probe.ts` (adaptadores de protocolo: `openai-chat`, `anthropic`, `gemini`, `ollama`) · `README.md` (**cartão de visita da casa** — D76/D78) · `__tests__/`.
 **Fronteira (LEGO):** fora da casa, só `index.ts` (cliente) e `server/` (dev server) são importáveis — **teste de fronteira novo**, no padrão do `explorer-search/__tests__/frontier.test.ts`.
 
 ## 3. Critérios de Pronto Testáveis
-1. **Escolher e configurar** — lista dos 6 provedores (com busca); escolher um monta o formulário dele: chave, URL base (padrão já preenchido; "usar URL personalizada" revela o campo), modelo (**lista local** do descritor **ou digitado à mão** — padrão `ModelPickerWithManualEntry` do Cline).
+1. **Escolher e configurar** — lista dos **7 nativos + o genérico "Compatível com OpenAI"** (com busca); escolher um monta o formulário dele: chave, URL base (padrão já preenchido nos nativos; **em branco e obrigatória no genérico**), modelo (**lista do descritor ou digitado à mão** — padrão `ModelPickerWithManualEntry` do Cline; no genérico o manual é o caminho principal).
 2. **Testar conexão (de verdade)** — botão por provedor; a chamada sai **do servidor** (o navegador não fala com o provedor — CORS/chave segura; a chave **não** viaja em URL). Sucesso = mensagem verde com nº de modelos vistos + tempo. Falha = categoria **honesta**: chave inválida (401/403), endereço inalcançável, timeout (10 s), HTTP N.
-3. **Buscar modelos** — botão consulta a lista do provedor e preenche o seletor; digitar à mão continua sempre permitido.
-4. **Persistir de verdade** — salvar → **F5** → tudo volta (provedores, modelos, avançados, provedor ativo, chaves **mascaradas**). Arquivo `~/.agente_window/providers.json`. **A chave completa nunca volta para a tela nem entra em log** (só `••••` + 4 últimos). Arquivo com permissão restrita (0600).
+3. **Buscar modelos** — botão consulta a lista do provedor e preenche o seletor; **quando o serviço não suportar a busca (ou a chave não permitir), o app diz isso com honestidade** e o campo digitado à mão segue liberado — sempre.
+4. **Persistir de verdade** — salvar → **F5** → tudo volta (provedores, modelos, avançados, provedor ativo, chaves **mascaradas**). Arquivo `~/.agente_window/providers.json` (**fora do repo**, 0600, backup `.bak` na migração) + **regra no `.gitignore` como segunda tranca**, com teste automatizado (D81). **Ver a chave (D83):** máscara por padrão; o **olhinho** revela sob clique — o servidor entrega só naquele pedido (`no-store`), nunca em log, nunca em URL. **Origem da chave (D84):** variável de ambiente só é usada **quando não há chave salva**, e a tela mostra a origem.
 5. **Múltiplos provedores ao mesmo tempo** (aceite literal do roadmap) — 2+ configurados simultaneamente, cada um com sua chave/modelo; trocar de provedor na tela não perde nada.
 6. **Provedor ativo** — escolha explícita de qual provedor o chat vai usar (1.º consumidor: FATIA 09); persistida.
 7. **Avançados mínimos** — contexto, máx. de tokens e temperatura por provedor (persistidos; consumidos na 09), com padrões vindos do descritor.
 8. **Casa de pé** — teste de fronteira verde; `App.tsx` só fala com a porta única; cartão de visita dentro da pasta; **zero regressão** nos specs existentes (A/B quando alguma falha).
 9. **Sem regressão de fundo** — typecheck 0 · unit ≥ baseline **730✓/12✗/16** (as mesmas 12 pré-existentes) · E2E existente sem regressão nova · `sonda_01_debt09.cjs` (Conta→Provedores na landing) continua passando.
-10. **"Conexão com sucesso" comprovada** — contra **provedor local simulado** (stub OpenAI-compatible, em pasta de validação externa) no teste automatizado; erro real (401 sem chave) também comprovado; e **roteiro do dono** para validar com chave real (§6-d).
+10. **"Conexão com sucesso" comprovada** — contra **provedor local simulado** (stub OpenAI-compatible, em pasta de validação externa) no teste automatizado, inclusive através do **genérico**; erro real (401 sem chave) também comprovado; e **roteiro do dono** com chave real (§6-d) — a **NVIDIA NIM** é a porta mais fácil (chave gratuita em `build.nvidia.com`, formato OpenAI).
 
-## 4. Decisões desta fatia — **2 precisam do dono**
+## 4. Decisões — fechadas com o dono em 2026-10-15 (D81–D84)
 
-**D81 (proposta) — onde mora a chave:**
+**D81 — a chave mora em arquivo local protegido.** Arquivo `~/.agente_window/providers.json`, **fora da pasta do projeto** (o Git nem o enxerga), permissão 0600, backup `.bak-<data>` na primeira migração do formato antigo. **Segunda tranca pedida pelo dono:** regra no `.gitignore` do repositório + teste automatizado que confere (a) arquivo fora do repo, (b) regra presente, (c) nenhum segredo em arquivo versionado.
 
-| Opção | Como fica | Prós | Contras |
-|---|---|---|---|
-| **A. Arquivo local 0600** (estilo Cline/OpenClaude; já previsto no plano de 05/10) | Digita na tela; salva em `~/.agente_window/providers.json` (fora do repo, permissão restrita, backup `.bak` ao migrar); tela recebe só a máscara | Cumpre os formulários ricos do DEBT-10; simples; é o que o plano original já desenhava | Chave em texto puro no disco do usuário (mitigado: 0600, fora do repo, nunca no Git/log/tela) |
-| **B. Só variáveis de ambiente** (como hoje) | Tela só liga/desliga e escolhe modelo; chave configurada fora do app | Postura mais fechada | Contradiz o DEBT-10 ("chave individual por provedor"); o dono não configura pela tela |
-| **C. Híbrido** | Tela digita **e** aceita ambiente quando existir | Cobre os dois mundos | Mais peças para manter/testar; ganho pequeno para app de uma pessoa |
+**D82 — escopo dos provedores: 7 nativos + 1 genérico "Compatível com OpenAI".** Nativos, um arquivo de descritor cada: **OpenAI · NVIDIA · Anthropic · Google Gemini · Ollama · OpenRouter · DeepSeek**. O **genérico** é a porta universal: o dono informa **base URL + chave + modelo** e usa qualquer serviço que fale o formato OpenAI (Groq, Mistral, LM Studio, xAI…). Teste de conexão e busca de modelos rodam **contra a URL informada**; quando o serviço não suportar busca, o app diz isso com honestidade e o campo manual continua liberado. Neste recorte, **1 slot genérico** (permitir vários = evolução pequena, se o dono quiser).
 
-**D82 (proposta) — escopo dos provedores:** os **6 do roadmap** (OpenAI, Anthropic, Gemini, Ollama, OpenRouter, DeepSeek) com formulário próprio; o **registro já nasce pronto** para plugar genéricos depois (adicionar = 1 arquivo de descritor). Catálogo genérico e OAuth (Copilot/Codex) ficam fora.
+**D83 — chave visível sob clique ("olhinho").** Padrão é a máscara (`••••••a1b2`); o botão revela a chave completa **só quando clicado** — endpoint próprio (`POST /api/providers/reveal`) com resposta `Cache-Control: no-store`; a chave **nunca** vem no carregamento da página, **nunca** entra em log e **nunca** entra em URL. Praticidade (pedido do dono) com o mínimo de exposição.
 
-**Decididas pela IA (registradas para não virar susto):** descritor é **dado, não tela**; dois endpoints no servidor (`POST /api/providers/test` e `POST /api/providers/models`) com adaptadores por protocolo; timeout de 10 s; máscara `••••` + 4 últimos; sem *headers* customizados neste recorte (fica no DEBT-10 remanescente); teste E2E roda contra **servidor de fixture** com `AGENTE_WINDOW_PROVIDERS_PATH` — **nunca** o arquivo real do dono (e o payload traz `storage: 'fixture'|'repo-home'` para a spec se auto-verificar).
+**D84 — precedência da chave: arquivo > ambiente.** Chave **salva no app manda**; variável de ambiente (`OPENAI_API_KEY`, `NVIDIA_API_KEY`…) é usada **apenas quando não há chave salva** — e a tela mostra a **origem** ("salva no app" / "ambiente do sistema"). Sem variável nenhuma, nada muda: vale sempre o arquivo.
+
+**Decididas pela IA (registradas para não virar susto):** descritor é **dado, não tela**; busca de modelos por provedor (OpenAI/NVIDIA/OpenRouter/DeepSeek `GET /v1/models` · Anthropic `GET /v1/models` · Gemini `GET /v1beta/models` · Ollama `GET /api/tags`) com modelo manual sempre liberado; endpoints no servidor (`POST /api/providers/test`, `/models`, `/reveal`) com timeout de 10 s; sem *headers* customizados neste recorte; teste E2E contra **servidor de fixture** (`AGENTE_WINDOW_PROVIDERS_PATH`) — **nunca** o arquivo real do dono; o payload traz `storage: 'fixture'|'repo-home'` para a spec se auto-verificar.
 
 ## 5. O que NÃO fazer na FATIA 08
 - **Nada de chamar modelo/chat/streaming** (FATIA 09), nada de Plan/Act, contexto de agente ou ferramentas (FATIA 10).
@@ -149,7 +147,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - Não renomear nem mover nada fora do que a tabela da §2 diz.
 
 ## 6. Plano de prova (como a fatia é validada)
-- **(a) Unit novos na casa:** fronteira (LEGO) · registro (descritores válidos, ids únicos, protocolos com adaptador) · repositório (migração do formato antigo **com backup**, permissão 0600, máscara, nada de chave no Git) · probe (com `fetch` mockado: ok / 401 / rede / timeout).
+- **(a) Unit novos na casa:** fronteira (LEGO) · registro (descritores válidos, ids únicos, protocolos com adaptador; inclui o genérico) · repositório (migração do formato antigo **com backup**, permissão 0600, máscara, **revelar chave** com `no-store` e id desconhecido → 404, **precedência arquivo > ambiente**, nada de chave no Git) · probe (com `fetch` mockado: ok / 401 / rede / timeout; genérico apontando para o stub).
 - **(b) Playwright `provedores_fatia08.spec.ts`** contra servidor de fixture + **stub local** de provedor: configurar 2 provedores, testar conexão (sucesso e falha honesta), buscar modelos, F5 e tudo persistido, máscara visível, provedor ativo, zero erros de console.
 - **(c) Evidências:** prints das telas + saída dos testes em pasta de validação **externa** ao repo.
 - **(d) Roteiro do dono** (em `docs/08`): com chave real, o passo a passo "configurar → testar → reabrir" em 5 minutos.
@@ -160,6 +158,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - **Sem chave real no sandbox**, o caminho de sucesso automatizado é provado contra o stub; a prova com provedor real fica no roteiro do dono.
 - **Migração do arquivo antigo** é o único ponto que mexe em dado já existente do dono: faz backup `.bak-<data>` antes de reescrever.
 - A tela **não** valida faturamento/limites de conta — só conexão/autenticação de chave.
+- **Revelar a chave (D83)** manda o segredo do servidor para a aba **sob clique do dono**: aceitável para uso local; fica registrado que, com o app exposto na rede, quem alcança a tela pode revelar a chave (mitigado: só sob clique, `no-store`, sem log, sem URL).
 
 ---
 
