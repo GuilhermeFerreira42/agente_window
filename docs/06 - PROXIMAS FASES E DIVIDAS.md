@@ -21,7 +21,7 @@
 | **DEBT-07** | Fatia 6 | Workspace / Recentes | Ao abrir o seletor de pasta, exibe a lista histórica de pastas recentes abertas para troca rápida em 1 clique. | Não exibe pastas recentes; não há histórico de workspaces acessível no diálogo para seleção imediata. | **Média** | `WorkspaceSwitcher.tsx`, `workspacePersistence.ts` |
 | **DEBT-08** | Fatia 5 | Layout / Activity Bar | Menu de contexto da Activity Bar permite alternar posição ("Activity Bar Position: Top / Side"). | Posição travada sem opção de mover para a barra superior ou alternar. | **Baixa** | `shell/ActivityBar.tsx`, `layoutState.ts` |
 | **DEBT-09** | Fatia 6 | Provedores (Cline UX) | Página de Provedores acessível a qualquer momento pelo menu da conta, inclusive com chat vazio (Landing / Empty State). | **Só abre se o chat estiver ativo**. Na tela inicial (Empty State), o clique não faz nada. | **Alta** | `App.tsx`, `Titlebar.tsx`, `SessionLanding.tsx` |
-| **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | `ProvidersEditor.tsx`, `providersApi.ts` |
+| **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | Caminho atual (15/10): `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` → destino `2-inteligencia/casas/provedores` — **entra na FATIA 08, SPEC na PARTE 2B** |
 | **DEBT-11** | FATIA 13 **(a decidir a forma)** | Title Bar / Pesquisa | O topo mantém a **pesquisa / centro de comando** (acesso rápido: "Ir para Arquivo", "Mostrar e Executar Comandos", "Pesquisar Texto", "Abrir Chat Rápido"). A troca de pasta deve ser **integrada dentro da pesquisa**, não ocupar o lugar dela. | A faixa de caminho + botão "Usar esta pasta" ocupou o lugar da pesquisa: o caminho fica fixo no topo e **a pesquisa não existe mais**. | **Alta** | `Titlebar.tsx`, `WorkspaceSwitcher.tsx`, `shell/` |
 
 ### Itens identificados na análise do vídeo de 2026-10-12 (ainda NÃO fatiados)
@@ -58,7 +58,7 @@
 
 # PARTE 2 — SPEC: FATIA 07 — Destravar (Dívidas Estruturais)
 
-> **STATUS:** **EM EXECUÇÃO desde 2026-10-15** (ordem do dono). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64). Fechamento **só** com os critérios de §3 verdes + evidências registradas (sondas Playwright em `validacao_fatia07/` — pasta externa ao repo — e entradas em `07`).
+> **STATUS:** **HOMOLOGADA pelo dono em 2026-10-15** ("funcionou perfeitamente"; as 3 dívidas entregues com evidências Playwright). Restam como limitações registradas: PTYs órfãos até a FATIA 12, 5 E2E vermelhos pré-existentes (`09 §2.6`) e o sintoma original do DEBT-06 (não reproduzido no estado anterior sob as condições testadas). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64).
 > **DECISÕES DA EXECUÇÃO (15/10):** **DEBT-06 — caminho C** (escolha expressa do dono): o terminal **renasce já na pasta nova** em vez de receber `cd` num shell vivo; a decisão fina "cd real × renascer" fica para a **FATIA 12**, contra o code-server (8080). **DEBT-09 — feito** (`a69137d`): as abas globais do editor deixaram de depender de sessão, então Provedores abre pela Conta na landing. **DEBT-04 — nada a expurgar:** busca no código não encontra resquício do visualizador legado (sem `legacy/`, `ProvidersView` é a única superfície, via `providersSurface`).
 > **Limitação registrada (DEBT-06):** os PTYs das abas antigas ficam **órfãos até o idle de 30 min** ao trocar de pasta (o motor do terminal não se toca nesta fatia — `04 §1` e §4); anotado no código para a FATIA 12.
 > **REGRA DE OURO:** A **FATIA 08 não inicia** enquanto os critérios testáveis abaixo não estiverem verdes e homologados pelo humano.
@@ -94,6 +94,75 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 
 ---
 
+# PARTE 2B — SPEC: FATIA 08 — Conectar (Provedores estilo Cline)
+
+> **STATUS:** **proposta escrita em 2026-10-15** (reconhecimento feito: código atual, notas do Cline/OpenClaude e matriz DEBT-10 lidas). **Aguarda o OK do dono nos 2 pontos da §4** antes de a implementação começar (regra do dono: "primeiro o plano, depois o OK").
+> **REGRA DE OURO:** a **FATIA 09 (Conversar)** não inicia sem os critérios da §3 verdes e homologados. A **FATIA 07 foi homologada pelo dono em 15/10** — a base está liberada.
+
+## 1. Objetivo em 1 frase
+Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** — escolher provedor, preencher chave/URL, escolher ou buscar modelos, **testar conexão de verdade** e persistir tudo localmente — e, de quebra, **a Casa Provedores nasce** (`2-inteligencia/casas/provedores`, D69/D76), sendo o **1.º módulo extraído** do `App.tsx` (D68/D70).
+
+## 2. Arquivos impactados e endereços (casa-a-casa, D69)
+
+| Peça | Hoje | Destino |
+|---|---|---|
+| Tela (UI) | `src/components/ProvidersView.tsx` (61 l.) | `src/bairros/2-inteligencia/casas/provedores/ui/ProvidersView.tsx` |
+| Servidor (dados) | `src/server/providers.ts` (64 l.) | `…/casas/provedores/server/providersRepo.ts` |
+| Estilos | `src/styles/providers.css` | `…/casas/provedores/providers.css` |
+| Registro da rota | dentro de `src/server/session-persistence/index.ts` | **fica onde está** (é a "prefeitura" do dev server) — passa só a **delegar** ao handler da casa |
+| `App.tsx` (síndico) | `providersSurface={<ProvidersView/>}` + import de `./components/ProvidersView` | importa **só a porta única** `./bairros/2-inteligencia/casas/provedores` (diff ~2 linhas) |
+
+**Nascem dentro da casa:** `contract.ts` (tipos da porta) · `index.ts` (**porta única** do cliente) · `descritores/` (**um arquivo de DADO por provedor** — openai, anthropic, gemini, ollama, openrouter, deepseek + `registro.ts`; princípio "descritor primeiro" do OpenClaude) · `ui/` (formulário + campos comuns: chave, URL base, modelo) · `client/api.ts` (chamadas ao servidor) · `server/probe.ts` (adaptadores de protocolo: `openai-chat`, `anthropic`, `gemini`, `ollama`) · `README.md` (**cartão de visita da casa** — D76/D78) · `__tests__/`.
+**Fronteira (LEGO):** fora da casa, só `index.ts` (cliente) e `server/` (dev server) são importáveis — **teste de fronteira novo**, no padrão do `explorer-search/__tests__/frontier.test.ts`.
+
+## 3. Critérios de Pronto Testáveis
+1. **Escolher e configurar** — lista dos 6 provedores (com busca); escolher um monta o formulário dele: chave, URL base (padrão já preenchido; "usar URL personalizada" revela o campo), modelo (**lista local** do descritor **ou digitado à mão** — padrão `ModelPickerWithManualEntry` do Cline).
+2. **Testar conexão (de verdade)** — botão por provedor; a chamada sai **do servidor** (o navegador não fala com o provedor — CORS/chave segura; a chave **não** viaja em URL). Sucesso = mensagem verde com nº de modelos vistos + tempo. Falha = categoria **honesta**: chave inválida (401/403), endereço inalcançável, timeout (10 s), HTTP N.
+3. **Buscar modelos** — botão consulta a lista do provedor e preenche o seletor; digitar à mão continua sempre permitido.
+4. **Persistir de verdade** — salvar → **F5** → tudo volta (provedores, modelos, avançados, provedor ativo, chaves **mascaradas**). Arquivo `~/.agente_window/providers.json`. **A chave completa nunca volta para a tela nem entra em log** (só `••••` + 4 últimos). Arquivo com permissão restrita (0600).
+5. **Múltiplos provedores ao mesmo tempo** (aceite literal do roadmap) — 2+ configurados simultaneamente, cada um com sua chave/modelo; trocar de provedor na tela não perde nada.
+6. **Provedor ativo** — escolha explícita de qual provedor o chat vai usar (1.º consumidor: FATIA 09); persistida.
+7. **Avançados mínimos** — contexto, máx. de tokens e temperatura por provedor (persistidos; consumidos na 09), com padrões vindos do descritor.
+8. **Casa de pé** — teste de fronteira verde; `App.tsx` só fala com a porta única; cartão de visita dentro da pasta; **zero regressão** nos specs existentes (A/B quando alguma falha).
+9. **Sem regressão de fundo** — typecheck 0 · unit ≥ baseline **730✓/12✗/16** (as mesmas 12 pré-existentes) · E2E existente sem regressão nova · `sonda_01_debt09.cjs` (Conta→Provedores na landing) continua passando.
+10. **"Conexão com sucesso" comprovada** — contra **provedor local simulado** (stub OpenAI-compatible, em pasta de validação externa) no teste automatizado; erro real (401 sem chave) também comprovado; e **roteiro do dono** para validar com chave real (§6-d).
+
+## 4. Decisões desta fatia — **2 precisam do dono**
+
+**D81 (proposta) — onde mora a chave:**
+
+| Opção | Como fica | Prós | Contras |
+|---|---|---|---|
+| **A. Arquivo local 0600** (estilo Cline/OpenClaude; já previsto no plano de 05/10) | Digita na tela; salva em `~/.agente_window/providers.json` (fora do repo, permissão restrita, backup `.bak` ao migrar); tela recebe só a máscara | Cumpre os formulários ricos do DEBT-10; simples; é o que o plano original já desenhava | Chave em texto puro no disco do usuário (mitigado: 0600, fora do repo, nunca no Git/log/tela) |
+| **B. Só variáveis de ambiente** (como hoje) | Tela só liga/desliga e escolhe modelo; chave configurada fora do app | Postura mais fechada | Contradiz o DEBT-10 ("chave individual por provedor"); o dono não configura pela tela |
+| **C. Híbrido** | Tela digita **e** aceita ambiente quando existir | Cobre os dois mundos | Mais peças para manter/testar; ganho pequeno para app de uma pessoa |
+
+**D82 (proposta) — escopo dos provedores:** os **6 do roadmap** (OpenAI, Anthropic, Gemini, Ollama, OpenRouter, DeepSeek) com formulário próprio; o **registro já nasce pronto** para plugar genéricos depois (adicionar = 1 arquivo de descritor). Catálogo genérico e OAuth (Copilot/Codex) ficam fora.
+
+**Decididas pela IA (registradas para não virar susto):** descritor é **dado, não tela**; dois endpoints no servidor (`POST /api/providers/test` e `POST /api/providers/models`) com adaptadores por protocolo; timeout de 10 s; máscara `••••` + 4 últimos; sem *headers* customizados neste recorte (fica no DEBT-10 remanescente); teste E2E roda contra **servidor de fixture** com `AGENTE_WINDOW_PROVIDERS_PATH` — **nunca** o arquivo real do dono (e o payload traz `storage: 'fixture'|'repo-home'` para a spec se auto-verificar).
+
+## 5. O que NÃO fazer na FATIA 08
+- **Nada de chamar modelo/chat/streaming** (FATIA 09), nada de Plan/Act, contexto de agente ou ferramentas (FATIA 10).
+- **Não tocar em área congelada:** terminal, `explorer-search/{core,server}`, `EditorArea`, PTY, Monaco (`04 §1`).
+- Não implementar catálogo genérico nem "listagem vinda do servidor" (o registro já comporta; a tela não entra).
+- Não guardar chave em Git/repo/logs/URL/tela; não criar `.env`.
+- Não renomear nem mover nada fora do que a tabela da §2 diz.
+
+## 6. Plano de prova (como a fatia é validada)
+- **(a) Unit novos na casa:** fronteira (LEGO) · registro (descritores válidos, ids únicos, protocolos com adaptador) · repositório (migração do formato antigo **com backup**, permissão 0600, máscara, nada de chave no Git) · probe (com `fetch` mockado: ok / 401 / rede / timeout).
+- **(b) Playwright `provedores_fatia08.spec.ts`** contra servidor de fixture + **stub local** de provedor: configurar 2 provedores, testar conexão (sucesso e falha honesta), buscar modelos, F5 e tudo persistido, máscara visível, provedor ativo, zero erros de console.
+- **(c) Evidências:** prints das telas + saída dos testes em pasta de validação **externa** ao repo.
+- **(d) Roteiro do dono** (em `docs/08`): com chave real, o passo a passo "configurar → testar → reabrir" em 5 minutos.
+- **(e) Testes existentes que mockam o formato antigo** (`App.test.tsx`, `fatia07_destravar.test.tsx`) são **atualizados** para o formato novo — atualização prevista, não é mudança de escopo.
+
+## 7. Riscos e limites (registro honesto)
+- **URL base livre** (inclusive `localhost`) é o objetivo (Ollama/estúdio local) e não um furo de segurança num app de uma pessoa só; fica anotado como limite consciente.
+- **Sem chave real no sandbox**, o caminho de sucesso automatizado é provado contra o stub; a prova com provedor real fica no roteiro do dono.
+- **Migração do arquivo antigo** é o único ponto que mexe em dado já existente do dono: faz backup `.bak-<data>` antes de reescrever.
+- A tela **não** valida faturamento/limites de conta — só conexão/autenticação de chave.
+
+---
+
 # PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 16 — renumeração D64 de 2026-10-13)
 
 Todas as fatias estruturadas sob o padrão **especificação prévia, escopo vertical e critérios rígidos de aceitação**. **Cada fatia agora tem duas tarefas: a FUNÇÃO (o que entrega) e a CASA (o que muda de endereço no `App.tsx`)** — a fila e a arquitetura andam juntas (D68/D69; condomínio no `04 §2.2`).
@@ -106,7 +175,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 08 — Conectar (Provedores estilo Cline) — era a 09
 - **Objetivo:** Gestão rica de múltiplos provedores de IA, inspirada no Cline.
-- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.**
+- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.** **SPEC detalhada: PARTE 2B** (escrita em 15/10; 2 pontos da §4 aguardam o dono). **Casa:** `2-inteligencia/casas/provedores` nasce aqui (1.º módulo extraído, D68/D69).
 - **Critério de aceite:** configurar múltiplos provedores, testar conexão com sucesso e persistir entre reloads.
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`; **e a nota nova:** `arquivo_morto/referencias/cline/01_tela_de_provedores.md` (campo a campo, com os caminhos do repo do Cline) + `referencias/openclaude/04_provedores_descriptor_first.md` (o esqueleto de dados por trás da tela).
 
