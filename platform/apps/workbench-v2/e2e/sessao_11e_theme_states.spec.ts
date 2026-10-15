@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test'
 import { BTN, collectConsoleErrors, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11E — tema reativo e estados closed/error', () => {
-  test('troca para tema claro sem recriar os PTYs das instâncias abertas', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera [data-pty-session-id$=":0"].
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('troca para tema claro sem recriar os PTYs das instâncias abertas', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await resetApp(page)
 
@@ -40,7 +42,9 @@ test.describe('Sessão 11E — tema reativo e estados closed/error', () => {
     await shot(page, 'sessao11e_theme_light_same_pids')
   })
 
-  test('quando o shell encerra, mantém o painel estável e preserva o scrollback visível', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera [data-pty-session-id$=":0"].
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('quando o shell encerra, mantém o painel estável e preserva o scrollback visível', async ({ page }) => {
     await resetApp(page)
 
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()

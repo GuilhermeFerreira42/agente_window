@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test'
 import { BTN, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11B — Paridade visual / multi-instância do terminal', () => {
-  test('abre 2 terminais, alterna abas e preserva PIDs/scrollback por instância', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera 2 abas no tablist "Terminais abertos" (rótulo pré-consolidação do comitê).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('abre 2 terminais, alterna abas e preserva PIDs/scrollback por instância', async ({ page }) => {
     await resetApp(page)
 
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()

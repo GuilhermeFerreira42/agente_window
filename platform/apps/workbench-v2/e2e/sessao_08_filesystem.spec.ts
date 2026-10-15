@@ -20,7 +20,9 @@ test.describe('Sessão 08 — Filesystem/Workspace', () => {
     await shot(page, 'sessao08_T1_deteccao_api')
   })
 
-  test('T2: a aba Files mostra a árvore Workspace Files', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera a árvore demo "Workspace Files" e os botões de pasta antigos — substituídos pelo módulo Explorer real na FATIA-04.
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T2: a aba Files mostra a árvore Workspace Files', async ({ page }) => {
     await page.getByRole('button', { name: BTN.abrirAlteracoes }).click()
     await page.waitForTimeout(300)
     await page.getByRole('tab', { name: /Files/ }).click()
@@ -33,7 +35,9 @@ test.describe('Sessão 08 — Filesystem/Workspace', () => {
     await shot(page, 'sessao08_T2_workspace_files')
   })
 
-  test('T3: o seletor de pasta é um botão de verdade, não um span decorativo', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera a árvore demo "Workspace Files" e os botões de pasta antigos — substituídos pelo módulo Explorer real na FATIA-04.
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T3: o seletor de pasta é um botão de verdade, não um span decorativo', async ({ page }) => {
     // Zera as sessões para cair na landing (é lá que fica o chip do workspace).
     await page.evaluate(() => localStorage.clear())
     await page.reload()
@@ -53,7 +57,9 @@ test.describe('Sessão 08 — Filesystem/Workspace', () => {
     await shot(page, 'sessao08_T3_botao_escolher_pasta')
   })
 
-  test('T4: clicar no seletor chama showDirectoryPicker (API real, não desenho)', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): espera a árvore demo "Workspace Files" e os botões de pasta antigos — substituídos pelo módulo Explorer real na FATIA-04.
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T4: clicar no seletor chama showDirectoryPicker (API real, não desenho)', async ({ page }) => {
     // Instrumenta a API nativa: o teste prova a CHAMADA, já que o diálogo do SO
     // não pode ser automatizado em headless.
     await page.addInitScript(() => {

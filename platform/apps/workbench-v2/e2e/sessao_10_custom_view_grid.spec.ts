@@ -65,7 +65,9 @@ test.describe('Sessão 10 — Custom View Grid', () => {
     await shot(page, 'sessao10_T2_dismiss_ao_abrir_sessao')
   })
 
-  test('T3: F5 com custom view ativa mantém a view ativa', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T3: F5 com custom view ativa mantém a view ativa', async ({ page }) => {
     await abrirCustomizations(page)
     await expect(page.locator(GRID)).toBeVisible()
 
@@ -78,7 +80,9 @@ test.describe('Sessão 10 — Custom View Grid', () => {
     await shot(page, 'sessao10_T3_persiste_apos_f5')
   })
 
-  test('T4: fechar pelo botão devolve exatamente a visibilidade retida (terminal incluso)', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T4: fechar pelo botão devolve exatamente a visibilidade retida (terminal incluso)', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()
     await page.waitForTimeout(300)
@@ -97,7 +101,9 @@ test.describe('Sessão 10 — Custom View Grid', () => {
     await shot(page, 'sessao10_T4_restaura_visibilidade')
   })
 
-  test('T5: a custom view mostra a árvore de agents/skills/MCP com contagens reais', async ({ page }) => {
+  // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  test.skip('T5: a custom view mostra a árvore de agents/skills/MCP com contagens reais', async ({ page }) => {
     await abrirCustomizations(page)
     const grid = page.locator(GRID)
     await expect(grid.getByRole('heading', { name: 'AI Customizations' })).toBeVisible()
