@@ -33,7 +33,7 @@
 .providers-link{color:var(--vscode-textLink-foreground);font-size:11.5px;text-decoration:none}
 .providers-input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,var(--vscode-widget-border));border-radius:5px;padding:8px 10px;font-size:13px;font-family:var(--vscode-font-family);width:100%}
 .providers-input.is-mono{font-family:var(--monaco-monospace-font)}
-.providers-input:focus{outline:1px solid var(--vscode-focusBorder);outline-offset:0}
+.providers-input:focus{outline:var(--vscode-strokeThickness) solid var(--vscode-focusBorder);outline-offset:0}
 .providers-input-row{display:flex;gap:9px;align-items:stretch}
 .providers-input-row .providers-input{flex:1}
 .providers-eye{border:1px solid var(--vscode-input-border,var(--vscode-widget-border));background:var(--vscode-input-background);color:var(--vscode-foreground);border-radius:5px;padding:0 11px;cursor:pointer;display:flex;align-items:center}

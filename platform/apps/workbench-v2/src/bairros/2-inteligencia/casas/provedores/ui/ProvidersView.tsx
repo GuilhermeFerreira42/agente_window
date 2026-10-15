@@ -134,21 +134,37 @@ export function ProvidersView() {
     }
   }
 
+  // Constrói o que vai ser gravado: o que já existe no disco + o que está na tela
+  // (rascunhos) + as chaves digitadas ('' apaga; texto salva — D84).
+  function montarProvedores(): Record<string, ProvedorConfig> {
+    const base =
+      estado?.provedores.reduce<Record<string, ProvedorConfig>>((mapa, p) => {
+        mapa[p.id] = {
+          // `nome` inclusive: sem ele, o próximo salvamento apagaria o nome do
+          // serviço genérico e o servidor recusaria ("dê um nome ao serviço").
+          nome: p.nome,
+          baseUrl: p.baseUrl,
+          modelo: p.modelo,
+          contexto: p.contexto,
+          maxSaida: p.maxSaida,
+          temperatura: p.temperatura,
+        }
+        return mapa
+      }, {}) ?? {}
+    const merged: Record<string, ProvedorConfig> = { ...base }
+    for (const [id, r] of Object.entries(rascunhos)) merged[id] = { ...(merged[id] ?? {}), ...r }
+    for (const [id, digitada] of Object.entries(chaveEditada)) {
+      if (digitada === undefined) continue
+      merged[id] = { ...(merged[id] ?? {}), apiKey: digitada }
+    }
+    return merged
+  }
+
   async function aoSalvar() {
     setSalvando(true)
     setErro('')
     try {
-      const provedores: Record<string, ProvedorConfig> = { ...(estado?.provedores.reduce<Record<string, ProvedorConfig>>((mapa, p) => {
-        mapa[p.id] = { baseUrl: p.baseUrl, modelo: p.modelo, contexto: p.contexto, maxSaida: p.maxSaida, temperatura: p.temperatura }
-        return mapa
-      }, {}) ?? {}) }
-      const merged = { ...provedores }
-      for (const [id, r] of Object.entries(rascunhos)) {
-        merged[id] = { ...r }
-        const digitada = chaveEditada[id]
-        if (digitada !== undefined) merged[id].apiKey = digitada // '' apaga; texto salva (D84)
-      }
-      const proximo = await salvar({ ativo: estado?.ativo ?? null, provedores })
+      const proximo = await salvar({ ativo: estado?.ativo ?? null, provedores: montarProvedores() })
       setEstado((atual) => (atual ? { ...atual, ...proximo } : proximo))
       setSalvo(true)
       // Depois de salvar, a chave digitada vira "guardada": limpa o rascunho dela.
@@ -167,13 +183,12 @@ export function ProvidersView() {
     setRascunhos((atual) => ({ ...atual }))
     setSalvo(false)
     // Persiste na hora: o "provedor ativo" é uma escolha pequena e imediata.
+    // Vai o MESMO pacote do Salvar (senão o servidor recusa o genérico sem nome
+    // e a escolha se perderia no F5).
     try {
-      const provedores = { ...(estado?.provedores.reduce<Record<string, ProvedorConfig>>((mapa, p) => {
-        mapa[p.id] = { baseUrl: p.baseUrl, modelo: p.modelo }
-        return mapa
-      }, {}) ?? {}), [selecionado]: { baseUrl: rascunho.baseUrl, modelo: rascunho.modelo } }
-      const proximo = await salvar({ ativo: selecionado, provedores })
+      const proximo = await salvar({ ativo: selecionado, provedores: montarProvedores() })
       setEstado((atual) => (atual ? { ...atual, ...proximo } : proximo))
+      setSalvo(false)
     } catch (motivo) {
       setErro(motivo instanceof Error ? motivo.message : String(motivo))
     }
@@ -232,7 +247,8 @@ export function ProvidersView() {
         <form className="providers-form" onSubmit={(evento) => { evento.preventDefault(); void aoSalvar() }}>
           <div className="providers-form-head">
             <div>
-              <h2>{descritor?.nome}</h2>
+              {/* No genérico (1 slot), o título mostra o serviço escolhido: "Compatível com OpenAI · Groq". */}
+              <h2>{descritor?.generico && daTela?.nome ? `${descritor.nome} · ${daTela.nome}` : descritor?.nome}</h2>
               <span className="providers-sub">{descritor?.dica}</span>
             </div>
             <span className="providers-grow" />
