@@ -49,13 +49,11 @@ vi.mock('../components/TerminalPanel', () => ({
   TerminalPanel: (props: { workspace: string }) => <div data-testid="terminal-stub" data-workspace={props.workspace} />,
 }))
 
+// FATIA 08: a tela de Provedores agora fala o formato v2 da Casa Provedores.
 const providersPayload = {
-  config: {
-    openai: { enabled: false, apiKeySource: 'environment' },
-    gemini: { enabled: false, apiKeySource: 'environment' },
-    ollama: { enabled: true, baseUrl: 'http://localhost:11434' },
-  },
-  environment: { openaiConfigured: false, geminiConfigured: false },
+  provedores: [],
+  ativo: null,
+  storage: 'fixture',
 }
 
 let workspacePosts: string[]
@@ -90,7 +88,8 @@ describe('FATIA 07 — Destravar', () => {
     // A página abre no editor central — o mesmo fluxo homologado com sessões.
     expect(await screen.findByRole('region', { name: 'Provedores' })).toBeInTheDocument()
     expect(editorTab('Provedores')).toHaveAttribute('data-tab-type', 'providers')
-    expect(await screen.findByText('Não configurada — use OPENAI_API_KEY')).toBeInTheDocument()
+    // FATIA 08: a tela nova mostra a lista (o rail) e o formulário do primeiro provedor.
+    expect(await screen.findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
     // A landing continua montada ao lado (a sessão futura segue disponível).
     expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
   })

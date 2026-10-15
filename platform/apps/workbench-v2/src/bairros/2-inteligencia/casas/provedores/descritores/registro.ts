@@ -1,6 +1,6 @@
 // Registro dos provedores (D82): a lista oficial. A tela e o servidor leem
 // daqui — ninguém mantém lista paralela (regra "quem manda é o descritor").
-import type { Descritor } from '../../contract'
+import type { Descritor } from '../contract'
 import {
   anthropic,
   deepseek,

@@ -19,3 +19,6 @@ export type {
 } from './contract'
 
 export { DESCRITORES, descritorPorId } from './descritores/registro'
+
+/** A tela da casa (cliente). O síndico (`App.tsx`) monta só isto. */
+export { ProvidersView } from './ui/ProvidersView'

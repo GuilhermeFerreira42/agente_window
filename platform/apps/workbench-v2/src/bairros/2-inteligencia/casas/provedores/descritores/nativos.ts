@@ -1,6 +1,6 @@
 // Descritores dos provedores nativos (D82) — um arquivo de DADO por provedor.
 // Regra (openclaude/04): descritor é dado, não tela — nada de React aqui.
-import type { Descritor } from '../../contract'
+import type { Descritor } from '../contract'
 
 export const openai: Descritor = {
   id: 'openai',

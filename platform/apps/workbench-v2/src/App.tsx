@@ -19,7 +19,7 @@ import { toggleEnablement, type EnablementState, type ProjectedItem } from './do
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
-import { ProvidersView } from './components/ProvidersView'
+import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import {
   closeCustomView,
   customViewTitle,

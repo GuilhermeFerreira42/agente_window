@@ -1,0 +1,67 @@
+/* Casa Provedores — estilos da tela (FATIA 08). Cores: tokens do tema (theme.css).
+   Cara aprovada pelo dono em 15/10 (design_fatia08/mockup_provedores.html). */
+.providers-view{height:100%;overflow:auto;background:var(--vscode-editor-background);color:var(--vscode-editor-foreground);padding:26px 30px;display:flex;flex-direction:column;gap:18px}
+.providers-view h1{font-size:23px;margin:0 0 6px}
+.providers-head>p{color:var(--vscode-descriptionForeground);font-size:13px;line-height:1.5;margin:0;max-width:860px}
+.providers-loading{color:var(--vscode-descriptionForeground)}
+.providers-cols{display:grid;grid-template-columns:300px minmax(0,1fr);gap:22px;align-items:start}
+
+.providers-rail{background:var(--vscode-sideBar-background);border:1px solid var(--vscode-widget-border);border-radius:8px;padding:10px 8px;position:sticky;top:0}
+.providers-search{display:flex;align-items:center;gap:7px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,var(--vscode-widget-border));border-radius:5px;padding:6px 8px;color:var(--vscode-descriptionForeground)}
+.providers-search input{flex:1;background:transparent;border:0;outline:0;color:var(--vscode-input-foreground);font-size:12.5px;font-family:var(--vscode-font-family)}
+.providers-group{margin-top:10px}
+.providers-group-title{display:block;color:var(--vscode-descriptionForeground);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;padding:6px 8px 4px}
+.providers-item{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:0;color:var(--vscode-foreground);font-family:var(--vscode-font-family);font-size:13px;padding:7px 9px;border-radius:6px;cursor:pointer;text-align:left}
+.providers-item:hover{background:var(--vscode-list-hoverBackground)}
+.providers-item.is-selected{background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground)}
+.providers-dot{width:7px;height:7px;border-radius:50%;background:#5a5a5a;flex:none}
+.providers-dot.is-on{background:var(--vscode-testing-iconPassed)}
+.providers-item-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.providers-item-tag{font-size:10px;color:var(--vscode-descriptionForeground);border:1px solid var(--vscode-widget-border);border-radius:10px;padding:1px 7px}
+.providers-item.is-selected .providers-item-tag{color:var(--vscode-list-activeSelectionForeground);border-color:currentColor}
+
+.providers-form{background:var(--vscode-sideBar-background);border:1px solid var(--vscode-widget-border);border-radius:8px;padding:18px 22px;display:flex;flex-direction:column;gap:14px;max-width:860px}
+.providers-form-head{display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--vscode-widget-border);padding-bottom:12px}
+.providers-form-head h2{font-size:16px;margin:0}
+.providers-sub{color:var(--vscode-descriptionForeground);font-size:11.5px}
+.providers-grow{flex:1}
+.providers-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;border:1px solid var(--vscode-widget-border);color:var(--vscode-descriptionForeground);border-radius:10px;padding:2px 9px}
+.providers-chip.is-active{border-color:var(--vscode-testing-iconPassed);color:var(--vscode-testing-iconPassed)}
+
+.providers-field{display:flex;flex-direction:column;gap:6px}
+.providers-label{display:flex;align-items:center;gap:8px;font-size:12px}
+.providers-link{color:var(--vscode-textLink-foreground);font-size:11.5px;text-decoration:none}
+.providers-input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,var(--vscode-widget-border));border-radius:5px;padding:8px 10px;font-size:13px;font-family:var(--vscode-font-family);width:100%}
+.providers-input.is-mono{font-family:var(--monaco-monospace-font)}
+.providers-input:focus{outline:1px solid var(--vscode-focusBorder);outline-offset:0}
+.providers-input-row{display:flex;gap:9px;align-items:stretch}
+.providers-input-row .providers-input{flex:1}
+.providers-eye{border:1px solid var(--vscode-input-border,var(--vscode-widget-border));background:var(--vscode-input-background);color:var(--vscode-foreground);border-radius:5px;padding:0 11px;cursor:pointer;display:flex;align-items:center}
+.providers-eye:hover{background:var(--vscode-toolbar-hoverBackground)}
+.providers-hint{color:var(--vscode-descriptionForeground);font-size:11px;display:flex;align-items:center;gap:5px;line-height:1.5}
+.providers-hint.is-ok{color:var(--vscode-testing-iconPassed)}
+
+.providers-adv{border:1px solid var(--vscode-widget-border);border-radius:7px;padding:12px 14px;background:var(--vscode-editorWidget-background)}
+.providers-adv summary{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;color:var(--vscode-foreground)}
+.providers-adv-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+.providers-adv input[type=range]{accent-color:var(--vscode-focusBorder);width:100%}
+
+.providers-banner{display:flex;align-items:flex-start;gap:9px;border-radius:6px;padding:10px 12px;font-size:12.5px;line-height:1.5}
+.providers-banner.is-ok{background:color-mix(in srgb, var(--vscode-testing-iconPassed) 18%, transparent);border:1px solid var(--vscode-testing-iconPassed)}
+.providers-banner.is-error{background:var(--vscode-inputValidation-errorBackground);border:1px solid var(--vscode-inputValidation-errorBorder);color:var(--vscode-foreground)}
+.providers-banner.is-warn{background:color-mix(in srgb, var(--vscode-charts-yellow) 16%, transparent);border:1px solid var(--vscode-charts-yellow)}
+
+.providers-foot{display:flex;align-items:center;gap:12px;border-top:1px solid var(--vscode-widget-border);padding-top:14px}
+.providers-radio{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--vscode-descriptionForeground)}
+.providers-radio input{accent-color:var(--vscode-focusBorder)}
+.providers-saved{color:var(--vscode-testing-iconPassed);font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.providers-btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:5px;font-family:var(--vscode-font-family);font-size:12.5px;padding:8px 14px;cursor:pointer}
+.providers-btn.is-primary{background:var(--vscode-button-background);color:var(--vscode-button-foreground);font-weight:600}
+.providers-btn.is-primary:hover{background:var(--vscode-button-hoverBackground)}
+.providers-btn.is-secondary{background:var(--vscode-button-secondaryBackground,#313131);color:var(--vscode-button-secondaryForeground,var(--vscode-foreground));border:1px solid var(--vscode-button-secondaryBorder,var(--vscode-widget-border))}
+.providers-btn.is-secondary:hover{background:var(--vscode-button-secondaryHoverBackground,#3c3c3c)}
+.providers-btn:disabled{opacity:.6;cursor:default}
+.providers-btn .spin{animation:providers-rodar 1s linear infinite}
+@keyframes providers-rodar{to{transform:rotate(360deg)}}
+
+@media(max-width:900px){.providers-cols{grid-template-columns:1fr}.providers-rail{position:static}.providers-view{padding:18px}}
