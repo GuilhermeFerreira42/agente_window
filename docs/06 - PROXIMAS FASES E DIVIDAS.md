@@ -170,6 +170,21 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - **Defeitos reais corrigidos durante a prova:** Salvar enviava a lista antiga; `nome` do genérico se perdia no 2.º salvamento (ambos em `fde5f0f`, com teste).
 - **Critérios de pronto (§4) — status:** todos verdes na prova automatizada; a **homologação** exige o roteiro do dono (chave real) e o aceite dele.
 
+## 8.1 Validação do dono com serviço REAL (2026-10-15/16) — evidência do vídeo dele
+O dono gravou um vídeo (2min33s, 15/10 21h21) testando no computador dele e o analisamos em duas IAs independentes (transcrição + frames + segunda IA com visão de vídeo). **Resultado:**
+- **Ollama local** (`http://localhost:11434`) → faixa verde **"Conexão aprovada. O serviço respondeu em 209 ms e mostrou 5 modelos."**
+- **Genérico "Compatível com OpenAI" → pool LiteLLM** (`http://0.0.0.0:4000`, apelido `meu-pool`) → **"…respondeu em 158 ms e mostrou 4 modelos."**
+- Chave **sempre mascarada** ("cole a chave aqui" / pontinhos) em todo o vídeo; aviso do arquivo local visível; **nenhum erro, nenhuma tela cinza**.
+- Veredito do dono: "o código também foi muito bom. Porém tem essas pequenas coisas que precisa de ajuste" → **homologação não declarada ainda**.
+
+### 8.2 Pendências abertas (D85/D86) — nada de código sem a ordem do dono
+| # | Pendência | Destino provável |
+|---|---|---|
+| P1 | **A1 — "visualizador antigo × novo"**: Provedores, Browser e Branch Changes abrem na **coluna estreita** (aba do editor fino); o dono quer tudo no "novo". **Definição do dono ainda pendente** (o que exatamente é "o novo"). | Decisão de rumo → **FATIA 11** (abas/editor) |
+| P2 | **A2 — tela de Provedores gruda no topo**; a tela de **novo chat** é centralizada. Dono esclareceu: a diferença é a **tela central (chat)** versus o conteúdo de Provedores subindo. Causa técnica conferida no código: `.providers-view{height:100%; flex-direction:column; padding-top:26px}` ancora no topo (a landing do chat é outro componente, centralizado). | Junto do P1 ou **FATIA 13** |
+| P3 | **D85 — valor de contexto/máximo de saída**: dono ainda vai decidir o número que usa; nada de teto artificial no app. | Aguardando decisão |
+| P4 | **A4 — "copiar o layout do LiteLLM"** (ele citou LiteLLM na fala; a tela do fim do vídeo era um estudo Open WebUI "Models", Demo Mode). Ordem: **"vamos apenas conversar por enquanto"**. | Futuro, sem fatia definida |
+
 ---
 
 # PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 16 — renumeração D64 de 2026-10-13)
@@ -202,6 +217,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md`, `fatia-09-tools/`; **nota nova:** `referencias/openclaude/03_sessoes_e_permissoes.md` (o desenho exato do "Permitir / Negar / Permitir na Sessão").
 
 ### FATIA 11 — Conferir (File Ops + SCM/Diff) — eram as 07 + 08
+> **Pendência do dono (D86/A1):** se confirmado o achado do vídeo de 15/10 ("Provedores, Browser e Branch Changes abrem no visualizador antigo"), esta fatia absorve a mudança — a definição do que é "o novo" está pendente com o dono.
 - **Objetivo:** edição real de arquivos no editor + visualização das alterações (a "lupa" para auditar o agente).
 - **Escopo:** abas funcionais e persistentes por sessão, salvamento atômico (`saveFile`), criação/renomeação/exclusão pelo Explorer; diff lado a lado via SCM (a barra lateral existente — **não** ressuscitar o diff antigo) e stage/unstage real.
 - **Critério de aceite:** criar/editar/salvar refletindo no disco **sem digitar nada no chat e sem F5** — o arquivo salvo aparece correto e o SCM mostra o diff lado a lado (com stage/unstage real).
@@ -217,7 +233,8 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Em aberto:** a aba "Portas" é real ou simulação? (verificar contra o code-server 8080.)
 - **Referência raspada (14/10):** `referencias/vs-code-1.135/04_terminal_e_pty.md` (pty host, batimento, capacidades, menu de contexto, terminal-como-aba; e o achado do agente usando terminal na 1.135 — a fronteira da D72).
 
-### FATIA 13 — Refinamentos + Casas Sessões & Command Center — absorve DEBT-05/07/11 + D2.23
+### FATIA 13 — Refinamentos + Casas Sessões & Command Center
+> **Pendência do dono (D86/A2):** tela de Provedores "gruda no topo" × tela de novo chat centralizada — refinamento visual apontado no vídeo de 15/10. — absorve DEBT-05/07/11 + D2.23
 - **Objetivo:** fechar o que ficou fora do caminho crítico do MVP + extrair as duas casas da barra lateral/topo.
 - **Escopo:** DEBT-05 (picker nativo no Windows + fallback Linux) · DEBT-07 (pastas recentes no seletor) · **DEBT-11/E9 (a Pesquisa volta ao lugar — a troca de pasta fica *dentro* dela, como seletor, D73)** · D2.23 (Trilha de Navegação/breadcrumbs **navegável**: menus suspensos + estrutura interna do código) · lacunas do mockup na sidebar de Sessões (29/29, busca, Novo Grupo Ctrl+N, indicador de voz, +1 workspace) e **histórico de chats antigos** (item 3 do vídeo de 12/10).
 - **Casas (D69):** nascem **Sessões** (`1-workbench/casas/sessoes` — `SessionSidebar.tsx` 604 l. + lógica no `App.tsx`) e **Command Center** (`1-workbench/casas/command-center` — `WorkspaceSwitcher` + centro da Titlebar; **o Titlebar fica corredor**, sem estado, D70).
