@@ -172,10 +172,21 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | Clique em "Restaurar editor" | volta ao 50/50 |
 | Componente legado no código | **nenhum** (só sobras de *nome* em migração de banco; `legacy/` removida na tag `legacy-backup-2026-09`) |
 **Conclusão:** o débito **não é de componente** (essa parte está atendida) e **sim de padrão de abertura**: hoje a superfície abre no estado dividido; deveria abrir **maximizada**. O A2 ("a tela sobe") é o **mesmo mecanismo** — com o editor maximizado o chat fica oculto e o salto deixa de existir nesse fluxo.
+**CAUSA do "a tela sobe" — medida ao vivo em 16/10 (não é código legado):**
+| Estado | Cadeia do elemento (medida real) |
+|---|---|
+| Chat sozinho | `section.session-landing` (altura 315) dentro de `div.desktop-surface-group.side-pane-closed` — **`align:center justify:center`** → centralizado (y=333) |
+| Com Provedores aberto | `section.session-landing` (altura 353) dentro de **`div.` sem classe = o painel redimensionável** (`display:block`) dentro de `div.desktop-surface-group.side-pane-editor-only` — **`align:normal`** → **sem centralização → y=36 (topo)** |
+
+**Leitura:** a tela de sessão nova tem só a altura do próprio conteúdo; quem a centraliza é o **pai**. Quando o Provedores abre, o chat passa para dentro de um painel redimensionável **sem** centralização → ela cola no topo. **Não há componente legado envolvido** (verificado: sem `components/legacy/`, sem `legacy/`; a superfície de Provedores renderiza no `EditorArea`). Prints: `validacao_fatia08/landing_1_centralizada.png` e `landing_2_depois.png`.
+
+**Vocabulário oficial dos dois modos (pedido do dono, 16/10):** **"modo anexo"** = editor dividido ao lado do chat · **"modo maximizado"** = editor toma o centro, chat oculto (`[lista 300][EDITOR flex][Side Bar 274][Activity Bar 48]`).
+
 **Opções (decisão do dono pendente):**
 | Opção | O que é | Custo/risco |
 |---|---|---|
-| **A — fix pequeno agora** | Abrir as superfícies da Conta **já maximizadas** (o botão continua ali para "Restaurar") + **teste de contrato** novo ("Conta ▸ Provedores abre com o editor maximizado") | Baixo/médio: mexe no estado de layout (`editorMaximized`) — exige rodar a bateria inteira (unit + E2E) por tocar área sensível |
+| **A1 — fix da CENTRALIZAÇÃO (prioridade declarada do dono)** | Fazer o conteúdo do chat esticar/centralizar dentro do painel (wrapper `height:100%` + flex) para a tela de sessão nova seguir centralizada com o Provedores aberto — mata o "sobe pro topo" | Pequeno (CSS/JSX no caminho do chat) + **teste de contrato novo** (geometria da landing com aba aberta); toca área sensível → exige bateria |
+| **A2 — abrir em modo maximizado por padrão** | Superfícies da Conta abrem já maximizadas ("Restaurar" continua disponível) | Baixo/médio — o dono disse que **isso não é o importante**; fica secundário |
 | **B — regra geral na FATIA 11** | Definir o roteamento de todas as superfícies auxiliares (Provedores, Browser, Branch/Changes, Configurações) na Casa Editor, com testes | Maior, porém faz junto do trabalho de abas/editor que já está previsto |
 | **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
 **Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
