@@ -191,6 +191,21 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
 **Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
 
+## 8.4 Classificação das dívidas e medição de Browser/Branch Changes (2026-10-16, conversa — sem código)
+**Pergunta do dono: "isso é dívida da fatia 7 ou não?" — resposta em camadas:**
+| Item | Origem | Verificação | Situação hoje |
+|---|---|---|---|
+| **DEBT-04 (Provedores)** | nasceu nas **fatias 4/6** (linha canônica do `06`: "Fatia 4 / 6") | era item do escopo da **FATIA 07** ("Destravar" = DEBT-06+04+09); a conferência de 15/10 declarou "nada a expurgar" e **errou a régua** (procurou componente, não posicionamento) | **reaberto 16/10** (D87); falta só o **padrão de abertura** |
+| **Browser** | **não é dívida** — é **funcionalidade da FATIA 11 (Conferir)** | expectativa antiga (specs de 17/09) em **quarentena** (D80) — expectativa morta | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; conteúdo real é da FATIA 11 |
+| **Branch Changes** | idem acima — **FATIA 11 (SCM/Diff real)** | idem | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; diff real é da FATIA 11 |
+
+**Medição ao vivo (app rodando, 1600×950, sessão ativa):** clicar em *"Abrir alterações no editor"* (Titlebar) e *"Abrir navegador no editor"* → em ambos os casos o painel cai em `section.editor-pane` (**EditorArea = editor moderno**), em `side-pane-editor-only`, com **chat 471 px | editor 471 px** (modo anexo) e a **aba** correspondente na barra do editor ("Branch Changes" / "Browser"). O próprio estado vazio do editor declara: *"Browser, Search e Branch Changes abrem aqui — não na barra auxiliar."* Prints: `validacao_fatia08/aba_branch_changes.png`, `aba_browser.png`.
+**Conclusão:** para as **três** superfícies (Provedores, Browser, Branch Changes) o que resta é a **mesma decisão de POSICIONAMENTO** (modo anexo × modo maximizado) — nenhuma tem componente legado, nenhuma "nasceu" na FATIA 11.
+
+**A2 reformulado pelo dono (16/10, EM CONVERSA — sem decisão):** *"Abertura baseada no estado do editor — Provedores (e futuros painéis) devem abrir no modo atual do editor de código (anexo ou maximizado). O pulo do chat não deve acontecer caso esteja abrindo no modo anexo."*
+- Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado);
+- Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 11).
+
 ## 8. Estado da implementação (2026-10-15) — IMPLEMENTADA, aguardando a validação do dono
 - **Código:** `bairros/2-inteligencia/casas/provedores` — `contract.ts` · `descritores/{nativos,registro}.ts` · `server/{providersRepo,probe,rotas}.ts` · `ui/{ProvidersView.tsx,client/api.ts}` · `providers.css` · `README.md`. **Legado removido:** `src/server/providers.ts` (+ teste), `src/components/ProvidersView.tsx`, `src/styles/providers.css`. `App.tsx` importa **só o barrel**; o plugin do dev server delega as rotas (`rotaPertenceAoModulo`, D71).
 - **Commits (sem push):** `f87981c` · `2b371c2` · `fde5f0f`.
@@ -209,7 +224,7 @@ O dono gravou um vídeo (2min33s, 15/10 21h21) testando no computador dele e o a
 ### 8.2 Pendências abertas (D85/D86) — nada de código sem a ordem do dono
 | # | Pendência | Destino provável |
 |---|---|---|
-| P1 | **A1/DEBT-04 — "visualizador antigo × novo"**: diagnóstico FECHADO em 16/10 (§8.3). Sem componente legado; falta o padrão de abertura maximizado. | Decisão do dono (opções em §8.3) |
+| P1 | **A1/DEBT-04 — "visualizador antigo × novo"**: diagnóstico FECHADO em 16/10 (§8.3; classificação e medição de Browser/Branch em §8.4). Sem componente legado; falta o padrão de abertura maximizado. | Decisão do dono (opções em §8.3) |
 | P2 | **A2 — "a tela sobe": causa CONFIRMADA no código (16/10).** O dono marcou na imagem que o que sobe é **a tela central do chat** (a landing "Nova sessão em workspace-local") — resposta **B**. Mecanismo: a centralização da landing depende do estado do painel lateral — `isChatCentered(inputs) = (resolveSidePaneState(inputs) === 'closed')` (`domain/sidePane.ts`). Sem aba aberta, os inputs são `{hasEditorTabs:false,…}` → estado **`'closed'`** → entra a classe `chat-centered` (`.desktop-surface-group.chat-centered{align-items:center}` + faixa de 950 px) e a landing fica centralizada. Ao abrir **Provedores** (aba **global**, sem dono de sessão — justamente o caso do DEBT-09), `hasEditorTabs` vira `true` → estado **`'editor-only'`** → a classe **sai** e o conteúdo ancora no topo. Regra herdada do desenho original ("Chat centers itself in the 950px band only when it is the sole surface"); a **landing** é que herda a regra e dá o salto. | Junto do P1 ou **FATIA 13** — corrigível de três formas (A pequena: manter a landing centralizada com aba global aberta · B de rumo: sai de graça se Provedores passar a abrir na superfície nova · C: deixar como está) |
 | P3 | **D85 — valor de contexto/máximo de saída**: dono ainda vai decidir o número que usa; nada de teto artificial no app. | Aguardando decisão |
 | P4 | **A4 — "copiar o layout do LiteLLM"** (ele citou LiteLLM na fala; a tela do fim do vídeo era um estudo Open WebUI "Models", Demo Mode). Ordem: **"vamos apenas conversar por enquanto"**. | Futuro, sem fatia definida |
