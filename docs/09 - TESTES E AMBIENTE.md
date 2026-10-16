@@ -321,3 +321,6 @@ Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 f
 **Prova direta com spec isolado:** `sessao_15_editor_maximize` (10 testes) = **9✗/1✓ nos DOIS estados** (rodado isolado, servidor limpo e seed de 5 sessões em cada) — falha idêntica, pré-existente.
 
 **Leitura honesta:** a suíte E2E completa **não é régua neste sandbox** (40 falhas por *timeout* de 30 s em áreas congeladas que a fatia não toca: explorer, search, git, editor, activity bar). A régua usada continua sendo: (a) as baterias focadas já registradas (§2.4/§2.5/§2.6) e (b) o A/B por spec. **Nenhuma falha exclusiva da FATIA 08**; a bateria da fatia é **6/6** (§13).
+
+### 13.3 Buraco de teste identificado (16/10) — nenhuma trava dizia ONDE a superfície abre
+A sonda `sonda_01_debt09.cjs` (FATIA 07) e a bateria da FATIA 08 verificavam que a tela **abre** (aba, `.providers-view` visível, zero erro de console) — **nenhuma** verificava **onde/como** ela abre (superfície, estado do painel, maximizado × divisão). Foi por esse buraco que o **DEBT-04** (reaberto pelo dono em 16/10) passou. **Trava proposta** (entra junto do fix da opção A, `06 §8.3`): teste E2E de contrato — "Conta ▸ Provedores abre com o editor **maximizado** (`.desktop-surface-group.editor-maximized`, sem `.chat-pane`)"; e, no unit, contrato do estado de layout por tipo de aba.
