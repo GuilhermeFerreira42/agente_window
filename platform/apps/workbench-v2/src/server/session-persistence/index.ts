@@ -9,6 +9,8 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
+import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
+import { obterAlvoDeConversa } from './chatAlvo'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -98,7 +100,7 @@ async function saveSession(session: Session): Promise<void> {
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -126,6 +128,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (rotaPertenceAoModulo(url.pathname)) {
     if (await tratarRotasProvedores(request, response, url)) return true
+  }
+
+  if (rotaPertenceAoModuloConversa(url.pathname)) {
+    if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa)) return true
   }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {
