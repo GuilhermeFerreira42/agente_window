@@ -22,7 +22,7 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 
 ---
 
-## 2. Inventário completo — 32 arquivos / 190 testes (atualizado 2026-10-17: + `fatia08_modo_abertura` com 4)
+## 2. Inventário completo — 33 arquivos / 195 testes (atualizado 2026-10-17: + `fatia08_modo_abertura` com 4 e + `conversa_fatia09` com 5)
 
 ### 2.1 Anti-regressão OBRIGATÓRIA em todo commit da FATIA-05 (`docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §9`) — 12 suítes / 115 testes
 | Spec | Testes | Mundo | Observação |
@@ -75,7 +75,7 @@ Todos testam rótulos/atributos do terminal **anteriores** à homologação `COM
 
 ### 2.5.1 Baseline FATIA 08 (HEAD `fde5f0f`, 2026-10-15)
 - `npx vitest run` → **765 passed / 12 failed / 16 skipped (793)** · typecheck **0**. As 12 falhas são **exatamente as mesmas** da linha anterior (9 `TerminalPanel` + `iconLabels` + `themeTokens` + `visualStates`). O `pass` subiu 730 → 765: **+37** dos testes da casa nova (registro 6, repositório 13, sonda 13, fronteira LEGO 5) **−2** do `src/server/providers.test.ts`, removido junto com o código legado.
-- **E2E da fatia:** `provedores_fatia08.spec.ts` **6/6** (ver §13).
+- **E2E da fatia:** `provedores_fatia08.spec.ts` **6/6** (ver §13) · `conversa_fatia09.spec.ts` **5/5** (FATIA 09 — streaming+Markdown+rodapé · Parar · F5+isolamento · erros honestos+varredura de chave · troca de provedor; roda contra o mesmo stub 4599 com o fio padrão de **600 ms/pedaço** e o cenário **LENTO** de 700 ms ativado pela palavra `LENTO` no pedido; caso (d) timeout 60 s é unit da C2, nota no spec).
 
 ### 2.5.2 Baseline 2026-10-17 (HEAD `f7b9035`) — pós A1 + D88 e homologação da FATIA 08
 - `npx vitest run` → **767 passed / 12 failed / 16 skipped (795)** · typecheck **0**.
