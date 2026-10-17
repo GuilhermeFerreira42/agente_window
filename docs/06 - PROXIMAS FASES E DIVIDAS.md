@@ -335,7 +335,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
 > **STATUS: NÃO INICIADA.** Ordem expressa do dono em 17/10: *"Não comece a fatia 9 ainda. Só preciso que você atualize os documentos… Tudo pronto e documentado antes de começar a fatia 9."*
-> **Regra do projeto (40 %):** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** Aguarda aprovação do dono e as **3 decisões** (Q1–Q3) antes de qualquer código.
+> **Regra do projeto (40 %):** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** Aguarda aprovação do dono e as **5 decisões** (Q1–Q3 originais + **Q4/Q5** nascidas do diagnóstico — ver §9.4 e §4).
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
@@ -455,13 +455,15 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 9. **Trocas de provedor** — trocar o provedor ativo na tela de Provedores muda **quem responde** na conversa seguinte, sem reiniciar o app.
 10. **Sem regressão** — typecheck **0** · unit ≥ baseline **767✓/12✗/16** (as mesmas 12 pré-existentes) · E2E FATIA 08 **6/6** · contrato de abertura **4/4** · nenhum teste apagado ou silenciado.
 
-## 4. Decisões a fechar com o dono (3)
+## 4. Decisões a fechar com o dono (5 — Q4/Q5 nasceram do diagnóstico da §9)
 
 | # | Pergunta | Opções | Minha recomendação |
 |---|---|---|---|
 | **Q1** | **Qual provedor é o "padrão de prova"?** | (a) **Ollama local** (`http://localhost:11434`) · (b) provedor simulado só · (c) um serviço pago | **(a) Ollama local** — roda na máquina do dono, **não exige chave** (D91), e foi o que ele já validou na 08. O simulado fica para a bateria automatizada |
 | **Q2** | **Histórico entra já nesta fatia?** | (a) entra (é critério) · (b) fica para refinamento | **(a) entra** — o `.jsonl` já existe; o custo é **verificar**, não construir. Sem isso a conversa "some no F5" e a fatia não parece pronta |
 | **Q3** | **Markdown mínimo ou completo?** | (a) completo (tabelas, listas, código com cópia) · (b) mínimo | **(a) completo** — **já está pronto** no `ChatPanel`; não faz sentido degradar o que existe |
+| **Q4** | **Anexos: o conteúdo do arquivo entra na 09?** | (a) só o **nome** (como hoje, com aviso de que não é lido) · (b) ler e enviar o **conteúdo** de arquivos pequenos · (c) adiar | **(a) na 09** — anexar arquivo e o modelo não ler é aceitável **se estiver escrito**; ler arquivo é uma **capacidade de agente** e pertence à FATIA 10 (Agir), junto com as ferramentas. Fazer (b) agora inflaria a 09 e misturaria duas fatias |
+| **Q5** | **Segunda conversa (nested chat): criar de verdade na 09?** | (a) sim, fluxo real de novo chat · (b) adiar; o **+** fica **fora** até existir | **(b)** — o **modelo já suporta** `chats[]` e a restauração já reagrupa por `chatId`; o que falta é **UI e fluxo**, que não muda o critério de aceite desta fatia. Construir agora desviaria o foco de "conversa real" |
 
 **Decisões tomadas pela IA (registradas para não virar susto):** a **casa nova** será `bairros/2-inteligencia/casas/conversa` (2.º módulo extraído, D69/D76 — com cartão de visita e teste de fronteira); a rota de conversa segue o **mesmo padrão** da casa Provedores (`rotaPertenceAoModulo` + registro no dev server "prefeitura"); o transporte do streaming será **HTTP com envio em pedaços (SSE)** por reaproveitar a porta única 5174 e não exigir infraestrutura nova — se a prova mostrar problema, cai-se para WebSocket (o `ws` já é dependência do projeto).
 
@@ -490,3 +492,41 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 
 ## 8. Entrega esperada
 1 commit por conquista (≥ 4): **(1)** casa + rota + protocolo; **(2)** streaming no servidor; **(3)** ligação no chat + Parar; **(4)** erros honestos + histórico; **(5)** documentação e evidências. Cada um com typecheck 0 + bateria focada + A/B quando alguma falha.
+
+## 9. Diagnóstico do chat — o que existe, o que foi testado e o que falta (2026-10-17, antes de codar a 09)
+
+### 9.1 O que existe HOJE (medido no código)
+| Peça | Onde | O que realmente faz | Evidência |
+|---|---|---|---|
+| Modelo de dados | `types.ts` | `Session` → `chats[]` (`NestedChat`: id, título, status, mensagens) + `mainChatId`; `ChatMessage` tem `running`, `cancelled`, `vote`, `reported`, `attachments`, `model`, `mode` | tipos + invariantes (`sessionState.ts:188`) |
+| Lista de mensagens | `components/ChatPanel.tsx:193` | Markdown real (`react-markdown` + `remark-gfm`), bloco de código com **copiar**, ações de feedback/regenerar | `ChatPanel.test.tsx` **3 testes** |
+| Composer | `components/ChatInput.tsx` | texto, **Enter/Shift+Enter**, histórico de entradas, rascunho por chat, anexos por picker (workspace/local), modo e modelo | `ChatInput.test.tsx` **13 testes** |
+| Envio | `App.tsx:1578 handleSend` | **SIMULADO**: adiciona a mensagem e, após **1 s**, escreve uma resposta fixa (varia se a palavra "build" aparece) | nenhum teste contra provedor |
+| Parar | `App.tsx:1657 handleStop` | limpa os temporizadores do mock e marca como cancelado | idem |
+| Persistência | `server/session-persistence/` | metadados no SQLite + **mensagens em `.jsonl` por sessão** (`slug/sessionId.jsonl`, com `chatId` em cada linha); restauração **reagrupa por chat**; mensagens `running` **não** são gravadas (decisão explícita, evita bolha vazia eterna) | **sem teste** do round-trip de transcrição |
+| Provedores (08) | `casas/provedores/server/probe.ts` | **testar conexão** e **listar modelos** em 4 protocolos (`openai-chat`, `anthropic`, `gemini`, `ollama`), timeout 10 s, chave só no servidor | 37 unit + E2E 6/6 |
+| Conversa real com provedor | — | **NÃO EXISTE** (nenhuma rota `/api/chat*`) | — |
+
+### 9.2 Lacunas encontradas no diagnóstico (novas, não estavam na SPEC)
+| # | Lacuna | Consequência | Encaminhamento |
+|---|---|---|---|
+| **G1** | **Anexos só vão pelo nome**: `"Arquivos anexados: a, b"` vai no texto; o **conteúdo do arquivo nunca é lido nem enviado** | Pedir "analise este arquivo" hoje **não funciona** com provedor real | Decisão do dono (Q4) |
+| **G2** | **Lista de modelos fixa no composer** (`ChatInput.tsx:43`: Auto, Claude Sonnet 4, GPT-5, GPT-5 mini) e **não ligada** ao catálogo do provedor ativo da 08 | Escolher "GPT-5" com Ollama ativo daria erro | **Decidido pela IA:** na 09 o modelo efetivo passa a vir do **provedor ativo** (catálogo da 08); o texto livre continua |
+| **G3** | **"Novo chat" é simulado**: o botão **+** apenas envia a mensagem *"Inicie um novo chat contextual…"* | Não existe fluxo real de segunda conversa | Decisão do dono (Q5) |
+| **G4** | **Não há teste** provando que a conversa volta igual após F5 nem que **sessão A não vê mensagens de B** | É a base do "isolamento"; hoje só há invariantes do modelo | **Decidido pela IA:** entra como critério de prova da 09 (não é decisão de produto) |
+| **G5** | **Sem contagem de contexto/tokens**: o histórico inteiro seria enviado a cada turno | Em conversa longa o provedor devolve **413/estouro de contexto** | **Decidido pela IA:** MVP envia o histórico do chat atual; estouro vira **erro honesto** com orientação (compactação fica para depois, referência OpenClaude `compact_boundary`) |
+
+### 9.3 A raspagem do VS Code é suficiente? (resposta à pergunta do dono)
+**O que já foi raspado e é diretamente útil à 09:**
+- `arquivo_morto/engenharia_reversa/04_CENTER_CHAT/` — **9 documentos** (inventário, comportamento, **mapa de código**, gap analysis, conclusão, **contrato de implementação**, **fluxos e eventos**, testes, ordem). O `04F` já define o contrato do módulo: `ChatTurnInput{sessionId,text,attachments,mode,providerId}` e `ChatEvent{thinking|chunk|toolPending|toolResult|completed|failed}` com a **regra dura**: *"UI não fala com provider diretamente"* e *"sessão é a unidade de isolamento de histórico, rascunho e anexos"*. O `04G` traz o fluxo em diagrama (UI → serviço → runtime → eventos).
+- `arquivo_morto/pesquisa_bruta/fatia-06-chat/` — botões, **ERRO_HANDLING com os cenários da 09** (401/403 → abrir Provedores; Ollama offline `ECONNREFUSED`; **429** rate-limit; **413** estouro de contexto; `compact_boundary`), persistência (OpenClaude/OpenCode), permissões, picker de sessão.
+- `pesquisa_bruta/fatia-08-streaming/` — ciclo do streaming, estados de "pensando", interrupção e **"Keep Going"**.
+- `pesquisa_bruta/fatia-07-input/` — comportamento e medidas do composer.
+**O que NÃO está raspado (e não precisa vir do VS Code):** o **formato de fio de cada provedor** (SSE da OpenAI/Anthropic, streaming do Gemini, NDJSON do Ollama). Isso é **API pública de cada provedor**, não arquitetura do VS Code — o VS Code fala com modelos pelo host de extensões, que é outro caminho. O `probe.ts` da 08 **já tem** o mapa de URL/cabeçalho por protocolo, que é o andaime exato para a chamada de conversa.
+**Veredito:** **não é preciso raspar o VS Code de novo para a FATIA 09.** A lacuna real é de **protocolo de provedor**, e ela se resolve com a documentação pública de cada um + o **stub** que vai emitir pedaços no teste. Se aparecer dúvida fina de comportamento (ex.: como o original trata interrupção), o `04G`/`04F` já respondem.
+**Onde uma nova consulta ainda valeria:** só na **FATIA 10 (Agir)** — ferramentas, permissões e o ciclo de aprovação têm detalhe que a raspagem atual cobre só em parte (`PERMISSOES.md`).
+
+### 9.4 Decisões novas a fechar (além de Q1–Q3)
+Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4** (para não haver duas fontes de verdade):
+- **Q4 — anexos:** só o **nome** na 09 (recomendado, com aviso de que o arquivo ainda não é lido) × ler o **conteúdo** agora × adiar para a 10.
+- **Q5 — segunda conversa:** criar o fluxo real agora × **adiar** e deixar o **+** fora até existir (recomendado).
