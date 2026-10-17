@@ -206,6 +206,26 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado);
 - Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 11).
 
+## 8.5 Autoavaliação de maturidade — "3 níveis" (2026-10-17, a pedido do dono)
+O dono enviou um vídeo de terceiro (anúncio de curso, 60 s) que descreve **3 níveis de desenvolvimento com IA**: **(1) vibe coding** (prompt → aceita tudo → torce) · **(2) configurações** (skills, rules, MCP servers) · **(3) workflow assistido** (spec antes do código, testes automatizados no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, **métricas**: carga, complexidade ciclomática, estrutura de dependências, cobertura). Análise completa em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
+
+**Onde estamos — medido em 17/10, não estimado:**
+| Pilar do nível 3 | Temos? | Evidência |
+|---|---|---|
+| Spec antes do código | ✅ | SPEC por fatia, critérios de aceite, plano de prova, dívidas rastreadas |
+| Decisões registradas | ✅ | D1–D87 (`05`), histórico (`07`), vocabulário canônico |
+| Testes no loop | 🟡 manual | tsc + Vitest + Playwright antes de cada commit — por **disciplina**, não por automação |
+| Teste como trava confiável | 🟡 **furo provado** | **DEBT-04 escapou** (`09 §13.3`): o teste media "abre", não "onde/como abre" |
+| CI / gate bloqueante | ❌ | **sem `.github/workflows`**, sem husky/lint-staged; D62 = sem push |
+| Cobertura medida | ❌ | meta **90/90/85/90** em `vitest.config.ts`, mas **nunca medida**; em 17/10 a suíte completa **não gerou relatório** (vermelha); só subconjunto verde gerou |
+| Complexidade ciclomática · estrutura de dependências · carga · contexto por grafos | ❌ | nada instalado (candidatos dependency-cruiser/eslint-plugin-boundaries só anotados) |
+
+**Placar medido em 17/10:** unit **765✓/12✗/16 skip** e, numa 2.ª execução, **763✓/14✗/16 skip** (flaky 12→14); 21 E2E em quarentena; E2E completo inútil no sandbox (88✘ ambientais).
+
+**Veredito: nível 2 sólido com um pé no nível 3 ("2,5")** — o *cérebro* é de nível 3 (spec, decisões, evidências, homologação); o *robô* é de nível 2 (nada é automaticamente bloqueante; a métrica principal nunca foi medida).
+
+**Falta para fechar o 3 (proposta, sem código):** (1) `npm run ci` único = typecheck+lint+testes+cobertura, que **falha**; (2) hook de pre-commit chamando o `ci`; (3) **zerar o vermelho** (12–14✗ + 16 skip + 21 quarentena → 0); (4) cobertura visível no `ci`; (5) estrutura de dependências (dependency-cruiser ou eslint-plugin-boundaries); (6) complexidade ciclomática (regra `complexity` do ESLint); (7) E2E confiável (separar ambiente de lógica); (8) code review — hoje é revisão por IA antes do commit; GitHub Actions só quando houver push (D62 mantém sem push). **Nada disso está nas fatias 08–10** — decisão de dono: virar fatia própria ou entrar na 13/16.
+
 ## 8. Estado da implementação (2026-10-15) — IMPLEMENTADA, aguardando a validação do dono
 - **Código:** `bairros/2-inteligencia/casas/provedores` — `contract.ts` · `descritores/{nativos,registro}.ts` · `server/{providersRepo,probe,rotas}.ts` · `ui/{ProvidersView.tsx,client/api.ts}` · `providers.css` · `README.md`. **Legado removido:** `src/server/providers.ts` (+ teste), `src/components/ProvidersView.tsx`, `src/styles/providers.css`. `App.tsx` importa **só o barrel**; o plugin do dev server delega as rotas (`rotaPertenceAoModulo`, D71).
 - **Commits (sem push):** `f87981c` · `2b371c2` · `fde5f0f`.

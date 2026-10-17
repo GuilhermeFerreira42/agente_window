@@ -2,6 +2,12 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-17 — Autoavaliação "em que nível estamos" (vídeo de 3 níveis) + cobertura nunca medida
+- **Vídeo do dono (60 s, 720×1280, anúncio de curso):** descreve 3 níveis — vibe coding · configurações (skills/rules/MCP) · workflow assistido (spec antes do código, testes no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, métricas de qualidade). Método: `file`/ffprobe → 30 frames + 12 dirigidos → Whisper `small` (pt p=1,00) → termos conferidos na tela. Análise em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
+- **Veredito:** **nível 2 sólido com um pé no nível 3 ("2,5")** — spec/decidões/evidências = nível 3; automação bloqueante e métricas = nível 2 (ou ausentes). Registro completo em `06 §8.5`.
+- **Achado medido no próprio projeto (17/10):** a **meta de cobertura 90/90/85/90 existe** em `vitest.config.ts`, mas `test:coverage` **nunca entrou na rotina**; rodando a suíte completa, **o relatório não sai** (só com subconjunto verde, ex. 1 arquivo → 0,1% e erro de threshold). Ou seja: **cobertura é desconhecida na prática**. Placar: 765✓/12✗/16 skip e 763✓/14✗/16 skip (flaky). Não há CI, hook de pre-commit, complexidade ciclomática nem checagem de dependências (candidatos só anotados).
+- **Nenhuma linha de código alterada** — autoavaliação e registro apenas; decisão de rumo (virar fatia de qualidade ou entrar na 13/16) fica com o dono.
+
 ## 2026-10-16 — DEBT-04 reaberto: terminologia corrigida, diagnóstico fechado ao vivo (D87)
 - **O dono corrigiu a terminologia e reabriu o débito:** o certo é **visualizador legado × editor moderno** (Monaco/Webview), e o **DEBT-04 da FATIA 07 não foi 100% expurgado** — Provedores, Browser e Branch Changes abrem na coluna estreita em vez do editor moderno centralizado. Palavras dele: *"esse débito passou sem eu verificar o teste. E passou pelo seu testes também. Então eu errei e você também errou."*
 - **Erro meu, registrado:** a verificação do DEBT-04 na FATIA 07 procurou **componente legado** (e achou nada — correto), mas a régua era **onde/como a superfície abre**; a sonda do DEBT-09 afirmava "abre no editor novo" e só checava aba visível + console; a bateria da FATIA 08 idem. Régua errada = débito escapou. A trava que faltava entra junto do fix.
