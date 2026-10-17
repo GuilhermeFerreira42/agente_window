@@ -234,3 +234,22 @@ A V1 só pode ser declarada pronta quando:
 
 ## C.4 Se algo falhar
 Anote **tela + texto do aviso** e traga: a validação vale como **reprovado com evidência**. Nada é declarado verde sem o aceite do dono.
+
+# PARTE D — FATIA 09 (Conversar): roteiro de validação do dono — **VALIDAÇÃO PARCIAL FEITA EM VÍDEO (17/10) · homologação formal pendente**
+
+> **Estado:** implementada em 17/10 (`5968b70`, `9e2c703`, `c0af6fe`, `90f75c8`) e **já usada com sucesso pelo dono** (2 vídeos de 17/10: Ollama local respondendo, Markdown completo, provedor ativo persistindo; o 1º vídeo também mostrou o erro honesto "Nenhum provedor está ativo" quando a bolinha de ativação fica desligada). A bateria automatizada passou **5/5 em 4 rodadas seguidas**. Prints da prova em `~/validacao_fatia09/` (fora do repo). Este roteiro é o caminho curto para **declarar a homologação** — ou apontar o que falta.
+
+## D.1 Caminho rápido (5 minutos, com Ollama local — sem chave)
+1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
+2. **Conta ▸ Provedores** → **Ollama (local)** → endereço `http://localhost:11434` → **[Buscar modelos]** → escolha um → **[Testar conexão]** (faixa verde) → **[Salvar provedores]** → **marque "usar este provedor no chat"** (a bolinha — sem ela o chat responde *"Nenhum provedor está ativo"*; foi o esquecimento do 1º vídeo).
+3. Abra uma sessão e mande "oi" → a resposta **cresce aos poucos** (chega em pedaços, não de uma vez) e, no fim, o rodapé mostra o **modelo que respondeu de verdade**.
+4. Peça algo comprido (ex.: *"escreva o hino do Brasil na integral"*) → clique **Parar** no meio → a resposta para onde está, com a marca **Cancelada**, e nada de texto falso entra depois.
+5. **F5** → a conversa continua lá, **na mesma sessão**; abra **outra sessão** → a conversa da primeira **não aparece** na segunda.
+6. Troque o provedor/modelo ativo em Provedores → a **próxima** pergunta já sai pelo novo, **sem reiniciar** o app.
+
+## D.2 O que observar (falhas honestas, sem erro genérico)
+- Sem provedor ativo → *"Nenhum provedor está ativo…"* · chave errada → *"Chave inválida (erro 401)"* · serviço desligado → *"Não deu para alcançar o serviço…"* · demora > 60 s → *"O serviço não respondeu em 60 segundos"*.
+- A **chave nunca aparece** na tela, no log nem na resposta da API — a tela mostra só o arquivo de onde ela veio (`~/.agente_window/providers.json`).
+
+## D.3 Se algo falhar
+Anote **tela + texto do aviso** (ou grave um vídeo, como em 17/10 — a análise por transcrição + quadros funciona bem) e traga: a validação vale como **reprovado com evidência**. Nada é declarado homologado sem a palavra do dono — ao aprovar, registre a homologação no topo deste arquivo, como na FATIA 08 (D89).

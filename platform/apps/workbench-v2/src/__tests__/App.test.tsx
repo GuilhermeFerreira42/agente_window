@@ -22,7 +22,47 @@ const editorTab = (name: string | RegExp) => within(document.querySelector('.edi
 // outro — importante agora que a visibilidade da barra auxiliar é por sessão.
 beforeEach(() => {
   window.localStorage.clear()
+  // FATIA 09: o /api/chat do teste fica SUSPENSO até o Parar abortar (ou até o
+  // teste substituir o fetch por um fio SSE). Sem isto o fetch do jsdom falha
+  // na hora e o chat nunca fica "Trabalhando" — quebrando os fluxos de Parar.
+  const fetchOriginal = globalThis.fetch.bind(globalThis)
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/api/chat')) {
+      return new Promise<Response>((_resolve, reject) => {
+        const sinal = init?.signal
+        const abortar = () => reject(new DOMException('Aborted', 'AbortError'))
+        if (sinal?.aborted) abortar()
+        else sinal?.addEventListener('abort', abortar)
+      })
+    }
+    return fetchOriginal(input, init)
+  })
 })
+
+/** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
+function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' = 'done', atrasoMs = 25): void {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+    if (!String(input).includes('/api/chat')) throw new Error('fetch inesperado no teste')
+    const codificar = new TextEncoder()
+    const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
+    if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))
+    const fio = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Atraso entre frames: o fio é ASSÍNCRONO como o do servidor, e o teste
+        // consegue observar o estado "em andamento" antes do fim.
+        let indice = 0
+        const passo = () => {
+          if (indice >= pedacos.length) { controller.close(); return }
+          controller.enqueue(pedacos[indice])
+          indice += 1
+          setTimeout(passo, atrasoMs)
+        }
+        setTimeout(passo, atrasoMs)
+      },
+    })
+    return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+  })
+}
 
 vi.mock('../components/TerminalPanel', () => ({
   TerminalPanel: () => null,
@@ -171,10 +211,16 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Copiar resposta final' }))
     expect(screen.getByText('Resposta final copiada')).toBeInTheDocument()
 
+    // FATIA 09: regenerar agora fala COM O SERVIDOR — o fio SSE de teste
+    // substitui o antigo texto fixo de 1 s.
+    responderChatComSSE(['Nova tentativa em **pedaços**, direto do provedor.'])
     await user.click(within(responseRow).getByRole('button', { name: 'Regenerar' }))
-    expect(screen.getByText('Regenerando resposta')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByText(/Resposta regenerada para:/)).toBeInTheDocument(), { timeout: 5000 })
+    // O toast "Regenerando resposta" é intermediário (depende do tempo do fio);
+    // o que importa é o RESULTADO: conteúdo novinho + aviso de conclusão.
+    await waitFor(() => expect(screen.getByText(/Nova tentativa em/)).toBeInTheDocument(), { timeout: 5000 })
     expect(screen.getByRole('status')).toHaveTextContent('Resposta regenerada')
+    // O done carrega o modelo EFETIVO do provedor (SPEC §3.9).
+    expect(within(responseRow).getByText(/· stub-model/)).toBeInTheDocument()
   })
 
   it('interrompe uma resposta em andamento e não deixa o timer concluir depois', async () => {
@@ -263,6 +309,9 @@ describe('App session flows', () => {
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
     await user.type(input, 'usar o modelo selecionado')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(screen.getByText('Trabalhando')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
+    // O rodapé da bolha mostra o modelo EFETIVO da tentativa (SPEC §3.9).
     await waitFor(() => expect(screen.getByText(/· GPT-5$/)).toBeInTheDocument(), { timeout: 2500 })
   })
 
@@ -282,7 +331,7 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
     expect(screen.getByRole('list', { name: 'Anexos enviados' })).toBeInTheDocument()
-    expect(screen.getByRole('listitem', { name: 'app.ts, arquivo local' })).toBeInTheDocument()
+    expect(screen.getByRole('listitem', { name: /app\.ts, arquivo local/ })).toBeInTheDocument()
     expect(screen.getByText('Arquivos anexados: app.ts')).toBeInTheDocument()
     expect(screen.getByText('· Editar')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: /app\.ts, arquivo local/ })).not.toBeInTheDocument()

@@ -18,6 +18,8 @@ export interface ChatMessage {
   attachments?: Attachment[]
   running?: boolean
   cancelled?: boolean
+  /** Bolha de ERRO honesto (FATIA 09) — fica fora do histórico enviado ao modelo. */
+  erro?: boolean
   vote?: ChatVote
   reported?: boolean
 }

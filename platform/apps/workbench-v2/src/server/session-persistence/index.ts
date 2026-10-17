@@ -9,6 +9,8 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
+import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
+import { obterAlvoDeConversa } from './chatAlvo'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -64,11 +66,24 @@ function restoreMessages(session: Session, entries: TranscriptEntry[]): Session 
   }
 }
 
+function sanarStatusAposF5(session: Session): Session {
+  // FATIA 09 (§3.8): mensagens em streaming NÃO são persistidas (decisão da
+  // §9.1 — evita bolha vazia eterna), então depois do F5 nunca existe nada
+  // rodando. Um status 'working' gravado no meio da corrida (F5 durante o
+  // streaming) ficaria ÓRFÃO para sempre: chip "Trabalhando" fantasma e
+  // composer travado. Na restauração, ele vira 'completed'.
+  return {
+    ...session,
+    status: session.status === 'working' ? 'completed' : session.status,
+    chats: session.chats.map((chat) => (chat.status === 'working' ? { ...chat, status: 'completed' } : chat)),
+  }
+}
+
 async function listSessions(): Promise<Session[]> {
   const records = listSessionRecords()
   return Promise.all(records.map(async (record) => {
     const session = JSON.parse(record.sessionJson) as Session
-    return restoreMessages(session, await readTranscript(record.slug, record.id))
+    return sanarStatusAposF5(restoreMessages(session, await readTranscript(record.slug, record.id)))
   }))
 }
 
@@ -98,7 +113,7 @@ async function saveSession(session: Session): Promise<void> {
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -126,6 +141,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (rotaPertenceAoModulo(url.pathname)) {
     if (await tratarRotasProvedores(request, response, url)) return true
+  }
+
+  if (rotaPertenceAoModuloConversa(url.pathname)) {
+    if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa)) return true
   }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {

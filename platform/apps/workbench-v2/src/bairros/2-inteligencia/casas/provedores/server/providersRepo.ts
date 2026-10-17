@@ -13,6 +13,11 @@ import { dirname, join } from 'node:path'
 import type { ArquivoProvedores, ProvedorConfig, ProvedorNaTela, SalvarProvedoresInput } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
 
+// Re-export MÍNIMO (glicose da prefeitura): quem monta o alvo da conversa
+// precisa do descritor sem furar a fronteira LEGO (só `server/**` é permitido
+// fora da casa). Adição pura — nenhum comportamento da 08 muda.
+export { descritorPorId }
+
 export function caminhoDoArquivo(): string {
   // E2E aponta para uma fixture: o arquivo REAL do dono nunca é tocado pelo teste.
   return process.env.AGENTE_WINDOW_PROVIDERS_PATH ?? join(homedir(), '.agente_window', 'providers.json')

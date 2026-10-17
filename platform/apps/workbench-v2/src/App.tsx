@@ -13,13 +13,14 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { persistSessionNoUnload, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
+import { enviarConversa, type ControleConversa, type MensagemChat } from './bairros/2-inteligencia/casas/conversa'
 import {
   closeCustomView,
   customViewTitle,
@@ -32,7 +33,7 @@ import {
   shouldShowCustomViewGrid,
   type CustomViewId,
 } from './domain/customView'
-import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
+import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
 import {
   assertWorkbenchInvariants,
   navigateBrowser as navigateBrowserState,
@@ -181,6 +182,9 @@ function ScmModuleSlot({ module }: { module: IExplorerSearchModule }) {
 // FATIA-05 5.7 fix (DoD "F5 mantém as 3 abas", 2026-10-01): o módulo persiste largura/maximizado, mas NÃO as abas
 // (fato da 4.7, D2.70). O shell guarda a lista por sessão e reabre no boot — só `kind: 'code'` (diff/changes têm payload).
 const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
+/** FATIA 09 (§3.8): qual sessão estava aberta — o F5 volta para ELA e a
+ * conversa (restaurada do .jsonl) aparece na hora. */
+const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
 type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
 function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
   try {
@@ -229,13 +233,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
   const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
   const persistedLayout = useRef(loadLayoutState())
-  const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? BOOT_SESSION_ID)
+  const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? window.localStorage.getItem(ACTIVE_SESSION_KEY) ?? BOOT_SESSION_ID)
   // (E14/R-022/R-026) Sessions Part grid: ids das sessões visíveis lado a lado.
   // Por padrão só a sessão ativa é visível (arranjo single). Abrir uma sessão
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
   const [newSessionLanding, setNewSessionLanding] = useState(false)
+  // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
+  // a primeira da lista e a conversa "parecia" perdida.
+  useEffect(() => {
+    if (!activeSessionId) return
+    window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId)
+  }, [activeSessionId])
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
@@ -289,8 +299,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         if (controller.signal.aborted) return
         setSessions(restored)
         const first = restored[0]
-        setActiveSessionId(first?.id ?? BOOT_SESSION_ID)
-        setVisibleSessionIds(first ? [first.id] : [])
+        // FATIA 09 (§3.8): o F5 volta para a MESMA sessão que estava aberta.
+        const salva = window.localStorage.getItem(ACTIVE_SESSION_KEY)
+        const recuperada = salva ? restored.find((session) => session.id === salva) : undefined
+        setActiveSessionId(recuperada?.id ?? first?.id ?? BOOT_SESSION_ID)
+        setVisibleSessionIds(recuperada ? [recuperada.id] : first ? [first.id] : [])
         setActiveChatBySession(Object.fromEntries(restored.map((session) => [session.id, session.mainChatId])))
       })
       .catch((error: unknown) => {
@@ -302,13 +315,27 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     return () => controller.abort()
   }, [])
 
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
   useEffect(() => {
     if (!sessionsHydrated) return
-    const timer = window.setTimeout(() => {
+    const gravar = () => {
       void Promise.all(sessions.filter((session) => !session.isDraft).map(persistSession))
         .catch((error: unknown) => console.error('[sessions] persistence failed', error))
-    }, 150)
-    return () => window.clearTimeout(timer)
+    }
+    const timer = window.setTimeout(gravar, 150)
+    // FATIA 09 (§3.8): sem isto, um F5 nos 150 ms após o fim da resposta
+    // matava a página antes da gravação — a conversa "some" no reload.
+    const despejar = () => {
+      for (const session of sessionsRef.current) {
+        if (!session.isDraft) persistSessionNoUnload(session)
+      }
+    }
+    window.addEventListener('pagehide', despejar)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', despejar)
+    }
   }, [sessions, sessionsHydrated])
 
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
@@ -572,6 +599,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
   }, [])
   const pendingResponseTimers = useRef<Map<string, number>>(new Map())
+  // FATIA 09: conversas REAIS em voo (runKey → controle de abort do fio).
+  const conversasAtivas = useRef<Map<string, ControleConversa>>(new Map())
   const approvalTimer = useRef<number | undefined>(undefined)
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
@@ -1575,10 +1604,89 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     pendingResponseTimers.current.set(runKey, timer)
   }
 
+  /** Histórico limpo do chat atual (G5): sem bolhas de erro, canceladas ou em voo. */
+  const montarHistorico = (mensagens: ChatMessage[]): MensagemChat[] =>
+    mensagens
+      .filter((mensagem) => !mensagem.running && !mensagem.cancelled && !mensagem.erro && mensagem.content.trim().length > 0)
+      .map((mensagem) => ({ role: mensagem.role, content: mensagem.content }))
+
+  /**
+   * FATIA 09 — liga a conversa REAL no chat: troca o miolo (geração da
+   * resposta), mantendo a assinatura do handleSend (nenhum chamador muda).
+   * O mock de 1 s saiu do caminho — não existe reserva silenciosa (SPEC §3.1).
+   */
+  const iniciarConversaReal = (
+    sessionId: string,
+    chatId: string,
+    responseId: string,
+    historico: MensagemChat[],
+    aoConcluir?: () => void,
+  ): void => {
+    const runKey = `${sessionId}:${chatId}`
+    conversasAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
+    let acumulado = ''
+
+    const controle = enviarConversa(historico, {
+      onChunk: (pedaco) => {
+        acumulado += pedaco
+        const conteudo = acumulado
+        updateSession(sessionId, (session) => ({
+          ...session,
+          chats: session.chats.map((chat) => chat.id === chatId ? {
+            ...chat,
+            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, content: conteudo } : message),
+          } : chat),
+        }))
+      },
+      onDone: (modelo) => {
+        conversasAtivas.current.delete(runKey)
+        updateSession(sessionId, (session) => {
+          const next = completeChatRun(session, chatId)
+          return {
+            ...next,
+            updated: 'agora',
+            chats: next.chats.map((chat) => chat.id === chatId ? {
+              ...chat,
+              messages: chat.messages.map((message) => (message.id === responseId && message.running) ? {
+                ...message,
+                content: acumulado,
+                model: modelo ?? message.model,
+                running: false,
+                time: timeLabel(),
+              } : message),
+            } : chat),
+          }
+        })
+        aoConcluir?.()
+      },
+      onError: (_code, mensagemErro) => {
+        conversasAtivas.current.delete(runKey)
+        updateSession(sessionId, (session) => {
+          const next = completeChatRun(session, chatId)
+          return {
+            ...next,
+            updated: 'agora',
+            chats: next.chats.map((chat) => chat.id === chatId ? {
+              ...chat,
+              status: 'error',
+              messages: chat.messages.map((message) => (message.id === responseId && message.running) ? {
+                ...message,
+                content: mensagemErro,
+                running: false,
+                erro: true,
+                time: timeLabel(),
+              } : message),
+            } : chat),
+          }
+        })
+      },
+    })
+    conversasAtivas.current.set(runKey, controle)
+  }
+
   const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }) => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
-    const runKey = `${sessionId}:${chatId}`
     const attachmentText = attachments.length > 0 ? `Arquivos anexados: ${attachments.map((item) => item.name).join(', ')}` : ''
     const messageContent = [text.trim(), attachmentText].filter(Boolean).join('\n\n')
     const requestLabel = text.trim() || attachments.map((item) => item.name).join(', ')
@@ -1599,6 +1707,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       model: selectedModel,
       running: true,
     }
+    // Histórico da conversa atual (G5) + a mensagem nova — o que SAI para o servidor.
+    const sessaoOrigem = sessions.find((session) => session.id === sessionId)
+    const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
+    const historico: MensagemChat[] = [
+      ...montarHistorico(chatOrigem?.messages ?? []),
+      { role: 'user', content: messageContent },
+    ]
 
     updateSession(sessionId, (session) => {
       const next = updateSessionAndChatStatus(session, chatId, 'working')
@@ -1626,40 +1741,25 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }
     })
 
-    // (R-060/R-063) Uma requisição de build ("build the project") produz um
-    // changeset real na changes view — espelha os cenários e2e 02/05.
-    const isBuildRequest = /\bbuild\b/i.test(text)
-
-    const timer = window.setTimeout(() => {
-      if (pendingResponseTimers.current.get(runKey) !== timer) return
-      pendingResponseTimers.current.delete(runKey)
-      const response = isBuildRequest
-        ? 'Compilei o projeto. Atualizei **package.json**, adicionei **build.ts** e ajustei **src/index.ts** — veja a changes view; abra **index.ts** para revisar o diff, ou use **Abrir terminal** para acompanhar a saída do build.'
-        : `Estou trabalhando em **${requestLabel.slice(0, 72)}**. A resposta fica vinculada à sessão e pode abrir Browser, Search ou Changes na área do editor.`
-      // 5.3: o changeset simulado de "build" (maquete "Changes N") não existe mais.
-      updateSession(sessionId, (session) => {
-        const next = completeChatRun(session, chatId)
-        const buildStats = {}
-        return {
-          ...next,
-          ...buildStats,
-          updated: 'agora',
-          chats: next.chats.map((chat) => chat.id === chatId ? {
-            ...chat,
-            messages: chat.messages.map((message) => message.id === responseId ? { ...message, content: response, time: timeLabel(), running: false } : message),
-          } : chat),
-        }
-      })
-    }, 1000)
-    pendingResponseTimers.current.set(runKey, timer)
+    // (FATIA 09) Conversa REAL com o provedor ativo: o histórico vai para o
+    // servidor e a resposta chega em pedaços (a bolha cresce — SPEC §3.2).
+    iniciarConversaReal(sessionId, chatId, responseId, historico)
   }
 
   const handleStop = () => {
     const sessionId = activeSession.id
+    // FATIA 09: derruba o fio REAL desta sessão no servidor (o provedor para de
+    // ser consumido) — e a bolha guarda o texto que já chegou (SPEC §3.4).
+    for (const [key, controle] of conversasAtivas.current) {
+      if (key.startsWith(`${sessionId}:`)) {
+        controle.abortar()
+        conversasAtivas.current.delete(key)
+      }
+    }
     // CancelAction in the workbench cancels the request owned by the current
     // session, not merely the nested chat currently visible in the UI. Clear
-    // every mock timer for that session so switching chats cannot leave a
-    // response completing after the user pressed Stop.
+    // every residual timer for that session so switching chats cannot leave a
+    // run completing after the user pressed Stop.
     clearPendingTimersForSession(sessionId)
     updateSession(sessionId, (session) => {
       const next = updateSessionStatus(session, 'completed')
@@ -1673,7 +1773,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             status: 'completed',
             messages: chat.messages.map((message) => message.running ? {
               ...message,
-              content: 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
+              // Preserva o parcial (SPEC §3.4); o placeholder só para bolha vazia.
+              content: message.content.trim()
+                ? message.content
+                : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
               running: false,
               cancelled: true,
               time: timeLabel(),
@@ -1691,7 +1794,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const original = targetChat?.messages.find((message) => message.id === messageId)
     if (!original || original.role !== 'assistant') return
 
-    const preview = original.content.replace(/\s+/g, ' ').trim().slice(0, 72)
+    // FATIA 09: regenerar = conversa real com o histórico ANTES da mensagem alvo.
+    const chatOrigemRegenerar = activeSession.chats.find((candidate) => candidate.id === chatId)
+    const indiceAlvo = chatOrigemRegenerar
+      ? chatOrigemRegenerar.messages.findIndex((candidate) => candidate.id === messageId)
+      : -1
+    const historicoRegenerar = montarHistorico(
+      indiceAlvo >= 0 ? (chatOrigemRegenerar?.messages ?? []).slice(0, indiceAlvo) : [],
+    )
+    if (historicoRegenerar.length === 0) {
+      notify('Não há histórico anterior para regenerar')
+      return
+    }
     const runKey = `${sessionId}:${chatId}`
     const previousTimer = pendingResponseTimers.current.get(runKey)
     if (previousTimer !== undefined) {
@@ -1716,28 +1830,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     })
     notify('Regenerando resposta')
 
-    const timer = window.setTimeout(() => {
-      if (pendingResponseTimers.current.get(runKey) !== timer) return
-      pendingResponseTimers.current.delete(runKey)
-      updateSession(sessionId, (session) => {
-        const next = completeChatRun(session, chatId)
-        return {
-          ...next,
-          updated: 'agora',
-          chats: next.chats.map((candidate) => candidate.id === chatId ? {
-            ...candidate,
-            messages: candidate.messages.map((message) => message.id === messageId ? {
-              ...message,
-              content: `Resposta regenerada${preview ? ` para: **${preview}**` : '.'}\n\nA nova tentativa preserva o contexto desta sessão.`,
-              time: timeLabel(),
-              running: false,
-            } : message),
-          } : candidate),
-        }
-      })
-      notify('Resposta regenerada')
-    }, 1000)
-    pendingResponseTimers.current.set(runKey, timer)
+    iniciarConversaReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'))
   }
 
   const handleMessageCopy = (_chatId: string, _messageId: string, kind: ChatCopyKind) => {

@@ -24,6 +24,9 @@
 | **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | Caminho atual (15/10): `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` → destino `2-inteligencia/casas/provedores` — **entra na FATIA 08, SPEC na PARTE 2B** |
 | **DEBT-12** | Fatia 4 (origem) / 11 (execução) | Editor / Abas | **Janela única de abas:** editor de código, Provedores, Browser, Branch Changes e Search na **mesma barra de abas** (conceito VS Code), podendo alternar entre eles como abas de navegador. | **Estado atual:** Provedores/Browser/Changes já são abas do **centro**; o **editor de código** vive em **outra** estrutura (coluna direita, `AttachTab`), com `search`/`diff`/`changes` **duplicados** nos dois modelos. Causa: **exceção autorizada da FATIA 04** (4.7 c4 — `App.tsx:1083-1087`). O editor do centro **não salva**; o da direita **salva**. | **Média hoje / Alta na 11** (é pré-requisito do critério "editar e salvar sem F5") | Avaliação completa em `06 §8.7`; execução = **1.º trabalho da FATIA 11** (D90) |
 | **DEBT-11** | FATIA 13 **(a decidir a forma)** | Title Bar / Pesquisa | O topo mantém a **pesquisa / centro de comando** (acesso rápido: "Ir para Arquivo", "Mostrar e Executar Comandos", "Pesquisar Texto", "Abrir Chat Rápido"). A troca de pasta deve ser **integrada dentro da pesquisa**, não ocupar o lugar dela. | A faixa de caminho + botão "Usar esta pasta" ocupou o lugar da pesquisa: o caminho fica fixo no topo e **a pesquisa não existe mais**. | **Alta** | `Titlebar.tsx`, `WorkspaceSwitcher.tsx`, `shell/` |
+| **DEBT-13** | FATIA a decidir **(não é da 09)** | Chat / Memória de contexto | O usuário **enxerga e controla** o enchimento do contexto da conversa: **medidor de uso** ("quanto da mesa está ocupada"), opção de **limpar / recomeçar** e política de **compactação** (resumir o passado antes de estourar) — como o **Claude Code / OpenClaude** (ver uso, compactar, limpar) e como o original (erro 413 + `compact_boundary`, registrado na raspagem). | **Não existe nada hoje:** sem contagem de tokens (G5 da §9.2), sem medidor, sem limpeza e sem compactação; a 09 envia o histórico inteiro e, se estourar, mostra erro honesto. | **Média** (não bloqueia a 09; vira dor em conversas longas) | Origem: conversa do dono em **17/10** ("não sei o quanto estou enchendo, não sei se posso limpar"). Para **discutir depois**: tratativas do **OpenClaude/Claude Code** (o dono indicou que já as tem) + `pesquisa_bruta/fatia-06-chat/ERRO_HANDLING.md` (413/`compact_boundary`). **Não implementar sem deliberação do dono.** |
+| **DEBT-14** | FATIA a decidir **(sugestão do dono na validação da 09)** | Chat / Seletor de modelos | O seletor de modelos do **composador** (chip ao lado do campo de mensagem) conversa com o **provedor ativo**: a lista oferece **todos os modelos do provedor escolhido** (ex.: os do Ollama local) e o chip mostra quem de fato vai responder. | **Hoje a lista é fixa** (Auto · Claude Sonnet 4 · GPT-5 · GPT-5 mini — herança do mock) e o chip não acompanha o provedor: no vídeo de validação do dono (17/10) quem respondeu foi `gemma4:31b-cloud` (rodapé certo) com o chip escrito "Claude Sonnet 4". | **Média** | Origem: **sugestão explícita do dono no vídeo de 17/10** ("achei que o usuário ia poder selecionar todos os modelos disponíveis aqui"); amarra a **G2** da §9.2 ("modelo efetivo vem do provedor ativo"). Ligar ao catálogo já pronto da 08 (`Buscar modelos`). Só registro — implementar quando o dono decidir. |
+| **DEBT-15** | FATIA a decidir **(UX da 09)** | Chat / Provedores | Escolher o provedor que responde no chat seja **difícil de esquecer**: enquanto ninguém estiver ativo, o passo "usar este provedor no chat" aparece de forma óbvia. | O interruptor é uma **bolinha discreta** no rodapé do painel de Provedores; no vídeo de 17/10 o dono esqueceu de marcá-lo e as 4 primeiras mensagens caíram no 409 honesto ("Nenhum provedor está ativo") — ele mesmo concluiu: *"esqueci que tinha a selecionar aqui"*. | **Baixa/Média** | Origem: vídeo do dono em **17/10** + análise da IA (transcrição + quadros). Só registro — qualquer mudança de UX passa por deliberação do dono. |
 
 ### Itens identificados na análise do vídeo de 2026-10-12 (ainda NÃO fatiados)
 > Fonte: gravação do usuário (4min02s) analisada por transcrição + frames (método em `docs/09 §11`). Itens que **não constam em nenhuma fatia** do roadmap — aguardando deliberação do usuário. O vídeo **confirma** as dívidas já registradas (DEBT-05, DEBT-06, DEBT-07, DEBT-09, DEBT-04, DEBT-10); o terminal não aparece na gravação, então DEBT-01/02/03 ficaram sem evidência nova. **Atualização 14/10:** itens **2, 3 e 4 ganharam dono** (anotado em cada); 5 e 6 seguem em deliberação.
@@ -334,8 +337,8 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`; **e a nota nova:** `arquivo_morto/referencias/cline/01_tela_de_provedores.md` (campo a campo, com os caminhos do repo do Cline) + `referencias/openclaude/04_provedores_descriptor_first.md` (o esqueleto de dados por trás da tela).
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
-> **STATUS: NÃO INICIADA.** Ordem expressa do dono em 17/10: *"Não comece a fatia 9 ainda. Só preciso que você atualize os documentos… Tudo pronto e documentado antes de começar a fatia 9."*
-> **Regra do projeto (40 %):** antes da primeira linha de código, esta fatia ganha **SPEC própria** (critérios testáveis + "o que NÃO fazer" + plano de prova), como aconteceu na 08 (PARTE 2B). Só depois do "vai" do dono.
+> **STATUS (17/10): IMPLEMENTADA EM 5 COMMITS E VALIDADA NA MÁQUINA DO DONO — homologação formal pendente (`08` PARTE D).** Commits: `5968b70` (casa Conversa + rota `/api/chat`) · `9e2c703` (streaming no servidor: fio SSE + Parar + réguas) · `c0af6fe` (ligação no chat + Parar honesto) · `90f75c8` (E2E 5 provas + 3 consertos de F5/histórico) · **C5 = documentação** (esta revisão). Provas: tsc **0** · unit **813✓ / 12✗ pré-existentes / 16skip** · E2E `conversa_fatia09` **5/5 em 4 rodadas seguidas** (stub local 4599) · **validação real do dono em 2 vídeos de 17/10** (Ollama local respondendo, Markdown completo, rodapé com o modelo efetivo, provedor ativo persistindo). Pendências registradas pós-09: **DEBT-14** (seletor de modelos do composador × provedor ativo) e **DEBT-15** (bolinha do provedor ativo fácil de esquecer). **Próxima: FATIA 10 — Agir** (abre ao homologar a 09).
+> **Regra do projeto (40 %) cumprida:** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** **5 de 5 decisões fechadas** (Q1–Q5 na §4) e **"pode começar" do dono** recebido em 17/10 — a fatia foi executada por completo.
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
@@ -419,3 +422,139 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Destino dos canônicos da obra:** viram `arquivo_morto` — são a **planta da construção**, não o manual do prédio.
 - **Candidatos registrados na raspagem (D77):** fiscal automático de fronteiras (dependency-cruiser/ts-arch — receita em `referencias/arquitetura-limpa/02…`); avaliar junto com o gatilho do Robusto.
 - **Kit de testes:** bateria final verde (typecheck 0; suítes de terminal já consertadas na FATIA 12; E2E mortos já em `skip` desde a FATIA 07).
+---
+
+# PARTE 2C — SPEC: FATIA 09 — Conversar (Chat real + Streaming)
+
+> **STATUS:** escrita em **2026-10-17**, a pedido do dono ("pode começar" = começar pela SPEC). **Nenhuma linha de código escrita.** Aguarda **aprovação do dono** e a resposta às **3 decisões** da §4.
+> **Origem:** a FATIA 08 foi **homologada em 17/10** (D89) — a base está liberada. Regra do projeto: **40 % especificando antes de codar**; e a fatia só abre depois do aval.
+
+## 1. Objetivo em 1 frase
+Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handleSend`, que devolve texto fixo) por uma **conversa real** com o **provedor ativo** configurado na FATIA 08, com a resposta **aparecendo aos poucos** (streaming), Markdown já renderizado e erro honesto quando não der.
+
+## 2. O que já existe (o terreno medido em 17/10 — para NÃO refazer)
+
+| Peça | Onde | Estado |
+|---|---|---|
+| Bolha da mensagem + Markdown | `components/ChatPanel.tsx:193` — usa **`react-markdown` + `remark-gfm`**, já instalados, com blocos de código e botão de copiar | **pronto** |
+| Carona do "digitando" | `ChatMessage.running?: boolean` (`types.ts:19`) — já existe e a bolha já sabe exibir | **pronto** |
+| Botão **Parar** | `App.tsx:1657 handleStop` — hoje limpa os timers simulados da sessão | **existe**, precisa passar a **abortar o pedido real** |
+| Provedor **ativo** + chave + URL + modelo | Casa Provedores (FATIA 08), arquivo local `~/.agente_window/providers.json` (0600), D84 | **pronto** |
+| Descritores por provedor (URL padrão, modelos) | `casas/provedores/descritores/` | **pronto** |
+| Sonda de conexão por protocolo (openai-chat / anthropic / gemini / ollama), timeout 10 s | `casas/provedores/server/probe.ts` | **pronto — reusar os adaptadores** |
+| Histórico: as mensagens já são gravadas em `.jsonl` por sessão | `server/session-persistence/transcripts.ts` + `index.ts:39-78` | **pronto** (verificar na prova que sobrevive ao F5) |
+| **Rota de conversa** | — | **NÃO EXISTE** (`/api/chat*` não aparece no código) |
+| Chamada real ao provedor com streaming | — | **NÃO EXISTE** |
+
+## 3. Critérios de Pronto Testáveis
+1. **Conversa de verdade** — enviar um prompt e receber resposta **do provedor ativo**; nenhuma resposta fixa de `setTimeout` sobrevive no fluxo (o mock sai do caminho, não fica de reserva silenciosa).
+2. **Streaming visível** — o texto **aparece aos poucos** na bolha (primeiro pedaço em < 2 s num provedor local; a bolha cresce), com o indicador de "trabalhando" ligado enquanto não termina.
+3. **Fim do pedido** — ao terminar, a bolha perde o `running`, o horário é gravado e o status da sessão volta a "concluída".
+4. **Parar funciona de verdade** — clicar **Parar** interrompe o pedido **no servidor** (o provedor deixa de ser consumido) e a bolha fica marcada como cancelada, preservando o texto que já chegou.
+5. **Markdown** — a resposta renderiza **negrito, listas, tabelas e blocos de código** com o botão de copiar (o componente já existe; a prova é ponta a ponta).
+6. **Erros honestos, sem inventar resposta** — quatro casos, com mensagem clara e **sem texto falso** na bolha: (a) **nenhum provedor configurado**; (b) **chave ausente/ inválida** (401/403); (c) **endereço inalcançável / serviço fora**; (d) **timeout** (limite a definir — proposta: 60 s sem primeiro byte; 10 s é curto demais para modelo local).
+7. **A chave nunca sai do servidor** — o navegador **não** fala com o provedor; a chave **não** aparece em URL, log ou no corpo de resposta; teste automatizado confere que nenhuma resposta da API contém o valor da chave.
+8. **Histórico por sessão** — a conversa continua lá depois de **F5** e ao **trocar de sessão** (mensagens não vazam para outra sessão); o `.jsonl` da sessão contém os pares.
+9. **Trocas de provedor** — trocar o provedor ativo na tela de Provedores muda **quem responde** na conversa seguinte, sem reiniciar o app.
+10. **Sem regressão** — typecheck **0** · unit ≥ baseline **767✓/12✗/16** (as mesmas 12 pré-existentes) · E2E FATIA 08 **6/6** · contrato de abertura **4/4** · nenhum teste apagado ou silenciado.
+
+## 4. Decisões a fechar com o dono (5 — Q4/Q5 nasceram do diagnóstico da §9)
+
+| # | Pergunta | Opções | Minha recomendação |
+|---|---|---|---|
+| **Q1** | **Qual provedor é o "padrão de prova"?** | (a) **Ollama local** (`http://localhost:11434`) · (b) provedor simulado só · (c) um serviço pago | **(a) Ollama local** — roda na máquina do dono, **não exige chave** (D91), e foi o que ele já validou na 08. O simulado fica para a bateria automatizada **→ RESPONDIDO (17/10): Ollama OU LiteLLM + Nemotron (porta personalizada, compatível com OpenAI) — os dois suportados; o dono escolhe no dia da validação.** |
+| **Q2** | **Histórico entra já nesta fatia?** | (a) entra (é critério) · (b) fica para refinamento | **(a) entra** — o `.jsonl` já existe; o custo é **verificar**, não construir. Sem isso a conversa "some no F5" e a fatia não parece pronta **→ RESPONDIDO (17/10): sim — histórico e prova de F5 ficam como parte da fatia.** |
+| **Q3** | **Markdown mínimo ou completo?** | (a) completo (tabelas, listas, código com cópia) · (b) mínimo | **(a) completo** — **já está pronto** no `ChatPanel`; não faz sentido degradar o que existe **→ RESPONDIDO (17/10): confirmado — formatação completa.** |
+| **Q4** | **Anexos: o conteúdo do arquivo entra na 09?** | (a) só o **nome** (como hoje, com aviso de que não é lido) · (b) ler e enviar o **conteúdo** de arquivos pequenos · (c) adiar | **(a) na 09** — anexar arquivo e o modelo não ler é aceitável **se estiver escrito**; ler arquivo é uma **capacidade de agente** e pertence à FATIA 10 (Agir), junto com as ferramentas. Fazer (b) agora inflaria a 09 e misturaria duas fatias **→ RESPONDIDO (17/10): letra (a), depois da pesquisa da §9.5 — jeito do original: anexo = referência de caminho, SEM pasta uploads, conteúdo do arquivo lido só na FATIA 10; na 09 vai com aviso honesto.** |
+| **Q5** | **Segunda conversa (nested chat): criar de verdade na 09?** | (a) sim, fluxo real de novo chat · (b) adiar; o **+** fica **fora** até existir | **(b)** — o **modelo já suporta** `chats[]` e a restauração já reagrupa por `chatId`; o que falta é **UI e fluxo**, que não muda o critério de aceite desta fatia. Construir agora desviaria o foco de "conversa real" **→ RESPONDIDO (17/10): letra (b) — adiar para a FATIA 13 e esconder o "+" falso da 09; receita do original anotada em §9.5 (nunca ter botão "limpar conversa").** |
+
+**Decisões tomadas pela IA (registradas para não virar susto):** a **casa nova** será `bairros/2-inteligencia/casas/conversa` (2.º módulo extraído, D69/D76 — com cartão de visita e teste de fronteira); a rota de conversa segue o **mesmo padrão** da casa Provedores (`rotaPertenceAoModulo` + registro no dev server "prefeitura"); o transporte do streaming será **HTTP com envio em pedaços (SSE)** por reaproveitar a porta única 5174 e não exigir infraestrutura nova — se a prova mostrar problema, cai-se para WebSocket (o `ws` já é dependência do projeto).
+
+## 5. O que NÃO fazer na FATIA 09
+- **Nada de ferramentas/arquivos/terminal** (isso é a FATIA 10 — Agir): o agente **não age**, só conversa.
+- **Nada de segunda conversa (Q5b):** o botão `+` (`chat-group-tab-add`, `ChatPanel.tsx:294`) fica **oculto** até a FATIA 13, e **nunca** haverá botão "limpar conversa" (o original não tem — `RESET_SESSAO.md`).
+- **Nada de cartão de permissão** (FATIA 10).
+- **Nada de mexer na tela de Provedores** além de consumi-la (ela está homologada — mudança ali exigiria reabrir a 08).
+- **Nada de "modo anexo/maximizado"** nem de unificação de abas (DEBT-12 é da FATIA 11).
+- **Nada de chave no navegador** — nem em teste, nem em log, nem em exemplo.
+- **Não "consertar"** as 12 falhas pré-existentes (decisão já tomada: FATIA 12) nem apagar teste nenhum.
+
+## 6. Plano de prova (§6)
+- **(a) Provedor simulado com streaming** — extensão do stub da 08 (`validacao_fatia08/stub_provider.cjs`, porta 4599, **fora do repo**) com um endpoint que **emite pedaços com atraso**, um que **falha no meio**, um que **não responde** (para timeout) e um que **recusa a chave** (401).
+- **(b) Unit** — adaptadores de streaming por protocolo (pedaço → acumulado → fim), cancelamento, timeout, formatação de erro; fronteira da casa.
+- **(c) E2E** — `e2e/conversa_fatia09.spec.ts`: enviar → ver a bolha **crescendo** → terminar → recarregar e conferir o histórico; **Parar** para no meio; erro honesto nos 4 casos; trocar de provedor muda quem responde.
+- **(d) Validação do dono (Windows 5174)** — roteiro curto no `08` (PARTE D): abrir o app → escolher o provedor → conversar → parar no meio → recarregar. **Com Ollama local**, sem chave; e, se quiser, com um serviço real dele.
+
+## 7. Riscos honestos
+| Risco | Mitigação |
+|---|---|
+| Streaming por SSE em dev server próprio (não é framework) exige cuidado com buffer/flush | Prova isolada primeiro com o stub; se travar, WebSocket (já instalado) |
+| "Parar" no meio do streaming deixa o provedor consumindo | Abortar a conexão no servidor e fechar o corpo da resposta; teste dedicado |
+| Chave vazar por log/erro | Teste que varre as respostas da API; erro do provedor é **traduzido**, nunca repassado cru |
+| Provedor local lento (primeiro token demora) | Timeout de **primeiro byte** separado do timeout total; mensagem honesta ("o serviço está demorando") |
+| O `handleSend` é chamado por vários fluxos (landing, worktree, menus) | Trocar o **miolo** (a geração da resposta), mantendo a assinatura — nenhum chamador muda |
+
+## 8. Entrega esperada
+1 commit por conquista (≥ 4): **(1)** casa + rota + protocolo; **(2)** streaming no servidor; **(3)** ligação no chat + Parar; **(4)** erros honestos + histórico; **(5)** documentação e evidências. Cada um com typecheck 0 + bateria focada + A/B quando alguma falha.
+
+**STATUS DA ENTREGA (17/10) — 5 de 5 concluídos:** **(1)** `5968b70` ✓ · **(2)** `9e2c703` ✓ · **(3)** `c0af6fe` ✓ · **(4)** `90f75c8` ✓ · **(5)** documentação (esta revisão). Os 10 critérios da §3 estão cobertos pela bateria E2E `e2e/conversa_fatia09.spec.ts` (T1 streaming+Markdown+rodapé · T2 Parar · T3 F5+isolamento · T4 erros a/b/c + varredura de chave · T5 troca de provedor); o caso (d) timeout de 60 s é unitário (C2) por limite de tempo do E2E — registrado honestamente no próprio spec. Evidências **fora do repo**: `~/validacao_fatia09/` (`c3_*` prova ao vivo da C3 + `f09_T1..T5` prints da spec) e as **análises dos 2 vídeos do dono** (`~/video_analysis`, `~/video_analysis2` — transcrição + quadros, método `09 §11`).
+
+## 9. Diagnóstico do chat — o que existe, o que foi testado e o que falta (2026-10-17, antes de codar a 09)
+
+### 9.1 O que existe HOJE (medido no código)
+| Peça | Onde | O que realmente faz | Evidência |
+|---|---|---|---|
+| Modelo de dados | `types.ts` | `Session` → `chats[]` (`NestedChat`: id, título, status, mensagens) + `mainChatId`; `ChatMessage` tem `running`, `cancelled`, `vote`, `reported`, `attachments`, `model`, `mode` | tipos + invariantes (`sessionState.ts:188`) |
+| Lista de mensagens | `components/ChatPanel.tsx:193` | Markdown real (`react-markdown` + `remark-gfm`), bloco de código com **copiar**, ações de feedback/regenerar | `ChatPanel.test.tsx` **3 testes** |
+| Composer | `components/ChatInput.tsx` | texto, **Enter/Shift+Enter**, histórico de entradas, rascunho por chat, anexos por picker (workspace/local), modo e modelo | `ChatInput.test.tsx` **13 testes** |
+| Envio | `App.tsx:1578 handleSend` | **SIMULADO**: adiciona a mensagem e, após **1 s**, escreve uma resposta fixa (varia se a palavra "build" aparece) | nenhum teste contra provedor |
+| Parar | `App.tsx:1657 handleStop` | limpa os temporizadores do mock e marca como cancelado | idem |
+| Persistência | `server/session-persistence/` | metadados no SQLite + **mensagens em `.jsonl` por sessão** (`slug/sessionId.jsonl`, com `chatId` em cada linha); restauração **reagrupa por chat**; mensagens `running` **não** são gravadas (decisão explícita, evita bolha vazia eterna) | **sem teste** do round-trip de transcrição |
+| Provedores (08) | `casas/provedores/server/probe.ts` | **testar conexão** e **listar modelos** em 4 protocolos (`openai-chat`, `anthropic`, `gemini`, `ollama`), timeout 10 s, chave só no servidor | 37 unit + E2E 6/6 |
+| Conversa real com provedor | — | **NÃO EXISTE** (nenhuma rota `/api/chat*`) | — |
+
+### 9.2 Lacunas encontradas no diagnóstico (novas, não estavam na SPEC)
+| # | Lacuna | Consequência | Encaminhamento |
+|---|---|---|---|
+| **G1** | **Anexos só vão pelo nome**: `"Arquivos anexados: a, b"` vai no texto; o **conteúdo do arquivo nunca é lido nem enviado** | Pedir "analise este arquivo" hoje **não funciona** com provedor real | Decisão do dono (Q4) |
+| **G2** | **Lista de modelos fixa no composer** (`ChatInput.tsx:43`: Auto, Claude Sonnet 4, GPT-5, GPT-5 mini) e **não ligada** ao catálogo do provedor ativo da 08 | Escolher "GPT-5" com Ollama ativo daria erro | **Decidido pela IA:** na 09 o modelo efetivo passa a vir do **provedor ativo** (catálogo da 08); o texto livre continua |
+| **G3** | **"Novo chat" é simulado**: o botão **+** apenas envia a mensagem *"Inicie um novo chat contextual…"* | Não existe fluxo real de segunda conversa | Decisão do dono (Q5) |
+| **G4** | **Não há teste** provando que a conversa volta igual após F5 nem que **sessão A não vê mensagens de B** | É a base do "isolamento"; hoje só há invariantes do modelo | **Decidido pela IA:** entra como critério de prova da 09 (não é decisão de produto) |
+| **G5** | **Sem contagem de contexto/tokens**: o histórico inteiro seria enviado a cada turno | Em conversa longa o provedor devolve **413/estouro de contexto** | **Decidido pela IA:** MVP envia o histórico do chat atual; estouro vira **erro honesto** com orientação (compactação fica para depois, referência OpenClaude `compact_boundary`) — detalhamento e tratativa viram a **DEBT-13** |
+
+### 9.3 A raspagem do VS Code é suficiente? (resposta à pergunta do dono)
+**O que já foi raspado e é diretamente útil à 09:**
+- `arquivo_morto/engenharia_reversa/04_CENTER_CHAT/` — **9 documentos** (inventário, comportamento, **mapa de código**, gap analysis, conclusão, **contrato de implementação**, **fluxos e eventos**, testes, ordem). O `04F` já define o contrato do módulo: `ChatTurnInput{sessionId,text,attachments,mode,providerId}` e `ChatEvent{thinking|chunk|toolPending|toolResult|completed|failed}` com a **regra dura**: *"UI não fala com provider diretamente"* e *"sessão é a unidade de isolamento de histórico, rascunho e anexos"*. O `04G` traz o fluxo em diagrama (UI → serviço → runtime → eventos).
+- `arquivo_morto/pesquisa_bruta/fatia-06-chat/` — botões, **ERRO_HANDLING com os cenários da 09** (401/403 → abrir Provedores; Ollama offline `ECONNREFUSED`; **429** rate-limit; **413** estouro de contexto; `compact_boundary`), persistência (OpenClaude/OpenCode), permissões, picker de sessão.
+- `pesquisa_bruta/fatia-08-streaming/` — ciclo do streaming, estados de "pensando", interrupção e **"Keep Going"**.
+- `pesquisa_bruta/fatia-07-input/` — comportamento e medidas do composer.
+**O que NÃO está raspado (e não precisa vir do VS Code):** o **formato de fio de cada provedor** (SSE da OpenAI/Anthropic, streaming do Gemini, NDJSON do Ollama). Isso é **API pública de cada provedor**, não arquitetura do VS Code — o VS Code fala com modelos pelo host de extensões, que é outro caminho. O `probe.ts` da 08 **já tem** o mapa de URL/cabeçalho por protocolo, que é o andaime exato para a chamada de conversa.
+**Veredito:** **não é preciso raspar o VS Code de novo para a FATIA 09.** A lacuna real é de **protocolo de provedor**, e ela se resolve com a documentação pública de cada um + o **stub** que vai emitir pedaços no teste. Se aparecer dúvida fina de comportamento (ex.: como o original trata interrupção), o `04G`/`04F` já respondem.
+**Onde uma nova consulta ainda valeria:** só na **FATIA 10 (Agir)** — ferramentas, permissões e o ciclo de aprovação têm detalhe que a raspagem atual cobre só em parte (`PERMISSOES.md`).
+
+### 9.4 Decisões novas a fechar (além de Q1–Q3)
+Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4** (para não haver duas fontes de verdade):
+- **Q4 — anexos:** só o **nome** na 09 (recomendado, com aviso de que o arquivo ainda não é lido) × ler o **conteúdo** agora × adiar para a 10.
+- **Q5 — segunda conversa:** criar o fluxo real agora × **adiar** e deixar o **+** fora até existir (recomendado).
+
+### 9.5 Pesquisa de referência para Q4/Q5 (17/10, a pedido do dono — "ver como funciona no original/OpenClaude")
+
+**Q4 — anexo de arquivo: como tratam os referências**
+| Referência | Como funciona | Evidência |
+|---|---|---|
+| **Projeto original (VS Code / Copilot)** | **Não existe pasta de uploads.** Anexo é **referência de contexto**: arquivo do workspace entra pelo caminho (`#arquivo`, menção, seletor/context picker), e as **ferramentas do agente leem do disco**; arquivo fora do workspace exige aba aberta ou permissão; anexar uma **pasta** manda **só a árvore de nomes** (nunca o conteúdo) | Raspagem `engenharia_reversa/04_CENTER_CHAT/04C`/`04F` (`ChatInputPart.getAttachedContext()`, `attachments: string[]`, "sessão isola anexos") + issue microsoft/vscode **#301432** (folder = só estrutura) e **#293386** (fora do workspace = permissão) + doc oficial `code.visualstudio.com/docs/chat/copilot-chat-context` |
+| **OpenClaude** | Mesma filosofia de agente de código (primo do Claude Code — usa até `~/.claude` como caminho legado): **lê direto do disco**, histórico em `.jsonl` por sessão; **nenhuma pasta uploads** na raspagem | `pesquisa_bruta/fatia-06-chat/PERSISTENCIA_OPENCLAUDE.md` |
+| **Claude Code** | **Não sobe arquivo nenhum**: lê do disco por caminho (`@arquivo`), `--add-dir`, Shift+arrastar; anexos da UI caem em `%TEMP%` e existe **feature pedindo exatamente uma pasta estável** (há quem parea com a ideia do dono) | issue anthropics/claude-code **#54062** + docs de uso |
+| **Quem JÁ tem "pasta uploads"** | O **Ambiente da Arena** (o dono usa aqui) e a **plataforma cloud da Anthropic** (`/mnt/session/uploads` montado no sandbox da sessão, cópias somente-leitura) | Conversa + `platform.claude.com/docs/en/managed-agents/files` |
+
+**Q5 — nova conversa: como fazem os referências** (`RESET_SESSAO.md` + `SESSION_PICKER.md` — fonte: código do OpenClaude + vídeos)
+- **Não existe botão "limpar conversa"** em nenhum dos dois; o ciclo é só **Nova Conversa** + **Retomar**.
+- **Dois botões "+":** (1) **global** no topo = sala/worktree nova (pasta `untitled-<timestamp>`, empty state 768px); (2) **dentro do projeto** = sessão nova na mesma pasta, `<sessionId>.jsonl` novo, **histórico antigo permanece no disco**.
+- Fluxo: `new_session` → `stopSession` → `session_cleared` (limpa só a tela) → **id novo alocado no primeiro envio**; retomar = lista/modal (Session Picker: needs-input / recentes / outras) — esse seletor é **terreno da FATIA 13**.
+- Exclusão só pela **lixeira** ao lado da conversa — nunca "limpar".
+
+**No nosso projeto hoje:** o "+" é o `chat-group-tab-add` em `ChatPanel.tsx:294`, na faixa de abas de chats do painel central — e a faixa **só aparece quando já existem 2+ conversas**; o botão hoje é falso (envia frase pronta).
+
+**Leitura para as decisões:**
+- **Q4:** a proposta do dono (pasta `uploads` criada dentro da pasta ativa) **não é o modelo do original** (que referencia e deixa o agente ler na FATIA 10) — é o modelo de produto de chat (Arena/nuvem Anthropic), e tem um ganho: o arquivo **nasce dentro do workspace**, então a FATIA 10 já o enxerga para agir. Pesa contra: escrever na pasta do usuário sem pedir e crescer a 09.
+- **Q5:** a receita do "+" de verdade está mapeada (acima); adiar mantém o foco da 09 e o seletor de conversas cai naturalmente na FATIA 13.

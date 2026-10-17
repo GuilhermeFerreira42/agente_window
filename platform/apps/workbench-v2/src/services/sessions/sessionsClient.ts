@@ -33,6 +33,22 @@ export async function persistSession(session: Session): Promise<void> {
   }))
 }
 
+/** FATIA 09 (§3.8): descarga imediata no `pagehide` (F5/fechar aba) — o
+ * `keepalive` faz o navegador ENTREGAR a requisição mesmo morrendo agora.
+ * Erros aqui são ignorados de propósito: a página está saindo. */
+export function persistSessionNoUnload(session: Session): void {
+  try {
+    void fetch(SESSIONS_ENDPOINT, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session }),
+      keepalive: true,
+    }).catch(() => undefined)
+  } catch {
+    // página já saindo — nada a fazer
+  }
+}
+
 export interface WorkspaceDescriptor { path: string; slug: string; name: string; isGit: boolean }
 export interface WorkspaceDirectoryEntry { name: string; path: string; isDir: true }
 export interface WorkspaceDirectoryListing { path: string; realpath: string; parent: string; folders: WorkspaceDirectoryEntry[]; error?: string }

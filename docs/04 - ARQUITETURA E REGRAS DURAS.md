@@ -128,7 +128,7 @@ src/bairros/
 | Explorer/Search | 1 | `modules/explorer-search` | (pode ficar) | ✅ verde — exemplo a copiar |
 | Terminal | 1 | `components/terminal` + `services/pty-server` | `1-workbench/casas/terminal` | 🔒 congelado — muda na FATIA 12 (ordem expressa) |
 | Provedores | 2 | `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` | `2-inteligencia/casas/provedores` | ✅ **migrado em 15/10 (FATIA 08)** — 1.ª casa extraída; os 3 arquivos antigos foram removidos |
-| Chat | 3 | `components/ChatPanel.tsx` + `handleSend` no `App.tsx` | `3-ponte/casas/chat` | 🟠 nasce na FATIA 09 |
+| Chat / Conversa | 3 | `components/ChatPanel.tsx` + casa `bairros/2-inteligencia/casas/conversa` (rota `/api/chat`, fio SSE) | `2-inteligencia/casas/conversa` (destino decidido na SPEC da 09 — D69/D76; era `3-ponte/casas/chat`) | ✅ **nasceu na FATIA 09 (17/10)** — casa extraída + `handleSend` ligado ao provedor; o `ChatPanel.tsx` segue em `components/` |
 | Agente (runtime/sessões/ferramentas) | 4 | (novo) | `4-agent-host/casas/…` | 🆕 nasce na FATIA 10 |
 | Editor | 1 | `components/EditorArea.tsx` + gestão de abas no `App.tsx` | `1-workbench/casas/editor` | 🟠 nasce na FATIA 11 |
 | Personalizações | 1 | `components/CustomizationsView.tsx` + dados no `App.tsx` | `1-workbench/casas/personalizacoes` | 🟠 nasce na FATIA 11 (E4) |
@@ -211,7 +211,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 | `shot.tmp.mjs` | utilitário de print da FATIA-05 | **não existe mais** (verificado 2026-10-02) |
 | `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/`; removido em 2026-10-12 na limpeza de espaço (recuperável no histórico do Git) |
 | `probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas manuais da FATIA-03/04 | não usadas; manter até decisão |
-| `manual_evidence/`, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; `manual_evidence/` é histórico da FATIA-03 |
+| ~~`manual_evidence/`~~, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; **`manual_evidence/` foi MOVIDO em 17/10** para `docs/arquivo_morto/manual_evidence_fatia03/` (histórico da FATIA-03 — 18 prints + 1 vídeo da homologação do terminal). Ver `docs/arquivo_morto/INDICE.md`. |
 | `Data Nesta` (se aparecer no `ls`) | não é arquivo — artefato de exibição | ignorar |
 
 ## 5. Fora do repositório (só no sandbox / uploads do usuário)
