@@ -211,7 +211,7 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 | `shot.tmp.mjs` | utilitário de print da FATIA-05 | **não existe mais** (verificado 2026-10-02) |
 | `tsc` (arquivo vazio) | resíduo de um `npx tsc` errado | **arquivado** em `docs/arquivo_morto/platform-residuos/`; removido em 2026-10-12 na limpeza de espaço (recuperável no histórico do Git) |
 | `probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas manuais da FATIA-03/04 | não usadas; manter até decisão |
-| `manual_evidence/`, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; `manual_evidence/` é histórico da FATIA-03 |
+| ~~`manual_evidence/`~~, `test-results/`, `test-results-debug/` | evidências antigas e saída do Playwright | `test-results*` são descartáveis; **`manual_evidence/` foi MOVIDO em 17/10** para `docs/arquivo_morto/manual_evidence_fatia03/` (histórico da FATIA-03 — 18 prints + 1 vídeo da homologação do terminal). Ver `docs/arquivo_morto/INDICE.md`. |
 | `Data Nesta` (se aparecer no `ls`) | não é arquivo — artefato de exibição | ignorar |
 
 ## 5. Fora do repositório (só no sandbox / uploads do usuário)

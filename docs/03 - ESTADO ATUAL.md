@@ -14,7 +14,7 @@
 | O que está aberto (não bloqueia) | **D85** (número de tokens — decisão do dono) · **A4** (visual inspirado no LiteLLM) · **DEBT-12** (janela única de abas → 1.º trabalho da FATIA 11) · E2E completo inútil no sandbox (88✘ ambientais, `09 §13.1`) |
 | Como subir o app | `cd platform && npm ci && cd apps/workbench-v2 && npx vite --host 0.0.0.0 --port 5174` |
 | Como rodar os testes | `cd platform/apps/workbench-v2 && npx tsc -b --force && npx vitest run` · E2E: `npx playwright test e2e/provedores_fatia08.spec.ts` (precisa do stub 4599 e da fixture v2) |
-| Qual documento ler agora? | `01` (regras) → `02` (visão) → este `03` → `06` (roadmap e a SPEC que vem) · detalhe técnico: `04` · testes: `09` |
+| Qual documento ler agora? | `01` (regras) → `02` (visão) → este `03` → `06` (roadmap e a SPEC que vem) · detalhe técnico: `04` · testes: `09` · **investigar o passado: `docs/arquivo_morto/INDICE.md`** |
 | Arquivos que NÃO estão no repo (de propósito) | mídias, transcrições e prints de validação (`validacao_*`, `midia_*`) — vivem fora, por decisão do dono |
 
 > Única fonte de estado. Ao terminar qualquer tarefa, a primeira linha acima (data + HEAD) é atualizada **sempre**. Histórico vai para o `07`; coisa futura para o `06`.
