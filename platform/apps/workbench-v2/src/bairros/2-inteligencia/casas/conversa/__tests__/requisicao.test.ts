@@ -30,6 +30,7 @@ describe('requisicao — um protocolo, um jeito de falar', () => {
     expect(corpo.model).toBe('gpt-4o-mini')
     expect(corpo.messages).toHaveLength(2)
     expect(corpo.temperature).toBe(0.2)
+    expect(corpo.stream).toBe(true)
   })
 
   it('anthropic: /messages, x-api-key + versão, max_tokens obrigatório', () => {
@@ -43,6 +44,7 @@ describe('requisicao — um protocolo, um jeito de falar', () => {
     expect(cabecalhos['anthropic-version']).toBe('2023-06-01')
     expect(pedido.url).not.toContain('ant-1')
     expect(corpoDe(pedido).max_tokens).toBe(4096)
+    expect(corpoDe(pedido).stream).toBe(true)
     expect(String(pedido.init.body)).not.toContain('ant-1')
   })
 
@@ -51,7 +53,7 @@ describe('requisicao — um protocolo, um jeito de falar', () => {
       { protocolo: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', modelo: 'gemini-2.5-flash', apiKey: 'AIza-1' },
       MENSAGENS,
     )
-    expect(pedido.url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent')
+    expect(pedido.url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse')
     expect(cabecalhosDe(pedido)['x-goog-api-key']).toBe('AIza-1')
     expect(pedido.url).not.toContain('AIza')
     const conteudo = corpoDe(pedido).contents as { role: string }[]
@@ -69,6 +71,7 @@ describe('requisicao — um protocolo, um jeito de falar', () => {
     expect(cabecalhos['x-api-key']).toBeUndefined()
     const corpo = corpoDe(pedido)
     expect(corpo.model).toBe('nemotron')
+    expect(corpo.stream).toBe(true)
     expect((corpo.options as { temperature: number }).temperature).toBe(0.7)
   })
 })

@@ -3,7 +3,7 @@
 // Um protocolo = um jeito de falar (os MESMOS 4 da sonda da FATIA 08):
 //   openai-chat · anthropic · gemini · ollama
 // A chave vai SEMPRE por cabeçalho — nunca na URL, nunca no corpo.
-// (A conquista 2 acrescenta o streaming; aqui a conversa é resposta única.)
+// Conquista 2: TODOS os pedidos já pedem streaming (fio aos pedaços).
 // ============================================================================
 import type { AlvoConversa, MensagemChat } from '../contract'
 
@@ -42,7 +42,7 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
       init: {
         method: 'POST',
         headers: cabecalhos,
-        body: JSON.stringify({ model: alvo.modelo, messages, ...temperatura }),
+        body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...temperatura }),
       },
     }
   }
@@ -57,6 +57,7 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
           model: alvo.modelo,
           max_tokens: alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : 8192,
           messages,
+          stream: true,
           ...temperatura,
         }),
       },
@@ -65,7 +66,7 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
 
   if (alvo.protocolo === 'gemini') {
     return {
-      url: `${baseUrl}/models/${encodeURIComponent(alvo.modelo)}:generateContent`,
+      url: `${baseUrl}/models/${encodeURIComponent(alvo.modelo)}:streamGenerateContent?alt=sse`,
       init: {
         method: 'POST',
         headers: cabecalhos,
@@ -80,7 +81,7 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
     init: {
       method: 'POST',
       headers: cabecalhos,
-      body: JSON.stringify({ model: alvo.modelo, messages, ...(alvo.temperatura !== undefined ? { options: temperatura } : {}) }),
+      body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...(alvo.temperatura !== undefined ? { options: temperatura } : {}) }),
     },
   }
 }

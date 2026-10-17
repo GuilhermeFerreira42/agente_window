@@ -1,6 +1,10 @@
 // ============================================================================
 // Casa Conversa — execução da conversa (servidor → provedor).
-// Conquista 1: resposta ÚNICA com extração por protocolo e erros honestos.
+// Conquista 2: LEITURA EM STREAMING — cada pedaço que chega vira `chunk`
+// imediatamente (a bolha cresce aos poucos na tela — SPEC §3.2).
+// Duas réguas de tempo SEPARADAS (SPEC §7):
+//   · primeiro byte — 60 s (provedor local pode demorar a arrancar)
+//   · total do pedido — 5 min (nem tudo que começa acaba)
 // A chave só aparece em cabeçalho; o corpo do erro do provedor NUNCA é
 // repassado cru para a tela (traduzimos — regra da SPEC §7).
 //
@@ -9,9 +13,12 @@
 // ============================================================================
 import type { AlvoConversa, CategoriaErro, ErroConversa, EventoChat, MensagemChat } from '../contract'
 import { montarPedido } from './requisicao'
+import { criarFramer } from './streaming'
 
-/** C1: resposta inteira em até 60 s (conforme proposta da SPEC §3.6d). */
-export const TIMEOUT_CONVERSA_MS = 60_000
+/** Sem NENHUM byte do corpo em 60 s → `tempo` (proposta da SPEC §3.6d). */
+export const TIMEOUT_PRIMEIRO_BYTE_MS = 60_000
+/** Pedido inteiro não pode passar de 5 minutos (decisão técnica da 09). */
+export const TIMEOUT_TOTAL_MS = 300_000
 
 export class ErroChat extends Error implements ErroConversa {
   readonly code: CategoriaErro
@@ -47,26 +54,41 @@ function erroPorStatus(status: number): ErroChat {
   return new ErroChat('http', `O serviço respondeu com o erro ${status}. Tente novamente em instantes.`)
 }
 
-function erroTempo(): ErroChat {
-  return new ErroChat('tempo', `O serviço não respondeu em ${Math.round(TIMEOUT_CONVERSA_MS / 1000)} segundos. Ele pode estar fora do ar ou muito lento.`)
+function erroTempo(motivo: 'primeiro' | 'total'): ErroChat {
+  if (motivo === 'total') {
+    return new ErroChat('tempo', `O pedido passou de ${Math.round(TIMEOUT_TOTAL_MS / 60000)} minutos sem terminar e foi encerrado. Tente uma pergunta menor.`)
+  }
+  return new ErroChat('tempo', `O serviço não respondeu em ${Math.round(TIMEOUT_PRIMEIRO_BYTE_MS / 1000)} segundos. Ele pode estar fora do ar ou muito lento.`)
 }
 
 function erroEndereco(): ErroChat {
   return new ErroChat('endereco', 'Não deu para alcançar o serviço. Verifique se ele está ligado (no caso do Ollama, se está rodando na sua máquina).')
 }
 
-/** Extrai o texto da resposta no formato de cada protocolo (tolerante a variações). */
+function erroInterrompida(): ErroChat {
+  return new ErroChat('resposta', 'A resposta foi interrompida no meio (o serviço caiu ou a conexão falhou). Tente enviar de novo.')
+}
+
+/**
+ * Extrai o texto de UM pedaço recebido — tolerante aos dois formatos de cada
+ * protocolo (evento de streaming OU corpo inteiro, quando o provedor ignora o
+ * `stream` e responde de uma vez).
+ */
 export function extrairTexto(protocolo: AlvoConversa['protocolo'], corpo: unknown): string {
   const dados = corpo as Record<string, unknown> | null
   if (!dados) throw new ErroChat('resposta', 'O serviço respondeu sem corpo legível.')
 
   if (protocolo === 'openai-chat') {
     const escolhas = Array.isArray(dados.choices) ? dados.choices : []
-    const primeira = escolhas[0] as { message?: { content?: unknown } } | undefined
-    const conteudo = primeira?.message?.content
+    const primeira = escolhas[0] as { delta?: { content?: unknown }; message?: { content?: unknown } } | undefined
+    const conteudo = primeira?.delta?.content ?? primeira?.message?.content
     return typeof conteudo === 'string' ? conteudo : ''
   }
   if (protocolo === 'anthropic') {
+    // Evento de streaming: content_block_delta → delta.text
+    const delta = dados.delta as { text?: unknown } | undefined
+    if (typeof delta?.text === 'string') return delta.text
+    // Corpo inteiro: content[] de blocos
     const blocos = Array.isArray(dados.content) ? dados.content : []
     return blocos
       .map((bloco) => String((bloco as { text?: unknown }).text ?? ''))
@@ -91,8 +113,12 @@ export function extrairTexto(protocolo: AlvoConversa['protocolo'], corpo: unknow
 
 interface SinalConversa {
   signal: AbortSignal
-  /** O timeout de 60 s foi quem abortou. */
+  /** Algum dos cronômetros disparou. */
   estourou: () => boolean
+  /** Qual cronômetro (mensagem honesta certa). */
+  motivo: () => 'primeiro' | 'total'
+  /** O primeiro byte do corpo chegou — o relógio de 60 s zerou. */
+  byteRecebido: () => void
   /** Foi o usuário que apertou Parar (silêncio total). */
   silenciado: () => boolean
   limpar: () => void
@@ -100,31 +126,50 @@ interface SinalConversa {
 
 function criarSinalConversa(externo?: AbortSignal): SinalConversa {
   const controlador = new AbortController()
-  let tempoEstourado = false
-  const timer = setTimeout(() => {
-    tempoEstourado = true
-    controlador.abort()
-  }, TIMEOUT_CONVERSA_MS)
+  let estouro: 'primeiro' | 'total' | null = null
+  let byteViu = false
+
+  const timerPrimeiro = setTimeout(() => {
+    if (!byteViu && estouro === null) {
+      estouro = 'primeiro'
+      controlador.abort()
+    }
+  }, TIMEOUT_PRIMEIRO_BYTE_MS)
+  const timerTotal = setTimeout(() => {
+    if (estouro === null) {
+      estouro = 'total'
+      controlador.abort()
+    }
+  }, TIMEOUT_TOTAL_MS)
+
   const aoAbortarExterno = () => controlador.abort()
   if (externo) {
     if (externo.aborted) controlador.abort()
     else externo.addEventListener('abort', aoAbortarExterno, { once: true })
   }
+
   return {
     signal: controlador.signal,
-    estourou: () => tempoEstourado,
+    estourou: () => estouro !== null,
+    motivo: () => (estouro === 'total' ? 'total' : 'primeiro'),
+    byteRecebido: () => {
+      byteViu = true
+      clearTimeout(timerPrimeiro) // corpo começou a chegar; o total continua
+    },
     silenciado: () => Boolean(externo?.aborted),
     limpar: () => {
-      clearTimeout(timer)
+      clearTimeout(timerPrimeiro)
+      clearTimeout(timerTotal)
       externo?.removeEventListener('abort', aoAbortarExterno)
     },
   }
 }
 
 /**
- * Executa a conversa em resposta única (C1). Emite `chunk` com o texto final.
- * `done` é emitido pela rota. Silêncio total quando o usuário apertou Parar
- * (sinal abortado): sem erro, sem texto inventado.
+ * Executa a conversa em STREAMING: cada pedaço útil emite `chunk` na hora.
+ * Espaço vazio isolado fica retido (nada de bolha piscando em branco); se a
+ * resposta terminar sem NENHUM texto útil → erro honesto `resposta` (nunca
+ * inventa conteúdo). `done` é emitido pela rota ao fim do retorno.
  */
 export async function executarConversa(
   alvo: AlvoConversa,
@@ -141,29 +186,65 @@ export async function executarConversa(
       resposta = await fetch(pedido.url, { ...pedido.init, signal: sinal.signal })
     } catch (erro) {
       if (sinal.silenciado()) return // Parar: nada a declarar
-      // Nosso cronômetro OU um timeout nomeado pelo próprio fetch.
-      if (sinal.estourou() || (erro as { name?: string })?.name === 'TimeoutError') throw erroTempo()
+      if (sinal.estourou() || (erro as { name?: string })?.name === 'TimeoutError') throw erroTempo(sinal.motivo())
       throw erroEndereco()
     }
 
-    if (!resposta.ok) throw erroPorStatus(resposta.status)
+    if (!resposta.ok) {
+      // O corpo do erro é descartado — só o status vira mensagem honesta.
+      void resposta.body?.cancel().catch(() => undefined)
+      throw erroPorStatus(resposta.status)
+    }
+    if (!resposta.body) throw new ErroChat('resposta', 'O serviço não mandou corpo de resposta.')
 
-    let corpo: unknown
-    try {
-      corpo = await resposta.json()
-    } catch {
-      if (sinal.silenciado()) return // Parar durante a leitura
-      if (sinal.estourou()) throw erroTempo()
-      throw new ErroChat('resposta', 'O serviço respondeu, mas não em formato reconhecível.')
+    const leitor = resposta.body.getReader()
+    const decodificador = new TextDecoder()
+    const framer = criarFramer(alvo.protocolo)
+    let pendente = '' // só espaço que espera conteúdo de verdade
+    let emitiuUtil = false
+
+    const enviar = (texto: string): void => {
+      if (texto.length === 0) return
+      const combinado = pendente + texto
+      if (!combinado.trim().length) {
+        pendente = combinado
+        return
+      }
+      pendente = ''
+      emitiuUtil = true
+      emitir({ type: 'chunk', text: combinado })
     }
 
-    if (sinal.silenciado()) return // Parar após a leitura: não emitir nada
+    const consumirPayloads = (payloads: string[]): void => {
+      for (const payload of payloads) {
+        try {
+          enviar(extrairTexto(alvo.protocolo, JSON.parse(payload)))
+        } catch {
+          // Quadro que não é JSON de texto (eventos de ciclo de vida, [DONE],
+          // ruído de compat) é ignorado — nunca vira erro nem texto falso.
+        }
+      }
+    }
 
-    const texto = extrairTexto(alvo.protocolo, corpo)
-    if (!texto.trim()) {
+    try {
+      for (;;) {
+        const { value, done } = await leitor.read()
+        if (done) break
+        sinal.byteRecebido()
+        consumirPayloads(framer.entrar(decodificador.decode(value, { stream: true })))
+      }
+      consumirPayloads(framer.entrar(decodificador.decode())) // flush do codificador
+      consumirPayloads(framer.fechar())
+    } catch (erro) {
+      if (sinal.silenciado()) return // Parar no meio do fio: preserva o que chegou, silêncio
+      if (sinal.estourou() || (erro as { name?: string })?.name === 'TimeoutError') throw erroTempo(sinal.motivo())
+      if (ehErroChat(erro)) throw erro
+      throw erroInterrompida()
+    }
+
+    if (!emitiuUtil) {
       throw new ErroChat('resposta', 'O serviço respondeu, mas veio sem texto. Nada foi exibido para não inventar resposta.')
     }
-    emitir({ type: 'chunk', text: texto })
   } finally {
     sinal.limpar()
   }
