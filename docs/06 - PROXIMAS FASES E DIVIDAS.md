@@ -531,3 +531,25 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4** (para não haver duas fontes de verdade):
 - **Q4 — anexos:** só o **nome** na 09 (recomendado, com aviso de que o arquivo ainda não é lido) × ler o **conteúdo** agora × adiar para a 10.
 - **Q5 — segunda conversa:** criar o fluxo real agora × **adiar** e deixar o **+** fora até existir (recomendado).
+
+### 9.5 Pesquisa de referência para Q4/Q5 (17/10, a pedido do dono — "ver como funciona no original/OpenClaude")
+
+**Q4 — anexo de arquivo: como tratam os referências**
+| Referência | Como funciona | Evidência |
+|---|---|---|
+| **Projeto original (VS Code / Copilot)** | **Não existe pasta de uploads.** Anexo é **referência de contexto**: arquivo do workspace entra pelo caminho (`#arquivo`, menção, seletor/context picker), e as **ferramentas do agente leem do disco**; arquivo fora do workspace exige aba aberta ou permissão; anexar uma **pasta** manda **só a árvore de nomes** (nunca o conteúdo) | Raspagem `engenharia_reversa/04_CENTER_CHAT/04C`/`04F` (`ChatInputPart.getAttachedContext()`, `attachments: string[]`, "sessão isola anexos") + issue microsoft/vscode **#301432** (folder = só estrutura) e **#293386** (fora do workspace = permissão) + doc oficial `code.visualstudio.com/docs/chat/copilot-chat-context` |
+| **OpenClaude** | Mesma filosofia de agente de código (primo do Claude Code — usa até `~/.claude` como caminho legado): **lê direto do disco**, histórico em `.jsonl` por sessão; **nenhuma pasta uploads** na raspagem | `pesquisa_bruta/fatia-06-chat/PERSISTENCIA_OPENCLAUDE.md` |
+| **Claude Code** | **Não sobe arquivo nenhum**: lê do disco por caminho (`@arquivo`), `--add-dir`, Shift+arrastar; anexos da UI caem em `%TEMP%` e existe **feature pedindo exatamente uma pasta estável** (há quem parea com a ideia do dono) | issue anthropics/claude-code **#54062** + docs de uso |
+| **Quem JÁ tem "pasta uploads"** | O **Ambiente da Arena** (o dono usa aqui) e a **plataforma cloud da Anthropic** (`/mnt/session/uploads` montado no sandbox da sessão, cópias somente-leitura) | Conversa + `platform.claude.com/docs/en/managed-agents/files` |
+
+**Q5 — nova conversa: como fazem os referências** (`RESET_SESSAO.md` + `SESSION_PICKER.md` — fonte: código do OpenClaude + vídeos)
+- **Não existe botão "limpar conversa"** em nenhum dos dois; o ciclo é só **Nova Conversa** + **Retomar**.
+- **Dois botões "+":** (1) **global** no topo = sala/worktree nova (pasta `untitled-<timestamp>`, empty state 768px); (2) **dentro do projeto** = sessão nova na mesma pasta, `<sessionId>.jsonl` novo, **histórico antigo permanece no disco**.
+- Fluxo: `new_session` → `stopSession` → `session_cleared` (limpa só a tela) → **id novo alocado no primeiro envio**; retomar = lista/modal (Session Picker: needs-input / recentes / outras) — esse seletor é **terreno da FATIA 13**.
+- Exclusão só pela **lixeira** ao lado da conversa — nunca "limpar".
+
+**No nosso projeto hoje:** o "+" é o `chat-group-tab-add` em `ChatPanel.tsx:294`, na faixa de abas de chats do painel central — e a faixa **só aparece quando já existem 2+ conversas**; o botão hoje é falso (envia frase pronta).
+
+**Leitura para as decisões:**
+- **Q4:** a proposta do dono (pasta `uploads` criada dentro da pasta ativa) **não é o modelo do original** (que referencia e deixa o agente ler na FATIA 10) — é o modelo de produto de chat (Arena/nuvem Anthropic), e tem um ganho: o arquivo **nasce dentro do workspace**, então a FATIA 10 já o enxerga para agir. Pesa contra: escrever na pasta do usuário sem pedir e crescer a 09.
+- **Q5:** a receita do "+" de verdade está mapeada (acima); adiar mantém o foco da 09 e o seletor de conversas cai naturalmente na FATIA 13.
