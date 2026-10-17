@@ -147,7 +147,7 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
     return { ...render(<ChatPanel {...props} />), props }
   }
 
-  it('dispara sugestão do welcome e cria novo chat', async () => {
+  it('dispara sugestão do welcome e o "+" de novo chat está oculto (Q5b)', async () => {
     const user = userEvent.setup()
     const { props } = renderPanel()
 
@@ -156,8 +156,10 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
     await user.click(suggestion)
     expect(props.onSend).toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Novo chat' }))
-    expect(props.onSend).toHaveBeenCalledWith('Inicie um novo chat contextual para esta sessão.', [])
+    // Q5b (decisão do dono, 17/10): o "+" de nova conversa foi OCULTADO — nunca
+    // vira "limpar conversa"; a criação de mais conversas volta na FATIA 13.
+    expect(screen.queryByRole('button', { name: 'Novo chat' })).not.toBeInTheDocument()
+    expect(document.querySelector('.chat-group-tab-add')).toBeNull()
   })
 })
 

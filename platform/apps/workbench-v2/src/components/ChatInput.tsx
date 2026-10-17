@@ -585,8 +585,8 @@ export function ChatInput({
                   if (element) chipRefs.current.set(attachment.id, element)
                   else chipRefs.current.delete(attachment.id)
                 }}
-                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}. Pressione Delete para remover.`}
-                title={`${attachment.name} · ${attachmentTypeLabel(attachment)}`}
+                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}. Só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10). Pressione Delete para remover.`}
+                title={`${attachment.name} · ${attachmentTypeLabel(attachment)} · só o nome vai junto (conteúdo lido na FATIA 10)`}
                 onKeyDown={(event) => handleAttachmentChipKeyDown(attachment.id, event)}
               >
                 <FileCode2 size={11} aria-hidden="true" />

@@ -110,7 +110,7 @@ export async function tratarRotasConversa(
 
   try {
     await executarConversa(alvo, validacao.pedido.messages, (evento) => escreverEvento(res, evento), abort.signal)
-    if (!abort.signal.aborted) escreverEvento(res, { type: 'done' })
+    if (!abort.signal.aborted) escreverEvento(res, { type: 'done', model: alvo.modelo })
   } catch (erro) {
     if (!abort.signal.aborted) {
       if (ehErroChat(erro)) {

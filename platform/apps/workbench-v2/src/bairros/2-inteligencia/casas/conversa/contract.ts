@@ -58,5 +58,5 @@ export type ObterAlvo = () => Promise<AlvoOuErro>
  */
 export type EventoChat =
   | { type: 'chunk'; text: string }
-  | { type: 'done' }
+  | { type: 'done'; model?: string }
   | { type: 'error'; code: CategoriaErro; message: string }

@@ -111,7 +111,8 @@ describe('rotas — POST /api/chat', () => {
     expect(res.cabecalhos['cache-control']).toContain('no-cache')
     expect(frames(res)).toEqual([
       { type: 'chunk', text: 'Olá' },
-      { type: 'done' },
+      // FATIA 09: o done carrega o modelo EFETIVO (fallback: o configurado).
+      { type: 'done', model: 'm' },
     ])
     expect(res.ended).toBe(true)
   })

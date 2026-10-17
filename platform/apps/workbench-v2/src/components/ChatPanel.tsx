@@ -182,7 +182,8 @@ function MessageRow({
                 className="chat-message-attachment"
                 key={attachment.id}
                 role="listitem"
-                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'}`}
+                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
+                title={`${attachment.name} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>
@@ -291,7 +292,6 @@ export function ChatPanel({
               <MessageCircle size={12} /><span className="chat-group-tab-title">{chat.title}</span>{chat.status === 'needs-input' && <span className="unread-dot" />}
             </button>
           ))}
-          <button className="chat-group-tab-add" type="button" title="Novo chat" aria-label="Novo chat" onClick={() => onSend('Inicie um novo chat contextual para esta sessão.', [])}>+</button>
         </div>
       )}
       <div className="chat-content">

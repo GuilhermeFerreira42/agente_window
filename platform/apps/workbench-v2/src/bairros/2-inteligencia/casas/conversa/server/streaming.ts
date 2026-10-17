@@ -65,6 +65,11 @@ function framerNDJSON(): Framer {
   }
 }
 
+/** O fio do NOSSO servidor é sempre SSE — o cliente do browser usa este. */
+export function criarFramerSSE(): Framer {
+  return framerSSE()
+}
+
 export function criarFramer(protocolo: AlvoConversa['protocolo']): Framer {
   return protocolo === 'ollama' ? framerNDJSON() : framerSSE()
 }

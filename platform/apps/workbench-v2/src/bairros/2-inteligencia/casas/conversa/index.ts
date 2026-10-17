@@ -17,3 +17,7 @@ export type {
   PedidoChat,
   ProtocoloConversa,
 } from './contract'
+
+/** A tela (síndico) fala com a rota SÓ por aqui — a URL mora na casa (FT-05). */
+export { enviarConversa } from './ui/client/api'
+export type { ControleConversa, OuvintesConversa } from './ui/client/api'

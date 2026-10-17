@@ -117,10 +117,14 @@ describe('Fronteira da Casa Conversa (LEGO)', () => {
     expect(infratores).toEqual([])
   })
 
-  it('FT-05: o App não hardcodá a URL da conversa — a casa é dona do `/api/chat`', () => {
+  it('FT-05: o App fala com a conversa só pelo barrel; a casa é dona do `/api/chat`', () => {
     const app = readFileSync(join(SRC_ROOT, 'App.tsx'), 'utf8')
-    // (A conquista 3 liga o App pelo barrel; aí entra o assert positivo aqui.)
+    // FATIA 09 conquista 3 (C3): o App casa o cliente da conversa pelo barrel…
+    expect(app, 'App.tsx importa a casa Conversa pelo barrel').toContain("from './bairros/2-inteligencia/casas/conversa'")
+    // …e a URL da rota continua SEGREDO da casa (o navegador só fala com o app).
     expect(app, 'App.tsx não deve conter /api/chat (URL pertence à casa)').not.toContain('/api/chat')
     expect(app, 'App.tsx não deve montar o fio SSE à mão').not.toContain('text/event-stream')
+    const cliente = readFileSync(join(CASA, 'ui', 'client', 'api.ts'), 'utf8')
+    expect(cliente, 'o cliente da casa é dono da URL /api/chat').toContain("'/api/chat'")
   })
 })
