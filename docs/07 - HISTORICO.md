@@ -2,6 +2,11 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-17 — D88: regra de abertura decidida (segue o modo do editor) + achado dos dois "maximizados"
+- **Decisão do dono (D88):** a superfície abre no **modo do editor** — se o editor está **aberto**, no modo em que está; se está **fechado**, no **último modo** que o usuário deixou; **padrão de fábrica = anexo**; o caso **"arquivo aberto + Provedores ao mesmo tempo" vai para a FATIA 11** (escolha explícita do dono, junto do trabalho de abas).
+- **Achado técnico (leitura de código):** convivem **dois "maximizados"** — `layout.state.editorMaximized` (**persistido**, maximiza a **coluna anexa**, recurso 5.7/RF-07, `App.tsx:2075`) × `editorMaximized` **local** (`useState(false)`, `App.tsx:550`, ramo de `App.tsx:2136` + botão "Maximizar editor", **não persistido**). O modo que o dono quer é o **segundo**. Logo: **o "último modo" não é lembrado hoje**, e qualquer implementação precisa **separar os dois** para não maximizar a coluna errada. A parte "editor já maximizado → Provedores abre maximizado" **já funciona** (o toggle não é resetado ao abrir superfície).
+- **Nenhuma linha de código alterada** — decisão e achado registrados; A1 e a memória do modo aguardam a ordem de início.
+
 ## 2026-10-17 — Autoavaliação "em que nível estamos" (vídeo de 3 níveis) + cobertura nunca medida
 - **Vídeo do dono (60 s, 720×1280, anúncio de curso):** descreve 3 níveis — vibe coding · configurações (skills/rules/MCP) · workflow assistido (spec antes do código, testes no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, métricas de qualidade). Método: `file`/ffprobe → 30 frames + 12 dirigidos → Whisper `small` (pt p=1,00) → termos conferidos na tela. Análise em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
 - **Veredito:** **nível 2 sólido com um pé no nível 3 ("2,5")** — spec/decidões/evidências = nível 3; automação bloqueante e métricas = nível 2 (ou ausentes). Registro completo em `06 §8.5`.

@@ -202,8 +202,24 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 **Medição ao vivo (app rodando, 1600×950, sessão ativa):** clicar em *"Abrir alterações no editor"* (Titlebar) e *"Abrir navegador no editor"* → em ambos os casos o painel cai em `section.editor-pane` (**EditorArea = editor moderno**), em `side-pane-editor-only`, com **chat 471 px | editor 471 px** (modo anexo) e a **aba** correspondente na barra do editor ("Branch Changes" / "Browser"). O próprio estado vazio do editor declara: *"Browser, Search e Branch Changes abrem aqui — não na barra auxiliar."* Prints: `validacao_fatia08/aba_branch_changes.png`, `aba_browser.png`.
 **Conclusão:** para as **três** superfícies (Provedores, Browser, Branch Changes) o que resta é a **mesma decisão de POSICIONAMENTO** (modo anexo × modo maximizado) — nenhuma tem componente legado, nenhuma "nasceu" na FATIA 11.
 
-**A2 reformulado pelo dono (16/10, EM CONVERSA — sem decisão):** *"Abertura baseada no estado do editor — Provedores (e futuros painéis) devem abrir no modo atual do editor de código (anexo ou maximizado). O pulo do chat não deve acontecer caso esteja abrindo no modo anexo."*
-- Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado);
+**A2 — DECIDIDO em 17/10 (dono): abertura segue o estado do editor (D88).**
+| Situação ao abrir a superfície | Regra decidida |
+|---|---|
+| Editor **aberto em modo anexo** | abre em **modo anexo** |
+| Editor **aberto em modo maximizado** | abre em **modo maximizado** |
+| Editor **fechado** | abre no **último modo** que o usuário deixou o editor (memória entre reloads) |
+| Nunca usou (primeira vez) | **modo anexo** (padrão de fábrica) |
+| **Arquivo aberto + Provedores ao mesmo tempo** | **FATIA 11** — decidir junto do trabalho de abas (escolha do dono) |
+
+**ACHADO TÉCNICO decisivo (17/10, leitura do código):** existem **DOIS "maximizados" diferentes** no app, e só um é o que o dono quer:
+| Estado | Onde | Persistido? | O que faz |
+|---|---|---|---|
+| `layout.state.editorMaximized` (`shell/layoutState.ts:33`) | usado em `App.tsx:2075` (classe no `.top-right-section`) | **SIM** (localStorage, "F5 mantém") | maximiza a **coluna anexa (AuxiliaryBar)** — recurso antigo 5.7/RF-07, ligado por eventos `editor.attachMaximized/Restored` |
+| `editorMaximized` local (`App.tsx:550`, `useState(false)`) | usado em `App.tsx:2136` (ramo que renderiza só o editor) e no botão **"Maximizar editor"** (`App.tsx:1977`) | **NÃO** | é o modo que o dono chama de **maximizado**: chat some, editor toma o centro (o que foi medido: 471 → **942 px**) |
+**Consequências:** (a) **o "último modo" NÃO é lembrado hoje** — o estado que importa nasce `false` a cada carga, então quem maximizou ontem abre em anexo hoje; (b) **nome igual para coisas diferentes** — implementar a D88 sem separar os dois pode maximizar a coluna errada; (c) a parte "editor já aberto em maximizado → Provedores abre maximizado" **já funciona hoje** (o toggle não é resetado ao abrir superfície), falta a memória e o A1.
+
+**A2 como o dono formulou em 16/10 (histórico, agora decidido):** *"Abertura baseada no estado do editor — Provedores (e futuros painéis) devem abrir no modo atual do editor de código (anexo ou maximizado). O pulo do chat não deve acontecer caso esteja abrindo no modo anexo."*
+- Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado) — **continua separado da D88**;
 - Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 11).
 
 ## 8.5 Autoavaliação de maturidade — "3 níveis" (2026-10-17, a pedido do dono)
