@@ -336,7 +336,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
 > **STATUS: NÃO INICIADA.** Ordem expressa do dono em 17/10: *"Não comece a fatia 9 ainda. Só preciso que você atualize os documentos… Tudo pronto e documentado antes de começar a fatia 9."*
-> **Regra do projeto (40 %):** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** **4 de 5 decisões fechadas** (Q1–Q4 respondidas na §4 em 17/10); falta **Q5** + o ok de abrir a SPEC.
+> **Regra do projeto (40 %):** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** **5 de 5 decisões fechadas** (Q1–Q5 na §4, todas em 17/10). SPEC **pronta** — abre com o "pode começar" do dono.
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
@@ -464,12 +464,13 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 | **Q2** | **Histórico entra já nesta fatia?** | (a) entra (é critério) · (b) fica para refinamento | **(a) entra** — o `.jsonl` já existe; o custo é **verificar**, não construir. Sem isso a conversa "some no F5" e a fatia não parece pronta **→ RESPONDIDO (17/10): sim — histórico e prova de F5 ficam como parte da fatia.** |
 | **Q3** | **Markdown mínimo ou completo?** | (a) completo (tabelas, listas, código com cópia) · (b) mínimo | **(a) completo** — **já está pronto** no `ChatPanel`; não faz sentido degradar o que existe **→ RESPONDIDO (17/10): confirmado — formatação completa.** |
 | **Q4** | **Anexos: o conteúdo do arquivo entra na 09?** | (a) só o **nome** (como hoje, com aviso de que não é lido) · (b) ler e enviar o **conteúdo** de arquivos pequenos · (c) adiar | **(a) na 09** — anexar arquivo e o modelo não ler é aceitável **se estiver escrito**; ler arquivo é uma **capacidade de agente** e pertence à FATIA 10 (Agir), junto com as ferramentas. Fazer (b) agora inflaria a 09 e misturaria duas fatias **→ RESPONDIDO (17/10): letra (a), depois da pesquisa da §9.5 — jeito do original: anexo = referência de caminho, SEM pasta uploads, conteúdo do arquivo lido só na FATIA 10; na 09 vai com aviso honesto.** |
-| **Q5** | **Segunda conversa (nested chat): criar de verdade na 09?** | (a) sim, fluxo real de novo chat · (b) adiar; o **+** fica **fora** até existir | **(b)** — o **modelo já suporta** `chats[]` e a restauração já reagrupa por `chatId`; o que falta é **UI e fluxo**, que não muda o critério de aceite desta fatia. Construir agora desviaria o foco de "conversa real" **→ ABERTA (17/10): reexplicada ao dono em alto nível; aguardando 5a/5b.** |
+| **Q5** | **Segunda conversa (nested chat): criar de verdade na 09?** | (a) sim, fluxo real de novo chat · (b) adiar; o **+** fica **fora** até existir | **(b)** — o **modelo já suporta** `chats[]` e a restauração já reagrupa por `chatId`; o que falta é **UI e fluxo**, que não muda o critério de aceite desta fatia. Construir agora desviaria o foco de "conversa real" **→ RESPONDIDO (17/10): letra (b) — adiar para a FATIA 13 e esconder o "+" falso da 09; receita do original anotada em §9.5 (nunca ter botão "limpar conversa").** |
 
 **Decisões tomadas pela IA (registradas para não virar susto):** a **casa nova** será `bairros/2-inteligencia/casas/conversa` (2.º módulo extraído, D69/D76 — com cartão de visita e teste de fronteira); a rota de conversa segue o **mesmo padrão** da casa Provedores (`rotaPertenceAoModulo` + registro no dev server "prefeitura"); o transporte do streaming será **HTTP com envio em pedaços (SSE)** por reaproveitar a porta única 5174 e não exigir infraestrutura nova — se a prova mostrar problema, cai-se para WebSocket (o `ws` já é dependência do projeto).
 
 ## 5. O que NÃO fazer na FATIA 09
 - **Nada de ferramentas/arquivos/terminal** (isso é a FATIA 10 — Agir): o agente **não age**, só conversa.
+- **Nada de segunda conversa (Q5b):** o botão `+` (`chat-group-tab-add`, `ChatPanel.tsx:294`) fica **oculto** até a FATIA 13, e **nunca** haverá botão "limpar conversa" (o original não tem — `RESET_SESSAO.md`).
 - **Nada de cartão de permissão** (FATIA 10).
 - **Nada de mexer na tela de Provedores** além de consumi-la (ela está homologada — mudança ali exigiria reabrir a 08).
 - **Nada de "modo anexo/maximizado"** nem de unificação de abas (DEBT-12 é da FATIA 11).
