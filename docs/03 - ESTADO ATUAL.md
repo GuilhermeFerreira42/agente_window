@@ -1,14 +1,14 @@
 # 03 - ESTADO ATUAL — onde a obra parou
 
 **ATUALIZADO EM: 2026-10-17 · HEAD do sandbox: `f7b9035`** (o HEAD do GitHub é o do dono — os hashes não coincidem, ver nota abaixo) · PADRÃO SPEC-DRIVEN ATIVO
-**FASE ATUAL: FATIA 09 — CONVERSAR (não iniciada — ordem expressa do dono em 17/10: "não comece a fatia 9 ainda, só atualize os documentos")**
+**FASE ATUAL: FATIA 09 — CONVERSAR — SPEC escrita (`06` PARTE 2C, 17/10), aguardando aprovação e as 3 decisões; nenhuma linha de código escrita**
 **Últimas fatias fechadas:** FATIA 07 ✅ homologada (15/10) · **FATIA 08 ✅ homologada (17/10, D89)** · **DEBT-12 aberta** para a abertura da FATIA 11 (D90)
 
 ## 0. COMO RETOMAR (bloco de handoff — leia isto primeiro depois de baixar o workspace)
 | Pergunta | Resposta |
 |---|---|
 | Onde a obra parou? | **Depois da FATIA 08 homologada.** Nada em andamento. A **FATIA 09 não foi iniciada** (ordem do dono em 17/10). |
-| Qual é o próximo passo? | Escrever a **SPEC da FATIA 09 (Conversar)** e submeter ao dono (regra dos 40%). Só codar depois do "vai". |
+| Qual é o próximo passo? | A **SPEC da FATIA 09 já está escrita** (`06` **PARTE 2C**, 17/10). Falta o dono **aprovar** e responder às **3 decisões** (Q1 provedor de prova · Q2 histórico · Q3 Markdown). Só então o código começa. |
 | O que está pronto e provado? | FATIA 07 (DEBT-06/09/04) e FATIA 08 (Provedores) **homologadas pelo dono**; A1 (o "sobe pro topo") e D88 (memória do modo do editor) **implementados em 17/10** com trava de geometria. |
 | Placar técnico atual | typecheck **0** · unit **767✓ / 12✗ (todas pré-existentes) / 16 skip** · E2E FATIA 08 **6/6** · contrato de abertura **4/4** |
 | O que está aberto (não bloqueia) | **D85** (número de tokens — decisão do dono) · **A4** (visual inspirado no LiteLLM) · **DEBT-12** (janela única de abas → 1.º trabalho da FATIA 11) · E2E completo inútil no sandbox (88✘ ambientais, `09 §13.1`) |

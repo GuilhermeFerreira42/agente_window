@@ -335,7 +335,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
 > **STATUS: NÃO INICIADA.** Ordem expressa do dono em 17/10: *"Não comece a fatia 9 ainda. Só preciso que você atualize os documentos… Tudo pronto e documentado antes de começar a fatia 9."*
-> **Regra do projeto (40 %):** antes da primeira linha de código, esta fatia ganha **SPEC própria** (critérios testáveis + "o que NÃO fazer" + plano de prova), como aconteceu na 08 (PARTE 2B). Só depois do "vai" do dono.
+> **Regra do projeto (40 %):** ✅ **SPEC escrita em 17/10 — `PARTE 2C` no fim deste arquivo.** Aguarda aprovação do dono e as **3 decisões** (Q1–Q3) antes de qualquer código.
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
@@ -419,3 +419,74 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Destino dos canônicos da obra:** viram `arquivo_morto` — são a **planta da construção**, não o manual do prédio.
 - **Candidatos registrados na raspagem (D77):** fiscal automático de fronteiras (dependency-cruiser/ts-arch — receita em `referencias/arquitetura-limpa/02…`); avaliar junto com o gatilho do Robusto.
 - **Kit de testes:** bateria final verde (typecheck 0; suítes de terminal já consertadas na FATIA 12; E2E mortos já em `skip` desde a FATIA 07).
+---
+
+# PARTE 2C — SPEC: FATIA 09 — Conversar (Chat real + Streaming)
+
+> **STATUS:** escrita em **2026-10-17**, a pedido do dono ("pode começar" = começar pela SPEC). **Nenhuma linha de código escrita.** Aguarda **aprovação do dono** e a resposta às **3 decisões** da §4.
+> **Origem:** a FATIA 08 foi **homologada em 17/10** (D89) — a base está liberada. Regra do projeto: **40 % especificando antes de codar**; e a fatia só abre depois do aval.
+
+## 1. Objetivo em 1 frase
+Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handleSend`, que devolve texto fixo) por uma **conversa real** com o **provedor ativo** configurado na FATIA 08, com a resposta **aparecendo aos poucos** (streaming), Markdown já renderizado e erro honesto quando não der.
+
+## 2. O que já existe (o terreno medido em 17/10 — para NÃO refazer)
+
+| Peça | Onde | Estado |
+|---|---|---|
+| Bolha da mensagem + Markdown | `components/ChatPanel.tsx:193` — usa **`react-markdown` + `remark-gfm`**, já instalados, com blocos de código e botão de copiar | **pronto** |
+| Carona do "digitando" | `ChatMessage.running?: boolean` (`types.ts:19`) — já existe e a bolha já sabe exibir | **pronto** |
+| Botão **Parar** | `App.tsx:1657 handleStop` — hoje limpa os timers simulados da sessão | **existe**, precisa passar a **abortar o pedido real** |
+| Provedor **ativo** + chave + URL + modelo | Casa Provedores (FATIA 08), arquivo local `~/.agente_window/providers.json` (0600), D84 | **pronto** |
+| Descritores por provedor (URL padrão, modelos) | `casas/provedores/descritores/` | **pronto** |
+| Sonda de conexão por protocolo (openai-chat / anthropic / gemini / ollama), timeout 10 s | `casas/provedores/server/probe.ts` | **pronto — reusar os adaptadores** |
+| Histórico: as mensagens já são gravadas em `.jsonl` por sessão | `server/session-persistence/transcripts.ts` + `index.ts:39-78` | **pronto** (verificar na prova que sobrevive ao F5) |
+| **Rota de conversa** | — | **NÃO EXISTE** (`/api/chat*` não aparece no código) |
+| Chamada real ao provedor com streaming | — | **NÃO EXISTE** |
+
+## 3. Critérios de Pronto Testáveis
+1. **Conversa de verdade** — enviar um prompt e receber resposta **do provedor ativo**; nenhuma resposta fixa de `setTimeout` sobrevive no fluxo (o mock sai do caminho, não fica de reserva silenciosa).
+2. **Streaming visível** — o texto **aparece aos poucos** na bolha (primeiro pedaço em < 2 s num provedor local; a bolha cresce), com o indicador de "trabalhando" ligado enquanto não termina.
+3. **Fim do pedido** — ao terminar, a bolha perde o `running`, o horário é gravado e o status da sessão volta a "concluída".
+4. **Parar funciona de verdade** — clicar **Parar** interrompe o pedido **no servidor** (o provedor deixa de ser consumido) e a bolha fica marcada como cancelada, preservando o texto que já chegou.
+5. **Markdown** — a resposta renderiza **negrito, listas, tabelas e blocos de código** com o botão de copiar (o componente já existe; a prova é ponta a ponta).
+6. **Erros honestos, sem inventar resposta** — quatro casos, com mensagem clara e **sem texto falso** na bolha: (a) **nenhum provedor configurado**; (b) **chave ausente/ inválida** (401/403); (c) **endereço inalcançável / serviço fora**; (d) **timeout** (limite a definir — proposta: 60 s sem primeiro byte; 10 s é curto demais para modelo local).
+7. **A chave nunca sai do servidor** — o navegador **não** fala com o provedor; a chave **não** aparece em URL, log ou no corpo de resposta; teste automatizado confere que nenhuma resposta da API contém o valor da chave.
+8. **Histórico por sessão** — a conversa continua lá depois de **F5** e ao **trocar de sessão** (mensagens não vazam para outra sessão); o `.jsonl` da sessão contém os pares.
+9. **Trocas de provedor** — trocar o provedor ativo na tela de Provedores muda **quem responde** na conversa seguinte, sem reiniciar o app.
+10. **Sem regressão** — typecheck **0** · unit ≥ baseline **767✓/12✗/16** (as mesmas 12 pré-existentes) · E2E FATIA 08 **6/6** · contrato de abertura **4/4** · nenhum teste apagado ou silenciado.
+
+## 4. Decisões a fechar com o dono (3)
+
+| # | Pergunta | Opções | Minha recomendação |
+|---|---|---|---|
+| **Q1** | **Qual provedor é o "padrão de prova"?** | (a) **Ollama local** (`http://localhost:11434`) · (b) provedor simulado só · (c) um serviço pago | **(a) Ollama local** — roda na máquina do dono, **não exige chave** (D91), e foi o que ele já validou na 08. O simulado fica para a bateria automatizada |
+| **Q2** | **Histórico entra já nesta fatia?** | (a) entra (é critério) · (b) fica para refinamento | **(a) entra** — o `.jsonl` já existe; o custo é **verificar**, não construir. Sem isso a conversa "some no F5" e a fatia não parece pronta |
+| **Q3** | **Markdown mínimo ou completo?** | (a) completo (tabelas, listas, código com cópia) · (b) mínimo | **(a) completo** — **já está pronto** no `ChatPanel`; não faz sentido degradar o que existe |
+
+**Decisões tomadas pela IA (registradas para não virar susto):** a **casa nova** será `bairros/2-inteligencia/casas/conversa` (2.º módulo extraído, D69/D76 — com cartão de visita e teste de fronteira); a rota de conversa segue o **mesmo padrão** da casa Provedores (`rotaPertenceAoModulo` + registro no dev server "prefeitura"); o transporte do streaming será **HTTP com envio em pedaços (SSE)** por reaproveitar a porta única 5174 e não exigir infraestrutura nova — se a prova mostrar problema, cai-se para WebSocket (o `ws` já é dependência do projeto).
+
+## 5. O que NÃO fazer na FATIA 09
+- **Nada de ferramentas/arquivos/terminal** (isso é a FATIA 10 — Agir): o agente **não age**, só conversa.
+- **Nada de cartão de permissão** (FATIA 10).
+- **Nada de mexer na tela de Provedores** além de consumi-la (ela está homologada — mudança ali exigiria reabrir a 08).
+- **Nada de "modo anexo/maximizado"** nem de unificação de abas (DEBT-12 é da FATIA 11).
+- **Nada de chave no navegador** — nem em teste, nem em log, nem em exemplo.
+- **Não "consertar"** as 12 falhas pré-existentes (decisão já tomada: FATIA 12) nem apagar teste nenhum.
+
+## 6. Plano de prova (§6)
+- **(a) Provedor simulado com streaming** — extensão do stub da 08 (`validacao_fatia08/stub_provider.cjs`, porta 4599, **fora do repo**) com um endpoint que **emite pedaços com atraso**, um que **falha no meio**, um que **não responde** (para timeout) e um que **recusa a chave** (401).
+- **(b) Unit** — adaptadores de streaming por protocolo (pedaço → acumulado → fim), cancelamento, timeout, formatação de erro; fronteira da casa.
+- **(c) E2E** — `e2e/conversa_fatia09.spec.ts`: enviar → ver a bolha **crescendo** → terminar → recarregar e conferir o histórico; **Parar** para no meio; erro honesto nos 4 casos; trocar de provedor muda quem responde.
+- **(d) Validação do dono (Windows 5174)** — roteiro curto no `08` (PARTE D): abrir o app → escolher o provedor → conversar → parar no meio → recarregar. **Com Ollama local**, sem chave; e, se quiser, com um serviço real dele.
+
+## 7. Riscos honestos
+| Risco | Mitigação |
+|---|---|
+| Streaming por SSE em dev server próprio (não é framework) exige cuidado com buffer/flush | Prova isolada primeiro com o stub; se travar, WebSocket (já instalado) |
+| "Parar" no meio do streaming deixa o provedor consumindo | Abortar a conexão no servidor e fechar o corpo da resposta; teste dedicado |
+| Chave vazar por log/erro | Teste que varre as respostas da API; erro do provedor é **traduzido**, nunca repassado cru |
+| Provedor local lento (primeiro token demora) | Timeout de **primeiro byte** separado do timeout total; mensagem honesta ("o serviço está demorando") |
+| O `handleSend` é chamado por vários fluxos (landing, worktree, menus) | Trocar o **miolo** (a geração da resposta), mantendo a assinatura — nenhum chamador muda |
+
+## 8. Entrega esperada
+1 commit por conquista (≥ 4): **(1)** casa + rota + protocolo; **(2)** streaming no servidor; **(3)** ligação no chat + Parar; **(4)** erros honestos + histórico; **(5)** documentação e evidências. Cada um com typecheck 0 + bateria focada + A/B quando alguma falha.

@@ -2,6 +2,12 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-17 — SPEC da FATIA 09 (Conversar) escrita — nenhum código
+- **Terreno medido antes de especificar:** o **Markdown já está pronto** (`ChatPanel.tsx:193`, `react-markdown` + `remark-gfm` com cópia de código); o **`running`** da bolha já existe (`types.ts:19`); o **Parar** existe (`App.tsx:1657`, hoje só limpa timers); o provedor ativo/chave/modelo vêm prontos da 08; as **sondas por protocolo** já existem (`casas/provedores/server/probe.ts`) e serão **reusadas**; o **histórico já é gravado** em `.jsonl` (`server/session-persistence/transcripts.ts`). **Falta de verdade:** rota de conversa (não existe `/api/chat*`) e a chamada real com streaming.
+- **SPEC registrada em `06` PARTE 2C:** 10 critérios testáveis, 3 decisões para o dono (provedor de prova = **Ollama local** recomendado; histórico **entra**; Markdown **completo**), "o que NÃO fazer" (nada de ferramentas — FATIA 10; nada de mexer em Provedores; nada de abas — DEBT-12), plano de prova com provedor simulado em pedaços + 4 casos de erro, e riscos com mitigação.
+- **Decisões da IA registradas na SPEC:** casa nova `bairros/2-inteligencia/casas/conversa` (2.º módulo extraído, D69/D76, com cartão e teste de fronteira) · rota no padrão da casa Provedores · transporte por **SSE** na porta única (fallback WebSocket, já instalado).
+- **Nenhuma linha de código escrita.** Aguardando aprovação.
+
 ## 2026-10-17 — FATIA 08 HOMOLOGADA + DEBT-12 aberta (janela única de abas na FATIA 11)
 - **Homologação (D89):** palavras do dono — *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"*. A PARTE 2B foi marcada **✅ HOMOLOGADA**; pendências **D85** (número de tokens) e **A4** (layout do LiteLLM) seguem como **refinamento**, sem bloquear. **Fase ativa passa a ser a FATIA 09 — Conversar.**
 - **Dívida registrada (D90 → DEBT-12):** o dono escolheu a **opção B** da avaliação `§8.7` — a unificação ("janela única de abas") entra como **primeiro trabalho da FATIA 11**, sem interromper o MVP. Classificação explicada a ele: **é dívida técnica no efeito** (dois modelos de aba, `search`/`diff`/`changes` duplicados, coluna inteira a aposentar), **mas a origem é uma decisão de desenho** (exceção autorizada da FATIA 04), não descuido.
