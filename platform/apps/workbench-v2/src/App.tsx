@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { persistSessionNoUnload, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -182,6 +182,9 @@ function ScmModuleSlot({ module }: { module: IExplorerSearchModule }) {
 // FATIA-05 5.7 fix (DoD "F5 mantém as 3 abas", 2026-10-01): o módulo persiste largura/maximizado, mas NÃO as abas
 // (fato da 4.7, D2.70). O shell guarda a lista por sessão e reabre no boot — só `kind: 'code'` (diff/changes têm payload).
 const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
+/** FATIA 09 (§3.8): qual sessão estava aberta — o F5 volta para ELA e a
+ * conversa (restaurada do .jsonl) aparece na hora. */
+const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
 type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
 function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
   try {
@@ -230,13 +233,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
   const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
   const persistedLayout = useRef(loadLayoutState())
-  const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? BOOT_SESSION_ID)
+  const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? window.localStorage.getItem(ACTIVE_SESSION_KEY) ?? BOOT_SESSION_ID)
   // (E14/R-022/R-026) Sessions Part grid: ids das sessões visíveis lado a lado.
   // Por padrão só a sessão ativa é visível (arranjo single). Abrir uma sessão
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
   const [newSessionLanding, setNewSessionLanding] = useState(false)
+  // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
+  // a primeira da lista e a conversa "parecia" perdida.
+  useEffect(() => {
+    if (!activeSessionId) return
+    window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId)
+  }, [activeSessionId])
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
@@ -290,8 +299,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         if (controller.signal.aborted) return
         setSessions(restored)
         const first = restored[0]
-        setActiveSessionId(first?.id ?? BOOT_SESSION_ID)
-        setVisibleSessionIds(first ? [first.id] : [])
+        // FATIA 09 (§3.8): o F5 volta para a MESMA sessão que estava aberta.
+        const salva = window.localStorage.getItem(ACTIVE_SESSION_KEY)
+        const recuperada = salva ? restored.find((session) => session.id === salva) : undefined
+        setActiveSessionId(recuperada?.id ?? first?.id ?? BOOT_SESSION_ID)
+        setVisibleSessionIds(recuperada ? [recuperada.id] : first ? [first.id] : [])
         setActiveChatBySession(Object.fromEntries(restored.map((session) => [session.id, session.mainChatId])))
       })
       .catch((error: unknown) => {
@@ -303,13 +315,27 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     return () => controller.abort()
   }, [])
 
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
   useEffect(() => {
     if (!sessionsHydrated) return
-    const timer = window.setTimeout(() => {
+    const gravar = () => {
       void Promise.all(sessions.filter((session) => !session.isDraft).map(persistSession))
         .catch((error: unknown) => console.error('[sessions] persistence failed', error))
-    }, 150)
-    return () => window.clearTimeout(timer)
+    }
+    const timer = window.setTimeout(gravar, 150)
+    // FATIA 09 (§3.8): sem isto, um F5 nos 150 ms após o fim da resposta
+    // matava a página antes da gravação — a conversa "some" no reload.
+    const despejar = () => {
+      for (const session of sessionsRef.current) {
+        if (!session.isDraft) persistSessionNoUnload(session)
+      }
+    }
+    window.addEventListener('pagehide', despejar)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', despejar)
+    }
   }, [sessions, sessionsHydrated])
 
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)

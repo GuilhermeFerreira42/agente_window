@@ -66,11 +66,24 @@ function restoreMessages(session: Session, entries: TranscriptEntry[]): Session 
   }
 }
 
+function sanarStatusAposF5(session: Session): Session {
+  // FATIA 09 (§3.8): mensagens em streaming NÃO são persistidas (decisão da
+  // §9.1 — evita bolha vazia eterna), então depois do F5 nunca existe nada
+  // rodando. Um status 'working' gravado no meio da corrida (F5 durante o
+  // streaming) ficaria ÓRFÃO para sempre: chip "Trabalhando" fantasma e
+  // composer travado. Na restauração, ele vira 'completed'.
+  return {
+    ...session,
+    status: session.status === 'working' ? 'completed' : session.status,
+    chats: session.chats.map((chat) => (chat.status === 'working' ? { ...chat, status: 'completed' } : chat)),
+  }
+}
+
 async function listSessions(): Promise<Session[]> {
   const records = listSessionRecords()
   return Promise.all(records.map(async (record) => {
     const session = JSON.parse(record.sessionJson) as Session
-    return restoreMessages(session, await readTranscript(record.slug, record.id))
+    return sanarStatusAposF5(restoreMessages(session, await readTranscript(record.slug, record.id)))
   }))
 }
 
