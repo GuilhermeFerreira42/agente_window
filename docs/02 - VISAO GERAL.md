@@ -35,7 +35,7 @@ O **Agente Window** é construído sob uma proporção clara de fidelidade:
 - **04 Motor:** Explorer, Search, SCM e Monaco Editor anexo.
 - **05 Chassis-Right:** Activity Bar e Side Bar à direita, DnD de views, Outline/Timeline, maximizar editor (100 % homologada).
 - **06 Workspace & Chat base:** persistência, Empty State 768 px, base de sessões (implementada).
-- **07 Destravar:** DEBT-06 + DEBT-04 + DEBT-09 (era a parte estrutural da 6.1) — **fase ativa / aprovada**; SPEC no `06` Parte 2.
+- **07 Destravar:** DEBT-06 + DEBT-04 + DEBT-09 (era a parte estrutural da 6.1) — **✅ HOMOLOGADA em 15/10**; SPEC no `06` Parte 2.
 - **08 Conectar:** Provedores estilo Cline — chave, modelos, teste de conexão (era a antiga 09; absorve DEBT-10) — **✅ HOMOLOGADA em 17/10 (D89)**.
 - **09 Conversar:** chat real ligado aos provedores + streaming (era a antiga 10) — substitui o mock do `App.tsx` — **fase ativa**.
 - **10 Agir:** ferramentas + card de permissão **[Permitir] / [Negar] / [Permitir na Sessão]** (era a antiga 11) — **o MVP fecha aqui (D65)**.

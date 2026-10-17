@@ -22,7 +22,7 @@ Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-s
 
 ---
 
-## 2. Inventário completo — 31 arquivos / 186 testes
+## 2. Inventário completo — 32 arquivos / 190 testes (atualizado 2026-10-17: + `fatia08_modo_abertura` com 4)
 
 ### 2.1 Anti-regressão OBRIGATÓRIA em todo commit da FATIA-05 (`docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §9`) — 12 suítes / 115 testes
 | Spec | Testes | Mundo | Observação |
@@ -76,6 +76,17 @@ Todos testam rótulos/atributos do terminal **anteriores** à homologação `COM
 ### 2.5.1 Baseline FATIA 08 (HEAD `fde5f0f`, 2026-10-15)
 - `npx vitest run` → **765 passed / 12 failed / 16 skipped (793)** · typecheck **0**. As 12 falhas são **exatamente as mesmas** da linha anterior (9 `TerminalPanel` + `iconLabels` + `themeTokens` + `visualStates`). O `pass` subiu 730 → 765: **+37** dos testes da casa nova (registro 6, repositório 13, sonda 13, fronteira LEGO 5) **−2** do `src/server/providers.test.ts`, removido junto com o código legado.
 - **E2E da fatia:** `provedores_fatia08.spec.ts` **6/6** (ver §13).
+
+### 2.5.2 Baseline 2026-10-17 (HEAD `f7b9035`) — pós A1 + D88 e homologação da FATIA 08
+- `npx vitest run` → **767 passed / 12 failed / 16 skipped (795)** · typecheck **0**.
+- As **12 falhas são exatamente as mesmas** de sempre: **9** `TerminalPanel.test.tsx` + `iconLabels` + `themeTokens` + `visualStates`. **Prova de que são pré-existentes:** A/B com `git stash` em 17/10 — **12 antes e 12 depois**, nos mesmos 4 arquivos.
+- O `pass` subiu **765 → 767**: **+2** testes novos de persistência (D88) — `centerEditorMaximized` nasce em anexo e é lembrado no reload; layout antigo (sem a coluna) migra para anexo.
+- **Trava nova (a que faltava no DEBT-04):** `e2e/fatia08_modo_abertura.spec.ts` — **4/4** (`T1` geometria da landing com aba aberta · `T2` editor maximizado → Provedores maximizado · `T3` reload preserva o último modo · `T4` padrão de fábrica = anexo).
+- **Regras aprendidas nesta rodada (não repetir o erro):**
+  1. O **contrato anti-trapaça** (`e2eAssertionContract.test.ts`) exige `test(` com **2 espaços** no início da linha; spec fora da convenção reprova a suíte.
+  2. A **fixture de provedores** precisa estar em **v2** (`{"versao":2,"ativo":null,"provedores":{}}`); em v1 a tela mostra "Formato não reconhecido".
+  3. A primeira execução de uma spec nova costuma falhar **por Vite frio** (compilação na primeira visita) — re-rodar antes de investigar.
+  4. Specs que usam o stub de provedor exigem o **stub na 4599 no ar**; sem ele, T2/T4/T5 da bateria 08 falham por conexão recusada (não é regressão).
 
 ### 2.6 Falhas pré-existentes FORA do §2.4 — triagem 2026-10-15 (decisão do dono pendente)
 Encontradas ao rodar a suíte com o seed de sessões correto (ver §3.6). **Não** estão na lista canônica do §2.4, então **não** foram marcadas como `skip` (seria estender a onda 1, D74). Cada uma foi conferida no **A/B `e02e486`** (falha idêntica nos dois estados → pré-existente, não regressão da FATIA 07):

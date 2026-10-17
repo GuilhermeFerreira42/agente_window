@@ -17,7 +17,16 @@
 - **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d`.
 - **Números na homologação:** typecheck 0 · unit 730✓/12✗ (pré-existentes)/16 skip · E2E sem regressão (A/B em `e02e486`).
 - **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
-- **Roteiro do dono para a FATIA 08 (Provedores):** entra neste documento quando a 08 fechar (previsto na SPEC, PARTE 2B §6-d): configurar um provedor real → Testar conexão → salvar → reabrir e conferir a chave mascarada.
+## Homologação FATIA 08 — 2026-10-17 (declaração do dono) ✅
+**Palavras do dono (canônicas):** *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"* (registro **D89**, `docs/05`).
+**O que essa homologação cobre:**
+- os **10 critérios de pronto** da SPEC (`docs/06` PARTE 2B §3) — todos verdes na prova automatizada;
+- a **validação do dono com serviço REAL** (15/10, vídeo): **Ollama local** ("Conexão aprovada… 209 ms e 5 modelos") e o **genérico apontando para um pool LiteLLM** ("…158 ms e 4 modelos"), **chave sempre mascarada**, nenhum erro;
+- as correções abertas naquele momento — **A1** (a tela de sessão nova não sobe mais com o Provedores aberto) e **D88** (o modo do editor é lembrado) — implementadas em 17/10 com trava de geometria (`e2e/fatia08_modo_abertura.spec.ts`, 4/4).
+**Pendências que NÃO bloqueiam a homologação (viram refinamento):**
+- **D85** — número de contexto/tokens que o dono quer como padrão (decisão dele; hoje os valores gigantes estão digitados de propósito);
+- **A4** — "copiar o visual do LiteLLM" (estudo futuro, sem fatia definida).
+**Roteiro do dono (PARTE C) — cumprido:** configurar provedor real → Testar conexão → salvar → reabrir e conferir a chave mascarada (feito no vídeo de 15/10).
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
@@ -201,7 +210,7 @@ A V1 só pode ser declarada pronta quando:
 - Em ambos: Conta > Provedores continua independente do picker e não persiste chaves.
 
 
-# PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono
+# PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono — **CUMPRIDO em 15/10 · HOMOLOGADA em 17/10** (registro no topo deste arquivo)
 
 > **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/`.
 
