@@ -1259,7 +1259,14 @@ svg {
    (.app-frame.is-empty-landing) foi aposentado na Onda 1 (E5). ===== */
 .session-landing {
   flex: 1 1 auto;
-  min-height: 0;
+  /* A1/DEBT-04 (17/10): era `min-height: 0`. A landing tem só a altura do conteúdo, e
+     quem a centraliza é o PAI. Fechada (sem aba de editor), o pai é a faixa central com
+     `chat-centered` (align-items:center) → centraliza. Abrindo uma aba global (ex.:
+     Provedores), o pai vira o painel do split (display:block) → a landing colava no topo
+     ("a tela sobe"). Com `min-height: 100%` ela ocupa a coluna inteira em QUALQUER pai
+     (bloco ou flex) e o próprio `align-items:center` a centraliza — o salto deixa de existir.
+     `min-height` (e não `height`) para o conteúdo poder crescer em janelas baixas. */
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -12,6 +12,22 @@
 
 ---
 
+## Homologação FATIA 07 — 2026-10-15 (declaração do dono, com evidências)
+- **Entregas homologadas:** DEBT-09 (`a69137d`) · DEBT-06 caminho C (`62cf055`) · DEBT-04 (nada a expurgar) · onda 1 da faxina D74 (`9985b9e`) · quarentena pontual dos 2 E2E da Aux (`e182960`).
+- **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d`.
+- **Números na homologação:** typecheck 0 · unit 730✓/12✗ (pré-existentes)/16 skip · E2E sem regressão (A/B em `e02e486`).
+- **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
+## Homologação FATIA 08 — 2026-10-17 (declaração do dono) ✅
+**Palavras do dono (canônicas):** *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"* (registro **D89**, `docs/05`).
+**O que essa homologação cobre:**
+- os **10 critérios de pronto** da SPEC (`docs/06` PARTE 2B §3) — todos verdes na prova automatizada;
+- a **validação do dono com serviço REAL** (15/10, vídeo): **Ollama local** ("Conexão aprovada… 209 ms e 5 modelos") e o **genérico apontando para um pool LiteLLM** ("…158 ms e 4 modelos"), **chave sempre mascarada**, nenhum erro;
+- as correções abertas naquele momento — **A1** (a tela de sessão nova não sobe mais com o Provedores aberto) e **D88** (o modo do editor é lembrado) — implementadas em 17/10 com trava de geometria (`e2e/fatia08_modo_abertura.spec.ts`, 4/4).
+**Pendências que NÃO bloqueiam a homologação (viram refinamento):**
+- **D85** — número de contexto/tokens que o dono quer como padrão (decisão dele; hoje os valores gigantes estão digitados de propósito);
+- **A4** — "copiar o visual do LiteLLM" (estudo futuro, sem fatia definida).
+**Roteiro do dono (PARTE C) — cumprido:** configurar provedor real → Testar conexão → salvar → reabrir e conferir a chave mascarada (feito no vídeo de 15/10).
+
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
 > **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
@@ -192,3 +208,29 @@ A V1 só pode ser declarada pronta quando:
 - Linux: `/` lista diretórios; `/mnt/` lista ou mostra pasta vazia; `/tmp` deve aparecer simultaneamente no título, Explorer e `pwd`.
 - Windows 5174: Procurar abre seletor Explorer moderno; escolha deve atualizar título, Explorer e `Get-Location`.
 - Em ambos: Conta > Provedores continua independente do picker e não persiste chaves.
+
+
+# PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono — **CUMPRIDO em 15/10 · HOMOLOGADA em 17/10** (registro no topo deste arquivo)
+
+> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/`.
+
+## C.1 Caminho rápido (5 minutos, sem chave paga)
+1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
+2. **Conta ▸ Provedores**.
+3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `validacao_fatia08/stub_provider.cjs` no ar.
+4. Chave: qualquer texto · **Modelo**: digite um à mão · **[Testar conexão]** → faixa verde · **[Salvar provedores]** → "Configuração salva".
+5. **F5** → reabrir Provedores → o serviço continua lá, com o nome no título; o campo da chave vem **mascarado** (o olhinho mostra só sob clique).
+6. Marcar **usar este provedor no chat** → chip "provedor ativo do chat" → **F5** → continua ativo.
+
+## C.2 Caminho com chave real (NVIDIA — grátis em build.nvidia.com)
+1. Crie a chave (`nvapi-…`) em build.nvidia.com.
+2. Em **NVIDIA** → cole a chave → **[Buscar modelos]** (o catálogo aparece) → escolha um modelo → **[Testar conexão]** (faixa verde com a contagem).
+3. **[Salvar provedores]** → **F5** → reabrir: a chave volta **mascarada** e o rodapé diz **"guardada em ~/.agente_window/providers.json (fora do projeto) — nunca entra no Git"**.
+4. No repo, `git status`: **nenhuma** menção a chave (a segunda tranca é o `.gitignore`).
+
+## C.3 O que observar (falhas honestas, sem erro genérico)
+- Chave errada → "Chave inválida (erro 401)" · endereço que não existe → "Não deu para alcançar o endereço" · serviço sem catálogo → aviso de **405** e o **modelo digitado continua valendo**.
+- Nenhuma chave em log, URL ou no carregamento da tela; o **olhinho** é o único caminho que traz a chave inteira (D83) — limite consciente registrado em `06 §7`.
+
+## C.4 Se algo falhar
+Anote **tela + texto do aviso** e traga: a validação vale como **reprovado com evidência**. Nada é declarado verde sem o aceite do dono.

@@ -35,11 +35,11 @@ O **Agente Window** é construído sob uma proporção clara de fidelidade:
 - **04 Motor:** Explorer, Search, SCM e Monaco Editor anexo.
 - **05 Chassis-Right:** Activity Bar e Side Bar à direita, DnD de views, Outline/Timeline, maximizar editor (100 % homologada).
 - **06 Workspace & Chat base:** persistência, Empty State 768 px, base de sessões (implementada).
-- **07 Destravar:** DEBT-06 + DEBT-04 + DEBT-09 (era a parte estrutural da 6.1) — **fase ativa / aprovada**; SPEC no `06` Parte 2.
-- **08 Conectar:** Provedores estilo Cline — chave, modelos, teste de conexão (era a antiga 09; absorve DEBT-10).
-- **09 Conversar:** chat real ligado aos provedores + streaming (era a antiga 10) — substitui o mock do `App.tsx`.
+- **07 Destravar:** DEBT-06 + DEBT-04 + DEBT-09 (era a parte estrutural da 6.1) — **✅ HOMOLOGADA em 15/10**; SPEC no `06` Parte 2.
+- **08 Conectar:** Provedores estilo Cline — chave, modelos, teste de conexão (era a antiga 09; absorve DEBT-10) — **✅ HOMOLOGADA em 17/10 (D89)**.
+- **09 Conversar:** chat real ligado aos provedores + streaming (era a antiga 10) — substitui o mock do `App.tsx` — **fase ativa**.
 - **10 Agir:** ferramentas + card de permissão **[Permitir] / [Negar] / [Permitir na Sessão]** (era a antiga 11) — **o MVP fecha aqui (D65)**.
-- **11 Conferir:** Motor de Edição/File Ops + SCM/Diff real (eram as antigas 07 + 08).
+- **11 Conferir:** Motor de Edição/File Ops + SCM/Diff real (eram as antigas 07 + 08) — **abre por DEBT-12: janela única de abas (D90)**.
 - **12 Terminal 2.0:** aparência e comportamentos do terminal, Ctrl+C/V, arrastar arquivo (absorve DEBT-01/02/03).
 - **13 Refinamentos:** recentes, picker nativo, pesquisa/centro de comando (DEBT-11), acabamentos do Explorer/Pesquisa, Trilha de Navegação clicável (D2.23) (era a ideia da "6.2").
 - **14 Painéis Avançados:** arrastar terminal entre painel inferior e lateral, splits (era a antiga 12).

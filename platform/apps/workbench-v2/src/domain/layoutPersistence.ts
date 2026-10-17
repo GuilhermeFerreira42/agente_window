@@ -14,6 +14,13 @@ export interface ShellVisibility {
   terminalVisible: boolean
   editorHidden: boolean
   sidebarWidth: number
+  /** D88 (17/10): ÚLTIMO MODO do editor CENTRAL — `false` = modo anexo (dividido com o
+   *  chat) · `true` = modo maximizado (editor toma o centro, chat oculto; o que o botão
+   *  "Maximizar editor" alterna). Existe para a regra do dono: com o editor FECHADO, a
+   *  superfície aberta pela Conta (Provedores etc.) nasce no último modo que o usuário
+   *  deixou. ATENÇÃO: NÃO é o `editorMaximized` de `shell/layoutState.ts` — aquele é o
+   *  recurso antigo que maximiza a COLUNA ANEXA (5.7/RF-07). Este é o do centro. */
+  centerEditorMaximized: boolean
 }
 
 export const SIDEBAR_WIDTH_MIN = 230
@@ -42,6 +49,8 @@ export const DEFAULT_SHELL: ShellVisibility = {
   terminalVisible: false,
   editorHidden: false,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+  // D88: padrão de fábrica = modo anexo (nunca usou o editor → nada de maximizar sozinho).
+  centerEditorMaximized: false,
 }
 
 export function defaultLayoutState(): LayoutState {

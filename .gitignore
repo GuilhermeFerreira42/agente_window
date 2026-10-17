@@ -45,3 +45,9 @@ blob-report/
 code-server/
 # FATIA-04 (4.3): build do adapter FS p/ preview (compilado de server/fs)
 dist-fs-server/
+
+# FATIA 08 (D81): a chave de API mora FORA do repo (~/.agente_window/providers.json).
+# Regra aqui como segunda tranca — se algum caminho relativo surgir, nunca vai para o Git.
+.agente_window/
+providers.json
+providers.json.bak-*

@@ -19,7 +19,7 @@ import { toggleEnablement, type EnablementState, type ProjectedItem } from './do
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
-import { ProvidersView } from './components/ProvidersView'
+import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import {
   closeCustomView,
   customViewTitle,
@@ -547,7 +547,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (Hide/Show editor) onde browserViews e editorTabs ficam temporariamente
   // dessincronizados entre renders.
   const skipInvariantCheck = useRef(false)
-  const [editorMaximized, setEditorMaximized] = useState(false)
+  // D88 (17/10): o modo do editor CENTRAL é lembrado entre reloads. Nasce do último valor
+  // persistido (padrão de fábrica = anexo) e é gravado no mesmo efeito do layout.
+  // NÃO confundir com `layout.state.editorMaximized` (shell/layoutState.ts), que maximiza a coluna anexa.
+  const [editorMaximized, setEditorMaximized] = useState(persistedLayout.current.shell.centerEditorMaximized)
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
   const [editorHidden, setEditorHidden] = useState(persistedLayout.current.shell.editorHidden)
   // (R-BUG/Val2) — Estado compartilhado de novas sessões (landing). Persiste no
@@ -732,10 +735,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Persiste o layout entre reloads (visibilidade global + tamanhos por sessão).
   useEffect(() => {
     saveLayoutState({
-      shell: { sidebarVisible, auxiliaryVisible, terminalVisible, editorHidden, sidebarWidth },
+      shell: { sidebarVisible, auxiliaryVisible, terminalVisible, editorHidden, sidebarWidth, centerEditorMaximized: editorMaximized },
       partSizesBySession,
     })
-  }, [sidebarVisible, auxiliaryVisible, terminalVisible, editorHidden, sidebarWidth, partSizesBySession])
+  }, [sidebarVisible, auxiliaryVisible, terminalVisible, editorHidden, sidebarWidth, editorMaximized, partSizesBySession])
 
   useEffect(() => () => {
     for (const timer of pendingResponseTimers.current.values()) window.clearTimeout(timer)

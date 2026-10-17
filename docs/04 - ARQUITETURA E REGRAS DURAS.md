@@ -127,7 +127,7 @@ src/bairros/
 |---|---|---|---|---|
 | Explorer/Search | 1 | `modules/explorer-search` | (pode ficar) | ✅ verde — exemplo a copiar |
 | Terminal | 1 | `components/terminal` + `services/pty-server` | `1-workbench/casas/terminal` | 🔒 congelado — muda na FATIA 12 (ordem expressa) |
-| Provedores | 2 | `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` | `2-inteligencia/casas/provedores` | 🟠 nasce na FATIA 08 |
+| Provedores | 2 | `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` | `2-inteligencia/casas/provedores` | ✅ **migrado em 15/10 (FATIA 08)** — 1.ª casa extraída; os 3 arquivos antigos foram removidos |
 | Chat | 3 | `components/ChatPanel.tsx` + `handleSend` no `App.tsx` | `3-ponte/casas/chat` | 🟠 nasce na FATIA 09 |
 | Agente (runtime/sessões/ferramentas) | 4 | (novo) | `4-agent-host/casas/…` | 🆕 nasce na FATIA 10 |
 | Editor | 1 | `components/EditorArea.tsx` + gestão de abas no `App.tsx` | `1-workbench/casas/editor` | 🟠 nasce na FATIA 11 |

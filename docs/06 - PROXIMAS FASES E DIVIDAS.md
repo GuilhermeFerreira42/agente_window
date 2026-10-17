@@ -15,13 +15,14 @@
 | **DEBT-01** | Fatia 3 | Terminal | Executar `clear` ou `cls` limpa o viewport do xterm sem deixar resquício ou fantasmas de texto no topo. | O texto antigo não limpa direito; sobram resíduos visuais e artefatos no topo do viewport. | **Alta** | `TerminalPanel.tsx`, `singlePort.ts` |
 | **DEBT-02** | Fatia 3 | Terminal / Layout | Terminal é desacoplado e pode ser arrastado/movido para painel inferior ou lateral com transição fluida e grid intacto. | Drag & drop não é modular: arrastar quebra o grid ou cria uma sessão empilhada no topo da interface. | **Alta** | `shell/layoutController.ts`, `shell/dnd/`, `TerminalPanel.tsx` |
 | **DEBT-03** | Fatia 3 | Terminal / Layout | Existe a barra/painel inferior padrão do VS Code (Terminal, Output, Debug, Ports). | **Correção 2026-10-13:** o painel inferior **existe** no código (`components/terminal/PanelTabs.tsx`, `shell/panel/ViewsPanel.tsx`) e aparece no vídeo do usuário com as abas Problemas/Saída/Console de Depuração/Terminal/Portas. O que falta é a **verificação de realidade das abas** (o usuário questiona se "Portas" é simulação) e a paridade de comportamentos. | **Média** | `PanelTabs.tsx`, `ViewsPanel.tsx`, `App.tsx` |
-| **DEBT-04** | Fatia 4 / 6 | Editor / Visualizador | Todas as superfícies auxiliares (inclusive Provedores e Configurações) abrem no **visualizador novo** (Monaco/Webview moderno). | A aba de Provedores ainda abre no **visualizador legado**. Componentes antigos de visualizador não foram expurgados. | **Alta** | `AuxiliaryBar.tsx`, `EditorArea.tsx`, `components/legacy/` |
+| **DEBT-04** | Fatia 4 / 6 | Editor / Visualizador | Todas as superfícies auxiliares (inclusive Provedores e Configurações) abrem no **visualizador novo** (Monaco/Webview moderno). | ~~A aba de Provedores ainda abre no visualizador legado~~ **REABERTO em 16/10 (dono):** o componente legado **não existe mais** (verificado ao vivo — a superfície renderiza no `EditorArea`); o que falta é o **posicionamento**: abre em divisão 50/50 com o chat, não **maximizada/centralizada**. O botão "Maximizar editor" já entrega o estado esperado — falta só o **padrão de abertura** (opções em §8.3). | **Alta** | `AuxiliaryBar.tsx`, `EditorArea.tsx`, `components/legacy/` |
 | **DEBT-05** | Fatia 6 | Workspace / Dialog | No Windows, clicar em "Open Folder" abre o diálogo nativo Explorer (`IFileOpenDialog`) de seleção de pastas. | Foi criado um seletor customizado/incompleto; no Linux falta fallback que liste direto as pastas de forma integrada. | **Alta** | `WorkspaceSwitcher.tsx`, `server/api/fs` |
 | **DEBT-06** | Fatia 6 | Workspace / Sincronização | Ao selecionar "Usar esta pasta", a atualização é **atômica e imediata**: o Explorer carrega a árvore e o Terminal dá `cd` na hora. | **Não é atômico:** só atualiza após mandar mensagem ("oi") no chat. Se trocar de pasta, fica dessincronizado. | **Crítica** | `App.tsx`, `useWorkspace.ts`, `pty-server` (`/api/pty/cwd`) |
 | **DEBT-07** | Fatia 6 | Workspace / Recentes | Ao abrir o seletor de pasta, exibe a lista histórica de pastas recentes abertas para troca rápida em 1 clique. | Não exibe pastas recentes; não há histórico de workspaces acessível no diálogo para seleção imediata. | **Média** | `WorkspaceSwitcher.tsx`, `workspacePersistence.ts` |
 | **DEBT-08** | Fatia 5 | Layout / Activity Bar | Menu de contexto da Activity Bar permite alternar posição ("Activity Bar Position: Top / Side"). | Posição travada sem opção de mover para a barra superior ou alternar. | **Baixa** | `shell/ActivityBar.tsx`, `layoutState.ts` |
 | **DEBT-09** | Fatia 6 | Provedores (Cline UX) | Página de Provedores acessível a qualquer momento pelo menu da conta, inclusive com chat vazio (Landing / Empty State). | **Só abre se o chat estiver ativo**. Na tela inicial (Empty State), o clique não faz nada. | **Alta** | `App.tsx`, `Titlebar.tsx`, `SessionLanding.tsx` |
-| **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | `ProvidersEditor.tsx`, `providersApi.ts` |
+| **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | Caminho atual (15/10): `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` → destino `2-inteligencia/casas/provedores` — **entra na FATIA 08, SPEC na PARTE 2B** |
+| **DEBT-12** | Fatia 4 (origem) / 11 (execução) | Editor / Abas | **Janela única de abas:** editor de código, Provedores, Browser, Branch Changes e Search na **mesma barra de abas** (conceito VS Code), podendo alternar entre eles como abas de navegador. | **Estado atual:** Provedores/Browser/Changes já são abas do **centro**; o **editor de código** vive em **outra** estrutura (coluna direita, `AttachTab`), com `search`/`diff`/`changes` **duplicados** nos dois modelos. Causa: **exceção autorizada da FATIA 04** (4.7 c4 — `App.tsx:1083-1087`). O editor do centro **não salva**; o da direita **salva**. | **Média hoje / Alta na 11** (é pré-requisito do critério "editar e salvar sem F5") | Avaliação completa em `06 §8.7`; execução = **1.º trabalho da FATIA 11** (D90) |
 | **DEBT-11** | FATIA 13 **(a decidir a forma)** | Title Bar / Pesquisa | O topo mantém a **pesquisa / centro de comando** (acesso rápido: "Ir para Arquivo", "Mostrar e Executar Comandos", "Pesquisar Texto", "Abrir Chat Rápido"). A troca de pasta deve ser **integrada dentro da pesquisa**, não ocupar o lugar dela. | A faixa de caminho + botão "Usar esta pasta" ocupou o lugar da pesquisa: o caminho fica fixo no topo e **a pesquisa não existe mais**. | **Alta** | `Titlebar.tsx`, `WorkspaceSwitcher.tsx`, `shell/` |
 
 ### Itens identificados na análise do vídeo de 2026-10-12 (ainda NÃO fatiados)
@@ -58,7 +59,7 @@
 
 # PARTE 2 — SPEC: FATIA 07 — Destravar (Dívidas Estruturais)
 
-> **STATUS:** **EM EXECUÇÃO desde 2026-10-15** (ordem do dono). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64). Fechamento **só** com os critérios de §3 verdes + evidências registradas (sondas Playwright em `validacao_fatia07/` — pasta externa ao repo — e entradas em `07`).
+> **STATUS:** **HOMOLOGADA pelo dono em 2026-10-15** ("funcionou perfeitamente"; as 3 dívidas entregues com evidências Playwright). Restam como limitações registradas: PTYs órfãos até a FATIA 12, 5 E2E vermelhos pré-existentes (`09 §2.6`) e o sintoma original do DEBT-06 (não reproduzido no estado anterior sob as condições testadas). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64).
 > **DECISÕES DA EXECUÇÃO (15/10):** **DEBT-06 — caminho C** (escolha expressa do dono): o terminal **renasce já na pasta nova** em vez de receber `cd` num shell vivo; a decisão fina "cd real × renascer" fica para a **FATIA 12**, contra o code-server (8080). **DEBT-09 — feito** (`a69137d`): as abas globais do editor deixaram de depender de sessão, então Provedores abre pela Conta na landing. **DEBT-04 — nada a expurgar:** busca no código não encontra resquício do visualizador legado (sem `legacy/`, `ProvidersView` é a única superfície, via `providersSurface`).
 > **Limitação registrada (DEBT-06):** os PTYs das abas antigas ficam **órfãos até o idle de 30 min** ao trocar de pasta (o motor do terminal não se toca nesta fatia — `04 §1` e §4); anotado no código para a FATIA 12.
 > **REGRA DE OURO:** A **FATIA 08 não inicia** enquanto os critérios testáveis abaixo não estiverem verdes e homologados pelo humano.
@@ -94,6 +95,228 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 
 ---
 
+# PARTE 2B — SPEC: FATIA 08 — Conectar (Provedores estilo Cline)
+
+> **STATUS: ✅ HOMOLOGADA PELO DONO EM 2026-10-17** — palavras dele: *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"*. Cobre os **10 critérios da §3** + a validação dele **com serviço real** (Ollama local e LiteLLM pelo genérico, 15/10 — `§8.1`). **Pendências que não bloqueiam:** D85 (número de tokens — decisão dele) e A4 (layout inspirado no LiteLLM — futuro). Registro da D89. A **FATIA 09 (Conversar)** passa a ser a fase ativa.
+>
+> **STATUS ANTERIOR (histórico):** **proposta escrita em 2026-10-15; decisões D81–D84 fechadas com o dono no mesmo dia** (chave em arquivo local + segunda tranca no `.gitignore`; olhinho para revelar; arquivo manda sobre ambiente; 7 nativos + "Compatível com OpenAI"). A **implementação começa ao sinal do dono** (a conversa de arquitetura segue em andamento).
+> **REGRA DE OURO:** a **FATIA 09 (Conversar)** não inicia sem os critérios da §3 verdes e homologados. A **FATIA 07 foi homologada pelo dono em 15/10** — a base está liberada.
+
+## 1. Objetivo em 1 frase
+Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** — escolher provedor, preencher chave/URL, escolher ou buscar modelos, **testar conexão de verdade** e persistir tudo localmente — e, de quebra, **a Casa Provedores nasce** (`2-inteligencia/casas/provedores`, D69/D76), sendo o **1.º módulo extraído** do `App.tsx` (D68/D70).
+
+## 2. Arquivos impactados e endereços (casa-a-casa, D69)
+
+| Peça | Hoje | Destino |
+|---|---|---|
+| Tela (UI) | `src/components/ProvidersView.tsx` (61 l.) | `src/bairros/2-inteligencia/casas/provedores/ui/ProvidersView.tsx` |
+| Servidor (dados) | `src/server/providers.ts` (64 l.) | `…/casas/provedores/server/providersRepo.ts` |
+| Estilos | `src/styles/providers.css` | `…/casas/provedores/providers.css` |
+| Registro da rota | dentro de `src/server/session-persistence/index.ts` | **fica onde está** (é a "prefeitura" do dev server) — passa só a **delegar** ao handler da casa |
+| `App.tsx` (síndico) | `providersSurface={<ProvidersView/>}` + import de `./components/ProvidersView` | importa **só a porta única** `./bairros/2-inteligencia/casas/provedores` (diff ~2 linhas) |
+
+**Nascem dentro da casa:** `contract.ts` (tipos da porta) · `index.ts` (**porta única** do cliente) · `descritores/` (**um arquivo de DADO por provedor** — openai, nvidia, anthropic, gemini, ollama, openrouter, deepseek, openai-compat + `registro.ts`; princípio "descritor primeiro" do OpenClaude) · `ui/` (formulário + campos comuns: chave, URL base, modelo) · `client/api.ts` (chamadas ao servidor) · `server/probe.ts` (adaptadores de protocolo: `openai-chat`, `anthropic`, `gemini`, `ollama`) · `README.md` (**cartão de visita da casa** — D76/D78) · `__tests__/`.
+**Fronteira (LEGO):** fora da casa, só `index.ts` (cliente) e `server/` (dev server) são importáveis — **teste de fronteira novo**, no padrão do `explorer-search/__tests__/frontier.test.ts`.
+
+## 3. Critérios de Pronto Testáveis
+1. **Escolher e configurar** — lista dos **7 nativos + o genérico "Compatível com OpenAI"** (com busca); escolher um monta o formulário dele: chave, URL base (padrão já preenchido nos nativos; **em branco e obrigatória no genérico**), modelo (**lista do descritor ou digitado à mão** — padrão `ModelPickerWithManualEntry` do Cline; no genérico o manual é o caminho principal).
+2. **Testar conexão (de verdade)** — botão por provedor; a chamada sai **do servidor** (o navegador não fala com o provedor — CORS/chave segura; a chave **não** viaja em URL). Sucesso = mensagem verde com nº de modelos vistos + tempo. Falha = categoria **honesta**: chave inválida (401/403), endereço inalcançável, timeout (10 s), HTTP N.
+3. **Buscar modelos** — botão consulta a lista do provedor e preenche o seletor; **quando o serviço não suportar a busca (ou a chave não permitir), o app diz isso com honestidade** e o campo digitado à mão segue liberado — sempre.
+4. **Persistir de verdade** — salvar → **F5** → tudo volta (provedores, modelos, avançados, provedor ativo, chaves **mascaradas**). Arquivo `~/.agente_window/providers.json` (**fora do repo**, 0600, backup `.bak` na migração) + **regra no `.gitignore` como segunda tranca**, com teste automatizado (D81). **Ver a chave (D83):** máscara por padrão; o **olhinho** revela sob clique — o servidor entrega só naquele pedido (`no-store`), nunca em log, nunca em URL. **Origem da chave (D84):** variável de ambiente só é usada **quando não há chave salva**, e a tela mostra a origem.
+5. **Múltiplos provedores ao mesmo tempo** (aceite literal do roadmap) — 2+ configurados simultaneamente, cada um com sua chave/modelo; trocar de provedor na tela não perde nada.
+6. **Provedor ativo** — escolha explícita de qual provedor o chat vai usar (1.º consumidor: FATIA 09); persistida.
+7. **Avançados mínimos** — contexto, máx. de tokens e temperatura por provedor (persistidos; consumidos na 09), com padrões vindos do descritor.
+8. **Casa de pé** — teste de fronteira verde; `App.tsx` só fala com a porta única; cartão de visita dentro da pasta; **zero regressão** nos specs existentes (A/B quando alguma falha).
+9. **Sem regressão de fundo** — typecheck 0 · unit ≥ baseline **730✓/12✗/16** (as mesmas 12 pré-existentes) · E2E existente sem regressão nova · `sonda_01_debt09.cjs` (Conta→Provedores na landing) continua passando.
+10. **"Conexão com sucesso" comprovada** — contra **provedor local simulado** (stub OpenAI-compatible, em pasta de validação externa) no teste automatizado, inclusive através do **genérico**; erro real (401 sem chave) também comprovado; e **roteiro do dono** com chave real (§6-d) — a **NVIDIA NIM** é a porta mais fácil (chave gratuita em `build.nvidia.com`, formato OpenAI).
+
+## 4. Decisões — fechadas com o dono em 2026-10-15 (D81–D84)
+
+**D81 — a chave mora em arquivo local protegido.** Arquivo `~/.agente_window/providers.json`, **fora da pasta do projeto** (o Git nem o enxerga), permissão 0600, backup `.bak-<data>` na primeira migração do formato antigo. **Segunda tranca pedida pelo dono:** regra no `.gitignore` do repositório + teste automatizado que confere (a) arquivo fora do repo, (b) regra presente, (c) nenhum segredo em arquivo versionado.
+
+**D82 — escopo dos provedores: 7 nativos + 1 genérico "Compatível com OpenAI".** Nativos, um arquivo de descritor cada: **OpenAI · NVIDIA · Anthropic · Google Gemini · Ollama · OpenRouter · DeepSeek**. O **genérico** é a porta universal: o dono informa **base URL + chave + modelo** e usa qualquer serviço que fale o formato OpenAI (Groq, Mistral, LM Studio, xAI…). Teste de conexão e busca de modelos rodam **contra a URL informada**; quando o serviço não suportar busca, o app diz isso com honestidade e o campo manual continua liberado. Neste recorte, **1 slot genérico** (permitir vários = evolução pequena, se o dono quiser).
+
+**D83 — chave visível sob clique ("olhinho").** Padrão é a máscara (`••••••a1b2`); o botão revela a chave completa **só quando clicado** — endpoint próprio (`POST /api/providers/reveal`) com resposta `Cache-Control: no-store`; a chave **nunca** vem no carregamento da página, **nunca** entra em log e **nunca** entra em URL. Praticidade (pedido do dono) com o mínimo de exposição.
+
+**D84 — precedência da chave: arquivo > ambiente.** Chave **salva no app manda**; variável de ambiente (`OPENAI_API_KEY`, `NVIDIA_API_KEY`…) é usada **apenas quando não há chave salva** — e a tela mostra a **origem** ("salva no app" / "ambiente do sistema"). Sem variável nenhuma, nada muda: vale sempre o arquivo.
+
+**D82a — o genérico é UM espaço só (opção A, escolha do dono em 15/10):** existe um único slot "Compatível com OpenAI"; o dono troca o serviço (Groov/LM Studio/xAI…) quando quiser. Múltiplos slots = evolução pequena, se um dia precisar.
+
+**Decididas pela IA (registradas para não virar susto):** descritor é **dado, não tela**; busca de modelos por provedor (OpenAI/NVIDIA/OpenRouter/DeepSeek `GET /v1/models` · Anthropic `GET /v1/models` · Gemini `GET /v1beta/models` · Ollama `GET /api/tags`) com modelo manual sempre liberado; endpoints no servidor (`POST /api/providers/test`, `/models`, `/reveal`) com timeout de 10 s; sem *headers* customizados neste recorte; teste E2E contra **servidor de fixture** (`AGENTE_WINDOW_PROVIDERS_PATH`) — **nunca** o arquivo real do dono; o payload traz `storage: 'fixture'|'repo-home'` para a spec se auto-verificar.
+
+## 5. O que NÃO fazer na FATIA 08
+- **Nada de chamar modelo/chat/streaming** (FATIA 09), nada de Plan/Act, contexto de agente ou ferramentas (FATIA 10).
+- **Não tocar em área congelada:** terminal, `explorer-search/{core,server}`, `EditorArea`, PTY, Monaco (`04 §1`).
+- Não implementar catálogo genérico nem "listagem vinda do servidor" (o registro já comporta; a tela não entra).
+- Não guardar chave em Git/repo/logs/URL/tela; não criar `.env`.
+- Não renomear nem mover nada fora do que a tabela da §2 diz.
+
+## 6. Plano de prova (como a fatia é validada)
+- **(a) Unit novos na casa:** fronteira (LEGO) · registro (descritores válidos, ids únicos, protocolos com adaptador; inclui o genérico) · repositório (migração do formato antigo **com backup**, permissão 0600, máscara, **revelar chave** com `no-store` e id desconhecido → 404, **precedência arquivo > ambiente**, nada de chave no Git) · probe (com `fetch` mockado: ok / 401 / rede / timeout; genérico apontando para o stub).
+- **(b) Playwright `provedores_fatia08.spec.ts`** contra servidor de fixture + **stub local** de provedor: configurar 2 provedores, testar conexão (sucesso e falha honesta), buscar modelos, F5 e tudo persistido, máscara visível, provedor ativo, zero erros de console.
+- **(c) Evidências:** prints das telas + saída dos testes em pasta de validação **externa** ao repo.
+- **(d) Roteiro do dono** (em `docs/08`): com chave real, o passo a passo "configurar → testar → reabrir" em 5 minutos.
+- **(e) Testes existentes que mockam o formato antigo** (`App.test.tsx`, `fatia07_destravar.test.tsx`) são **atualizados** para o formato novo — atualização prevista, não é mudança de escopo.
+
+## 7. Riscos e limites (registro honesto)
+- **URL base livre** (inclusive `localhost`) é o objetivo (Ollama/estúdio local) e não um furo de segurança num app de uma pessoa só; fica anotado como limite consciente.
+- **Sem chave real no sandbox**, o caminho de sucesso automatizado é provado contra o stub; a prova com provedor real fica no roteiro do dono.
+- **Migração do arquivo antigo** é o único ponto que mexe em dado já existente do dono: faz backup `.bak-<data>` antes de reescrever.
+- A tela **não** valida faturamento/limites de conta — só conexão/autenticação de chave.
+- **Revelar a chave (D83)** manda o segredo do servidor para a aba **sob clique do dono**: aceitável para uso local; fica registrado que, com o app exposto na rede, quem alcança a tela pode revelar a chave (mitigado: só sob clique, `no-store`, sem log, sem URL).
+
+## 8.3 DEBT-04 reaberto — diagnóstico fechado ao vivo (2026-10-16) e opções
+**Como o dono descreveu (canônico):** Provedores, Browser e Branch Changes "ainda abrem no visualizador legado (AuxiliaryBar antiga / coluna estreita)" e deveriam abrir no "editor moderno centralizado".
+**O que a verificação ao vivo mostrou (app rodando, 1600×950):**
+| Passo | Medição |
+|---|---|
+| Conta ▸ Provedores | `section.editor-pane` (EditorArea = editor moderno) em `side-pane-editor-only` · **chat 471 px | editor 471 px** (divisão 50/50) |
+| Clique em **"Maximizar editor"** (existe e está visível na barra do editor) | chat **some** · editor **942 px** no centro (`editor-maximized`) — é exatamente o layout pedido: `[lista 300][EDITOR flex][Side Bar 274][Activity Bar 48]` |
+| Clique em "Restaurar editor" | volta ao 50/50 |
+| Componente legado no código | **nenhum** (só sobras de *nome* em migração de banco; `legacy/` removida na tag `legacy-backup-2026-09`) |
+**Conclusão:** o débito **não é de componente** (essa parte está atendida) e **sim de padrão de abertura**: hoje a superfície abre no estado dividido; deveria abrir **maximizada**. O A2 ("a tela sobe") é o **mesmo mecanismo** — com o editor maximizado o chat fica oculto e o salto deixa de existir nesse fluxo.
+**CAUSA do "a tela sobe" — medida ao vivo em 16/10 (não é código legado):**
+| Estado | Cadeia do elemento (medida real) |
+|---|---|
+| Chat sozinho | `section.session-landing` (altura 315) dentro de `div.desktop-surface-group.side-pane-closed` — **`align:center justify:center`** → centralizado (y=333) |
+| Com Provedores aberto | `section.session-landing` (altura 353) dentro de **`div.` sem classe = o painel redimensionável** (`display:block`) dentro de `div.desktop-surface-group.side-pane-editor-only` — **`align:normal`** → **sem centralização → y=36 (topo)** |
+
+**Leitura:** a tela de sessão nova tem só a altura do próprio conteúdo; quem a centraliza é o **pai**. Quando o Provedores abre, o chat passa para dentro de um painel redimensionável **sem** centralização → ela cola no topo. **Não há componente legado envolvido** (verificado: sem `components/legacy/`, sem `legacy/`; a superfície de Provedores renderiza no `EditorArea`). Prints: `validacao_fatia08/landing_1_centralizada.png` e `landing_2_depois.png`.
+
+**Vocabulário oficial dos dois modos (pedido do dono, 16/10):** **"modo anexo"** = editor dividido ao lado do chat · **"modo maximizado"** = editor toma o centro, chat oculto (`[lista 300][EDITOR flex][Side Bar 274][Activity Bar 48]`).
+
+**Opções (decisão do dono pendente):**
+| Opção | O que é | Custo/risco |
+|---|---|---|
+| ~~**A1 — fix da CENTRALIZAÇÃO**~~ ✅ **FEITO (17/10)** | `styles/app.css`: `.session-landing` passou de `min-height: 0` para **`min-height: 100%`** — a landing ocupa a coluna inteira em qualquer pai (bloco ou flex) e o próprio `align-items:center` a centraliza. **Medido:** desvio do centro **29 px** com Provedores aberto (antes: conteúdo colado no topo, ~305 px de desvio). Trava: `e2e/fatia08_modo_abertura.spec.ts` **T1** | Pequeno. Bateria completa rodada: tsc 0 · unit **767✓/12✗/16 skip** (as 12 pré-existentes, provadas em A/B) · E2E 08 **6/6** · contrato novo **4/4** |
+| ~~**A2 — abrir em modo maximizado por padrão**~~ → **substituído pela D88** ✅ **FEITO (17/10)** | Implementada a regra do dono: com o editor **aberto** a superfície abre no modo em que ele está; com o editor **fechado**, no **último modo** deixado; **padrão de fábrica = anexo**. Travas: **T2/T3/T4** do contrato novo. Detalhe em §8.6 | Baixo — só a memória faltava (o resto já funcionava) |
+| **B — regra geral na FATIA 11** | Definir o roteamento de todas as superfícies auxiliares (Provedores, Browser, Branch/Changes, Configurações) na Casa Editor, com testes | Maior, porém faz junto do trabalho de abas/editor que já está previsto |
+| **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
+**Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
+
+## 8.7 AVALIAÇÃO DE ARQUITETURA — "janela única de abas" (pedido do dono, 2026-10-17)
+**Pedido (palavras do dono):** *"Quero que os provedores e o navegador sejam abertos dentro do Monaco, seguindo o mesmo conceito de integração utilizado pelo VS Code… Atualmente, estamos separando o Monaco em duas partes: uma destinada à edição de código e outra utilizada como uma área independente… centralizar o editor de código, os provedores e o navegador em uma única janela… poder alternar entre eles por meio de abas, da mesma forma que faço em um navegador de internet."*
+
+**Diagnóstico (leitura do código, 17/10) — o dono está certo, com uma correção de endereço:**
+| | **Centro** (`components/EditorArea.tsx`) | **Coluna direita** (`AuxiliaryBar` → `modules/explorer-search/ui/attach/`) |
+|---|---|---|
+| Modelo de aba | `EditorTab` (`types.ts:7`): `file · browser · search · diff · customizations · providers` | `AttachTab` (`contract.ts:123`): `kind: code · search · changes · diff` + `dirty` + `preview/pinned` |
+| Monaco | **sim** para `file` (`EditorArea.tsx:651`) | **sim** (`CodeEditorPane.tsx`, 277 linhas) |
+| Salvar / "sujo" | **não** (0 ocorrências de save/dirty) | **sim** (salvamento atômico, `AttachArea.tsx` + `CodeEditorPane.tsx`) |
+| Extras | Image Preview, ERROR EDITOR, barra de abas, menu, dividir, maximizar | breadcrumbs, outline, changes, diff |
+| O que abre ali | **Provedores, Browser, Branch Changes, Search, Personalizações** | **arquivo/código** (o que o Explorer abre) |
+**Correção de endereço:** Provedores e Browser **já são abas** do editor central — quem está fora dele é o **editor de código**. Ou seja: o "Monaco em duas partes" é exatamente *código à direita* × *todo o resto no centro*.
+**Causa histórica (não é limite do Monaco):** foi uma **exceção autorizada da FATIA 04** (4.7 c4), comentada no próprio código (`App.tsx:1083-1087`): *"Arquivo REAL clicado na árvore abre no EDITOR ANEXO do módulo (`attach.open`, 04_05 §10), **não mais no editor central**"*. Antes disso o clique ia para o centro.
+**Duplicação que explica a analogia "aba do Windows Explorer no Chrome":** `search`, `diff` e `changes` existem **nos dois modelos** — são duas estruturas de aba concorrentes.
+
+**O que precisa ser ajustado (escopo técnico da unificação):**
+1. **Modelo único de abas** — fundir `AttachTab` em `EditorTab` (uma superfície por tipo, com dono: sessão ou global) e resolver a duplicação `search`/`diff`/`changes`.
+2. **Um host de editor** — a aba `file` do centro passa a renderizar o **editor capaz** (`CodeEditorPane`: salvar, dirty, preview/pinned, breadcrumbs, outline) no lugar do Monaco simples de `EditorArea.tsx:651`.
+3. **Roteamento** — Explorer, resultado de busca e SCM deixam de chamar `attach.open` e passam a abrir aba no modelo único.
+4. **Aposentar a coluna** — `AuxiliaryBar`/`AttachArea`/`attach.css`, o `pendingAttachOpen` e a "Regra 10 (nunca desmonta)" saem; a máquina de estados do painel simplifica de **4 estados → 2** ("tem abas / não tem").
+5. **Testes** — **31 testes de unidade** no módulo + **11 specs E2E** tocam o anexo (`sessao_14_editor_anexo`, `sessao_14b/14c/14d`, `sessao_15_activity_bar/editor_maximize/outline_timeline`…). Vários ficam **obsoletos** (testam a coluna que deixa de existir) e precisam ser repontados ou postos em quarentena com registro.
+
+**Ganho colateral (resolve dívida já aberta):** o caso *"arquivo aberto + Provedores ao mesmo tempo"* (adiado para a FATIA 11 em `§8.4`) **deixa de existir por construção** — viram abas irmãs na mesma barra.
+
+**Riscos honestos:** é a área mais testada do app (5.7, 5.8, D2.50, R-040, R-083); mexe em layout + máquina de estados, então screenshot/E2E sentem; e o E2E completo segue inútil no sandbox (88✘ ambientais), logo a régua tem de ser **por spec**.
+
+**Opções:**
+| Opção | O que é | Custo/risco |
+|---|---|---|
+| **A — fatia própria agora** ("11-A: Editor Único") | Faz a unificação já, antes de 09/10 | Alto e interrompe a sequência do MVP (09 Conversar → 10 Agir) |
+| **B — abrir a FATIA 11 por aqui** ⭐ | A 11 já prevê **"Casa Editor (abas do EditorArea + gestão de abas)"** e o critério "editar/salvar sem F5" — a unificação é **pré-requisito** dele | Faz 09 e 10 (fecha o MVP) e começa a 11 por este trabalho |
+| **C — passo mínimo (rotear o clique para o centro)** | 1 commit: o Explorer abre arquivo como aba central | **Regressão**: o centro não salva (o anexo salva hoje) — só vale se o salvar entrar junto |
+| **C+ — passo mínimo com o editor capaz** | Roteia para o centro **renderizando o `CodeEditorPane`** dentro da aba, mantendo o anexo como fallback | Entrega "tudo em abas" já, ao custo de **dois modelos convivendo** (dívida temporária declarada) |
+| **D — só registrar** | Nada agora | Zero |
+
+**Recomendação:** **B**. Se o dono quiser **ver o efeito já**, **C+** é o único passo mínimo honesto (C puro seria regressão). Decisão pendente.
+
+## 8.6 A1 + D88 — IMPLEMENTADOS e provados (2026-10-17)
+**O que mudou (2 conquistas, ambas com trava):**
+| # | Mudança | Arquivo | Prova |
+|---|---|---|---|
+| **A1** | `.session-landing { min-height: 0 → 100% }` | `src/styles/app.css` | `e2e/fatia08_modo_abertura.spec.ts` **T1**: com Provedores aberto, a landing ocupa **>90 %** da coluna e o conteúdo fica a **<80 px** do centro (medido: **29 px**; antes o conteúdo colava no topo) |
+| **D88** | `centerEditorMaximized` em `ShellVisibility` (persistido em `workbench.sessions.layout.v1`) + `useState` do App lê/grava | `src/domain/layoutPersistence.ts`, `src/App.tsx` | **T2** (aberto em maximizado → Provedores abre maximizado, chat fora de cena) · **T3** (reload preserva; com o editor fechado abre maximizado) · **T4** (quem nunca maximizou abre em anexo) |
+**Por que a D88 foi barata:** o "editor aberto em maximizado → abre maximizado" **já funcionava** (o toggle não é resetado). Faltava só a **memória**. Não toquei no `layout.state.editorMaximized` (o homônimo que maximiza a **coluna anexa**, 5.7/RF-07) — ficou documentado para ninguém confundir.
+**Migração:** layout antigo (sem a coluna nova) carrega com `centerEditorMaximized: false` = anexo — silencioso, sem quebrar. Teste dedicado cobre isso.
+**Números (17/10):** typecheck **0** · unit **767✓ / 12✗ (pré-existentes, A/B idêntico) / 16 skip** · E2E FATIA 08 **6/6** · contrato novo **4/4** · evidências em `validacao_fatia08/a1_*.png` (externo ao repo).
+
+## 8.4 Classificação das dívidas e medição de Browser/Branch Changes (2026-10-16, conversa — sem código)
+**Pergunta do dono: "isso é dívida da fatia 7 ou não?" — resposta em camadas:**
+| Item | Origem | Verificação | Situação hoje |
+|---|---|---|---|
+| **DEBT-04 (Provedores)** | nasceu nas **fatias 4/6** (linha canônica do `06`: "Fatia 4 / 6") | era item do escopo da **FATIA 07** ("Destravar" = DEBT-06+04+09); a conferência de 15/10 declarou "nada a expurgar" e **errou a régua** (procurou componente, não posicionamento) | **reaberto 16/10** (D87); falta só o **padrão de abertura** |
+| **Browser** | **não é dívida** — é **funcionalidade da FATIA 11 (Conferir)** | expectativa antiga (specs de 17/09) em **quarentena** (D80) — expectativa morta | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; conteúdo real é da FATIA 11 |
+| **Branch Changes** | idem acima — **FATIA 11 (SCM/Diff real)** | idem | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; diff real é da FATIA 11 |
+
+**Medição ao vivo (app rodando, 1600×950, sessão ativa):** clicar em *"Abrir alterações no editor"* (Titlebar) e *"Abrir navegador no editor"* → em ambos os casos o painel cai em `section.editor-pane` (**EditorArea = editor moderno**), em `side-pane-editor-only`, com **chat 471 px | editor 471 px** (modo anexo) e a **aba** correspondente na barra do editor ("Branch Changes" / "Browser"). O próprio estado vazio do editor declara: *"Browser, Search e Branch Changes abrem aqui — não na barra auxiliar."* Prints: `validacao_fatia08/aba_branch_changes.png`, `aba_browser.png`.
+**Conclusão:** para as **três** superfícies (Provedores, Browser, Branch Changes) o que resta é a **mesma decisão de POSICIONAMENTO** (modo anexo × modo maximizado) — nenhuma tem componente legado, nenhuma "nasceu" na FATIA 11.
+
+**A2 — DECIDIDO em 17/10 (dono): abertura segue o estado do editor (D88).**
+| Situação ao abrir a superfície | Regra decidida |
+|---|---|
+| Editor **aberto em modo anexo** | abre em **modo anexo** |
+| Editor **aberto em modo maximizado** | abre em **modo maximizado** |
+| Editor **fechado** | abre no **último modo** que o usuário deixou o editor (memória entre reloads) |
+| Nunca usou (primeira vez) | **modo anexo** (padrão de fábrica) |
+| **Arquivo aberto + Provedores ao mesmo tempo** | **FATIA 11** — decidir junto do trabalho de abas (escolha do dono) |
+
+**ACHADO TÉCNICO decisivo (17/10, leitura do código):** existem **DOIS "maximizados" diferentes** no app, e só um é o que o dono quer:
+| Estado | Onde | Persistido? | O que faz |
+|---|---|---|---|
+| `layout.state.editorMaximized` (`shell/layoutState.ts:33`) | usado em `App.tsx:2075` (classe no `.top-right-section`) | **SIM** (localStorage, "F5 mantém") | maximiza a **coluna anexa (AuxiliaryBar)** — recurso antigo 5.7/RF-07, ligado por eventos `editor.attachMaximized/Restored` |
+| `editorMaximized` local (`App.tsx:550`, `useState(false)`) | usado em `App.tsx:2136` (ramo que renderiza só o editor) e no botão **"Maximizar editor"** (`App.tsx:1977`) | **NÃO** | é o modo que o dono chama de **maximizado**: chat some, editor toma o centro (o que foi medido: 471 → **942 px**) |
+**Consequências:** (a) **o "último modo" NÃO é lembrado hoje** — o estado que importa nasce `false` a cada carga, então quem maximizou ontem abre em anexo hoje; (b) **nome igual para coisas diferentes** — implementar a D88 sem separar os dois pode maximizar a coluna errada; (c) a parte "editor já aberto em maximizado → Provedores abre maximizado" **já funciona hoje** (o toggle não é resetado ao abrir superfície), falta a memória e o A1.
+
+**A2 como o dono formulou em 16/10 (histórico, agora decidido):** *"Abertura baseada no estado do editor — Provedores (e futuros painéis) devem abrir no modo atual do editor de código (anexo ou maximizado). O pulo do chat não deve acontecer caso esteja abrindo no modo anexo."*
+- Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado) — **continua separado da D88**;
+- Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 11).
+
+## 8.5 Autoavaliação de maturidade — "3 níveis" (2026-10-17, a pedido do dono)
+O dono enviou um vídeo de terceiro (anúncio de curso, 60 s) que descreve **3 níveis de desenvolvimento com IA**: **(1) vibe coding** (prompt → aceita tudo → torce) · **(2) configurações** (skills, rules, MCP servers) · **(3) workflow assistido** (spec antes do código, testes automatizados no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, **métricas**: carga, complexidade ciclomática, estrutura de dependências, cobertura). Análise completa em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
+
+**Onde estamos — medido em 17/10, não estimado:**
+| Pilar do nível 3 | Temos? | Evidência |
+|---|---|---|
+| Spec antes do código | ✅ | SPEC por fatia, critérios de aceite, plano de prova, dívidas rastreadas |
+| Decisões registradas | ✅ | D1–D87 (`05`), histórico (`07`), vocabulário canônico |
+| Testes no loop | 🟡 manual | tsc + Vitest + Playwright antes de cada commit — por **disciplina**, não por automação |
+| Teste como trava confiável | 🟡 **furo provado** | **DEBT-04 escapou** (`09 §13.3`): o teste media "abre", não "onde/como abre" |
+| CI / gate bloqueante | ❌ | **sem `.github/workflows`**, sem husky/lint-staged; D62 = sem push |
+| Cobertura medida | ❌ | meta **90/90/85/90** em `vitest.config.ts`, mas **nunca medida**; em 17/10 a suíte completa **não gerou relatório** (vermelha); só subconjunto verde gerou |
+| Complexidade ciclomática · estrutura de dependências · carga · contexto por grafos | ❌ | nada instalado (candidatos dependency-cruiser/eslint-plugin-boundaries só anotados) |
+
+**Placar medido em 17/10:** unit **765✓/12✗/16 skip** e, numa 2.ª execução, **763✓/14✗/16 skip** (flaky 12→14); 21 E2E em quarentena; E2E completo inútil no sandbox (88✘ ambientais).
+
+**Veredito: nível 2 sólido com um pé no nível 3 ("2,5")** — o *cérebro* é de nível 3 (spec, decisões, evidências, homologação); o *robô* é de nível 2 (nada é automaticamente bloqueante; a métrica principal nunca foi medida).
+
+**Falta para fechar o 3 (proposta, sem código):** (1) `npm run ci` único = typecheck+lint+testes+cobertura, que **falha**; (2) hook de pre-commit chamando o `ci`; (3) **zerar o vermelho** (12–14✗ + 16 skip + 21 quarentena → 0); (4) cobertura visível no `ci`; (5) estrutura de dependências (dependency-cruiser ou eslint-plugin-boundaries); (6) complexidade ciclomática (regra `complexity` do ESLint); (7) E2E confiável (separar ambiente de lógica); (8) code review — hoje é revisão por IA antes do commit; GitHub Actions só quando houver push (D62 mantém sem push). **Nada disso está nas fatias 08–10** — decisão de dono: virar fatia própria ou entrar na 13/16.
+
+## 8. Estado da implementação da FATIA 08 (2026-10-15) — **HOMOLOGADA em 17/10 (D89)**; o registro abaixo é o retrato da época da implementação
+- **Código:** `bairros/2-inteligencia/casas/provedores` — `contract.ts` · `descritores/{nativos,registro}.ts` · `server/{providersRepo,probe,rotas}.ts` · `ui/{ProvidersView.tsx,client/api.ts}` · `providers.css` · `README.md`. **Legado removido:** `src/server/providers.ts` (+ teste), `src/components/ProvidersView.tsx`, `src/styles/providers.css`. `App.tsx` importa **só o barrel**; o plugin do dev server delega as rotas (`rotaPertenceAoModulo`, D71).
+- **Commits (sem push):** `f87981c` · `2b371c2` · `fde5f0f`.
+- **§6 (plano de prova) atendido:** (a) unit da casa **37/37** + suíte completa **765✓/12✗/16 skip** com typecheck 0; (b) Playwright `e2e/provedores_fatia08.spec.ts` **6/6** contra stub local; (c) evidências (prints + saída) em `validacao_fatia08/` — **fora do repo**; (e) mocks de `App.test.tsx` e `fatia07_destravar.test.tsx` atualizados para o formato **v2**.
+- **§6(d) pendente:** roteiro do dono com **chave real** — escrito em `08` **PARTE C**.
+- **Defeitos reais corrigidos durante a prova:** Salvar enviava a lista antiga; `nome` do genérico se perdia no 2.º salvamento (ambos em `fde5f0f`, com teste).
+- **Critérios de pronto (§4) — status:** todos verdes na prova automatizada; a **homologação** exige o roteiro do dono (chave real) e o aceite dele.
+
+## 8.1 Validação do dono com serviço REAL (2026-10-15/16) — evidência do vídeo dele
+O dono gravou um vídeo (2min33s, 15/10 21h21) testando no computador dele e o analisamos em duas IAs independentes (transcrição + frames + segunda IA com visão de vídeo). **Resultado:**
+- **Ollama local** (`http://localhost:11434`) → faixa verde **"Conexão aprovada. O serviço respondeu em 209 ms e mostrou 5 modelos."**
+- **Genérico "Compatível com OpenAI" → pool LiteLLM** (`http://0.0.0.0:4000`, apelido `meu-pool`) → **"…respondeu em 158 ms e mostrou 4 modelos."**
+- Chave **sempre mascarada** ("cole a chave aqui" / pontinhos) em todo o vídeo; aviso do arquivo local visível; **nenhum erro, nenhuma tela cinza**.
+- Veredito do dono: "o código também foi muito bom. Porém tem essas pequenas coisas que precisa de ajuste" → **homologação não declarada ainda**.
+
+### 8.2 Pendências abertas (D85/D86) — nada de código sem a ordem do dono
+| # | Pendência | Destino provável |
+|---|---|---|
+| P1 | **A1/DEBT-04 — "visualizador antigo × novo"**: diagnóstico FECHADO em 16/10 (§8.3; classificação e medição de Browser/Branch em §8.4). Sem componente legado; falta o padrão de abertura maximizado. | Decisão do dono (opções em §8.3) |
+| P2 | **A2 — "a tela sobe": causa CONFIRMADA no código (16/10).** O dono marcou na imagem que o que sobe é **a tela central do chat** (a landing "Nova sessão em workspace-local") — resposta **B**. Mecanismo: a centralização da landing depende do estado do painel lateral — `isChatCentered(inputs) = (resolveSidePaneState(inputs) === 'closed')` (`domain/sidePane.ts`). Sem aba aberta, os inputs são `{hasEditorTabs:false,…}` → estado **`'closed'`** → entra a classe `chat-centered` (`.desktop-surface-group.chat-centered{align-items:center}` + faixa de 950 px) e a landing fica centralizada. Ao abrir **Provedores** (aba **global**, sem dono de sessão — justamente o caso do DEBT-09), `hasEditorTabs` vira `true` → estado **`'editor-only'`** → a classe **sai** e o conteúdo ancora no topo. Regra herdada do desenho original ("Chat centers itself in the 950px band only when it is the sole surface"); a **landing** é que herda a regra e dá o salto. | Junto do P1 ou **FATIA 13** — corrigível de três formas (A pequena: manter a landing centralizada com aba global aberta · B de rumo: sai de graça se Provedores passar a abrir na superfície nova · C: deixar como está) |
+| P3 | **D85 — valor de contexto/máximo de saída**: dono ainda vai decidir o número que usa; nada de teto artificial no app. | Aguardando decisão |
+| P4 | **A4 — "copiar o layout do LiteLLM"** (ele citou LiteLLM na fala; a tela do fim do vídeo era um estudo Open WebUI "Models", Demo Mode). Ordem: **"vamos apenas conversar por enquanto"**. | Futuro, sem fatia definida |
+
+---
+
 # PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 16 — renumeração D64 de 2026-10-13)
 
 Todas as fatias estruturadas sob o padrão **especificação prévia, escopo vertical e critérios rígidos de aceitação**. **Cada fatia agora tem duas tarefas: a FUNÇÃO (o que entrega) e a CASA (o que muda de endereço no `App.tsx`)** — a fila e a arquitetura andam juntas (D68/D69; condomínio no `04 §2.2`).
@@ -106,14 +329,20 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 08 — Conectar (Provedores estilo Cline) — era a 09
 - **Objetivo:** Gestão rica de múltiplos provedores de IA, inspirada no Cline.
-- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.**
+- **Escopo:** formulários dedicados (OpenAI, Anthropic, Gemini, Ollama local, OpenRouter, DeepSeek…), seleção dinâmica de modelos, teste de conexão, persistência local segura (`~/.agente_window/providers.json`) sem expor credenciais. **Absorve a DEBT-10.** **SPEC detalhada: PARTE 2B** (escrita em 15/10; D81–D84 fechadas com o dono). **IMPLEMENTADA em 15/10** (`f87981c`/`2b371c2`/`fde5f0f`; estado e prova na PARTE 2B §8) — falta a **validação do dono com chave real** (`08` PARTE C). **Casa:** `2-inteligencia/casas/provedores` nasceu aqui (1.º módulo extraído, D68/D69).
 - **Critério de aceite:** configurar múltiplos provedores, testar conexão com sucesso e persistir entre reloads.
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/GUI_PROVEDORES_CLONE.md` + `PROVIDERS_EXEMPLO.json`; **e a nota nova:** `arquivo_morto/referencias/cline/01_tela_de_provedores.md` (campo a campo, com os caminhos do repo do Cline) + `referencias/openclaude/04_provedores_descriptor_first.md` (o esqueleto de dados por trás da tela).
 
 ### FATIA 09 — Conversar (Chat real + Streaming) — era a 10
+> **STATUS: NÃO INICIADA.** Ordem expressa do dono em 17/10: *"Não comece a fatia 9 ainda. Só preciso que você atualize os documentos… Tudo pronto e documentado antes de começar a fatia 9."*
+> **Regra do projeto (40 %):** antes da primeira linha de código, esta fatia ganha **SPEC própria** (critérios testáveis + "o que NÃO fazer" + plano de prova), como aconteceu na 08 (PARTE 2B). Só depois do "vai" do dono.
 - **Objetivo:** Ligar o chat aos provedores configurados, com streaming real.
 - **Escopo:** rota de servidor que fala com o provedor + resposta em streaming + Markdown completo com blocos de código + histórico por sessão. **Substitui o mock atual de `App.tsx::handleSend`.**
 - **Critério de aceite:** enviar prompt e receber resposta fluida, em streaming, do provedor escolhido.
+- **O que a FATIA 08 já deixou pronto (reusar, não refazer):** provedor **ativo** persistido · chaves em arquivo local (`~/.agente_window/providers.json`, 0600) com "arquivo manda sobre ambiente" (D84) · **descritores** por provedor com `baseUrl`/modelo padrão · **sonda de conexão** por protocolo (`openai-chat`, `anthropic`, `gemini`, `ollama`) com timeout de 10 s · catálogo de modelos · ajustes avançados (contexto/máx. tokens/temperatura). A 09 **consome** isso — não recria.
+- **O que precisa nascer na 09 (provável):** rota de **conversa** no servidor (a chave **não** sai do servidor; o navegador nunca fala com o provedor), **streaming** até a tela (SSE ou equivalente), renderização de **Markdown com blocos de código**, **histórico por sessão** (hoje o chat é mock e não persiste por sessão de verdade), tratamento **honesto** de erro (sem chave, 401, timeout, serviço fora).
+- **Plano de prova (proposto):** durante a construção, **provedor simulado local** (o mesmo padrão da 08: stub OpenAI-compatible em porta local, com respostas em pedaços) — cobre streaming, erro e "sem chave" sem depender de terceiros. **Validação final com serviço real: no computador do dono** (Ollama local, que ele já usou na 08, é o caminho mais barato — não exige chave). **Regra de segurança registrada (D91):** **nunca** pedir/colar chave de API no chat; a chave mora no arquivo local do app e a validação com chave real é feita pelo dono, na máquina dele.
+- **Decisões a fechar com o dono antes de abrir a 09:** (1) qual provedor será o "padrão de prova" (recomendo **Ollama local**); (2) se o histórico por sessão entra já nesta fatia ou fica como refinamento; (3) se o Markdown entra completo (tabelas, listas, código com cópia) ou mínimo na primeira volta.
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-08-streaming/`, `fatia-07-input/`; **nota nova:** `referencias/openclaude/01_loop_do_agente_e_ferramentas.md` (limites, guardas anti-loop).
 
 ### FATIA 10 — Agir (Tools + Permissões) — era a 11 — **FECHA O MVP**
@@ -124,6 +353,8 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md`, `fatia-09-tools/`; **nota nova:** `referencias/openclaude/03_sessoes_e_permissoes.md` (o desenho exato do "Permitir / Negar / Permitir na Sessão").
 
 ### FATIA 11 — Conferir (File Ops + SCM/Diff) — eram as 07 + 08
+> **ABERTURA DECIDIDA (D90, 17/10):** a fatia **começa por DEBT-12 — "janela única de abas"** (avaliação completa em `§8.7`): fundir os **dois modelos de aba** (`EditorTab` × `AttachTab`), trazer o **editor que salva** para a aba central, rotear Explorer/Busca/SCM para a barra única e **aposentar a coluna da direita** (`AuxiliaryBar`/`AttachArea` + `pendingAttachOpen` + Regra 10; máquina de estados do painel **4 → 2**). É **pré-requisito** do critério de aceite abaixo ("editar e salvar sem F5"). Ganho colateral: o caso "arquivo aberto + Provedores ao mesmo tempo" (`§8.4`) **deixa de existir por construção**. Repontar **31 testes de unidade + 11 specs E2E** que tocam o anexo; os obsoletos vão para quarentena **com registro** (nunca apagar em silêncio).
+> **Pendência do dono (D86/A1) — RESOLVIDA em 17/10:** a definição de "o novo" foi fechada (`D87`, `§8.3/§8.6`) — não havia componente legado; o padrão de abertura foi corrigido (A1) e a regra do modo ficou na `D88`. O que resta desta família já está na `D90`. 
 - **Objetivo:** edição real de arquivos no editor + visualização das alterações (a "lupa" para auditar o agente).
 - **Escopo:** abas funcionais e persistentes por sessão, salvamento atômico (`saveFile`), criação/renomeação/exclusão pelo Explorer; diff lado a lado via SCM (a barra lateral existente — **não** ressuscitar o diff antigo) e stage/unstage real.
 - **Critério de aceite:** criar/editar/salvar refletindo no disco **sem digitar nada no chat e sem F5** — o arquivo salvo aparece correto e o SCM mostra o diff lado a lado (com stage/unstage real).
@@ -139,7 +370,8 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Em aberto:** a aba "Portas" é real ou simulação? (verificar contra o code-server 8080.)
 - **Referência raspada (14/10):** `referencias/vs-code-1.135/04_terminal_e_pty.md` (pty host, batimento, capacidades, menu de contexto, terminal-como-aba; e o achado do agente usando terminal na 1.135 — a fronteira da D72).
 
-### FATIA 13 — Refinamentos + Casas Sessões & Command Center — absorve DEBT-05/07/11 + D2.23
+### FATIA 13 — Refinamentos + Casas Sessões & Command Center
+> **Pendência do dono (D86/A2):** tela de Provedores "gruda no topo" × tela de novo chat centralizada — refinamento visual apontado no vídeo de 15/10. — absorve DEBT-05/07/11 + D2.23
 - **Objetivo:** fechar o que ficou fora do caminho crítico do MVP + extrair as duas casas da barra lateral/topo.
 - **Escopo:** DEBT-05 (picker nativo no Windows + fallback Linux) · DEBT-07 (pastas recentes no seletor) · **DEBT-11/E9 (a Pesquisa volta ao lugar — a troca de pasta fica *dentro* dela, como seletor, D73)** · D2.23 (Trilha de Navegação/breadcrumbs **navegável**: menus suspensos + estrutura interna do código) · lacunas do mockup na sidebar de Sessões (29/29, busca, Novo Grupo Ctrl+N, indicador de voz, +1 workspace) e **histórico de chats antigos** (item 3 do vídeo de 12/10).
 - **Casas (D69):** nascem **Sessões** (`1-workbench/casas/sessoes` — `SessionSidebar.tsx` 604 l. + lógica no `App.tsx`) e **Command Center** (`1-workbench/casas/command-center` — `WorkspaceSwitcher` + centro da Titlebar; **o Titlebar fica corredor**, sem estado, D70).

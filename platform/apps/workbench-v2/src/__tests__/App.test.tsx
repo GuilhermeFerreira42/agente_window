@@ -1285,8 +1285,9 @@ describe('App session flows', () => {
     const user = userEvent.setup()
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (String(input) === '/api/providers') return new Response(JSON.stringify({
-        config: { openai: { enabled: false, apiKeySource: 'environment' }, gemini: { enabled: false, apiKeySource: 'environment' }, ollama: { enabled: true, baseUrl: 'http://localhost:11434' } },
-        environment: { openaiConfigured: false, geminiConfigured: false },
+        provedores: [],
+        ativo: null,
+        storage: 'fixture',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       return new Response('{}', { status: 404 })
     })
@@ -1297,7 +1298,8 @@ describe('App session flows', () => {
 
     expect(await screen.findByRole('region', { name: 'Provedores' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Provedores' })).toHaveAttribute('data-tab-type', 'providers')
-    expect(screen.getByText('Não configurada — use OPENAI_API_KEY')).toBeInTheDocument()
+    // FATIA 08: a tela nova mostra a lista de provedores e o formulário do primeiro.
+    expect(await screen.findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Provedores' })).not.toBeInTheDocument()
   })
 
