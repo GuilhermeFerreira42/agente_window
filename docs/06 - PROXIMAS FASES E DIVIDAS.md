@@ -191,6 +191,43 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
 **Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
 
+## 8.7 AVALIAÇÃO DE ARQUITETURA — "janela única de abas" (pedido do dono, 2026-10-17)
+**Pedido (palavras do dono):** *"Quero que os provedores e o navegador sejam abertos dentro do Monaco, seguindo o mesmo conceito de integração utilizado pelo VS Code… Atualmente, estamos separando o Monaco em duas partes: uma destinada à edição de código e outra utilizada como uma área independente… centralizar o editor de código, os provedores e o navegador em uma única janela… poder alternar entre eles por meio de abas, da mesma forma que faço em um navegador de internet."*
+
+**Diagnóstico (leitura do código, 17/10) — o dono está certo, com uma correção de endereço:**
+| | **Centro** (`components/EditorArea.tsx`) | **Coluna direita** (`AuxiliaryBar` → `modules/explorer-search/ui/attach/`) |
+|---|---|---|
+| Modelo de aba | `EditorTab` (`types.ts:7`): `file · browser · search · diff · customizations · providers` | `AttachTab` (`contract.ts:123`): `kind: code · search · changes · diff` + `dirty` + `preview/pinned` |
+| Monaco | **sim** para `file` (`EditorArea.tsx:651`) | **sim** (`CodeEditorPane.tsx`, 277 linhas) |
+| Salvar / "sujo" | **não** (0 ocorrências de save/dirty) | **sim** (salvamento atômico, `AttachArea.tsx` + `CodeEditorPane.tsx`) |
+| Extras | Image Preview, ERROR EDITOR, barra de abas, menu, dividir, maximizar | breadcrumbs, outline, changes, diff |
+| O que abre ali | **Provedores, Browser, Branch Changes, Search, Personalizações** | **arquivo/código** (o que o Explorer abre) |
+**Correção de endereço:** Provedores e Browser **já são abas** do editor central — quem está fora dele é o **editor de código**. Ou seja: o "Monaco em duas partes" é exatamente *código à direita* × *todo o resto no centro*.
+**Causa histórica (não é limite do Monaco):** foi uma **exceção autorizada da FATIA 04** (4.7 c4), comentada no próprio código (`App.tsx:1083-1087`): *"Arquivo REAL clicado na árvore abre no EDITOR ANEXO do módulo (`attach.open`, 04_05 §10), **não mais no editor central**"*. Antes disso o clique ia para o centro.
+**Duplicação que explica a analogia "aba do Windows Explorer no Chrome":** `search`, `diff` e `changes` existem **nos dois modelos** — são duas estruturas de aba concorrentes.
+
+**O que precisa ser ajustado (escopo técnico da unificação):**
+1. **Modelo único de abas** — fundir `AttachTab` em `EditorTab` (uma superfície por tipo, com dono: sessão ou global) e resolver a duplicação `search`/`diff`/`changes`.
+2. **Um host de editor** — a aba `file` do centro passa a renderizar o **editor capaz** (`CodeEditorPane`: salvar, dirty, preview/pinned, breadcrumbs, outline) no lugar do Monaco simples de `EditorArea.tsx:651`.
+3. **Roteamento** — Explorer, resultado de busca e SCM deixam de chamar `attach.open` e passam a abrir aba no modelo único.
+4. **Aposentar a coluna** — `AuxiliaryBar`/`AttachArea`/`attach.css`, o `pendingAttachOpen` e a "Regra 10 (nunca desmonta)" saem; a máquina de estados do painel simplifica de **4 estados → 2** ("tem abas / não tem").
+5. **Testes** — **31 testes de unidade** no módulo + **11 specs E2E** tocam o anexo (`sessao_14_editor_anexo`, `sessao_14b/14c/14d`, `sessao_15_activity_bar/editor_maximize/outline_timeline`…). Vários ficam **obsoletos** (testam a coluna que deixa de existir) e precisam ser repontados ou postos em quarentena com registro.
+
+**Ganho colateral (resolve dívida já aberta):** o caso *"arquivo aberto + Provedores ao mesmo tempo"* (adiado para a FATIA 11 em `§8.4`) **deixa de existir por construção** — viram abas irmãs na mesma barra.
+
+**Riscos honestos:** é a área mais testada do app (5.7, 5.8, D2.50, R-040, R-083); mexe em layout + máquina de estados, então screenshot/E2E sentem; e o E2E completo segue inútil no sandbox (88✘ ambientais), logo a régua tem de ser **por spec**.
+
+**Opções:**
+| Opção | O que é | Custo/risco |
+|---|---|---|
+| **A — fatia própria agora** ("11-A: Editor Único") | Faz a unificação já, antes de 09/10 | Alto e interrompe a sequência do MVP (09 Conversar → 10 Agir) |
+| **B — abrir a FATIA 11 por aqui** ⭐ | A 11 já prevê **"Casa Editor (abas do EditorArea + gestão de abas)"** e o critério "editar/salvar sem F5" — a unificação é **pré-requisito** dele | Faz 09 e 10 (fecha o MVP) e começa a 11 por este trabalho |
+| **C — passo mínimo (rotear o clique para o centro)** | 1 commit: o Explorer abre arquivo como aba central | **Regressão**: o centro não salva (o anexo salva hoje) — só vale se o salvar entrar junto |
+| **C+ — passo mínimo com o editor capaz** | Roteia para o centro **renderizando o `CodeEditorPane`** dentro da aba, mantendo o anexo como fallback | Entrega "tudo em abas" já, ao custo de **dois modelos convivendo** (dívida temporária declarada) |
+| **D — só registrar** | Nada agora | Zero |
+
+**Recomendação:** **B**. Se o dono quiser **ver o efeito já**, **C+** é o único passo mínimo honesto (C puro seria regressão). Decisão pendente.
+
 ## 8.6 A1 + D88 — IMPLEMENTADOS e provados (2026-10-17)
 **O que mudou (2 conquistas, ambas com trava):**
 | # | Mudança | Arquivo | Prova |

@@ -2,6 +2,12 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-17 — Avaliação de arquitetura: "janela única de abas" (editor de código + Provedores + Browser)
+- **Pedido do dono:** juntar editor de código, Provedores e Browser numa única janela com abas (conceito do VS Code), porque o Monaco está "dividido em duas partes".
+- **Diagnóstico (código):** confirmado, com correção de endereço — **Provedores e Browser já são abas do centro**; quem vive fora é o **editor de código** (coluna direita). Dois modelos concorrentes (`EditorTab` × `AttachTab`), com `search`/`diff`/`changes` duplicados. A separação **não é limite técnico**: foi **exceção autorizada da FATIA 04** (4.7 c4, comentada em `App.tsx:1083-1087`).
+- **Diferença de capacidade:** o editor do centro **não salva**; o da direita **salva** (atômico), tem `dirty`, preview/pinned, breadcrumbs e outline — por isso a fusão deve trazer o editor capaz para o centro, não o contrário.
+- **Escopo técnico e riscos registrados** em `06 §8.7`, com 5 opções (A–D) e recomendação **B** (abrir a FATIA 11 por aqui, depois de fechar 09/10). **Nenhuma linha de código alterada** — avaliação apenas.
+
 ## 2026-10-17 — A1 + D88 IMPLEMENTADOS (o "sobe pro topo" morreu; o modo do editor é lembrado)
 - **A1 (o pulo da landing):** causa era CSS — `.session-landing` tinha `min-height: 0`, então a seção só ocupava a altura do conteúdo e dependia do pai para centralizar; com aba de editor aberta o pai vira o painel do split (bloco, sem centralização) e ela colava no topo. Fix: `min-height: 100%` — agora ela preenche a coluna em qualquer pai e o próprio `align-items:center` centraliza. **Medição:** desvio do centro **29 px** com Provedores aberto (antes, conteúdo no topo).
 - **D88 (memória do modo):** `centerEditorMaximized` entrou no `ShellVisibility` (`layoutPersistence`) e o `useState` do App lê no boot e grava no efeito de layout. Layout antigo migra silenciosamente para **anexo**. **Não** toquei no `layout.state.editorMaximized` (o homônimo da coluna anexa, 5.7/RF-07).
