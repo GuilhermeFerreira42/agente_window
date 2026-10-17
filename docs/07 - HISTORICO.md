@@ -2,6 +2,11 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-17 — FATIA 08 HOMOLOGADA + DEBT-12 aberta (janela única de abas na FATIA 11)
+- **Homologação (D89):** palavras do dono — *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"*. A PARTE 2B foi marcada **✅ HOMOLOGADA**; pendências **D85** (número de tokens) e **A4** (layout do LiteLLM) seguem como **refinamento**, sem bloquear. **Fase ativa passa a ser a FATIA 09 — Conversar.**
+- **Dívida registrada (D90 → DEBT-12):** o dono escolheu a **opção B** da avaliação `§8.7` — a unificação ("janela única de abas") entra como **primeiro trabalho da FATIA 11**, sem interromper o MVP. Classificação explicada a ele: **é dívida técnica no efeito** (dois modelos de aba, `search`/`diff`/`changes` duplicados, coluna inteira a aposentar), **mas a origem é uma decisão de desenho** (exceção autorizada da FATIA 04), não descuido.
+- **Nenhuma linha de código alterada** neste passo — registro e documentação apenas.
+
 ## 2026-10-17 — Avaliação de arquitetura: "janela única de abas" (editor de código + Provedores + Browser)
 - **Pedido do dono:** juntar editor de código, Provedores e Browser numa única janela com abas (conceito do VS Code), porque o Monaco está "dividido em duas partes".
 - **Diagnóstico (código):** confirmado, com correção de endereço — **Provedores e Browser já são abas do centro**; quem vive fora é o **editor de código** (coluna direita). Dois modelos concorrentes (`EditorTab` × `AttachTab`), com `search`/`diff`/`changes` duplicados. A separação **não é limite técnico**: foi **exceção autorizada da FATIA 04** (4.7 c4, comentada em `App.tsx:1083-1087`).
