@@ -185,11 +185,21 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 **Opções (decisão do dono pendente):**
 | Opção | O que é | Custo/risco |
 |---|---|---|
-| **A1 — fix da CENTRALIZAÇÃO (prioridade declarada do dono)** | Fazer o conteúdo do chat esticar/centralizar dentro do painel (wrapper `height:100%` + flex) para a tela de sessão nova seguir centralizada com o Provedores aberto — mata o "sobe pro topo" | Pequeno (CSS/JSX no caminho do chat) + **teste de contrato novo** (geometria da landing com aba aberta); toca área sensível → exige bateria |
-| **A2 — abrir em modo maximizado por padrão** | Superfícies da Conta abrem já maximizadas ("Restaurar" continua disponível) | Baixo/médio — o dono disse que **isso não é o importante**; fica secundário |
+| ~~**A1 — fix da CENTRALIZAÇÃO**~~ ✅ **FEITO (17/10)** | `styles/app.css`: `.session-landing` passou de `min-height: 0` para **`min-height: 100%`** — a landing ocupa a coluna inteira em qualquer pai (bloco ou flex) e o próprio `align-items:center` a centraliza. **Medido:** desvio do centro **29 px** com Provedores aberto (antes: conteúdo colado no topo, ~305 px de desvio). Trava: `e2e/fatia08_modo_abertura.spec.ts` **T1** | Pequeno. Bateria completa rodada: tsc 0 · unit **767✓/12✗/16 skip** (as 12 pré-existentes, provadas em A/B) · E2E 08 **6/6** · contrato novo **4/4** |
+| ~~**A2 — abrir em modo maximizado por padrão**~~ → **substituído pela D88** ✅ **FEITO (17/10)** | Implementada a regra do dono: com o editor **aberto** a superfície abre no modo em que ele está; com o editor **fechado**, no **último modo** deixado; **padrão de fábrica = anexo**. Travas: **T2/T3/T4** do contrato novo. Detalhe em §8.6 | Baixo — só a memória faltava (o resto já funcionava) |
 | **B — regra geral na FATIA 11** | Definir o roteamento de todas as superfícies auxiliares (Provedores, Browser, Branch/Changes, Configurações) na Casa Editor, com testes | Maior, porém faz junto do trabalho de abas/editor que já está previsto |
 | **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
 **Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
+
+## 8.6 A1 + D88 — IMPLEMENTADOS e provados (2026-10-17)
+**O que mudou (2 conquistas, ambas com trava):**
+| # | Mudança | Arquivo | Prova |
+|---|---|---|---|
+| **A1** | `.session-landing { min-height: 0 → 100% }` | `src/styles/app.css` | `e2e/fatia08_modo_abertura.spec.ts` **T1**: com Provedores aberto, a landing ocupa **>90 %** da coluna e o conteúdo fica a **<80 px** do centro (medido: **29 px**; antes o conteúdo colava no topo) |
+| **D88** | `centerEditorMaximized` em `ShellVisibility` (persistido em `workbench.sessions.layout.v1`) + `useState` do App lê/grava | `src/domain/layoutPersistence.ts`, `src/App.tsx` | **T2** (aberto em maximizado → Provedores abre maximizado, chat fora de cena) · **T3** (reload preserva; com o editor fechado abre maximizado) · **T4** (quem nunca maximizou abre em anexo) |
+**Por que a D88 foi barata:** o "editor aberto em maximizado → abre maximizado" **já funcionava** (o toggle não é resetado). Faltava só a **memória**. Não toquei no `layout.state.editorMaximized` (o homônimo que maximiza a **coluna anexa**, 5.7/RF-07) — ficou documentado para ninguém confundir.
+**Migração:** layout antigo (sem a coluna nova) carrega com `centerEditorMaximized: false` = anexo — silencioso, sem quebrar. Teste dedicado cobre isso.
+**Números (17/10):** typecheck **0** · unit **767✓ / 12✗ (pré-existentes, A/B idêntico) / 16 skip** · E2E FATIA 08 **6/6** · contrato novo **4/4** · evidências em `validacao_fatia08/a1_*.png` (externo ao repo).
 
 ## 8.4 Classificação das dívidas e medição de Browser/Branch Changes (2026-10-16, conversa — sem código)
 **Pergunta do dono: "isso é dívida da fatia 7 ou não?" — resposta em camadas:**

@@ -33,7 +33,7 @@ describe('layoutPersistence', () => {
 
   it('round-trips a saved state across a simulated reload', () => {
     const state: LayoutState = {
-      shell: { sidebarVisible: false, auxiliaryVisible: false, terminalVisible: true, editorHidden: true, sidebarWidth: 320 },
+      shell: { sidebarVisible: false, auxiliaryVisible: false, terminalVisible: true, editorHidden: true, sidebarWidth: 320, centerEditorMaximized: true },
       partSizesBySession: { s1: [30, 70], s2: [60, 40] },
     }
     saveLayoutState(state, storage)
@@ -55,6 +55,24 @@ describe('layoutPersistence', () => {
     expect(loaded.shell.terminalVisible).toBe(true)
     expect(loaded.shell.sidebarVisible).toBe(true) // veio do default
     expect(loaded.partSizesBySession).toEqual({ s1: [50, 50] })
+  })
+
+  it('D88: o modo do editor central nasce em anexo (padrão de fábrica) e é lembrado no reload', () => {
+    // Nunca usou: anexo — a superfície aberta pela Conta não pode nascer maximizada.
+    expect(DEFAULT_SHELL.centerEditorMaximized).toBe(false)
+    expect(loadLayoutState(storage).shell.centerEditorMaximized).toBe(false)
+    // Maximizou e recarregou: o último modo volta (é o que a regra D88 exige).
+    saveLayoutState({ shell: { ...DEFAULT_SHELL, centerEditorMaximized: true }, partSizesBySession: {} }, storage)
+    expect(loadLayoutState(storage).shell.centerEditorMaximized).toBe(true)
+  })
+
+  it('D88: layout salvo antes da coluna existir não quebra (migração silenciosa → anexo)', () => {
+    const antigo = makeStorage({
+      [LAYOUT_STORAGE_KEY]: JSON.stringify({ shell: { sidebarVisible: false, terminalVisible: true }, partSizesBySession: {} }),
+    })
+    const loaded = loadLayoutState(antigo)
+    expect(loaded.shell.centerEditorMaximized).toBe(false)
+    expect(loaded.shell.sidebarVisible).toBe(false)
   })
 
   it('limita (clamp) a largura da sidebar aos limites válidos', () => {
