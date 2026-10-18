@@ -349,11 +349,12 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-08-streaming/`, `fatia-07-input/`; **nota nova:** `referencias/openclaude/01_loop_do_agente_e_ferramentas.md` (limites, guardas anti-loop).
 
 ### FATIA 10 — Agir (Tools + Permissões) — era a 11 — **FECHA O MVP**
-- **Objetivo:** o agente age no sistema de arquivos (e, conforme recorte a decidir, no terminal) com autorização do usuário.
-- **Escopo:** ferramentas ligadas ao servidor existente (`/fs/*` — escrita atômica já pronta) + card **[Permitir] / [Negar] / [Permitir na Sessão]** + trava anti-loop (3 chamadas idênticas).
+> **STATUS (18/10): FASE ATIVA — SPEC `PARTE 2D` FECHADA: decisões Q1–Q4 respondidas pelo dono (D93) e execução autorizada ("começe a 10"). Execução em 5 commits (C1–C5), começando pela casa Agir.**
+- **Objetivo:** o agente age no **sistema de arquivos** com autorização do usuário — **recorte fechado (D72): só arquivos; terminal na FATIA 12**.
+- **Escopo:** ferramentas ligadas ao servidor existente (`/fs/*` + **`fsHost`** — escrita atômica **já pronta**, conferida no código em 18/10: `writeFileAtomic`, temp+rename) + card **[Permitir] / [Negar] / [Permitir na Sessão]** + trava anti-loop (3 chamadas idênticas). Detalhe completo: **PARTE 2D**, fim deste arquivo.
 - **Critério de aceite:** o agente propõe uma ação (ex.: criar arquivo) e **só executa após autorização** — é o teste final do MVP.
 - **Q6 RESPONDIDA (D72, 14/10):** no MVP o agente mexe **só em arquivos** (ler, criar, escrever, listar, buscar); **rodar comandos no terminal é bloqueado** — mais poderoso e mais perigoso (ex.: `rm -rf`), exige protocolo de permissão mais maduro e entra na **FATIA 12**.
-- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md`, `fatia-09-tools/`; **nota nova:** `referencias/openclaude/03_sessoes_e_permissoes.md` (o desenho exato do "Permitir / Negar / Permitir na Sessão").
+- **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md` (card de 3 botões + resposta `allow/deny` + guardião `doomLoop` de 3 chamadas) e `fatia-09-tools/` (worktree/painel de alterações — **fora do escopo da 10**, são tema das fatias 11/15). *(A nota externa `referencias/openclaude/03_sessoes_e_permissoes.md` não sobreviveu à faxina de 17/10 — a referência válida hoje é o PERMISSOES.md, dentro do repo.)*
 
 ### FATIA 11 — Conferir (File Ops + SCM/Diff) — eram as 07 + 08
 > **ABERTURA DECIDIDA (D90, 17/10):** a fatia **começa por DEBT-12 — "janela única de abas"** (avaliação completa em `§8.7`): fundir os **dois modelos de aba** (`EditorTab` × `AttachTab`), trazer o **editor que salva** para a aba central, rotear Explorer/Busca/SCM para a barra única e **aposentar a coluna da direita** (`AuxiliaryBar`/`AttachArea` + `pendingAttachOpen` + Regra 10; máquina de estados do painel **4 → 2**). É **pré-requisito** do critério de aceite abaixo ("editar e salvar sem F5"). Ganho colateral: o caso "arquivo aberto + Provedores ao mesmo tempo" (`§8.4`) **deixa de existir por construção**. Repontar **31 testes de unidade + 11 specs E2E** que tocam o anexo; os obsoletos vão para quarentena **com registro** (nunca apagar em silêncio).
@@ -558,3 +559,69 @@ Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4
 **Leitura para as decisões:**
 - **Q4:** a proposta do dono (pasta `uploads` criada dentro da pasta ativa) **não é o modelo do original** (que referencia e deixa o agente ler na FATIA 10) — é o modelo de produto de chat (Arena/nuvem Anthropic), e tem um ganho: o arquivo **nasce dentro do workspace**, então a FATIA 10 já o enxerga para agir. Pesa contra: escrever na pasta do usuário sem pedir e crescer a 09.
 - **Q5:** a receita do "+" de verdade está mapeada (acima); adiar mantém o foco da 09 e o seletor de conversas cai naturalmente na FATIA 13.
+
+---
+
+# PARTE 2D — SPEC: FATIA 10 — Agir (Ferramentas de Arquivo + Permissões)
+
+> Escrita em **2026-10-18**, no dia em que o dono homologou a FATIA 09 (D92) e mandou começar ("começe a 10"). Padrão das fatias: SPEC → decisões fechadas com o dono → 5 commits por conquistas. **Decisões Q1–Q4 FECHADAS com o dono ainda em 18/10 (registro D93, `docs/05`) — execução autorizada.**
+
+## 1. Objetivo (uma frase)
+Fechar o MVP: a IA deixa de ser só conversa e passa a **ler, listar, buscar, criar e escrever arquivos dentro da pasta de trabalho** — e **nenhuma mexida acontece sem o cartão de aprovação do dono**: **[Permitir] [Negar] [Permitir na Sessão]**.
+
+## 2. Terreno conferido no código (18/10)
+- **D72** — escopo fixo: ferramentas de **arquivo**; **terminal bloqueado** (FATIA 12).
+- **Casa Conversa (09)** — fio SSE `chunk/done/error` + Parar no servidor; o contrato já reserva a frase: *"a FATIA 10 soma os eventos de ferramenta"* (`contract.ts`).
+- **Servidor de arquivos** — leitura/listagem nas rotas `/api/fs/*` e o **`fsHost`** (`modules/explorer-search/server/fs/fsHost.ts`) com **escrita atômica já pronta** (`writeFileAtomic`: grava num temporário e troca num passo — ou grava tudo, ou não grava nada), além de `mkdir`/`rename`/`copy`/`delete`. A C2 **liga** essas mãos às ferramentas do agente + trava de território; a FATIA 11 reaproveita a mesma peça para o **editor salvar**.
+- **Pasta ativa** — resolvida no servidor (`/api/workspaces/*`); é o território que nenhuma ferramenta pode ultrapassar.
+- **Referência de produto (dentro do repo):** `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md` — desenho do OpenClaude: card no fluxo do chat **[Permitir] [Não] [Sempre na Sessão]**; negar devolve *"User denied permission"* à IA; **guardião anti-loop** (`doomLoop.ts`): hash de `ferramenta + argumentos`, contador por sessão, **bloqueio na 3ª chamada idêntica consecutiva** com mensagem ao modelo. *(A nota externa `referencias/openclaude/03_sessoes_e_permissoes.md` não sobreviveu à faxina — vale o PERMISSOES.md.)*
+- **Regra de segurança (VS Code agent mode, pesquisa de 17/10):** ferramentas embutidas só tocam arquivos **dentro do workspace**.
+
+## 3. Decisões Q1–Q4 — FECHADAS COM O DONO (18/10; registro D93)
+
+| # | Pergunta | Opções | Recomendação da IA |
+|---|---|---|---|
+| **Q1** | **O que a IA faz SEM perguntar?** | (a) **só olhar** de graça (ler/listar/buscar dentro da pasta) — criar/escrever **sempre** passam pelo cartão · (b) perguntar por **tudo**, até ler · (c) nada pergunta | **(a)** — é o jeito do VS Code e do OpenClaude (PERMISSOES.md: leitura `allow`, escrita `ask`); controle de verdade sem um clique por cada olhada **→ RESPONDIDO (18/10): (a)** |
+| **Q2** | **O "Permitir na Sessão" vale até quando?** | (a) até a **conversa acabar** — conversa nova pergunta de novo; **F5 mantém** (a sessão sobrevive ao F5 desde a 09) · (b) **para sempre** por tipo de mexida | **(a)** — simples e previsível; (b) cresce escopo e risco nesta fatia **→ RESPONDIDO (18/10): (a)** |
+| **Q3** | **Quanto o cartão mostra da mexida?** | (a) **caminho + prévia** do conteúdo a gravar · (b) comparação **antes × depois** lado a lado · (c) só o caminho | **(a)** no MVP — a "lupa" rica de diff é o tema da **FATIA 11**; (c) é aprovar no escuro **→ RESPONDIDO (18/10): (a)** (o dono pediu explicação alto-nível antes de decidir; explicado o caso "arquivo novo não tem antes") |
+| **Q4** | **Como a IA "levanta a mão" pedindo ferramenta?** | (a) **idioma único combinado** — um formato de pedido que todos os provedores usam igual · (b) **jeito nativo de cada serviço** (4 implementações: OpenAI/Anthropic/Gemini/Ollama) | **(a)** — um idioma só, uma suíte de provas, funciona igual no Ollama local, na nuvem e no stub (D91); pedido torto = aviso **honesto** + nova chance, nunca texto inventado **→ RESPONDIDO (18/10): (b), ESCOLHA DO DONO** — perguntou como o VS Code/Claude Code fazem (nativo) e escolheu seguir esse desenho, **contra a recomendação da IA**, com a consequência aceita e registrada na §8 |
+
+## 4. O que NÃO fazer na FATIA 10
+- **Nada de terminal/comandos** (FATIA 12 — D72): a IA não executa nada; só lê e escreve arquivo.
+- **Nada de worktree/branch de sessão** (FATIA 15): a IA mexe direto na pasta ativa, sempre com aprovação.
+- **Nada de painel de alterações / Accept All / Discard** (FATIA 11 — a "lupa"): a auditoria rica vem com o diff.
+- **Nada de sair da pasta:** caminho com `..` ou absoluto de fora do workspace = **recusa honesta**, sem executar.
+- **Nada das dívidas:** DEBT-12 (abas → 11) · DEBT-13 (memória) · DEBT-14/15 (seletor/bolinha) · "+" segunda conversa (13).
+
+## 5. Desenho (alto nível)
+- **Eventos novos no fio** (contrato da casa Conversa estendido): `tool` (a IA quer usar uma ferramenta: nome + argumentos) · `approval` (o servidor pede o sim/não — só quando a ferramenta mexe) · `tool_result` (o que a ferramenta devolveu, enxuto) — ao lado dos `chunk/done/error` de hoje.
+- **O loop mora no servidor**, numa **casa Agir** vizinha da casa Conversa (mesmo padrão de contrato + porta própria): modelo pede ferramenta → servidor aplica as regras (território? permissão? anti-loop?) → executa → devolve o resultado ao modelo → repete até a IA responder em texto. **Teto de 10 voltas** por mensagem, para nunca rodar de graça.
+- **Q4 = canal NATIVO:** cada protocolo tem seu **extrator de pedidos de ferramenta** (openai-chat · anthropic · gemini · ollama — 4 implementações, à imagem do `extrairTexto` da 09) e seu jeito de anunciar as ferramentas no pedido. Modelo/provedor **sem** canal nativo de ferramentas → **aviso honesto** e a conversa segue sem agir (§8).
+- **Cartão de permissão no chat** (PERMISSOES.md): card dentro da linha do tempo, com o que vai ser feito + os 3 botões; **Negar** devolve à IA o "dono negou" e ela segue o plano sem escrever; **Permitir na Sessão** guarda a permissão **na sessão** (persistida — sobrevive ao F5, como a conversa).
+- **Anti-loop 3×:** mesma ferramenta + mesmos argumentos 3 vezes seguidas = bloqueio com mensagem honesta ao modelo e aviso na tela.
+- **Parar continua valendo:** mata o loop no meio — inclusive entre o pedido de ferramenta e a retomada (sem `working` órfão, lição da 09).
+- **Escrita sempre atômica:** todo criar/escrever passa pelo `writeFileAtomic` do `fsHost`.
+
+## 6. Critérios de aceite (a régua do dono)
+1. Conversa normal (sem ferramenta) continua idêntica à 09 — nada quebra.
+2. "Crie o arquivo `ola.txt`…" → cartão aparece → **sem aprovar, NADA é escrito** (prova automatizada).
+3. Aprovado → arquivo existe na pasta ativa com o conteúdo exato.
+4. Negado → a IA responde sabendo do "não", sem escrever nada.
+5. Permitir na Sessão → as próximas escritas desta conversa não perguntam; conversa nova pergunta de novo (conforme Q2).
+6. F5 no meio (cartão aberto ou depois de aprovado): conversa, cartão e permissões da sessão sobrevivem.
+7. Tentativa de sair da pasta → recusa honesta, nada executado.
+8. 3 pedidos idênticos seguidos → bloqueio honesto (anti-loop).
+9. Parar no meio do loop → tudo morre limpo, status honesto na tela.
+10. tsc **0** + unit verde (baseline 813✓/12✗) + E2E novo da fatia verde, tudo com **stub** (D91 — sem chave do dono); homologação = roteiro do dono (nova PARTE no `08`).
+
+## 7. Commits planejados (5 conquistas)
+1. **C1 — a casa Agir nasce:** contrato (eventos `tool/approval/tool_result`) + loop no servidor com **ferramentas falsas** (o esqueleto provado: o modelo "pede", o servidor responde simulado) + testes.
+2. **C2 — ferramentas de arquivo de verdade:** ler/listar/buscar (livres) + criar/escrever via `writeFileAtomic` + trava de território; testes de fronteira (fora da pasta, nome inválido).
+3. **C3 — o cartão na tela:** card de permissão no chat + resposta do dono (3 botões) retomando o loop + cartões de ferramenta no histórico; Parar no loop.
+4. **C4 — memória e travas finas:** permissões da sessão persistidas (sobrevivem ao F5), anti-loop 3×, teto de voltas, F5 com cartão pendente.
+5. **C5 — E2E da fatia + docs de fechamento** (padrão C5 da 09).
+
+## 8. Limitações honestas
+- **Consequência aceita do Q4=(b):** modelo/provedor **sem canal nativo de ferramentas** (comum em modelos locais) **não usa o Agir** — o app detecta e mostra aviso honesto; a conversa normal segue funcionando. Se o `gemma` (Ollama) do dono tiver ou não o canal **só se confirma na prática**, na homologação dele. O **stub** da prova fala os 4 formatos nativos (D91).
+- A prova automatizada usa **stub** (D91); serviço real é roteiro do dono.
+- O seletor de modelos do composador segue com a lista fixa (**DEBT-14**); a conversa da 10 usa o **provedor ativo do chat**, como na 09.
