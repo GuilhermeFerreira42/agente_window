@@ -49,6 +49,7 @@ export type CategoriaErroAgir =
   | 'http' // outro erro do serviço (429, 5xx, 400…)
   | 'resposta' // resposta sem nada aproveitável
   | 'voltas' // estourou o teto de voltas do loop
+  | 'loop' // guardião: 3 chamadas idênticas seguidas (anti-loop, C4)
 
 /** Um erro da casa Agir em forma de porta (mesma ideia da casa Conversa). */
 export interface ErroAgir {

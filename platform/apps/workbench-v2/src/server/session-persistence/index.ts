@@ -12,6 +12,7 @@ import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-int
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
 import { obterAlvoDeConversa } from './chatAlvo'
+import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -73,11 +74,11 @@ function sanarStatusAposF5(session: Session): Session {
   // rodando. Um status 'working' gravado no meio da corrida (F5 durante o
   // streaming) ficaria ÓRFÃO para sempre: chip "Trabalhando" fantasma e
   // composer travado. Na restauração, ele vira 'completed'.
-  return {
+  return sanarCartoesDeSessao({
     ...session,
     status: session.status === 'working' ? 'completed' : session.status,
     chats: session.chats.map((chat) => (chat.status === 'working' ? { ...chat, status: 'completed' } : chat)),
-  }
+  })
 }
 
 async function listSessions(): Promise<Session[]> {

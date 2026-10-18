@@ -22,6 +22,7 @@ import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import { enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
 import type { FerramentaNoChat } from './types'
+import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
   closeCustomView,
   customViewTitle,
@@ -322,14 +323,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     void loadPersistedSessions(controller.signal)
       .then((restored) => {
         if (controller.signal.aborted) return
-        setSessions(restored)
+        // FATIA 10 (C4): cartão 'aguardando' que sobreviveu ao F5 vira 'expirado'.
+        const sanadas = sanarCartoesAposF5(restored)
+        setSessions(sanadas)
         const first = restored[0]
         // FATIA 09 (§3.8): o F5 volta para a MESMA sessão que estava aberta.
         const salva = window.localStorage.getItem(ACTIVE_SESSION_KEY)
-        const recuperada = salva ? restored.find((session) => session.id === salva) : undefined
-        setActiveSessionId(recuperada?.id ?? first?.id ?? BOOT_SESSION_ID)
-        setVisibleSessionIds(recuperada ? [recuperada.id] : first ? [first.id] : [])
-        setActiveChatBySession(Object.fromEntries(restored.map((session) => [session.id, session.mainChatId])))
+        const recuperada = salva ? sanadas.find((session) => session.id === salva) : undefined
+        const primeiraSanada = sanadas[0]
+        setActiveSessionId(recuperada?.id ?? primeiraSanada?.id ?? BOOT_SESSION_ID)
+        setVisibleSessionIds(recuperada ? [recuperada.id] : primeiraSanada ? [primeiraSanada.id] : [])
+        setActiveChatBySession(Object.fromEntries(sanadas.map((session) => [session.id, session.mainChatId])))
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) console.error('[sessions] hydration failed', error)

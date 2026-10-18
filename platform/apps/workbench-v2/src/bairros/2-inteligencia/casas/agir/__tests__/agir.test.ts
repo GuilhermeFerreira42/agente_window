@@ -104,7 +104,9 @@ describe('O loop do agente (rodarAgir)', () => {
     const fim = await rodarAgir({
       vizinho: async () => {
         n += 1
-        return { texto: '', pedidos: [{ id: `p${n}`, ferramenta: 'buscar', argumentos: { padrao: 'x' } }] }
+        // Argumentos DIFERENTES a cada volta: o guardião anti-loop (C4) bloqueia
+        // repetição idêntica — este teste é do TETO de voltas, não do guardião.
+        return { texto: '', pedidos: [{ id: `p${n}`, ferramenta: 'buscar', argumentos: { padrao: `padrao-${n}` } }] }
       },
       historico: [{ papel: 'usuario', conteudo: 'procura' }],
       executores: EXECUTORES,
@@ -115,6 +117,27 @@ describe('O loop do agente (rodarAgir)', () => {
     expect(fim.voltas).toBe(MAX_VOLTAS)
     const erro = eventos.find((e) => e.type === 'error')
     expect(erro).toMatchObject({ type: 'error', code: 'voltas' })
+  })
+
+  it('guardião anti-loop: 3 chamadas idênticas seguidas = bloqueio honesto (C4)', async () => {
+    const eventos: EventoAgir[] = []
+    let execucoes = 0
+    const buscarEspiada: ExecutorFerramenta = async () => {
+      execucoes += 1
+      return { ok: true, resumo: 'leu' }
+    }
+    const fim = await rodarAgir({
+      vizinho: async () => ({ texto: '', pedidos: [{ id: 'x', ferramenta: 'buscar', argumentos: { padrao: 'sempre-igual' } }] }),
+      historico: [{ papel: 'usuario', conteudo: 'procura' }],
+      executores: { ...EXECUTORES, buscar: buscarEspiada },
+      emitir: (e) => eventos.push(e),
+    })
+    expect(execucoes).toBe(2) // a 3.ª NÃO executa
+    expect(fim.status).toBe('loop_bloqueado')
+    const ultimoResultado = eventos.filter((e) => e.type === 'tool_result').at(-1) as { ok: boolean; resumo: string }
+    expect(ultimoResultado.ok).toBe(false)
+    expect(ultimoResultado.resumo).toContain('Bloqueado: 3 chamadas idênticas')
+    expect(eventos.at(-1)).toMatchObject({ type: 'error', code: 'loop' })
   })
 
   it('Parar ANTES de começar: silêncio total (sem evento nenhum) — lição da 09', async () => {

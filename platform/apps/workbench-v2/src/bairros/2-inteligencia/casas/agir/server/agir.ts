@@ -47,7 +47,7 @@ export interface OpcoesAgir {
   sinal?: AbortSignal
 }
 
-export type StatusAgir = 'respondeu' | 'interrompido' | 'voltas_excedidas' | 'erro'
+export type StatusAgir = 'respondeu' | 'interrompido' | 'voltas_excedidas' | 'loop_bloqueado' | 'erro'
 
 export interface ResultadoAgir {
   status: StatusAgir
@@ -72,6 +72,10 @@ function mensagemDeErro(erro: unknown): string {
 export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
   const { vizinho, executores, emitir, pedirAprovacao, sinal } = opcoes
   const mensagens: MensagemAgir[] = [...opcoes.historico]
+  /** Anti-loop (C4, desenho do PERMISSOES.md/doomLoop): assinatura = ferramenta
+   * + argumentos exatos. 3 idênticas SEGUIDAS → bloqueia sem executar e sem
+   * perguntar ao dono de novo. */
+  const assinaturas: string[] = []
 
   for (let volta = 1; volta <= MAX_VOLTAS; volta += 1) {
     if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
@@ -107,6 +111,16 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
 
       emitir({ type: 'tool', pedido })
+
+      const assinatura = `${pedido.ferramenta}:${JSON.stringify(pedido.argumentos)}`
+      assinaturas.push(assinatura)
+      if (assinaturas.length >= 3 && assinaturas.slice(-3).every((uma) => uma === assinatura)) {
+        const motivo = 'Bloqueado: 3 chamadas idênticas seguidas — você provavelmente está em um loop. Mude os argumentos, use outra ferramenta ou peça ajuda ao dono.'
+        emitir({ type: 'tool_result', id: pedido.id, ferramenta: pedido.ferramenta, ok: false, resumo: motivo })
+        mensagens.push({ papel: 'ferramenta', conteudo: `NÃO EXECUTADO: ${motivo}`, pedidoId: pedido.id, ferramenta: pedido.ferramenta })
+        emitir({ type: 'error', code: 'loop', message: 'A IA repetiu a mesma ação 3 vezes seguidas e foi parada por segurança. Reformule o pedido com mais detalhes ou comece uma conversa nova.' })
+        return { status: 'loop_bloqueado', textoFinal: '', voltas: volta }
+      }
 
       let liberado = true
       if (ehMexida(pedido.ferramenta) && pedirAprovacao) {
