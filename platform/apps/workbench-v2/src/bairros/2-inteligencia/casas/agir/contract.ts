@@ -43,6 +43,7 @@ export type CategoriaErroAgir =
   | 'sem_canal_nativo' // o serviço/modelo não suporta ferramentas (Q4b, D93)
   | 'configuracao' // argumento obrigatório faltando ou torto
   | 'territorio' // caminho fora da pasta de trabalho (executado na C2)
+  | 'chave' // 401/403 — chave inválida ou ausente
   | 'endereco' // não alcançou o serviço
   | 'tempo' // serviço lento/parado
   | 'http' // outro erro do serviço (429, 5xx, 400…)
@@ -90,10 +91,21 @@ export interface RespostaVolta {
 }
 
 /**
- * Quem fala com o provedor numa volta. A C2 liga isto no HTTP real de cada
+ * Quem fala com o provedor numa volta. C2 liga isto no HTTP real de cada
  * protocolo (com o anúncio nativo das ferramentas); nos testes da C1 é falso.
+ * Contrato do fio: os PEDAÇOS de texto saem AO VIVO por `opcoes.aoTexto` —
+ * quem implementa o vizinho é responsável por chamá-lo; o loop não repete
+ * o texto depois (fonte única). `sinal` = Parar do dono.
  */
-export type VizinhoProvedor = (mensagens: MensagemAgir[]) => Promise<RespostaVolta>
+export interface OpcoesVizinho {
+  aoTexto?: (pedaco: string) => void
+  sinal?: AbortSignal
+}
+
+export type VizinhoProvedor = (
+  mensagens: MensagemAgir[],
+  opcoes?: OpcoesVizinho,
+) => Promise<RespostaVolta>
 
 /** Resultado de executar uma ferramenta. */
 export interface ResultadoFerramenta {

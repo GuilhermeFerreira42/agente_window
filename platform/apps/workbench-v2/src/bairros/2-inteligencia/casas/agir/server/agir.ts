@@ -11,6 +11,7 @@
 // (Os relógios de rede vivem no vizinho real — C2, como na casa Conversa.)
 // ============================================================================
 import type {
+  CategoriaErroAgir,
   EventoAgir,
   ExecutorFerramenta,
   FerramentaId,
@@ -77,13 +78,22 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
     let resposta: RespostaVolta
     try {
-      resposta = await vizinho(mensagens)
+      resposta = await vizinho(mensagens, {
+        aoTexto: (pedaco) => emitir({ type: 'chunk', text: pedaco }),
+        sinal,
+      })
     } catch (erro) {
-      emitir({ type: 'error', code: 'http', message: mensagemDeErro(erro) })
+      // Parar no meio do fetch = interrupção SILENCIOSA (lição da 09) —
+      // só sai erro de verdade quando a culpa é do serviço/rede.
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
+      const codigoSuspeito: unknown = erro instanceof Error && 'code' in erro ? (erro as { code?: unknown }).code : undefined
+      const codigo: CategoriaErroAgir =
+        typeof codigoSuspeito === 'string' && codigoSuspeito !== '' ? (codigoSuspeito as CategoriaErroAgir) : 'http'
+      emitir({ type: 'error', code: codigo, message: mensagemDeErro(erro) })
       return { status: 'erro', textoFinal: '', voltas: volta }
     }
 
-    if (resposta.texto) emitir({ type: 'chunk', text: resposta.texto })
+    // O texto AO VIVO já saiu pelo `aoTexto` (contrato do vizinho — fonte única).
 
     if (resposta.pedidos.length === 0) {
       emitir({ type: 'done', model: resposta.modelo })

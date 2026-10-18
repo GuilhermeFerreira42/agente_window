@@ -115,11 +115,14 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
     expect(infratores).toEqual([])
   })
 
-  it('FT-05: a casa ainda não tem rota — a URL nasce na C3, dentro da casa', () => {
+  it('FT-05: o SEGREDO da casa ("/api/agir") não existe antes da hora — nasce na C3', () => {
+    // Desde a C2 a casa cita endereços de PROVEDORES (ex.: o /api/chat nativo
+    // do Ollama) — esses são de fora e são legítimos. O que não pode existir
+    // antes da C3 é a URL da NOSSA rota.
     const infratores: string[] = []
     for (const arquivo of arquivosDe(CASA)) {
-      if (readFileSync(arquivo, 'utf8').includes('/api/')) infratores.push(relative(CASA, arquivo))
+      if (readFileSync(arquivo, 'utf8').includes('/api/agir')) infratores.push(relative(CASA, arquivo))
     }
-    expect(infratores, "nenhum '/api/' na C1 (a rota SSE é da C3)").toEqual([])
+    expect(infratores, "a rota '/api/agir' nasce na C3, dentro da casa").toEqual([])
   })
 })

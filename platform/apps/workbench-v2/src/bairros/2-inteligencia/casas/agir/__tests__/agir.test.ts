@@ -4,20 +4,23 @@
 // Parar antes e no meio · o comportamento dos executores falsos.
 // ============================================================================
 import { describe, expect, it } from 'vitest'
-import type { EventoAgir, ExecutorFerramenta, MensagemAgir, RespostaVolta, ResultadoFerramenta } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, RespostaVolta } from '../contract'
 import { MAX_VOLTAS, rodarAgir } from '../server/agir'
 import { criarExecutoresFalsos, ehMexida } from '../server/ferramentas'
 
-/** Vizinho falso que segue um roteiro (uma resposta por chamada, na ordem). */
+/** Vizinho falso que segue um roteiro (uma resposta por chamada, na ordem) —
+ * e cumpre o contrato do fio: texto sai AO VIVO pelo `aoTexto`. */
 function vizinhoRoteado(roteiro: RespostaVolta[]) {
   const chamadas: MensagemAgir[][] = []
   return {
     chamadas,
-    vizinho: async (mensagens: MensagemAgir[]): Promise<RespostaVolta> => {
+    vizinho: async (mensagens: MensagemAgir[], opcoes?: OpcoesVizinho): Promise<RespostaVolta> => {
       chamadas.push(mensagens.map((m) => ({ ...m })))
       const volta = chamadas.length - 1
       if (volta >= roteiro.length) throw new Error('roteiro acabou')
-      return roteiro[volta]
+      const resposta = roteiro[volta]
+      if (resposta.texto !== '') opcoes?.aoTexto?.(resposta.texto)
+      return resposta
     },
   }
 }
@@ -73,16 +76,14 @@ describe('O loop do agente (rodarAgir)', () => {
     ])
     const eventos: EventoAgir[] = []
     let executou = 0
-    const espião: Record<'escrever', ExecutorFerramenta> = {
-      escrever: async (pedido) => {
-        executou += 1
-        return { ok: true, resumo: 'nunca deveria acontecer' } satisfies ResultadoFerramenta
-      },
+    const escreverEspiado: ExecutorFerramenta = async () => {
+      executou += 1
+      return { ok: true, resumo: 'nunca deveria acontecer' }
     }
     const fim = await rodarAgir({
       vizinho,
       historico: [{ papel: 'usuario', conteudo: 'escreve' }],
-      executores: { ...EXECUTORES, ...espião },
+      executores: { ...EXECUTORES, escrever: escreverEspiado },
       emitir: (e) => eventos.push(e),
       pedirAprovacao: async () => false,
     })

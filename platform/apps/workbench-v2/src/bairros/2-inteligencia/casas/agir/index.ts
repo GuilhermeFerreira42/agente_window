@@ -26,7 +26,7 @@ export type {
 export { MAX_VOLTAS, rodarAgir } from './server/agir'
 export type { EmitirAgir, OpcoesAgir, ResultadoAgir, StatusAgir } from './server/agir'
 
-/** Catálogo + executores falsos da C1 (a C2 troca por arquivos de verdade). */
+/** Catálogo + executores falsos da C1 (prova do esqueleto). */
 export {
   catalogoFerramentas,
   criarExecutoresFalsos,
@@ -37,3 +37,17 @@ export type { DescritorFerramenta } from './server/ferramentas'
 
 /** Extratores do canal nativo (Q4=(b), D93) — um por protocolo. */
 export { extrairFerramentas } from './server/extracao'
+
+/** C2 — mãos de verdade: território, disco, anúncio nativo e vizinho real. */
+export { verificarTerritorio } from './server/territorio'
+export type { ImplPath, VereditoTerritorio } from './server/territorio'
+export { criarExecutoresReais, LIMITE_BUSCA } from './server/discos'
+export { anunciarFerramentas } from './server/anuncio'
+export { traduzirHistorico } from './server/dialogo'
+export {
+  criarVizinhoReal,
+  ErroVizinho,
+  TIMEOUT_PRIMEIRO_BYTE_MS,
+  TIMEOUT_TOTAL_MS,
+} from './server/vizinho'
+export type { AjustesVizinho } from './server/vizinho'
