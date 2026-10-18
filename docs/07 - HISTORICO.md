@@ -2,6 +2,11 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-18 — FATIA 09 (Conversar) HOMOLOGADA pelo dono (D92) — abre a FATIA 10 (Agir)
+- **Palavras do dono (canônicas):** *"09 homologada. começe a 10"*.
+- **O que a homologação cobre:** a prova automatizada da fatia (tsc **0** · unit **813✓/12✗ pré-existentes/16skip** · E2E `conversa_fatia09` **5/5 ×4** · contrato anti-trapaça **6/6**) e a **validação dele com serviço real** (2 vídeos de 17/10, Ollama local `gemma4:31b-cloud` — 1º vídeo: erro honesto por falta de ativar a bolinha, lição registrada; 2º: streaming, Markdown completo, Parar, rodapé com o modelo efetivo). O roteiro `08` **PARTE D** fica registrado como o roteiro de referência da fatia.
+- **Efeito:** a **fase ativa passa a ser a FATIA 10 — Agir** (última do MVP). No mesmo dia a **SPEC da FATIA 10** foi escrita (`06` **PARTE 2D**, fim do arquivo), com **decisões Q1–Q4 propostas ao dono** — o código só começa depois das respostas (padrão spec-driven das fatias 07–09).
+
 ## 2026-10-17 — FATIA 09 (Conversar) IMPLEMENTADA E VALIDADA EM VÍDEO — documentação de fechamento (C5)
 - **5 de 5 commits da PARTE 2C §8:** `5968b70` (casa Conversa nasce + rota `/api/chat` com erros honestos 409/400 e chave só no servidor) · `9e2c703` (streaming no servidor: fio SSE por protocolo, Parar aborta no servidor, réguas de tempo) · `c0af6fe` (ligação no chat: `handleSend` real, mock de 1 s saiu, rodapé do modelo efetivo, `+` oculto por Q5b, aviso de anexo Q4a — 12 arquivos) · `90f75c8` (E2E 5 provas + 3 consertos de F5/histórico) · **C5 = documentação** (esta entrada).
 - **Provas:** tsc **0** · unit **813✓ / 12✗ (todas pré-existentes) / 16skip** + contrato anti-trapaça **6/6** · E2E `conversa_fatia09` **5/5 em 4 rodadas seguidas** (T1×3 e T3×3 isolados verdes) contra o stub local 4599 (fio padrão **600 ms por pedaço** para dar janela observável; cenário LENTO=700 ms detectado pelo **último** pedido do usuário). Evidências fora do repo: `~/validacao_fatia09/` — `c3_*` (prova ao vivo da C3) + `f09_T1..T5` (prints da spec, copiados do test-results antes da faxina).

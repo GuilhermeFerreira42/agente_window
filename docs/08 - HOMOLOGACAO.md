@@ -28,6 +28,15 @@
 - **A4** — "copiar o visual do LiteLLM" (estudo futuro, sem fatia definida).
 **Roteiro do dono (PARTE C) — cumprido:** configurar provedor real → Testar conexão → salvar → reabrir e conferir a chave mascarada (feito no vídeo de 15/10).
 
+## Homologação FATIA 09 — 2026-10-18 (declaração do dono) ✅
+**Palavras do dono (canônicas):** *"09 homologada. começe a 10"* (registro **D92**, `docs/05`).
+**O que essa homologação cobre:**
+- os critérios da SPEC (`docs/06` PARTE 2C) — verdes na prova automatizada: tsc **0** · unit **813✓ / 12✗ pré-existentes / 16skip** · E2E `conversa_fatia09` **5/5 em 4 rodadas** · contrato anti-trapaça **6/6**;
+- a **validação do dono com serviço REAL** (17/10, 2 vídeos): **Ollama local** (`gemma4:31b-cloud`) — no 1º vídeo o app recusou com o erro honesto *"Nenhum provedor está ativo"* porque a bolinha "usar este provedor no chat" não estava marcada (comportamento correto do sistema); no 2º vídeo, com a bolinha marcada, a conversa funcionou de ponta a ponta (resposta em pedaços, Markdown completo, Parar, rodapé com o modelo efetivo);
+- os achados desse teste viraram dívidas anotadas (**DEBT-14/DEBT-15**), sem bloquear a homologação.
+**Roteiro do dono (PARTE D) — registrado como roteiro de referência da fatia.**
+**Fase ativa passa a ser a FATIA 10 — Agir** (SPEC: `docs/06` PARTE 2D).
+
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
 > **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
