@@ -69,6 +69,18 @@ export interface MensagemAgir {
 }
 
 /**
+ * Mensagem SIMPLES no fio da rota (o que a tela manda: o histórico visível
+ * da conversa — mesma forma do `/api/chat` da casa vizinha, G5).
+ */
+export interface MensagemSimples {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/** A resposta do dono ao cartão (os 3 botões). */
+export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
+
+/**
  * Eventos do fio da casa Agir. O loop emite; a rota repassa por SSE na C3.
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
  * contrato porque o loop precisa saber onde parar e esperar.

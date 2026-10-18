@@ -20,7 +20,8 @@ import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT }
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
-import { enviarConversa, type ControleConversa, type MensagemChat } from './bairros/2-inteligencia/casas/conversa'
+import { enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
+import type { FerramentaNoChat } from './types'
 import {
   closeCustomView,
   customViewTitle,
@@ -185,6 +186,30 @@ const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
 /** FATIA 09 (§3.8): qual sessão estava aberta — o F5 volta para ELA e a
  * conversa (restaurada do .jsonl) aparece na hora. */
 const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
+/** FATIA 10 (Q2a): ferramentas que o dono liberou "na sessão" — sobrevivem ao F5. */
+const PERMISSOES_AGIR_KEY = 'workbench.agir.permissoes.v1'
+type PermissoesAgir = Record<string, string[]>
+const lerPermissoesAgir = (): PermissoesAgir => {
+  try {
+    const bruto = window.localStorage.getItem(PERMISSOES_AGIR_KEY)
+    return bruto ? (JSON.parse(bruto) as PermissoesAgir) : {}
+  } catch {
+    return {}
+  }
+}
+const permissoesDeSessao = (sessionId: string): string[] => lerPermissoesAgir()[sessionId] ?? []
+const salvarPermissaoSessao = (sessionId: string, ferramenta: string): void => {
+  const todas = lerPermissoesAgir()
+  const atuais = todas[sessionId] ?? []
+  if (!atuais.includes(ferramenta)) {
+    todas[sessionId] = [...atuais, ferramenta]
+    try {
+      window.localStorage.setItem(PERMISSOES_AGIR_KEY, JSON.stringify(todas))
+    } catch {
+      // armazenamento indisponível: a liberação vale só neste fluxo
+    }
+  }
+}
 type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
 function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
   try {
@@ -600,7 +625,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }, [])
   const pendingResponseTimers = useRef<Map<string, number>>(new Map())
   // FATIA 09: conversas REAIS em voo (runKey → controle de abort do fio).
-  const conversasAtivas = useRef<Map<string, ControleConversa>>(new Map())
+  const agirAtivas = useRef<Map<string, ControleAgir>>(new Map())
   const approvalTimer = useRef<number | undefined>(undefined)
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
@@ -1605,28 +1630,50 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   /** Histórico limpo do chat atual (G5): sem bolhas de erro, canceladas ou em voo. */
-  const montarHistorico = (mensagens: ChatMessage[]): MensagemChat[] =>
+  const montarHistorico = (mensagens: ChatMessage[]): MensagemSimples[] =>
     mensagens
       .filter((mensagem) => !mensagem.running && !mensagem.cancelled && !mensagem.erro && mensagem.content.trim().length > 0)
       .map((mensagem) => ({ role: mensagem.role, content: mensagem.content }))
 
   /**
-   * FATIA 09 — liga a conversa REAL no chat: troca o miolo (geração da
-   * resposta), mantendo a assinatura do handleSend (nenhum chamador muda).
-   * O mock de 1 s saiu do caminho — não existe reserva silenciosa (SPEC §3.1).
+   * FATIA 10 — liga o AGIR no chat: o mesmo lugar da FATIA 09, agora com
+   * ferramentas de arquivo. O texto continua crescendo em pedaços e os
+   * cartões (ler/criar/…) nascem, esperam o dono e mostram o resultado
+   * presos à resposta (SPEC PARTE 2D §5). Parar continua silencioso.
    */
-  const iniciarConversaReal = (
+  const iniciarAgirReal = (
     sessionId: string,
     chatId: string,
     responseId: string,
-    historico: MensagemChat[],
+    historico: MensagemSimples[],
     aoConcluir?: () => void,
   ): void => {
     const runKey = `${sessionId}:${chatId}`
-    conversasAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
+    agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
     let acumulado = ''
 
-    const controle = enviarConversa(historico, {
+    /** Atualiza os cartões da resposta em voo (fonte única da verdade). */
+    const mexerCartoes = (mexer: (cartoes: FerramentaNoChat[]) => FerramentaNoChat[]): void => {
+      updateSession(sessionId, (session) => ({
+        ...session,
+        chats: session.chats.map((chat) => chat.id === chatId ? {
+          ...chat,
+          messages: chat.messages.map((message) => message.id === responseId ? {
+            ...message,
+            ferramentas: mexer(message.ferramentas ?? []),
+          } : message),
+        } : chat),
+      }))
+    }
+
+    const controle = enviarAgir(
+      {
+        mensagens: historico,
+        fluxo: sessionId,
+        workspace: sessions.find((session) => session.id === sessionId)?.workspacePath ?? undefined,
+        permissoes: permissoesDeSessao(sessionId),
+      },
+      {
       onChunk: (pedaco) => {
         acumulado += pedaco
         const conteudo = acumulado
@@ -1638,8 +1685,28 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           } : chat),
         }))
       },
+      onTool: (pedido: PedidoFerramenta) => {
+        mexerCartoes((cartoes) => [...cartoes, {
+          id: pedido.id,
+          ferramenta: pedido.ferramenta,
+          alvo: String(pedido.argumentos.caminho ?? pedido.argumentos.padrao ?? ''),
+          status: 'executando',
+        }])
+      },
+      onApproval: (pedido: PedidoFerramenta) => {
+        const bruta = pedido.argumentos.conteudo
+        const previa = typeof bruta === 'string' ? bruta.slice(0, 400) : undefined
+        mexerCartoes((cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
+      },
+      onToolResult: (id, _ferramenta, ok, resumo) => {
+        mexerCartoes((cartoes) => cartoes.map((carta) => carta.id === id ? {
+          ...carta,
+          status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
+          resumo,
+        } : carta))
+      },
       onDone: (modelo) => {
-        conversasAtivas.current.delete(runKey)
+        agirAtivas.current.delete(runKey)
         updateSession(sessionId, (session) => {
           const next = completeChatRun(session, chatId)
           return {
@@ -1660,7 +1727,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         aoConcluir?.()
       },
       onError: (_code, mensagemErro) => {
-        conversasAtivas.current.delete(runKey)
+        agirAtivas.current.delete(runKey)
         updateSession(sessionId, (session) => {
           const next = completeChatRun(session, chatId)
           return {
@@ -1680,8 +1747,36 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           }
         })
       },
+      },
+    )
+    agirAtivas.current.set(runKey, controle)
+  }
+
+  /** O dono respondeu um cartão: guarda "na sessão" (Q2a) e responde ao servidor. */
+  const decidirFerramenta = (sessionId: string, chatId: string, messageId: string, ferramentaId: string, decisao: DecisaoAprovacao): void => {
+    const sessao = sessions.find((item) => item.id === sessionId)
+    const chat = sessao?.chats.find((item) => item.id === chatId)
+    const carta = chat?.messages.find((item) => item.id === messageId)?.ferramentas?.find((item) => item.id === ferramentaId)
+    if (!sessao || !carta || carta.status !== 'aguardando') return
+    const marcar = (status: FerramentaNoChat['status']): void => {
+      updateSession(sessionId, (session) => ({
+        ...session,
+        chats: session.chats.map((item) => item.id === chatId ? {
+          ...item,
+          messages: item.messages.map((mensagem) => mensagem.id === messageId ? {
+            ...mensagem,
+            ferramentas: (mensagem.ferramentas ?? []).map((uma) => uma.id === carta.id ? { ...uma, status } : uma),
+          } : mensagem),
+        } : item),
+      }))
+    }
+    marcar('executando')
+    if (decisao === 'sessao' && (carta.ferramenta === 'criar' || carta.ferramenta === 'escrever')) {
+      salvarPermissaoSessao(sessionId, carta.ferramenta)
+    }
+    void responderAprovacao(sessionId, carta.id, decisao, carta.ferramenta).then((aceita) => {
+      if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
     })
-    conversasAtivas.current.set(runKey, controle)
   }
 
   const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }) => {
@@ -1710,7 +1805,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // Histórico da conversa atual (G5) + a mensagem nova — o que SAI para o servidor.
     const sessaoOrigem = sessions.find((session) => session.id === sessionId)
     const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
-    const historico: MensagemChat[] = [
+    const historico: MensagemSimples[] = [
       ...montarHistorico(chatOrigem?.messages ?? []),
       { role: 'user', content: messageContent },
     ]
@@ -1741,19 +1836,20 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }
     })
 
-    // (FATIA 09) Conversa REAL com o provedor ativo: o histórico vai para o
-    // servidor e a resposta chega em pedaços (a bolha cresce — SPEC §3.2).
-    iniciarConversaReal(sessionId, chatId, responseId, historico)
+    // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
+    // servidor, a resposta chega em pedaços e as ferramentas viram cartões
+    // com aprovação do dono (SPEC PARTE 2D).
+    iniciarAgirReal(sessionId, chatId, responseId, historico)
   }
 
   const handleStop = () => {
     const sessionId = activeSession.id
     // FATIA 09: derruba o fio REAL desta sessão no servidor (o provedor para de
     // ser consumido) — e a bolha guarda o texto que já chegou (SPEC §3.4).
-    for (const [key, controle] of conversasAtivas.current) {
+    for (const [key, controle] of agirAtivas.current) {
       if (key.startsWith(`${sessionId}:`)) {
         controle.abortar()
-        conversasAtivas.current.delete(key)
+        agirAtivas.current.delete(key)
       }
     }
     // CancelAction in the workbench cancels the request owned by the current
@@ -1830,7 +1926,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     })
     notify('Regenerando resposta')
 
-    iniciarConversaReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'))
+    iniciarAgirReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'))
   }
 
   const handleMessageCopy = (_chatId: string, _messageId: string, kind: ChatCopyKind) => {
@@ -1958,6 +2054,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onSend={handleSend}
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}
+        onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}
         composerDrafts={composerDrafts}
         onChangeComposerDraft={(key, updater) => setComposerDrafts((current) => ({ ...current, [key]: updater(current[key] ?? { text: '', attachments: [] }) }))}
         composerHistory={composerHistoryByChat}

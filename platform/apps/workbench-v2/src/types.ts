@@ -8,6 +8,19 @@ export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'customizat
 export type BrowserViewport = 'desktop' | 'tablet' | 'mobile'
 export type BrowserStatus = 'loading' | 'ready' | 'error'
 
+/** Cartão de ferramenta do agente (FATIA 10) preso a uma resposta do chat. */
+export interface FerramentaNoChat {
+  id: string
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever'
+  /** Caminho (ou padrão de busca) mostrado no cartão. */
+  alvo: string
+  /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */
+  previa?: string
+  status: 'aguardando' | 'executando' | 'ok' | 'negado' | 'erro' | 'expirado'
+  /** Resumo honesto do resultado (texto do servidor). */
+  resumo?: string
+}
+
 export interface ChatMessage {
   id: string
   role: MessageRole
@@ -22,6 +35,8 @@ export interface ChatMessage {
   erro?: boolean
   vote?: ChatVote
   reported?: boolean
+  /** Cartões de ferramenta do agente (FATIA 10) — presos a esta resposta. */
+  ferramentas?: FerramentaNoChat[]
 }
 
 export interface ComposerDraft {

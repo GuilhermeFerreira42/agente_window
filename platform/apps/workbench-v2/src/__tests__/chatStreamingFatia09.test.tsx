@@ -14,10 +14,10 @@ import { testSessions } from './fixtures/sessions'
 
 beforeEach(() => {
   window.localStorage.clear()
-  // /api/chat pendente até o teste instalar um fio (ou até o Parar abortar).
+  // /api/agir pendente até o teste instalar um fio (ou até o Parar abortar).
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).includes('/api/chat')) {
+    if (String(input).includes('/api/agir')) {
       return new Promise<Response>((_resolve, reject) => {
         const sinal = init?.signal
         const abortar = () => reject(new DOMException('Aborted', 'AbortError'))
@@ -32,7 +32,7 @@ beforeEach(() => {
 /** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
 function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 'aberto' = 'done', atrasoMs = 40): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
-    if (!String(input).includes('/api/chat')) throw new Error('fetch inesperado no teste')
+    if (!String(input).includes('/api/agir')) throw new Error('fetch inesperado no teste')
     const codificar = new TextEncoder()
     const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
     if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))

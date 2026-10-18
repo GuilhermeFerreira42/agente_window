@@ -157,7 +157,11 @@ export function criarExecutoresReais(raiz: string): Record<FerramentaId, Executo
     } catch {
       // não existe ainda: é exatamente o caso do "criar"
     }
-    await gravarAtomico(porta.caminho, String(pedido.argumentos.conteudo))
+    try {
+      await gravarAtomico(porta.caminho, String(pedido.argumentos.conteudo))
+    } catch {
+      return falha(`Não deu para gravar "${String(pedido.argumentos.caminho)}" (permissão negada, disco cheio ou caminho inválido).`)
+    }
     return { ok: true, resumo: `Arquivo "${String(pedido.argumentos.caminho)}" criado (escrita atômica).` }
   }
 
@@ -175,7 +179,11 @@ export function criarExecutoresReais(raiz: string): Record<FerramentaId, Executo
     if (!existia) {
       return falha(`"${String(pedido.argumentos.caminho)}" não existe ainda — peça a ferramenta "criar" para arquivos novos.`)
     }
-    await gravarAtomico(porta.caminho, String(pedido.argumentos.conteudo))
+    try {
+      await gravarAtomico(porta.caminho, String(pedido.argumentos.conteudo))
+    } catch {
+      return falha(`Não deu para gravar "${String(pedido.argumentos.caminho)}" (permissão negada, disco cheio ou caminho inválido).`)
+    }
     return { ok: true, resumo: `Arquivo "${String(pedido.argumentos.caminho)}" reescrito por completo (escrita atômica).` }
   }
 

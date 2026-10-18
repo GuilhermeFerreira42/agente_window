@@ -133,6 +133,7 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
       onChangeMode: vi.fn(),
       onSend: vi.fn(),
       onStop: vi.fn(),
+      onDecidirFerramenta: vi.fn(),
       onApprove: vi.fn(),
       onCopy: vi.fn(),
       onCopyAll: vi.fn(),

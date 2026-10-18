@@ -85,7 +85,10 @@ describe('O loop do agente (rodarAgir)', () => {
       historico: [{ papel: 'usuario', conteudo: 'escreve' }],
       executores: { ...EXECUTORES, escrever: escreverEspiado },
       emitir: (e) => eventos.push(e),
-      pedirAprovacao: async () => false,
+      pedirAprovacao: async (pedidoDaVez) => {
+        eventos.push({ type: 'approval', pedido: pedidoDaVez }) // quem pergunta anuncia
+        return false
+      },
     })
     expect(eventos.map((e) => e.type)).toEqual(['tool', 'approval', 'tool_result', 'chunk', 'done'])
     expect(executou).toBe(0)

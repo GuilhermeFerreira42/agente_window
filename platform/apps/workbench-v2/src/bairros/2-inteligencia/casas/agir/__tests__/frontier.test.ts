@@ -115,14 +115,18 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
     expect(infratores).toEqual([])
   })
 
-  it('FT-05: o SEGREDO da casa ("/api/agir") não existe antes da hora — nasce na C3', () => {
+  it('FT-05: as URLs da casa moram SÓ na rota e no cliente (segredo de casa)', () => {
     // Desde a C2 a casa cita endereços de PROVEDORES (ex.: o /api/chat nativo
-    // do Ollama) — esses são de fora e são legítimos. O que não pode existir
-    // antes da C3 é a URL da NOSSA rota.
+    // do Ollama) — legítimos. A NOSSA URL vive só em server/rotas.ts e em
+    // ui/client/api.ts; nenhum outro arquivo (e o App NUNCA) a cita.
     const infratores: string[] = []
     for (const arquivo of arquivosDe(CASA)) {
-      if (readFileSync(arquivo, 'utf8').includes('/api/agir')) infratores.push(relative(CASA, arquivo))
+      const rel = relative(CASA, arquivo)
+      if (rel.endsWith('server/rotas.ts') || rel.endsWith('ui/client/api.ts')) continue
+      if (readFileSync(arquivo, 'utf8').includes('/api/agir')) infratores.push(rel)
     }
-    expect(infratores, "a rota '/api/agir' nasce na C3, dentro da casa").toEqual([])
+    expect(infratores, "'/api/agir' só pode aparecer em server/rotas.ts e ui/client/api.ts").toEqual([])
+    const cliente = readFileSync(join(CASA, 'ui', 'client', 'api.ts'), 'utf8')
+    expect(cliente, 'o cliente da casa é dono da URL /api/agir').toContain("'/api/agir'")
   })
 })

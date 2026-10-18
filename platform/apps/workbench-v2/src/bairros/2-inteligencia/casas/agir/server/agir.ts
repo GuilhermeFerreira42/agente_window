@@ -110,7 +110,9 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
       let liberado = true
       if (ehMexida(pedido.ferramenta) && pedirAprovacao) {
-        emitir({ type: 'approval', pedido })
+        // Quem pergunta é que anuncia o cartão (a rota emite `approval` só
+        // quando vai MESMO esperar o dono — permissão de sessão não faz
+        // cartão). O loop apenas pergunta e espera.
         liberado = await pedirAprovacao(pedido)
       }
 

@@ -42,7 +42,7 @@ export interface AjustesVizinho {
 }
 
 // ── Enquadração (espelho de streaming.ts da casa Conversa) ──────────────────
-interface Framer {
+export interface Framer {
   entrar(texto: string): string[]
   fechar(): string[]
 }
@@ -324,6 +324,11 @@ function textoDeCorpoInteiro(protocolo: ProtocoloAgir, dados: Record<string, unk
   }
   const mensagem = dados.message as { content?: unknown } | undefined
   return typeof mensagem?.content === 'string' ? mensagem.content : ''
+}
+
+/** O fio do NOSSO servidor é sempre SSE — o cliente do browser usa este. */
+export function criarFramerSSE(): Framer {
+  return framerSSE()
 }
 
 /**

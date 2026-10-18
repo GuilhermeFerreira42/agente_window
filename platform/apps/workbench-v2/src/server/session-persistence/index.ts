@@ -10,6 +10,7 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
+import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
 import { obterAlvoDeConversa } from './chatAlvo'
 
 const API_PREFIX = '/api/sessions'
@@ -111,9 +112,24 @@ async function saveSession(session: Session): Promise<void> {
   await writeTranscript(slug, session.id, entries)
 }
 
+/**
+ * FATIA 10 — o território do agente: a prefeitura valida a pasta informada
+ * pela sessão e entrega a RAIZ real (o navegador nunca define território).
+ */
+const pastaDeTrabalhoAgir = (caminho: string | undefined): { ok: true; raiz: string } | { ok: false; message: string } => {
+  if (caminho === undefined || caminho.trim() === '') {
+    return { ok: false, message: 'Nenhuma pasta de trabalho ativa nesta sessão — escolha a pasta para o agente poder agir.' }
+  }
+  const checagem = validateWorkspacePath(caminho)
+  if (!checagem.valid || !checagem.exists || !checagem.isDir) {
+    return { ok: false, message: 'A pasta de trabalho desta sessão não está acessível. Escolha a pasta de novo.' }
+  }
+  return { ok: true, raiz: checagem.realpath }
+}
+
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -145,6 +161,9 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (rotaPertenceAoModuloConversa(url.pathname)) {
     if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa)) return true
+  }
+  if (rotaPertenceAoModuloAgir(url.pathname)) {
+    if (await tratarRotasAgir(request, response, url, { obterAlvo: obterAlvoDeConversa, pastaDeTrabalho: pastaDeTrabalhoAgir })) return true
   }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {

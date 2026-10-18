@@ -15,6 +15,7 @@ import {
   ThumbsUp,
 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
+import { CartaoFerramenta } from './CartaoFerramenta'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
@@ -37,6 +38,7 @@ interface ChatPanelProps {
   onSend: (text: string, attachments: Attachment[]) => void
   onStop: () => void
   onApprove: (chatId?: string) => void
+  onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onCopy: (chatId: string, messageId: string, kind: ChatCopyKind) => void
   onCopyAll: (chatId: string) => void
   onCopyFinalResponse: (chatId: string, messageId: string) => void
@@ -152,9 +154,11 @@ function MessageRow({
   onFeedback,
   onRegenerate,
   onReport,
+  onDecidirFerramenta,
   canRegenerate,
 }: {
   message: ChatMessage
+  onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onCopy: (messageId: string, kind: ChatCopyKind) => void
   onCopyAll: () => void
   onCopyFinalResponse: () => void
@@ -188,6 +192,17 @@ function MessageRow({
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>
               </span>
+            ))}
+          </div>
+        )}
+        {message.ferramentas && message.ferramentas.length > 0 && (
+          <div role="list" aria-label="Ferramentas usadas pelo agente">
+            {message.ferramentas.map((carta) => (
+              <CartaoFerramenta
+                key={carta.id}
+                carta={carta}
+                onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
+              />
             ))}
           </div>
         )}
@@ -244,6 +259,7 @@ export function ChatPanel({
   onSend,
   onStop,
   onApprove,
+  onDecidirFerramenta,
   onCopy,
   onCopyAll,
   onCopyFinalResponse,
@@ -306,6 +322,7 @@ export function ChatPanel({
               onFeedback={(messageId, vote) => onFeedback(activeChat.id, messageId, vote)}
               onRegenerate={(messageId) => onRegenerate(activeChat.id, messageId)}
               onReport={(messageId) => onReport(activeChat.id, messageId)}
+              onDecidirFerramenta={(ferramentaId, decisao) => onDecidirFerramenta(activeChat.id, message.id, ferramentaId, decisao)}
               canRegenerate={message.id === lastAssistantMessageId}
             />
           ))}
