@@ -48,6 +48,8 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 7. **Parar (§6.9):** peça uma ação e clique **Parar** no meio — tudo morre limpo, status honesto na tela.
 8. **F5 no meio de um cartão aberto:** cartão pendente vira **expirado** na volta (a execução morreu com a página — nada fica pendurado).
 
+**Progresso (19/10, acompanhamento — NÃO é homologação):** passo 2 ✅ (CRUD do dono no Windows, Nemotron via LiteLLM, cartões aprovados) · passo 6 dispensado (teste automatizado do guardião). **Faltam:** 1 (oi) · 3 (negar) · 4 (sessão+F5) · 5 (território) · 7 (Parar) · 8 (F5 com cartão aberto).
+
 **Homologado = o dono declara** (padrão das fatias 07–09).
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
