@@ -335,3 +335,8 @@ Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 f
 
 ### 13.3 Buraco de teste identificado (16/10) — nenhuma trava dizia ONDE a superfície abre
 A sonda `sonda_01_debt09.cjs` (FATIA 07) e a bateria da FATIA 08 verificavam que a tela **abre** (aba, `.providers-view` visível, zero erro de console) — **nenhuma** verificava **onde/como** ela abre (superfície, estado do painel, maximizado × divisão). Foi por esse buraco que o **DEBT-04** (reaberto pelo dono em 16/10) passou. **Trava proposta** (entra junto do fix da opção A, `06 §8.3`): teste E2E de contrato — "Conta ▸ Provedores abre com o editor **maximizado** (`.desktop-surface-group.editor-maximized`, sem `.chat-pane`)"; e, no unit, contrato do estado de layout por tipo de aba.
+
+### 13.4 FATIA 10 — bateria da fatia e estado da suíte (19/10)
+- Unit: **872✓ / 12✗ (pré-existentes e intocáveis: `TerminalPanel`×9, `iconLabels`, `themeTokens`, `visualStates`) / 16 skip**. O flaky "regenerar" do `App.test` segue intermitente sob carga (provado pré-existente via stash no C1; hoje: 3/3 no estado limpo, 4/4 isolado com as mudanças da fatia, e o arquivo inteiro 46✓ logo depois de falhar — corrida a corrida).
+- E2E régua (por fatia, conforme §13.1): **fatias 08 + 09 + 10 = 15/15**, contra os stubs 4599/4610 e território REAL em `/tmp`. A `agir_fatia10` (5/5) prova: cartão aparece e **nada é escrito antes do Permitir**, o disco recebe o conteúdo exato, negar não escreve, "Permitir na Sessão" vale no fluxo e sobrevive ao F5, e ferramenta nenhuma sai da pasta.
+- Suíte E2E **completa**: segue não-régua neste sandbox — travou >25 min nas specs antigas de terminal/PTY (ver §13.1: 88✘ ambientais já auditados). A bateria da fatia é a régua.

@@ -1422,6 +1422,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     if (!hasSessions) { setWorkspaceChangePending(false); return }
     const previousPath = activeSession.worktreePath ?? activeSession.workspacePath
     try {
+      // Sessão recém-criada pode ainda não existir no servidor (ela só vai em
+      // bloco no pagehide) — persiste ANTES de trocar a pasta, senão a troca
+      // morre no 404 silencioso (o caso do teste manual do dono na FATIA 10:
+      // sessão nova → digita a pasta → agente seguia na pasta antiga).
+      if (!activeSession.isDraft) await persistSessionNoUnload(activeSession)
       const { session } = await changeSessionWorkspace(activeSession.id, path)
       const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
       if (!fsResponse.ok) throw new Error(`Falha ao atualizar Explorer (${fsResponse.status})`)
@@ -1673,7 +1678,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const controle = enviarAgir(
       {
         mensagens: historico,
-        fluxo: sessionId,
+        // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
+        // aprovações desta resposta — nada vaza para a próxima troca. As
+        // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
+        fluxo: `${sessionId}:${chatId}:${responseId}`,
         workspace: sessions.find((session) => session.id === sessionId)?.workspacePath ?? undefined,
         permissoes: permissoesDeSessao(sessionId),
       },
@@ -1778,7 +1786,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     if (decisao === 'sessao' && (carta.ferramenta === 'criar' || carta.ferramenta === 'escrever')) {
       salvarPermissaoSessao(sessionId, carta.ferramenta)
     }
-    void responderAprovacao(sessionId, carta.id, decisao, carta.ferramenta).then((aceita) => {
+    void responderAprovacao(`${sessionId}:${chatId}:${messageId}`, carta.id, decisao, carta.ferramenta).then((aceita) => {
       if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
     })
   }

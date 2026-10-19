@@ -625,3 +625,25 @@ Fechar o MVP: a IA deixa de ser só conversa e passa a **ler, listar, buscar, cr
 - **Consequência aceita do Q4=(b):** modelo/provedor **sem canal nativo de ferramentas** (comum em modelos locais) **não usa o Agir** — o app detecta e mostra aviso honesto; a conversa normal segue funcionando. Se o `gemma` (Ollama) do dono tiver ou não o canal **só se confirma na prática**, na homologação dele. O **stub** da prova fala os 4 formatos nativos (D91).
 - A prova automatizada usa **stub** (D91); serviço real é roteiro do dono.
 - O seletor de modelos do composador segue com a lista fixa (**DEBT-14**); a conversa da 10 usa o **provedor ativo do chat**, como na 09.
+
+## 9. STATUS DA ENTREGA (19/10) — IMPLEMENTADA (C1–C5) · HOMOLOGAÇÃO PENDENTE (é do dono)
+
+Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não considerar concluída apenas porque o código foi implementado"*):
+
+| Commit | Conquista | Prova registrada |
+|---|---|---|
+| `547729e` | C1 — a casa Agir nasce (contrato + loop no servidor + extratores nativos ×4, Q4b) | 21 testes da casa |
+| `8b93c05` | C2 — mãos de arquivo de verdade (território, escrita atômica, anúncio, diálogo, vizinho) | 49/49 |
+| `c1b6518` | C3 — o cartão na tela (rota SSE + cartão de permissão no chat) | casa 56/56 · E2E 09 **5/5** sobre o fio novo · fumaça HTTP real (400 histórico · 409 sem pasta · 409 fluxo morto · SSE com chunks) |
+| `1c4945d` | C4 — memória e travas finas (anti-loop 3× + F5 sana cartões) | +4 testes; agir+services **60/60** |
+| C5 | E2E da própria fatia + 2 consertos de sessão + docs (esta atualização) | E2E `agir_fatia10` **5/5** |
+
+**Placar de fechamento:** tsc **0** · unit **872✓ / 12✗ (todas pré-existentes: TerminalPanel×9, iconLabels, themeTokens, visualStates) / 16skip** — o flaky "regenerar" do `App.test` segue intermitente sob carga (provado pré-existente via stash no C1; hoje: 3/3 no estado limpo, 4/4 isolado com as mudanças, arquivo inteiro 46✓ logo depois de falhar) · E2E **`agir_fatia10` 5/5** + regressão das fatias **08+09+10 = 15/15** · contrato anti-trapaça **6/6**.
+
+**Os 10 critérios do §6, critério a critério:** 1 = T1 do E2E · 2 = T2 (prova do disco **antes** do Permitir) · 3 = T2 (conteúdo exato no disco) · 4 = T3 · 5 = T4 ("Permitir na Sessão" + F5) · 6 = T4 (F5) e C4 (cartão `aguardando`→`expirado`) · 7 = T5 · 8 = teste do guardião (3 idênticas → 2 execuções, `loop_bloqueado`) · 9 = Parar herdado da 09 (abort no servidor, provado em `rotas.test`) · 10 = este placar, tudo com **stub** (D91 — sem chave do dono).
+
+**Dois consertos que a prova da própria fatia exigiu (memória de sessão):**
+1. **Fluxo único por troca** — o "fluxo" do agir passou a ser `sessão:chat:resposta` (antes era só o id da sessão): as aprovações do fluxo ficam isoladas por troca; a permissão "na sessão" (Q2a) continua atravessando trocas pelo armário do cliente.
+2. **Trocar a pasta numa sessão recém-criada** — a sessão nova só vai ao servidor em bloco no `pagehide`; trocar a pasta **antes disso** morria no 404 silencioso e o agente seguia na pasta antiga — **o cenário exato do teste manual do dono em 18/10**. Conserto: persistir a sessão antes de trocar (`handleChangeActiveWorkspace`).
+
+**Limitação nova registrada honestamente:** cada envio é **um fluxo novo**; o resultado das ferramentas entra no histórico como texto (o modelo lê o que aconteceu nas trocas anteriores), mas não há "estado de ferramenta vivo" entre mensagens. E a suíte E2E **completa** segue não sendo régua no sandbox (`09 §13.1`) — a régua é por fatia.

@@ -37,6 +37,19 @@
 **Roteiro do dono (PARTE D) — registrado como roteiro de referência da fatia.**
 **Fase ativa passa a ser a FATIA 10 — Agir** (SPEC: `docs/06` PARTE 2D).
 
+## Roteiro de Homologação — FATIA 10: AGIR (o cartão de permissão no chat) — PENDENTE (a declaração é do dono)
+Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de ferramentas**. **Aviso Q4b (D93):** se o modelo ativo (ex.: `gemma` no Ollama) não tiver tool calling nativo, o Agir mostra aviso honesto (`sem_canal_nativo`) e a conversa segue sem agir — nesse caso valide os passos 2–7 com um provedor que tenha o canal; a conversa normal funciona com qualquer provedor.
+1. **Conversa normal (§6.1):** mande "oi" — responde como na 09, sem cartão.
+2. **O teste final do MVP (§6.2/3):** numa sessão com **pasta real** (interruptor no topo: digite o caminho da pasta e Enter), mande **"Crie o arquivo teste-homologacao.txt com o conteúdo: feito pela fatia 10"** → cartão com caminho + prévia + 3 botões. **Antes de permitir, confira no Explorador: o arquivo NÃO existe.** Clique **Permitir** → cartão "Feito" e o arquivo **existe** com o conteúdo exato.
+3. **Negar (§6.4):** "crie o arquivo nao-quero.txt" → cartão → **Negar** → cartão "Negado por você"; a IA segue sabendo do "não" e **nada é escrito**.
+4. **Permitir na Sessão + F5 (§6.5/6):** "crie s1.txt" → **Permitir nesta sessão** → "crie s2.txt" → **não pergunta** (escreve direto). Aperte **F5** → "crie s3.txt" → **ainda não pergunta** (a permissão sobrevive ao F5). Conversa NOVA volta a perguntar.
+5. **Território (§6.7):** "crie o arquivo ../fora.txt" → mesmo aprovando: recusa honesta ("Fora da pasta…") e **nada fora da pasta**.
+6. **Anti-loop (§6.8):** se o modelo repetir a MESMA chamada 3× seguidas, aparece o aviso de loop e ele é parado (raro com modelo bom; coberto por teste automatizado).
+7. **Parar (§6.9):** peça uma ação e clique **Parar** no meio — tudo morre limpo, status honesto na tela.
+8. **F5 no meio de um cartão aberto:** cartão pendente vira **expirado** na volta (a execução morreu com a página — nada fica pendurado).
+
+**Homologado = o dono declara** (padrão das fatias 07–09).
+
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
 > **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
