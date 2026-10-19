@@ -28,6 +28,30 @@
 - **A4** — "copiar o visual do LiteLLM" (estudo futuro, sem fatia definida).
 **Roteiro do dono (PARTE C) — cumprido:** configurar provedor real → Testar conexão → salvar → reabrir e conferir a chave mascarada (feito no vídeo de 15/10).
 
+## Homologação FATIA 09 — 2026-10-18 (declaração do dono) ✅
+**Palavras do dono (canônicas):** *"09 homologada. começe a 10"* (registro **D92**, `docs/05`).
+**O que essa homologação cobre:**
+- os critérios da SPEC (`docs/06` PARTE 2C) — verdes na prova automatizada: tsc **0** · unit **813✓ / 12✗ pré-existentes / 16skip** · E2E `conversa_fatia09` **5/5 em 4 rodadas** · contrato anti-trapaça **6/6**;
+- a **validação do dono com serviço REAL** (17/10, 2 vídeos): **Ollama local** (`gemma4:31b-cloud`) — no 1º vídeo o app recusou com o erro honesto *"Nenhum provedor está ativo"* porque a bolinha "usar este provedor no chat" não estava marcada (comportamento correto do sistema); no 2º vídeo, com a bolinha marcada, a conversa funcionou de ponta a ponta (resposta em pedaços, Markdown completo, Parar, rodapé com o modelo efetivo);
+- os achados desse teste viraram dívidas anotadas (**DEBT-14/DEBT-15**), sem bloquear a homologação.
+**Roteiro do dono (PARTE D) — registrado como roteiro de referência da fatia.**
+**Fase ativa passa a ser a FATIA 10 — Agir** (SPEC: `docs/06` PARTE 2D).
+
+## Roteiro de Homologação — FATIA 10: AGIR (o cartão de permissão no chat) — PENDENTE (a declaração é do dono)
+Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de ferramentas**. **Aviso Q4b (D93):** se o modelo ativo (ex.: `gemma` no Ollama) não tiver tool calling nativo, o Agir mostra aviso honesto (`sem_canal_nativo`) e a conversa segue sem agir — nesse caso valide os passos 2–7 com um provedor que tenha o canal; a conversa normal funciona com qualquer provedor.
+1. **Conversa normal (§6.1):** mande "oi" — responde como na 09, sem cartão.
+2. **O teste final do MVP (§6.2/3):** numa sessão com **pasta real** (interruptor no topo: digite o caminho da pasta e Enter), mande **"Crie o arquivo teste-homologacao.txt com o conteúdo: feito pela fatia 10"** → cartão com caminho + prévia + 3 botões. **Antes de permitir, confira no Explorador: o arquivo NÃO existe.** Clique **Permitir** → cartão "Feito" e o arquivo **existe** com o conteúdo exato.
+3. **Negar (§6.4):** "crie o arquivo nao-quero.txt" → cartão → **Negar** → cartão "Negado por você"; a IA segue sabendo do "não" e **nada é escrito**.
+4. **Permitir na Sessão + F5 (§6.5/6):** "crie s1.txt" → **Permitir nesta sessão** → "crie s2.txt" → **não pergunta** (escreve direto). Aperte **F5** → "crie s3.txt" → **ainda não pergunta** (a permissão sobrevive ao F5). Conversa NOVA volta a perguntar.
+5. **Território (§6.7):** "crie o arquivo ../fora.txt" → mesmo aprovando: recusa honesta ("Fora da pasta…") e **nada fora da pasta**.
+6. **Anti-loop (§6.8):** se o modelo repetir a MESMA chamada 3× seguidas, aparece o aviso de loop e ele é parado (raro com modelo bom; coberto por teste automatizado).
+7. **Parar (§6.9):** peça uma ação e clique **Parar** no meio — tudo morre limpo, status honesto na tela.
+8. **F5 no meio de um cartão aberto:** cartão pendente vira **expirado** na volta (a execução morreu com a página — nada fica pendurado).
+
+**Progresso (19/10, acompanhamento — NÃO é homologação):** passo 2 ✅ (CRUD do dono no Windows, Nemotron via LiteLLM, cartões aprovados) · passo 6 dispensado (teste automatizado do guardião). **Faltam:** 1 (oi) · 3 (negar) · 4 (sessão+F5) · 5 (território) · 7 (Parar) · 8 (F5 com cartão aberto).
+
+**Homologado = o dono declara** (padrão das fatias 07–09).
+
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
 > **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
