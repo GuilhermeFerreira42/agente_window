@@ -16,7 +16,7 @@
 - **Entregas homologadas:** DEBT-09 (`a69137d`) · DEBT-06 caminho C (`62cf055`) · DEBT-04 (nada a expurgar) · onda 1 da faxina D74 (`9985b9e`) · quarentena pontual dos 2 E2E da Aux (`e182960`).
 - **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d`.
 - **Números na homologação:** typecheck 0 · unit 730✓/12✗ (pré-existentes)/16 skip · E2E sem regressão (A/B em `e02e486`).
-- **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
+- **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 (pré-D95 = 16) · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
 ## Homologação FATIA 08 — 2026-10-17 (declaração do dono) ✅
 **Palavras do dono (canônicas):** *"vamos concluir a fatia número 8. Eu já homologuei ela, já tá funcionando corretamente"* (registro **D89**, `docs/05`).
 **O que essa homologação cobre:**
@@ -114,7 +114,7 @@ Roteiro usado no Windows real, porta 5174:
 6. **Recentes:** abrir novamente o seletor e confirmar as pastas em recentes, sem duplicatas e na ordem mais recente.
 7. **Exclusão segura:** excluir uma sessão e confirmar que a pasta real permanece intacta; não pode apagar arquivos do usuário nem criar/remover worktree ou branch.
 
-**Resultado histórico da 06.4a:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo; itens **2, 6 e 7** foram aceitos com base na validação local. A dívida do seletor pequeno foi posteriormente corrigida pela consolidação 06.4d/06.5; permanecem para a Fatia 12 o polish do Workspace Switcher e o texto/apresentação final da landing.
+**Resultado histórico da 06.4a:** homologada com ressalvas. Itens **1, 3, 4 e 5** passaram no vídeo; itens **2, 6 e 7** foram aceitos com base na validação local. A dívida do seletor pequeno foi posteriormente corrigida pela consolidação 06.4d/06.5; permanecem para a Fatia 12 (pré-D95 = 16) o polish do Workspace Switcher e o texto/apresentação final da landing.
 
 # PARTE A — O que cada coisa precisa provar (antigo 07 — Matriz de Validação)
 ## Objetivo

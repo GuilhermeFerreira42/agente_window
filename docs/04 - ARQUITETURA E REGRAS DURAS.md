@@ -16,7 +16,7 @@
 ## 1.1 Decisão 06.3 — seletor nativo de repositório (2026-10-06)
 - **Inspeção técnica:** `workbench-v2` é Vite/React puro; não há `tauri.conf`, pacote `@tauri-apps` nem runtime Tauri. Portanto, `plugin-dialog` não se aplica.
 - **Opção C servidor:** no Windows, o plugin Vite chama `powershell.exe` via `child_process.execFile`, em modo STA, e abre `System.Windows.Forms.FolderBrowserDialog`.
-- **Fluxo padrão 06.4a:** o caminho deve existir, ser diretório e resolver por `realpath`. Git não é obrigatório. `git rev-parse --show-toplevel` só pode ser exigido quando a chamada explícita usar `requireGit=true`/`useWorktree=true` (worktree opcional da Fatia 11).
+- **Fluxo padrão 06.4a:** o caminho deve existir, ser diretório e resolver por `realpath`. Git não é obrigatório. `git rev-parse --show-toplevel` só pode ser exigido quando a chamada explícita usar `requireGit=true`/`useWorktree=true` (worktree opcional da FATIA 19 — era 11 em esquema antigo).
 - A operação fica em `src/server/session-persistence/`; a UI usa endpoint single-port dedicado. Cancelamento retorna resultado explícito, não cria draft e não altera a seleção atual.
 - **Proibido:** usar `FileSystemDirectoryHandle`/File System Access API para inferir caminho absoluto; aceitar caminho sem validação canônica; implementar o diálogo dentro de Explorer ou terminal.
 - Fora do Windows, o endpoint de diálogo responde “não suportado”; a validação de caminho e os testes backend continuam multiplataforma.
