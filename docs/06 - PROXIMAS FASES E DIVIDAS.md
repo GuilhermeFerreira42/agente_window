@@ -695,7 +695,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R11-1 teto alto + nuvem = gasto (mitiga: texto de custo + máximo) · R11-2 "continuar" em loop real (mitiga: anti-loop intacto + cada continuar é decisão humana).
 
-**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? · Q11-2 máximo 200 (rec: sim)? · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? · Q11-4 arquivo `settings.json` (rec: sim)? · Q11-5 Continuar = +1 orçamento cheio (rec: sim)?
+**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 200 (rec: sim)? · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
 
 ## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
 
@@ -717,7 +717,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R12-1 API de lixeira difere por SO (mitiga: camada fina por SO + erro honesto) · R12-2 pasta gigante (mitiga: contagem no cartão + sem desfazer-direto avisado) · R12-3 sandbox sem lixeira (mitiga: XDG no Linux; Windows valida o dono).
 
-**10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)?
+**10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? → DECIDIDO (19/10): `excluir`. · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)? → DECIDIDO (19/10): sim, fora.
 
 ## PARTE 2G — SPEC da FATIA 13: Terminal-para-o-agente (poderes + segurança) — RASCUNHO
 
@@ -739,7 +739,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R13-1 **shell foge do território** (`cd /`, caminhos absolutos no comando) — NÃO há sandbox real; mitigação honesta: cartão mostra o comando (o humano julga) + negação + cwd fixo + aviso na SPEC. Risco aceito e declarado, não resolvido. R13-2 comando trava saída (mitiga: timeout + Parar) · R13-3 diferença cmd/pwsh/sh (mitiga: shell padrão do app + testes por SO no que der).
 
-**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? · Q13-2 shell = padrão do app por SO (rec: sim)? · Q13-3 timeout 60s (rec: sim)? · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? · Q13-6 lista inicial de negação acima (rec: sim)?
+**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? · Q13-3 timeout 60s (rec: sim)? · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
 
 ## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — RASCUNHO
 
