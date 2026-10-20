@@ -649,3 +649,72 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 2. **Trocar a pasta numa sessão recém-criada** — a sessão nova só vai ao servidor em bloco no `pagehide`; trocar a pasta **antes disso** morria no 404 silencioso e o agente seguia na pasta antiga — **o cenário exato do teste manual do dono em 18/10**. Conserto: persistir a sessão antes de trocar (`handleChangeActiveWorkspace`).
 
 **Limitação nova registrada honestamente:** cada envio é **um fluxo novo**; o resultado das ferramentas entra no histórico como texto (o modelo lê o que aconteceu nas trocas anteriores), mas não há "estado de ferramenta vivo" entre mensagens. E a suíte E2E **completa** segue não sendo régua no sandbox (`09 §13.1`) — a régua é por fatia. **Sem ferramenta de exclusão (por desenho, confirmado 19/10):** o conjunto da FATIA 10 é ler/listar/buscar + criar/escrever (SPEC 2D §7-C2, fechada no D93) — o código tem exatamente essas 5; o relatório CRUD do dono confirmou CREATE/READ/UPDATE e a ausência do DELETE, que fica registrado como **fora do escopo do MVP** (evoluiu em 19/10: dono declarou necessidade do CRUD completo e **fechou o desenho** — lixeira, arquivo+pasta, cartão reforçado, micro-fatia própria; ver **DEBT-16**).
+
+
+---
+
+# §0 — Mapa pós-MVP (D95) + matriz das SPECs 11–15 — RASCUNHO, Q&A pendente
+
+> **Status:** rascunho escrito pela IA em 19/10. **Implementação proibida** até o Q&A de cada SPEC com o dono + autorização expressa. Barra: qualquer programador ou IA implementa sem interpretação subjetiva.
+
+**Mapa (D95):** novas 11 (teto/Config) · 12 (DELETE) · 13 (terminal-agente) · 14 (barra/skills) → velha 11 virou **15** (abas/DEBT-12) · 12→**16** (Terminal 2.0 visual) · 13→**17** (refinamentos) · 14→**18** (painéis) · 15→**19** (worktree) · 16→**20** (polimento+navegador).
+
+**Matriz de dependências (lê-se: linha depende de coluna):**
+
+| SPEC | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|
+| 11 teto/Config | — | não | não | não | não |
+| 12 DELETE | não¹ | — | não | não | não |
+| 13 terminal-agente | sim² | não | — | não | não |
+| 14 barra/skills | não | não | não | — | não |
+| 15 abas (DEBT-12) | não | não | não | pref³ | — |
+
+¹ A 12 independe da 11 (ferramenta nova, teto atual vale). ² A 13 usa a aba Config se existir (teto) — senão usa o padrão 25; e estende o cartão que a 12 reforçou. ³ A 15 prefere a 14 pronta (mesma região de código, lados opostos) para não fundir UI em conflito — não é bloqueio duro.
+
+**Pontos de toque compartilhados:** casa Agir — loop (11), ferramentas (12, 13), anúncio de tools (12, 13); cartão de permissão — reforço (12), tipo comando (13); `App.tsx`/`shell/` — 14 (esquerda) e 15 (direita/centro). **RNF global:** nenhuma fatia aumenta o `App.tsx` — UI nova nasce em componentes/casas (D69); fiação mínima no síndico.
+
+**Riscos cruzados:** R-X1 testes E2E antigos de terminal seguem frágeis no sandbox (régua = specs das fatias, `09 §13.1`) · R-X2 cada SPEC mexe no cartão — regressão obrigatória do cartão da 10 em 12 e 13 · R-X3 escopo da 14 é o maior — o bound da v1 (§2H-6) é inegociável.
+
+## PARTE 2E — SPEC da FATIA 11: Teto 25 + "Continuar?" + Config v1 — RASCUNHO
+
+**1. Objetivo:** desbloquear tarefa real (o teto 10 parou o dono em 19/10): teto configurável padrão 25 (igual ao original), pergunta "continuar?" ao bater em vez de morrer, aba Configurações (casa das preferências) e auto-scroll do chat.
+
+**2. Entregáveis:** (a) aba Configurações com 2 itens na v1 — teto de voltas (número) + auto-scroll (liga/desliga); (b) loop do Agir lê o teto (padrão 25); (c) fim de teto vira cartão-mensagem com botão **[Continuar]** (+N voltas) e **[Parar]**; (d) anti-loop 3× segue fixo e sempre ligado (decisão 19/10); (e) auto-scroll só quando o usuário já está no fim (não puxa leitura).
+
+**3. Requisitos funcionais:** RF11-1 teto vale por mensagem, 1–200, padrão 25 (Q11-2 confirma o máximo) · RF11-2 salvar aplica na próxima mensagem (nunca no meio de um loop) · RF11-3 "Continuar" concede +1 orçamento cheio e retoma o MESMO fluxo (Q11-5) · RF11-4 sem Config salva = 25 + auto-scroll padrão (Q11-3) · RF11-5 número inválido = erro honesto no campo, nada salva · RF11-6 auto-scroll só dispara se o viewport estiver a ≤120px do fim.
+
+**4. Requisitos não-funcionais:** RNF11-1 settings em `~/.agente_window/settings.json`, sem segredos, só números/bools (Q11-4) · RNF11-2 texto de custo ao lado do teto ("valores altos = mais chamadas = mais gasto/tempo") · RNF11-3 Config na aba central ao lado de Provedores (Q11-1), mesmo padrão visual · RNF11-4 App.tsx não cresce (RNF global).
+
+**5. Dependências:** de — casa Agir (loop/teto), chat (viewport), padrão da aba Provedores. Para — 13 usa o teto; nenhuma fatia bloqueada.
+
+**6. Limites (NÃO fazer):** nada de anti-loop configurável (fixo) · nada de "aprovar tudo" · nada de teto por ferramenta · nada de limite em R$ (ideia futura) · nada de outras preferências na v1.
+
+**7. Critérios de aceite:** 1. teto=2 → tarefa para no 2 com cartão "continuar?". 2. Continuar → retoma e conclui. 3. Parar → morre limpo. 4. Recarregar → config persiste. 5. Auto-scroll: no fim desce; lendo acima não puxa. 6. tsc 0 + unit verdes + E2E novos verdes (stub) + roteiro do dono no `08`.
+
+**8. Testes:** unit — validação (faixa, inválido), padrão sem arquivo, roundtrip de persistência, regra dos 120px; E2E (stub 4610) — T1 teto 2 + continuar retoma, T2 negar/parar, T3 F5 persiste, T4 anti-loop intacto (regressão 10); homologação = roteiro do dono.
+
+**9. Riscos:** R11-1 teto alto + nuvem = gasto (mitiga: texto de custo + máximo) · R11-2 "continuar" em loop real (mitiga: anti-loop intacto + cada continuar é decisão humana).
+
+**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? · Q11-2 máximo 200 (rec: sim)? · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? · Q11-4 arquivo `settings.json` (rec: sim)? · Q11-5 Continuar = +1 orçamento cheio (rec: sim)?
+
+## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
+
+**1. Objetivo:** CRUD completo: o agente exclui arquivos E pastas para a lixeira, sempre com cartão reforçado (decisão do dono 19/10: 1-lixeira, 2-pasta-também, 3-cartão-sim, 4-micro-fatia; DEBT-16).
+
+**2. Entregáveis:** (a) ferramenta `excluir` (Q12-1 confirma o nome) — arquivo ou pasta → lixeira do SO, com contagem de itens; (b) cartão reforçado: "sem desfazer direto" + caminho + o quê vai (prévia p/ arquivo; contagem p/ pasta — Q12-2); (c) território = pasta ativa (igual às outras); (d) anúncio da tool nos 4 canais nativos (Q4b); (e) restaurar = pela lixeira do SO (fora do app).
+
+**3. Requisitos funcionais:** RF12-1 SEMPRE pergunta (Q1a; sem caminho automático) · RF12-2 negar = nada some; o "dono negou" volta à IA · RF12-3 "Permitir na Sessão" NÃO vale para `excluir` (exclusão sempre pergunta, uma a uma) · RF12-4 fora da pasta = recusa honesta, mesmo aprovando · RF12-5 falha da lixeira = erro honesto, nada some pela metade · RF12-6 pasta mostra contagem antes de ir.
+
+**4. Requisitos não-funcionais:** RNF12-1 Windows = Lixeira real; Linux = XDG Trash (`~/.local/share/Trash`); sem lixeira = erro honesto (nunca apagar permanente escondido) · RNF12-2 App.tsx não cresce · RNF12-3 nomes inválidos/`..` = recusa (padrão 10).
+
+**5. Dependências:** de — casa Agir (tools, território, cartão, anúncio), teto da 11 (se existir). Para — 13 estende o cartão; Ferramentas da 14 lista a tool.
+
+**6. Limites (NÃO fazer):** nada de apagar permanente · nada de "esvaziar lixeira" no app (Q12-3; é do SO) · nada de excluir fora da pasta nem por padrão · nada de auto-aprovar exclusão.
+
+**7. Critérios de aceite:** 1. cartão reforçado aparece com contagem. 2. Sem aprovar, nada some (o disco é a régua). 3. Aprovado → some da pasta, aparece na lixeira, restaurável pelo SO. 4. Negado → nada some, IA sabe. 5. Sessão-permitida de escrita NÃO cobre excluir (pergunta igual). 6. `../fora` = recusa. 7. tsc 0 + unit + E2E verdes (stub) + roteiro do dono.
+
+**8. Testes:** unit — mover p/ lixeira (mock), território, nomes inválidos, contagem de pasta, falha = nada some; E2E (stub 4610) — T1 aprovar some+restaura-conferível, T2 negar, T3 sessão-não-cobre, T4 fora-da-pasta, T5 regressão do cartão da 10 (criar/escrever intactos); homologação = roteiro do dono (Windows: Lixeira real).
+
+**9. Riscos:** R12-1 API de lixeira difere por SO (mitiga: camada fina por SO + erro honesto) · R12-2 pasta gigante (mitiga: contagem no cartão + sem desfazer-direto avisado) · R12-3 sandbox sem lixeira (mitiga: XDG no Linux; Windows valida o dono).
+
+**10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)?
