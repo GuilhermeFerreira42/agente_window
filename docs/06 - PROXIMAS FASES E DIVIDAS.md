@@ -725,7 +725,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **2. Entregáveis:** (a) ferramenta `executar` (Q13-1 confirma o nome): comando + cwd=pasta ativa, one-shot, com timeout e teto de saída; (b) cartão tipo-comando (comando + cwd + [Permitir][Negar][Permitir na Sessão]); (c) lista de negação: padrões destrutivos SEMPRE perguntam um a um, mesmo com sessão permitida (Q13-6: `rm -rf`, `del /s`, `format`, `mkfs`, `git clean -fdx`, `DROP`, …); (d) anúncio nos 4 canais; (e) Parar mata o comando junto.
 
-**3. Requisitos funcionais:** RF13-1 cwd sempre = pasta ativa da sessão · RF13-2 timeout 2min (Q13-3 DECIDIDO 20/10: op b) → ao bater, pergunta "continuar aguardando?" em vez de matar · RF13-3 saída limitada a 20 KB de cauda (Q13-4; resto descartado com aviso "cortada") · RF13-4 negar = nada executa; "dono negou" volta à IA · RF13-5 sessão-permitida vale para comandos comuns, NUNCA para a lista de negação (Q13-5 DECIDIDO 20/10: sim, como na SPEC) · RF13-6 shell = padrão do terminal do app por SO (Q13-2 DECIDIDO 20/10: sim, mesmo do app = padrão da indústria).
+**3. Requisitos funcionais:** RF13-1 cwd sempre = pasta ativa da sessão · RF13-2 timeout 2min (Q13-3 DECIDIDO 20/10: op b) → ao bater, pergunta "continuar aguardando?" em vez de matar · RF13-3 saída limitada a 20 KB de cauda (Q13-4 DECIDIDO 20/10: (a)); resto descartado com aviso "cortada" · RF13-4 negar = nada executa; "dono negou" volta à IA · RF13-5 sessão-permitida vale para comandos comuns, NUNCA para a lista de negação (Q13-5 DECIDIDO 20/10: sim, como na SPEC) · RF13-6 shell = padrão do terminal do app por SO (Q13-2 DECIDIDO 20/10: sim, mesmo do app = padrão da indústria).
 
 **4. Requisitos não-funcionais:** RNF13-1 execução one-shot isolada (não no PTY interativo do usuário) · RNF13-2 sem segredos em log · RNF13-3 App.tsx não cresce · RNF13-4 honestidade: comando vazio/inexistente = erro claro, nunca silêncio.
 
@@ -739,7 +739,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R13-1 **shell foge do território** (`cd /`, caminhos absolutos no comando) — NÃO há sandbox real; mitigação honesta: cartão mostra o comando (o humano julga) + negação + cwd fixo + aviso na SPEC. Risco aceito e declarado, não resolvido. R13-2 comando trava saída (mitiga: timeout + Parar) · R13-3 diferença cmd/pwsh/sh (mitiga: shell padrão do app + testes por SO no que der).
 
-**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? → DECIDIDO (20/10): sim, mesmo do app. · Q13-3 timeout (rec revisto: op b, 2min+perguntar)? → DECIDIDO (20/10): (b). · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? → DECIDIDO (20/10): sim, como na SPEC. · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
+**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? → DECIDIDO (20/10): sim, mesmo do app. · Q13-3 timeout (rec revisto: op b, 2min+perguntar)? → DECIDIDO (20/10): (b). · Q13-4 saída 20 KB de cauda (rec: sim)? → DECIDIDO (20/10): (a). · Q13-5 sessão-permitida p/ comuns (rec: sim)? → DECIDIDO (20/10): sim, como na SPEC. · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
 
 ## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — RASCUNHO
 
