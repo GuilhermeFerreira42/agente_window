@@ -681,7 +681,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **2. Entregáveis:** (a) aba Configurações com 2 itens na v1 — teto de voltas (número) + auto-scroll (liga/desliga); (b) loop do Agir lê o teto (padrão 25); (c) fim de teto vira cartão-mensagem com botão **[Continuar]** (+N voltas) e **[Parar]**; (d) anti-loop 3× segue fixo e sempre ligado (decisão 19/10); (e) auto-scroll só quando o usuário já está no fim (não puxa leitura).
 
-**3. Requisitos funcionais:** RF11-1 teto vale por mensagem, 1–200, padrão 25 (Q11-2 confirma o máximo) · RF11-2 salvar aplica na próxima mensagem (nunca no meio de um loop) · RF11-3 "Continuar" concede +1 orçamento cheio e retoma o MESMO fluxo (Q11-5) · RF11-4 sem Config salva = 25 + auto-scroll padrão (Q11-3) · RF11-5 número inválido = erro honesto no campo, nada salva · RF11-6 auto-scroll só dispara se o viewport estiver a ≤120px do fim.
+**3. Requisitos funcionais:** RF11-1 teto vale por mensagem, 1–250, padrão 25 (Q11-2 DECIDIDO 20/10: 250) · RF11-2 salvar aplica na próxima mensagem (nunca no meio de um loop) · RF11-3 "Continuar" concede +1 orçamento cheio e retoma o MESMO fluxo (Q11-5) · RF11-4 sem Config salva = 25 + auto-scroll padrão (Q11-3) · RF11-5 número inválido = erro honesto no campo, nada salva · RF11-6 auto-scroll só dispara se o viewport estiver a ≤120px do fim.
 
 **4. Requisitos não-funcionais:** RNF11-1 settings em `~/.agente_window/settings.json`, sem segredos, só números/bools (Q11-4) · RNF11-2 texto de custo ao lado do teto ("valores altos = mais chamadas = mais gasto/tempo") · RNF11-3 Config na aba central ao lado de Provedores (Q11-1), mesmo padrão visual · RNF11-4 App.tsx não cresce (RNF global).
 
@@ -695,7 +695,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R11-1 teto alto + nuvem = gasto (mitiga: texto de custo + máximo) · R11-2 "continuar" em loop real (mitiga: anti-loop intacto + cada continuar é decisão humana).
 
-**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 200 (rec: sim)? · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
+**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + modo "até terminar" (GOAL) em avaliação — dono verifica se é skill ou modo; pesquisa 20/10: é MODO (/goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
 
 ## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
 
@@ -717,7 +717,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R12-1 API de lixeira difere por SO (mitiga: camada fina por SO + erro honesto) · R12-2 pasta gigante (mitiga: contagem no cartão + sem desfazer-direto avisado) · R12-3 sandbox sem lixeira (mitiga: XDG no Linux; Windows valida o dono).
 
-**10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? → DECIDIDO (19/10): `excluir`. · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)? → DECIDIDO (19/10): sim, fora.
+**10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? → DECIDIDO (19/10): `excluir`. · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? → DECIDIDO (20/10): sim. · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)? → DECIDIDO (19/10): sim, fora.
 
 ## PARTE 2G — SPEC da FATIA 13: Terminal-para-o-agente (poderes + segurança) — RASCUNHO
 
@@ -725,7 +725,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **2. Entregáveis:** (a) ferramenta `executar` (Q13-1 confirma o nome): comando + cwd=pasta ativa, one-shot, com timeout e teto de saída; (b) cartão tipo-comando (comando + cwd + [Permitir][Negar][Permitir na Sessão]); (c) lista de negação: padrões destrutivos SEMPRE perguntam um a um, mesmo com sessão permitida (Q13-6: `rm -rf`, `del /s`, `format`, `mkfs`, `git clean -fdx`, `DROP`, …); (d) anúncio nos 4 canais; (e) Parar mata o comando junto.
 
-**3. Requisitos funcionais:** RF13-1 cwd sempre = pasta ativa da sessão · RF13-2 timeout 60s (Q13-3) → mata + avisa honesto · RF13-3 saída limitada a 20 KB de cauda (Q13-4; resto descartado com aviso "cortada") · RF13-4 negar = nada executa; "dono negou" volta à IA · RF13-5 sessão-permitida vale para comandos comuns, NUNCA para a lista de negação (Q13-5) · RF13-6 shell = padrão do terminal do app por SO (Q13-2).
+**3. Requisitos funcionais:** RF13-1 cwd sempre = pasta ativa da sessão · RF13-2 timeout 2min (Q13-3 DECIDIDO 20/10: op b) → ao bater, pergunta "continuar aguardando?" em vez de matar · RF13-3 saída limitada a 20 KB de cauda (Q13-4; resto descartado com aviso "cortada") · RF13-4 negar = nada executa; "dono negou" volta à IA · RF13-5 sessão-permitida vale para comandos comuns, NUNCA para a lista de negação (Q13-5 DECIDIDO 20/10: sim, como na SPEC) · RF13-6 shell = padrão do terminal do app por SO (Q13-2 DECIDIDO 20/10: sim, mesmo do app = padrão da indústria).
 
 **4. Requisitos não-funcionais:** RNF13-1 execução one-shot isolada (não no PTY interativo do usuário) · RNF13-2 sem segredos em log · RNF13-3 App.tsx não cresce · RNF13-4 honestidade: comando vazio/inexistente = erro claro, nunca silêncio.
 
@@ -733,13 +733,13 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **6. Limites (NÃO fazer):** nada de shell interativo para o agente (só one-shot) · nada de executar fora da pasta por padrão · nada de auto-aprovar lista de negação · nada de segredos/`.env` (regra da casa) · nada de mexer no terminal visual (é a 16 — área congelada).
 
-**7. Critérios de aceite:** 1. `echo oi` aprovado → saída no chat. 2. Negado → nada executa. 3. `rm -rf x` com sessão permitida → pergunta igual (negação dura). 4. Comando de 70s → morre aos 60 com aviso. 5. Saída gigante → 20 KB + "cortada". 6. Parar no meio → processo morre. 7. tsc 0 + unit + E2E verdes (stub) + roteiro do dono.
+**7. Critérios de aceite:** 1. `echo oi` aprovado → saída no chat. 2. Negado → nada executa. 3. `rm -rf x` com sessão permitida → pergunta igual (negação dura). 4. Comando de 3min → aos 2min pergunta "continuar aguardando?" (mata só se o dono mandar parar). 5. Saída gigante → 20 KB + "cortada". 6. Parar no meio → processo morre. 7. tsc 0 + unit + E2E verdes (stub) + roteiro do dono.
 
 **8. Testes:** unit — timeout, teto de saída, negação (padrões), cwd, negar-nada-executa; E2E (stub 4610) — T1 aprovar-executa, T2 negar, T3 negação-com-sessão, T4 timeout simulado (comando curto no teste + teto baixo de teste), T5 regressão cartão da 10/12; homologação = roteiro do dono (Windows real).
 
 **9. Riscos:** R13-1 **shell foge do território** (`cd /`, caminhos absolutos no comando) — NÃO há sandbox real; mitigação honesta: cartão mostra o comando (o humano julga) + negação + cwd fixo + aviso na SPEC. Risco aceito e declarado, não resolvido. R13-2 comando trava saída (mitiga: timeout + Parar) · R13-3 diferença cmd/pwsh/sh (mitiga: shell padrão do app + testes por SO no que der).
 
-**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? · Q13-3 timeout 60s (rec: sim)? · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
+**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? → DECIDIDO (20/10): sim, mesmo do app. · Q13-3 timeout (rec revisto: op b, 2min+perguntar)? → DECIDIDO (20/10): (b). · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? → DECIDIDO (20/10): sim, como na SPEC. · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
 
 ## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — RASCUNHO
 
@@ -785,4 +785,4 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R15-1 churn de testes (31+11) — mitigação: repontar em onda própria antes do código (padrão D74). R15-2 regressão abrir/salvar — mitigação: E2E de editar+salvar sem F5 como trava. R15-3 arquivo+Provedores ressurgir — mitigação: impossível por construção + teste que prova.
 
-**10. Perguntas abertas:** Q15-1 §8.7 continua válida pós-D95 (rec: sim, só o número mudou)? · (Sem outras — avaliação completa.)
+**10. Perguntas abertas:** Q15-1 §8.7 continua válida pós-D95 (rec: sim, só o número mudou)? → DECIDIDO (20/10): sim, vale. · (Sem outras — avaliação completa.)
