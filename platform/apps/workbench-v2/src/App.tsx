@@ -2398,7 +2398,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             {/* FATIA 07 (DEBT-06, opção C aprovada 15/10): a chave inclui a pasta da
                 sessão — ao trocar de pasta o painel remonta e o shell novo já nasce na
                 pasta nova (o servidor usa o `cwd` enviado no `open`). A decisão
-                "cd em shell vivo × shell novo" será reavaliada na FATIA 12, com
+                "cd em shell vivo × shell novo" será reavaliada na FATIA 16 (pós-D95), com
                 inspeção lado a lado do code-server 8080. */}
             <TerminalPanel
               key={`${activeSession.id}|${activeSession.worktreePath ?? activeSession.workspacePath}`}

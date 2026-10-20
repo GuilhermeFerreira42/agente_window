@@ -12,7 +12,7 @@
  */
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
-/** As 5 ferramentas do MVP (D72) — todas de ARQUIVO; terminal é FATIA 12. */
+/** As 5 ferramentas do MVP (D72) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
 export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever'
 
 /**

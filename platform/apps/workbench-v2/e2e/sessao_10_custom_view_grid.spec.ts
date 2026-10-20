@@ -69,7 +69,7 @@ test.describe('Sessão 10 — Custom View Grid', () => {
   })
 
   // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('T3: F5 com custom view ativa mantém a view ativa', async ({ page }) => {
     await abrirCustomizations(page)
     await expect(page.locator(GRID)).toBeVisible()
@@ -84,7 +84,7 @@ test.describe('Sessão 10 — Custom View Grid', () => {
   })
 
   // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('T4: fechar pelo botão devolve exatamente a visibilidade retida (terminal incluso)', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await page.getByRole('button', { name: BTN.toggleTerminal }).click()
@@ -105,7 +105,7 @@ test.describe('Sessão 10 — Custom View Grid', () => {
   })
 
   // MORTO (D74 onda 1 — FATIA 07, 15/10): timeouts de click em F5/persistência da custom view (pré-existentes desde 75c6686).
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('T5: a custom view mostra a árvore de agents/skills/MCP com contagens reais', async ({ page }) => {
     await abrirCustomizations(page)
     const grid = page.locator(GRID)

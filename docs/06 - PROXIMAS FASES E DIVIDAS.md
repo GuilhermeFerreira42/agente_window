@@ -2,7 +2,7 @@
 
 > **Documento Canônico de Planejamento e Débito Técnico (Padrão Spec-Driven / Stream Coding).**
 > - **Regra de ouro:** Todo débito técnico e todo o roadmap do projeto vivem estritamente aqui (não criar arquivos separados como `TECHNICAL_DEBT.md` ou `ROADMAP.md`).
-> - **Princípio de bloqueio:** Nenhuma fatia nova é iniciada enquanto existirem dívidas bloqueantes da fatia anterior. **Flexibilizado conscientemente pela D63/D64** para os itens de *refinamento* (foram para a FATIA 13, fora do caminho crítico do MVP).
+> - **Princípio de bloqueio:** Nenhuma fatia nova é iniciada enquanto existirem dívidas bloqueantes da fatia anterior. **Flexibilizado conscientemente pela D63/D64** para os itens de *refinamento* (foram para a FATIA 17 (pós-D95; era 13), fora do caminho crítico do MVP).
 > - **Régua de medição:** 90 % do produto é réplica fiel da **"Agents Window" do VS Code** (**D66**, 2026-10-13 — régua: code-server 8080 / VS Code real); 10 % é customizado (chassi direito com terminal + tela de Provedores estilo **Cline**).
 > - **Atualizado:** 2026-10-14 — **arquitetura oficial "Condomínio" (D68/D69/D70)**: cada fatia agora tem a coluna **Casas** (função + o que muda de endereço; detalhe no `04 §2.2`); decisões **D68–D75** no `docs/05`; material novo do **OpenClaude / VS Code 1.135** (Parte 3); faxina de testes em **2 ondas** (D74). *(Reordenação e renumeração D63–D67: 13/10.)*
 
@@ -22,8 +22,8 @@
 | **DEBT-08** | Fatia 5 | Layout / Activity Bar | Menu de contexto da Activity Bar permite alternar posição ("Activity Bar Position: Top / Side"). | Posição travada sem opção de mover para a barra superior ou alternar. | **Baixa** | `shell/ActivityBar.tsx`, `layoutState.ts` |
 | **DEBT-09** | Fatia 6 | Provedores (Cline UX) | Página de Provedores acessível a qualquer momento pelo menu da conta, inclusive com chat vazio (Landing / Empty State). | **Só abre se o chat estiver ativo**. Na tela inicial (Empty State), o clique não faz nada. | **Alta** | `App.tsx`, `Titlebar.tsx`, `SessionLanding.tsx` |
 | **DEBT-10** | Fatia 6 | Provedores (Cline UX) | Múltiplos provedores com formulários ricos (Claude, OpenAI, Gemini, Ollama), modelos e chaves individuais estilo **Cline**. | Implementação básica com cards estáticos, sem a riqueza e flexibilidade de catálogo do Cline. | **Média** | Caminho atual (15/10): `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` → destino `2-inteligencia/casas/provedores` — **entra na FATIA 08, SPEC na PARTE 2B** |
-| **DEBT-12** | Fatia 4 (origem) / 11 (execução) | Editor / Abas | **Janela única de abas:** editor de código, Provedores, Browser, Branch Changes e Search na **mesma barra de abas** (conceito VS Code), podendo alternar entre eles como abas de navegador. | **Estado atual:** Provedores/Browser/Changes já são abas do **centro**; o **editor de código** vive em **outra** estrutura (coluna direita, `AttachTab`), com `search`/`diff`/`changes` **duplicados** nos dois modelos. Causa: **exceção autorizada da FATIA 04** (4.7 c4 — `App.tsx:1083-1087`). O editor do centro **não salva**; o da direita **salva**. | **Média hoje / Alta na 11** (é pré-requisito do critério "editar e salvar sem F5") | Avaliação completa em `06 §8.7`; execução = **1.º trabalho da FATIA 11** (D90) |
-| **DEBT-11** | FATIA 13 **(a decidir a forma)** | Title Bar / Pesquisa | O topo mantém a **pesquisa / centro de comando** (acesso rápido: "Ir para Arquivo", "Mostrar e Executar Comandos", "Pesquisar Texto", "Abrir Chat Rápido"). A troca de pasta deve ser **integrada dentro da pesquisa**, não ocupar o lugar dela. | A faixa de caminho + botão "Usar esta pasta" ocupou o lugar da pesquisa: o caminho fica fixo no topo e **a pesquisa não existe mais**. | **Alta** | `Titlebar.tsx`, `WorkspaceSwitcher.tsx`, `shell/` |
+| **DEBT-12** | Fatia 4 (origem) / 15 (execução, pós-D95) | Editor / Abas | **Janela única de abas:** editor de código, Provedores, Browser, Branch Changes e Search na **mesma barra de abas** (conceito VS Code), podendo alternar entre eles como abas de navegador. | **Estado atual:** Provedores/Browser/Changes já são abas do **centro**; o **editor de código** vive em **outra** estrutura (coluna direita, `AttachTab`), com `search`/`diff`/`changes` **duplicados** nos dois modelos. Causa: **exceção autorizada da FATIA 04** (4.7 c4 — `App.tsx:1083-1087`). O editor do centro **não salva**; o da direita **salva**. | **Média hoje / Alta na 11** (é pré-requisito do critério "editar e salvar sem F5") | Avaliação completa em `06 §8.7`; execução = **1.º trabalho da FATIA 11** (D90) |
+| **DEBT-11** | FATIA 17 **(a decidir a forma; pós-D95)** | Title Bar / Pesquisa | O topo mantém a **pesquisa / centro de comando** (acesso rápido: "Ir para Arquivo", "Mostrar e Executar Comandos", "Pesquisar Texto", "Abrir Chat Rápido"). A troca de pasta deve ser **integrada dentro da pesquisa**, não ocupar o lugar dela. | A faixa de caminho + botão "Usar esta pasta" ocupou o lugar da pesquisa: o caminho fica fixo no topo e **a pesquisa não existe mais**. | **Alta** | `Titlebar.tsx`, `WorkspaceSwitcher.tsx`, `shell/` |
 | **DEBT-13** | FATIA a decidir **(não é da 09)** | Chat / Memória de contexto | O usuário **enxerga e controla** o enchimento do contexto da conversa: **medidor de uso** ("quanto da mesa está ocupada"), opção de **limpar / recomeçar** e política de **compactação** (resumir o passado antes de estourar) — como o **Claude Code / OpenClaude** (ver uso, compactar, limpar) e como o original (erro 413 + `compact_boundary`, registrado na raspagem). | **Não existe nada hoje:** sem contagem de tokens (G5 da §9.2), sem medidor, sem limpeza e sem compactação; a 09 envia o histórico inteiro e, se estourar, mostra erro honesto. | **Média** (não bloqueia a 09; vira dor em conversas longas) | Origem: conversa do dono em **17/10** ("não sei o quanto estou enchendo, não sei se posso limpar"). Para **discutir depois**: tratativas do **OpenClaude/Claude Code** (o dono indicou que já as tem) + `pesquisa_bruta/fatia-06-chat/ERRO_HANDLING.md` (413/`compact_boundary`). **Não implementar sem deliberação do dono.** |
 | **DEBT-14** | FATIA a decidir **(sugestão do dono na validação da 09)** | Chat / Seletor de modelos | O seletor de modelos do **composador** (chip ao lado do campo de mensagem) conversa com o **provedor ativo**: a lista oferece **todos os modelos do provedor escolhido** (ex.: os do Ollama local) e o chip mostra quem de fato vai responder. | **Hoje a lista é fixa** (Auto · Claude Sonnet 4 · GPT-5 · GPT-5 mini — herança do mock) e o chip não acompanha o provedor: no vídeo de validação do dono (17/10) quem respondeu foi `gemma4:31b-cloud` (rodapé certo) com o chip escrito "Claude Sonnet 4". | **Média** | Origem: **sugestão explícita do dono no vídeo de 17/10** ("achei que o usuário ia poder selecionar todos os modelos disponíveis aqui"); amarra a **G2** da §9.2 ("modelo efetivo vem do provedor ativo"). Ligar ao catálogo já pronto da 08 (`Buscar modelos`). Só registro — implementar quando o dono decidir. |
 | **DEBT-15** | FATIA a decidir **(UX da 09)** | Chat / Provedores | Escolher o provedor que responde no chat seja **difícil de esquecer**: enquanto ninguém estiver ativo, o passo "usar este provedor no chat" aparece de forma óbvia. | O interruptor é uma **bolinha discreta** no rodapé do painel de Provedores; no vídeo de 17/10 o dono esqueceu de marcá-lo e as 4 primeiras mensagens caíram no 409 honesto ("Nenhum provedor está ativo") — ele mesmo concluiu: *"esqueci que tinha a selecionar aqui"*. | **Baixa/Média** | Origem: vídeo do dono em **17/10** + análise da IA (transcrição + quadros). Só registro — qualquer mudança de UX passa por deliberação do dono. |
@@ -34,9 +34,9 @@
 > Fonte: gravação do usuário (4min02s) analisada por transcrição + frames (método em `docs/09 §11`). Itens que **não constam em nenhuma fatia** do roadmap — aguardando deliberação do usuário. O vídeo **confirma** as dívidas já registradas (DEBT-05, DEBT-06, DEBT-07, DEBT-09, DEBT-04, DEBT-10); o terminal não aparece na gravação, então DEBT-01/02/03 ficaram sem evidência nova. **Atualização 14/10:** itens **2, 3 e 4 ganharam dono** (anotado em cada); 5 e 6 seguem em deliberação.
 
 1. **Raspar o código original (1:45–1:54):** pedido explícito de engenharia reversa do VS Code/Cline original para portar funcionalidades ao nosso (ex.: lista de recentes e nome da pasta no topo).
-2. **Página "Personalizações" do original (1:54–2:33):** Visão geral, Agentes, **Habilidades (14)**, Instruções, Hooks, **Servidores MCP (1)**, Plugins (11), Ferramentas (11). **Dono (14/10): FATIA 11 (E4) — Casa Personalizações.**
-3. **Histórico de chats na sidebar de Sessões (1:07–1:18):** o original lista conversas antigas ("Greeting in Portuguese — 4 semanas atrás") com tempo relativo. O roadmap cobre histórico persistente **por sessão** na Fatia 10. **Dono (14/10): FATIA 13 — Casa Sessões.**
-4. **"Botão que abre navegador" (2:18–2:33):** botão funcional do original apontado pelo usuário; **não identificado com certeza** na gravação (candidato visto: botão de topo do Cline com tooltip "Abrir no Editor", t≈145 s). Usuário informou que mostrará qual é. **Decidido (14/10): fica por último — FATIA 16 (acordo com a Meta).**
+2. **Página "Personalizações" do original (1:54–2:33):** Visão geral, Agentes, **Habilidades (14)**, Instruções, Hooks, **Servidores MCP (1)**, Plugins (11), Ferramentas (11). **Dono (14/10): FATIA 14 — Casa Personalizações (pós-D95; era 11).**
+3. **Histórico de chats na sidebar de Sessões (1:07–1:18):** o original lista conversas antigas ("Greeting in Portuguese — 4 semanas atrás") com tempo relativo. O roadmap cobre histórico persistente **por sessão** na Fatia 10. **Dono (14/10): FATIA 14 — Casa Sessões (pós-D95; era 13).**
+4. **"Botão que abre navegador" (2:18–2:33):** botão funcional do original apontado pelo usuário; **não identificado com certeza** na gravação (candidato visto: botão de topo do Cline com tooltip "Abrir no Editor", t≈145 s). Usuário informou que mostrará qual é. **Decidido (14/10): fica por último — FATIA 20 (pós-D95; acordo com a Meta).**
 5. **Diferença de Landing (1:31–1:45):** o original exibe chips "Interativo / Manual permissions" + "Nova Árvore de Trabalho" + branch "main"; o clone exibe apenas "Interativo / Permissões manuais". Placeholder do original: "Descreva o resultado desejado".
 6. **Seletor de pasta do original (t=97 s):** abas "Local / Github / Remoto", remoção de recente por "X" e item "Select…". Reforça DEBT-05/DEBT-07; as abas Github/Remoto são fidelidade a decidir.
 
@@ -56,9 +56,9 @@
 | 9 | **Animação do indicador de drop** ("Drop view here") diferente do original | `shell/dnd` | Paridade fina. (5:19–6:00) |
 | 10 | **Trilha de Navegação (breadcrumbs) navegável** — hoje é **puramente visual**: clicar em pasta › subpasta › arquivo deve abrir menu suspenso, e clicar no elemento mostra a estrutura interna do código (classes, métodos, funções) para pular direto, sem rolar o arquivo | topo do editor (`modules/explorer-search/ui/attach/Breadcrumbs.tsx`) | **Identificado pelo usuário em 2026-10-13** ("é a trilha de navegação"). É o débito histórico **D2.23 (4.7-c)** citado no próprio comentário do arquivo: o componente monta os segmentos e **não tem clique/dropdown** (verificado no código). (6:33) |
 
-**Atualização 14/10 (donos):** item **5 → FATIA 11** (Conferir — era a "08" na numeração antiga) · **6 e 7 → FATIA 12** (Terminal 2.0) · **9 → FATIA 14** (Painéis) · **10 → FATIA 13** (Refinamentos). Itens **1–4 e 8** = refinamento (dono a fechar quando a FATIA 13 abrir).
+**Atualização 14/10 (donos):** item **5 → FATIA 15** (Conferir) · **6 e 7 → FATIA 16** (Terminal 2.0) · **9 → FATIA 18** (Painéis) · **10 → FATIA 17** (Refinamentos). Itens **1–4 e 8** = refinamento (dono a fechar quando a FATIA 17 abrir (números pós-D95)).
 
-**Prioridade declarada pelo usuário (2026-10-13):** "quero avançar logo para as próximas fatias, para a gente já colocar os Provedores e já fazer funcionar e colocar o Agente Loop para a gente já testar" — **DECIDIDO (D63 + D64 + D65, `docs/05`)**: ordem **MVP-first** com a numeração nova → **(1) FATIA 07 — Destravar** (DEBT-06 + DEBT-04 + DEBT-09) → **(2) FATIA 08 — Conectar** (Provedores) → **(3) FATIA 09 — Conversar** (chat real + streaming) → **(4) FATIA 10 — Agir** (tools + permissões) = **MVP ponta a ponta**. Refinamentos fora do caminho crítico → **FATIA 13 — Refinamentos** (antiga proposta "6.2"). Dependência dura: a FATIA 08 não inicia sem os critérios da FATIA 07 verdes.
+**Prioridade declarada pelo usuário (2026-10-13):** "quero avançar logo para as próximas fatias, para a gente já colocar os Provedores e já fazer funcionar e colocar o Agente Loop para a gente já testar" — **DECIDIDO (D63 + D64 + D65, `docs/05`)**: ordem **MVP-first** com a numeração nova → **(1) FATIA 07 — Destravar** (DEBT-06 + DEBT-04 + DEBT-09) → **(2) FATIA 08 — Conectar** (Provedores) → **(3) FATIA 09 — Conversar** (chat real + streaming) → **(4) FATIA 10 — Agir** (tools + permissões) = **MVP ponta a ponta**. Refinamentos fora do caminho crítico → **FATIA 17 — Refinamentos** (pós-D95) (antiga proposta "6.2"). Dependência dura: a FATIA 08 não inicia sem os critérios da FATIA 07 verdes.
 
 ---
 
@@ -66,9 +66,9 @@
 
 > **STATUS:** **HOMOLOGADA pelo dono em 2026-10-15** ("funcionou perfeitamente"; as 3 dívidas entregues com evidências Playwright). Restam como limitações registradas: PTYs órfãos até a FATIA 12, 5 E2E vermelhos pré-existentes (`09 §2.6`) e o sintoma original do DEBT-06 (não reproduzido no estado anterior sob as condições testadas). Substitui a SPEC da antiga "Fatia 6.1" (renumerada pela D64).
 > **DECISÕES DA EXECUÇÃO (15/10):** **DEBT-06 — caminho C** (escolha expressa do dono): o terminal **renasce já na pasta nova** em vez de receber `cd` num shell vivo; a decisão fina "cd real × renascer" fica para a **FATIA 12**, contra o code-server (8080). **DEBT-09 — feito** (`a69137d`): as abas globais do editor deixaram de depender de sessão, então Provedores abre pela Conta na landing. **DEBT-04 — nada a expurgar:** busca no código não encontra resquício do visualizador legado (sem `legacy/`, `ProvidersView` é a única superfície, via `providersSurface`).
-> **Limitação registrada (DEBT-06):** os PTYs das abas antigas ficam **órfãos até o idle de 30 min** ao trocar de pasta (o motor do terminal não se toca nesta fatia — `04 §1` e §4); anotado no código para a FATIA 12.
+> **Limitação registrada (DEBT-06):** os PTYs das abas antigas ficam **órfãos até o idle de 30 min** ao trocar de pasta (o motor do terminal não se toca nesta fatia — `04 §1` e §4); anotado no código para a FATIA 16 (pós-D95).
 > **REGRA DE OURO:** A **FATIA 08 não inicia** enquanto os critérios testáveis abaixo não estiverem verdes e homologados pelo humano.
-> **Mudança de escopo (D63/D64):** só as 3 dívidas estruturais ficaram aqui. Saíram para fatias próprias: `clear` do terminal (**DEBT-01** → FATIA 12), lista de recentes (**DEBT-07** → FATIA 13) e picker nativo (**DEBT-05** → FATIA 13).
+> **Mudança de escopo (D63/D64):** só as 3 dívidas estruturais ficaram aqui. Saíram para fatias próprias: `clear` do terminal (**DEBT-01** → FATIA 16), lista de recentes (**DEBT-07** → FATIA 17) e picker nativo (**DEBT-05** → FATIA 17). (Números pós-D95.)
 
 ### 1. Objetivo em 1 frase
 Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atômica (Explorer + Terminal), purga total do visualizador legado e abertura dos Provedores em qualquer estado da tela.
@@ -95,7 +95,7 @@ Zerar as 3 dívidas estruturais que travam o caminho do MVP: troca de pasta atô
 ### 4. O que NÃO fazer na FATIA 07
 - **NÃO** implementar chamadas de IA, ferramentas ou permissões (conteúdo das Fatias 08–10).
 - **NÃO** mexer no motor do Monaco/PTY nem no terminal homologado (contratos congelados do `04`).
-- **NÃO** antecipar refinamentos (recentes, `clear`, picker nativo) — têm fatia própria (12/13) e **a Pesquisa volta ao lugar na FATIA 13 (D73)**.
+- **NÃO** antecipar refinamentos (recentes, `clear`, picker nativo) — têm fatia própria (16/17, pós-D95) e **a Pesquisa volta ao lugar na FATIA 17 (D73, pós-D95)**.
 - **NÃO** mover nenhuma área congelada (D69) — Terminal, `explorer-search/{core,server}` e `EditorArea` (até 5.7) ficam onde estão.
 
 ---
@@ -195,8 +195,8 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 |---|---|---|
 | ~~**A1 — fix da CENTRALIZAÇÃO**~~ ✅ **FEITO (17/10)** | `styles/app.css`: `.session-landing` passou de `min-height: 0` para **`min-height: 100%`** — a landing ocupa a coluna inteira em qualquer pai (bloco ou flex) e o próprio `align-items:center` a centraliza. **Medido:** desvio do centro **29 px** com Provedores aberto (antes: conteúdo colado no topo, ~305 px de desvio). Trava: `e2e/fatia08_modo_abertura.spec.ts` **T1** | Pequeno. Bateria completa rodada: tsc 0 · unit **767✓/12✗/16 skip** (as 12 pré-existentes, provadas em A/B) · E2E 08 **6/6** · contrato novo **4/4** |
 | ~~**A2 — abrir em modo maximizado por padrão**~~ → **substituído pela D88** ✅ **FEITO (17/10)** | Implementada a regra do dono: com o editor **aberto** a superfície abre no modo em que ele está; com o editor **fechado**, no **último modo** deixado; **padrão de fábrica = anexo**. Travas: **T2/T3/T4** do contrato novo. Detalhe em §8.6 | Baixo — só a memória faltava (o resto já funcionava) |
-| **B — regra geral na FATIA 11** | Definir o roteamento de todas as superfícies auxiliares (Provedores, Browser, Branch/Changes, Configurações) na Casa Editor, com testes | Maior, porém faz junto do trabalho de abas/editor que já está previsto |
-| **C — registrar e seguir** | Nada agora; vai para a FATIA 11 sem fix imediato | Zero — o dono convive com o clique extra em "Maximizar" |
+| **B — regra geral na FATIA 15 (pós-D95)** | Definir o roteamento de todas as superfícies auxiliares (Provedores, Browser, Branch/Changes, Configurações) na Casa Editor, com testes | Maior, porém faz junto do trabalho de abas/editor que já está previsto |
+| **C — registrar e seguir** | Nada agora; vai para a FATIA 15 sem fix imediato (pós-D95) | Zero — o dono convive com o clique extra em "Maximizar" |
 **Buraco de teste que deixou passar (lição registrada):** nenhum teste travava **onde/como** a superfície abre — a sonda do DEBT-09 e a bateria da FATIA 08 verificavam apenas que a tela **abre** e sem erros de console. A opção A inclui a trava que faltava.
 
 ## 8.7 AVALIAÇÃO DE ARQUITETURA — "janela única de abas" (pedido do dono, 2026-10-17)
@@ -221,7 +221,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 4. **Aposentar a coluna** — `AuxiliaryBar`/`AttachArea`/`attach.css`, o `pendingAttachOpen` e a "Regra 10 (nunca desmonta)" saem; a máquina de estados do painel simplifica de **4 estados → 2** ("tem abas / não tem").
 5. **Testes** — **31 testes de unidade** no módulo + **11 specs E2E** tocam o anexo (`sessao_14_editor_anexo`, `sessao_14b/14c/14d`, `sessao_15_activity_bar/editor_maximize/outline_timeline`…). Vários ficam **obsoletos** (testam a coluna que deixa de existir) e precisam ser repontados ou postos em quarentena com registro.
 
-**Ganho colateral (resolve dívida já aberta):** o caso *"arquivo aberto + Provedores ao mesmo tempo"* (adiado para a FATIA 11 em `§8.4`) **deixa de existir por construção** — viram abas irmãs na mesma barra.
+**Ganho colateral (resolve dívida já aberta):** o caso *"arquivo aberto + Provedores ao mesmo tempo"* (adiado para a FATIA 15 em (pós-D95) `§8.4`) **deixa de existir por construção** — viram abas irmãs na mesma barra.
 
 **Riscos honestos:** é a área mais testada do app (5.7, 5.8, D2.50, R-040, R-083); mexe em layout + máquina de estados, então screenshot/E2E sentem; e o E2E completo segue inútil no sandbox (88✘ ambientais), logo a régua tem de ser **por spec**.
 
@@ -229,7 +229,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | Opção | O que é | Custo/risco |
 |---|---|---|
 | **A — fatia própria agora** ("11-A: Editor Único") | Faz a unificação já, antes de 09/10 | Alto e interrompe a sequência do MVP (09 Conversar → 10 Agir) |
-| **B — abrir a FATIA 11 por aqui** ⭐ | A 11 já prevê **"Casa Editor (abas do EditorArea + gestão de abas)"** e o critério "editar/salvar sem F5" — a unificação é **pré-requisito** dele | Faz 09 e 10 (fecha o MVP) e começa a 11 por este trabalho |
+| **B — abrir a FATIA 15 por aqui (pós-D95)** ⭐ | A 15 já prevê **"Casa Editor (abas do EditorArea + gestão de abas)"** e o critério "editar/salvar sem F5" — a unificação é **pré-requisito** dele | Faz 09 e 10 (fecha o MVP) e começa a 15 por este trabalho (MVP fechado em D94) |
 | **C — passo mínimo (rotear o clique para o centro)** | 1 commit: o Explorer abre arquivo como aba central | **Regressão**: o centro não salva (o anexo salva hoje) — só vale se o salvar entrar junto |
 | **C+ — passo mínimo com o editor capaz** | Roteia para o centro **renderizando o `CodeEditorPane`** dentro da aba, mantendo o anexo como fallback | Entrega "tudo em abas" já, ao custo de **dois modelos convivendo** (dívida temporária declarada) |
 | **D — só registrar** | Nada agora | Zero |
@@ -251,11 +251,11 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | Item | Origem | Verificação | Situação hoje |
 |---|---|---|---|
 | **DEBT-04 (Provedores)** | nasceu nas **fatias 4/6** (linha canônica do `06`: "Fatia 4 / 6") | era item do escopo da **FATIA 07** ("Destravar" = DEBT-06+04+09); a conferência de 15/10 declarou "nada a expurgar" e **errou a régua** (procurou componente, não posicionamento) | **reaberto 16/10** (D87); falta só o **padrão de abertura** |
-| **Browser** | **não é dívida** — é **funcionalidade da FATIA 11 (Conferir)** | expectativa antiga (specs de 17/09) em **quarentena** (D80) — expectativa morta | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; conteúdo real é da FATIA 11 |
-| **Branch Changes** | idem acima — **FATIA 11 (SCM/Diff real)** | idem | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; diff real é da FATIA 11 |
+| **Browser** | **não é dívida** — é **funcionalidade da FATIA 15 (Conferir, pós-D95)** | expectativa antiga (specs de 17/09) em **quarentena** (D80) — expectativa morta | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; conteúdo real é da FATIA 11 |
+| **Branch Changes** | idem acima — **FATIA 15 (SCM/Diff real, pós-D95)** | idem | **medido 16/10:** abre no **editor moderno** (aba), em **modo anexo**; diff real é da FATIA 11 |
 
 **Medição ao vivo (app rodando, 1600×950, sessão ativa):** clicar em *"Abrir alterações no editor"* (Titlebar) e *"Abrir navegador no editor"* → em ambos os casos o painel cai em `section.editor-pane` (**EditorArea = editor moderno**), em `side-pane-editor-only`, com **chat 471 px | editor 471 px** (modo anexo) e a **aba** correspondente na barra do editor ("Branch Changes" / "Browser"). O próprio estado vazio do editor declara: *"Browser, Search e Branch Changes abrem aqui — não na barra auxiliar."* Prints: `validacao_fatia08/aba_branch_changes.png`, `aba_browser.png`.
-**Conclusão:** para as **três** superfícies (Provedores, Browser, Branch Changes) o que resta é a **mesma decisão de POSICIONAMENTO** (modo anexo × modo maximizado) — nenhuma tem componente legado, nenhuma "nasceu" na FATIA 11.
+**Conclusão:** para as **três** superfícies (Provedores, Browser, Branch Changes) o que resta é a **mesma decisão de POSICIONAMENTO** (modo anexo × modo maximizado) — nenhuma tem componente legado, nenhuma "nasceu" na FATIA 15 (pós-D95).
 
 **A2 — DECIDIDO em 17/10 (dono): abertura segue o estado do editor (D88).**
 | Situação ao abrir a superfície | Regra decidida |
@@ -264,7 +264,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 | Editor **aberto em modo maximizado** | abre em **modo maximizado** |
 | Editor **fechado** | abre no **último modo** que o usuário deixou o editor (memória entre reloads) |
 | Nunca usou (primeira vez) | **modo anexo** (padrão de fábrica) |
-| **Arquivo aberto + Provedores ao mesmo tempo** | **FATIA 11** — decidir junto do trabalho de abas (escolha do dono) |
+| **Arquivo aberto + Provedores ao mesmo tempo** | **FATIA 15** — decidir (pós-D95) junto do trabalho de abas (escolha do dono) |
 
 **ACHADO TÉCNICO decisivo (17/10, leitura do código):** existem **DOIS "maximizados" diferentes** no app, e só um é o que o dono quer:
 | Estado | Onde | Persistido? | O que faz |
@@ -275,7 +275,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 
 **A2 como o dono formulou em 16/10 (histórico, agora decidido):** *"Abertura baseada no estado do editor — Provedores (e futuros painéis) devem abrir no modo atual do editor de código (anexo ou maximizado). O pulo do chat não deve acontecer caso esteja abrindo no modo anexo."*
 - Parte **"o pulo não deve acontecer"** = **A1** (independente do modo; vale para anexo e maximizado) — **continua separado da D88**;
-- Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 11).
+- Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 15 (pós-D95)).
 
 ## 8.5 Autoavaliação de maturidade — "3 níveis" (2026-10-17, a pedido do dono)
 O dono enviou um vídeo de terceiro (anúncio de curso, 60 s) que descreve **3 níveis de desenvolvimento com IA**: **(1) vibe coding** (prompt → aceita tudo → torce) · **(2) configurações** (skills, rules, MCP servers) · **(3) workflow assistido** (spec antes do código, testes automatizados no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, **métricas**: carga, complexidade ciclomática, estrutura de dependências, cobertura). Análise completa em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
@@ -322,7 +322,7 @@ O dono gravou um vídeo (2min33s, 15/10 21h21) testando no computador dele e o a
 
 ---
 
-# PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 16 — renumeração D64 de 2026-10-13)
+# PARTE 3 — Roadmap Completo Spec-Driven (Fatias 07 a 20 — renumeração D95 de 2026-10-19 (antes D64))
 
 Todas as fatias estruturadas sob o padrão **especificação prévia, escopo vertical e critérios rígidos de aceitação**. **Cada fatia agora tem duas tarefas: a FUNÇÃO (o que entrega) e a CASA (o que muda de endereço no `App.tsx`)** — a fila e a arquitetura andam juntas (D68/D69; condomínio no `04 §2.2`).
 
@@ -352,13 +352,13 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 
 ### FATIA 10 — Agir (Tools + Permissões) — era a 11 — **FECHA O MVP**
 > **STATUS (18/10): FASE ATIVA — SPEC `PARTE 2D` FECHADA: decisões Q1–Q4 respondidas pelo dono (D93) e execução autorizada ("começe a 10"). Execução em 5 commits (C1–C5), começando pela casa Agir.**
-- **Objetivo:** o agente age no **sistema de arquivos** com autorização do usuário — **recorte fechado (D72): só arquivos; terminal na FATIA 12**.
+- **Objetivo:** o agente age no **sistema de arquivos** com autorização do usuário — **recorte fechado (D72): só arquivos; terminal-visual na FATIA 16 + terminal-para-o-agente na FATIA 13 (pós-D95)**.
 - **Escopo:** ferramentas ligadas ao servidor existente (`/fs/*` + **`fsHost`** — escrita atômica **já pronta**, conferida no código em 18/10: `writeFileAtomic`, temp+rename) + card **[Permitir] / [Negar] / [Permitir na Sessão]** + trava anti-loop (3 chamadas idênticas). Detalhe completo: **PARTE 2D**, fim deste arquivo.
 - **Critério de aceite:** o agente propõe uma ação (ex.: criar arquivo) e **só executa após autorização** — é o teste final do MVP.
-- **Q6 RESPONDIDA (D72, 14/10):** no MVP o agente mexe **só em arquivos** (ler, criar, escrever, listar, buscar); **rodar comandos no terminal é bloqueado** — mais poderoso e mais perigoso (ex.: `rm -rf`), exige protocolo de permissão mais maduro e entra na **FATIA 12**.
+- **Q6 RESPONDIDA (D72, 14/10):** no MVP o agente mexe **só em arquivos** (ler, criar, escrever, listar, buscar); **rodar comandos no terminal é bloqueado** — mais poderoso e mais perigoso (ex.: `rm -rf`), exige protocolo de permissão mais maduro e entra em duas: **terminal-para-o-agente na FATIA 13** e reforma visual na **FATIA 16** (pós-D95).
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md` (card de 3 botões + resposta `allow/deny` + guardião `doomLoop` de 3 chamadas) e `fatia-09-tools/` (worktree/painel de alterações — **fora do escopo da 10**, são tema das fatias 11/15). *(A nota externa `referencias/openclaude/03_sessoes_e_permissoes.md` não sobreviveu à faxina de 17/10 — a referência válida hoje é o PERMISSOES.md, dentro do repo.)*
 
-### FATIA 11 — Conferir (File Ops + SCM/Diff) — eram as 07 + 08
+### FATIA 15 — Conferir (File Ops + SCM/Diff) — era a 11 (pós-D95)
 > **ABERTURA DECIDIDA (D90, 17/10):** a fatia **começa por DEBT-12 — "janela única de abas"** (avaliação completa em `§8.7`): fundir os **dois modelos de aba** (`EditorTab` × `AttachTab`), trazer o **editor que salva** para a aba central, rotear Explorer/Busca/SCM para a barra única e **aposentar a coluna da direita** (`AuxiliaryBar`/`AttachArea` + `pendingAttachOpen` + Regra 10; máquina de estados do painel **4 → 2**). É **pré-requisito** do critério de aceite abaixo ("editar e salvar sem F5"). Ganho colateral: o caso "arquivo aberto + Provedores ao mesmo tempo" (`§8.4`) **deixa de existir por construção**. Repontar **31 testes de unidade + 11 specs E2E** que tocam o anexo; os obsoletos vão para quarentena **com registro** (nunca apagar em silêncio).
 > **Pendência do dono (D86/A1) — RESOLVIDA em 17/10:** a definição de "o novo" foi fechada (`D87`, `§8.3/§8.6`) — não havia componente legado; o padrão de abertura foi corrigido (A1) e a regra do modo ficou na `D88`. O que resta desta família já está na `D90`. 
 - **Objetivo:** edição real de arquivos no editor + visualização das alterações (a "lupa" para auditar o agente).
@@ -368,7 +368,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Em aberto (E4):** a página Personalizações pode nascer dentro desta fatia **ou** virar fatia própria — decidir quando a fatia abrir.
 - **Referência no código:** o diff real **já existe** — `shell/sideBar/views/ScmView.tsx` + `ui/attach/changes/ChangesPane.tsx` → `core/git/gitService.ts` (getDiff). **Não** ressuscitar o diff antigo do Windows.
 
-### FATIA 12 — Terminal 2.0 (Transplante) — absorve DEBT-01 + DEBT-02 + DEBT-03
+### FATIA 16 — Terminal 2.0 (Transplante visual) — absorve DEBT-01 + DEBT-02 + DEBT-03 (era a 12; terminal-para-o-agente é a nova 13)
 - **Objetivo:** o "transplante" do terminal apontado no vídeo de 13/10 — aparência e comportamentos do original, terminais dívidas antigas.
 - **Escopo:** DEBT-01 (`clear` limpa o viewport sem resíduos) · DEBT-02 (arrastar o terminal para painel inferior ou lateral **sem quebrar o grid nem empilhar sessão**) · DEBT-03 (verificação de realidade das abas do painel inferior — Problemas/Saída/Depuração/Terminal/**Portas** — e paridade de comportamento) · comportamentos do vídeo: **Ctrl+C/Ctrl+V**, **arrastar arquivo/pasta para o terminal e ver o caminho**, **arrastar o terminal para dividir telas** · conserto das **9 falhas de teste unitário do terminal** (onda 2 da faxina, D74).
 - **Casa (D69):** o Terminal — área de **endereço congelado** — é a **única área protegida que muda de endereço, e só nesta fatia**: `components/terminal` + `services/pty-server` → `1-workbench/casas/terminal` (**com ordem expressa do dono**).
@@ -376,27 +376,27 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Em aberto:** a aba "Portas" é real ou simulação? (verificar contra o code-server 8080.)
 - **Referência raspada (14/10):** `referencias/vs-code-1.135/04_terminal_e_pty.md` (pty host, batimento, capacidades, menu de contexto, terminal-como-aba; e o achado do agente usando terminal na 1.135 — a fronteira da D72).
 
-### FATIA 13 — Refinamentos + Casas Sessões & Command Center
+### FATIA 17 — Refinamentos + Casa Command Center (era a 13; Casa Sessões foi para a 14)
 > **Pendência do dono (D86/A2):** tela de Provedores "gruda no topo" × tela de novo chat centralizada — refinamento visual apontado no vídeo de 15/10. — absorve DEBT-05/07/11 + D2.23
 - **Objetivo:** fechar o que ficou fora do caminho crítico do MVP + extrair as duas casas da barra lateral/topo.
-- **Escopo:** DEBT-05 (picker nativo no Windows + fallback Linux) · DEBT-07 (pastas recentes no seletor) · **DEBT-11/E9 (a Pesquisa volta ao lugar — a troca de pasta fica *dentro* dela, como seletor, D73)** · D2.23 (Trilha de Navegação/breadcrumbs **navegável**: menus suspensos + estrutura interna do código) · lacunas do mockup na sidebar de Sessões (29/29, busca, Novo Grupo Ctrl+N, indicador de voz, +1 workspace) e **histórico de chats antigos** (item 3 do vídeo de 12/10).
+- **Escopo:** DEBT-05 (picker nativo no Windows + fallback Linux) · DEBT-07 (pastas recentes no seletor) · **DEBT-11/E9 (a Pesquisa volta ao lugar — a troca de pasta fica *dentro* dela, como seletor, D73)** · D2.23 (Trilha de Navegação/breadcrumbs **navegável**: menus suspensos + estrutura interna do código) · lacunas do mockup na sidebar de Sessões (→ FATIA 14, pós-D95) (29/29, busca, Novo Grupo Ctrl+N, indicador de voz, +1 workspace) e **histórico de chats antigos** (item 3 do vídeo de 12/10).
 - **Casas (D69):** nascem **Sessões** (`1-workbench/casas/sessoes` — `SessionSidebar.tsx` 604 l. + lógica no `App.tsx`) e **Command Center** (`1-workbench/casas/command-center` — `WorkspaceSwitcher` + centro da Titlebar; **o Titlebar fica corredor**, sem estado, D70).
 - **Critério de aceite:** os 4 débitos com o comportamento do original; as duas casas com porta única (`index.ts`) + teste de fronteira verde.
 - **Referência:** mockup `arquivo_morto/pesquisa_bruta/personalizacoes/vscode_agents_mockup_interativo (1).html` — barra lateral esquerda fiel (Sessões 29/29 + Personalizações 16).
 
-### FATIA 14 — Painéis (Drag & Drop Avançado)
+### FATIA 18 — Painéis (Drag & Drop Avançado) (era a 14)
 - **Objetivo:** modularidade total de janelas e painéis conforme o original (parte geral — o que não é terminal).
 - **Escopo:** splits horizontais e verticais de painéis funcionais sem quebrar o grid; animação fiel do indicador de drop ("Drop view here", item 9 do vídeo 13/10); limpeza do campo órfão `auxiliaryVisible` (D2.72 — reservada para cá).
 - **Casas (D69):** sem casa nova — é layout (`shell/`, corredor); extrair conforme necessidade.
 - **Critério de aceite:** arranjar painéis como no VS Code (mover, dividir, fechar) sem quebrar o grid; paridade da animação.
 
-### FATIA 15 — Worktree & Isolamento de Sessões
+### FATIA 19 — Worktree & Isolamento de Sessões (era a 15)
 - **Objetivo:** execução de tarefas em ambiente isolado sem afetar a árvore principal de trabalho.
 - **Escopo:** criar sessão em `git worktree` temporária ("Nova Árvore de Trabalho" — o chip do original visto no item 5 do vídeo de 12/10), isolamento dos arquivos modificados e merge/descarte controlado pelo usuário.
-- **Casas (D69):** sem casa nova — extensão da Casa **Sessões** (13) + Agent Host; extrair conforme necessidade.
+- **Casas (D69):** sem casa nova — extensão da Casa **Sessões** (14, pós-D95) + Agent Host; extrair conforme necessidade.
 - **Critério de aceite:** abrir sessão isolada, modificar arquivos e descartar sem alterar a pasta principal do workspace.
 
-### FATIA 16 — Polimento + Navegador (POR ÚLTIMO)
+### FATIA 20 — Polimento + Navegador (POR ÚLTIMO) (era a 16)
 - **Objetivo:** acabamento estético, atalhos globais e paridade final de 90 % com o original — **o navegador entra aqui, por último** (acordo com a Meta, 14/10).
 - **Escopo:** posição da Activity Bar (topo/lateral — DEBT-08, Baixa) · Command Palette (Ctrl+Shift+P) · fidelidade de animações · temas dark/light · atalhos · **botão que abre navegador** (apontado pelo dono no vídeo de 12/10, ~2:18 — "é outro, mostro depois") + **Casa Navegador** (`1-workbench/casas/navegador`, extraída do `BrowserPreview` de `EditorArea.tsx`; padrão do `simple-browser` do VS Code).
 - **Critério de aceite:** inspeção lado a lado com o code-server (8080) comprovando paridade visual e funcional de 90 %; o botão do navegador funcionando.
@@ -407,24 +407,24 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 # PARTE 4 — Débitos Técnicos Secundários & Históricos
 
 ### Higiene de Testes — faxina em 2 ondas (D74, 2026-10-14)
-- **Onda 1 — skip: ✅ EXECUTADA (2026-10-15, FATIA 07, commit `9985b9e`).** Os **13 E2E mortos históricos** estão em `test.skip` com 2 linhas de comentário apontando o registro (`09 §2.4`) e o conserto na FATIA 12. Skips da suíte E2E: **6 → 19**. O contrato anti-trapaça (`e2eAssertionContract.test.ts`) passou a contar `skip` como declaração e, em troca, exige que spec 100 % pulada cite `docs/09` (**D79**).
-- **Onda 2 — conserto:** as **9 falhas de unit do terminal** (P4) são consertadas na **FATIA 12**, junto do transplante.
+- **Onda 1 — skip: ✅ EXECUTADA (2026-10-15, FATIA 07, commit `9985b9e`).** Os **13 E2E mortos históricos** estão em `test.skip` com 2 linhas de comentário apontando o registro (`09 §2.4`) e o conserto na FATIA 16 (pós-D95). Skips da suíte E2E: **6 → 19**. O contrato anti-trapaça (`e2eAssertionContract.test.ts`) passou a contar `skip` como declaração e, em troca, exige que spec 100 % pulada cite `docs/09` (**D79**).
+- **Onda 2 — conserto:** as **9 falhas de unit do terminal** (P4) são consertadas na **FATIA 16**, junto do transplante (pós-D95).
 - **Baseline atualizado (2026-10-15, HEAD `9985b9e`):** typecheck 0 · `vitest run` → **730 pass / 12 falhas / 16 skip** (12 = 9 P4 do terminal + `iconLabels` + `themeTokens` + `visualStates`; todas pré-existentes, provadas com `git stash`). Baseline histórico anterior: 722/9/16 em `f2ff5a3`.
 - **Falhas E2E pré-existentes FORA da lista §2.4 (triagem 15/10):** 7 testes — `sessao_01` T2/T3, `sessao_08` T1, `sessao_09` T5, `sessao_10` T1, `sessao_05_single_pane` T2/T6 — conferidos no A/B em `e02e486` (falham igual nos dois estados). **Destino (D80, 15/10):** os **2 investigados** (`sessao_10` T1 e `sessao_05` T2 — expectativa morta da coluna "Detalhes") entram em **quarentena com nota** (skips 19 → **21**); os **5 restantes seguem vermelhos** e registrados em `09 §2.6` até a fatia da área (12/13).
 - **P7 — Flakes de digitação:** latência em testes de search/explorer — tratar na fatia que mexer nesses testes (a partir da 11/13).
-- **D2.72 — Campo `auxiliaryVisible` órfão:** limpeza de código sem impacto visual reservada para a **FATIA 14 (Painéis)**.
+- **D2.72 — Campo `auxiliaryVisible` órfão:** limpeza de código sem impacto visual reservada para a **FATIA 18 (Painéis)** (pós-D95).
 - **D2.1 a D2.13:** itens de acabamento de árvore e decorators — absorvidos pelo roadmap acima; revisar quando a fatia correspondente abrir.
 
 ### Nota de fronteira (D70)
 - As dívidas **DEBT-ROBUST-01..04** (migração MVP → **Condomínio Robusto**) **não pertencem a este roadmap** — vivem no `04 §2.2` (gatilhos e custos) e no `05` (D70). Só migram **com gatilho + ordem expressa do dono**, nunca no meio de uma fatia.
 
-### ENCERRAMENTO — Padronização & Entrega (após a FATIA 16 — D78)
+### ENCERRAMENTO — Padronização & Entrega (após a FATIA 20 — D78, pós-D95)
 > **Não é fatia numerada** (a numeração segue 07–16); é a **etapa de entrega**, feita quando o dono mandar, depois do polimento.
 - **Padronização do código (o "pente-fino"):** revisar nomes, comentários e o uso da língua de alto nível em todo o código (D76) — o objetivo é o projeto **se explicar sozinho** para qualquer pessoa/IA que pegue o código sem ler documento.
 - **Pacote de documentação de entrega (alvo enxuto ~6 arquivos):** README da raiz · `AGENTS.md` atualizado · **cartões de visita por casa** (revisados) · glossário curto dentro do repo · decisões destiladas (versão enxuta do `05`).
 - **Destino dos canônicos da obra:** viram `arquivo_morto` — são a **planta da construção**, não o manual do prédio.
 - **Candidatos registrados na raspagem (D77):** fiscal automático de fronteiras (dependency-cruiser/ts-arch — receita em `referencias/arquitetura-limpa/02…`); avaliar junto com o gatilho do Robusto.
-- **Kit de testes:** bateria final verde (typecheck 0; suítes de terminal já consertadas na FATIA 12; E2E mortos já em `skip` desde a FATIA 07).
+- **Kit de testes:** bateria final verde (typecheck 0; suítes de terminal já consertadas na FATIA 16 (pós-D95); E2E mortos já em `skip` desde a FATIA 07).
 ---
 
 # PARTE 2C — SPEC: FATIA 09 — Conversar (Chat real + Streaming)
@@ -475,12 +475,12 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 
 ## 5. O que NÃO fazer na FATIA 09
 - **Nada de ferramentas/arquivos/terminal** (isso é a FATIA 10 — Agir): o agente **não age**, só conversa.
-- **Nada de segunda conversa (Q5b):** o botão `+` (`chat-group-tab-add`, `ChatPanel.tsx:294`) fica **oculto** até a FATIA 13, e **nunca** haverá botão "limpar conversa" (o original não tem — `RESET_SESSAO.md`).
+- **Nada de segunda conversa (Q5b):** o botão `+` (`chat-group-tab-add`, `ChatPanel.tsx:294`) fica **oculto** até a FATIA 17 (pós-D95), e **nunca** haverá botão "limpar conversa" (o original não tem — `RESET_SESSAO.md`).
 - **Nada de cartão de permissão** (FATIA 10).
 - **Nada de mexer na tela de Provedores** além de consumi-la (ela está homologada — mudança ali exigiria reabrir a 08).
-- **Nada de "modo anexo/maximizado"** nem de unificação de abas (DEBT-12 é da FATIA 11).
+- **Nada de "modo anexo/maximizado"** nem de unificação de abas (DEBT-12 é da FATIA 15, pós-D95).
 - **Nada de chave no navegador** — nem em teste, nem em log, nem em exemplo.
-- **Não "consertar"** as 12 falhas pré-existentes (decisão já tomada: FATIA 12) nem apagar teste nenhum.
+- **Não "consertar"** as 12 falhas pré-existentes (decisão já tomada: FATIA 16 (pós-D95)) nem apagar teste nenhum.
 
 ## 6. Plano de prova (§6)
 - **(a) Provedor simulado com streaming** — extensão do stub da 08 (`validacao_fatia08/stub_provider.cjs`, porta 4599, **fora do repo**) com um endpoint que **emite pedaços com atraso**, um que **falha no meio**, um que **não responde** (para timeout) e um que **recusa a chave** (401).
@@ -553,14 +553,14 @@ Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4
 **Q5 — nova conversa: como fazem os referências** (`RESET_SESSAO.md` + `SESSION_PICKER.md` — fonte: código do OpenClaude + vídeos)
 - **Não existe botão "limpar conversa"** em nenhum dos dois; o ciclo é só **Nova Conversa** + **Retomar**.
 - **Dois botões "+":** (1) **global** no topo = sala/worktree nova (pasta `untitled-<timestamp>`, empty state 768px); (2) **dentro do projeto** = sessão nova na mesma pasta, `<sessionId>.jsonl` novo, **histórico antigo permanece no disco**.
-- Fluxo: `new_session` → `stopSession` → `session_cleared` (limpa só a tela) → **id novo alocado no primeiro envio**; retomar = lista/modal (Session Picker: needs-input / recentes / outras) — esse seletor é **terreno da FATIA 13**.
+- Fluxo: `new_session` → `stopSession` → `session_cleared` (limpa só a tela) → **id novo alocado no primeiro envio**; retomar = lista/modal (Session Picker: needs-input / recentes / outras) — esse seletor é **terreno da FATIA 17** (pós-D95).
 - Exclusão só pela **lixeira** ao lado da conversa — nunca "limpar".
 
 **No nosso projeto hoje:** o "+" é o `chat-group-tab-add` em `ChatPanel.tsx:294`, na faixa de abas de chats do painel central — e a faixa **só aparece quando já existem 2+ conversas**; o botão hoje é falso (envia frase pronta).
 
 **Leitura para as decisões:**
 - **Q4:** a proposta do dono (pasta `uploads` criada dentro da pasta ativa) **não é o modelo do original** (que referencia e deixa o agente ler na FATIA 10) — é o modelo de produto de chat (Arena/nuvem Anthropic), e tem um ganho: o arquivo **nasce dentro do workspace**, então a FATIA 10 já o enxerga para agir. Pesa contra: escrever na pasta do usuário sem pedir e crescer a 09.
-- **Q5:** a receita do "+" de verdade está mapeada (acima); adiar mantém o foco da 09 e o seletor de conversas cai naturalmente na FATIA 13.
+- **Q5:** a receita do "+" de verdade está mapeada (acima); adiar mantém o foco da 09 e o seletor de conversas cai naturalmente na FATIA 17 (pós-D95).
 
 ---
 
@@ -572,9 +572,9 @@ Duas perguntas nasceram deste diagnóstico e estão na **tabela canônica da §4
 Fechar o MVP: a IA deixa de ser só conversa e passa a **ler, listar, buscar, criar e escrever arquivos dentro da pasta de trabalho** — e **nenhuma mexida acontece sem o cartão de aprovação do dono**: **[Permitir] [Negar] [Permitir na Sessão]**.
 
 ## 2. Terreno conferido no código (18/10)
-- **D72** — escopo fixo: ferramentas de **arquivo**; **terminal bloqueado** (FATIA 12).
+- **D72** — escopo fixo: ferramentas de **arquivo**; **terminal-visual na FATIA 16; terminal-para-o-agente na FATIA 13** (pós-D95).
 - **Casa Conversa (09)** — fio SSE `chunk/done/error` + Parar no servidor; o contrato já reserva a frase: *"a FATIA 10 soma os eventos de ferramenta"* (`contract.ts`).
-- **Servidor de arquivos** — leitura/listagem nas rotas `/api/fs/*` e o **`fsHost`** (`modules/explorer-search/server/fs/fsHost.ts`) com **escrita atômica já pronta** (`writeFileAtomic`: grava num temporário e troca num passo — ou grava tudo, ou não grava nada), além de `mkdir`/`rename`/`copy`/`delete`. A C2 **liga** essas mãos às ferramentas do agente + trava de território; a FATIA 11 reaproveita a mesma peça para o **editor salvar**.
+- **Servidor de arquivos** — leitura/listagem nas rotas `/api/fs/*` e o **`fsHost`** (`modules/explorer-search/server/fs/fsHost.ts`) com **escrita atômica já pronta** (`writeFileAtomic`: grava num temporário e troca num passo — ou grava tudo, ou não grava nada), além de `mkdir`/`rename`/`copy`/`delete`. A C2 **liga** essas mãos às ferramentas do agente + trava de território; a FATIA 15 reaproveita a mesma peça para o **editor salvar** (pós-D95).
 - **Pasta ativa** — resolvida no servidor (`/api/workspaces/*`); é o território que nenhuma ferramenta pode ultrapassar.
 - **Referência de produto (dentro do repo):** `docs/arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md` — desenho do OpenClaude: card no fluxo do chat **[Permitir] [Não] [Sempre na Sessão]**; negar devolve *"User denied permission"* à IA; **guardião anti-loop** (`doomLoop.ts`): hash de `ferramenta + argumentos`, contador por sessão, **bloqueio na 3ª chamada idêntica consecutiva** com mensagem ao modelo. *(A nota externa `referencias/openclaude/03_sessoes_e_permissoes.md` não sobreviveu à faxina — vale o PERMISSOES.md.)*
 - **Regra de segurança (VS Code agent mode, pesquisa de 17/10):** ferramentas embutidas só tocam arquivos **dentro do workspace**.
@@ -585,15 +585,15 @@ Fechar o MVP: a IA deixa de ser só conversa e passa a **ler, listar, buscar, cr
 |---|---|---|---|
 | **Q1** | **O que a IA faz SEM perguntar?** | (a) **só olhar** de graça (ler/listar/buscar dentro da pasta) — criar/escrever **sempre** passam pelo cartão · (b) perguntar por **tudo**, até ler · (c) nada pergunta | **(a)** — é o jeito do VS Code e do OpenClaude (PERMISSOES.md: leitura `allow`, escrita `ask`); controle de verdade sem um clique por cada olhada **→ RESPONDIDO (18/10): (a)** |
 | **Q2** | **O "Permitir na Sessão" vale até quando?** | (a) até a **conversa acabar** — conversa nova pergunta de novo; **F5 mantém** (a sessão sobrevive ao F5 desde a 09) · (b) **para sempre** por tipo de mexida | **(a)** — simples e previsível; (b) cresce escopo e risco nesta fatia **→ RESPONDIDO (18/10): (a)** |
-| **Q3** | **Quanto o cartão mostra da mexida?** | (a) **caminho + prévia** do conteúdo a gravar · (b) comparação **antes × depois** lado a lado · (c) só o caminho | **(a)** no MVP — a "lupa" rica de diff é o tema da **FATIA 11**; (c) é aprovar no escuro **→ RESPONDIDO (18/10): (a)** (o dono pediu explicação alto-nível antes de decidir; explicado o caso "arquivo novo não tem antes") |
+| **Q3** | **Quanto o cartão mostra da mexida?** | (a) **caminho + prévia** do conteúdo a gravar · (b) comparação **antes × depois** lado a lado · (c) só o caminho | **(a)** no MVP — a "lupa" rica de diff é o tema da **FATIA 15** (número pós-D95; definição sob revisão — DEBT-17); (c) é aprovar no escuro **→ RESPONDIDO (18/10): (a)** (o dono pediu explicação alto-nível antes de decidir; explicado o caso "arquivo novo não tem antes") |
 | **Q4** | **Como a IA "levanta a mão" pedindo ferramenta?** | (a) **idioma único combinado** — um formato de pedido que todos os provedores usam igual · (b) **jeito nativo de cada serviço** (4 implementações: OpenAI/Anthropic/Gemini/Ollama) | **(a)** — um idioma só, uma suíte de provas, funciona igual no Ollama local, na nuvem e no stub (D91); pedido torto = aviso **honesto** + nova chance, nunca texto inventado **→ RESPONDIDO (18/10): (b), ESCOLHA DO DONO** — perguntou como o VS Code/Claude Code fazem (nativo) e escolheu seguir esse desenho, **contra a recomendação da IA**, com a consequência aceita e registrada na §8 |
 
 ## 4. O que NÃO fazer na FATIA 10
-- **Nada de terminal/comandos** (FATIA 12 — D72): a IA não executa nada; só lê e escreve arquivo.
-- **Nada de worktree/branch de sessão** (FATIA 15): a IA mexe direto na pasta ativa, sempre com aprovação.
-- **Nada de painel de alterações / Accept All / Discard** (FATIA 11 — a "lupa"): a auditoria rica vem com o diff.
+- **Nada de terminal/comandos** (visual na 16; para-o-agente na 13 — pós-D95): a IA não executa nada; só lê e escreve arquivo.
+- **Nada de worktree/branch de sessão** (FATIA 19, pós-D95): a IA mexe direto na pasta ativa, sempre com aprovação.
+- **Nada de painel de alterações / Accept All / Discard** (FATIA 15 — "lupa" sob revisão (DEBT-17)): a auditoria rica vem com o diff.
 - **Nada de sair da pasta:** caminho com `..` ou absoluto de fora do workspace = **recusa honesta**, sem executar.
-- **Nada das dívidas:** DEBT-12 (abas → 11) · DEBT-13 (memória) · DEBT-14/15 (seletor/bolinha) · "+" segunda conversa (13).
+- **Nada das dívidas:** DEBT-12 (abas → 15, pós-D95) · DEBT-13 (memória) · DEBT-14/15 (seletor/bolinha) · "+" segunda conversa (17, pós-D95).
 
 ## 5. Desenho (alto nível)
 - **Eventos novos no fio** (contrato da casa Conversa estendido): `tool` (a IA quer usar uma ferramenta: nome + argumentos) · `approval` (o servidor pede o sim/não — só quando a ferramenta mexe) · `tool_result` (o que a ferramenta devolveu, enxuto) — ao lado dos `chunk/done/error` de hoje.

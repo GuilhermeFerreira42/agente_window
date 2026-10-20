@@ -42,11 +42,11 @@
   2. **Remoção do Visualizador Legado (DEBT-04):** a aba de Provedores e demais superfícies abrem exclusivamente no editor moderno; sem resquício de visualizador antigo.
   3. **Abertura de Provedores na Landing (DEBT-09):** Conta > Provedores abre com a sessão vazia (Empty State / Landing), sem depender de chat ativo.
   - **Higiene (onda 1 da D74):** marcar como `skip` os 13 E2E mortos do `09 §2.4` (registro preservado — não apagar).
-  - **Regra do caminho crítico (D63/D64):** refinamentos saíram daqui — `clear` do terminal (**DEBT-01**) → **FATIA 12 — Terminal 2.0**; lista de recentes (**DEBT-07**), picker nativo (**DEBT-05**) e pesquisa (**DEBT-11**) → **FATIA 13 — Refinamentos**.
+  - **Regra do caminho crítico (D63/D64):** refinamentos saíram daqui — `clear` do terminal (**DEBT-01**) → **FATIA 16 — Terminal 2.0** (pós-D95); lista de recentes (**DEBT-07**), picker nativo (**DEBT-05**) e pesquisa (**DEBT-11**) → **FATIA 17 — Refinamentos** (pós-D95).
   - **Bloqueio:** a **FATIA 08 (Conectar/Provedores)** não inicia enquanto os critérios da Parte 2 do `06` não estiverem verdes e homologados.
 - **Fila do MVP (D65):** 07 → 08 (Provedores) → 09 (chat real + streaming) → **10 (Agir/tools+permissões = MVP ponta a ponta)**.
 - **FATIA-05 "Chassis-Right":** 100 % homologada no Windows (5174 real) em 2026-10-02.
-- **Fatias 07 a 16:** replanejadas e renumeradas (D64) no padrão Spec-Driven dentro de `docs/06 - PROXIMAS FASES E DIVIDAS.md` (Parte 3 + conversão de numeração).
+- **Fatias 07 a 20 (pós-D95):** replanejadas e renumeradas (D64) no padrão Spec-Driven dentro de `docs/06 - PROXIMAS FASES E DIVIDAS.md` (Parte 3 + conversões D64/D95).
 - Servidor de homologação: Vite **5174** (repo real). Régua comparativa oficial: **VS Code Server (8080)** e VS Code real.
 
 ## Estado real do código (verificado em 2026-10-13, somente leitura)
@@ -79,23 +79,23 @@ Medidas finais em 1400 px: boot chat 768 / Side Bar 274; 3 abas 420/341; maximiz
 Fatia 06 consolidada no checkpoint `a65a246`: typecheck 0 · `WorkspaceSwitcher` 3/3 · `SessionLanding` 11/11 · workspaces 7/7 · providers 2/2 · `App.test.tsx` 46 pass / 13 skip. Playwright Linux comprovou listagem de `/`, estado vazio de `/mnt/`, troca para `/tmp`, `/fs/root=file:///tmp`, `document.title=/tmp`, `pwd=/tmp`, Provedores com 3 cards e zero `pageerror`. A suíte global histórica anterior permanece em 722 pass / 9 falhas P4 preexistentes de terminal / 16 skip.
 
 ## Pendências abertas
-- **✅ DECIDIDO (2026-10-13, D63/D64/D65) — reordenação + renumeração MVP-first:** fila do MVP = **FATIA 07 (Destravar) → 08 (Conectar) → 09 (Conversar) → 10 (Agir)**; refinamentos → **FATIA 13**. Numeração nova e conversão: `05` D64 e `06` Parte 3.
+- **✅ DECIDIDO (2026-10-13, D63/D64/D65) — reordenação + renumeração MVP-first:** fila do MVP = **FATIA 07 (Destravar) → 08 (Conectar) → 09 (Conversar) → 10 (Agir)**; refinamentos → **FATIA 17** (pós-D95). Numeração nova e conversão: `05` D64 e `06` Parte 3.
 - **✅ DECIDIDO (2026-10-13, D66) — projeto de referência oficial: a "Agents Window" do VS Code** (90 %; fonte da verdade). Material raspado no `arquivo_morto/pesquisa_bruta/**` é fonte de fidelidade; infraestrutura do Agent Host não será reproduzida. Estratégia acordada: agora só compreender; quando autorizado, clonar o VS Code para consultar o código.
 - **✅ DECIDIDO (2026-10-13, D67) — kit de contexto para IA colaboradora:** carta avulsa **fora do repositório** + registro das conversas também fora. A regra dos 9 documentos permanece intacta.
 - **✅ PERGUNTAS DO ALINHAMENTO — RESPONDIDAS (2026-10-14, 2.ª rodada com a IA colaboradora; decisões D68–D75):**
   1. **Sequência pós-MVP:** **mantida** (11 Conferir → 12 Terminal 2.0 → 13 Refinamentos → 14 Painéis → 15 Worktree → 16 Polimento), com donos definidos: Personalizações → **11** (E4); histórico de chats → **13**; navegador → **16 (por último)**.
   2. **O que sai primeiro do `App.tsx`:** **Provedores é o 1.º módulo extraído** (FATIA 08); o resto sai casa-a-casa, na fatia que mexer (D69). O Terminal só muda na 12 e **com ordem expressa** (área congelada).
   3. **Régua do VS Code:** fixada **1.135** (D71); versões posteriores = refinamento futuro.
-  4. **Barra lateral esquerda fiel:** entra na **FATIA 13** (Casas Sessões + Command Center); detalhes finos (contador 29/29, "Novo Grupo", "+1 mais workspace") se fecham com a fatia aberta, contra o mockup.
-  5. **Higiene de testes:** **2 ondas** (D74) — `skip` nos 13 E2E mortos (FATIA 07); conserto das 9 falhas do terminal (FATIA 12).
-  6. **Escopo do "Agir" (FATIA 10):** no MVP o agente **só mexe em arquivos** (D72); terminal fica para a FATIA 12.
+  4. **Barra lateral esquerda fiel:** entra na **FATIA 14** (pós-D95; era 13 — Casas Sessões + personalizações/skills; Command Center vai com a Pesquisa na 17); detalhes finos (contador 29/29, "Novo Grupo", "+1 mais workspace") se fecham com a fatia aberta, contra o mockup.
+  5. **Higiene de testes:** **2 ondas** (D74) — `skip` nos 13 E2E mortos (FATIA 07); conserto das 9 falhas do terminal (FATIA 16, pós-D95).
+  6. **Escopo do "Agir" (FATIA 10):** no MVP o agente **só mexe em arquivos** (D72); terminal-visual fica para a FATIA 16; terminal-para-o-agente é a FATIA 13 (pós-D95).
 - **🟡 Próximo passo imediato:** **FATIA 10 — Agir, execução** — SPEC fechada (Q1–Q4 = D93; Q4 = canal **nativo** por serviço, escolha do dono): 5 commits, padrão de sempre (teste antes de cada commit, provas com stub, homologação do dono por último). Escopo fixado: **só arquivos** (D72); terminal na FATIA 12.
-- **🟡 Botão "abre navegador" (vídeo de 2026-10-12, ~2:18):** o dono disse "é outro — mostro depois". **Decidido (14/10): tratado por último — FATIA 16** (o "qual é" continua aguardando o dono mostrar; não adivinhar).
-- **DEBT-11 (pesquisa/centro de comando):** destino **FATIA 13**; **forma decidida (D73/E9): a pesquisa volta ao lugar e a troca de pasta vira seletor dentro dela.** Itens dos vídeos: Personalizações → **FATIA 11**; histórico de chats → **FATIA 13**; navegador → **FATIA 16**; demais itens seguem mapeados com dono no `06`.
+- **🟡 Botão "abre navegador" (vídeo de 2026-10-12, ~2:18):** o dono disse "é outro — mostro depois". **Decidido (14/10): tratado por último — FATIA 20 (pós-D95)** (o "qual é" continua aguardando o dono mostrar; não adivinhar).
+- **DEBT-11 (pesquisa/centro de comando):** destino **FATIA 13**; **forma decidida (D73/E9): a pesquisa volta ao lugar e a troca de pasta vira seletor dentro dela.** Itens dos vídeos: Personalizações → **FATIA 14** (pós-D95; era 11); histórico de chats → **FATIA 17** (pós-D95); navegador → **FATIA 20** (pós-D95); demais itens seguem mapeados com dono no `06`.
 - **P3 / P4 / P7** — higiene de testes (specs mortas, skips, flakes de digitação em `sessao_13_search` T6/T10 e `sessao_14` T9).
 - **P5** — `legacy/`: removida pelo usuário no Windows (tag `legacy-backup-2026-09`); não restaurar.
 - **P9** — layout mobile/single-pane (D2.61) não revisitado.
-- **D2.72** — campo `auxiliaryVisible` órfão no domínio (`layoutPersistence`, `sessionLayout`, `newSessionViewState`, `layoutController`, `sidePane`): **aceito como fechado para a Fatia 5**; limpeza sem efeito visual fica para o **Polimento final** (antiga "Fatia 12 — Polish Visual & Ruflo" = **FATIA 16** por D64).
+- **D2.72** — campo `auxiliaryVisible` órfão no domínio (`layoutPersistence`, `sessionLayout`, `newSessionViewState`, `layoutController`, `sidePane`): **aceito como fechado para a Fatia 5**; limpeza sem efeito visual fica para o **Polimento final** (antiga "Fatia 12 — Polish Visual & Ruflo" = **FATIA 20** por D64 (pós-D95)).
 - Dívidas de layout pós-MVP: pequenos ajustes de fidelidade visual vistos na homologação Windows → **FATIA 16 — Polimento final** (não listar; não bloqueiam).
 - Fora da Fatia 5 por decisão: Alt+Z e menu de abas → 5.9/futura; Simple Browser → 4.8 separada (só UI, sem runtime IA/CDP).
 

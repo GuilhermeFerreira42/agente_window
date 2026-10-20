@@ -113,7 +113,7 @@ src/bairros/
   4-agent-host/casas/    → agente (runtime, sessões, ferramentas)
   5-extensoes/casas/     → skills, plugins
 ```
-`*` **Endereço congelado:** área com contrato congelado **não muda de pasta** até a fatia que abrir a área **com ordem expressa do dono** — o **Terminal** muda na **FATIA 12**; o **Explorer/Search** pode ficar onde está (já é casa de verdade). Cada casa por dentro segue o desenho que já funciona: `contract.ts` (porta tipada) · `index.ts` (barrel) · `ui/`, `core/`, `server/` internos.
+`*` **Endereço congelado:** área com contrato congelado **não muda de pasta** até a fatia que abrir a área **com ordem expressa do dono** — o **Terminal** muda na **FATIA 16** (pós-D95); o **Explorer/Search** pode ficar onde está (já é casa de verdade). Cada casa por dentro segue o desenho que já funciona: `contract.ts` (porta tipada) · `index.ts` (barrel) · `ui/`, `core/`, `server/` internos.
 
 ### Regras do Condomínio (valem para o MVP e para o Robusto)
 1. **Bairro 1 não importa Bairro 2–5** — desligue a IA e o Workbench continua um editor completo (igual VS Code sem Copilot). **Verificado por teste automático** (não é promessa).
@@ -126,15 +126,15 @@ src/bairros/
 | Casa | Bairro | Endereço hoje | Destino | Situação |
 |---|---|---|---|---|
 | Explorer/Search | 1 | `modules/explorer-search` | (pode ficar) | ✅ verde — exemplo a copiar |
-| Terminal | 1 | `components/terminal` + `services/pty-server` | `1-workbench/casas/terminal` | 🔒 congelado — muda na FATIA 12 (ordem expressa) |
+| Terminal | 1 | `components/terminal` + `services/pty-server` | `1-workbench/casas/terminal` | 🔒 congelado — muda na FATIA 16 (pós-D95; ordem expressa) |
 | Provedores | 2 | `components/ProvidersView.tsx` + `server/providers.ts` + lógica no `App.tsx` | `2-inteligencia/casas/provedores` | ✅ **migrado em 15/10 (FATIA 08)** — 1.ª casa extraída; os 3 arquivos antigos foram removidos |
 | Chat / Conversa | 3 | `components/ChatPanel.tsx` + casa `bairros/2-inteligencia/casas/conversa` (rota `/api/chat`, fio SSE) | `2-inteligencia/casas/conversa` (destino decidido na SPEC da 09 — D69/D76; era `3-ponte/casas/chat`) | ✅ **nasceu na FATIA 09 (17/10)** — casa extraída + `handleSend` ligado ao provedor; o `ChatPanel.tsx` segue em `components/` |
 | Agente (runtime/sessões/ferramentas) | 4 | (novo) | `4-agent-host/casas/…` | 🆕 nasce na FATIA 10 |
-| Editor | 1 | `components/EditorArea.tsx` + gestão de abas no `App.tsx` | `1-workbench/casas/editor` | 🟠 nasce na FATIA 11 |
-| Personalizações | 1 | `components/CustomizationsView.tsx` + dados no `App.tsx` | `1-workbench/casas/personalizacoes` | 🟠 nasce na FATIA 11 (E4) |
-| Sessões | 1 | `components/SessionSidebar.tsx` + lógica no `App.tsx` | `1-workbench/casas/sessoes` | 🟠 nasce na FATIA 13 |
-| Command Center | 1 | `components/TopBar/WorkspaceSwitcher.tsx` + centro da Titlebar | `1-workbench/casas/command-center` | 🟠 nasce na FATIA 13 |
-| Navegador | 1 | `BrowserPreview` dentro de `EditorArea.tsx` | `1-workbench/casas/navegador` | 🟠 nasce na FATIA 16 — **por último** (padrão `simple-browser`; acordo com a Meta, 14/10) |
+| Editor | 1 | `components/EditorArea.tsx` + gestão de abas no `App.tsx` | `1-workbench/casas/editor` | 🟠 nasce na FATIA 15 (pós-D95) |
+| Personalizações | 1 | `components/CustomizationsView.tsx` + dados no `App.tsx` | `1-workbench/casas/personalizacoes` | 🟠 nasce na FATIA 14 (pós-D95; era 11) |
+| Sessões | 1 | `components/SessionSidebar.tsx` + lógica no `App.tsx` | `1-workbench/casas/sessoes` | 🟠 nasce na FATIA 14 (pós-D95; era 13) |
+| Command Center | 1 | `components/TopBar/WorkspaceSwitcher.tsx` + centro da Titlebar | `1-workbench/casas/command-center` | 🟠 nasce na FATIA 17 (pós-D95; com a Pesquisa) |
+| Navegador | 1 | `BrowserPreview` dentro de `EditorArea.tsx` | `1-workbench/casas/navegador` | 🟠 nasce na FATIA 20 (pós-D95) — **por último** (padrão `simple-browser`; acordo com a Meta, 14/10) |
 | Skills (agnósticas) | 5 | (novo) | `5-extensoes/casas/skills` | 🆕 pós-MVP (padrão `loadSkillsDir` do OpenClaude) |
 
 ### Escolhas do MVP — justificativa e "quando revisitar"
