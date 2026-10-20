@@ -37,7 +37,7 @@
 **Roteiro do dono (PARTE D) — registrado como roteiro de referência da fatia.**
 **Fase ativa passa a ser a FATIA 10 — Agir** (SPEC: `docs/06` PARTE 2D).
 
-## Roteiro de Homologação — FATIA 10: AGIR (o cartão de permissão no chat) — PENDENTE (a declaração é do dono)
+## Roteiro de Homologação — FATIA 10: AGIR (o cartão de permissão no chat) — ✅ HOMOLOGADA (D94, 19/10)
 Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de ferramentas**. **Aviso Q4b (D93):** se o modelo ativo (ex.: `gemma` no Ollama) não tiver tool calling nativo, o Agir mostra aviso honesto (`sem_canal_nativo`) e a conversa segue sem agir — nesse caso valide os passos 2–7 com um provedor que tenha o canal; a conversa normal funciona com qualquer provedor.
 1. **Conversa normal (§6.1):** mande "oi" — responde como na 09, sem cartão.
 2. **O teste final do MVP (§6.2/3):** numa sessão com **pasta real** (interruptor no topo: digite o caminho da pasta e Enter), mande **"Crie o arquivo teste-homologacao.txt com o conteúdo: feito pela fatia 10"** → cartão com caminho + prévia + 3 botões. **Antes de permitir, confira no Explorador: o arquivo NÃO existe.** Clique **Permitir** → cartão "Feito" e o arquivo **existe** com o conteúdo exato.
@@ -48,7 +48,7 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 7. **Parar (§6.9):** peça uma ação e clique **Parar** no meio — tudo morre limpo, status honesto na tela.
 8. **F5 no meio de um cartão aberto:** cartão pendente vira **expirado** na volta (a execução morreu com a página — nada fica pendurado).
 
-**Progresso (19/10, acompanhamento — NÃO é homologação):** passo 2 ✅ (CRUD do dono no Windows, Nemotron via LiteLLM, cartões aprovados) · passo 6 dispensado (teste automatizado do guardião). **Faltam:** 1 (oi) · 3 (negar) · 4 (sessão+F5) · 5 (território) · 7 (Parar) · 8 (F5 com cartão aberto).
+**HOMOLOGADA (D94, 19/10):** declaração do dono (*"vou considerar que já está homologado... vou confiar nos testes que você fez"*) — cobre a bateria (tsc 0 · E2E 5/5 · 15/15) + passo 2 em uso real (CRUD, Nemotron via LiteLLM, cartões aprovados). **Registro honesto:** passos 1, 3, 4, 5, 7, 8 **não** foram executados manualmente. MVP FECHADO.
 
 **Homologado = o dono declara** (padrão das fatias 07–09).
 
