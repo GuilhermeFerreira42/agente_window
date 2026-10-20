@@ -653,7 +653,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 ---
 
-# §0 — Mapa pós-MVP (D95) + matriz das SPECs 11–15 — RASCUNHO, Q&A pendente
+# §0 — Mapa pós-MVP (D95) + matriz das SPECs 11–15 — FECHADO, Q&A 100% (20/10)
 
 > **Status:** rascunho escrito pela IA em 19/10. **Implementação proibida** até o Q&A de cada SPEC com o dono + autorização expressa. Barra: qualquer programador ou IA implementa sem interpretação subjetiva.
 
@@ -675,7 +675,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **Riscos cruzados:** R-X1 testes E2E antigos de terminal seguem frágeis no sandbox (régua = specs das fatias, `09 §13.1`) · R-X2 cada SPEC mexe no cartão — regressão obrigatória do cartão da 10 em 12 e 13 · R-X3 escopo da 14 é o maior — o bound da v1 (§2H-6) é inegociável.
 
-## PARTE 2E — SPEC da FATIA 11: Teto 25 + "Continuar?" + Config v1 — RASCUNHO
+## PARTE 2E — SPEC da FATIA 11: Teto 25 + "Continuar?" + Config v1 — FECHADA (Q&A 100% em 20/10)
 
 **1. Objetivo:** desbloquear tarefa real (o teto 10 parou o dono em 19/10): teto configurável padrão 25 (igual ao original), pergunta "continuar?" ao bater em vez de morrer, aba Configurações (casa das preferências) e auto-scroll do chat.
 
@@ -697,7 +697,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → DECIDIDO (20/10): sim, central ao lado de Provedores. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + GOAL fica para DEPOIS (fora da 11; pesquisa 20/10: é MODO, /goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
 
-## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
+## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — FECHADA (Q&A 100% em 20/10)
 
 **1. Objetivo:** CRUD completo: o agente exclui arquivos E pastas para a lixeira, sempre com cartão reforçado (decisão do dono 19/10: 1-lixeira, 2-pasta-também, 3-cartão-sim, 4-micro-fatia; DEBT-16).
 
@@ -719,7 +719,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? → DECIDIDO (19/10): `excluir`. · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? → DECIDIDO (20/10): sim. · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)? → DECIDIDO (19/10): sim, fora.
 
-## PARTE 2G — SPEC da FATIA 13: Terminal-para-o-agente (poderes + segurança) — RASCUNHO
+## PARTE 2G — SPEC da FATIA 13: Terminal-para-o-agente (poderes + segurança) — FECHADA (Q&A 100% em 20/10)
 
 **1. Objetivo:** o agente executa comandos de terminal (a classe de poder da Arena: instalar, compilar, testar, inspecionar) — cada comando com cartão, lista de negação dura e limites honestos. Fatia própria, separada da reforma visual (16) — decisão 19/10.
 
@@ -741,13 +741,13 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? → DECIDIDO (19/10): `executar`. · Q13-2 shell = padrão do app por SO (rec: sim)? → DECIDIDO (20/10): sim, mesmo do app. · Q13-3 timeout (rec revisto: op b, 2min+perguntar)? → DECIDIDO (20/10): (b). · Q13-4 saída 20 KB de cauda (rec: sim)? → DECIDIDO (20/10): (a). · Q13-5 sessão-permitida p/ comuns (rec: sim)? → DECIDIDO (20/10): sim, como na SPEC. · Q13-6 lista inicial de negação acima (rec: sim)? → DECIDIDO (19/10): sim.
 
-## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — RASCUNHO
+## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — FECHADA (Q&A 100% em 20/10)
 
 **1. Objetivo:** terminar a barra lateral esquerda como casa das Personalizações (prioridade declarada do dono): entrada "Personalizações" + visão central, com **Habilidades (skills)** funcionais e **Ferramentas** (liga/desliga) na v1. Régua: mockup extraído do VS Code (`arquivo_morto/pesquisa_bruta/personalizacoes/*.html`, 3,1 MB).
 
 **2. Entregáveis:** (a) seção "Personalizações" na lateral esquerda (medidas extraídas do mockup — 1.ª tarefa); (b) visão central com v1 = **Visão geral + Habilidades + Ferramentas** (Q14-1); (c) skills: criar/listar/ligar/desligar/invocar manualmente, formato **SKILL.md-compatível** (Q14-2: pasta + `SKILL.md` + frontmatter nome/descrição); (d) Ferramentas lista as tools reais (as 5 + `excluir` + `executar`) com liga/desliga por grupo; (e) Casas Sessões + Personalizações nascem (D69); Command Center vai com a Pesquisa na 17 (Q14-5 confirma).
 
-**3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1 — Q14-3 DECIDIDO 20/10; automático é v2, timing aberto) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
+**3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1 — Q14-3 DECIDIDO 20/10; automático é v2 (a) logo após a 14 + Instruções — DECIDIDO 20/10) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
 
 **4. Requisitos não-funcionais:** RNF14-1 reconstruir nos componentes React (não colar o HTML) · RNF14-2 skill malformada nunca derruba o chat · RNF14-3 App.tsx não cresce (casas novas!) · RNF14-4 PT-BR na UI (padrão `01`).
 
@@ -761,9 +761,9 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R14-1 escopo (7 cartões!) — mitigação: bound da v1 inegociável (§6). R14-2 compat SKILL.md tem detalhes (frontmatter, pastas) — mitigação: subconjunto documentado + skill-exemplo no repo de testes. R14-3 mockup ≠ React 1:1 — mitigação: régua ±2px, não pixel-perfect cego.
 
-**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto: timing em aberto (dono pergunta se vai após as 7 prateleiras — rec: logo após a 14, sem esperar). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → DECIDIDO (20/10): (a) mantém na 17 com a Pesquisa.
+**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto DECIDIDO (20/10): (a) logo após a 14 (+ Instruções junto). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → DECIDIDO (20/10): (a) mantém na 17 com a Pesquisa.
 
-## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — RASCUNHO
+## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — FECHADA (Q&A 100% em 20/10)
 
 > Esta SPEC é a **execução** da avaliação completa já feita em `06 §8.7` (D90 — "15 abre por DEBT-12", número pós-D95). Não reavalia: executa.
 
