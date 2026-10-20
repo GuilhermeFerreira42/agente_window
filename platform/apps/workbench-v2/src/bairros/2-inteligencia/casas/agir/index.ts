@@ -29,7 +29,7 @@ export type {
 } from './contract'
 
 /** O loop do agente (motor da casa — puro, sem node:*). */
-export { MAX_VOLTAS, rodarAgir } from './server/agir'
+export { TETO_PADRAO, rodarAgir } from './server/agir'
 export type { EmitirAgir, OpcoesAgir, ResultadoAgir, StatusAgir } from './server/agir'
 
 /** Catálogo + peças puras (ferramentas falsas e extração não tocam node:*). */
@@ -43,5 +43,5 @@ export type { DescritorFerramenta } from './server/ferramentas'
 export { extrairFerramentas } from './server/extracao'
 
 /** A tela fala com a casa SÓ por aqui (as URLs moram na casa, FT-05). */
-export { enviarAgir, responderAprovacao } from './ui/client/api'
+export { continuarAgir, enviarAgir, responderAprovacao } from './ui/client/api'
 export type { ControleAgir, EntradaAgir, OuvintesAgir } from './ui/client/api'

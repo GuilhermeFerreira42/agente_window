@@ -37,6 +37,17 @@ export interface ChatMessage {
   reported?: boolean
   /** Cartões de ferramenta do agente (FATIA 10) — presos a esta resposta. */
   ferramentas?: FerramentaNoChat[]
+  /** Cartões "continuar?" do teto (FATIA 11) — presos a esta resposta. */
+  continuar?: ContinuarNoChat[]
+}
+
+export interface ContinuarNoChat {
+  id: string
+  status: 'aguardando' | 'continuado' | 'parado' | 'expirado'
+  /** Voltas usadas quando pausou (= o teto da época). */
+  voltas: number
+  /** Orçamento cheio que o Continuar concede. */
+  teto: number
 }
 
 export interface ComposerDraft {

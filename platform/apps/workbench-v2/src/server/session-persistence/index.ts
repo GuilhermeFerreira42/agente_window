@@ -11,6 +11,8 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
+import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
 import { obterAlvoDeConversa } from './chatAlvo'
 import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 
@@ -130,7 +132,7 @@ const pastaDeTrabalhoAgir = (caminho: string | undefined): { ok: true; raiz: str
 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
-  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+  if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -164,7 +166,15 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa)) return true
   }
   if (rotaPertenceAoModuloAgir(url.pathname)) {
-    if (await tratarRotasAgir(request, response, url, { obterAlvo: obterAlvoDeConversa, pastaDeTrabalho: pastaDeTrabalhoAgir })) return true
+    if (await tratarRotasAgir(request, response, url, {
+      obterAlvo: obterAlvoDeConversa,
+      pastaDeTrabalho: pastaDeTrabalhoAgir,
+      lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
+    })) return true
+  }
+
+  if (rotaPertenceAoModuloConfig(url.pathname)) {
+    if (await tratarRotasConfig(request, response, url)) return true
   }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {

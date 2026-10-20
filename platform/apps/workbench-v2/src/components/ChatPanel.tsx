@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
+import { CartaoContinuar } from './CartaoContinuar'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
@@ -39,6 +40,7 @@ interface ChatPanelProps {
   onStop: () => void
   onApprove: (chatId?: string) => void
   onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirContinuar: (chatId: string, messageId: string, continuarId: string, decisao: 'continuar' | 'parar') => void
   onCopy: (chatId: string, messageId: string, kind: ChatCopyKind) => void
   onCopyAll: (chatId: string) => void
   onCopyFinalResponse: (chatId: string, messageId: string) => void
@@ -155,10 +157,12 @@ function MessageRow({
   onRegenerate,
   onReport,
   onDecidirFerramenta,
+  onDecidirContinuar,
   canRegenerate,
 }: {
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirContinuar: (continuarId: string, decisao: 'continuar' | 'parar') => void
   onCopy: (messageId: string, kind: ChatCopyKind) => void
   onCopyAll: () => void
   onCopyFinalResponse: () => void
@@ -202,6 +206,17 @@ function MessageRow({
                 key={carta.id}
                 carta={carta}
                 onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
+              />
+            ))}
+          </div>
+        )}
+        {message.continuar && message.continuar.length > 0 && (
+          <div role="list" aria-label="Pausas do teto de voltas">
+            {message.continuar.map((carta) => (
+              <CartaoContinuar
+                key={carta.id}
+                carta={carta}
+                onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirContinuar(carta.id, decisao) : undefined}
               />
             ))}
           </div>
@@ -260,6 +275,7 @@ export function ChatPanel({
   onStop,
   onApprove,
   onDecidirFerramenta,
+  onDecidirContinuar,
   onCopy,
   onCopyAll,
   onCopyFinalResponse,
@@ -323,6 +339,7 @@ export function ChatPanel({
               onRegenerate={(messageId) => onRegenerate(activeChat.id, messageId)}
               onReport={(messageId) => onReport(activeChat.id, messageId)}
               onDecidirFerramenta={(ferramentaId, decisao) => onDecidirFerramenta(activeChat.id, message.id, ferramentaId, decisao)}
+              onDecidirContinuar={(continuarId, decisao) => onDecidirContinuar(activeChat.id, message.id, continuarId, decisao)}
               canRegenerate={message.id === lastAssistantMessageId}
             />
           ))}

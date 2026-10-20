@@ -48,8 +48,9 @@ export type CategoriaErroAgir =
   | 'tempo' // serviço lento/parado
   | 'http' // outro erro do serviço (429, 5xx, 400…)
   | 'resposta' // resposta sem nada aproveitável
-  | 'voltas' // estourou o teto de voltas do loop
+  | 'voltas' // (legado da 10 — o teto agora é o evento `teto`, sem erro)
   | 'loop' // guardião: 3 chamadas idênticas seguidas (anti-loop, C4)
+  | 'fluxo' // a execução já não espera mais (recarregou, terminou ou retomada vencida)
 
 /** Um erro da casa Agir em forma de porta (mesma ideia da casa Conversa). */
 export interface ErroAgir {
@@ -84,13 +85,16 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 /**
  * Eventos do fio da casa Agir. O loop emite; a rota repassa por SSE na C3.
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
- * contrato porque o loop precisa saber onde parar e esperar.
+ * contrato porque o loop precisa saber onde parar e esperar. `teto` (FATIA
+ * 11) é a pausa honesta ao bater o limite: NÃO é erro — o dono continua
+ * (mesmo fluxo, orçamento cheio) ou para por aqui.
  */
 export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
   | { type: 'approval'; pedido: PedidoFerramenta }
+  | { type: 'teto'; voltas: number; teto: number }
   | { type: 'done'; model?: string }
   | { type: 'error'; code: CategoriaErroAgir; message: string }
 

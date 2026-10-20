@@ -1,8 +1,9 @@
 // ============================================================================
-// Casa Agir — cliente do loop no BROWSER (FATIA 10, conquista 3).
-// DONO das URLs `/api/agir` e `/api/agir/aprovar` (fronteira FT-05 — o App
-// nunca hardcoda rota nem monta fio SSE à mão). O "Parar" derruba o pedido;
-// o servidor aborta o provedor e interrompe o loop em silêncio.
+// Casa Agir — cliente do loop no BROWSER (FATIA 10, conquista 3; teto na 11).
+// DONO das URLs `/api/agir`, `/api/agir/aprovar` e `/api/agir/continuar`
+// (fronteira FT-05 — o App nunca hardcoda rota nem monta fio SSE à mão).
+// O "Parar" derruba o pedido; o servidor aborta o provedor e interrompe o
+// loop em silêncio. O "Continuar" (FATIA 11) reabre o fio no MESMO fluxo.
 // ============================================================================
 import type {
   CategoriaErroAgir,
@@ -23,9 +24,11 @@ export interface OuvintesAgir {
   onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string) => void
   /** O servidor pediu o sim/não do dono — o cartão ganha os 3 botões. */
   onApproval: (pedido: PedidoFerramenta) => void
+  /** O teto pausou o loop (FATIA 11) — a tela mostra o cartão "continuar?". */
+  onTeto: (voltas: number, teto: number) => void
   /** Fim confirmado (com o modelo que realmente respondeu). */
   onDone: (modelo?: string) => void
-  /** Erro honesto (sem_provedor, chave, endereco, tempo, voltas, resposta…). */
+  /** Erro honesto (sem_provedor, chave, endereco, tempo, fluxo, resposta…). */
   onError: (code: CategoriaErroAgir, message: string) => void
 }
 
@@ -45,84 +48,111 @@ export interface ControleAgir {
   abortar: () => void
 }
 
-export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): ControleAgir {
+/** Bombeia UM fio SSE até o fim (pedido novo e "continuar" usam o mesmo). */
+async function bombearFio(resposta: Response, controlador: AbortController, ouvintes: OuvintesAgir): Promise<void> {
+  let encerrou = false
+  try {
+    if (!resposta.ok || !resposta.body) {
+      let code: CategoriaErroAgir = 'resposta'
+      let message = 'O servidor do app não respondeu direito. Recarregue a página e tente de novo.'
+      try {
+        const corpo = (await resposta.json()) as { code?: CategoriaErroAgir; message?: string }
+        if (corpo && typeof corpo.code === 'string') code = corpo.code
+        if (corpo && typeof corpo.message === 'string') message = corpo.message
+      } catch {
+        // mantém a mensagem honesta padrão
+      }
+      ouvintes.onError(code, message)
+      return
+    }
+
+    const framer = criarFramerSSE()
+    const leitor = resposta.body.getReader()
+    const decodificador = new TextDecoder()
+
+    const consumir = (payloads: string[]): boolean => {
+      for (const payload of payloads) {
+        let evento: EventoAgir
+        try {
+          evento = JSON.parse(payload) as EventoAgir
+        } catch {
+          continue // ruído de compat nunca vira texto nem erro
+        }
+        if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
+        else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
+        else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo)
+        else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido)
+        else if (evento.type === 'teto') {
+          encerrou = true
+          ouvintes.onTeto(evento.voltas, evento.teto)
+          return false
+        } else if (evento.type === 'error') {
+          encerrou = true
+          ouvintes.onError(evento.code, evento.message)
+          return false
+        } else if (evento.type === 'done') {
+          encerrou = true
+          ouvintes.onDone(evento.model)
+          return false
+        }
+      }
+      return true
+    }
+
+    for (;;) {
+      const { value, done } = await leitor.read()
+      if (done) break
+      if (!consumir(framer.entrar(decodificador.decode(value, { stream: true })))) return
+    }
+    if (!encerrou) consumir(framer.fechar())
+    if (!encerrou) {
+      ouvintes.onError('resposta', 'A conexão terminou antes de o servidor confirmar o fim. Envie a mensagem de novo.')
+    }
+  } catch (erro) {
+    if ((erro as { name?: string })?.name === 'AbortError') return // Parar do usuário: silêncio
+    if (!encerrou) {
+      ouvintes.onError('endereco', 'Não deu para falar com o servidor do app. Verifique e tente de novo.')
+    }
+  }
+}
+
+function abrirFio(url: string, corpo: unknown, ouvintes: OuvintesAgir): ControleAgir {
   const controlador = new AbortController()
   void (async () => {
-    let encerrou = false
+    let resposta: Response
     try {
-      const resposta = await fetch('/api/agir', {
+      resposta = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: entrada.mensagens,
-          fluxo: entrada.fluxo,
-          ...(entrada.workspace ? { workspace: entrada.workspace } : {}),
-          ...(entrada.permissoes && entrada.permissoes.length > 0 ? { permissoes: entrada.permissoes } : {}),
-        }),
+        body: JSON.stringify(corpo),
         signal: controlador.signal,
       })
-
-      if (!resposta.ok || !resposta.body) {
-        let code: CategoriaErroAgir = 'resposta'
-        let message = 'O servidor do app não respondeu direito. Recarregue a página e tente de novo.'
-        try {
-          const corpo = (await resposta.json()) as { code?: CategoriaErroAgir; message?: string }
-          if (corpo && typeof corpo.code === 'string') code = corpo.code
-          if (corpo && typeof corpo.message === 'string') message = corpo.message
-        } catch {
-          // mantém a mensagem honesta padrão
-        }
-        encerrou = true
-        ouvintes.onError(code, message)
-        return
-      }
-
-      const framer = criarFramerSSE()
-      const leitor = resposta.body.getReader()
-      const decodificador = new TextDecoder()
-
-      const consumir = (payloads: string[]): boolean => {
-        for (const payload of payloads) {
-          let evento: EventoAgir
-          try {
-            evento = JSON.parse(payload) as EventoAgir
-          } catch {
-            continue // ruído de compat nunca vira texto nem erro
-          }
-          if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
-          else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
-          else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo)
-          else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido)
-          else if (evento.type === 'error') {
-            encerrou = true
-            ouvintes.onError(evento.code, evento.message)
-            return false
-          } else if (evento.type === 'done') {
-            encerrou = true
-            ouvintes.onDone(evento.model)
-            return false
-          }
-        }
-        return true
-      }
-
-      for (;;) {
-        const { value, done } = await leitor.read()
-        if (done) break
-        if (!consumir(framer.entrar(decodificador.decode(value, { stream: true })))) return
-      }
-      if (!encerrou) consumir(framer.fechar())
-      if (!encerrou) {
-        ouvintes.onError('resposta', 'A conexão terminou antes de o servidor confirmar o fim. Envie a mensagem de novo.')
-      }
     } catch (erro) {
       if ((erro as { name?: string })?.name === 'AbortError') return // Parar do usuário: silêncio
-      if (!encerrou) {
-        ouvintes.onError('endereco', 'Não deu para falar com o servidor do app. Verifique e tente de novo.')
-      }
+      ouvintes.onError('endereco', 'Não deu para falar com o servidor do app. Verifique e tente de novo.')
+      return
     }
+    await bombearFio(resposta, controlador, ouvintes)
   })()
   return { abortar: () => controlador.abort() }
+}
+
+export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): ControleAgir {
+  return abrirFio(
+    '/api/agir',
+    {
+      messages: entrada.mensagens,
+      fluxo: entrada.fluxo,
+      ...(entrada.workspace ? { workspace: entrada.workspace } : {}),
+      ...(entrada.permissoes && entrada.permissoes.length > 0 ? { permissoes: entrada.permissoes } : {}),
+    },
+    ouvintes,
+  )
+}
+
+/** FATIA 11 — retoma o MESMO fluxo pausado no teto (orçamento cheio). */
+export function continuarAgir(fluxo: string, permissoes: string[], ouvintes: OuvintesAgir): ControleAgir {
+  return abrirFio('/api/agir/continuar', { fluxo, ...(permissoes.length > 0 ? { permissoes } : {}) }, ouvintes)
 }
 
 /** O dono respondeu o cartão. `false` = a execução já não esperava mais. */

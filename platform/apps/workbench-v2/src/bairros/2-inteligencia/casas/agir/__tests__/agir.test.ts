@@ -4,8 +4,8 @@
 // Parar antes e no meio · o comportamento dos executores falsos.
 // ============================================================================
 import { describe, expect, it } from 'vitest'
-import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, RespostaVolta } from '../contract'
-import { MAX_VOLTAS, rodarAgir } from '../server/agir'
+import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, RespostaVolta, VizinhoProvedor } from '../contract'
+import { TETO_PADRAO, rodarAgir } from '../server/agir'
 import { criarExecutoresFalsos, ehMexida } from '../server/ferramentas'
 
 /** Vizinho falso que segue um roteiro (uma resposta por chamada, na ordem) —
@@ -98,7 +98,7 @@ describe('O loop do agente (rodarAgir)', () => {
     expect(fim.status).toBe('respondeu')
   })
 
-  it('teto de voltas: a IA que só pede ferramenta é parada com erro honesto', async () => {
+  it('teto de voltas: a IA que só pede ferramenta PAUSA com evento `teto` (não erro)', async () => {
     let n = 0
     const eventos: EventoAgir[] = []
     const fim = await rodarAgir({
@@ -112,11 +112,71 @@ describe('O loop do agente (rodarAgir)', () => {
       executores: EXECUTORES,
       emitir: (e) => eventos.push(e),
     })
-    expect(MAX_VOLTAS).toBe(10)
+    expect(TETO_PADRAO).toBe(25)
     expect(fim.status).toBe('voltas_excedidas')
-    expect(fim.voltas).toBe(MAX_VOLTAS)
-    const erro = eventos.find((e) => e.type === 'error')
-    expect(erro).toMatchObject({ type: 'error', code: 'voltas' })
+    expect(fim.voltas).toBe(TETO_PADRAO)
+    expect(n).toBe(TETO_PADRAO)
+    expect(eventos.at(-1)).toEqual({ type: 'teto', voltas: TETO_PADRAO, teto: TETO_PADRAO })
+    expect(eventos.some((e) => e.type === 'error')).toBe(false)
+    // A retomada leva o diálogo acumulado (eco + resultados):
+    expect(fim.mensagensParaRetomar?.length).toBeGreaterThan(1)
+    expect(fim.mensagensParaRetomar?.at(-1)).toMatchObject({ papel: 'ferramenta' })
+  })
+
+  it('teto configurável: vale o que a rota mandar (a casa Config é dona do número)', async () => {
+    let n = 0
+    const eventos: EventoAgir[] = []
+    const fim = await rodarAgir({
+      vizinho: async () => {
+        n += 1
+        return { texto: '', pedidos: [{ id: `q${n}`, ferramenta: 'buscar', argumentos: { padrao: `x-${n}` } }] }
+      },
+      historico: [{ papel: 'usuario', conteudo: 'procura' }],
+      executores: EXECUTORES,
+      teto: 2,
+      emitir: (e) => eventos.push(e),
+    })
+    expect(n).toBe(2)
+    expect(fim).toMatchObject({ status: 'voltas_excedidas', voltas: 2 })
+    expect(eventos.at(-1)).toEqual({ type: 'teto', voltas: 2, teto: 2 })
+  })
+
+  it('retomada: o mesmo fluxo continua de onde parou (orçamento cheio)', async () => {
+    const sempreFerramenta = (prefixo: string): VizinhoProvedor => {
+      let n = 0
+      return async () => {
+        n += 1
+        return { texto: '', pedidos: [{ id: `${prefixo}${n}`, ferramenta: 'buscar', argumentos: { padrao: `${prefixo}-${n}` } }] }
+      }
+    }
+    const eventos1: EventoAgir[] = []
+    const pausa = await rodarAgir({
+      vizinho: sempreFerramenta('a'),
+      historico: [{ papel: 'usuario', conteudo: 'procura' }],
+      executores: EXECUTORES,
+      teto: 1,
+      emitir: (e) => eventos1.push(e),
+    })
+    expect(pausa.status).toBe('voltas_excedidas')
+    expect(eventos1.at(-1)).toEqual({ type: 'teto', voltas: 1, teto: 1 })
+    // O "continuar" reabre o loop com o diálogo guardado (+1 orçamento cheio):
+    const eventos2: EventoAgir[] = []
+    const chamadas2: MensagemAgir[][] = []
+    const fim = await rodarAgir({
+      vizinho: async (mensagens) => {
+        chamadas2.push(mensagens)
+        return { texto: 'Achei após continuar.', pedidos: [], modelo: 'm' }
+      },
+      historico: pausa.mensagensParaRetomar ?? [],
+      executores: EXECUTORES,
+      teto: 25,
+      emitir: (e) => eventos2.push(e),
+    })
+    expect(fim).toMatchObject({ status: 'respondeu', textoFinal: 'Achei após continuar.' })
+    // A retomada viu o eco da ferramenta + o resultado (o MESMO fluxo):
+    expect(chamadas2[0].filter((m) => m.papel === 'ferramenta')).toHaveLength(1)
+    // (O falso não chama `aoTexto` — `chunk` só existe no vizinho real; aqui o `done` basta.)
+    expect(eventos2.map((e) => e.type)).toEqual(['done'])
   })
 
   it('guardião anti-loop: 3 chamadas idênticas seguidas = bloqueio honesto (C4)', async () => {

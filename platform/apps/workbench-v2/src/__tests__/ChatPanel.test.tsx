@@ -59,6 +59,7 @@ function renderPanel() {
     onFeedback: vi.fn(),
     onReport: vi.fn(),
     onDecidirFerramenta: vi.fn(),
+    onDecidirContinuar: vi.fn(),
     onOpenBrowser: vi.fn(),
     onOpenDiff: vi.fn(),
   }

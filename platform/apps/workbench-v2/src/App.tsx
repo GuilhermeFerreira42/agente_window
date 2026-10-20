@@ -20,8 +20,8 @@ import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT }
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
-import { enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
-import type { FerramentaNoChat } from './types'
+import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
+import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
   closeCustomView,
@@ -1644,48 +1644,61 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       .filter((mensagem) => !mensagem.running && !mensagem.cancelled && !mensagem.erro && mensagem.content.trim().length > 0)
       .map((mensagem) => ({ role: mensagem.role, content: mensagem.content }))
 
-  /**
-   * FATIA 10 — liga o AGIR no chat: o mesmo lugar da FATIA 09, agora com
-   * ferramentas de arquivo. O texto continua crescendo em pedaços e os
-   * cartões (ler/criar/…) nascem, esperam o dono e mostram o resultado
-   * presos à resposta (SPEC PARTE 2D §5). Parar continua silencioso.
-   */
-  const iniciarAgirReal = (
+  /** Atualiza os cartões de ferramenta da resposta em voo (fonte única da verdade). */
+  const mexerFerramentas = (
     sessionId: string,
     chatId: string,
     responseId: string,
-    historico: MensagemSimples[],
-    aoConcluir?: () => void,
+    mexer: (cartoes: FerramentaNoChat[]) => FerramentaNoChat[],
   ): void => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      chats: session.chats.map((chat) => chat.id === chatId ? {
+        ...chat,
+        messages: chat.messages.map((message) => message.id === responseId ? {
+          ...message,
+          ferramentas: mexer(message.ferramentas ?? []),
+        } : message),
+      } : chat),
+    }))
+  }
+
+  /** Atualiza os cartões "continuar?" da resposta em voo (FATIA 11). */
+  const mexerContinuar = (
+    sessionId: string,
+    chatId: string,
+    responseId: string,
+    mexer: (cartoes: ContinuarNoChat[]) => ContinuarNoChat[],
+  ): void => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      chats: session.chats.map((chat) => chat.id === chatId ? {
+        ...chat,
+        messages: chat.messages.map((message) => message.id === responseId ? {
+          ...message,
+          continuar: mexer(message.continuar ?? []),
+        } : message),
+      } : chat),
+    }))
+  }
+
+  /**
+   * Ouvintes do fio do agente para UMA resposta (FATIA 11): o pedido novo e
+   * o "continuar" usam os mesmos — a bolha cresce, os cartões nascem e o teto
+   * pausa com o cartão "continuar?". `aoFluxoMorto` = 409 'fluxo' (só o
+   * continuar recebe: a retomada venceu e o cartão expira).
+   */
+  const criarOuvintesAgir = (
+    sessionId: string,
+    chatId: string,
+    responseId: string,
+    acumuladoInicial: string,
+    aoFluxoMorto?: () => void,
+    aoConcluir?: () => void,
+  ): OuvintesAgir => {
     const runKey = `${sessionId}:${chatId}`
-    agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
-    let acumulado = ''
-
-    /** Atualiza os cartões da resposta em voo (fonte única da verdade). */
-    const mexerCartoes = (mexer: (cartoes: FerramentaNoChat[]) => FerramentaNoChat[]): void => {
-      updateSession(sessionId, (session) => ({
-        ...session,
-        chats: session.chats.map((chat) => chat.id === chatId ? {
-          ...chat,
-          messages: chat.messages.map((message) => message.id === responseId ? {
-            ...message,
-            ferramentas: mexer(message.ferramentas ?? []),
-          } : message),
-        } : chat),
-      }))
-    }
-
-    const controle = enviarAgir(
-      {
-        mensagens: historico,
-        // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
-        // aprovações desta resposta — nada vaza para a próxima troca. As
-        // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
-        fluxo: `${sessionId}:${chatId}:${responseId}`,
-        workspace: sessions.find((session) => session.id === sessionId)?.workspacePath ?? undefined,
-        permissoes: permissoesDeSessao(sessionId),
-      },
-      {
+    let acumulado = acumuladoInicial
+    return {
       onChunk: (pedaco) => {
         acumulado += pedaco
         const conteudo = acumulado
@@ -1698,7 +1711,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         }))
       },
       onTool: (pedido: PedidoFerramenta) => {
-        mexerCartoes((cartoes) => [...cartoes, {
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
           id: pedido.id,
           ferramenta: pedido.ferramenta,
           alvo: String(pedido.argumentos.caminho ?? pedido.argumentos.padrao ?? ''),
@@ -1708,14 +1721,39 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onApproval: (pedido: PedidoFerramenta) => {
         const bruta = pedido.argumentos.conteudo
         const previa = typeof bruta === 'string' ? bruta.slice(0, 400) : undefined
-        mexerCartoes((cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
       },
       onToolResult: (id, _ferramenta, ok, resumo) => {
-        mexerCartoes((cartoes) => cartoes.map((carta) => carta.id === id ? {
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? {
           ...carta,
           status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
           resumo,
         } : carta))
+      },
+      onTeto: (voltas, teto) => {
+        agirAtivas.current.delete(runKey)
+        mexerContinuar(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
+          id: `teto-${Date.now()}-${cartoes.length}`,
+          status: 'aguardando',
+          voltas,
+          teto,
+        }])
+        updateSession(sessionId, (session) => {
+          const next = completeChatRun(session, chatId)
+          return {
+            ...next,
+            updated: 'agora',
+            chats: next.chats.map((chat) => chat.id === chatId ? {
+              ...chat,
+              messages: chat.messages.map((message) => (message.id === responseId && message.running) ? {
+                ...message,
+                content: acumulado,
+                running: false,
+                time: timeLabel(),
+              } : message),
+            } : chat),
+          }
+        })
       },
       onDone: (modelo) => {
         agirAtivas.current.delete(runKey)
@@ -1738,7 +1776,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         })
         aoConcluir?.()
       },
-      onError: (_code, mensagemErro) => {
+      onError: (code, mensagemErro) => {
+        if (code === 'fluxo' && aoFluxoMorto) {
+          aoFluxoMorto()
+          return
+        }
         agirAtivas.current.delete(runKey)
         updateSession(sessionId, (session) => {
           const next = completeChatRun(session, chatId)
@@ -1759,7 +1801,38 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           }
         })
       },
+    }
+  }
+
+  /**
+   * FATIA 10 — liga o AGIR no chat: o mesmo lugar da FATIA 09, agora com
+   * ferramentas de arquivo. O texto continua crescendo em pedaços e os
+   * cartões (ler/criar/…) nascem, esperam o dono e mostram o resultado
+   * presos à resposta (SPEC PARTE 2D §5). Parar continua silencioso.
+   * FATIA 11: o teto pausa com o cartão "continuar?" (MESMO fluxo, orçamento
+   * cheio) — o pedido novo e o "continuar" dividem os ouvintes.
+   */
+  const iniciarAgirReal = (
+    sessionId: string,
+    chatId: string,
+    responseId: string,
+    historico: MensagemSimples[],
+    aoConcluir?: () => void,
+  ): void => {
+    const runKey = `${sessionId}:${chatId}`
+    agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
+
+    const controle = enviarAgir(
+      {
+        mensagens: historico,
+        // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
+        // aprovações desta resposta — nada vaza para a próxima troca. As
+        // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
+        fluxo: `${sessionId}:${chatId}:${responseId}`,
+        workspace: sessions.find((session) => session.id === sessionId)?.workspacePath ?? undefined,
+        permissoes: permissoesDeSessao(sessionId),
       },
+      criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir),
     )
     agirAtivas.current.set(runKey, controle)
   }
@@ -1789,6 +1862,41 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     void responderAprovacao(`${sessionId}:${chatId}:${messageId}`, carta.id, decisao, carta.ferramenta).then((aceita) => {
       if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
     })
+  }
+
+  /** O dono respondeu o cartão "continuar?" (FATIA 11): continuar reabre o fio no MESMO fluxo; parar morre limpo. */
+  const decidirContinuar = (sessionId: string, chatId: string, messageId: string, continuarId: string, decisao: 'continuar' | 'parar'): void => {
+    const sessao = sessions.find((item) => item.id === sessionId)
+    const mensagem = sessao?.chats.find((item) => item.id === chatId)?.messages.find((item) => item.id === messageId)
+    const pausa = mensagem?.continuar?.find((item) => item.id === continuarId)
+    if (!sessao || !mensagem || !pausa || pausa.status !== 'aguardando') return
+    const marcar = (status: ContinuarNoChat['status']): void => {
+      mexerContinuar(sessionId, chatId, messageId, (cartoes) => cartoes.map((uma) => uma.id === pausa.id ? { ...uma, status } : uma))
+    }
+    if (decisao === 'parar') {
+      marcar('parado')
+      return
+    }
+    marcar('continuado')
+    // Reabre a corrida na MESMA bolha: o texto continua de onde parou.
+    const runKey = `${sessionId}:${chatId}`
+    agirAtivas.current.get(runKey)?.abortar()
+    updateSession(sessionId, (session) => {
+      const next = updateSessionAndChatStatus(session, chatId, 'working')
+      return {
+        ...next,
+        chats: next.chats.map((chat) => chat.id === chatId ? {
+          ...chat,
+          messages: chat.messages.map((uma) => uma.id === messageId ? { ...uma, running: true } : uma),
+        } : chat),
+      }
+    })
+    const controle = continuarAgir(
+      `${sessionId}:${chatId}:${messageId}`,
+      permissoesDeSessao(sessionId),
+      criarOuvintesAgir(sessionId, chatId, messageId, mensagem.content, () => marcar('expirado')),
+    )
+    agirAtivas.current.set(runKey, controle)
   }
 
   const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }) => {
@@ -2067,6 +2175,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}
         onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}
+        onDecidirContinuar={(chatId, messageId, continuarId, decisao) => decidirContinuar(session.id, chatId, messageId, continuarId, decisao)}
         composerDrafts={composerDrafts}
         onChangeComposerDraft={(key, updater) => setComposerDrafts((current) => ({ ...current, [key]: updater(current[key] ?? { text: '', attachments: [] }) }))}
         composerHistory={composerHistoryByChat}

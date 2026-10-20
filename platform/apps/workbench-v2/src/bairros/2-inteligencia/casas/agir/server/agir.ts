@@ -3,7 +3,8 @@
 // aplica as regras (é mexida? o dono liberou?) → executa → devolve o
 // resultado ao modelo → repete até a IA responder em texto.
 // Réguas duras:
-//   · TETO de 10 voltas por mensagem (nunca rodar de graça);
+//   · TETO configurável de voltas por mensagem (FATIA 11: 1–250, default
+//     25, dono = casa Config — nunca rodar de graça);
 //   · Parar (AbortSignal) é checado ANTES de cada execução — interromper é
 //     SILÊNCIO (sem evento de erro), lição da FATIA 09;
 //   · mexida (criar/escrever, Q1a) SEM aprovação do dono NÃO executa — o
@@ -23,8 +24,9 @@ import type {
 } from '../contract'
 import { ehMexida } from './ferramentas'
 
-/** Teto de voltas por mensagem do dono (SPEC §5). */
-export const MAX_VOLTAS = 10
+/** Teto default de voltas por mensagem (FATIA 11: a casa Config é dona do
+ * número — 1–250; isto é só o fallback quando ninguém mandar). */
+export const TETO_PADRAO = 25
 
 export type EmitirAgir = (evento: EventoAgir) => void
 
@@ -37,6 +39,11 @@ export interface OpcoesAgir {
   executores: Record<FerramentaId, ExecutorFerramenta>
   /** Saída do fio (C3: vira SSE; testes: lista na mão). */
   emitir: EmitirAgir
+  /**
+   * Teto desta mensagem (FATIA 11): a rota lê da casa Config e manda aqui.
+   * Ausente = TETO_PADRAO (25).
+   */
+  teto?: number
   /**
    * Gancho de aprovação (o cartão da C3): chamado SÓ para mexidas; resolve
    * `true` = dono deixou, `false` = dono negou. Ausente na C1 = executa
@@ -54,6 +61,11 @@ export interface ResultadoAgir {
   /** Texto final da IA (vazio quando não respondeu). */
   textoFinal: string
   voltas: number
+  /**
+   * O diálogo acumulado (FATIA 11, só em `voltas_excedidas`): a rota guarda
+   * por fluxo para o "Continuar" retomar o MESMO fluxo com orçamento cheio.
+   */
+  mensagensParaRetomar?: MensagemAgir[]
 }
 
 function foiInterrompido(sinal: AbortSignal | undefined): boolean {
@@ -71,13 +83,14 @@ function mensagemDeErro(erro: unknown): string {
  */
 export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
   const { vizinho, executores, emitir, pedirAprovacao, sinal } = opcoes
+  const teto = opcoes.teto ?? TETO_PADRAO
   const mensagens: MensagemAgir[] = [...opcoes.historico]
   /** Anti-loop (C4, desenho do PERMISSOES.md/doomLoop): assinatura = ferramenta
    * + argumentos exatos. 3 idênticas SEGUIDAS → bloqueia sem executar e sem
    * perguntar ao dono de novo. */
   const assinaturas: string[] = []
 
-  for (let volta = 1; volta <= MAX_VOLTAS; volta += 1) {
+  for (let volta = 1; volta <= teto; volta += 1) {
     if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
 
     let resposta: RespostaVolta
@@ -151,10 +164,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
     }
   }
 
-  emitir({
-    type: 'error',
-    code: 'voltas',
-    message: `A IA pediu ferramentas ${MAX_VOLTAS} vezes seguidas sem concluir. Ela foi parada por segurança — tente dividir o pedido em partes menores.`,
-  })
-  return { status: 'voltas_excedidas', textoFinal: '', voltas: MAX_VOLTAS }
+  // FATIA 11: o teto PAUSA (não erra) — o fio emite `teto` e a rota guarda
+  // o diálogo para o "Continuar" retomar o MESMO fluxo com orçamento cheio.
+  emitir({ type: 'teto', voltas: teto, teto })
+  return { status: 'voltas_excedidas', textoFinal: '', voltas: teto, mensagensParaRetomar: mensagens }
 }
