@@ -158,7 +158,7 @@ describe('P8.2 ChatPanel — welcome e novo chat', () => {
     expect(props.onSend).toHaveBeenCalled()
 
     // Q5b (decisão do dono, 17/10): o "+" de nova conversa foi OCULTADO — nunca
-    // vira "limpar conversa"; a criação de mais conversas volta na FATIA 13.
+    // vira "limpar conversa"; a criação de mais conversas volta na FATIA 17 (pós-D95).
     expect(screen.queryByRole('button', { name: 'Novo chat' })).not.toBeInTheDocument()
     expect(document.querySelector('.chat-group-tab-add')).toBeNull()
   })

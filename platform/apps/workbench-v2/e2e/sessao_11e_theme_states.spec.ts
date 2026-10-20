@@ -3,7 +3,7 @@ import { BTN, collectConsoleErrors, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11E — tema reativo e estados closed/error', () => {
   // MORTO (D74 onda 1 — FATIA 07, 15/10): espera [data-pty-session-id$=":0"].
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('troca para tema claro sem recriar os PTYs das instâncias abertas', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await resetApp(page)
@@ -43,7 +43,7 @@ test.describe('Sessão 11E — tema reativo e estados closed/error', () => {
   })
 
   // MORTO (D74 onda 1 — FATIA 07, 15/10): espera [data-pty-session-id$=":0"].
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('quando o shell encerra, mantém o painel estável e preserva o scrollback visível', async ({ page }) => {
     await resetApp(page)
 

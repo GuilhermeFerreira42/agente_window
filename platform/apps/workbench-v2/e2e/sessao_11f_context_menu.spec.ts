@@ -3,7 +3,7 @@ import { BTN, collectConsoleErrors, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11F — menu de contexto do terminal', () => {
   // MORTO (D74 onda 1 — FATIA 07, 15/10): ações do menu de contexto do terminal (rótulos pré-comitê).
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('abre o menu de contexto com as ações esperadas e fecha com Escape', async ({ page }) => {
     const errors = collectConsoleErrors(page)
     await resetApp(page)
@@ -32,7 +32,7 @@ test.describe('Sessão 11F — menu de contexto do terminal', () => {
   })
 
   // MORTO (D74 onda 1 — FATIA 07, 15/10): ações do menu de contexto do terminal (rótulos pré-comitê).
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('encerrar processo pelo menu mantém o layout estável e entra em closed', async ({ page }) => {
     await resetApp(page)
 

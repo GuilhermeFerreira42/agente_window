@@ -3,7 +3,7 @@ import { BTN, resetApp, SEL, shot } from './helpers'
 
 test.describe('Sessão 11D — split com sash redimensionável', () => {
   // MORTO (D74 onda 1 — FATIA 07, 15/10): espera role=separator "Redimensionar split do terminal".
-  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 12 (Terminal 2.0).
+  // Ver docs/09 §2.4. Registro preservado — NÃO apagar; conserto na FATIA 16 (Terminal 2.0, pós-D95).
   test.skip('cria o sash, redimensiona as panes e preserva o terminal funcional', async ({ page }) => {
     await resetApp(page)
 
