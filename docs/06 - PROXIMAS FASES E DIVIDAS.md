@@ -718,3 +718,71 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 **9. Riscos:** R12-1 API de lixeira difere por SO (mitiga: camada fina por SO + erro honesto) · R12-2 pasta gigante (mitiga: contagem no cartão + sem desfazer-direto avisado) · R12-3 sandbox sem lixeira (mitiga: XDG no Linux; Windows valida o dono).
 
 **10. Perguntas abertas:** Q12-1 nome `excluir` (rec: sim)? · Q12-2 pasta mostra contagem sempre + tamanho se barato (rec: sim)? · Q12-3 "esvaziar lixeira" fica de fora para sempre (rec: sim, é do SO)?
+
+## PARTE 2G — SPEC da FATIA 13: Terminal-para-o-agente (poderes + segurança) — RASCUNHO
+
+**1. Objetivo:** o agente executa comandos de terminal (a classe de poder da Arena: instalar, compilar, testar, inspecionar) — cada comando com cartão, lista de negação dura e limites honestos. Fatia própria, separada da reforma visual (16) — decisão 19/10.
+
+**2. Entregáveis:** (a) ferramenta `executar` (Q13-1 confirma o nome): comando + cwd=pasta ativa, one-shot, com timeout e teto de saída; (b) cartão tipo-comando (comando + cwd + [Permitir][Negar][Permitir na Sessão]); (c) lista de negação: padrões destrutivos SEMPRE perguntam um a um, mesmo com sessão permitida (Q13-6: `rm -rf`, `del /s`, `format`, `mkfs`, `git clean -fdx`, `DROP`, …); (d) anúncio nos 4 canais; (e) Parar mata o comando junto.
+
+**3. Requisitos funcionais:** RF13-1 cwd sempre = pasta ativa da sessão · RF13-2 timeout 60s (Q13-3) → mata + avisa honesto · RF13-3 saída limitada a 20 KB de cauda (Q13-4; resto descartado com aviso "cortada") · RF13-4 negar = nada executa; "dono negou" volta à IA · RF13-5 sessão-permitida vale para comandos comuns, NUNCA para a lista de negação (Q13-5) · RF13-6 shell = padrão do terminal do app por SO (Q13-2).
+
+**4. Requisitos não-funcionais:** RNF13-1 execução one-shot isolada (não no PTY interativo do usuário) · RNF13-2 sem segredos em log · RNF13-3 App.tsx não cresce · RNF13-4 honestidade: comando vazio/inexistente = erro claro, nunca silêncio.
+
+**5. Dependências:** de — casa Agir (loop, teto da 11), cartão (estendido na 12), pty-server SOMENTE como referência de shell padrão (não executa aqui). Para — Ferramentas da 14 lista a tool.
+
+**6. Limites (NÃO fazer):** nada de shell interativo para o agente (só one-shot) · nada de executar fora da pasta por padrão · nada de auto-aprovar lista de negação · nada de segredos/`.env` (regra da casa) · nada de mexer no terminal visual (é a 16 — área congelada).
+
+**7. Critérios de aceite:** 1. `echo oi` aprovado → saída no chat. 2. Negado → nada executa. 3. `rm -rf x` com sessão permitida → pergunta igual (negação dura). 4. Comando de 70s → morre aos 60 com aviso. 5. Saída gigante → 20 KB + "cortada". 6. Parar no meio → processo morre. 7. tsc 0 + unit + E2E verdes (stub) + roteiro do dono.
+
+**8. Testes:** unit — timeout, teto de saída, negação (padrões), cwd, negar-nada-executa; E2E (stub 4610) — T1 aprovar-executa, T2 negar, T3 negação-com-sessão, T4 timeout simulado (comando curto no teste + teto baixo de teste), T5 regressão cartão da 10/12; homologação = roteiro do dono (Windows real).
+
+**9. Riscos:** R13-1 **shell foge do território** (`cd /`, caminhos absolutos no comando) — NÃO há sandbox real; mitigação honesta: cartão mostra o comando (o humano julga) + negação + cwd fixo + aviso na SPEC. Risco aceito e declarado, não resolvido. R13-2 comando trava saída (mitiga: timeout + Parar) · R13-3 diferença cmd/pwsh/sh (mitiga: shell padrão do app + testes por SO no que der).
+
+**10. Perguntas abertas:** Q13-1 nome `executar` (rec: sim)? · Q13-2 shell = padrão do app por SO (rec: sim)? · Q13-3 timeout 60s (rec: sim)? · Q13-4 saída 20 KB de cauda (rec: sim)? · Q13-5 sessão-permitida p/ comuns (rec: sim)? · Q13-6 lista inicial de negação acima (rec: sim)?
+
+## PARTE 2H — SPEC da FATIA 14: Barra esquerda + Personalizações + Skills — RASCUNHO
+
+**1. Objetivo:** terminar a barra lateral esquerda como casa das Personalizações (prioridade declarada do dono): entrada "Personalizações" + visão central, com **Habilidades (skills)** funcionais e **Ferramentas** (liga/desliga) na v1. Régua: mockup extraído do VS Code (`arquivo_morto/pesquisa_bruta/personalizacoes/*.html`, 3,1 MB).
+
+**2. Entregáveis:** (a) seção "Personalizações" na lateral esquerda (medidas extraídas do mockup — 1.ª tarefa); (b) visão central com v1 = **Visão geral + Habilidades + Ferramentas** (Q14-1); (c) skills: criar/listar/ligar/desligar/invocar manualmente, formato **SKILL.md-compatível** (Q14-2: pasta + `SKILL.md` + frontmatter nome/descrição); (d) Ferramentas lista as tools reais (as 5 + `excluir` + `executar`) com liga/desliga por grupo; (e) Casas Sessões + Personalizações nascem (D69); Command Center vai com a Pesquisa na 17 (Q14-5 confirma).
+
+**3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1; automático é v2 — Q14-3) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
+
+**4. Requisitos não-funcionais:** RNF14-1 reconstruir nos componentes React (não colar o HTML) · RNF14-2 skill malformada nunca derruba o chat · RNF14-3 App.tsx não cresce (casas novas!) · RNF14-4 PT-BR na UI (padrão `01`).
+
+**5. Dependências:** de — Bairro 1 (sidebar), casa Agir (injetar skill no loop; registro de tools), mockup-régua. Para — 15 prefere esta pronta (§0); MCP/Plugins/Agentes/Instruções/Hooks = fatias futuras (17+), não aqui.
+
+**6. Limites (NÃO fazer):** nada dos outros 4 cartões na v1 (Agentes, Instruções, Hooks, Servidores MCP, Plugins — ficam para 17+) · nada de invocar skill automaticamente na v1 · nada de Command Center aqui (vai na 17, Q14-5) · nada de mexer na coluna direita (é a 15) · nada de loja/galeria de skills.
+
+**7. Critérios de aceite:** 1. Lateral tem "Personalizações" com as medidas do mockup. 2. Criar skill → aparece, liga/desliga funciona. 3. Invocar `/nome` → agente segue a skill. 4. Desligar `excluir` → some do anúncio (testável). 5. Frontmatter torto → "com erro", lista de pé. 6. F5 → tudo persiste. 7. tsc 0 + unit + E2E verdes (stub) + roteiro do dono.
+
+**8. Testes:** unit — parse frontmatter (válido/inválido), descoberta (usuário+projeto), liga/desliga, anúncio filtra desligadas; E2E (stub) — T1 criar→invocar→segue, T2 desligar some do anúncio, T3 skill quebrada não derruba, T4 F5 persiste, T5 medidas da lateral ±2px; homologação = roteiro do dono (com SKILL.md real de exemplo).
+
+**9. Riscos:** R14-1 escopo (7 cartões!) — mitigação: bound da v1 inegociável (§6). R14-2 compat SKILL.md tem detalhes (frontmatter, pastas) — mitigação: subconjunto documentado + skill-exemplo no repo de testes. R14-3 mockup ≠ React 1:1 — mitigação: régua ±2px, não pixel-perfect cego.
+
+**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? · Q14-2 formato SKILL.md-compatível (rec: sim)? · Q14-3 só invocação manual na v1 (rec: sim)? · Q14-4 storage usuário+projeto (rec: sim)? · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)?
+
+## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — RASCUNHO
+
+> Esta SPEC é a **execução** da avaliação completa já feita em `06 §8.7` (D90 — "15 abre por DEBT-12", número pós-D95). Não reavalia: executa.
+
+**1. Objetivo:** fundir os dois modelos de aba numa barra única estilo VS Code: o editor que salva vai para o centro; a coluna direita aposenta.
+
+**2. Entregáveis:** (a) `EditorTab` × `AttachTab` fundidos; (b) editor que salva na aba central (reaproveita `writeFileAtomic` — §2D); (c) Explorer/Busca/SCM roteados para a barra única; (d) aposentadoria: `AuxiliaryBar`/`AttachArea` + `pendingAttachOpen` + Regra 10; máquina de estados do painel 4→2; (e) caso "arquivo aberto + Provedores" deixa de existir por construção (§8.4).
+
+**3. Requisitos funcionais:** RF15-1 editar+salvar sem F5 (critério-mãe) · RF15-2 abas irmãs alternam sem perder estado · RF15-3 Provedores/Browser/Changes como abas centrais (posicionamento §8.3/D88 preservado) · RF15-4 F5 restaura abas e modos.
+
+**4. Requisitos não-funcionais:** RNF15-1 repontar 31 unit + 11 E2E que tocam o anexo; obsoleto → quarentena COM registro (nunca apagar em silêncio — D79) · RNF15-2 App.tsx DIMINUI (meta: gestão de abas sai dele) · RNF15-3 esquerda (14) intacta.
+
+**5. Dependências:** de — 14 pronta (preferência §0); §8.7 (avaliação). Para — 16 usa o centro estável; 17 usa abas para Pesquisa/Command Center.
+
+**6. Limites (NÃO fazer):** nada da lateral esquerda (é a 14) · nada de terminal (é a 16) · nada de ressuscitar a coluna direita · nada de Net Promoter de abas (sem métrica subjetiva).
+
+**7. Critérios de aceite:** 1. editar+salvar sem F5. 2. Arquivo + Provedores como abas irmãs. 3. F5 restaura. 4. 31+11 testes repontados/quarentenados com registro. 5. tsc 0 + suítes verdes (baseline sem as quarentenas) + roteiro do dono.
+
+**8. Testes:** unit — fusão de abas, roteamento, persistência, máquina 4→2; E2E — fluxos de aba irmã, F5, regressão Provedores/Browser/Changes; quarentenas com registro D79; homologação = roteiro do dono.
+
+**9. Riscos:** R15-1 churn de testes (31+11) — mitigação: repontar em onda própria antes do código (padrão D74). R15-2 regressão abrir/salvar — mitigação: E2E de editar+salvar sem F5 como trava. R15-3 arquivo+Provedores ressurgir — mitigação: impossível por construção + teste que prova.
+
+**10. Perguntas abertas:** Q15-1 §8.7 continua válida pós-D95 (rec: sim, só o número mudou)? · (Sem outras — avaliação completa.)
