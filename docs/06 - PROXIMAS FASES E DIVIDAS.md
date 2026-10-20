@@ -683,7 +683,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **3. Requisitos funcionais:** RF11-1 teto vale por mensagem, 1–250, padrão 25 (Q11-2 DECIDIDO 20/10: 250) · RF11-2 salvar aplica na próxima mensagem (nunca no meio de um loop) · RF11-3 "Continuar" concede +1 orçamento cheio e retoma o MESMO fluxo (Q11-5) · RF11-4 sem Config salva = 25 + auto-scroll padrão (Q11-3) · RF11-5 número inválido = erro honesto no campo, nada salva · RF11-6 auto-scroll só dispara se o viewport estiver a ≤120px do fim.
 
-**4. Requisitos não-funcionais:** RNF11-1 settings em `~/.agente_window/settings.json`, sem segredos, só números/bools (Q11-4) · RNF11-2 texto de custo ao lado do teto ("valores altos = mais chamadas = mais gasto/tempo") · RNF11-3 Config na aba central ao lado de Provedores (Q11-1), mesmo padrão visual · RNF11-4 App.tsx não cresce (RNF global).
+**4. Requisitos não-funcionais:** RNF11-1 settings em `~/.agente_window/settings.json`, sem segredos, só números/bools (Q11-4) · RNF11-2 texto de custo ao lado do teto ("valores altos = mais chamadas = mais gasto/tempo") · RNF11-3 Config na aba central ao lado de Provedores (Q11-1 DECIDIDO 20/10), mesmo padrão visual · RNF11-4 App.tsx não cresce (RNF global).
 
 **5. Dependências:** de — casa Agir (loop/teto), chat (viewport), padrão da aba Provedores. Para — 13 usa o teto; nenhuma fatia bloqueada.
 
@@ -695,7 +695,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R11-1 teto alto + nuvem = gasto (mitiga: texto de custo + máximo) · R11-2 "continuar" em loop real (mitiga: anti-loop intacto + cada continuar é decisão humana).
 
-**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + GOAL fica para DEPOIS (fora da 11; pesquisa 20/10: é MODO, /goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
+**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → DECIDIDO (20/10): sim, central ao lado de Provedores. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + GOAL fica para DEPOIS (fora da 11; pesquisa 20/10: é MODO, /goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
 
 ## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
 
@@ -761,7 +761,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R14-1 escopo (7 cartões!) — mitigação: bound da v1 inegociável (§6). R14-2 compat SKILL.md tem detalhes (frontmatter, pastas) — mitigação: subconjunto documentado + skill-exemplo no repo de testes. R14-3 mockup ≠ React 1:1 — mitigação: régua ±2px, não pixel-perfect cego.
 
-**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto: timing em aberto (dono pergunta se vai após as 7 prateleiras — rec: logo após a 14, sem esperar). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → dono questionou (20/10): "porque na 17?" — explicação entregue, aguarda confirmação.
+**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto: timing em aberto (dono pergunta se vai após as 7 prateleiras — rec: logo após a 14, sem esperar). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → DECIDIDO (20/10): (a) mantém na 17 com a Pesquisa.
 
 ## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — RASCUNHO
 
