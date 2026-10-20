@@ -4,7 +4,7 @@ export type ChatStatus = SessionStatus
 export type MessageRole = 'user' | 'assistant'
 export type ChatVote = 'up' | 'down'
 export type ChatCopyKind = 'message' | 'code'
-export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'customizations' | 'providers'
+export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'customizations' | 'providers' | 'config'
 export type BrowserViewport = 'desktop' | 'tablet' | 'mobile'
 export type BrowserStatus = 'loading' | 'ready' | 'error'
 

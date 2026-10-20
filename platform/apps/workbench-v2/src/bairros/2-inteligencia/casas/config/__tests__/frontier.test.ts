@@ -70,7 +70,7 @@ describe('Fronteira da Casa Config (LEGO)', () => {
   })
 
   it('FT-02: dentro da casa ninguém escapa; outra casa só pelo barrel; deps allowlist', () => {
-    const permitidas: string[] = []
+    const permitidas: string[] = ['react', 'lucide-react'] // (C2) só a tela usa
     const infratores: string[] = []
     for (const arquivo of arquivosDe(CASA)) {
       for (const alvo of importsDe(arquivo)) {
@@ -95,7 +95,7 @@ describe('Fronteira da Casa Config (LEGO)', () => {
         if (!permitidas.includes(pacote)) infratores.push(`${relative(CASA, arquivo)} → ${alvo}`)
       }
     }
-    expect(infratores, 'C1 não tem deps externas; node:* só em server/**').toEqual([])
+    expect(infratores, 'deps externas = allowlist; node:* só em server/**').toEqual([])
   })
 
   it('FT-03: contract.ts não tem `any` no código (comentário pode citar a regra)', () => {
@@ -114,13 +114,14 @@ describe('Fronteira da Casa Config (LEGO)', () => {
     expect(infratores).toEqual([])
   })
 
-  it("FT-05: a URL '/api/config' mora SÓ em server/rotas.ts (o cliente nasce na C2)", () => {
+  it("FT-05: a URL '/api/config' mora SÓ em server/rotas.ts + ui/client/api.ts", () => {
     const infratores: string[] = []
     for (const arquivo of arquivosDe(CASA)) {
       const rel = relative(CASA, arquivo)
       if (rel.endsWith('server/rotas.ts')) continue
+      if (rel.endsWith(join('ui', 'client', 'api.ts'))) continue // (C2) o cliente fala com a rota
       if (readFileSync(arquivo, 'utf8').includes('/api/config')) infratores.push(rel)
     }
-    expect(infratores, "'/api/config' só pode aparecer em server/rotas.ts").toEqual([])
+    expect(infratores, "'/api/config' só pode aparecer em server/rotas.ts e ui/client/api.ts").toEqual([])
   })
 })

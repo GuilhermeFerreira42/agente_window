@@ -17,6 +17,7 @@ import {
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
 import { CartaoContinuar } from './CartaoContinuar'
+import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
@@ -41,6 +42,7 @@ interface ChatPanelProps {
   onApprove: (chatId?: string) => void
   onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onDecidirContinuar: (chatId: string, messageId: string, continuarId: string, decisao: 'continuar' | 'parar') => void
+  autoScroll?: boolean
   onCopy: (chatId: string, messageId: string, kind: ChatCopyKind) => void
   onCopyAll: (chatId: string) => void
   onCopyFinalResponse: (chatId: string, messageId: string) => void
@@ -276,6 +278,7 @@ export function ChatPanel({
   onApprove,
   onDecidirFerramenta,
   onDecidirContinuar,
+  autoScroll,
   onCopy,
   onCopyAll,
   onCopyFinalResponse,
@@ -292,6 +295,20 @@ export function ChatPanel({
   const activeChat: NestedChat = session.chats.find((chat) => chat.id === activeChatId) ?? session.chats[0]
   const lastAssistantMessageId = [...activeChat.messages].reverse().find((message) => message.role === 'assistant')?.id
   const isEmpty = activeChat.messages.length === 0
+  const seguir = autoScroll ?? AUTOSCROLL_PADRAO
+  const listaRef = useRef<HTMLDivElement>(null)
+  const noFimRef = useRef(true)
+  const aoRolar = (): void => {
+    const el = listaRef.current
+    if (!el) return
+    noFimRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= AUTOSCROLL_LIMITE_PX
+  }
+  // Auto-scroll só-no-fim (FATIA 11): só acompanha sozinho quem já estava no
+  // fim (≤120px); quem subiu para ler não é puxado de volta.
+  useEffect(() => {
+    const el = listaRef.current
+    if (seguir && noFimRef.current && el) el.scrollTop = el.scrollHeight
+  }, [activeChat.messages, seguir])
   return (
     <section className="chat-pane" aria-label="Chat da sessão">
       <div className="chat-pane-header">
@@ -327,7 +344,7 @@ export function ChatPanel({
         </div>
       )}
       <div className="chat-content">
-        <div className="chat-messages">
+        <div className="chat-messages" ref={listaRef} onScroll={aoRolar}>
           {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [])} /> : activeChat.messages.map((message) => (
             <MessageRow
               key={message.id}

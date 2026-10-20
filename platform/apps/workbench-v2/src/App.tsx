@@ -20,6 +20,7 @@ import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT }
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
+import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
 import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
@@ -1153,8 +1154,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const openBrowser = () => createBrowser()
+  // FATIA 11: o auto-scroll do chat é config do servidor — carrega uma vez;
+  // a aba Config avisa quando salvar (sem ela, vale o default LIGADO).
+  const [autoScrollChat, setAutoScrollChat] = useState(AUTOSCROLL_PADRAO)
+  useEffect(() => {
+    carregarConfig().then((config) => setAutoScrollChat(config.autoScroll)).catch(() => {})
+  }, [])
+
   const openProviders = () => {
     openEditorTab('providers', { title: 'Provedores' })
+    setEditorHidden(false)
+  }
+  const openConfig = () => {
+    openEditorTab('config', { title: 'Configurações' })
     setEditorHidden(false)
   }
   // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
@@ -2176,6 +2188,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onApprove={(chatId) => handleApprove(session.id, chatId)}
         onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}
         onDecidirContinuar={(chatId, messageId, continuarId, decisao) => decidirContinuar(session.id, chatId, messageId, continuarId, decisao)}
+        autoScroll={autoScrollChat}
         composerDrafts={composerDrafts}
         onChangeComposerDraft={(key, updater) => setComposerDrafts((current) => ({ ...current, [key]: updater(current[key] ?? { text: '', attachments: [] }) }))}
         composerHistory={composerHistoryByChat}
@@ -2271,6 +2284,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
       providersSurface={<ProvidersView />}
+      configSurface={<ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} />}
       onNavigateBrowser={navigateBrowser}
       onBrowserBack={browserBack}
       onBrowserForward={browserForward}
@@ -2349,7 +2363,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
-        onAccountAction={(action) => action === 'open-providers' ? openProviders() : notify(action)}
+        onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
         <SessionSidebar

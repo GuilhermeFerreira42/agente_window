@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatPanel } from '../components/ChatPanel'
@@ -115,3 +115,39 @@ describe('ChatPanel message actions', () => {
   })
 })
 
+
+describe('ChatPanel auto-scroll (FATIA 11)', () => {
+  it('só-no-fim: acompanha no fim, respeita quem subiu para ler', () => {
+    const primeira = renderPanel()
+    const lista = document.querySelector('.chat-messages')
+    if (!(lista instanceof HTMLDivElement)) throw new Error('lista do chat não encontrada')
+    Object.defineProperty(lista, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(lista, 'clientHeight', { value: 200, configurable: true })
+
+    // No fim: mensagem nova desce sozinha (default = LIGADO).
+    lista.scrollTop = 800
+    const maisUma: Session = { ...session, chats: [{ ...chat, messages: [...chat.messages, { id: 'response-2', role: 'assistant', content: 'Nova resposta.', time: '10:02' }] }] }
+    primeira.rerender(<ChatPanel {...primeira.props} session={maisUma} />)
+    expect(lista.scrollTop).toBe(1000)
+
+    // Subiu para ler: mensagem nova NÃO puxa de volta.
+    lista.scrollTop = 0
+    fireEvent.scroll(lista)
+    const outra: Session = { ...session, chats: [{ ...chat, messages: [...maisUma.chats[0].messages, { id: 'response-3', role: 'assistant', content: 'Outra.', time: '10:03' }] }] }
+    primeira.rerender(<ChatPanel {...primeira.props} session={outra} />)
+    expect(lista.scrollTop).toBe(0)
+  })
+
+  it('desligado na config: nunca desce sozinho', () => {
+    const primeira = renderPanel()
+    const lista = document.querySelector('.chat-messages')
+    if (!(lista instanceof HTMLDivElement)) throw new Error('lista do chat não encontrada')
+    Object.defineProperty(lista, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(lista, 'clientHeight', { value: 200, configurable: true })
+
+    lista.scrollTop = 800 // no fim, mas com o interruptor desligado
+    const maisUma: Session = { ...session, chats: [{ ...chat, messages: [...chat.messages, { id: 'response-2', role: 'assistant', content: 'Nova resposta.', time: '10:02' }] }] }
+    primeira.rerender(<ChatPanel {...primeira.props} session={maisUma} autoScroll={false} />)
+    expect(lista.scrollTop).toBe(800)
+  })
+})

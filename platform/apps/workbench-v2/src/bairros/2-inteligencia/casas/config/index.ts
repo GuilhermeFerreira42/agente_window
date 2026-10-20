@@ -14,3 +14,6 @@ export {
   TETO_PADRAO,
 } from './contract'
 export type { ConfigAgente, ConfigParcial } from './contract'
+export { carregarConfig, salvarConfig } from './ui/client/api'
+// (C2) A tela mora na casa, como a casa Provedores — o App a recebe pronta.
+export { ConfigView } from './ui/ConfigView'
