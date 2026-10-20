@@ -687,7 +687,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **5. Dependências:** de — casa Agir (loop/teto), chat (viewport), padrão da aba Provedores. Para — 13 usa o teto; nenhuma fatia bloqueada.
 
-**6. Limites (NÃO fazer):** nada de anti-loop configurável (fixo) · nada de "aprovar tudo" · nada de teto por ferramenta · nada de limite em R$ (ideia futura) · nada de outras preferências na v1.
+**6. Limites (NÃO fazer):** nada de anti-loop configurável (fixo) · nada de "aprovar tudo" · nada de teto por ferramenta · nada de limite em R$ (ideia futura) · nada de outras preferências na v1 · nada de modo GOAL (futuro — dono 20/10).
 
 **7. Critérios de aceite:** 1. teto=2 → tarefa para no 2 com cartão "continuar?". 2. Continuar → retoma e conclui. 3. Parar → morre limpo. 4. Recarregar → config persiste. 5. Auto-scroll: no fim desce; lendo acima não puxa. 6. tsc 0 + unit verdes + E2E novos verdes (stub) + roteiro do dono no `08`.
 
@@ -695,7 +695,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R11-1 teto alto + nuvem = gasto (mitiga: texto de custo + máximo) · R11-2 "continuar" em loop real (mitiga: anti-loop intacto + cada continuar é decisão humana).
 
-**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + modo "até terminar" (GOAL) em avaliação — dono verifica se é skill ou modo; pesquisa 20/10: é MODO (/goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
+**10. Perguntas abertas:** Q11-1 posição da aba (rec: central, ao lado de Provedores)? → dono SIM aba própria (19/10); detalhe do ONDE no Q&A-2. · Q11-2 máximo 250 (rec era 200)? → DECIDIDO (20/10): 250 + GOAL fica para DEPOIS (fora da 11; pesquisa 20/10: é MODO, /goal Claude/Codex) · Q11-3 auto-scroll padrão LIGADO (rec: sim, só-no-fim)? → DECIDIDO (19/10): LIGADO. · Q11-4 arquivo `settings.json` (rec: sim)? → DECIDIDO (19/10): sim. · Q11-5 Continuar = +1 orçamento cheio (rec: sim)? → DECIDIDO (19/10): cheio.
 
 ## PARTE 2F — SPEC da FATIA 12: DELETE micro (lixeira, arquivo+pasta, cartão) — RASCUNHO
 
@@ -747,7 +747,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **2. Entregáveis:** (a) seção "Personalizações" na lateral esquerda (medidas extraídas do mockup — 1.ª tarefa); (b) visão central com v1 = **Visão geral + Habilidades + Ferramentas** (Q14-1); (c) skills: criar/listar/ligar/desligar/invocar manualmente, formato **SKILL.md-compatível** (Q14-2: pasta + `SKILL.md` + frontmatter nome/descrição); (d) Ferramentas lista as tools reais (as 5 + `excluir` + `executar`) com liga/desliga por grupo; (e) Casas Sessões + Personalizações nascem (D69); Command Center vai com a Pesquisa na 17 (Q14-5 confirma).
 
-**3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1; automático é v2 — Q14-3) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
+**3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1 — Q14-3 DECIDIDO 20/10; automático é v2, timing aberto) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
 
 **4. Requisitos não-funcionais:** RNF14-1 reconstruir nos componentes React (não colar o HTML) · RNF14-2 skill malformada nunca derruba o chat · RNF14-3 App.tsx não cresce (casas novas!) · RNF14-4 PT-BR na UI (padrão `01`).
 
@@ -761,7 +761,7 @@ Os 5 commits do §7, cada um provado antes de commitado (regra do dono: *"não c
 
 **9. Riscos:** R14-1 escopo (7 cartões!) — mitigação: bound da v1 inegociável (§6). R14-2 compat SKILL.md tem detalhes (frontmatter, pastas) — mitigação: subconjunto documentado + skill-exemplo no repo de testes. R14-3 mockup ≠ React 1:1 — mitigação: régua ±2px, não pixel-perfect cego.
 
-**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? · Q14-2 formato SKILL.md-compatível (rec: sim)? · Q14-3 só invocação manual na v1 (rec: sim)? · Q14-4 storage usuário+projeto (rec: sim)? · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)?
+**10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto: timing em aberto (dono pergunta se vai após as 7 prateleiras — rec: logo após a 14, sem esperar). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → dono questionou (20/10): "porque na 17?" — explicação entregue, aguarda confirmação.
 
 ## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — RASCUNHO
 
