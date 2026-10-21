@@ -1,6 +1,6 @@
 // ============================================================================
 // Casa Config — a tela (FATIA 11, aba própria no editor central).
-// v1: teto de voltas do agente (1–250) + rolagem automática do chat.
+// v1: teto de iterações do agente (1–250) + rolagem automática do chat.
 // Rascunho + Salvar explícito, como a casa Provedores: o slider não cospe
 // PUT a cada pixel — o servidor grampeia e a tela mostra o eco final.
 // ============================================================================
@@ -90,12 +90,12 @@ export function ConfigView({ aoSalvar }: { aoSalvar?: (config: ConfigAgente) => 
 
         <div className="config-field">
           <span className="config-label" id="config-teto-rotulo">
-            Teto de voltas: <strong aria-live="polite">{teto} {teto === 1 ? 'volta' : 'voltas'}</strong>
+            Teto de iterações: <strong aria-live="polite">{teto} {teto === 1 ? 'iteração' : 'iterações'}</strong>
           </span>
           <div className="config-range-row">
             <input
               type="range"
-              aria-label="Ajustar teto de voltas"
+              aria-label="Ajustar teto de iterações"
               min={TETO_MINIMO}
               max={TETO_MAXIMO}
               step={1}
@@ -103,7 +103,7 @@ export function ConfigView({ aoSalvar }: { aoSalvar?: (config: ConfigAgente) => 
               onChange={(e) => mexer(Number(e.target.value), autoScroll)}
             />
             <label className="config-number">
-              <span className="config-sr">Teto de voltas do agente</span>
+              <span className="config-sr">Teto de iterações do agente</span>
               <input
                 type="number"
                 min={TETO_MINIMO}
@@ -114,7 +114,7 @@ export function ConfigView({ aoSalvar }: { aoSalvar?: (config: ConfigAgente) => 
             </label>
           </div>
           <span className="config-hint">
-            Quantas voltas (idas ao modelo) o agente pode dar antes de perguntar se continua ({TETO_MINIMO}–{TETO_MAXIMO}). Uma volta pode fazer várias ações de uma vez.
+            Quantas iterações (idas ao modelo) o agente pode dar antes de perguntar se continua ({TETO_MINIMO}–{TETO_MAXIMO}). Uma iteração pode fazer várias ações de uma vez.
           </span>
         </div>
 

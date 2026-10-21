@@ -1155,6 +1155,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // O modo preview (clique simples substitui, itálico) continua disponível pela API `attach.open` sem `pinned` (T6 da 14).
   handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
     setExplorerContextMenu(null)
+    setEditorHidden(false) // pós-11: clique no Explorer REEXIBE o editor (era o "não abre")
     void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
   }
 
@@ -1759,12 +1760,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (modulo) void modulo.explorer.refresh().catch(() => undefined)
         }
       },
-      onTeto: (voltas, teto) => {
+      onTeto: (iteracoes, teto) => {
         agirAtivas.current.delete(runKey)
         mexerContinuar(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
           id: `teto-${Date.now()}-${cartoes.length}`,
           status: 'aguardando',
-          voltas,
+          iteracoes,
           teto,
           ordem: proximaOrdemCartao(),
         }])
@@ -1785,12 +1786,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           }
         })
       },
-      onVolta: (volta, teto) => {
+      onIteracao: (iteracao, teto) => {
         updateSession(sessionId, (session) => ({
           ...session,
           chats: session.chats.map((chat) => chat.id === chatId ? {
             ...chat,
-            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, voltaAtual: volta, tetoAtual: teto } : message),
+            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, iteracaoAtual: iteracao, tetoAtual: teto } : message),
           } : chat),
         }))
       },
@@ -1824,12 +1825,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         // Erro TRANSITÓRIO com retomada guardada: a bolha mostra o erro E o
         // cartão "continuar de onde parou" (o mesmo Continuar do teto).
         if (detalhe?.retomavel === true) {
-          const voltas = detalhe.voltas ?? 0
+          const iteracoes = detalhe.iteracoes ?? 0
           const teto = detalhe.teto ?? 25
           mexerContinuar(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
             id: `retomar-${Date.now()}`,
             status: 'aguardando',
-            voltas,
+            iteracoes,
             teto,
             ordem: proximaOrdemCartao(),
             titulo: 'A resposta não terminou a tempo',

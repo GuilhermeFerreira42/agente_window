@@ -23,7 +23,7 @@ export type {
   OpcoesVizinho,
   PedidoFerramenta,
   ProtocoloAgir,
-  RespostaVolta,
+  RespostaIteracao,
   ResultadoFerramenta,
   VizinhoProvedor,
 } from './contract'

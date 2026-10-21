@@ -1,9 +1,9 @@
 // ============================================================================
 // Casa Config — contrato da FATIA 11 (preferências do agente).
-// A v1 tem 2 ajustes: teto de voltas + auto-scroll do chat. Sem segredos —
+// A v1 tem 2 ajustes: teto de iterações + auto-scroll do chat. Sem segredos —
 // só números e liga/desliga (Q11-4, D93: settings.json, nunca .env).
 // ============================================================================
-/** Teto de voltas do agente: 1–250 por mensagem (Q11-2), padrão 25 (igual ao original). */
+/** Teto de iterações do agente: 1–250 por mensagem (Q11-2), padrão 25 (igual ao original). */
 export const TETO_MINIMO = 1
 export const TETO_MAXIMO = 250
 export const TETO_PADRAO = 25

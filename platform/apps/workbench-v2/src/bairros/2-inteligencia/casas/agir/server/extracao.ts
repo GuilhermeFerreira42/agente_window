@@ -4,7 +4,7 @@
 // Conversa (espelho de forma — a vizinha NÃO é importada). Regras:
 //   · pedido de ferramenta desconhecida → IGNORADO (nunca derruba o fio);
 //   · argumentos em JSON torto → a chamada é ignorada (o modelo tentará de
-//     novo na próxima volta);
+//     novo na próxima iteração);
 //   · a validade dos argumentos (o que é obrigatório) é problema de QUEM
 //     EXECUTA — aqui só traduzimos o pedido.
 // ============================================================================

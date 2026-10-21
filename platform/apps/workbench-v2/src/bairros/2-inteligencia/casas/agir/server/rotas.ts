@@ -45,7 +45,7 @@ const permissoesPorFluxo = new Map<string, Set<string>>()
 const pendentesPorFluxo = new Map<string, Map<string, (liberado: boolean) => void>>()
 /**
  * Diálogos pausados no teto, por fluxo (FATIA 11): o "Continuar" retoma o
- * MESMO fluxo com orçamento cheio. Teto de mapa (não de voltas!): as mais
+ * MESMO fluxo com orçamento cheio. Teto de mapa (não de iterações!): as mais
  * velhas caem fora para a memória não crescer sem limite.
  */
 const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; raiz: string }>()
@@ -113,7 +113,7 @@ function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
 function guardarRetomada(fluxo: string, resultado: ResultadoAgir, raiz: string): void {
   retomarPorFluxo.delete(fluxo)
-  const pausouNoTeto = resultado.status === 'voltas_excedidas'
+  const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
     (resultado.codigoErro === 'tempo' || resultado.codigoErro === 'endereco' || resultado.codigoErro === 'http')
@@ -155,7 +155,7 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
   permissoesPorFluxo.set(fluxo, new Set(fio.permissoes))
   pendentesPorFluxo.set(fluxo, new Map())
 
-  let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', voltas: 0 }
+  let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   try {
     resultado = await rodarAgir({
       vizinho: criarVizinhoReal(fio.alvo),

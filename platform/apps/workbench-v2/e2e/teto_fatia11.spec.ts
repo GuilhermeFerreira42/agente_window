@@ -4,7 +4,7 @@
 //   · Vite 5174 com AGENTE_WINDOW_PROVIDERS_PATH + AGENTE_WINDOW_SETTINGS_PATH
 //     em fixtures (o disco do dono nunca é tocado);
 //   · stub 4610 v3 (uploads/stub_agir.cjs): cenário TETO_INFINITO —
-//     SEMPRE responde tool 'buscar' (leitura, args únicos por volta), então o
+//     SEMPRE responde tool 'buscar' (leitura, args únicos por iteração), então o
 //     teto SEMPRE pausa, qualquer que seja o valor;
 //   · território REAL: /tmp/teto-e2e-ws (recriado por teste).
 //
@@ -100,9 +100,9 @@ test.describe('FATIA 11 — Teto + Continuar + Config', () => {
     await expect(cartoesContinuar(page)).toHaveCount(1, { timeout: 8000 })
     const pausa1 = cartoesContinuar(page).first()
     await expect(pausa1).toContainText('Pausado no limite')
-    await expect(pausa1).toContainText('2 de 2 voltas')
-    // Continuar: +2 voltas no MESMO fluxo (4 cartões), pausa de novo.
-    await pausa1.getByRole('button', { name: 'Continuar com mais 2 voltas' }).click()
+    await expect(pausa1).toContainText('2 de 2 iterações')
+    // Continuar: +2 iterações no MESMO fluxo (4 cartões), pausa de novo.
+    await pausa1.getByRole('button', { name: 'Continuar' }).click()
     await expect(pausa1).toContainText('Continuado', { timeout: 8000 })
     await expect(cartoesFerramenta(page)).toHaveCount(4, { timeout: 15000 })
     const pausa2 = cartoesContinuar(page).nth(1)
@@ -121,10 +121,10 @@ test.describe('FATIA 11 — Teto + Continuar + Config', () => {
     await page.getByRole('menuitem', { name: 'Configurações', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible({ timeout: 8000 })
     // Veio do beforeEach (teto 2, rolagem ligada).
-    await expect(page.getByLabel('Teto de voltas do agente')).toHaveValue('2')
+    await expect(page.getByLabel('Teto de iterações do agente')).toHaveValue('2')
     await expect(page.getByLabel(/Rolagem automática do chat/)).toBeChecked()
     // O dono muda os dois e salva.
-    await page.getByLabel('Teto de voltas do agente').fill('7')
+    await page.getByLabel('Teto de iterações do agente').fill('7')
     await page.getByLabel(/Rolagem automática do chat/).uncheck()
     await page.getByRole('button', { name: 'Salvar configurações' }).click()
     await expect(page.getByText('Configuração salva')).toBeVisible({ timeout: 8000 })
@@ -137,7 +137,7 @@ test.describe('FATIA 11 — Teto + Continuar + Config', () => {
     await expect(page.locator('.agent-sessions-workbench')).toBeVisible()
     await page.getByRole('button', { name: 'Conta', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Configurações', exact: true }).click()
-    await expect(page.getByLabel('Teto de voltas do agente')).toHaveValue('7', { timeout: 8000 })
+    await expect(page.getByLabel('Teto de iterações do agente')).toHaveValue('7', { timeout: 8000 })
     await expect(page.getByLabel(/Rolagem automática do chat/)).not.toBeChecked()
     await shot(page, 'f11_T2_aba_config')
   })

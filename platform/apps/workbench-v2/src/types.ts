@@ -41,8 +41,8 @@ export interface ChatMessage {
   ferramentas?: FerramentaNoChat[]
   /** Cartões "continuar?" do teto (FATIA 11) — presos a esta resposta. */
   continuar?: ContinuarNoChat[]
-  /** Progresso do agente (pós-11): a volta atual e o teto — "volta 2 de 25". */
-  voltaAtual?: number
+  /** Progresso do agente (pós-11): a iteração atual e o teto — "iteração 2 de 25". */
+  iteracaoAtual?: number
   tetoAtual?: number
   /** Quando a corrida começou (pós-11) — o contador "há Xs" do dono. */
   inicioEm?: number
@@ -51,8 +51,8 @@ export interface ChatMessage {
 export interface ContinuarNoChat {
   id: string
   status: 'aguardando' | 'continuado' | 'parado' | 'expirado'
-  /** Voltas usadas quando pausou (= o teto da época). */
-  voltas: number
+  /** Iterações usadas quando pausou (= o teto da época). */
+  iteracoes: number
   /** Orçamento cheio que o Continuar concede. */
   teto: number
   /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */

@@ -249,7 +249,7 @@ function MessageRow({
           </div>
         )}
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents(() => onCopy(message.id, 'code'))}>{message.content}</ReactMarkdown>
-        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span>{message.voltaAtual !== undefined && message.tetoAtual !== undefined && <span> — volta {message.voltaAtual} de {message.tetoAtual}</span>}{message.inicioEm !== undefined && <span> · há <TempoDecorrido inicio={message.inicioEm} correndo={message.running === true} /></span>}<span className="chat-progress-dots">...</span></div>}
+        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span>{message.iteracaoAtual !== undefined && message.tetoAtual !== undefined && <span> — iteração {message.iteracaoAtual} de {message.tetoAtual}</span>}{message.inicioEm !== undefined && <span> · há <TempoDecorrido inicio={message.inicioEm} correndo={message.running === true} /></span>}<span className="chat-progress-dots">...</span></div>}
       </div>
       {!message.running && (
         <div className="chat-message-footer">

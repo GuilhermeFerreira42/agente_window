@@ -33,7 +33,7 @@ export function CartaoContinuar({ carta, onDecidir }: CartaoContinuarProps) {
     <div
       className="chat-continue-card"
       role="group"
-      aria-label="Limite de voltas do agente"
+      aria-label="Limite de iterações do agente"
       style={{
         margin: '6px 0',
         padding: '8px 10px',
@@ -44,9 +44,9 @@ export function CartaoContinuar({ carta, onDecidir }: CartaoContinuarProps) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <strong style={{ fontSize: 12 }}>{carta.titulo ?? 'Limite de voltas'}</strong>
+        <strong style={{ fontSize: 12 }}>{carta.titulo ?? 'Limite de iterações'}</strong>
         <span style={{ fontSize: 11, opacity: 0.9 }}>
-          {carta.motivo ?? `A IA usou ${carta.voltas} de ${carta.teto} voltas sem concluir.`}
+          {carta.motivo ?? `A IA usou ${carta.iteracoes} de ${carta.teto} iterações sem concluir.`}
         </span>
         <span style={{ marginLeft: 'auto', color: cor, fontWeight: 600, fontSize: 11 }}>
           {carta.status === 'aguardando' && carta.titulo !== undefined ? 'Esperando você decidir' : ROTULOS_STATUS[carta.status]}
@@ -57,11 +57,11 @@ export function CartaoContinuar({ carta, onDecidir }: CartaoContinuarProps) {
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            aria-label={`Continuar com mais ${carta.teto} voltas`}
+            aria-label="Continuar"
             onClick={() => onDecidir('continuar')}
             style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${cor}`, background: 'transparent', color: cor }}
           >
-            Continuar (+{carta.teto})
+            Continuar
           </button>
           <button
             type="button"

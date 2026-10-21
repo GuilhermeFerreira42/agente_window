@@ -33,8 +33,8 @@ describe('ConfigView (FATIA 11)', () => {
     mockFetch()
     render(<ConfigView />)
     expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Teto de voltas do agente')).toHaveValue(25)
-    expect(screen.getByLabelText('Ajustar teto de voltas')).toHaveValue('25')
+    expect(screen.getByLabelText('Teto de iterações do agente')).toHaveValue(25)
+    expect(screen.getByLabelText('Ajustar teto de iterações')).toHaveValue('25')
     expect(screen.getByLabelText(/Rolagem automática do chat/)).toBeChecked()
   })
 
@@ -45,8 +45,8 @@ describe('ConfigView (FATIA 11)', () => {
     render(<ConfigView aoSalvar={aoSalvar} />)
     expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Ajustar teto de voltas'), { target: { value: '50' } })
-    expect(screen.getByText('50 voltas')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Ajustar teto de iterações'), { target: { value: '50' } })
+    expect(screen.getByText('50 iterações')).toBeInTheDocument()
     await user.click(screen.getByLabelText(/Rolagem automática do chat/))
     expect(screen.getByLabelText(/Rolagem automática do chat/)).not.toBeChecked()
 
@@ -65,10 +65,10 @@ describe('ConfigView (FATIA 11)', () => {
     render(<ConfigView />)
     expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Teto de voltas do agente'), { target: { value: '999' } })
+    fireEvent.change(screen.getByLabelText('Teto de iterações do agente'), { target: { value: '999' } })
     await user.click(screen.getByRole('button', { name: 'Salvar configurações' }))
-    await waitFor(() => expect(screen.getByLabelText('Teto de voltas do agente')).toHaveValue(250))
-    expect(screen.getByText('250 voltas')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Teto de iterações do agente')).toHaveValue(250))
+    expect(screen.getByText('250 iterações')).toBeInTheDocument()
   })
 
   it('GET quebrado = banner honesto (sem tela vazia)', async () => {

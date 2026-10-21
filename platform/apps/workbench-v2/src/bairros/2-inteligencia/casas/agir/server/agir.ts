@@ -3,7 +3,7 @@
 // aplica as regras (é mexida? o dono liberou?) → executa → devolve o
 // resultado ao modelo → repete até a IA responder em texto.
 // Réguas duras:
-//   · TETO configurável de voltas por mensagem (FATIA 11: 1–250, default
+//   · TETO configurável de iterações por mensagem (FATIA 11: 1–250, default
 //     25, dono = casa Config — nunca rodar de graça);
 //   · Parar (AbortSignal) é checado ANTES de cada execução — interromper é
 //     SILÊNCIO (sem evento de erro), lição da FATIA 09;
@@ -18,20 +18,20 @@ import type {
   FerramentaId,
   MensagemAgir,
   PedidoFerramenta,
-  RespostaVolta,
+  RespostaIteracao,
   ResultadoFerramenta,
   VizinhoProvedor,
 } from '../contract'
 import { ehMexida } from './ferramentas'
 
-/** Teto default de voltas por mensagem (FATIA 11: a casa Config é dona do
+/** Teto default de iterações por mensagem (FATIA 11: a casa Config é dona do
  * número — 1–250; isto é só o fallback quando ninguém mandar). */
 export const TETO_PADRAO = 25
 
 export type EmitirAgir = (evento: EventoAgir) => void
 
 export interface OpcoesAgir {
-  /** Fala com o provedor numa volta (C2 = HTTP real; testes = falso). */
+  /** Fala com o provedor numa iteração (C2 = HTTP real; testes = falso). */
   vizinho: VizinhoProvedor
   /** Histórico da conversa (a mensagem nova do dono já entra aqui). */
   historico: MensagemAgir[]
@@ -54,15 +54,15 @@ export interface OpcoesAgir {
   sinal?: AbortSignal
 }
 
-export type StatusAgir = 'respondeu' | 'interrompido' | 'voltas_excedidas' | 'loop_bloqueado' | 'erro'
+export type StatusAgir = 'respondeu' | 'interrompido' | 'iteracoes_excedidas' | 'loop_bloqueado' | 'erro'
 
 export interface ResultadoAgir {
   status: StatusAgir
   /** Texto final da IA (vazio quando não respondeu). */
   textoFinal: string
-  voltas: number
+  iteracoes: number
   /**
-   * O diálogo acumulado (FATIA 11, em `voltas_excedidas` — e pós-11 também
+   * O diálogo acumulado (FATIA 11, em `iteracoes_excedidas` — e pós-11 também
    * em `erro` TRANSITÓRIO): a rota guarda por fluxo para o "Continuar"
    * retomar o MESMO fluxo com orçamento cheio.
    */
@@ -82,7 +82,7 @@ function mensagemDeErro(erro: unknown): string {
 
 /**
  * Roda o loop do agente até a IA responder em texto, o dono Parar, ou o teto
- * de voltas estourar. O `historico` de entrada NUNCA é alterado.
+ * de iterações estourar. O `historico` de entrada NUNCA é alterado.
  */
 export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
   const { vizinho, executores, emitir, pedirAprovacao, sinal } = opcoes
@@ -93,11 +93,11 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
    * perguntar ao dono de novo. */
   const assinaturas: string[] = []
 
-  for (let volta = 1; volta <= teto; volta += 1) {
-    if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
-    emitir({ type: 'volta', volta, teto })
+  for (let iteracao = 1; iteracao <= teto; iteracao += 1) {
+    if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
+    emitir({ type: 'iteracao', iteracao, teto })
 
-    let resposta: RespostaVolta
+    let resposta: RespostaIteracao
     try {
       resposta = await vizinho(mensagens, {
         aoTexto: (pedaco) => emitir({ type: 'chunk', text: pedaco }),
@@ -106,7 +106,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
     } catch (erro) {
       // Parar no meio do fetch = interrupção SILENCIOSA (lição da 09) —
       // só sai erro de verdade quando a culpa é do serviço/rede.
-      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
       const codigoSuspeito: unknown = erro instanceof Error && 'code' in erro ? (erro as { code?: unknown }).code : undefined
       const codigo: CategoriaErroAgir =
         typeof codigoSuspeito === 'string' && codigoSuspeito !== '' ? (codigoSuspeito as CategoriaErroAgir) : 'http'
@@ -117,12 +117,12 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         type: 'error',
         code: codigo,
         message: mensagemDeErro(erro),
-        ...(retomavel ? { retomavel: true as const, voltas: volta, teto } : {}),
+        ...(retomavel ? { retomavel: true as const, iteracoes: iteracao, teto } : {}),
       })
       return {
         status: 'erro',
         textoFinal: '',
-        voltas: volta,
+        iteracoes: iteracao,
         codigoErro: codigo,
         ...(retomavel ? { mensagensParaRetomar: mensagens } : {}),
       }
@@ -132,14 +132,14 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
     if (resposta.pedidos.length === 0) {
       emitir({ type: 'done', model: resposta.modelo })
-      return { status: 'respondeu', textoFinal: resposta.texto, voltas: volta }
+      return { status: 'respondeu', textoFinal: resposta.texto, iteracoes: iteracao }
     }
 
-    // Eco fiel do que a IA pediu — a próxima volta reconstrói o diálogo.
+    // Eco fiel do que a IA pediu — a próxima iteração reconstrói o diálogo.
     mensagens.push({ papel: 'assistente', conteudo: resposta.texto, pedidos: resposta.pedidos })
 
     for (const pedido of resposta.pedidos) {
-      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
 
       emitir({ type: 'tool', pedido })
 
@@ -150,7 +150,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         emitir({ type: 'tool_result', id: pedido.id, ferramenta: pedido.ferramenta, ok: false, resumo: motivo })
         mensagens.push({ papel: 'ferramenta', conteudo: `NÃO EXECUTADO: ${motivo}`, pedidoId: pedido.id, ferramenta: pedido.ferramenta })
         emitir({ type: 'error', code: 'loop', message: 'A IA repetiu a mesma ação 3 vezes seguidas e foi parada por segurança. Reformule o pedido com mais detalhes ou comece uma conversa nova.' })
-        return { status: 'loop_bloqueado', textoFinal: '', voltas: volta }
+        return { status: 'loop_bloqueado', textoFinal: '', iteracoes: iteracao }
       }
 
       let liberado = true
@@ -184,6 +184,6 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
   // FATIA 11: o teto PAUSA (não erra) — o fio emite `teto` e a rota guarda
   // o diálogo para o "Continuar" retomar o MESMO fluxo com orçamento cheio.
-  emitir({ type: 'teto', voltas: teto, teto })
-  return { status: 'voltas_excedidas', textoFinal: '', voltas: teto, mensagensParaRetomar: mensagens }
+  emitir({ type: 'teto', iteracoes: teto, teto })
+  return { status: 'iteracoes_excedidas', textoFinal: '', iteracoes: teto, mensagensParaRetomar: mensagens }
 }

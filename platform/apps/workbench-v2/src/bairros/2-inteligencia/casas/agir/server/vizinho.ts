@@ -1,6 +1,6 @@
 // ============================================================================
 // Casa Agir — VIZINHO REAL (conquista 2): fala HTTP de verdade com o
-// provedor numa volta do loop. Anuncia as ferramentas no idioma nativo
+// provedor numa iteração do loop. Anuncia as ferramentas no idioma nativo
 // (anuncio.ts), traduz o histórico (dialogo.ts), lê o fio em pedaços
 // (SSE ou NDJSON — mesma receita de enquadração da casa Conversa,
 // reimplementada aqui por causa da fronteira LEGO) e MONTA os pedidos de
@@ -16,7 +16,7 @@ import type {
   ProtocoloAgir,
   OpcoesVizinho,
   PedidoFerramenta,
-  RespostaVolta,
+  RespostaIteracao,
   VizinhoProvedor,
 } from '../contract'
 import { anunciarFerramentas } from './anuncio'
@@ -340,14 +340,14 @@ export function criarFramerSSE(): Framer {
 
 /**
  * Fábrica do vizinho real de um protocolo/alvo. O loop chama o resultado
- * uma vez por volta do agente.
+ * uma vez por iteração do agente.
  */
 export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {}): VizinhoProvedor {
   const primeiroByteMs = ajustes.primeiroByteMs ?? TIMEOUT_PRIMEIRO_BYTE_MS
   const totalMs = ajustes.totalMs ?? TIMEOUT_TOTAL_MS
   const ociosoMs = ajustes.ociosoMs ?? TIMEOUT_OCIOSO_MS
 
-  return async (mensagens, opcoes?: OpcoesVizinho): Promise<RespostaVolta> => {
+  return async (mensagens, opcoes?: OpcoesVizinho): Promise<RespostaIteracao> => {
     const { url, corpo } = corpoDePedido(alvo, mensagens)
     const controlador = new AbortController()
     let byteViu = false

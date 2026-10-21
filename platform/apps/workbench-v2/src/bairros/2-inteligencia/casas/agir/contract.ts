@@ -48,7 +48,7 @@ export type CategoriaErroAgir =
   | 'tempo' // serviço lento/parado
   | 'http' // outro erro do serviço (429, 5xx, 400…)
   | 'resposta' // resposta sem nada aproveitável
-  | 'voltas' // (legado da 10 — o teto agora é o evento `teto`, sem erro)
+  | 'iteracoes' // (legado da 10 — o teto agora é o evento `teto`, sem erro)
   | 'loop' // guardião: 3 chamadas idênticas seguidas (anti-loop, C4)
   | 'fluxo' // a execução já não espera mais (recarregou, terminou ou retomada vencida)
 
@@ -63,7 +63,7 @@ export interface MensagemAgir {
   papel: 'usuario' | 'assistente' | 'ferramenta'
   conteudo: string
   /** Preenchido quando papel = 'assistente' e a IA pediu ferramentas — o eco
-   * fiel do que ela disse, para a próxima volta reconstruir o diálogo. */
+   * fiel do que ela disse, para a próxima iteração reconstruir o diálogo. */
   pedidos?: PedidoFerramenta[]
   /** Preenchidos quando papel = 'ferramenta'. */
   pedidoId?: string
@@ -87,24 +87,24 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
  * contrato porque o loop precisa saber onde parar e esperar. `teto` (FATIA
  * 11) é a pausa honesta ao bater o limite: NÃO é erro — o dono continua
- * (mesmo fluxo, orçamento cheio) ou para por aqui. `volta` (pós-11) anuncia
- * cada ida ao modelo para a tela mostrar o progresso ("volta 2 de 25").
+ * (mesmo fluxo, orçamento cheio) ou para por aqui. `iteracao` (pós-11) anuncia
+ * cada ida ao modelo para a tela mostrar o progresso ("iteração 2 de 25").
  * Um `error` TRANSITÓRIO (tempo/endereco/http) pode trazer `retomavel` com
- * voltas+teto: a rota guardou o diálogo e a tela oferece continuar de onde parou.
+ * iteracoes+teto: a rota guardou o diálogo e a tela oferece continuar de onde parou.
  */
 export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
   | { type: 'approval'; pedido: PedidoFerramenta }
-  | { type: 'volta'; volta: number; teto: number }
-  | { type: 'teto'; voltas: number; teto: number }
+  | { type: 'iteracao'; iteracao: number; teto: number }
+  | { type: 'teto'; iteracoes: number; teto: number }
   | { type: 'done'; model?: string }
-  | { type: 'error'; code: CategoriaErroAgir; message: string; retomavel?: boolean; voltas?: number; teto?: number }
+  | { type: 'error'; code: CategoriaErroAgir; message: string; retomavel?: boolean; iteracoes?: number; teto?: number }
 
-/** O que o provedor responde numa volta (o vizinho real monta; o falso, nos testes). */
-export interface RespostaVolta {
-  /** Texto "falado" pela IA nesta volta (pode ser vazio se só pediu ferramenta). */
+/** O que o provedor responde numa iteração (o vizinho real monta; o falso, nos testes). */
+export interface RespostaIteracao {
+  /** Texto "falado" pela IA nesta iteração (pode ser vazio se só pediu ferramenta). */
   texto: string
   /** Pedidos de ferramenta extraídos do canal nativo (vazio = resposta comum). */
   pedidos: PedidoFerramenta[]
@@ -112,7 +112,7 @@ export interface RespostaVolta {
 }
 
 /**
- * Quem fala com o provedor numa volta. C2 liga isto no HTTP real de cada
+ * Quem fala com o provedor numa iteração. C2 liga isto no HTTP real de cada
  * protocolo (com o anúncio nativo das ferramentas); nos testes da C1 é falso.
  * Contrato do fio: os PEDAÇOS de texto saem AO VIVO por `opcoes.aoTexto` —
  * quem implementa o vizinho é responsável por chamá-lo; o loop não repete
@@ -126,7 +126,7 @@ export interface OpcoesVizinho {
 export type VizinhoProvedor = (
   mensagens: MensagemAgir[],
   opcoes?: OpcoesVizinho,
-) => Promise<RespostaVolta>
+) => Promise<RespostaIteracao>
 
 /** Resultado de executar uma ferramenta. */
 export interface ResultadoFerramenta {
