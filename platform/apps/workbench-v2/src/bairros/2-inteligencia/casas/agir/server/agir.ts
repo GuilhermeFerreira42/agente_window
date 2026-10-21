@@ -161,9 +161,14 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         liberado = await pedirAprovacao(pedido)
       }
 
+      // RF12-2: a negação do `excluir` diz "nada sumiu" (o "dono negou" a
+      // tela usa para pintar o cartão de negado — mantido nos dois textos).
+      const textoNegacao = pedido.ferramenta === 'excluir'
+        ? 'O dono negou esta exclusão — nada sumiu.'
+        : 'O dono negou esta mexida — nada foi escrito.'
       const resultado: ResultadoFerramenta = liberado
         ? await executores[pedido.ferramenta](pedido)
-        : { ok: false, resumo: 'O dono negou esta mexida — nada foi escrito.' }
+        : { ok: false, resumo: textoNegacao }
 
       emitir({
         type: 'tool_result',

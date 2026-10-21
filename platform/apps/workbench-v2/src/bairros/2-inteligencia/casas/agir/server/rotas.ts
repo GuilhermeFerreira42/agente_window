@@ -21,8 +21,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
 import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
-import { criarExecutoresReais } from './discos'
-import { ehMexida } from './ferramentas'
+import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
+import { permiteSessao } from './ferramentas'
 import { criarVizinhoReal } from './vizinho'
 
 const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar']
@@ -75,7 +75,7 @@ async function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 
 function filtrarPermissoes(brutas: unknown): string[] {
-  return Array.isArray(brutas) ? brutas.filter((p): p is string => typeof p === 'string' && ehMexida(p as never)) : []
+  return Array.isArray(brutas) ? brutas.filter((p): p is string => typeof p === 'string' && permiteSessao(p as never)) : []
 }
 
 type PedidoValidado = {
@@ -171,9 +171,16 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
       },
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
-        if (concedidas?.has(pedido.ferramenta)) return true // Q2a: já liberada na sessão
+        // RF12-3: sessão liberada NÃO cobre `excluir` (cinto + suspensório com
+        // o filtro de entrada — mesmo que 'excluir' chegue, nunca auto-libera).
+        if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) return true // Q2a
         if (abort.signal.aborted) return false
-        escreverEvento(res, { type: 'approval', pedido }) // o cartão (1 vez)
+        // FATIA 12: o cartão do `excluir` mostra o que o servidor viu no disco
+        // (prévia do arquivo ou contagem da pasta — RF12-6).
+        const previa = pedido.ferramenta === 'excluir'
+          ? await descreverAlvoExcluir(fio.raiz, pedido.argumentos.caminho)
+          : undefined
+        escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}) })
         return await new Promise<boolean>((resolve) => {
           pendentesPorFluxo.get(fluxo)?.set(pedido.id, resolve)
         })
@@ -211,8 +218,8 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse): Promise
     sendErro(res, 400, 'configuracao', 'Resposta de aprovação inválida (fluxo, id e decisao são obrigatórios).')
     return true
   }
-  if (decisao === 'sessao' && !(typeof ferramenta === 'string' && ehMexida(ferramenta as never))) {
-    sendErro(res, 400, 'configuracao', '"Permitir na Sessão" só vale para ferramentas que mexem em arquivos (criar/escrever).')
+  if (decisao === 'sessao' && !(typeof ferramenta === 'string' && permiteSessao(ferramenta as never))) {
+    sendErro(res, 400, 'configuracao', '"Permitir na Sessão" só vale para criar/escrever — excluir sempre pergunta, uma a uma (RF12-3).')
     return true
   }
   const resolver = pendentesPorFluxo.get(fluxo)?.get(id)

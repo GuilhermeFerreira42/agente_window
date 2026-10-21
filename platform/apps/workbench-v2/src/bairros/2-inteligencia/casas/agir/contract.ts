@@ -12,8 +12,8 @@
  */
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
-/** As 5 ferramentas do MVP (D72) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever'
+/** As 6 ferramentas (D72 + FATIA 12 soma `excluir`) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
 
 /**
  * Argumentos como CHEGAM do modelo (canal nativo): tudo `unknown` de
@@ -85,7 +85,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 /**
  * Eventos do fio da casa Agir. O loop emite; a rota repassa por SSE na C3.
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
- * contrato porque o loop precisa saber onde parar e esperar. `teto` (FATIA
+ * contrato porque o loop precisa saber onde parar e esperar. `previa` (FATIA 12) carrega o que o servidor viu no disco (prévia do arquivo ou contagem da pasta) para o cartão reforçado do `excluir`. `teto` (FATIA
  * 11) é a pausa honesta ao bater o limite: NÃO é erro — o dono continua
  * (mesmo fluxo, orçamento cheio) ou para por aqui. `iteracao` (pós-11) anuncia
  * cada ida ao modelo para a tela mostrar o progresso ("iteração 2 de 25").
@@ -96,7 +96,7 @@ export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
-  | { type: 'approval'; pedido: PedidoFerramenta }
+  | { type: 'approval'; pedido: PedidoFerramenta; previa?: string }
   | { type: 'iteracao'; iteracao: number; teto: number }
   | { type: 'teto'; iteracoes: number; teto: number }
   | { type: 'done'; model?: string }

@@ -11,7 +11,41 @@ import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promi
 import * as nodePath from 'node:path'
 import type { ArgumentosFerramenta, ExecutorFerramenta, FerramentaId, ResultadoFerramenta } from '../contract'
 import { catalogoFerramentas } from './ferramentas'
+import { contarConteudo, formatarTamanho, moverParaLixeira } from './lixeira'
 import { verificarTerritorio } from './territorio'
+
+/** Prévia do alvo do `excluir` para o cartão reforçado (FATIA 12, RF12-6):
+ * arquivo → começo do conteúdo; pasta → contagem + tamanho; problema →
+ * frase honesta dizendo que aprovar não apaga nada. A rota chama antes de
+ * emitir o `approval` (só o servidor enxerga o disco). */
+export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Promise<string> {
+  if (typeof entrada !== 'string' || entrada.trim() === '') {
+    return 'O caminho veio vazio — aprovar não apaga nada.'
+  }
+  const nome = entrada.trim()
+  const veredito = verificarTerritorio(raiz, nome)
+  if (!veredito.liberado) {
+    return 'Fora da pasta de trabalho — aprovar não apaga nada.'
+  }
+  let info
+  try {
+    info = await stat(veredito.caminho)
+  } catch {
+    return `"${nome}" não existe — nada vai sumir.`
+  }
+  if (!info.isDirectory()) {
+    try {
+      const conteudo = await readFile(veredito.caminho, 'utf8')
+      return `Arquivo "${nome}" (${conteudo.length} caracteres):\n${conteudo.slice(0, 400)}`
+    } catch {
+      return `Arquivo "${nome}" (não deu para pré-visualizar).`
+    }
+  }
+  const contagem = await contarConteudo(veredito.caminho)
+  const itemOuItens = contagem.itens === 1 ? 'item' : 'itens'
+  const parcial = contagem.cortada ? ' (contagem parcial — pasta muito grande)' : ''
+  return `Pasta "${nome}": ${contagem.itens} ${itemOuItens} (${formatarTamanho(contagem.bytes)}).${parcial}`
+}
 
 /** Teto do resultado da busca (o excedente é CONTADO e anunciado, nunca calado). */
 export const LIMITE_BUSCA = 200
@@ -187,5 +221,32 @@ export function criarExecutoresReais(raiz: string): Record<FerramentaId, Executo
     return { ok: true, resumo: `Arquivo "${String(pedido.argumentos.caminho)}" reescrito por completo (escrita atômica).` }
   }
 
-  return { ler, listar, buscar, criar, escrever }
+  const excluir: ExecutorFerramenta = async (pedido) => {
+    const motivo = faltando('excluir', pedido.argumentos)
+    if (motivo) return falha(motivo)
+    const porta = dentro(pedido.argumentos.caminho)
+    if (!porta.ok) return porta
+    // A própria pasta de trabalho nunca é alvo (RNF12-3, padrão 10).
+    if (porta.caminho === nodePath.resolve(raiz)) {
+      return falha('A pasta de trabalho inteira não pode ser excluída — escolha o que vai para a lixeira dentro dela.')
+    }
+    const entrada = String(pedido.argumentos.caminho)
+    let info
+    try {
+      info = await stat(porta.caminho)
+    } catch {
+      return falha(`"${entrada}" não existe — nada sumiu.`)
+    }
+    const ehPasta = info.isDirectory()
+    const contagem = ehPasta ? await contarConteudo(porta.caminho) : null
+    const resultado = await moverParaLixeira(porta.caminho)
+    if (!resultado.ok) return falha(resultado.motivo ?? 'Não deu para mover para a lixeira — nada sumiu.')
+    if (!ehPasta || !contagem) {
+      return { ok: true, resumo: `Arquivo "${entrada}" movido para a lixeira (para restaurar, abra a lixeira do sistema).` }
+    }
+    const itemOuItens = contagem.itens === 1 ? 'item' : 'itens'
+    return { ok: true, resumo: `Pasta "${entrada}" (${contagem.itens} ${itemOuItens}) movida para a lixeira (para restaurar, abra a lixeira do sistema).` }
+  }
+
+  return { ler, listar, buscar, criar, escrever, excluir }
 }

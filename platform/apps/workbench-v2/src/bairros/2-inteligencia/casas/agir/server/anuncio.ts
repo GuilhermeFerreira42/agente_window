@@ -22,6 +22,8 @@ function esquemaDe(id: string): Record<string, unknown> {
         required: ['padrao'],
         additionalProperties: false,
       }
+    case 'excluir':
+      return { type: 'object', properties: { caminho }, required: ['caminho'], additionalProperties: false }
     default: // criar · escrever
       return {
         type: 'object',

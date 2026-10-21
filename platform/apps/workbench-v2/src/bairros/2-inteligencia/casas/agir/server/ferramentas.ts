@@ -21,7 +21,7 @@ export interface DescritorFerramenta {
   obrigatorios: Array<keyof ArgumentosFerramenta>
 }
 
-/** As 5 mãos do MVP — todas de ARQUIVO, dentro da pasta de trabalho. */
+/** As 6 mãos — todas de ARQUIVO, dentro da pasta de trabalho (a 6ª, `excluir`, é da FATIA 12). */
 export const catalogoFerramentas: DescritorFerramenta[] = [
   {
     id: 'ler',
@@ -53,6 +53,12 @@ export const catalogoFerramentas: DescritorFerramenta[] = [
     descricao: 'Sobrescreve um arquivo existente com o conteúdo dado (escrita atômica).',
     obrigatorios: ['caminho', 'conteudo'],
   },
+  {
+    id: 'excluir',
+    titulo: 'Excluir (lixeira)',
+    descricao: 'Move um arquivo ou pasta da pasta de trabalho para a LIXEIRA do sistema (nunca apaga permanente; restaurar é pela lixeira). Sempre pede permissão ao dono, uma a uma.',
+    obrigatorios: ['caminho'],
+  },
 ]
 
 const idsConhecidos = new Set<string>(catalogoFerramentas.map((f) => f.id))
@@ -63,11 +69,19 @@ export function ehFerramentaConhecida(nome: unknown): nome is FerramentaId {
 }
 
 /**
- * Q1=(a) (D93): LER/LISTAR/BUSCAR são de graça; CRIAR/ESCREVER são MEXIDA —
- * sempre passam pelo cartão [Permitir] [Negar] [Permitir na Sessão].
+ * Q1=(a) (D93) + RF12-1: LER/LISTAR/BUSCAR são de graça; CRIAR/ESCREVER/
+ * EXCLUIR são MEXIDA — sempre passam pelo cartão do dono.
  */
 export function ehMexida(ferramenta: FerramentaId): boolean {
-  return ferramenta === 'criar' || ferramenta === 'escrever'
+  return ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir'
+}
+
+/**
+ * RF12-3: "Permitir na Sessão" vale para CRIAR/ESCREVER — NUNCA para
+ * EXCLUIR (exclusão sempre pergunta, uma a uma, mesmo com sessão liberada).
+ */
+export function permiteSessao(ferramenta: FerramentaId): boolean {
+  return ehMexida(ferramenta) && ferramenta !== 'excluir'
 }
 
 /** Lista curta dos argumentos que vieram, para resumos honestos. */
@@ -122,6 +136,12 @@ export function criarExecutoresFalsos(): Record<FerramentaId, ExecutorFerramenta
           conteudo: 'a.txt\nc.md',
         }
       }
+      if (ferramenta === 'excluir') {
+        return {
+          ok: true,
+          resumo: `(SIMULADO C1) "${String(pedido.argumentos.caminho)}" iria para a lixeira — NADA sumiu (prova do esqueleto).`,
+        }
+      }
       const verbo = ferramenta === 'criar' ? 'criado' : 'gravado'
       return {
         ok: true,
@@ -135,5 +155,6 @@ export function criarExecutoresFalsos(): Record<FerramentaId, ExecutorFerramenta
     buscar: falso('buscar'),
     criar: falso('criar'),
     escrever: falso('escrever'),
+    excluir: falso('excluir'),
   }
 }

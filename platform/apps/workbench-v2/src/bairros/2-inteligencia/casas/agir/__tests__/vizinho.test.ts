@@ -55,7 +55,8 @@ const HISTORICO: MensagemAgir[] = [
 describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
   it('monta o tool_call que chega aos pedaços + texto ao vivo + corpo com anúncio', async () => {
     const s = await servidorFalso((req, res, corpo) => {
-      expect(corpo.tools).toHaveLength(5)
+      expect(corpo.tools).toHaveLength(6)
+      expect((corpo.tools as Array<{ function: { name: string } }>).map((t) => t.function.name)).toContain('excluir')
       expect((corpo.tool_choice as string)).toBe('auto')
       const mensagens = corpo.messages as Array<Record<string, unknown>>
       expect(mensagens[2]).toMatchObject({ role: 'tool', tool_call_id: 'p1' })
@@ -143,7 +144,8 @@ describe('Vizinho real — gemini (SSE functionCall) e ollama (NDJSON)', () => {
   it('gemini: functionCall completo no quadro + functionDeclarations no anúncio', async () => {
     const s = await servidorFalso((req, res, corpo) => {
       const declaracoes = (corpo.tools as Array<{ functionDeclarations: unknown[] }>)[0].functionDeclarations
-      expect(declaracoes).toHaveLength(5)
+      expect(declaracoes).toHaveLength(6)
+      expect((declaracoes as Array<{ name: string }>).map((d) => d.name)).toContain('excluir')
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
       res.end(
         [
@@ -165,7 +167,8 @@ describe('Vizinho real — gemini (SSE functionCall) e ollama (NDJSON)', () => {
 
   it('ollama: NDJSON com tool_calls em objeto; role tool traduzido', async () => {
     const s = await servidorFalso((req, res, corpo) => {
-      expect(corpo.tools).toHaveLength(5)
+      expect(corpo.tools).toHaveLength(6)
+      expect((corpo.tools as Array<{ function: { name: string } }>).map((t) => t.function.name)).toContain('excluir')
       const mensagens = corpo.messages as Array<Record<string, unknown>>
       expect(mensagens[1]).toMatchObject({ role: 'assistant', tool_calls: [{ function: { name: 'criar' } }] })
       expect(mensagens[2]).toMatchObject({ role: 'tool' })

@@ -4,7 +4,7 @@
 // tool_result → done), a NEGAÇÃO do dono e o "Permitir na Sessão" valendo
 // na segunda mexida — além do aprovar para fluxo morto.
 // ============================================================================
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
@@ -278,5 +278,72 @@ describe('FATIA 11 — teto e continuar no fio', () => {
     const res3 = fakeRes()
     await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-2' })), res3, URL_CONTINUAR, deps)
     expect(res3.statusCode).toBe(409)
+  })
+})
+
+const SSE_EXCLUIR = (arquivo: string, id = 'x1'): string =>
+  `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name: 'excluir', arguments: JSON.stringify({ caminho: arquivo }) } }] } }] })}\n\n`
+
+describe('FATIA 12 — excluir pede sempre, com prévia (RF12-1/RF12-3/RF12-6)', () => {
+  it('approval do excluir traz a prévia do disco; permitir move para a lixeira', async () => {
+    const xdg = await mkdtemp(path.join(tmpdir(), 'agir-12a-xdg-'))
+    const anterior = process.env.XDG_DATA_HOME
+    process.env.XDG_DATA_HOME = xdg
+    try {
+      await writeFile(path.join(raiz, 'alvo-12a.txt'), 'segredo do alvo 12a', 'utf8')
+      stubProvedor([SSE_EXCLUIR('alvo-12a.txt'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+      const res = fakeRes()
+      const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'apague o alvo-12a.txt' }], fluxo: 'fluxo-12a', workspace: 'raiz-real' })
+      const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+      await esperaFio(res, '"type":"approval"')
+      const cartao = frames(res).find((e) => e.type === 'approval') as Record<string, unknown>
+      expect(String(cartao.previa)).toContain('segredo do alvo 12a') // o servidor viu o disco
+      const aprovar = fakeRes()
+      expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12a', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
+      expect(aprovar.statusCode).toBe(200)
+      await fio
+      const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
+      expect(resultado).toMatchObject({ ok: true })
+      expect(String(resultado.resumo)).toContain('lixeira')
+      await expect(stat(path.join(raiz, 'alvo-12a.txt'))).rejects.toThrow()
+      expect(await readFile(path.join(xdg, 'Trash', 'files', 'alvo-12a.txt'), 'utf8')).toBe('segredo do alvo 12a')
+    } finally {
+      if (anterior === undefined) delete process.env.XDG_DATA_HOME
+      else process.env.XDG_DATA_HOME = anterior
+      await rm(xdg, { recursive: true, force: true })
+    }
+  })
+
+  it('"Permitir na Sessão" para excluir → 400 honesto, e o fio continua esperando (RF12-3)', async () => {
+    await writeFile(path.join(raiz, 'alvo-12b.txt'), 'b', 'utf8')
+    stubProvedor([SSE_EXCLUIR('alvo-12b.txt', 'x2'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'apague o alvo-12b.txt' }], fluxo: 'fluxo-12b', workspace: 'raiz-real' })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    const tentativa = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12b', id: 'x2', decisao: 'sessao', ferramenta: 'excluir' })), tentativa, URL_APROVAR, DEPS)).toBe(true)
+    expect(tentativa.statusCode).toBe(400)
+    expect(JSON.parse(tentativa.corpo()).message).toContain('sempre pergunta')
+    // o fio segue pendente: negar termina limpo e nada some
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12b', id: 'x2', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await fio
+    const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
+    expect(String(resultado.resumo)).toContain('dono negou')
+    expect(String(resultado.resumo)).toContain('nada sumiu')
+    expect(await readFile(path.join(raiz, 'alvo-12b.txt'), 'utf8')).toBe('b')
+  })
+
+  it("permissoes:['excluir'] no pedido NÃO auto-libera — o cartão aparece igual (RF12-3)", async () => {
+    await writeFile(path.join(raiz, 'alvo-12c.txt'), 'c', 'utf8')
+    stubProvedor([SSE_EXCLUIR('alvo-12c.txt', 'x3'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'apague o alvo-12c.txt' }], fluxo: 'fluxo-12c', workspace: 'raiz-real', permissoes: ['excluir'] })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"') // perguntou mesmo com "sessão liberada"
+    expect(frames(res).some((e) => e.type === 'approval')).toBe(true)
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12c', id: 'x3', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await fio
+    expect(await readFile(path.join(raiz, 'alvo-12c.txt'), 'utf8')).toBe('c')
   })
 })
