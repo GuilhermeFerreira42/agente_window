@@ -58,3 +58,31 @@ describe('Trava de território (win32 — o dono é Windows)', () => {
     expect(v.liberado).toBe(false)
   })
 })
+
+describe('Trava de território (win32 real — C5, o teste do dono)', () => {
+  const RAIZ_W = 'C:\\Users\\Usuario\\Desktop\\agente_window'
+  // A raiz chega via realpath (caixa do disco + às vezes prefixo \\?\); o
+  // modelo digita com a caixa "bonita" e barras `/` — tudo dentro libera.
+  it('realpath x digitado: caixa diferente + barras `/` liberam (vscode-main)', () => {
+    const raizReal = 'c:\\users\\usuario\\desktop\\agente_window' // caixa do disco
+    const v = verificarTerritorio(raizReal, 'C:/Users/Usuario/Desktop/agente_window/vscode-main', path.win32)
+    expect(v.liberado).toBe(true)
+  })
+  it('raiz com prefixo \\?\\ (realpath do Windows) não trava absoluto de dentro', () => {
+    const v = verificarTerritorio('\\\\?\\C:\\Users\\Usuario\\Desktop\\agente_window', 'C:\\Users\\Usuario\\Desktop\\agente_window\\vscode-main', path.win32)
+    expect(v.liberado).toBe(true)
+  })
+  it('absoluto com barra inicial (`/C:/...`, jeito do modelo) libera', () => {
+    const v = verificarTerritorio(RAIZ_W, '/C:/Users/Usuario/Desktop/agente_window/vscode-main', path.win32)
+    expect(v.liberado).toBe(true)
+  })
+  it('pasta irmã com prefixo parecido (`ws` x `ws2`) continua RECUSADA', () => {
+    const v = verificarTerritorio('C:\\Users\\Usuario\\Desktop\\agente_window', 'C:\\USERS\\USUARIO\\DESKTOP\\AGENTE_WINDOW2\\x.txt', path.win32)
+    expect(v.liberado).toBe(false)
+    if (!v.liberado) expect(v.motivo).toContain('Fora da pasta')
+  })
+  it('outro disco continua RECUSADO mesmo com caixa alta', () => {
+    const v = verificarTerritorio(RAIZ_W, 'D:\\COISAS\\x.txt', path.win32)
+    expect(v.liberado).toBe(false)
+  })
+})
