@@ -364,13 +364,13 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Referência raspada:** `arquivo_morto/pesquisa_bruta/fatia-06-chat/PERMISSOES.md` (card de 3 botões + resposta `allow/deny` + guardião `doomLoop` de 3 chamadas) e `fatia-09-tools/` (worktree/painel de alterações — **fora do escopo da 10**, são tema das fatias 15/19 (era 11/15 pré-D95)). *(A nota externa `referencias/openclaude/03_sessoes_e_permissoes.md` não sobreviveu à faxina de 17/10 — a referência válida hoje é o PERMISSOES.md, dentro do repo.)*
 
 ### FATIA 11 — Teto + "Continuar?" + Config v1 (nova, D95)
-> **STATUS (20/10): SPEC FECHADA — PARTE 2E (Q&A 100%).** Teto 1–250, padrão 25 · Continuar = orçamento cheio · auto-scroll ligado · `settings.json` · Config central ao lado de Provedores. GOAL-mode = futuro. **Aguarda aval do dono para abrir.**
+> **STATUS (21/10): ✅ HOMOLOGADA (D96).** Teto 1–250 + Continuar/Parar + Config + auto-scroll + pós-11 C1–C7. Provas: tsc 0 · unit 906✓/12✗ pré · régua 18/18 · trava C7 3/3.
 - **Objetivo:** desbloquear tarefa real: teto configurável, cartão "continuar?" ao bater, aba Configurações, auto-scroll.
 - **Escopo:** Config (teto + auto-scroll); loop lê teto; fim de teto = cartão **[Continuar]**/**[Parar]**; anti-loop 3× fixo.
 - **Critério de aceite:** teto=2 para com "continuar?"; Continuar retoma e conclui; recarregar persiste; tsc 0 + testes verdes.
 
 ### FATIA 12 — DELETE micro (nova, D95 — DEBT-16 decidido)
-> **STATUS (20/10): SPEC FECHADA — PARTE 2F (Q&A 100%).** Ferramenta `excluir` · contagem+tamanho no cartão · sem "esvaziar lixeira".
+> **STATUS (21/10): ✅ IMPLEMENTADA (C1–C3) — AGUARDA HOMOLOGAÇÃO (roteiro no `08`).** Tool `excluir` + lixeira por SO + cartão reforçado + RF12-3. Provas: tsc 0 · unit 929✓/12✗ pré/16skip · E2E 5/5 · régua 23/23.
 - **Objetivo:** CRUD completo: excluir arquivo+pasta para a lixeira, sempre com cartão reforçado.
 - **Escopo:** tool `excluir`; cartão reforçado ("sem desfazer direto" + caminho + contagem); território = pasta ativa; "Permitir na Sessão" NÃO cobre excluir.
 - **Critério de aceite:** sem aprovar nada some; aprovado vai p/ lixeira e restaura pelo SO; `../fora` recusa.

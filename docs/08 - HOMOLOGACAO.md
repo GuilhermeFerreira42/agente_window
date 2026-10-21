@@ -60,6 +60,17 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 4. Volte o teto para **25** e salve (padrão de fábrica).
 
 **HOMOLOGADA (D96, 21/10):** palavras do dono: *"fiz os testes e parece que foi resolvido. acho tbm ja esta homologada a fatia 11."* Cobre a fatia (teto + Continuar + Config + auto-scroll) + as 7 correções pós-11 (C1–C7), incluindo o fix do "não abre arquivo" (C7) testado por ele no Windows. Prova automatizada: tsc 0 · unit 906✓/12✗ pré/16skip · régua 18/18 · trava C7 3/3. Pós-homologação: conversar o ajuste do teto na Config (pedido dele).
+
+## Roteiro de Homologação — FATIA 12 (excluir para a lixeira) — ⏳ PENDENTE (21/10)
+> O que a IA já provou sozinha: typecheck 0 · unit 929✓/12✗ pré/16skip · E2E `excluir_fatia12` 5/5 (lixeira real do Linux, com bilhete) · régua 08+09+10+11+12 23/23. Abaixo = o que só você prova, no Windows real (5174) — aqui a lixeira é a **Lixeira real do Windows**.
+1. **Cartão reforçado:** numa sessão com **pasta real**, crie `alvo-homolog.txt` (qualquer conteúdo) e mande o agente excluir (`"exclua o arquivo alvo-homolog.txt"`). Tem que aparecer o cartão **"Excluir (lixeira)"** com o caminho + começo do conteúdo + aviso **"Sem desfazer direto"** + só 2 botões (**sem** "Permitir na Sessão").
+2. **Aprovado vai para a Lixeira:** clique **Permitir** → cartão "Feito". Confira: o arquivo **sumiu da pasta** e **apareceu na Lixeira do Windows** (abra a Lixeira e ache ele lá, com o conteúdo intacto).
+3. **Restaurar é pelo Windows:** na Lixeira, clique com o botão direito no arquivo → **Restaurar** → ele **volta para a pasta**. (Restaurar pelo app não existe — é de propósito.)
+4. **Negar:** mande excluir outro arquivo → **Negar** → cartão "Negado por você" + "nada sumiu"; o arquivo **continua na pasta** e **não foi para a Lixeira**.
+5. **Pasta:** mande excluir uma pasta com arquivos dentro → o cartão mostra a **contagem de itens** antes de você decidir. Permita → pasta some e aparece na Lixeira.
+6. **Sessão não cobre:** se você liberou "Permitir na Sessão" para criar/escrever, mande excluir mesmo assim → o cartão do excluir **pergunta igual** (sempre, uma a uma).
+7. **Fora da pasta:** mande `"exclua o arquivo ../fora.txt"` → mesmo aprovando: recusa honesta ("Fora da pasta") e **nada some**.
+8. Limpe a Lixeira dos arquivos de teste quando terminar (restaurar ou excluir de lá — pelo Windows).
 5. Diga "homologada" ou liste o que falhou. Depois conversamos o ajuste do teto na Config (seu pedido) e a FATIA 12.
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)

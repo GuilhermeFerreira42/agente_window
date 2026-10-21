@@ -156,10 +156,10 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 
 ### 3.7 Régua pós-MVP — 08→09→10→11 em série (receita 20/10, FATIA 11 C3)
 - **Browsers:** `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/browsers` (já vem com chromium) — `npx playwright install` FALHA (lock sem permissão) e não é preciso.
-- **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3** — 10/11; v3 tem o cenário `TETO_INFINITO`).
+- **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3+12** — 10/11/12; v3 tem `TETO_INFINITO`, a 12 somou os cenários `EXCLUIR_*`).
 - **Vite:** `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json AGENTE_WINDOW_SETTINGS_PATH=/tmp/f11-e2e-settings.json npm run dev -- --host 0.0.0.0 --port 5174` (a 08 **amarra** o caminho `/tmp/prov-fixture/providers.json` — outro caminho = 6 fails no beforeEach; `mkdir -p /tmp/prov-fixture` antes).
-- **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 = 18/18**.
-- **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`~/.agente_window/*.jsonl` + `.db`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado).
+- **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11` → `excluir_fatia12`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 + 5/5 = 23/23**.
+- **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`.db` + memória do Vite + `*.jsonl`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*`/`EXCLUIR-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409 workspace), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado). **NUNCA zerar o banco** (`resetApp` exige ≥1 `.session-row` — banco zerado = falha em massa) e **NUNCA semear via `PUT /api/sessions`** (corpo mínimo quebra o boot da UI) — seed só pela UI (§3.6).
 
 ---
 
