@@ -386,7 +386,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
-        explorerRootRef.current = root
         if (cancelled) return
         const module = createExplorerSearchModule({
           fs,
@@ -635,9 +634,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const agirAtivas = useRef<Map<string, ControleAgir>>(new Map())
   /** Numera os cartões do agente na ordem de chegada (ordem cronológica na tela). */
   const ordemCartao = useRef(0)
-  /** O módulo Explorer + a raiz (o agente manda atualizar após escrever no disco). */
+  /** O módulo Explorer (o agente manda atualizar após escrever no disco). */
   const explorerModuleRef = useRef<IExplorerSearchModule | null>(null)
-  const explorerRootRef = useRef<WorkspaceUri | null>(null)
   const approvalTimer = useRef<number | undefined>(undefined)
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
@@ -1758,8 +1756,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         // O agente escreveu no disco: o Explorer mostra sem precisar resselecionar.
         if (ok && (ferramenta === 'criar' || ferramenta === 'escrever')) {
           const modulo = explorerModuleRef.current
-          const raiz = explorerRootRef.current
-          if (modulo && raiz) void modulo.explorer.refresh({ uri: raiz }).catch(() => undefined)
+          if (modulo) void modulo.explorer.refresh().catch(() => undefined)
         }
       },
       onTeto: (voltas, teto) => {

@@ -116,6 +116,9 @@ export class ExplorerService implements IExplorerSearchApi {
       // upstream tree.refresh(): descendentes expandidos são re-resolvidos
       // (senão a UI mostra a pasta aberta e vazia até novo clique).
       await this.resolveExpandedDescendants(target);
+      // A UI redesenha a cada evento do serviço — sem este aviso ela
+      // continuaria mostrando a lista velha (prova: pós-11, prova A).
+      this.events.fire({ type: 'explorer.refreshed', uri: target.resource })
     }
   }
 

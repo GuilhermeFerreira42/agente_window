@@ -49,7 +49,7 @@ export function CartaoContinuar({ carta, onDecidir }: CartaoContinuarProps) {
           {carta.motivo ?? `A IA usou ${carta.voltas} de ${carta.teto} voltas sem concluir.`}
         </span>
         <span style={{ marginLeft: 'auto', color: cor, fontWeight: 600, fontSize: 11 }}>
-          {ROTULOS_STATUS[carta.status]}
+          {carta.status === 'aguardando' && carta.titulo !== undefined ? 'Esperando você decidir' : ROTULOS_STATUS[carta.status]}
         </span>
       </div>
 

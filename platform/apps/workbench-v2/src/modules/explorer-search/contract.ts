@@ -19,6 +19,7 @@ export type ExplorerSearchEvent =
   | { type: 'explorer.nodeExpanded'; uri: WorkspaceUri }
   | { type: 'explorer.nodeCollapsed'; uri: WorkspaceUri }
   | { type: 'explorer.allCollapsed' }
+  | { type: 'explorer.refreshed'; uri: WorkspaceUri }
   | { type: 'explorer.selectionChanged'; uris: WorkspaceUri[] }
   | { type: 'explorer.fileOpened'; uri: WorkspaceUri }          // → EditorService.attach.open
   | { type: 'explorer.revealRequested'; uri: WorkspaceUri }
