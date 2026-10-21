@@ -98,7 +98,7 @@ export function criarExecutoresFalsos(): Record<FerramentaId, ExecutorFerramenta
       if (ausentes.length > 0) {
         return {
           ok: false,
-          resumo: `A ferramenta "${ferramenta}" não executou: faltou ${ausentes.join(' e ')} (${descreverArgumentos(pedido.argumentos)}).`,
+          resumo: `A ferramenta "${ferramenta}" não executou: faltou ${ausentes.join(' e ')} (${descreverArgumentos(pedido.argumentos)}). Não foi a permissão do dono — o pedido veio incompleto. Tente de novo mandando ${ausentes.join(' e ')}.`,
         }
       }
       if (ferramenta === 'ler') {

@@ -114,7 +114,7 @@ export function ConfigView({ aoSalvar }: { aoSalvar?: (config: ConfigAgente) => 
             </label>
           </div>
           <span className="config-hint">
-            Quantas ferramentas seguidas o agente pode usar antes de perguntar se continua ({TETO_MINIMO}–{TETO_MAXIMO}).
+            Quantas voltas (idas ao modelo) o agente pode dar antes de perguntar se continua ({TETO_MINIMO}–{TETO_MAXIMO}). Uma volta pode fazer várias ações de uma vez.
           </span>
         </div>
 
