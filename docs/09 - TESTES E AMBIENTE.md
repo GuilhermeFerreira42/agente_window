@@ -347,3 +347,21 @@ A sonda `sonda_01_debt09.cjs` (FATIA 07) e a bateria da FATIA 08 verificavam que
 - Unit: **872✓ / 12✗ (pré-existentes e intocáveis: `TerminalPanel`×9, `iconLabels`, `themeTokens`, `visualStates`) / 16 skip**. O flaky "regenerar" do `App.test` segue intermitente sob carga (provado pré-existente via stash no C1; hoje: 3/3 no estado limpo, 4/4 isolado com as mudanças da fatia, e o arquivo inteiro 46✓ logo depois de falhar — corrida a corrida).
 - E2E régua (por fatia, conforme §13.1): **fatias 08 + 09 + 10 = 15/15**, contra os stubs 4599/4610 e território REAL em `/tmp`. A `agir_fatia10` (5/5) prova: cartão aparece e **nada é escrito antes do Permitir**, o disco recebe o conteúdo exato, negar não escreve, "Permitir na Sessão" vale no fluxo e sobrevive ao F5, e ferramenta nenhuma sai da pasta.
 - Suíte E2E **completa**: segue não-régua neste sandbox — travou >25 min nas specs antigas de terminal/PTY (ver §13.1: 88✘ ambientais já auditados). A bateria da fatia é a régua.
+
+## Pós-11: travas de regressão por correção (C1–C7, 21/10 — FATIA 11 homologada, D96)
+Cada coisa tratada no pós-11 e ONDE mora a proteção que impede regressão. "Prova viva" = conferência com o app rodando (prints fora do repo, pasta `prova-pos11/`).
+| Correção | O que a trava garante | Trava (arquivo real) |
+|---|---|---|
+| C1 (`7bc2231`) ocioso 300s | fio lento-mas-vivo NÃO sofre timeout | `casas/agir/__tests__/vizinho.test.ts` — "fio saudável e LENTO: o ocioso NÃO dispara" |
+| C1 absoluto 1800s | fio pingando para sempre morre no total | `vizinho.test.ts` — "rede absoluta: pingando PARA SEMPRE morre no total" |
+| C1 retomada transitória | erro 500 guarda retomada; Continuar retoma de onde parou | `agir.test.ts` ("erro TRANSITÓRIO… retomável") + `rotas.test.ts` ("erro transitório (500) guarda retomada") |
+| C1 erro definitivo | erro de chave NÃO oferece retomada | `agir.test.ts` — "erro DEFINITIVO (chave): sem retomada" |
+| C2 (`7c42fa3`) progresso/cartões | SEM teste dedicado — guardado pela suíte App (49 testes) + régua E2E + provas vivas B/C | `src/__tests__/App.test.tsx` + régua 18/18 |
+| C3 (`224c58c`) textos honestos | ferramentas dizem que NADA foi gravado; recusas honestas | `casas/agir/__tests__/discos.test.ts` 10/10 |
+| C4 (`5ec8c48`) Explorer pós-escrita | agente escreve → Explorer mostra sem resselecionar | E2E `agir_fatia10` 5/5 + `teto_fatia11` 2/2 (7/7) + prova viva A (evento `refreshed` sem unit dedicado) |
+| F11 teto/Continuar | teto pausa com cartão; Continuar dá +2 no mesmo fluxo; Parar morre limpo | `e2e/teto_fatia11.spec.ts` T1 + `agir/rotas.test.ts` (evento `teto`, 409 sem pausa) |
+| F11 Config | salva teto+rolagem e sobrevive ao F5 | `teto_fatia11` T2 + `casas/config/__tests__/ConfigView.test.tsx` |
+| F11 auto-scroll | só-no-fim; desligado nunca desce | `src/__tests__/ChatPanel.test.tsx` ("só-no-fim…", "desligado na config…") |
+| C6 (`4c8df87`) iterações/Continuar | Continuar funciona; rename validado por tsc + suíte verde (sem trava textual) | `teto_fatia11` T1 + unit base idêntico |
+| C7 (`4321393`) diff re-clicado | A→A→B: diff visível + zero erros fatais | `e2e/diff_sem_travar.spec.ts` 3/3 |
+| Régua geral | 08+09+10+11 sem regressão + specs honestas | 18/18 na ordem canônica + `e2eAssertionContract.test.ts` (anti-trapaça) |

@@ -52,12 +52,14 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 
 **Homologado = o dono declara** (padrão das fatias 07–09).
 
-## Roteiro de Homologação — FATIA 11 (teto + continuar + Config) — ⏳ PENDENTE (20/10)
+## Roteiro de Homologação — FATIA 11 (teto + continuar + Config) — ✅ HOMOLOGADA (D96, 21/10)
 > O que a IA já provou sozinha: typecheck 0 · unit 900✓/12✗ pré/16skip · E2E `teto_fatia11` 2/2 · régua 08+09+10+11 18/18. Abaixo = o que só você prova, no Windows real (5174).
 1. **Aba Config:** Conta (canto superior direito) > Configurações → aba abre no centro. Confira: slider + número do teto (1–250, vem 25), interruptor "Rolagem automática" ligado, botão Salvar + aviso "Configuração salva". Mude o teto para **2**, salve, dê **F5**, reabra — tem que continuar 2.
 2. **Cartão continuar:** com teto 2, peça ao agente algo que use várias ferramentas (ex.: "liste os .txt e me resuma cada um"). Tem que aparecer o cartão **"Limite de voltas — Pausado no limite"** com [Continuar (+2)] [Parar]. Clique **Continuar** → ele trabalha mais 2 voltas e pausa de novo. Clique **Parar** → "Parado por você", sem erro.
 3. **Auto-scroll:** numa resposta longa, role para cima no meio do streaming → o chat NÃO pode puxar você de volta. Fique no fim → acompanha sozinho. Desligue o interruptor na Config → nunca acompanha.
 4. Volte o teto para **25** e salve (padrão de fábrica).
+
+**HOMOLOGADA (D96, 21/10):** palavras do dono: *"fiz os testes e parece que foi resolvido. acho tbm ja esta homologada a fatia 11."* Cobre a fatia (teto + Continuar + Config + auto-scroll) + as 7 correções pós-11 (C1–C7), incluindo o fix do "não abre arquivo" (C7) testado por ele no Windows. Prova automatizada: tsc 0 · unit 906✓/12✗ pré/16skip · régua 18/18 · trava C7 3/3. Pós-homologação: conversar o ajuste do teto na Config (pedido dele).
 5. Diga "homologada" ou liste o que falhou. Depois conversamos o ajuste do teto na Config (seu pedido) e a FATIA 12.
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)

@@ -2,6 +2,12 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-21 — FATIA 11 HOMOLOGADA (D96) — declaração do dono após testar o C7 no Windows
+- **Palavras dele:** *"fiz os testes e parece que foi resolvido. acho tbm ja esta homologada a fatia 11."*
+- **Cobre:** FATIA 11 (C1–C4, 20/10: teto 1–250 + Continuar/Parar + aba Config + auto-scroll) + pós-11 C1–C7 (21/10: timeouts, retomada, progresso, textos, Explorer, iterações, fix do diff). Provas: tsc 0 · unit 906✓/12✗ pré/16skip · régua 18/18 (08 6/6 + 09 5/5 + 10 5/5 + 11 2/2) · trava C7 3/3.
+- **Travas de regressão do que foi tratado (detalhe no `09`):** timeouts (vizinho: ocioso-não-dispara + rede-absoluta) · retomada transitória vs definitiva (agir+rotas) · teto/continuar (teto_fatia11 T1+T2 + agir/rotas) · Config salva+F5 (T2 + ConfigView) · auto-scroll só-no-fim (ChatPanel) · textos honestos (discos 10/10) · Explorer pós-escrita (E2E 7/7 + prova viva A) · diff re-clicado (diff_sem_travar 3/3). Honesto: C2 (progresso/cartões) e o evento `refreshed` (C4) não têm teste dedicado — guardados pela suíte App + régua + provas vivas.
+- **Pós-homologação:** conversar o ajuste do teto na Config (pedido dele) → FATIA 12 (DELETE, SPEC 2F fechada) aguarda ordem de início.
+
 ## 2026-10-21 — LIMPEZA DO WORKSPACE (ordem do dono) — raiz só com `agente_window/` + `uploads/`
 - **Deletado (lista dele):** os 2 vídeos `.mp4` de validação · `validacao_fatia07/` · `validacao_fatia08/` · `validacao_fatia09/` (incl. 238 `.bak`) · `validacao_fatia10/` · `entrega_ia/` (carta) · `design_fatia08/` · geral ("coisas antigas não utilizadas"): `video_analysis/` + `video_analysis2/` (frames+áudios) · `ferramentas_analise/` · `e2e_saida.txt` · `LISTA_POR_FATIA.md` (números pré-D95, errados) · `LEIA-ME_DOWNLOAD.txt` (manifesto de pacote ausente).
 - **Preservado → `uploads/`:** os 2 stubs E2E (`stub_agir.cjs` v3 + `stub_provider.cjs`) + `providers_fixture.json` (infra de teste — sem eles não há E2E futuro) · `midia_16-10/` + `midia_fatia08/` (análises em texto) · `registro_alinhamento/` · `condominio_*.svg`. "Pasta de download" = `uploads/` (não existe outra).
