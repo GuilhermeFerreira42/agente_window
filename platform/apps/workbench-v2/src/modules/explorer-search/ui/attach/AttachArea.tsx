@@ -22,6 +22,7 @@ import { AttachDialog } from './AttachDialog';
 import { ATTACH_STRINGS } from './attachStrings';
 import { AttachEmptyState } from './AttachEmptyState';
 import { DiffPane } from './diff/DiffPane';
+import { DiffPaneBoundary } from './diff/DiffPaneBoundary';
 import type { GitService } from '../../core/git/gitService';
 import { uriBasename } from '../../core/uri';
 import '../explorer.css';
@@ -207,7 +208,11 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
           )}
           <div className="editor-container">
             {!activeTab && <AttachEmptyState />}
-            {isDiffActive && diffPayload && <DiffPane sessionId={sessionId} payload={diffPayload} />}
+            {isDiffActive && diffPayload && (
+              <DiffPaneBoundary resetKey={`${diffPayload.title}:${diffPayload.original.length}:${diffPayload.modified.length}`} fileName={diffPayload.title}>
+                <DiffPane sessionId={sessionId} payload={diffPayload} />
+              </DiffPaneBoundary>
+            )}
             <CodeEditorPane editor={editor} sessionId={sessionId} fs={fs} onEditorReady={onEditorReady}
               onSaveRequest={(uri) => { void doSave(uri); }}
               saveError={saveError && saveError.uri === activeTab?.uri ? saveError.message : null} />
