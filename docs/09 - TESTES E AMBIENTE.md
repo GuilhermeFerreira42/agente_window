@@ -154,6 +154,13 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 3. **Persistência atrasada:** depois do Enter na landing, esperar **~2,5–3 s** antes de fechar o navegador, senão o `PUT /api/sessions` **não sai** e o banco fica vazio. Com sessões já existentes, abrir a landing exige clicar em **"Nova sessão"** (`landingVisible = newSessionLanding || !hasSessions`).
 4. **Banco:** `~/.agente_window/agente_window.db` (tabela `sessions`); conferir com `GET /api/sessions`; limpar com `DELETE /api/sessions/<id>?force=true`. **Cuidado:** `sessao_09 T3` apaga uma sessão no meio da rodada — re-semear entre lotes.
 
+### 3.7 Régua pós-MVP — 08→09→10→11 em série (receita 20/10, FATIA 11 C3)
+- **Browsers:** `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/browsers` (já vem com chromium) — `npx playwright install` FALHA (lock sem permissão) e não é preciso.
+- **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3** — 10/11; v3 tem o cenário `TETO_INFINITO`).
+- **Vite:** `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json AGENTE_WINDOW_SETTINGS_PATH=/tmp/f11-e2e-settings.json npm run dev -- --host 0.0.0.0 --port 5174` (a 08 **amarra** o caminho `/tmp/prov-fixture/providers.json` — outro caminho = 6 fails no beforeEach; `mkdir -p /tmp/prov-fixture` antes).
+- **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 = 18/18**.
+- **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`~/.agente_window/*.jsonl` + `.db`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado).
+
 ---
 
 ## 4. Becos sem saída (não tente de novo)
@@ -271,7 +278,7 @@ O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e
 5. **Frames:** periódicos (`fps=1/15,scale=1280:-2`), de cena (`select='gt(scene,0.18)'`) e **dirigidos por timestamp** (`-ss T -frames:v 1`) nos pontos que a fala marca. Folhas de contato com `drawtext` (`%{pts\:hms}`) + `tile` dão panorama rápido; **atenção**: em clipes extraídos com `-ss`, o rótulo `pts` reinicia em zero — somar o offset do corte.
 6. **Timestamps exatos sem perder tempo:** extrair `fps=1` do vídeo inteiro (242 JPEGs) e casar cada frame periódico por comparação de pixels (MSE) — MSE=0 identifica o segundo exato. Não estimar por aproximação em trecho que vá para doc.
 7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
-8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py`.)*
+8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/uploads/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py` — pasta removida na limpeza de 21/10.)*
 9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).
 
 ## 12. Habilidade de podcast (skills_podcast 4.0.1 — Greenforged Edition)
@@ -294,7 +301,7 @@ Pacote de produção de podcast (orquestrador → escritor → atomizador/valida
 | `probe.test.ts` | 13 | `fetch` mockado: ok · 401 · endereço · tempo (timeout 10 s) · http · resposta · catálogo e ping de conversa |
 | `frontier.test.ts` | 5 | fronteira LEGO: fora da casa só o barrel (exceção estreita do plugin), deps permitidas, `contract.ts` sem `any`, `as unknown as` confinado, dono único das regras |
 
-**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`validacao_fatia08/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
+**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`uploads/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
 | Teste | Prova |
 |---|---|
 | T1 | Conta ▸ Provedores: 8 itens + endereços padrão por provedor (NVIDIA = `integrate.api.nvidia.com/v1`) |
@@ -316,7 +323,7 @@ Duas IAs independentes (transcrição Whisper + frames + IA com visão de vídeo
 | Genérico → LiteLLM (`http://0.0.0.0:4000`, `meu-pool`) | **"…respondeu em 158 ms e mostrou 4 modelos."** |
 | Chave | mascarada o vídeo inteiro; nunca revelada |
 | Erros | **nenhum** (nenhuma faixa vermelha, nenhuma tela cinza) |
-Divergências resolvidas por recorte ampliado: os números dos ajustes são `99999999999999`/`10000000000000000` (a IA de vídeo leu "999/1000") e o rodapé do chat **tem** "Claude Sonnet 4" (a IA de vídeo disse que não). Registro completo: `midia_fatia08/ANALISE_VIDEO_15-10.md` (fora do repo; mídia apagada a pedido do dono em 16/10).
+Divergências resolvidas por recorte ampliado: os números dos ajustes são `99999999999999`/`10000000000000000` (a IA de vídeo leu "999/1000") e o rodapé do chat **tem** "Claude Sonnet 4" (a IA de vídeo disse que não). Registro completo: `uploads/midia_fatia08/ANALISE_VIDEO_15-10.md` (fora do repo; mídia apagada a pedido do dono em 16/10).
 
 ### 13.1 A/B da suíte E2E completa (2026-10-15) — **zero regressão da FATIA 08** (com ressalva honesta)
 Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 failed / 21 skipped / 87 passed (33,4 min)** — muito pior que a auditoria histórica (166/180 em `ba571dd`), e **não** é da FATIA 08.
@@ -340,3 +347,21 @@ A sonda `sonda_01_debt09.cjs` (FATIA 07) e a bateria da FATIA 08 verificavam que
 - Unit: **872✓ / 12✗ (pré-existentes e intocáveis: `TerminalPanel`×9, `iconLabels`, `themeTokens`, `visualStates`) / 16 skip**. O flaky "regenerar" do `App.test` segue intermitente sob carga (provado pré-existente via stash no C1; hoje: 3/3 no estado limpo, 4/4 isolado com as mudanças da fatia, e o arquivo inteiro 46✓ logo depois de falhar — corrida a corrida).
 - E2E régua (por fatia, conforme §13.1): **fatias 08 + 09 + 10 = 15/15**, contra os stubs 4599/4610 e território REAL em `/tmp`. A `agir_fatia10` (5/5) prova: cartão aparece e **nada é escrito antes do Permitir**, o disco recebe o conteúdo exato, negar não escreve, "Permitir na Sessão" vale no fluxo e sobrevive ao F5, e ferramenta nenhuma sai da pasta.
 - Suíte E2E **completa**: segue não-régua neste sandbox — travou >25 min nas specs antigas de terminal/PTY (ver §13.1: 88✘ ambientais já auditados). A bateria da fatia é a régua.
+
+## Pós-11: travas de regressão por correção (C1–C7, 21/10 — FATIA 11 homologada, D96)
+Cada coisa tratada no pós-11 e ONDE mora a proteção que impede regressão. "Prova viva" = conferência com o app rodando (prints fora do repo, pasta `prova-pos11/`).
+| Correção | O que a trava garante | Trava (arquivo real) |
+|---|---|---|
+| C1 (`7bc2231`) ocioso 300s | fio lento-mas-vivo NÃO sofre timeout | `casas/agir/__tests__/vizinho.test.ts` — "fio saudável e LENTO: o ocioso NÃO dispara" |
+| C1 absoluto 1800s | fio pingando para sempre morre no total | `vizinho.test.ts` — "rede absoluta: pingando PARA SEMPRE morre no total" |
+| C1 retomada transitória | erro 500 guarda retomada; Continuar retoma de onde parou | `agir.test.ts` ("erro TRANSITÓRIO… retomável") + `rotas.test.ts` ("erro transitório (500) guarda retomada") |
+| C1 erro definitivo | erro de chave NÃO oferece retomada | `agir.test.ts` — "erro DEFINITIVO (chave): sem retomada" |
+| C2 (`7c42fa3`) progresso/cartões | SEM teste dedicado — guardado pela suíte App (49 testes) + régua E2E + provas vivas B/C | `src/__tests__/App.test.tsx` + régua 18/18 |
+| C3 (`224c58c`) textos honestos | ferramentas dizem que NADA foi gravado; recusas honestas | `casas/agir/__tests__/discos.test.ts` 10/10 |
+| C4 (`5ec8c48`) Explorer pós-escrita | agente escreve → Explorer mostra sem resselecionar | E2E `agir_fatia10` 5/5 + `teto_fatia11` 2/2 (7/7) + prova viva A (evento `refreshed` sem unit dedicado) |
+| F11 teto/Continuar | teto pausa com cartão; Continuar dá +2 no mesmo fluxo; Parar morre limpo | `e2e/teto_fatia11.spec.ts` T1 + `agir/rotas.test.ts` (evento `teto`, 409 sem pausa) |
+| F11 Config | salva teto+rolagem e sobrevive ao F5 | `teto_fatia11` T2 + `casas/config/__tests__/ConfigView.test.tsx` |
+| F11 auto-scroll | só-no-fim; desligado nunca desce | `src/__tests__/ChatPanel.test.tsx` ("só-no-fim…", "desligado na config…") |
+| C6 (`4c8df87`) iterações/Continuar | Continuar funciona; rename validado por tsc + suíte verde (sem trava textual) | `teto_fatia11` T1 + unit base idêntico |
+| C7 (`4321393`) diff re-clicado | A→A→B: diff visível + zero erros fatais | `e2e/diff_sem_travar.spec.ts` 3/3 |
+| Régua geral | 08+09+10+11 sem regressão + specs honestas | 18/18 na ordem canônica + `e2eAssertionContract.test.ts` (anti-trapaça) |

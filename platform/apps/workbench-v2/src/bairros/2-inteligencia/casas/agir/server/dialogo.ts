@@ -6,7 +6,7 @@
 //   anthropic → blocos tool_use + user.tool_result
 //   gemini  → parts functionCall + functionResponse
 //   ollama  → assistant.tool_calls (argumentos em OBJETO) + role:'tool'
-// Sem tradução fiel, o modelo "esquece" o que pediu na volta anterior — e o
+// Sem tradução fiel, o modelo "esquece" o que pediu na iteração anterior — e o
 // loop vira cabra-cega (ou repete, ou inventa). É a segunda metade do anúncio.
 // ============================================================================
 import type { MensagemAgir, ProtocoloAgir } from '../contract'

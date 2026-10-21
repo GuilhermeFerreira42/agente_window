@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import {
   Check,
   Clipboard,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
+import { CartaoContinuar } from './CartaoContinuar'
+import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
@@ -39,6 +41,8 @@ interface ChatPanelProps {
   onStop: () => void
   onApprove: (chatId?: string) => void
   onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirContinuar: (chatId: string, messageId: string, continuarId: string, decisao: 'continuar' | 'parar') => void
+  autoScroll?: boolean
   onCopy: (chatId: string, messageId: string, kind: ChatCopyKind) => void
   onCopyAll: (chatId: string) => void
   onCopyFinalResponse: (chatId: string, messageId: string) => void
@@ -51,6 +55,25 @@ interface ChatPanelProps {
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
+}
+
+function formatarDuracao(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}min${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}min`
+}
+
+/** Contador "há Xs" do pedido do dono (pós-11): pulsa a cada segundo enquanto corre. */
+function TempoDecorrido({ inicio, correndo }: { inicio: number; correndo: boolean }): ReactNode {
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    if (!correndo) return
+    const timer = setInterval(() => setAgora(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [correndo, inicio])
+  return <>{formatarDuracao(agora - inicio)}</>
 }
 
 function MessageActions({
@@ -155,10 +178,12 @@ function MessageRow({
   onRegenerate,
   onReport,
   onDecidirFerramenta,
+  onDecidirContinuar,
   canRegenerate,
 }: {
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirContinuar: (continuarId: string, decisao: 'continuar' | 'parar') => void
   onCopy: (messageId: string, kind: ChatCopyKind) => void
   onCopyAll: () => void
   onCopyFinalResponse: () => void
@@ -195,19 +220,36 @@ function MessageRow({
             ))}
           </div>
         )}
-        {message.ferramentas && message.ferramentas.length > 0 && (
-          <div role="list" aria-label="Ferramentas usadas pelo agente">
-            {message.ferramentas.map((carta) => (
-              <CartaoFerramenta
-                key={carta.id}
-                carta={carta}
-                onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
-              />
-            ))}
+        {(message.ferramentas?.length ?? 0) + (message.continuar?.length ?? 0) > 0 && (
+          <div role="list" aria-label="Cartões do agente">
+            {[
+              ...(message.ferramentas ?? []).map((carta) => ({
+                ordem: carta.ordem ?? 0,
+                no: (
+                  <CartaoFerramenta
+                    key={carta.id}
+                    carta={carta}
+                    onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
+                  />
+                ),
+              })),
+              ...(message.continuar ?? []).map((carta) => ({
+                ordem: carta.ordem ?? 0,
+                no: (
+                  <CartaoContinuar
+                    key={carta.id}
+                    carta={carta}
+                    onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirContinuar(carta.id, decisao) : undefined}
+                  />
+                ),
+              })),
+            ]
+              .sort((a, b) => a.ordem - b.ordem)
+              .map((item) => item.no)}
           </div>
         )}
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents(() => onCopy(message.id, 'code'))}>{message.content}</ReactMarkdown>
-        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span><span className="chat-progress-dots">...</span></div>}
+        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span>{message.iteracaoAtual !== undefined && message.tetoAtual !== undefined && <span> — iteração {message.iteracaoAtual} de {message.tetoAtual}</span>}{message.inicioEm !== undefined && <span> · há <TempoDecorrido inicio={message.inicioEm} correndo={message.running === true} /></span>}<span className="chat-progress-dots">...</span></div>}
       </div>
       {!message.running && (
         <div className="chat-message-footer">
@@ -260,6 +302,8 @@ export function ChatPanel({
   onStop,
   onApprove,
   onDecidirFerramenta,
+  onDecidirContinuar,
+  autoScroll,
   onCopy,
   onCopyAll,
   onCopyFinalResponse,
@@ -276,6 +320,20 @@ export function ChatPanel({
   const activeChat: NestedChat = session.chats.find((chat) => chat.id === activeChatId) ?? session.chats[0]
   const lastAssistantMessageId = [...activeChat.messages].reverse().find((message) => message.role === 'assistant')?.id
   const isEmpty = activeChat.messages.length === 0
+  const seguir = autoScroll ?? AUTOSCROLL_PADRAO
+  const listaRef = useRef<HTMLDivElement>(null)
+  const noFimRef = useRef(true)
+  const aoRolar = (): void => {
+    const el = listaRef.current
+    if (!el) return
+    noFimRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= AUTOSCROLL_LIMITE_PX
+  }
+  // Auto-scroll só-no-fim (FATIA 11): só acompanha sozinho quem já estava no
+  // fim (≤120px); quem subiu para ler não é puxado de volta.
+  useEffect(() => {
+    const el = listaRef.current
+    if (seguir && noFimRef.current && el) el.scrollTop = el.scrollHeight
+  }, [activeChat.messages, seguir])
   return (
     <section className="chat-pane" aria-label="Chat da sessão">
       <div className="chat-pane-header">
@@ -311,7 +369,7 @@ export function ChatPanel({
         </div>
       )}
       <div className="chat-content">
-        <div className="chat-messages">
+        <div className="chat-messages" ref={listaRef} onScroll={aoRolar}>
           {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [])} /> : activeChat.messages.map((message) => (
             <MessageRow
               key={message.id}
@@ -323,6 +381,7 @@ export function ChatPanel({
               onRegenerate={(messageId) => onRegenerate(activeChat.id, messageId)}
               onReport={(messageId) => onReport(activeChat.id, messageId)}
               onDecidirFerramenta={(ferramentaId, decisao) => onDecidirFerramenta(activeChat.id, message.id, ferramentaId, decisao)}
+              onDecidirContinuar={(continuarId, decisao) => onDecidirContinuar(activeChat.id, message.id, continuarId, decisao)}
               canRegenerate={message.id === lastAssistantMessageId}
             />
           ))}

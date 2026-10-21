@@ -17,6 +17,7 @@ import './diff.css';
 
 type monaco = typeof Monaco;
 let monacoPromise: Promise<monaco> | null = null;
+let diffModelSeq = 0;
 const loadMonaco = (): Promise<monaco> => (monacoPromise ??= import('monaco-editor'));
 
 export const ATTACH_DIFF_OPTIONS: Monaco.editor.IStandaloneDiffEditorConstructionOptions = {
@@ -52,6 +53,7 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   const edRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null);
   const monacoRef = useRef<monaco | null>(null);
   const modelsRef = useRef<{ original: Monaco.editor.ITextModel; modified: Monaco.editor.ITextModel } | null>(null);
+  const appliedRef = useRef<{ resource: string; original: string; modified: string } | null>(null);
   const [ready, setReady] = useState(false);
   const identical = payload.original === payload.modified;
 
@@ -71,8 +73,11 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
     });
     return () => {
       disposed = true;
-      modelsRef.current?.original.dispose(); modelsRef.current?.modified.dispose(); modelsRef.current = null;
+      // pós-11 C7: o EDITOR solta primeiro — descartar os models com o
+      // DiffEditor vivo joga "TextModel got disposed before model got reset"
+      // e o React desmonta o anexo inteiro ("não abre nenhum arquivo", vídeo4).
       edRef.current?.dispose(); edRef.current = null;
+      modelsRef.current?.original.dispose(); modelsRef.current?.modified.dispose(); modelsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -81,11 +86,20 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   useEffect(() => {
     const ed = edRef.current; const monaco = monacoRef.current;
     if (!ready || !ed || !monaco || identical) return;
+    // pós-11 C7: payload igual ao aplicado (re-clique sem mudança) não recria
+    // models — menos churn no Monaco, menos corrida interna ("no diff result").
+    const prev = appliedRef.current;
+    if (prev && prev.resource === payload.resource && prev.original === payload.original && prev.modified === payload.modified) return;
+    appliedRef.current = { resource: payload.resource, original: payload.original, modified: payload.modified };
     const name = uriBasename(payload.resource);
     const lang = languageFor(monaco, name);
-    const base = `attach-diff:${sessionId}${payload.resource.replace(/^file:\/\//, '')}`;
-    const original = monaco.editor.createModel(payload.original, lang, monaco.Uri.parse(`${base}?original`));
-    const modified = monaco.editor.createModel(payload.modified, lang, monaco.Uri.parse(`${base}?modified`));
+    // pós-11 C7: nonce por payload — re-clicar o MESMO arquivo gera payload
+    // novo com o mesmo resource; sem nonce o createModel repete a URI e o
+    // ModelService joga "Cannot add model because it already exists" (vídeo4).
+    diffModelSeq += 1;
+    const base = `attach-diff:${sessionId}${payload.resource.replace(/^file:\/\//, '')}?u=${diffModelSeq}`;
+    const original = monaco.editor.createModel(payload.original, lang, monaco.Uri.parse(`${base}&original`));
+    const modified = monaco.editor.createModel(payload.modified, lang, monaco.Uri.parse(`${base}&modified`));
     const old = modelsRef.current;
     ed.setModel({ original, modified });
     modelsRef.current = { original, modified };

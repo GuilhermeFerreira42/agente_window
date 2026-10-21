@@ -14,7 +14,7 @@
 
 ## Homologação FATIA 07 — 2026-10-15 (declaração do dono, com evidências)
 - **Entregas homologadas:** DEBT-09 (`a69137d`) · DEBT-06 caminho C (`62cf055`) · DEBT-04 (nada a expurgar) · onda 1 da faxina D74 (`9985b9e`) · quarentena pontual dos 2 E2E da Aux (`e182960`).
-- **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d`.
+- **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d` (arquivos removidos na limpeza de 21/10, por ordem do dono).
 - **Números na homologação:** typecheck 0 · unit 730✓/12✗ (pré-existentes)/16 skip · E2E sem regressão (A/B em `e02e486`).
 - **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 (pré-D95 = 16) · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
 ## Homologação FATIA 08 — 2026-10-17 (declaração do dono) ✅
@@ -51,6 +51,16 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 **HOMOLOGADA (D94, 19/10):** declaração do dono (*"vou considerar que já está homologado... vou confiar nos testes que você fez"*) — cobre a bateria (tsc 0 · E2E 5/5 · 15/15) + passo 2 em uso real (CRUD, Nemotron via LiteLLM, cartões aprovados). **Registro honesto:** passos 1, 3, 4, 5, 7, 8 **não** foram executados manualmente. MVP FECHADO.
 
 **Homologado = o dono declara** (padrão das fatias 07–09).
+
+## Roteiro de Homologação — FATIA 11 (teto + continuar + Config) — ✅ HOMOLOGADA (D96, 21/10)
+> O que a IA já provou sozinha: typecheck 0 · unit 900✓/12✗ pré/16skip · E2E `teto_fatia11` 2/2 · régua 08+09+10+11 18/18. Abaixo = o que só você prova, no Windows real (5174).
+1. **Aba Config:** Conta (canto superior direito) > Configurações → aba abre no centro. Confira: slider + número do teto (1–250, vem 25), interruptor "Rolagem automática" ligado, botão Salvar + aviso "Configuração salva". Mude o teto para **2**, salve, dê **F5**, reabra — tem que continuar 2.
+2. **Cartão continuar:** com teto 2, peça ao agente algo que use várias ferramentas (ex.: "liste os .txt e me resuma cada um"). Tem que aparecer o cartão **"Limite de voltas — Pausado no limite"** com [Continuar (+2)] [Parar]. Clique **Continuar** → ele trabalha mais 2 voltas e pausa de novo. Clique **Parar** → "Parado por você", sem erro.
+3. **Auto-scroll:** numa resposta longa, role para cima no meio do streaming → o chat NÃO pode puxar você de volta. Fique no fim → acompanha sozinho. Desligue o interruptor na Config → nunca acompanha.
+4. Volte o teto para **25** e salve (padrão de fábrica).
+
+**HOMOLOGADA (D96, 21/10):** palavras do dono: *"fiz os testes e parece que foi resolvido. acho tbm ja esta homologada a fatia 11."* Cobre a fatia (teto + Continuar + Config + auto-scroll) + as 7 correções pós-11 (C1–C7), incluindo o fix do "não abre arquivo" (C7) testado por ele no Windows. Prova automatizada: tsc 0 · unit 906✓/12✗ pré/16skip · régua 18/18 · trava C7 3/3. Pós-homologação: conversar o ajuste do teto na Config (pedido dele).
+5. Diga "homologada" ou liste o que falhou. Depois conversamos o ajuste do teto na Config (seu pedido) e a FATIA 12.
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
@@ -236,12 +246,12 @@ A V1 só pode ser declarada pronta quando:
 
 # PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono — **CUMPRIDO em 15/10 · HOMOLOGADA em 17/10** (registro no topo deste arquivo)
 
-> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/`.
+> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/` (removidos na limpeza de 21/10).
 
 ## C.1 Caminho rápido (5 minutos, sem chave paga)
 1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
 2. **Conta ▸ Provedores**.
-3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `validacao_fatia08/stub_provider.cjs` no ar.
+3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `uploads/stub_provider.cjs` no ar.
 4. Chave: qualquer texto · **Modelo**: digite um à mão · **[Testar conexão]** → faixa verde · **[Salvar provedores]** → "Configuração salva".
 5. **F5** → reabrir Provedores → o serviço continua lá, com o nome no título; o campo da chave vem **mascarado** (o olhinho mostra só sob clique).
 6. Marcar **usar este provedor no chat** → chip "provedor ativo do chat" → **F5** → continua ativo.
@@ -261,7 +271,7 @@ Anote **tela + texto do aviso** e traga: a validação vale como **reprovado com
 
 # PARTE D — FATIA 09 (Conversar): roteiro de validação do dono — **VALIDAÇÃO PARCIAL FEITA EM VÍDEO (17/10) · homologação formal pendente**
 
-> **Estado:** implementada em 17/10 (`5968b70`, `9e2c703`, `c0af6fe`, `90f75c8`) e **já usada com sucesso pelo dono** (2 vídeos de 17/10: Ollama local respondendo, Markdown completo, provedor ativo persistindo; o 1º vídeo também mostrou o erro honesto "Nenhum provedor está ativo" quando a bolinha de ativação fica desligada). A bateria automatizada passou **5/5 em 4 rodadas seguidas**. Prints da prova em `~/validacao_fatia09/` (fora do repo). Este roteiro é o caminho curto para **declarar a homologação** — ou apontar o que falta.
+> **Estado:** implementada em 17/10 (`5968b70`, `9e2c703`, `c0af6fe`, `90f75c8`) e **já usada com sucesso pelo dono** (2 vídeos de 17/10: Ollama local respondendo, Markdown completo, provedor ativo persistindo; o 1º vídeo também mostrou o erro honesto "Nenhum provedor está ativo" quando a bolinha de ativação fica desligada). A bateria automatizada passou **5/5 em 4 rodadas seguidas**. Prints da prova em `~/validacao_fatia09/` (fora do repo; removidos na limpeza de 21/10 — os stubs seguem em `~/uploads/`). Este roteiro é o caminho curto para **declarar a homologação** — ou apontar o que falta.
 
 ## D.1 Caminho rápido (5 minutos, com Ollama local — sem chave)
 1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.

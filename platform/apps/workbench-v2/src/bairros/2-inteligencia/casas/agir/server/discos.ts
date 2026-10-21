@@ -54,7 +54,7 @@ export function criarExecutoresReais(raiz: string): Record<FerramentaId, Executo
     const ausentes = (descritor?.obrigatorios ?? []).filter(
       (campo) => typeof argumentos[campo] !== 'string' || (argumentos[campo] as string).length === 0,
     )
-    return ausentes.length > 0 ? `A ferramenta "${id}" não executou: faltou ${ausentes.join(' e ')}.` : null
+    return ausentes.length > 0 ? `A ferramenta "${id}" não executou: faltou ${ausentes.join(' e ')}. Não foi a sua permissão — o pedido da IA veio incompleto. Tente de novo mandando ${ausentes.join(' e ')}.` : null
   }
 
   const ler: ExecutorFerramenta = async (pedido) => {

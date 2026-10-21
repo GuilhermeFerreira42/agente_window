@@ -64,6 +64,7 @@ const DEPS = {
   obterAlvo: alvoOk,
   pastaDeTrabalho: (caminho: string | undefined) =>
     caminho && caminho !== '/fora' ? { ok: true as const, raiz } : { ok: false as const, message: 'Nenhuma pasta de trabalho ativa nesta sessão.' },
+  lerTeto: async () => 25,
 }
 
 afterAll(async () => {
@@ -156,7 +157,7 @@ describe('rotas — POST /api/agir', () => {
     const res = fakeRes()
     const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
-    expect(frames(res).map((e) => e.type)).toEqual(['tool', 'approval'])
+    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
 
     const aprovar = fakeRes()
     const corpoNegar = JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })
@@ -165,8 +166,8 @@ describe('rotas — POST /api/agir', () => {
 
     await fio
     const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['tool', 'approval', 'tool_result', 'chunk', 'done'])
-    const resultado = frames(res)[2] as Record<string, unknown>
+    expect(tipos).toEqual(['iteracao', 'tool', 'approval', 'tool_result', 'iteracao', 'chunk', 'done'])
+    const resultado = frames(res)[3] as Record<string, unknown>
     expect(resultado).toMatchObject({ type: 'tool_result', ok: false })
     expect(String(resultado.resumo)).toContain('dono negou')
     // nada foi escrito: o executor nem roda (a negação é a resposta ao modelo)
@@ -194,7 +195,7 @@ describe('rotas — POST /api/agir', () => {
     expect(tipos[tipos.length - 1]).toBe('done')
   })
 
-  it('permissão que chega NO PEDIDO já vale (o dono liberou numa volta anterior — C4)', async () => {
+  it('permissão que chega NO PEDIDO já vale (o dono liberou numa iteração anterior — C4)', async () => {
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
     const corpo = JSON.stringify({
@@ -205,7 +206,7 @@ describe('rotas — POST /api/agir', () => {
     })
     await tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
     const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['tool', 'tool_result', 'chunk', 'done']) // sem approval nenhum
+    expect(tipos).toEqual(['iteracao', 'tool', 'tool_result', 'iteracao', 'chunk', 'done']) // sem approval nenhum
   })
 
   it('aprovar para fluxo morto → 409 honesto', async () => {
@@ -213,5 +214,69 @@ describe('rotas — POST /api/agir', () => {
     expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fantasma', id: 'c1', decisao: 'permitir' })), res, URL_APROVAR, DEPS)).toBe(true)
     expect(res.statusCode).toBe(409)
     expect(JSON.parse(res.corpo()).message).toContain('já não espera mais')
+  })
+})
+
+const URL_CONTINUAR = new URL('http://localhost/api/agir/continuar')
+const SSE_BUSCAR = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'b1', function: { name: 'buscar', arguments: '{"padrao":"*.txt"}' } }] } }] })}\n\n`
+
+describe('FATIA 11 — teto e continuar no fio', () => {
+  it('teto no fio: pausa com evento `teto` e o "continuar" retoma o mesmo fluxo', async () => {
+    stubProvedor([SSE_BUSCAR, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const deps = { ...DEPS, lerTeto: async () => 1 }
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'lista txt' }], fluxo: 'fluxo-teto-1', workspace: 'raiz-real' })
+    const res1 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)).toBe(true)
+    const f1 = frames(res1)
+    expect(f1.map((f) => f.type)).toEqual(['iteracao', 'tool', 'tool_result', 'teto'])
+    expect(f1[3]).toEqual({ type: 'teto', iteracoes: 1, teto: 1 })
+
+    const res2 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-1' })), res2, URL_CONTINUAR, deps)).toBe(true)
+    const f2 = frames(res2)
+    expect(f2[f2.length - 1]).toMatchObject({ type: 'done' })
+    expect(f2.some((f) => f.type === 'chunk')).toBe(true)
+    expect(f2.some((f) => f.type === 'error')).toBe(false)
+  })
+
+  it('continuar sem pausa guardada = 409 honesto (nada para retomar)', async () => {
+    const res = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-fantasma' })), res, URL_CONTINUAR, DEPS)).toBe(true)
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.corpo()).code).toBe('fluxo')
+  })
+
+  it('erro transitório (500) guarda retomada: o "continuar" retoma de onde parou (pós-11)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('erro do provedor', { status: 500 })))
+    const deps = { ...DEPS, lerTeto: async () => 3 }
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'lista txt' }], fluxo: 'fluxo-erro-1', workspace: 'raiz-real' })
+    const res1 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)).toBe(true)
+    const f1 = frames(res1)
+    expect(f1.map((f) => f.type)).toEqual(['iteracao', 'error'])
+    expect(f1[1]).toMatchObject({ type: 'error', code: 'http', retomavel: true, iteracoes: 1, teto: 3 })
+    // O continuar reabre o MESMO fluxo (agora o provedor responde bem):
+    stubProvedor([SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res2 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-erro-1' })), res2, URL_CONTINUAR, deps)).toBe(true)
+    const f2 = frames(res2)
+    expect(f2[f2.length - 1]).toMatchObject({ type: 'done' })
+    expect(f2.some((f) => f.type === 'error')).toBe(false)
+  })
+
+  it('pedido novo no mesmo fluxo descarta a retomada velha', async () => {
+    stubProvedor([SSE_BUSCAR, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const deps = { ...DEPS, lerTeto: async () => 1 }
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'lista txt' }], fluxo: 'fluxo-teto-2', workspace: 'raiz-real' })
+    const res1 = fakeRes()
+    await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)
+    expect(frames(res1).at(-1)).toMatchObject({ type: 'teto' })
+    // Novo pedido no MESMO fluxo: conclui em texto — a retomada morre aqui.
+    const res2 = fakeRes()
+    await tratarRotasAgir(fakeReq(pedido), res2, URL_AGIR, deps)
+    expect(frames(res2).at(-1)).toMatchObject({ type: 'done' })
+    const res3 = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-2' })), res3, URL_CONTINUAR, deps)
+    expect(res3.statusCode).toBe(409)
   })
 })

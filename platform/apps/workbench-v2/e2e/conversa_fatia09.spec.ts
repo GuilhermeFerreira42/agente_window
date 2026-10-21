@@ -2,8 +2,8 @@
 //
 // Condições de execução (fora do repo, como a 08):
 //   · Vite 5174 com AGENTE_WINDOW_PROVIDERS_PATH apontando para a fixture da
-//     fatia (validacao_fatia09/providers_fixture.json);
-//   · stub 4599 (validacao_fatia08/stub_provider.cjs): 6 chunks atrasados,
+//     fatia (uploads/providers_fixture.json);
+//   · stub 4599 (uploads/stub_provider.cjs): 6 chunks atrasados,
 //     401 para chave ≠ nvapi-TESTE-valida-0001, serviço fora = porta morta.
 // A bateria zera/repassa o estado de provedores por /api/providers — nunca
 // toca o arquivo do dono. Caso (d) timeout (60 s sem primeiro byte) é de

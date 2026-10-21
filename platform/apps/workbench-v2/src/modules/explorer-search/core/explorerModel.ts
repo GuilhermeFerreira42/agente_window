@@ -164,6 +164,9 @@ export class ExplorerItem {
 
   forgetChildren(): void {
     this._children.clear();
+    // Sem zerar a flag, o ensureResolved seguinte curto-circuita e a
+    // pasta fica vazia para sempre (bug raiz do refresh — pós-11).
+    this._isDirectoryResolved = false;
     this._isDirectoryResolved = false;
   }
 

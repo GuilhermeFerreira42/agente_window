@@ -1,5 +1,5 @@
 // FATIA 08 — Conectar (Provedores). Bateria Playwright contra o app real (5174).
-// O "provedor de mentira" (validacao_fatia08/stub_provider.cjs, porta 4599) faz o
+// O "provedor de mentira" (uploads/stub_provider.cjs, porta 4599) faz o
 // papel de um serviço OpenAI-compatible: sucesso (200 + catálogo), chave errada (401)
 // e um serviço que NÃO deixa listar modelos (405).
 // Nada aqui toca o arquivo real do dono: o servidor de teste roda com
