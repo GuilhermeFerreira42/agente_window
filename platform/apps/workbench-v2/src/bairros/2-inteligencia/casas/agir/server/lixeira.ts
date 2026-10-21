@@ -107,24 +107,43 @@ export function comandoLixeiraWindows(absoluto: string, ehPasta: boolean): { com
   const escapado = absoluto.replace(/'/g, "''")
   const verbo = ehPasta ? 'DeleteDirectory' : 'DeleteFile'
   const script = `Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::${verbo}('${escapado}','OnlyErrorDialogs','SendToRecycleBin')`
-  return { comando: 'powershell.exe', args: ['-NoProfile', '-NonFatal', '-Command', script] }
+  // FATIA 12 C4: os switches são os OFICIAIS do powershell.exe 5.1
+  // (about_PowerShell_exe) — `-NonFatal` NÃO existe e fazia o Windows
+  // recusar TODA exclusão (o dono provou no teste real).
+  return { comando: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', script] }
 }
 
 function executarPadrao(comando: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, rejeita) => {
-    execFile(comando, args, { windowsHide: true }, (erro, stdout, stderr) => {
-      if (erro) rejeita(erro)
-      else resolve({ stdout: String(stdout), stderr: String(stderr) })
+    // Teto de 3 min: lixeira de pasta gigante pode demorar, mas nunca trava o fio para sempre.
+    execFile(comando, args, { windowsHide: true, timeout: 180000 }, (erro, stdout, stderr) => {
+      if (erro) {
+        const rico = erro as NodeJS.ErrnoException & { stdout?: unknown; stderr?: unknown }
+        rico.stdout = stdout
+        rico.stderr = stderr
+        rejeita(rico)
+      } else resolve({ stdout: String(stdout), stderr: String(stderr) })
     })
   })
+}
+
+/** Espreme o motivo REAL do Windows (stderr > stdout > message), em 1 linha de até 300. */
+export function detalheErroWindows(erro: unknown): string {
+  const e = erro as { message?: unknown; stderr?: unknown; stdout?: unknown } | null
+  const texto = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+  const bruto = texto(e?.stderr) !== '' ? texto(e?.stderr) : texto(e?.stdout) !== '' ? texto(e?.stdout) : texto(e?.message)
+  const linha = bruto.replace(/\s+/g, ' ')
+  if (linha === '') return 'sem detalhe do sistema'
+  return linha.length > 300 ? `${linha.slice(0, 300)}…` : linha
 }
 
 async function moverWindows(absoluto: string, ehPasta: boolean, executar: OpcoesLixeira['executar']): Promise<ResultadoLixeira> {
   const { comando, args } = comandoLixeiraWindows(absoluto, ehPasta)
   try {
     await (executar ?? executarPadrao)(comando, args)
-  } catch {
-    return fracasso(`O Windows não aceitou mandar "${absoluto}" para a Lixeira — nada sumiu.`)
+  } catch (erro) {
+    // C4: a recusa agora TRAZ o motivo do Windows (antes era genérica e cega).
+    return fracasso(`O Windows não aceitou mandar "${absoluto}" para a Lixeira — nada sumiu. (Detalhe: ${detalheErroWindows(erro)})`)
   }
   return { ok: true }
 }

@@ -11,6 +11,7 @@ import {
   comandoLixeiraWindows,
   contarConteudo,
   dataBilheteXdg,
+  detalheErroWindows,
   formatarTamanho,
   moverParaLixeira,
   resolverPastaTrashLinux,
@@ -113,6 +114,9 @@ describe('lixeira — Windows (comando puro + execução injetável)', () => {
     expect(resultado.ok).toBe(true)
     expect(chamadas).toHaveLength(1)
     expect(chamadas[0].comando).toBe('powershell.exe')
+    // C4: só switches OFICIAIS do powershell.exe 5.1 (`-NonFatal` não existe).
+    expect(chamadas[0].args.slice(0, 3)).toEqual(['-NoProfile', '-NonInteractive', '-Command'])
+    expect(chamadas[0].args.join(' ')).not.toContain('NonFatal')
     const script = chamadas[0].args.join(' ')
     expect(script).toContain('DeleteFile')
     expect(script).toContain('SendToRecycleBin')
@@ -125,15 +129,27 @@ describe('lixeira — Windows (comando puro + execução injetável)', () => {
     expect(pasta.args.join(' ')).toContain('DeleteDirectory')
     const origem = path.join(base, 'pasta-win')
     await mkdir(origem, { recursive: true })
+    const falha = Object.assign(new Error('exit 1'), { stderr: 'DeleteDirectory falhou: caminho longo demais' })
     const resultado = await moverParaLixeira(origem, {
       plataforma: 'win32',
       executar: async () => {
-        throw new Error('powershell morreu')
+        throw falha
       },
     })
     expect(resultado.ok).toBe(false)
     expect(resultado.motivo).toContain('nada sumiu')
+    expect(resultado.motivo).toContain('caminho longo demais') // o detalhe do Windows viaja junto (C4)
     await expect(stat(origem)).resolves.toBeDefined() // de pé
+  })
+})
+
+describe('lixeira — detalhe do erro Windows (C4: recusa nunca mais cega)', () => {
+  it('prefere stderr, cai para stdout/message, corta em 300 e nunca volta vazio', () => {
+    expect(detalheErroWindows(Object.assign(new Error('exit 1'), { stderr: '  motivo real  ', stdout: 'outro' }))).toBe('motivo real')
+    expect(detalheErroWindows(Object.assign(new Error('exit 1'), { stdout: 'só stdout' }))).toBe('só stdout')
+    expect(detalheErroWindows(new Error('só message'))).toBe('só message')
+    expect(detalheErroWindows(Object.assign(new Error('x'), { stderr: 'a'.repeat(400) }))).toBe(`${'a'.repeat(300)}…`)
+    expect(detalheErroWindows(null)).toBe('sem detalhe do sistema')
   })
 })
 
