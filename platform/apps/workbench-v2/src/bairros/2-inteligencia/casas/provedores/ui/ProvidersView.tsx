@@ -1,6 +1,6 @@
 // ============================================================================
 // Casa Provedores — a tela (D69: bairro 2 · Inteligência).
-// Cara desenhada com o dono em 15/10 (design_fatia08/mockup_provedores.html):
+// Cara desenhada com o dono em 15/10 (mockup_provedores.html — removido na limpeza de 21/10; a cara já está neste código):
 // lista à esquerda com busca · formulário à direita · olhinho na chave (D83) ·
 // avisos honestos do teste de conexão · 8 provedores (7 nativos + genérico).
 // ============================================================================

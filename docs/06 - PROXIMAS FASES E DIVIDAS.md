@@ -282,7 +282,7 @@ Trocar os 3 cards estáticos de Provedores por uma **tela rica estilo Cline** �
 - Parte **"seguir o modo atual do editor"** = regra de roteamento — dois casos a decidir em palavras: **(i)** landing sem arquivo (qual é "o modo atual"? padrão hoje = anexo) e **(ii)** arquivo aberto + Provedores (hoje o arquivo fica na coluna anexa e o Provedores ocupa o centro espremido — decisão de abas, casa natural = FATIA 15 (pós-D95)).
 
 ## 8.5 Autoavaliação de maturidade — "3 níveis" (2026-10-17, a pedido do dono)
-O dono enviou um vídeo de terceiro (anúncio de curso, 60 s) que descreve **3 níveis de desenvolvimento com IA**: **(1) vibe coding** (prompt → aceita tudo → torce) · **(2) configurações** (skills, rules, MCP servers) · **(3) workflow assistido** (spec antes do código, testes automatizados no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, **métricas**: carga, complexidade ciclomática, estrutura de dependências, cobertura). Análise completa em `/home/user/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
+O dono enviou um vídeo de terceiro (anúncio de curso, 60 s) que descreve **3 níveis de desenvolvimento com IA**: **(1) vibe coding** (prompt → aceita tudo → torce) · **(2) configurações** (skills, rules, MCP servers) · **(3) workflow assistido** (spec antes do código, testes automatizados no loop, code review que bloqueia deploy, contexto por grafos, loop engineering, **métricas**: carga, complexidade ciclomática, estrutura de dependências, cobertura). Análise completa em `/home/user/uploads/midia_16-10/ANALISE_VIDEO_16-10.md` (fora do repo).
 
 **Onde estamos — medido em 17/10, não estimado:**
 | Pilar do nível 3 | Temos? | Evidência |
@@ -512,7 +512,7 @@ Trocar a **resposta simulada** do chat (o `setTimeout` de 1 s em `App.tsx::handl
 - **Não "consertar"** as 12 falhas pré-existentes (decisão já tomada: FATIA 16 (pós-D95)) nem apagar teste nenhum.
 
 ## 6. Plano de prova (§6)
-- **(a) Provedor simulado com streaming** — extensão do stub da 08 (`validacao_fatia08/stub_provider.cjs`, porta 4599, **fora do repo**) com um endpoint que **emite pedaços com atraso**, um que **falha no meio**, um que **não responde** (para timeout) e um que **recusa a chave** (401).
+- **(a) Provedor simulado com streaming** — extensão do stub da 08 (`uploads/stub_provider.cjs`, porta 4599, **fora do repo**) com um endpoint que **emite pedaços com atraso**, um que **falha no meio**, um que **não responde** (para timeout) e um que **recusa a chave** (401).
 - **(b) Unit** — adaptadores de streaming por protocolo (pedaço → acumulado → fim), cancelamento, timeout, formatação de erro; fronteira da casa.
 - **(c) E2E** — `e2e/conversa_fatia09.spec.ts`: enviar → ver a bolha **crescendo** → terminar → recarregar e conferir o histórico; **Parar** para no meio; erro honesto nos 4 casos; trocar de provedor muda quem responde.
 - **(d) Validação do dono (Windows 5174)** — roteiro curto no `08` (PARTE D): abrir o app → escolher o provedor → conversar → parar no meio → recarregar. **Com Ollama local**, sem chave; e, se quiser, com um serviço real dele.

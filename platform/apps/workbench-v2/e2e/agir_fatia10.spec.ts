@@ -3,7 +3,7 @@
 // Condições de execução (fora do repo, como as fatias 08/09):
 //   · Vite 5174 com AGENTE_WINDOW_PROVIDERS_PATH em fixture (a bateria repassa
 //     o estado de provedores por /api/providers — nunca toca o arquivo do dono);
-//   · stub 4610 (validacao_fatia10/stub_agir.cjs): provedor OpenAI-compatível
+//   · stub 4610 (uploads/stub_agir.cjs): provedor OpenAI-compatível
 //     COM tool_calls nativos — argumentos FRAGMENTADOS para provar a
 //     remontagem; 401 para chave ≠ nvapi-TESTE-agir-0001;
 //   · território REAL: /tmp/agir-e2e-ws (recriado por teste) — as provas de

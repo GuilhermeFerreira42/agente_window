@@ -3,7 +3,7 @@
 // Condições de execução (fora do repo, como a FATIA 10):
 //   · Vite 5174 com AGENTE_WINDOW_PROVIDERS_PATH + AGENTE_WINDOW_SETTINGS_PATH
 //     em fixtures (o disco do dono nunca é tocado);
-//   · stub 4610 v3 (validacao_fatia10/stub_agir.cjs): cenário TETO_INFINITO —
+//   · stub 4610 v3 (uploads/stub_agir.cjs): cenário TETO_INFINITO —
 //     SEMPRE responde tool 'buscar' (leitura, args únicos por volta), então o
 //     teto SEMPRE pausa, qualquer que seja o valor;
 //   · território REAL: /tmp/teto-e2e-ws (recriado por teste).

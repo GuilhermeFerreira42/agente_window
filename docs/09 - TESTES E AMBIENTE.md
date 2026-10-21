@@ -156,7 +156,7 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 
 ### 3.7 Régua pós-MVP — 08→09→10→11 em série (receita 20/10, FATIA 11 C3)
 - **Browsers:** `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/browsers` (já vem com chromium) — `npx playwright install` FALHA (lock sem permissão) e não é preciso.
-- **Stubs (fora do repo, `start_process`):** `node /home/user/validacao_fatia08/stub_provider.cjs` (4599 — 08/09) + `node /home/user/validacao_fatia10/stub_agir.cjs` (4610 **v3** — 10/11; v3 tem o cenário `TETO_INFINITO`).
+- **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3** — 10/11; v3 tem o cenário `TETO_INFINITO`).
 - **Vite:** `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json AGENTE_WINDOW_SETTINGS_PATH=/tmp/f11-e2e-settings.json npm run dev -- --host 0.0.0.0 --port 5174` (a 08 **amarra** o caminho `/tmp/prov-fixture/providers.json` — outro caminho = 6 fails no beforeEach; `mkdir -p /tmp/prov-fixture` antes).
 - **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 = 18/18**.
 - **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`~/.agente_window/*.jsonl` + `.db`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado).
@@ -278,7 +278,7 @@ O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e
 5. **Frames:** periódicos (`fps=1/15,scale=1280:-2`), de cena (`select='gt(scene,0.18)'`) e **dirigidos por timestamp** (`-ss T -frames:v 1`) nos pontos que a fala marca. Folhas de contato com `drawtext` (`%{pts\:hms}`) + `tile` dão panorama rápido; **atenção**: em clipes extraídos com `-ss`, o rótulo `pts` reinicia em zero — somar o offset do corte.
 6. **Timestamps exatos sem perder tempo:** extrair `fps=1` do vídeo inteiro (242 JPEGs) e casar cada frame periódico por comparação de pixels (MSE) — MSE=0 identifica o segundo exato. Não estimar por aproximação em trecho que vá para doc.
 7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
-8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py`.)*
+8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/uploads/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py` — pasta removida na limpeza de 21/10.)*
 9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).
 
 ## 12. Habilidade de podcast (skills_podcast 4.0.1 — Greenforged Edition)
@@ -301,7 +301,7 @@ Pacote de produção de podcast (orquestrador → escritor → atomizador/valida
 | `probe.test.ts` | 13 | `fetch` mockado: ok · 401 · endereço · tempo (timeout 10 s) · http · resposta · catálogo e ping de conversa |
 | `frontier.test.ts` | 5 | fronteira LEGO: fora da casa só o barrel (exceção estreita do plugin), deps permitidas, `contract.ts` sem `any`, `as unknown as` confinado, dono único das regras |
 
-**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`validacao_fatia08/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
+**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`uploads/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
 | Teste | Prova |
 |---|---|
 | T1 | Conta ▸ Provedores: 8 itens + endereços padrão por provedor (NVIDIA = `integrate.api.nvidia.com/v1`) |
@@ -323,7 +323,7 @@ Duas IAs independentes (transcrição Whisper + frames + IA com visão de vídeo
 | Genérico → LiteLLM (`http://0.0.0.0:4000`, `meu-pool`) | **"…respondeu em 158 ms e mostrou 4 modelos."** |
 | Chave | mascarada o vídeo inteiro; nunca revelada |
 | Erros | **nenhum** (nenhuma faixa vermelha, nenhuma tela cinza) |
-Divergências resolvidas por recorte ampliado: os números dos ajustes são `99999999999999`/`10000000000000000` (a IA de vídeo leu "999/1000") e o rodapé do chat **tem** "Claude Sonnet 4" (a IA de vídeo disse que não). Registro completo: `midia_fatia08/ANALISE_VIDEO_15-10.md` (fora do repo; mídia apagada a pedido do dono em 16/10).
+Divergências resolvidas por recorte ampliado: os números dos ajustes são `99999999999999`/`10000000000000000` (a IA de vídeo leu "999/1000") e o rodapé do chat **tem** "Claude Sonnet 4" (a IA de vídeo disse que não). Registro completo: `uploads/midia_fatia08/ANALISE_VIDEO_15-10.md` (fora do repo; mídia apagada a pedido do dono em 16/10).
 
 ### 13.1 A/B da suíte E2E completa (2026-10-15) — **zero regressão da FATIA 08** (com ressalva honesta)
 Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 failed / 21 skipped / 87 passed (33,4 min)** — muito pior que a auditoria histórica (166/180 em `ba571dd`), e **não** é da FATIA 08.

@@ -14,7 +14,7 @@
 
 ## Homologação FATIA 07 — 2026-10-15 (declaração do dono, com evidências)
 - **Entregas homologadas:** DEBT-09 (`a69137d`) · DEBT-06 caminho C (`62cf055`) · DEBT-04 (nada a expurgar) · onda 1 da faxina D74 (`9985b9e`) · quarentena pontual dos 2 E2E da Aux (`e182960`).
-- **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d`.
+- **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d` (arquivos removidos na limpeza de 21/10, por ordem do dono).
 - **Números na homologação:** typecheck 0 · unit 730✓/12✗ (pré-existentes)/16 skip · E2E sem regressão (A/B em `e02e486`).
 - **Limitações aceitas com a homologação:** PTYs órfãos até a FATIA 12 (pré-D95 = 16) · 5 E2E vermelhos pré-existentes (`09 §2.6`) · sintoma original do DEBT-06 não reproduzido no estado anterior sob as condições testadas.
 ## Homologação FATIA 08 — 2026-10-17 (declaração do dono) ✅
@@ -244,12 +244,12 @@ A V1 só pode ser declarada pronta quando:
 
 # PARTE C — FATIA 08 (Conectar/Provedores): roteiro de validação do dono — **CUMPRIDO em 15/10 · HOMOLOGADA em 17/10** (registro no topo deste arquivo)
 
-> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/`.
+> **Estado:** implementada em 15/10 (`f87981c`, `2b371c2`, `fde5f0f`). **Não homologada** até este roteiro ser rodado. Prints da prova automatizada em `~/validacao_fatia08/prints/` (removidos na limpeza de 21/10).
 
 ## C.1 Caminho rápido (5 minutos, sem chave paga)
 1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
 2. **Conta ▸ Provedores**.
-3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `validacao_fatia08/stub_provider.cjs` no ar.
+3. **Compatível com OpenAI** → Nome do serviço: `Local` · Endereço: o do seu serviço local (ex.: LM Studio) — ou `http://127.0.0.1:4599/v1` com o stub `uploads/stub_provider.cjs` no ar.
 4. Chave: qualquer texto · **Modelo**: digite um à mão · **[Testar conexão]** → faixa verde · **[Salvar provedores]** → "Configuração salva".
 5. **F5** → reabrir Provedores → o serviço continua lá, com o nome no título; o campo da chave vem **mascarado** (o olhinho mostra só sob clique).
 6. Marcar **usar este provedor no chat** → chip "provedor ativo do chat" → **F5** → continua ativo.
@@ -269,7 +269,7 @@ Anote **tela + texto do aviso** e traga: a validação vale como **reprovado com
 
 # PARTE D — FATIA 09 (Conversar): roteiro de validação do dono — **VALIDAÇÃO PARCIAL FEITA EM VÍDEO (17/10) · homologação formal pendente**
 
-> **Estado:** implementada em 17/10 (`5968b70`, `9e2c703`, `c0af6fe`, `90f75c8`) e **já usada com sucesso pelo dono** (2 vídeos de 17/10: Ollama local respondendo, Markdown completo, provedor ativo persistindo; o 1º vídeo também mostrou o erro honesto "Nenhum provedor está ativo" quando a bolinha de ativação fica desligada). A bateria automatizada passou **5/5 em 4 rodadas seguidas**. Prints da prova em `~/validacao_fatia09/` (fora do repo). Este roteiro é o caminho curto para **declarar a homologação** — ou apontar o que falta.
+> **Estado:** implementada em 17/10 (`5968b70`, `9e2c703`, `c0af6fe`, `90f75c8`) e **já usada com sucesso pelo dono** (2 vídeos de 17/10: Ollama local respondendo, Markdown completo, provedor ativo persistindo; o 1º vídeo também mostrou o erro honesto "Nenhum provedor está ativo" quando a bolinha de ativação fica desligada). A bateria automatizada passou **5/5 em 4 rodadas seguidas**. Prints da prova em `~/validacao_fatia09/` (fora do repo; removidos na limpeza de 21/10 — os stubs seguem em `~/uploads/`). Este roteiro é o caminho curto para **declarar a homologação** — ou apontar o que falta.
 
 ## D.1 Caminho rápido (5 minutos, com Ollama local — sem chave)
 1. Suba o app: `npm --prefix platform/apps/workbench-v2 run dev` (porta **5174**). Uma instância só.
