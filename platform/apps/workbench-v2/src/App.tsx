@@ -386,6 +386,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
+        explorerRootRef.current = root
         if (cancelled) return
         const module = createExplorerSearchModule({
           fs,
@@ -413,6 +414,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         })
         restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
         mountedModule = module
+        explorerModuleRef.current = module
         setExplorerModule(module)
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
@@ -631,6 +633,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const pendingResponseTimers = useRef<Map<string, number>>(new Map())
   // FATIA 09: conversas REAIS em voo (runKey → controle de abort do fio).
   const agirAtivas = useRef<Map<string, ControleAgir>>(new Map())
+  /** Numera os cartões do agente na ordem de chegada (ordem cronológica na tela). */
+  const ordemCartao = useRef(0)
+  /** O módulo Explorer + a raiz (o agente manda atualizar após escrever no disco). */
+  const explorerModuleRef = useRef<IExplorerSearchModule | null>(null)
+  const explorerRootRef = useRef<WorkspaceUri | null>(null)
   const approvalTimer = useRef<number | undefined>(undefined)
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
@@ -1675,6 +1682,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }))
   }
 
+  /** Numera os cartões do agente na ordem de chegada (ordem cronológica na tela). */
+  const proximaOrdemCartao = (): number => {
+    ordemCartao.current += 1
+    return ordemCartao.current
+  }
+
   /** Atualiza os cartões "continuar?" da resposta em voo (FATIA 11). */
   const mexerContinuar = (
     sessionId: string,
@@ -1728,6 +1741,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           ferramenta: pedido.ferramenta,
           alvo: String(pedido.argumentos.caminho ?? pedido.argumentos.padrao ?? ''),
           status: 'executando',
+          ordem: proximaOrdemCartao(),
         }])
       },
       onApproval: (pedido: PedidoFerramenta) => {
@@ -1735,12 +1749,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const previa = typeof bruta === 'string' ? bruta.slice(0, 400) : undefined
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
       },
-      onToolResult: (id, _ferramenta, ok, resumo) => {
+      onToolResult: (id, ferramenta, ok, resumo) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? {
           ...carta,
           status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
           resumo,
         } : carta))
+        // O agente escreveu no disco: o Explorer mostra sem precisar resselecionar.
+        if (ok && (ferramenta === 'criar' || ferramenta === 'escrever')) {
+          const modulo = explorerModuleRef.current
+          const raiz = explorerRootRef.current
+          if (modulo && raiz) void modulo.explorer.refresh({ uri: raiz }).catch(() => undefined)
+        }
       },
       onTeto: (voltas, teto) => {
         agirAtivas.current.delete(runKey)
@@ -1749,6 +1769,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           status: 'aguardando',
           voltas,
           teto,
+          ordem: proximaOrdemCartao(),
         }])
         updateSession(sessionId, (session) => {
           const next = completeChatRun(session, chatId)
@@ -1766,6 +1787,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             } : chat),
           }
         })
+      },
+      onVolta: (volta, teto) => {
+        updateSession(sessionId, (session) => ({
+          ...session,
+          chats: session.chats.map((chat) => chat.id === chatId ? {
+            ...chat,
+            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, voltaAtual: volta, tetoAtual: teto } : message),
+          } : chat),
+        }))
       },
       onDone: (modelo) => {
         agirAtivas.current.delete(runKey)
@@ -1788,12 +1818,27 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         })
         aoConcluir?.()
       },
-      onError: (code, mensagemErro) => {
+      onError: (code, mensagemErro, detalhe) => {
         if (code === 'fluxo' && aoFluxoMorto) {
           aoFluxoMorto()
           return
         }
         agirAtivas.current.delete(runKey)
+        // Erro TRANSITÓRIO com retomada guardada: a bolha mostra o erro E o
+        // cartão "continuar de onde parou" (o mesmo Continuar do teto).
+        if (detalhe?.retomavel === true) {
+          const voltas = detalhe.voltas ?? 0
+          const teto = detalhe.teto ?? 25
+          mexerContinuar(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
+            id: `retomar-${Date.now()}`,
+            status: 'aguardando',
+            voltas,
+            teto,
+            ordem: proximaOrdemCartao(),
+            titulo: 'A resposta não terminou a tempo',
+            motivo: 'Dá para continuar de onde parou — o que já foi feito não se perdeu.',
+          }])
+        }
         updateSession(sessionId, (session) => {
           const next = completeChatRun(session, chatId)
           return {
@@ -1933,6 +1978,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       time: timeLabel(),
       model: selectedModel,
       running: true,
+      inicioEm: Date.now(),
     }
     // Histórico da conversa atual (G5) + a mensagem nova — o que SAI para o servidor.
     const sessaoOrigem = sessions.find((session) => session.id === sessionId)

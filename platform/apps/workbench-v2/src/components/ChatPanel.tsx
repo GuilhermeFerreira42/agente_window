@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import {
   Check,
   Clipboard,
@@ -55,6 +55,25 @@ interface ChatPanelProps {
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
+}
+
+function formatarDuracao(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}min${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}min`
+}
+
+/** Contador "há Xs" do pedido do dono (pós-11): pulsa a cada segundo enquanto corre. */
+function TempoDecorrido({ inicio, correndo }: { inicio: number; correndo: boolean }): ReactNode {
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    if (!correndo) return
+    const timer = setInterval(() => setAgora(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [correndo, inicio])
+  return <>{formatarDuracao(agora - inicio)}</>
 }
 
 function MessageActions({
@@ -201,30 +220,36 @@ function MessageRow({
             ))}
           </div>
         )}
-        {message.ferramentas && message.ferramentas.length > 0 && (
-          <div role="list" aria-label="Ferramentas usadas pelo agente">
-            {message.ferramentas.map((carta) => (
-              <CartaoFerramenta
-                key={carta.id}
-                carta={carta}
-                onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
-              />
-            ))}
-          </div>
-        )}
-        {message.continuar && message.continuar.length > 0 && (
-          <div role="list" aria-label="Pausas do teto de voltas">
-            {message.continuar.map((carta) => (
-              <CartaoContinuar
-                key={carta.id}
-                carta={carta}
-                onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirContinuar(carta.id, decisao) : undefined}
-              />
-            ))}
+        {(message.ferramentas?.length ?? 0) + (message.continuar?.length ?? 0) > 0 && (
+          <div role="list" aria-label="Cartões do agente">
+            {[
+              ...(message.ferramentas ?? []).map((carta) => ({
+                ordem: carta.ordem ?? 0,
+                no: (
+                  <CartaoFerramenta
+                    key={carta.id}
+                    carta={carta}
+                    onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
+                  />
+                ),
+              })),
+              ...(message.continuar ?? []).map((carta) => ({
+                ordem: carta.ordem ?? 0,
+                no: (
+                  <CartaoContinuar
+                    key={carta.id}
+                    carta={carta}
+                    onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirContinuar(carta.id, decisao) : undefined}
+                  />
+                ),
+              })),
+            ]
+              .sort((a, b) => a.ordem - b.ordem)
+              .map((item) => item.no)}
           </div>
         )}
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMarkdownComponents(() => onCopy(message.id, 'code'))}>{message.content}</ReactMarkdown>
-        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span><span className="chat-progress-dots">...</span></div>}
+        {message.running && <div className="chat-progress"><Sparkles size={13} /><span>Trabalhando</span>{message.voltaAtual !== undefined && message.tetoAtual !== undefined && <span> — volta {message.voltaAtual} de {message.tetoAtual}</span>}{message.inicioEm !== undefined && <span> · há <TempoDecorrido inicio={message.inicioEm} correndo={message.running === true} /></span>}<span className="chat-progress-dots">...</span></div>}
       </div>
       {!message.running && (
         <div className="chat-message-footer">

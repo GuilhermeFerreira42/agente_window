@@ -44,9 +44,9 @@ export function CartaoContinuar({ carta, onDecidir }: CartaoContinuarProps) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <strong style={{ fontSize: 12 }}>Limite de voltas</strong>
+        <strong style={{ fontSize: 12 }}>{carta.titulo ?? 'Limite de voltas'}</strong>
         <span style={{ fontSize: 11, opacity: 0.9 }}>
-          A IA usou {carta.voltas} de {carta.teto} voltas sem concluir.
+          {carta.motivo ?? `A IA usou ${carta.voltas} de ${carta.teto} voltas sem concluir.`}
         </span>
         <span style={{ marginLeft: 'auto', color: cor, fontWeight: 600, fontSize: 11 }}>
           {ROTULOS_STATUS[carta.status]}

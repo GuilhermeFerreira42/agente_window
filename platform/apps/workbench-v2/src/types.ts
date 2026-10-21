@@ -19,6 +19,8 @@ export interface FerramentaNoChat {
   status: 'aguardando' | 'executando' | 'ok' | 'negado' | 'erro' | 'expirado'
   /** Resumo honesto do resultado (texto do servidor). */
   resumo?: string
+  /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */
+  ordem?: number
 }
 
 export interface ChatMessage {
@@ -39,6 +41,11 @@ export interface ChatMessage {
   ferramentas?: FerramentaNoChat[]
   /** Cartões "continuar?" do teto (FATIA 11) — presos a esta resposta. */
   continuar?: ContinuarNoChat[]
+  /** Progresso do agente (pós-11): a volta atual e o teto — "volta 2 de 25". */
+  voltaAtual?: number
+  tetoAtual?: number
+  /** Quando a corrida começou (pós-11) — o contador "há Xs" do dono. */
+  inicioEm?: number
 }
 
 export interface ContinuarNoChat {
@@ -48,6 +55,12 @@ export interface ContinuarNoChat {
   voltas: number
   /** Orçamento cheio que o Continuar concede. */
   teto: number
+  /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */
+  ordem?: number
+  /** Título próprio (pós-11) — o cartão de "continuar após erro" não é teto. */
+  titulo?: string
+  /** Texto próprio (pós-11) — ausente = o texto padrão do teto. */
+  motivo?: string
 }
 
 export interface ComposerDraft {
