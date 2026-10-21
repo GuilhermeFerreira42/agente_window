@@ -13,6 +13,7 @@ const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   buscar: 'Buscar arquivos',
   criar: 'Criar arquivo',
   escrever: 'Escrever arquivo',
+  excluir: 'Excluir (lixeira)',
 }
 
 const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {
@@ -65,6 +66,12 @@ export function CartaoFerramenta({ carta, onDecidir }: CartaoFerramentaProps) {
         </span>
       </div>
 
+      {carta.status === 'aguardando' && carta.ferramenta === 'excluir' && (
+        <div style={{ margin: '6px 0 0', color: '#f48771', fontWeight: 600, fontSize: 11 }}>
+          Sem desfazer direto — vai para a lixeira do sistema (restaurar é pela lixeira).
+        </div>
+      )}
+
       {carta.status === 'aguardando' && carta.previa && (
         <pre
           style={{
@@ -106,14 +113,16 @@ export function CartaoFerramenta({ carta, onDecidir }: CartaoFerramentaProps) {
           >
             Negar
           </button>
-          <button
-            type="button"
-            aria-label="Permitir nesta sessão"
-            onClick={() => onDecidir('sessao')}
-            style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #ffffff33', background: 'transparent', color: '#cccccc' }}
-          >
-            Permitir na Sessão
-          </button>
+          {carta.ferramenta !== 'excluir' && (
+            <button
+              type="button"
+              aria-label="Permitir nesta sessão"
+              onClick={() => onDecidir('sessao')}
+              style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #ffffff33', background: 'transparent', color: '#cccccc' }}
+            >
+              Permitir na Sessão
+            </button>
+          )}
         </div>
       )}
     </div>

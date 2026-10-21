@@ -11,7 +11,7 @@ export type BrowserStatus = 'loading' | 'ready' | 'error'
 /** Cartão de ferramenta do agente (FATIA 10) preso a uma resposta do chat. */
 export interface FerramentaNoChat {
   id: string
-  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever'
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
   /** Caminho (ou padrão de busca) mostrado no cartão. */
   alvo: string
   /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */

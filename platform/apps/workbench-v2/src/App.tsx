@@ -1743,9 +1743,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           ordem: proximaOrdemCartao(),
         }])
       },
-      onApproval: (pedido: PedidoFerramenta) => {
+      onApproval: (pedido: PedidoFerramenta, previaServidor?: string) => {
         const bruta = pedido.argumentos.conteudo
-        const previa = typeof bruta === 'string' ? bruta.slice(0, 400) : undefined
+        // FATIA 12: a prévia do `excluir` vem do servidor (viu o disco); o resto usa o conteúdo do pedido.
+        const previa = previaServidor ?? (typeof bruta === 'string' ? bruta.slice(0, 400) : undefined)
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
       },
       onToolResult: (id, ferramenta, ok, resumo) => {
@@ -1754,8 +1755,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
           resumo,
         } : carta))
-        // O agente escreveu no disco: o Explorer mostra sem precisar resselecionar.
-        if (ok && (ferramenta === 'criar' || ferramenta === 'escrever')) {
+        // O agente escreveu/apagou no disco: o Explorer mostra sem precisar resselecionar.
+        if (ok && (ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir')) {
           const modulo = explorerModuleRef.current
           if (modulo) void modulo.explorer.refresh().catch(() => undefined)
         }

@@ -29,8 +29,8 @@ export interface OuvintesAgir {
   onTool: (pedido: PedidoFerramenta) => void
   /** Uma ferramenta terminou (ok ou não) — o cartão mostra o resumo. */
   onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string) => void
-  /** O servidor pediu o sim/não do dono — o cartão ganha os 3 botões. */
-  onApproval: (pedido: PedidoFerramenta) => void
+  /** O servidor pediu o sim/não do dono — o cartão ganha os botões. `previa` (FATIA 12) é o que o servidor viu no disco (só o `excluir` manda). */
+  onApproval: (pedido: PedidoFerramenta, previa?: string) => void
   /** O teto pausou o loop (FATIA 11) — a tela mostra o cartão "continuar?". */
   onTeto: (iteracoes: number, teto: number) => void
   /** Cada ida ao modelo anunciada (pós-11) — a tela mostra "iteração 2 de 25". */
@@ -90,7 +90,7 @@ async function bombearFio(resposta: Response, controlador: AbortController, ouvi
         if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
         else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
         else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo)
-        else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido)
+        else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido, evento.previa)
         else if (evento.type === 'teto') {
           encerrou = true
           ouvintes.onTeto(evento.iteracoes, evento.teto)
