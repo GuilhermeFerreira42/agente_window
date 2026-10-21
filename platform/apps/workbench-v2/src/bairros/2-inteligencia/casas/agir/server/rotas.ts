@@ -109,10 +109,15 @@ function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
   res.write(`data: ${JSON.stringify(evento)}\n\n`)
 }
 
-/** Guarda a retomada SÓ quando o teto pausou (outro fim limpa o fluxo). */
+/** Guarda a retomada quando o teto pausou OU um erro transitório
+ * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
 function guardarRetomada(fluxo: string, resultado: ResultadoAgir, raiz: string): void {
   retomarPorFluxo.delete(fluxo)
-  if (resultado.status === 'voltas_excedidas' && resultado.mensagensParaRetomar) {
+  const pausouNoTeto = resultado.status === 'voltas_excedidas'
+  const caiuTransitorio =
+    resultado.status === 'erro' &&
+    (resultado.codigoErro === 'tempo' || resultado.codigoErro === 'endereco' || resultado.codigoErro === 'http')
+  if ((pausouNoTeto || caiuTransitorio) && resultado.mensagensParaRetomar) {
     retomarPorFluxo.set(fluxo, { mensagens: resultado.mensagensParaRetomar, raiz })
     while (retomarPorFluxo.size > MAX_RETOMADAS) {
       const maisAntigo = retomarPorFluxo.keys().next()

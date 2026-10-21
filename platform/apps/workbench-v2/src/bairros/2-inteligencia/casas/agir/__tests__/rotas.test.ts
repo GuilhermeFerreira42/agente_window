@@ -157,7 +157,7 @@ describe('rotas — POST /api/agir', () => {
     const res = fakeRes()
     const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
-    expect(frames(res).map((e) => e.type)).toEqual(['tool', 'approval'])
+    expect(frames(res).map((e) => e.type)).toEqual(['volta', 'tool', 'approval'])
 
     const aprovar = fakeRes()
     const corpoNegar = JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })
@@ -166,8 +166,8 @@ describe('rotas — POST /api/agir', () => {
 
     await fio
     const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['tool', 'approval', 'tool_result', 'chunk', 'done'])
-    const resultado = frames(res)[2] as Record<string, unknown>
+    expect(tipos).toEqual(['volta', 'tool', 'approval', 'tool_result', 'volta', 'chunk', 'done'])
+    const resultado = frames(res)[3] as Record<string, unknown>
     expect(resultado).toMatchObject({ type: 'tool_result', ok: false })
     expect(String(resultado.resumo)).toContain('dono negou')
     // nada foi escrito: o executor nem roda (a negação é a resposta ao modelo)
@@ -206,7 +206,7 @@ describe('rotas — POST /api/agir', () => {
     })
     await tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
     const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['tool', 'tool_result', 'chunk', 'done']) // sem approval nenhum
+    expect(tipos).toEqual(['volta', 'tool', 'tool_result', 'volta', 'chunk', 'done']) // sem approval nenhum
   })
 
   it('aprovar para fluxo morto → 409 honesto', async () => {
@@ -228,8 +228,8 @@ describe('FATIA 11 — teto e continuar no fio', () => {
     const res1 = fakeRes()
     expect(await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)).toBe(true)
     const f1 = frames(res1)
-    expect(f1.map((f) => f.type)).toEqual(['tool', 'tool_result', 'teto'])
-    expect(f1[2]).toEqual({ type: 'teto', voltas: 1, teto: 1 })
+    expect(f1.map((f) => f.type)).toEqual(['volta', 'tool', 'tool_result', 'teto'])
+    expect(f1[3]).toEqual({ type: 'teto', voltas: 1, teto: 1 })
 
     const res2 = fakeRes()
     expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-1' })), res2, URL_CONTINUAR, deps)).toBe(true)
@@ -244,6 +244,24 @@ describe('FATIA 11 — teto e continuar no fio', () => {
     expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-fantasma' })), res, URL_CONTINUAR, DEPS)).toBe(true)
     expect(res.statusCode).toBe(409)
     expect(JSON.parse(res.corpo()).code).toBe('fluxo')
+  })
+
+  it('erro transitório (500) guarda retomada: o "continuar" retoma de onde parou (pós-11)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('erro do provedor', { status: 500 })))
+    const deps = { ...DEPS, lerTeto: async () => 3 }
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'lista txt' }], fluxo: 'fluxo-erro-1', workspace: 'raiz-real' })
+    const res1 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)).toBe(true)
+    const f1 = frames(res1)
+    expect(f1.map((f) => f.type)).toEqual(['volta', 'error'])
+    expect(f1[1]).toMatchObject({ type: 'error', code: 'http', retomavel: true, voltas: 1, teto: 3 })
+    // O continuar reabre o MESMO fluxo (agora o provedor responde bem):
+    stubProvedor([SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res2 = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-erro-1' })), res2, URL_CONTINUAR, deps)).toBe(true)
+    const f2 = frames(res2)
+    expect(f2[f2.length - 1]).toMatchObject({ type: 'done' })
+    expect(f2.some((f) => f.type === 'error')).toBe(false)
   })
 
   it('pedido novo no mesmo fluxo descarta a retomada velha', async () => {

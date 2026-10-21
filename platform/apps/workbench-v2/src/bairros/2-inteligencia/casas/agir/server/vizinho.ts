@@ -34,11 +34,18 @@ export class ErroVizinho extends Error {
 }
 
 export const TIMEOUT_PRIMEIRO_BYTE_MS = 60_000
-export const TIMEOUT_TOTAL_MS = 300_000
+/**
+ * Pós-11: o relógio TOTAL virou dois. O OCIOSO (5 min sem NADA chegar)
+ * mata fio emperrado; o ABSOLUTO (30 min, rede de segurança) mata fio
+ * pingando para sempre. Resposta saudável e lenta NUNCA morre no meio.
+ */
+export const TIMEOUT_OCIOSO_MS = 300_000
+export const TIMEOUT_TOTAL_MS = 1_800_000
 
 export interface AjustesVizinho {
   primeiroByteMs?: number
   totalMs?: number
+  ociosoMs?: number
 }
 
 // ── Enquadração (espelho de streaming.ts da casa Conversa) ──────────────────
@@ -338,12 +345,13 @@ export function criarFramerSSE(): Framer {
 export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {}): VizinhoProvedor {
   const primeiroByteMs = ajustes.primeiroByteMs ?? TIMEOUT_PRIMEIRO_BYTE_MS
   const totalMs = ajustes.totalMs ?? TIMEOUT_TOTAL_MS
+  const ociosoMs = ajustes.ociosoMs ?? TIMEOUT_OCIOSO_MS
 
   return async (mensagens, opcoes?: OpcoesVizinho): Promise<RespostaVolta> => {
     const { url, corpo } = corpoDePedido(alvo, mensagens)
     const controlador = new AbortController()
     let byteViu = false
-    let motivoTempo: 'primeiro' | 'total' | null = null
+    let motivoTempo: 'primeiro' | 'total' | 'ocioso' | null = null
     const aoParar = (): void => controlador.abort()
     opcoes?.sinal?.addEventListener('abort', aoParar, { once: true })
     const timerPrimeiro = setTimeout(() => {
@@ -358,6 +366,18 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         controlador.abort()
       }
     }, totalMs)
+    // O relógio ocioso REARMA a cada pedaço que chega: só dispara quando o
+    // serviço emudece de verdade no meio da resposta.
+    let timerOcioso: ReturnType<typeof setTimeout> | undefined
+    const rearmarOcioso = (): void => {
+      if (timerOcioso !== undefined) clearTimeout(timerOcioso)
+      timerOcioso = setTimeout(() => {
+        if (motivoTempo === null) {
+          motivoTempo = 'ocioso'
+          controlador.abort()
+        }
+      }, ociosoMs)
+    }
 
     const aoTexto = (pedaco: string): void => opcoes?.aoTexto?.(pedaco)
     const comedor = criarAcumulo(alvo.protocolo, aoTexto)
@@ -374,12 +394,14 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
       if (!resposta.ok) throw erroPorStatus(resposta.status)
       if (resposta.body === null) throw new ErroVizinho('resposta', 'O serviço respondeu sem corpo.')
       byteViu = true
+      rearmarOcioso()
 
       const leitor = resposta.body.getReader()
       const decodificador = new TextDecoder()
       for (;;) {
         const { done, value } = await leitor.read()
         if (done) break
+        rearmarOcioso()
         const pedaco = decodificador.decode(value, { stream: true })
         bruto += pedaco
         for (const payload of framer.entrar(pedaco)) {
@@ -424,14 +446,19 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
       if (motivoTempo === 'primeiro') {
         throw new ErroVizinho('tempo', `O serviço não respondeu em ${Math.round(primeiroByteMs / 1000)} segundos. Ele pode estar fora do ar ou muito lento.`)
       }
+      if (motivoTempo === 'ocioso') {
+        throw new ErroVizinho('tempo', `O serviço parou no meio da resposta (nada chegou em ${Math.round(ociosoMs / 1000)} segundos).`)
+      }
       if (motivoTempo === 'total') {
-        throw new ErroVizinho('tempo', `A resposta não terminou em ${Math.round(totalMs / 1000)} segundos.`)
+        const limite = totalMs >= 60_000 ? `${Math.round(totalMs / 60_000)} minutos` : `${Math.round(totalMs / 1000)} segundos`
+        throw new ErroVizinho('tempo', `A resposta não terminou em ${limite}.`)
       }
       if (erro instanceof ErroVizinho) throw erro
       throw new ErroVizinho('endereco', 'Não deu para alcançar o serviço. Verifique se ele está ligado (no caso do Ollama, se está rodando na sua máquina).')
     } finally {
       clearTimeout(timerPrimeiro)
       clearTimeout(timerTotal)
+      if (timerOcioso !== undefined) clearTimeout(timerOcioso)
       opcoes?.sinal?.removeEventListener('abort', aoParar)
     }
   }

@@ -15,6 +15,13 @@ import type {
 } from '../../contract'
 import { criarFramerSSE } from '../../server/vizinho'
 
+/** Detalhe do erro: quando é transitório, a tela pode oferecer retomar. */
+export interface DetalheErroAgir {
+  retomavel?: boolean
+  voltas?: number
+  teto?: number
+}
+
 export interface OuvintesAgir {
   /** Pedaço do texto da IA — a bolha cresce na hora. */
   onChunk: (texto: string) => void
@@ -26,10 +33,12 @@ export interface OuvintesAgir {
   onApproval: (pedido: PedidoFerramenta) => void
   /** O teto pausou o loop (FATIA 11) — a tela mostra o cartão "continuar?". */
   onTeto: (voltas: number, teto: number) => void
+  /** Cada ida ao modelo anunciada (pós-11) — a tela mostra "volta 2 de 25". */
+  onVolta?: (volta: number, teto: number) => void
   /** Fim confirmado (com o modelo que realmente respondeu). */
   onDone: (modelo?: string) => void
   /** Erro honesto (sem_provedor, chave, endereco, tempo, fluxo, resposta…). */
-  onError: (code: CategoriaErroAgir, message: string) => void
+  onError: (code: CategoriaErroAgir, message: string, detalhe?: DetalheErroAgir) => void
 }
 
 export interface EntradaAgir {
@@ -86,9 +95,15 @@ async function bombearFio(resposta: Response, controlador: AbortController, ouvi
           encerrou = true
           ouvintes.onTeto(evento.voltas, evento.teto)
           return false
+        } else if (evento.type === 'volta') {
+          ouvintes.onVolta?.(evento.volta, evento.teto)
         } else if (evento.type === 'error') {
           encerrou = true
-          ouvintes.onError(evento.code, evento.message)
+          const detalhe: DetalheErroAgir = {}
+          if (evento.retomavel !== undefined) detalhe.retomavel = evento.retomavel
+          if (evento.voltas !== undefined) detalhe.voltas = evento.voltas
+          if (evento.teto !== undefined) detalhe.teto = evento.teto
+          ouvintes.onError(evento.code, evento.message, detalhe)
           return false
         } else if (evento.type === 'done') {
           encerrou = true

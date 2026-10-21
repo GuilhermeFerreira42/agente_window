@@ -87,16 +87,20 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
  * contrato porque o loop precisa saber onde parar e esperar. `teto` (FATIA
  * 11) é a pausa honesta ao bater o limite: NÃO é erro — o dono continua
- * (mesmo fluxo, orçamento cheio) ou para por aqui.
+ * (mesmo fluxo, orçamento cheio) ou para por aqui. `volta` (pós-11) anuncia
+ * cada ida ao modelo para a tela mostrar o progresso ("volta 2 de 25").
+ * Um `error` TRANSITÓRIO (tempo/endereco/http) pode trazer `retomavel` com
+ * voltas+teto: a rota guardou o diálogo e a tela oferece continuar de onde parou.
  */
 export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
   | { type: 'approval'; pedido: PedidoFerramenta }
+  | { type: 'volta'; volta: number; teto: number }
   | { type: 'teto'; voltas: number; teto: number }
   | { type: 'done'; model?: string }
-  | { type: 'error'; code: CategoriaErroAgir; message: string }
+  | { type: 'error'; code: CategoriaErroAgir; message: string; retomavel?: boolean; voltas?: number; teto?: number }
 
 /** O que o provedor responde numa volta (o vizinho real monta; o falso, nos testes). */
 export interface RespostaVolta {

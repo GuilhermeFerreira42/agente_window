@@ -62,10 +62,13 @@ export interface ResultadoAgir {
   textoFinal: string
   voltas: number
   /**
-   * O diálogo acumulado (FATIA 11, só em `voltas_excedidas`): a rota guarda
-   * por fluxo para o "Continuar" retomar o MESMO fluxo com orçamento cheio.
+   * O diálogo acumulado (FATIA 11, em `voltas_excedidas` — e pós-11 também
+   * em `erro` TRANSITÓRIO): a rota guarda por fluxo para o "Continuar"
+   * retomar o MESMO fluxo com orçamento cheio.
    */
   mensagensParaRetomar?: MensagemAgir[]
+  /** O código do erro (só em `erro`) — a rota decide se é transitório. */
+  codigoErro?: CategoriaErroAgir
 }
 
 function foiInterrompido(sinal: AbortSignal | undefined): boolean {
@@ -92,6 +95,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
   for (let volta = 1; volta <= teto; volta += 1) {
     if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', voltas: volta - 1 }
+    emitir({ type: 'volta', volta, teto })
 
     let resposta: RespostaVolta
     try {
@@ -106,8 +110,22 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       const codigoSuspeito: unknown = erro instanceof Error && 'code' in erro ? (erro as { code?: unknown }).code : undefined
       const codigo: CategoriaErroAgir =
         typeof codigoSuspeito === 'string' && codigoSuspeito !== '' ? (codigoSuspeito as CategoriaErroAgir) : 'http'
-      emitir({ type: 'error', code: codigo, message: mensagemDeErro(erro) })
-      return { status: 'erro', textoFinal: '', voltas: volta }
+      // Erro TRANSITÓRIO (rede/provedor instável): o diálogo acumulado vai
+      // junto como retomada — a tela oferece "continuar de onde parou".
+      const retomavel = codigo === 'tempo' || codigo === 'endereco' || codigo === 'http'
+      emitir({
+        type: 'error',
+        code: codigo,
+        message: mensagemDeErro(erro),
+        ...(retomavel ? { retomavel: true as const, voltas: volta, teto } : {}),
+      })
+      return {
+        status: 'erro',
+        textoFinal: '',
+        voltas: volta,
+        codigoErro: codigo,
+        ...(retomavel ? { mensagensParaRetomar: mensagens } : {}),
+      }
     }
 
     // O texto AO VIVO já saiu pelo `aoTexto` (contrato do vizinho — fonte única).

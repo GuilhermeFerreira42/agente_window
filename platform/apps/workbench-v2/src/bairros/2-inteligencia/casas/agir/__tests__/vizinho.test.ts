@@ -189,6 +189,81 @@ describe('Vizinho real — gemini (SSE functionCall) e ollama (NDJSON)', () => {
   })
 })
 
+describe('Vizinho real — timeout ocioso (pós-11)', () => {
+  it('fio que EMUDECE no meio: erro de TEMPO dizendo que nada chegou', async () => {
+    const s = await servidorFalso((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      res.write('data: {"choices":[{"delta":{"content":"comecou"}}]}\n\n')
+      setTimeout(() => {
+        try { res.end('data: {}\n\n') } catch { /* já abortado */ }
+      }, 3000)
+    })
+    try {
+      try {
+        await criarVizinhoReal(alvoDe('openai-chat', s.baseUrl), { ociosoMs: 1200, totalMs: 30_000 })([{ papel: 'usuario', conteudo: 'oi' }])
+        throw new Error('deveria ter falhado')
+      } catch (erro) {
+        expect((erro as ErroVizinho).code).toBe('tempo')
+        expect((erro as Error).message).toContain('parou no meio da resposta')
+      }
+    } finally {
+      await s.fechar()
+    }
+  })
+
+  it('fio saudável e LENTO (pingos constantes): o ocioso NÃO dispara', async () => {
+    const s = await servidorFalso((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      let n = 0
+      const timer = setInterval(() => {
+        n += 1
+        if (n > 10) {
+          clearInterval(timer)
+          res.end('data: [DONE]\n\n')
+          return
+        }
+        res.write(`data: {"choices":[{"delta":{"content":"p${n} "}}]}\n\n`)
+      }, 100)
+      res.on('close', () => clearInterval(timer))
+    })
+    try {
+      const resposta = await criarVizinhoReal(alvoDe('openai-chat', s.baseUrl), { ociosoMs: 500, totalMs: 30_000 })([{ papel: 'usuario', conteudo: 'fala' }])
+      expect(resposta.texto).toContain('p1 ')
+      expect(resposta.texto).toContain('p10 ')
+    } finally {
+      await s.fechar()
+    }
+  })
+
+  it('rede absoluta: pingando PARA SEMPRE morre no total (não fica eterno)', async () => {
+    const s = await servidorFalso((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      let n = 0
+      const timer = setInterval(() => {
+        n += 1
+        res.write(`data: {"choices":[{"delta":{"content":"p${n} "}}]}\n\n`)
+      }, 60)
+      const parar = (): void => clearInterval(timer)
+      res.on('close', parar)
+      setTimeout(() => {
+        parar()
+        try { res.end() } catch { /* já abortado */ }
+      }, 3000)
+    })
+    try {
+      try {
+        await criarVizinhoReal(alvoDe('openai-chat', s.baseUrl), { ociosoMs: 5000, totalMs: 700 })([{ papel: 'usuario', conteudo: 'fala' }])
+        throw new Error('deveria ter falhado')
+      } catch (erro) {
+        expect((erro as ErroVizinho).code).toBe('tempo')
+        expect((erro as Error).message).toContain('não terminou em 1 segundo')
+      }
+    } finally {
+      await s.fechar()
+    }
+  })
+})
+
 describe('Vizinho real — erros honestos', () => {
   it('401 vira erro de CHAVE', async () => {
     const s = await servidorFalso((req, res) => {

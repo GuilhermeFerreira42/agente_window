@@ -38,8 +38,9 @@ describe('O loop do agente (rodarAgir)', () => {
       emitir: (e) => eventos.push(e),
     })
     expect(fim).toEqual({ status: 'respondeu', textoFinal: 'Olá, dono!', voltas: 1 })
-    expect(eventos.map((e) => e.type)).toEqual(['chunk', 'done'])
-    expect(eventos[1]).toEqual({ type: 'done', model: 'modelo-teste' })
+    expect(eventos.map((e) => e.type)).toEqual(['volta', 'chunk', 'done'])
+    expect(eventos[0]).toEqual({ type: 'volta', volta: 1, teto: TETO_PADRAO })
+    expect(eventos[2]).toEqual({ type: 'done', model: 'modelo-teste' })
     expect(chamadas).toHaveLength(1)
   })
 
@@ -55,8 +56,8 @@ describe('O loop do agente (rodarAgir)', () => {
       executores: EXECUTORES,
       emitir: (e) => eventos.push(e),
     })
-    expect(eventos.map((e) => e.type)).toEqual(['tool', 'tool_result', 'chunk', 'done'])
-    expect(eventos[1]).toMatchObject({ type: 'tool_result', id: 'p1', ferramenta: 'escrever', ok: true })
+    expect(eventos.map((e) => e.type)).toEqual(['volta', 'tool', 'tool_result', 'volta', 'chunk', 'done'])
+    expect(eventos[2]).toMatchObject({ type: 'tool_result', id: 'p1', ferramenta: 'escrever', ok: true })
     // Na 2.ª volta o modelo vê o eco do que pediu + o resultado da ferramenta:
     const segunda = chamadas[1]
     expect(segunda[segunda.length - 2]).toMatchObject({ papel: 'assistente', pedidos: [{ id: 'p1' }] })
@@ -90,9 +91,9 @@ describe('O loop do agente (rodarAgir)', () => {
         return false
       },
     })
-    expect(eventos.map((e) => e.type)).toEqual(['tool', 'approval', 'tool_result', 'chunk', 'done'])
+    expect(eventos.map((e) => e.type)).toEqual(['volta', 'tool', 'approval', 'tool_result', 'volta', 'chunk', 'done'])
     expect(executou).toBe(0)
-    expect(eventos[2]).toMatchObject({ type: 'tool_result', ok: false })
+    expect(eventos[3]).toMatchObject({ type: 'tool_result', ok: false })
     const segunda = chamadas[1]
     expect(segunda[segunda.length - 1].conteudo).toContain('NÃO EXECUTADO')
     expect(fim.status).toBe('respondeu')
@@ -176,7 +177,7 @@ describe('O loop do agente (rodarAgir)', () => {
     // A retomada viu o eco da ferramenta + o resultado (o MESMO fluxo):
     expect(chamadas2[0].filter((m) => m.papel === 'ferramenta')).toHaveLength(1)
     // (O falso não chama `aoTexto` — `chunk` só existe no vizinho real; aqui o `done` basta.)
-    expect(eventos2.map((e) => e.type)).toEqual(['done'])
+    expect(eventos2.map((e) => e.type)).toEqual(['volta', 'done'])
   })
 
   it('guardião anti-loop: 3 chamadas idênticas seguidas = bloqueio honesto (C4)', async () => {
@@ -216,6 +217,44 @@ describe('O loop do agente (rodarAgir)', () => {
     expect(eventos).toEqual([])
   })
 
+  it('erro TRANSITÓRIO do provedor: evento `error` retomável + diálogo guardado (pós-11)', async () => {
+    let chamadas = 0
+    const eventos: EventoAgir[] = []
+    const fim = await rodarAgir({
+      vizinho: async () => {
+        chamadas += 1
+        if (chamadas === 1) {
+          return { texto: '', pedidos: [{ id: 'p1', ferramenta: 'buscar', argumentos: { padrao: 'x' } }] }
+        }
+        throw Object.assign(new Error('lento'), { code: 'tempo' })
+      },
+      historico: [{ papel: 'usuario', conteudo: 'procura' }],
+      executores: EXECUTORES,
+      teto: 3,
+      emitir: (e) => eventos.push(e),
+    })
+    expect(fim.status).toBe('erro')
+    expect(fim.codigoErro).toBe('tempo')
+    expect(fim.mensagensParaRetomar?.length).toBeGreaterThan(1)
+    expect(eventos.at(-1)).toMatchObject({ type: 'error', code: 'tempo', retomavel: true, voltas: 2, teto: 3 })
+  })
+
+  it('erro DEFINITIVO (chave): sem retomada, sem `retomavel` (pós-11)', async () => {
+    const eventos: EventoAgir[] = []
+    const fim = await rodarAgir({
+      vizinho: async () => {
+        throw Object.assign(new Error('negada'), { code: 'chave' })
+      },
+      historico: [{ papel: 'usuario', conteudo: 'oi' }],
+      executores: EXECUTORES,
+      emitir: (e) => eventos.push(e),
+    })
+    expect(fim.status).toBe('erro')
+    expect(fim.codigoErro).toBe('chave')
+    expect(fim.mensagensParaRetomar).toBeUndefined()
+    expect(eventos.at(-1)).not.toHaveProperty('retomavel')
+  })
+
   it('Parar NO MEIO: a ferramenta seguinte não executa (checa antes de cada execução)', async () => {
     const controle = new AbortController()
     const eventos: EventoAgir[] = []
@@ -243,7 +282,7 @@ describe('O loop do agente (rodarAgir)', () => {
       sinal: controle.signal,
     })
     expect(execucoes).toBe(1)
-    expect(eventos.map((e) => e.type)).toEqual(['tool', 'tool_result'])
+    expect(eventos.map((e) => e.type)).toEqual(['volta', 'tool', 'tool_result', 'volta'])
     expect(fim.status).toBe('interrompido')
   })
 })
