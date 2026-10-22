@@ -365,3 +365,17 @@ Cada coisa tratada no pós-11 e ONDE mora a proteção que impede regressão. "P
 | C6 (`4c8df87`) iterações/Continuar | Continuar funciona; rename validado por tsc + suíte verde (sem trava textual) | `teto_fatia11` T1 + unit base idêntico |
 | C7 (`4321393`) diff re-clicado | A→A→B: diff visível + zero erros fatais | `e2e/diff_sem_travar.spec.ts` 3/3 |
 | Régua geral | 08+09+10+11 sem regressão + specs honestas | 18/18 na ordem canônica + `e2eAssertionContract.test.ts` (anti-trapaça) |
+
+## FATIA 12: travas de regressão (21/10 — homologada D97)
+Onde mora a proteção de cada comportamento da fatia (servidor em `casas/agir/server/` + `e2e/excluir_fatia12.spec.ts`).
+| Comportamento | O que a trava garante | Trava (arquivo real) |
+|---|---|---|
+| `excluir` no catálogo | ferramenta existe, anunciada nos 4 canais, `ehMexida` | `anuncio.test.ts` (6 ferramentas) + `ferramentas.ts` |
+| Lixeira por SO | Windows = Lixeira real (PowerShell, switches oficiais); Linux = XDG com bilhete; resto = erro honesto | `lixeira.test.ts` 12 testes + E2E T1 (lixeira real Linux) |
+| C4 switch + detalhe | sem switch inventado; recusa traz o stderr/stdout do Windows; teto 3 min | `lixeira.ts` (`detalheErroWindows`) + casa 92/92 |
+| RF12-3 sessão nunca cobre | `sessao` p/ excluir = 400; cartão sempre pergunta | `rotas.test.ts` + E2E T3 |
+| Território = pasta ativa | fora (`../`, irmã, outro disco) = recusa honesta, nada some | `territorio.test.ts` 15/15 + E2E T4 |
+| C5 canônico no Windows | dentro com caixa diferente/prefixo UNC/barra inicial NÃO dá "fora" | `territorio.test.ts` (5 testes win32) |
+| Cartão reforçado | sem-desfazer + prévia/contagem do servidor, sem botão de sessão | `CartaoFerramenta` + E2E T1/T5 |
+| Negar | "nada sumiu"; arquivo continua na pasta e fora da lixeira | negação no loop + E2E T2 |
+| Régua geral | 08+09+10+11+12 sem regressão | 23/23 na ordem canônica + `e2eAssertionContract.test.ts` |
