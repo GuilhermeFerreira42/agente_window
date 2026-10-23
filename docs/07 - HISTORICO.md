@@ -2,6 +2,12 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-21 — Micro-fatia PERF DECIDIDA (D98) — antes da 13, SCM+Explorer, miolo autorizado, confirmação antes
+- **Respostas do dono:** Q1=(a) micro-fatia dedicada antes da 13 · Q2=(a) SCM + Explorer juntos · Q3=(a) miolo autorizado dentro do escopo fechado (só no que a confirmação provar necessário; explicação ampla dada — miolo = `core`/`server` do explorer-search, NÃO o `App.tsx`) · Q4=(a) confirmação antes da obra.
+- **Base:** carta do outro chat (`uploads/carta_contexto_chat_arena_bug_desempenho.md`): Git em ms, UI com milhares de linhas DOM = gargalo, Explorer 1k stats, 5k inconclusivo; receita VS Code = virtualizar + limite 10k + cancelar de verdade. Recon neste chat: arquivos existem sob `platform/apps/workbench-v2/src/modules/explorer-search/`; virtualização = zero no projeto (lib nova ou motor à mão).
+- **Registro:** roadmap `06` (PERF entre 12 e 13, sem renumerar) + STATUS da 12 corrigido p/ homologada + `05` D98 + `03` (próximo passo = confirmação Q4a). Pergunta 1 do outro chat respondida: 12 homologada (D97).
+- **Próximo passo:** rodar a confirmação (trace CDP 5k/10k + protótipo virtualizado em fixture, porta 5175 isolada, deps a reinstalar) → SPEC mínima → obra. Conversa do teto-na-Config segue pendente (o dono diz quando).
+
 ## 2026-10-21 — FATIA 12 HOMOLOGADA (D97) — declaração do dono + DEBT-23 anotada (→ FATIA 13)
 - **Palavras dele:** *"a fatia 12 ja esta homologada"* + *"(a) junto da 13"* (destino da dívida de acesso total/YOLO/lixeira-permanente).
 - **Cobre:** FATIA 12 (C1–C5, 21/10: `excluir` → lixeira do SO + cartão reforçado + RF12-3 + território = pasta) + os 2 fixes do teste real (C4 switch PowerShell + detalhe do Windows; C5 território canônico no Windows). Provas: tsc 0 · unit 935✓/12✗ pré/16skip · régua 23/23 · E2E excluir 5/5. Travas de regressão: `09` §nova (tabela F12).

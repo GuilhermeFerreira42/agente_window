@@ -371,10 +371,17 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Critério de aceite:** teto=2 para com "continuar?"; Continuar retoma e conclui; recarregar persiste; tsc 0 + testes verdes.
 
 ### FATIA 12 — DELETE micro (nova, D95 — DEBT-16 decidido)
-> **STATUS (21/10): ✅ IMPLEMENTADA (C1–C3) — AGUARDA HOMOLOGAÇÃO (roteiro no `08`).** Tool `excluir` + lixeira por SO + cartão reforçado + RF12-3. Provas: tsc 0 · unit 929✓/12✗ pré/16skip · E2E 5/5 · régua 23/23.
+> **STATUS (21/10): ✅ HOMOLOGADA (D97).** Tool `excluir` + lixeira por SO + cartão reforçado + RF12-3 + C4 (switch PowerShell) + C5 (território canônico). Provas: tsc 0 · unit 935✓/12✗ pré/16skip · E2E 5/5 · régua 23/23. Registro honesto: retest Windows real dos C4+C5 não confirmado (declaração, padrão D94).
 - **Objetivo:** CRUD completo: excluir arquivo+pasta para a lixeira, sempre com cartão reforçado.
 - **Escopo:** tool `excluir`; cartão reforçado ("sem desfazer direto" + caminho + contagem); território = pasta ativa; "Permitir na Sessão" NÃO cobre excluir.
 - **Critério de aceite:** sem aprovar nada some; aprovado vai p/ lixeira e restaura pelo SO; `../fora` recusa.
+
+### MICRO-FATIA PERF — Desempenho SCM/Explorer em pastas gigantes (nova, D98 — entre a 12 e a 13, sem renumerar)
+> **STATUS (21/10): DECIDIDA (D98) — confirmação antes da obra (Q4a).** Travamento com Git + pasta gigante (vscode-main, 23k arquivos): medição indica UI (milhares de linhas DOM), não o Git. Escopo: SCM + Explorer juntos (Q2a) · miolo `core`/`server` do explorer-search autorizado dentro do escopo fechado (Q3a) · confirmação = trace CDP + protótipo virtualizado em fixture (Q4a). Carta do outro chat em `uploads/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo).
+- **Objetivo:** abrir pasta gigante sem travar: SCM utilizável + Explorer expansível em segundos, não minutos.
+- **Escopo:** confirmar (trace + protótipo) → SPEC mínima → obra (tela livre + miolo só no que a prova exigir) → provas com fixture de milhares de arquivos → homologação do dono.
+- **Critério de aceite:** a definir na SPEC mínima (base: tempos medidos na confirmação + régua 08–12 verde + sem regressão visual).
+- **Não é:** reforma do Explorer/SCM, feature nova, reabertura da 15 (decisão explícita contra).
 
 ### FATIA 13 — Terminal-para-o-agente (nova, D95)
 > **STATUS (20/10): SPEC FECHADA — PARTE 2G (Q&A 100%).** Ferramenta `executar` · shell do app · 2min + "continuar aguardando?" · cauda 20KB · sessão p/ comuns · negação dura. **Risco declarado: sem sandbox real.**
