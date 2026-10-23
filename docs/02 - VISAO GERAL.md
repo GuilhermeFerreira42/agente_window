@@ -19,32 +19,27 @@ O **Agente Window** é construído sob uma proporção clara de fidelidade:
 ## 3. Onde está cada coisa
 | O quê | Onde |
 |---|---|
-| Código do app | `platform/apps/workbench-v2/src/` — `App.tsx` (wiring), `shell/` (Activity Bar, Side Bar, sash, DnD, painel de views), `components/` (AuxiliaryBar = editor anexo, terminal **intocável**, Titlebar, Chat), `modules/explorer-search/` (`core/` e `server/` **intocáveis**; `ui/` montagem), `styles/theme.css` (tokens dark/light), `domain/` (layout/persistência) |
+| Código do app | `platform/apps/workbench-v2/src/` — `App.tsx` (wiring), `shell/` (Activity Bar, Side Bar, sash, DnD, painel de views), `components/` (AuxiliaryBar = editor anexo, terminal **intocável**, Titlebar, Chat), `modules/explorer-search/` (`core/` e `server/` **congelados (exceção vigente: micro-fatia PERF no escopo D98 — ver `05`)**; `ui/` montagem), `styles/theme.css` (tokens dark/light), `domain/` (layout/persistência) |
 | Serviço PTY | `platform/services/pty-server/` (**intocável**) |
 | Testes | `src/__tests__/` (Vitest) · `e2e/sessao_*.spec.ts` (Playwright) · `run-antiregressao.sh` (bateria com reseed) |
 | Documentação ativa | `docs/01…09` (este conjunto canônico) |
 | Matriz de Dívidas Técnicas | `docs/06 - PROXIMAS FASES E DIVIDAS.md` |
 | Raspagens, auditorias e pesquisa | `docs/arquivo_morto/engenharia_reversa/` e `docs/arquivo_morto/pesquisa_bruta/` (card de permissões, provedores estilo Cline, streaming/input, mockup raspado da Agents Window). A antiga `referencias_visuais/` foi removida na limpeza de 2026-10-12 (recuperável no histórico do Git) |
 | Carta de contexto para IA colaboradora | Fora do repositório (D67) — entregue pelo dono; contém o índice curado do `arquivo_morto` com a regra "história ≠ norma" |
+| Notas de alinhamento (fora do repo) | `/home/user/registro_alinhamento/` — ex.: nota DEBT-23 p/ a FATIA 13 (21/10). Movida de `uploads/` em 21/10 a pedido do dono |
+| Stubs E2E + carta PERF (fora do repo) | `/home/user/uploads/`: `stub_provider.cjs` (4599) + `stub_agir.cjs` (4610) — sem eles não há régua E2E — e `carta_contexto_chat_arena_bug_desempenho.md` (investigação-base da micro-fatia PERF) |
 | Docs antigos (referência, não autoridade) | `docs/arquivo_morto/` |
 
-## 4. Fatias do projeto (Roadmap canônico Spec-Driven — **renumerado pela D64 em 2026-10-13**)
+## 4. Fatias do projeto (Roadmap canônico Spec-Driven — **renumeração vigente: D95 de 2026-10-19** (antes D64) — detalhe no `06` Parte 3)
 - **01 Fundação:** setup do monorepo, Vite, single port.
 - **02 Shell base:** casca da aplicação, Titlebar, Statusbar.
 - **03 Terminal PTY real:** PTY e xterm integrados.
 - **04 Motor:** Explorer, Search, SCM e Monaco Editor anexo.
 - **05 Chassis-Right:** Activity Bar e Side Bar à direita, DnD de views, Outline/Timeline, maximizar editor (100 % homologada).
 - **06 Workspace & Chat base:** persistência, Empty State 768 px, base de sessões (implementada).
-- **07 Destravar:** DEBT-06 + DEBT-04 + DEBT-09 (era a parte estrutural da 6.1) — **✅ HOMOLOGADA em 15/10**; SPEC no `06` Parte 2.
-- **08 Conectar:** Provedores estilo Cline — chave, modelos, teste de conexão (era a antiga 09; absorve DEBT-10) — **✅ HOMOLOGADA em 17/10 (D89)**.
-- **09 Conversar:** chat real ligado aos provedores + streaming (era a antiga 10) — substitui o mock do `App.tsx` — **fase ativa**.
-- **10 Agir:** ferramentas + card de permissão **[Permitir] / [Negar] / [Permitir na Sessão]** (era a antiga 11) — **o MVP fecha aqui (D65)**.
-- **11 Conferir:** Motor de Edição/File Ops + SCM/Diff real (eram as antigas 07 + 08) — **abre por DEBT-12: janela única de abas (D90)**.
-- **12 Terminal 2.0:** aparência e comportamentos do terminal, Ctrl+C/V, arrastar arquivo (absorve DEBT-01/02/03).
-- **13 Refinamentos:** recentes, picker nativo, pesquisa/centro de comando (DEBT-11), acabamentos do Explorer/Pesquisa, Trilha de Navegação clicável (D2.23) (era a ideia da "6.2").
-- **14 Painéis Avançados:** arrastar terminal entre painel inferior e lateral, splits (era a antiga 12).
-- **15 Sessões Isoladas:** worktree opcional por sessão (era a antiga 13).
-- **16 Polimento Final:** Activity Bar (topo/lado), Command Palette, temas, atalhos, paridade 90 % (era a antiga 14).
+- **07 Destravar** ✅ 15/10 · **08 Conectar** ✅ 17/10 (D89) · **09 Conversar** ✅ 18/10 (D92) · **10 Agir** ✅ 19/10 (D94) — **MVP FECHADO** · **11 Teto+Continuar+Config** ✅ 21/10 (D96) · **12 DELETE-micro** ✅ 21/10 (D97).
+- **PERF (micro, D98)** — desempenho SCM/Explorer em pastas gigantes — entre a 12 e a 13, sem renumerar. Status: decidida 21/10; próximo passo = confirmação.
+- **13 Terminal-para-o-agente** (SPEC 2G fechada + DEBT-23 desenhada junto) · **14 Barra+Personalizações+skills** (SPEC 2H) · **15 Janela única de abas** (SPEC 2I, abre por DEBT-12) · **16 Terminal 2.0 visual** · **17 Refinamentos** · **18–20** (painéis, sessões isoladas, navegador/polimento).
 
 > Tabela de conversão antigo→novo e o detalhe de cada fatia: `06 - PROXIMAS FASES E DIVIDAS.md` (Partes 2 e 3).
 

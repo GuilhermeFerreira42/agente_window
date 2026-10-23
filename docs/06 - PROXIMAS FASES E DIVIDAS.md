@@ -384,7 +384,7 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Não é:** reforma do Explorer/SCM, feature nova, reabertura da 15 (decisão explícita contra).
 
 ### FATIA 13 — Terminal-para-o-agente (nova, D95)
-> **STATUS (20/10): SPEC FECHADA — PARTE 2G (Q&A 100%).** Ferramenta `executar` · shell do app · 2min + "continuar aguardando?" · cauda 20KB · sessão p/ comuns · negação dura. **Risco declarado: sem sandbox real.**
+> **STATUS (20/10): SPEC FECHADA — PARTE 2G (Q&A 100%).** Ferramenta `executar` · shell do app · 2min + "continuar aguardando?" · cauda 20KB · sessão p/ comuns · negação dura. **Risco declarado: sem sandbox real.** **+ DEBT-23 (21/10, D97):** acesso total + lixeira/permanente + YOLO — desenho junto na abertura (SPEC nova; a 2G não cobre; nota em `registro_alinhamento/`).
 - **Objetivo:** o agente executa comandos (instalar, compilar, testar) — um cartão por comando.
 - **Escopo:** one-shot com cwd = pasta ativa; cartão tipo-comando; Parar mata o processo; nada de terminal visual (é a 16).
 - **Critério de aceite:** `echo` aprovado roda; `rm -rf` com sessão pergunta igual; 2min pergunta; saída gigante = 20KB + "cortada".

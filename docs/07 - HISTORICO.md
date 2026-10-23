@@ -2,6 +2,11 @@
 
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
 
+## 2026-10-21 — Handoff: canônicos auditados p/ outra IA assumir (pedido do dono, sem código)
+- **Objetivo:** qualquer IA que pegar o workspace saber o que aconteceu, o que está pronto e os próximos passos. Nenhuma linha de código tocada.
+- **Corrigido:** `01` §5 (dizia 11 pendente → 11+12 homologadas + PERF) + faixa D1–D98 + exceções D98 no perímetro (§E) e intocáveis (§F) · `02` §4 (roadmap pré-D95 → pós-D95) + §3 (mapa externo `registro_alinhamento/`+`uploads/`) · `03` (placar 935✓/23/23, provado até a 12, canônica +12, foco = PERF) · `04` §2.1 (nota pré-D95 na ordem de migração) · `06` (STATUS 13 + DEBT-23) · `09` §3.7 (título +12) + §3.8 nova (receita da confirmação PERF) · `README` (estado 21/10, baseline 935, D98, roadmap 07–20).
+- **Regra dos 9 mantida:** nenhum canônico criado; externos seguem fora do repo (carta PERF em `uploads/`, nota DEBT-23 em `registro_alinhamento/`).
+
 ## 2026-10-21 — Micro-fatia PERF DECIDIDA (D98) — antes da 13, SCM+Explorer, miolo autorizado, confirmação antes
 - **Respostas do dono:** Q1=(a) micro-fatia dedicada antes da 13 · Q2=(a) SCM + Explorer juntos · Q3=(a) miolo autorizado dentro do escopo fechado (só no que a confirmação provar necessário; explicação ampla dada — miolo = `core`/`server` do explorer-search, NÃO o `App.tsx`) · Q4=(a) confirmação antes da obra.
 - **Base:** carta do outro chat (`uploads/carta_contexto_chat_arena_bug_desempenho.md`): Git em ms, UI com milhares de linhas DOM = gargalo, Explorer 1k stats, 5k inconclusivo; receita VS Code = virtualizar + limite 10k + cancelar de verdade. Recon neste chat: arquivos existem sob `platform/apps/workbench-v2/src/modules/explorer-search/`; virtualização = zero no projeto (lib nova ou motor à mão).

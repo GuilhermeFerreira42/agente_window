@@ -65,7 +65,7 @@ A dependência desce nesta ordem:
 - **`App.tsx` — 2.247 linhas** — é a "cola" central do sistema: 22 imports de `domain/`, 12 de `components/`, 5 de `shell/`; contém, por exemplo, a **sincronização sessão → terminal** (`fetch('/api/pty/cwd')`). Hoje, mexer nessa sincronização toca o mesmo arquivo que mexe em sessões/chat.
 - Chat/sessões, provedores e editor ainda vivem em **pastas por tipo** (`components/`, `domain/`, `server/`), não como módulos com contrato/fronteira próprios.
 
-**Rumo DECIDIDO (2026-10-14 — D68/D69/D70, detalhe na §2.2):** espalhar a receita do explorer-search (contrato + barrel + teste de fronteira) aos próximos módulos e encolher o `App.tsx` até a **composição fina (~200 linhas)**. A ordem é a das próprias fatias: **Provedores (08) → Chat (09) → Agente (10, novo) → Editor + Personalizações (11) → Terminal (12 — endereço congelado, exige ordem) → Sessões + Command Center + Navegador (13)**. **Nada foi alterado no código.**
+**Rumo DECIDIDO (2026-10-14 — D68/D69/D70, detalhe na §2.2):** espalhar a receita do explorer-search (contrato + barrel + teste de fronteira) aos próximos módulos e encolher o `App.tsx` até a **composição fina (~200 linhas)**. A ordem é a das próprias fatias: **Provedores (08) → Chat (09) → Agente (10, novo) → Editor + Personalizações (11) → Terminal (12 — endereço congelado, exige ordem) → Sessões + Command Center + Navegador (13)** (**numeração de 14/10, pré-D95** — mapa vigente no `06` Parte 3). **Nada foi alterado no código.**
 
 ## 2.2 Arquitetura oficial — Monolito Modular ("Condomínio") — D68/D69/D70 (2026-10-14)
 

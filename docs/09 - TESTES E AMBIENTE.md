@@ -154,12 +154,20 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 3. **Persistência atrasada:** depois do Enter na landing, esperar **~2,5–3 s** antes de fechar o navegador, senão o `PUT /api/sessions` **não sai** e o banco fica vazio. Com sessões já existentes, abrir a landing exige clicar em **"Nova sessão"** (`landingVisible = newSessionLanding || !hasSessions`).
 4. **Banco:** `~/.agente_window/agente_window.db` (tabela `sessions`); conferir com `GET /api/sessions`; limpar com `DELETE /api/sessions/<id>?force=true`. **Cuidado:** `sessao_09 T3` apaga uma sessão no meio da rodada — re-semear entre lotes.
 
-### 3.7 Régua pós-MVP — 08→09→10→11 em série (receita 20/10, FATIA 11 C3)
+### 3.7 Régua pós-MVP — 08→09→10→11→12 em série (receita 20/10, +12 em 21/10 C2)
 - **Browsers:** `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/browsers` (já vem com chromium) — `npx playwright install` FALHA (lock sem permissão) e não é preciso.
 - **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3+12** — 10/11/12; v3 tem `TETO_INFINITO`, a 12 somou os cenários `EXCLUIR_*`).
 - **Vite:** `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json AGENTE_WINDOW_SETTINGS_PATH=/tmp/f11-e2e-settings.json npm run dev -- --host 0.0.0.0 --port 5174` (a 08 **amarra** o caminho `/tmp/prov-fixture/providers.json` — outro caminho = 6 fails no beforeEach; `mkdir -p /tmp/prov-fixture` antes).
 - **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11` → `excluir_fatia12`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 + 5/5 = 23/23**.
 - **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`.db` + memória do Vite + `*.jsonl`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*`/`EXCLUIR-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409 workspace), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado). **NUNCA zerar o banco** (`resetApp` exige ≥1 `.session-row` — banco zerado = falha em massa) e **NUNCA semear via `PUT /api/sessions`** (corpo mínimo quebra o boot da UI) — seed só pela UI (§3.6).
+
+### 3.8 Micro-fatia PERF — receita da confirmação (Q4a, D98 — ainda NÃO executada)
+- **Base:** `uploads/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo) + D98 (`05`) + roadmap (`06`, PERF entre 12 e 13). Alvos no código: `platform/apps/workbench-v2/src/modules/explorer-search/` — tela livre (`ui/`); miolo autorizado SÓ no escopo (`core/`, `server/`).
+- **Ambiente:** Vite de teste na **5175 isolada** (nunca 5174); fixtures descartáveis em `/tmp` (repo Git de mentira com N arquivos untracked); entre turnos reinstalar (`npm ci` + `PLAYWRIGHT_BROWSERS_PATH=...` + chromium).
+- **Passo 1 — trace:** abrir 5k/10k mudanças no SCM com trace CDP; correlacionar fim do `/git/status` × tarefas longas × commits React × nós DOM. Esperado (outro chat): `/git/status` em ms, UI em segundos.
+- **Passo 2 — protótipo:** lista virtualizada TEMPORÁRIA (fora do código real) sobre a mesma fixture, Git/API constantes; mede o ganho isolado da UI. Se bastar → obra pode ser só-visual (miolo nem abre).
+- **Passo 3 — Explorer:** repetir 1k/5k filhos com logging progressivo de `list`/`stat` (o 5k anterior foi inconclusivo).
+- **Proibido:** rodar contra a 5174 com arquivos reais; concluir obra antes da SPEC mínima aprovada pelo dono.
 
 ---
 
