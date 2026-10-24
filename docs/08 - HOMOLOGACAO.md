@@ -1,7 +1,8 @@
 # 08 - HOMOLOGACAO (do humano)
 
 > **Para você, não para a IA.** Aqui não entra comando de terminal nem detalhe de teste — isso é o `09`. Parte A = o que cada fatia precisa provar (antigo `07`). Parte B = quando uma entrega está "pronta" (antigo `08`).
-> Regra de sempre: **homologação = você no Windows real (5174), com prints/vídeo**. Teste verde da IA não homologa.
+> Regra de sempre: **homologação funcional = você no Windows real (5174), com prints/vídeo**. Teste verde da IA não homologa.
+> **D91/D99:** uma validação real de provedor sem ambiente/acesso/autorização seguros será registrada como bloqueada/não executada; isso não substitui nem transfere sua responsabilidade de homologação funcional. Regras operacionais e de credenciais ficam no `09`.
 
 ## Como homologar uma fatia em 5 passos
 1. Peça o servidor 5174 de pé e abra no Windows.

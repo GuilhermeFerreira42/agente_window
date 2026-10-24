@@ -32,7 +32,7 @@ agente_window/
     ├── 02 - VISAO GERAL.md               ← o que é o projeto, stack, onde está cada coisa (curto)
     ├── 03 - ESTADO ATUAL.md              ← onde a obra parou: HEAD, placar, pendências, próximo passo
     ├── 04 - ARQUITETURA E REGRAS DURAS.md← como é construído + o que é intocável (terminal, core/server, App.tsx)
-    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D98… — a lista cresce; ver o fim do arquivo) — não reabrir
+    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D99… — a lista cresce; ver o fim do arquivo) — não reabrir
     ├── 06 - PROXIMAS FASES E DIVIDAS.md  ← próximas subfatias/fatias, dívidas e decisões ainda a deliberar
     ├── 07 - HISTORICO.md                 ← changelog + diário de sessão (único lugar de histórico)
     ├── 08 - HOMOLOGACAO.md               ← DO HUMANO: o que cada fatia prova e quando está "pronto" (curto, sem comando)
@@ -102,12 +102,12 @@ agente_window/
 ## E. Git
 - Commit **a cada grupo funcional atômico**, só com typecheck 0 + testes verdes. Exige `git -c user.name="Arena Agent" -c user.email="agent@arena.local" commit …`.
 - Passos de "só documentação" não geram commit **salvo ordem** do usuário.
-- Conferir perímetro antes de commitar: `git diff --name-only` **não** pode listar `modules/explorer-search/{core,server}/**` (exceção vigente: micro-fatia PERF no escopo D98 — ver `05`), `EditorArea.tsx` (até 5.7), `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, `components/terminal/**`, specs `sessao_11*`.
+- Conferir perímetro antes de commitar: `git diff --name-only` **não** pode listar `modules/explorer-search/{core,server}/**` (exceção D98 limitada à investigação autorizada após validação documental; mudança permanente exige SPEC e aprovação — ver `05`), `EditorArea.tsx` (até 5.7), `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, `components/terminal/**`, specs `sessao_11*`.
 - Não commitar utilitários temporários (`shot.tmp.mjs`), `test-results/`, prints fora de `auditoria_*/`.
 
 ## F. Escopo e arquitetura
 - Princípio **LEGO**: módulos prontos são **reposicionados**, não reescritos.
-- **Intocáveis:** Terminal homologado (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server`), contratos congelados (`docs/04 - ARQUITETURA E REGRAS DURAS.md`), `modules/explorer-search/{core,server}/**` (exceção vigente: PERF/D98), `EditorArea.tsx` (até 5.7).
+- **Intocáveis:** Terminal homologado (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server`), contratos congelados (`docs/04 - ARQUITETURA E REGRAS DURAS.md`), `modules/explorer-search/{core,server}/**` (D98 autoriza apenas investigação técnica após validação documental; qualquer mudança permanente exige SPEC e aprovação), `EditorArea.tsx` (até 5.7).
 - `App.tsx` só **wiring aditivo** via barrel único (`src/shell/index.ts` e `modules/explorer-search/index.ts`); `index.ts`/`contract.ts` do módulo **apenas aditivos**; `ui/**` só montagem; **módulo nunca importa do shell**. *Diagnóstico de acoplamento e rumo de modularização (2026-10-13): `04 §2.1`.*
 - `.env` não existe e não deve existir; npm (não pnpm/yarn); rodar E2E com `npx playwright test` (não há script `npm run e2e`).
 - **Inglês só em peças novas/migradas**. Nada existente é traduzido.
@@ -133,4 +133,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-FATIA-05 "Chassis-Right" **100 % homologada** · Fatia 06 homologada · **fases renumeradas e reordenadas em 2026-10-13 (D63–D67)** · **FATIA 07 homologada (15/10) e FATIA 08 homologada (17/10, D89)** · **FATIA 09 — Conversar: HOMOLOGADA em 18/10 (D92) · FATIA 10 — Agir: HOMOLOGADA em 19/10 (D94) — MVP FECHADO; SPECs 11–15 FECHADAS (Q&A 100% 20/10) —  **FATIA 11 ✅ HOMOLOGADA 21/10 (D96) · FATIA 12 ✅ HOMOLOGADA 21/10 (D97) · micro-fatia PERF DECIDIDA (D98, antes da 13 — próximo passo: confirmação)** · histórico da renumeração: **fase que era ativa em 13/10 = FATIA 07 — Destravar** (SPEC pronta na Parte 2 do `06`), seguida por **08 Conectar → 09 Conversar → 10 Agir, onde o MVP fecha (D65)**; refinamentos foram para a FATIA 17 (pós-D95; era 13). Referência oficial de fidelidade: **"Agents Window" do VS Code** (D66; régua code-server 8080).
+FATIA-05 "Chassis-Right" **100 % homologada** · Fatia 06 homologada · **fases renumeradas e reordenadas em 2026-10-13 (D63–D67)** · **FATIA 07 homologada (15/10) e FATIA 08 homologada (17/10, D89)** · **FATIA 09 — Conversar: HOMOLOGADA em 18/10 (D92) · FATIA 10 — Agir: HOMOLOGADA em 19/10 (D94) — MVP FECHADO; SPECs 11–15 FECHADAS (Q&A 100% 20/10) —  **FATIA 11 ✅ HOMOLOGADA 21/10 (D96) · FATIA 12 ✅ HOMOLOGADA 21/10 (D97) · D98 entre as fatias 12 e 13 — confirmação técnica autorizada em princípio, mas aguarda validação do pacote documental; Central de Diagnósticos futura aprovada (SPEC pendente); planejamento inicial M1–M4 aprovado sem implementação nem numeração oficial, M5–M8 ficam para depois** · histórico da renumeração: **fase que era ativa em 13/10 = FATIA 07 — Destravar** (SPEC pronta na Parte 2 do `06`), seguida por **08 Conectar → 09 Conversar → 10 Agir, onde o MVP fecha (D65)**; refinamentos foram para a FATIA 17 (pós-D95; era 13). Referência oficial de fidelidade: **"Agents Window" do VS Code** (D66; régua code-server 8080).

@@ -3,7 +3,7 @@
 > **Leia a §1 antes de rodar qualquer spec.** Specs de fixture (`12*`, `13*`, `14*` menos `14b_git_smoke`) **só na 5175**; na 5174 elas apagam arquivos reais do repo. Um Vite por vez (RAM). Reseed antes de cada spec de fixture.
 
 
-**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-12 (acrescentada a §11 — análise de vídeos do usuário) · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `a65a246` (Fatia 06 consolidada). Placar focado atual: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspaces 7/7; providers 2/2; App 46 pass / 13 skip. Placar global histórico: 722 pass / 9 falhas P4 preexistentes / 16 skip.
+**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-23 (D99: D91/D98, responsabilidade de testes e gate documental; preserva histórico anterior) · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest) · **Válido para HEAD** `a65a246` (Fatia 06 consolidada). Placar focado atual: typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspaces 7/7; providers 2/2; App 46 pass / 13 skip. Placar global histórico: 722 pass / 9 falhas P4 preexistentes / 16 skip. **Nota D99 (23/10):** os placares e HEADs citados abaixo são registros históricos de suas datas; não foram rerodados nesta consolidação documental.
 **Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
 
 ---
@@ -161,13 +161,21 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11` → `excluir_fatia12`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 + 5/5 = 23/23**.
 - **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`.db` + memória do Vite + `*.jsonl`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*`/`EXCLUIR-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409 workspace), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado). **NUNCA zerar o banco** (`resetApp` exige ≥1 `.session-row` — banco zerado = falha em massa) e **NUNCA semear via `PUT /api/sessions`** (corpo mínimo quebra o boot da UI) — seed só pela UI (§3.6).
 
-### 3.8 Micro-fatia PERF — receita da confirmação (Q4a, D98 — ainda NÃO executada)
-- **Base:** `uploads/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo) + D98 (`05`) + roadmap (`06`, PERF entre 12 e 13). Alvos no código: `platform/apps/workbench-v2/src/modules/explorer-search/` — tela livre (`ui/`); miolo autorizado SÓ no escopo (`core/`, `server/`).
-- **Ambiente:** Vite de teste na **5175 isolada** (nunca 5174); fixtures descartáveis em `/tmp` (repo Git de mentira com N arquivos untracked); entre turnos reinstalar (`npm ci` + `PLAYWRIGHT_BROWSERS_PATH=...` + chromium).
-- **Passo 1 — trace:** abrir 5k/10k mudanças no SCM com trace CDP; correlacionar fim do `/git/status` × tarefas longas × commits React × nós DOM. Esperado (outro chat): `/git/status` em ms, UI em segundos.
-- **Passo 2 — protótipo:** lista virtualizada TEMPORÁRIA (fora do código real) sobre a mesma fixture, Git/API constantes; mede o ganho isolado da UI. Se bastar → obra pode ser só-visual (miolo nem abre).
-- **Passo 3 — Explorer:** repetir 1k/5k filhos com logging progressivo de `list`/`stat` (o 5k anterior foi inconclusivo).
-- **Proibido:** rodar contra a 5174 com arquivos reais; concluir obra antes da SPEC mínima aprovada pelo dono.
+### 3.8 D98/PERF — protocolo da confirmação técnica (autorizado, mas aguarda validação documental)
+- **Gate atual (D99):** não iniciar trace, benchmark nem protótipo até o dono validar a consolidação documental. Nenhuma confirmação D98 foi executada nesta etapa.
+- **Base:** D98 (`05`) + roadmap (`06`, entre 12 e 13, sem renumeração) + carta em `/home/user/notas_temporarias/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo). Alvos a investigar: `platform/apps/workbench-v2/src/modules/explorer-search/`; superfície/UI e, apenas no escopo autorizado, `core/`/`server/`.
+- **Ambiente isolado após validação:** Vite de teste na **5175** (nunca 5174); fixtures descartáveis em `/tmp` (repo Git fictício com N arquivos untracked); entre turnos reinstalar (`npm ci` + `PLAYWRIGHT_BROWSERS_PATH=...` + chromium). Nenhum dado real do usuário deve ser alterado.
+- **Passo 1 — trace:** depois do gate, medir SCM com 5k/10k alterações e correlacionar tempo de `/git/status`, tarefas longas, commits React e elementos DOM/renderizados. Alegação de que Git é rápido e UI é gargalo é hipótese da carta, não fato confirmado.
+- **Passo 2 — protótipo:** lista virtualizada TEMPORÁRIA, fora do código de produção, sobre a mesma fixture e com Git/API constantes; medir ganho isolado da UI. Não promover protótipo a produção.
+- **Passo 3 — Explorer:** medir 1k/5k filhos com logging progressivo de `list`/`stat`; o 5k anterior foi inconclusivo.
+- **Métricas para fundamentar a SPEC:** tempo até interface utilizável; execução de tarefas longas; número de elementos renderizados; grandes volumes; tempos e gargalos separados de Git e filesystem. Propor limites quantitativos só após obter baseline comparativo e então aguardar aprovação do dono.
+- **Proibido:** rodar contra 5174 com arquivos reais; alterar produção antes de SPEC mínima aprovada; declarar hipótese como causa provada.
+
+### 3.9 Responsabilidade e segurança dos testes com provedores reais (D91, opção C; reafirmado D99)
+- Arena executa testes técnicos automatizados: unitários, integração, E2E, regressão e benchmarks.
+- Um provedor real só pode ser validado com ambiente legítimo, acesso seguro e autorização. Nunca solicitar, registrar ou expor chaves/credenciais em conversa, código, documentos ou logs.
+- Se o ambiente/acesso/autorização não estiver disponível, registrar o teste real como **bloqueado/não executado**; não substituir por um stub e chamá-lo de teste real.
+- Testes automatizados e validação de integração não substituem a **homologação funcional do dono** (`08`).
 
 ---
 
@@ -321,7 +329,7 @@ Pacote de produção de podcast (orquestrador → escritor → atomizador/valida
 
 **Contrato anti-trapaça:** a spec nova nasceu com asserções e na convenção exigida — `e2eAssertionContract.test.ts` **verde** (na 1.ª tentativa ele reprovou por indentação; corrigido e virou lição para specs futuras).
 **Evidências:** `/home/user/validacao_fatia08/` (prints `f08_T*.png` + `e2e_saida.txt`) — pasta **externa** ao repositório.
-**Limitação registrada (honesta):** a prova automatizada usa **serviço simulado**; a validação com **provedor real** é o roteiro do dono (`08` PARTE C). A migração do v1 real só será exercitada no primeiro uso do dono (o sandbox não tem o arquivo dele).
+**Limitação registrada (honesta):** a prova automatizada usa **serviço simulado**; a validação com **provedor real** é o roteiro do dono (`08` PARTE C). A migração do v1 real só será exercitada no primeiro uso do dono (o sandbox não tem o arquivo dele). **Nota D99:** este registro descreve a prova da FATIA 08 e a homologação funcional feitas à época; a responsabilidade vigente por testes técnicos com provedores reais está em `§3.9`.
 
 ### 13.2 Validação do dono com serviço REAL (15/10, via vídeo analisado em 16/10)
 Duas IAs independentes (transcrição Whisper + frames + IA com visão de vídeo) convergiram sobre a gravação do dono:

@@ -35,6 +35,16 @@
 - **Limpeza de buffer do Terminal (DEBT-01):** Execução de `clear`/`cls` no PTY deve disparar limpeza completa do viewport do xterm sem deixar resíduos visuais no topo.
 - **Purga de componentes legados (DEBT-04):** Baniu-se qualquer montagem ou referência ao visualizador antigo; todas as telas auxiliares usam a infraestrutura do editor moderno.
 
+## 1.4 Diretrizes aprovadas para SPECs futuras (D99, 2026-10-23)
+
+Estas diretrizes registram decisões de produto, **não** escolhem implementação. Cada capacidade permanente requer SPEC própria e aprovação antes de produção.
+
+- **Central de Diagnósticos:** futura capacidade permanente aprovada; registrar falhas/eventos relevantes, notificar discretamente só problemas importantes, manter eventos comuns silenciosos, deduplicar/agregar e permitir exportação sanitizada. Armazenamento, interface, retenção, arquitetura e política detalhada de privacidade ficam para SPEC própria. Não presumir envio externo.
+- **M1–M4 (primeiro conjunto de planejamento, sem numeração oficial):** M1 medir/orçar contexto; M2 transcript estruturado; M3 checkpoints/compactação; M4 busca manual no histórico. M5–M8 só entram em planejamento posterior. Nada aqui autoriza implementação.
+- **Privacidade para memória/contexto:** armazenamento local preferencialmente em `~/.agente_window`; isolamento entre projetos e conversas; transcript original preservado; aprovação humana para gravar memória persistente de projeto; exportação e exclusão explícitas; proteger credenciais e dados sensíveis; nenhuma telemetria externa presumida; não reexecutar ferramentas interrompidas. Retenção e limpeza detalhadas exigem SPEC.
+- **Medição honesta de contexto:** preferir `usage` real do provedor; sem isso, estimativa claramente identificada ou estado indisponível. Limites por modelo/provedor, configuráveis manualmente e com origem indicada; alertas em 75% e 90%.
+- **D98/PERF:** autorização somente para investigação técnica após validação deste pacote documental. Fixture/protótipo isolado e trace são experimentais; não alteram produção. Qualquer mudança permanente exige SPEC, critérios quantitativos derivados das medições e aprovação explícita.
+
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |
 |---|---|---|---|

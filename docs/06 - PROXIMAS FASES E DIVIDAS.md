@@ -4,7 +4,9 @@
 > - **Regra de ouro:** Todo débito técnico e todo o roadmap do projeto vivem estritamente aqui (não criar arquivos separados como `TECHNICAL_DEBT.md` ou `ROADMAP.md`).
 > - **Princípio de bloqueio:** Nenhuma fatia nova é iniciada enquanto existirem dívidas bloqueantes da fatia anterior. **Flexibilizado conscientemente pela D63/D64** para os itens de *refinamento* (foram para a FATIA 17 (pós-D95; era 13), fora do caminho crítico do MVP).
 > - **Régua de medição:** 90 % do produto é réplica fiel da **"Agents Window" do VS Code** (**D66**, 2026-10-13 — régua: code-server 8080 / VS Code real); 10 % é customizado (chassi direito com terminal + tela de Provedores estilo **Cline**).
-> - **Atualizado:** 2026-10-14 — **arquitetura oficial "Condomínio" (D68/D69/D70)**: cada fatia agora tem a coluna **Casas** (função + o que muda de endereço; detalhe no `04 §2.2`); decisões **D68–D75** no `docs/05`; material novo do **OpenClaude / VS Code 1.135** (Parte 3); faxina de testes em **2 ondas** (D74). *(Reordenação e renumeração D63–D67: 13/10.)*
+> - **Atualizado:** 2026-10-23 — **consolidação D99**: confirma D98 aguardando validação documental; registra Central de Diagnósticos futura e M1–M4 como planejamento não numerado; análise estática das dependências M1–M4 com Fatias 13–15 sem alterar ordem nem numeração. Mantém histórico da arquitetura D68–D75 e da renumeração D63–D67.
+
+> **Nota de vigência — D91 revisada pela D99 (2026-10-23):** Arena responde pelos testes técnicos automatizados e deve também realizar testes técnicos com provedores reais quando houver acesso legítimo, ambiente seguro e autorização. Se não for possível, registrar explicitamente como bloqueado/não executado. Stubs servem para testes controlados, mas **não comprovam funcionamento com provedores reais**. A homologação funcional do aplicativo permanece com o usuário. Menções abaixo a “validação real pelo dono” preservam o plano/histórico anterior à D99 e não substituem esta regra vigente.
 
 ---
 
@@ -377,14 +379,14 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Critério de aceite:** sem aprovar nada some; aprovado vai p/ lixeira e restaura pelo SO; `../fora` recusa.
 
 ### MICRO-FATIA PERF — Desempenho SCM/Explorer em pastas gigantes (nova, D98 — entre a 12 e a 13, sem renumerar)
-> **STATUS (21/10): DECIDIDA (D98) — confirmação antes da obra (Q4a).** Travamento com Git + pasta gigante (vscode-main, 23k arquivos): medição indica UI (milhares de linhas DOM), não o Git. Escopo: SCM + Explorer juntos (Q2a) · miolo `core`/`server` do explorer-search autorizado dentro do escopo fechado (Q3a) · confirmação = trace CDP + protótipo virtualizado em fixture (Q4a). Carta do outro chat em `uploads/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo).
-- **Objetivo:** abrir pasta gigante sem travar: SCM utilizável + Explorer expansível em segundos, não minutos.
-- **Escopo:** confirmar (trace + protótipo) → SPEC mínima → obra (tela livre + miolo só no que a prova exigir) → provas com fixture de milhares de arquivos → homologação do dono.
-- **Critério de aceite:** a definir na SPEC mínima (base: tempos medidos na confirmação + régua 08–12 verde + sem regressão visual).
-- **Não é:** reforma do Explorer/SCM, feature nova, reabertura da 15 (decisão explícita contra).
+> **STATUS (D99, 23/10): confirmação autorizada em princípio, mas BLOQUEADA até o dono validar esta consolidação documental.** Travamento com Git + pasta gigante (vscode-main, 23k arquivos): causa ainda é hipótese a confirmar, não diagnóstico independente. Escopo autorizado: SCM + Explorer juntos; investigação com trace CDP e fixture/protótipo isolado. Miolo `core`/`server` só poderá ser avaliado dentro do escopo fechado, sem alteração permanente antes de SPEC e aprovação. Carta-base fora do repo: `/home/user/notas_temporarias/carta_contexto_chat_arena_bug_desempenho.md`.
+- **Objetivo:** medir abertura e uso de pastas grandes sem travamento: SCM utilizável + Explorer expansível, com gargalos separados por causa.
+- **Próximo passo:** aguardar validação do pacote documental; então executar confirmação técnica isolada, registrar medições, derivar critérios quantitativos para SPEC mínima e aguardar aprovação. Nenhum teste/trace/protótipo D98 foi executado nesta etapa.
+- **Métricas a apurar para a SPEC:** tempo até interface utilizável; tarefas longas; elementos efetivamente renderizados; desempenho com grandes volumes; gargalos de Git e filesystem. Quantitativos só após medição; homologação funcional do dono.
+- **Não é:** implementação agora, reforma geral do Explorer/SCM, feature adicional ou reabertura da 15. Não renumera fatias.
 
 ### FATIA 13 — Terminal-para-o-agente (nova, D95)
-> **STATUS (20/10): SPEC FECHADA — PARTE 2G (Q&A 100%).** Ferramenta `executar` · shell do app · 2min + "continuar aguardando?" · cauda 20KB · sessão p/ comuns · negação dura. **Risco declarado: sem sandbox real.** **+ DEBT-23 (21/10, D97):** acesso total + lixeira/permanente + YOLO — desenho junto na abertura (SPEC nova; a 2G não cobre; nota em `registro_alinhamento/`).
+> **STATUS (20/10): SPEC FECHADA — PARTE 2G (Q&A 100%).** Ferramenta `executar` · shell do app · 2min + "continuar aguardando?" · cauda 20KB · sessão p/ comuns · negação dura. **Risco declarado: sem sandbox real.** **DEBT-23 (21/10, D97; reafirmada em D99):** acesso total + lixeira/permanente + YOLO. Na abertura da FATIA 13, exigir decisão específica do dono sobre escopo e segurança antes de incluí-la em qualquer SPEC; a SPEC 2G fechada não a cobre. Nota anterior em `registro_alinhamento/`.
 - **Objetivo:** o agente executa comandos (instalar, compilar, testar) — um cartão por comando.
 - **Escopo:** one-shot com cwd = pasta ativa; cartão tipo-comando; Parar mata o processo; nada de terminal visual (é a 16).
 - **Critério de aceite:** `echo` aprovado roda; `rm -rf` com sessão pergunta igual; 2min pergunta; saída gigante = 20KB + "cortada".
@@ -439,6 +441,21 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 - **Escopo:** posição da Activity Bar (topo/lateral — DEBT-08, Baixa) · Command Palette (Ctrl+Shift+P) · fidelidade de animações · temas dark/light · atalhos · **botão que abre navegador** (apontado pelo dono no vídeo de 12/10, ~2:18 — "é outro, mostro depois") + **Casa Navegador** (`1-workbench/casas/navegador`, extraída do `BrowserPreview` de `EditorArea.tsx`; padrão do `simple-browser` do VS Code).
 - **Critério de aceite:** inspeção lado a lado com o code-server (8080) comprovando paridade visual e funcional de 90 %; o botão do navegador funcionando.
 - **Entrega (D78):** a padronização final do código + o pacote de documentação de entrega **não** entram aqui — viram a **etapa ENCERRAMENTO**, logo depois desta fatia (ver PARTE 4).
+
+---
+
+## Iniciativa de contexto M1–M4 — análise estática de dependências (D99, 2026-10-23; não é roadmap numerado)
+
+**Decisão vigente:** M1–M4 são o primeiro conjunto aprovado para planejamento; não há autorização para implementação, inserção entre fatias oficiais ou renumeração. M5–M8 ficam para planejamento posterior. A análise abaixo cruza as propostas do estudo `docs/arquivo_morto/estudo_memoria_contexto_2026-10-22/` com as Fatias 13–15 já especificadas; é documental/estática, sem testes de código nesta etapa.
+
+| Iniciativa | Dependências e sobreposições com Fatias 13–15 | Consequência para sequência |
+|---|---|---|
+| **M1 — medição/orçamento** | Requer alvo/modelo efetivo e uso real/estimado (`usage`), limites e contexto enviado. A Fatia 13 acrescenta chamadas de terminal ao contexto do agente; a 14 pode acrescentar skills/instruções; logo contratos de prompt/ferramentas ainda mudam antes delas. A 15 muda a composição de abas/editor e pode competir por wiring central, embora não seja dependência funcional do medidor. | Planejar após contratos de 13/14 estabilizados; executar depois de 15 para reduzir retrabalho de integração. Continua pré-requisito de M3. Não assumir precisão sem `usage`; estimativa identificada ou indisponível, alertas 75%/90%. |
+| **M2 — transcript estruturado** | Precisa identidade, ordem e pareamento fiel de chamadas/resultados. Fatia 13 cria novo tipo de tool call; a 14 pode introduzir invocação/contexto de skills; a 15 mexe em composição de sessão/editor e pode elevar conflito de wiring/persistência. | Fechar cobertura de eventos após 13/14; planejar schema preservando extensibilidade e transcript original. Implementação recomendada após 15 para evitar migrações concorrentes; pré-requisito direto de M3 e M4. |
+| **M3 — checkpoints/compactação** | Depende de M1 (orçamento confiável) e M2 (fonte estruturada, IDs, chamadas/resultados); não depende diretamente das Fatias 13–15, mas qualquer tipo de evento novo nelas deve estar contemplado em M2. | Somente após M1 + M2; preservar transcript original e nunca gravar checkpoint vazio/inválido como válido. |
+| **M4 — busca manual no histórico** | Depende de M2 para IDs/sequence e fonte fiel; busca pode ler transcript original sem M3. UI tende a tocar ChatPanel/sessões, mas não há dependência funcional obrigatória da 15; executar após a 15 reduz concorrência com alterações de abas e composição. | Após M2; recomendação de menor risco é depois de M3, embora M3 não seja pré-requisito técnico. |
+
+**Sequência recomendada, sem alterar ordem ou numeração oficial:** concluir o gate D98 (após validação documental) → Fatia 13 (com decisão própria de DEBT-23 na abertura) → Fatia 14 → Fatia 15, mantendo a ordem canônica; então abrir as SPECs da iniciativa na ordem **M1 → M2 → M3 → M4**. M1 e M2 podem ser especificadas em paralelo, mas M3 só depois de ambas; M4 só depois de M2. A recomendação de executar memória depois da 15 é por estabilidade de contratos e menor risco de retrabalho/conflitos, não por dependência funcional dura. O estudo preservado pode conter posições hipotéticas M1–M8: elas não são oficiais nem substituem esta decisão.
 
 ---
 
