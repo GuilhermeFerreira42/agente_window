@@ -84,6 +84,13 @@ A inspeção estática posterior a D103–D112 e as **propostas técnicas ainda 
 
 O estado encontrado é somente evidência de código/documentação; os riscos não foram reproduzidos em runtime. Nenhuma proposta declara correção, superioridade, homologação ou autorização de implementação. A validação futura deve seguir `09` e manter separados os testes do agente, D98/Explorer, code-server de medição e homologação humana.
 
+## 1.8 Alinhamento aprovado F1–F5 (D113–D115, 2026-10-26)
+
+- **Local-only simples:** processo local do mesmo usuário do SO está no perímetro confiável; sem login/autenticação remota/isolamento complexo. Host/Origin rigorosos, CSRF quando aplicável, validação server-side do contexto sessão + workspace + grants. LAN é evolução futura. Separar explicitamente runtime local do produto dos ambientes de teste/proxy; não alterar bind/Host/porta sem mapear Vite, code-server, APIs, serviços e homologações. Acesso local não substitui autorização individual de ferramenta.
+- **Política de modos (D114):** `agent`/`edit` → Agir; `ask` → Perguntar (somente leitura); `plan` → Planejar (investigação/plano sem escrita ou efeitos equivalentes). UI envia intenção; servidor impõe política independentemente do modelo. Agent/Edit podem variar só em UX/instruções, nunca em permissões.
+- **Alvo de modelo (D115):** seleção explícita é o par inequívoco `(providerId, modelId)` da fonte administrativa Provedores; execução envia esse ID sem fallback. Credenciais ficam no backend. Remoção, desabilitação, indisponibilidade e incompatibilidade são estados distintos e visíveis. A seleção tem de sobreviver à restauração de conversa conforme SPEC aprovada.
+- **Limite:** são decisões e requisitos de planejamento, não descrição do comportamento atual, SPEC definitiva, teste ou autorização de implementação. A decomposição F5-A/F5-B e evidências ficam em `06`; nenhuma casa, ferramenta, fatia ou iniciativa nova é criada por este registro.
+
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |
 |---|---|---|---|
