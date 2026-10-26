@@ -7,6 +7,11 @@
 - `npm run build` falhou por limite de heap do Node durante `vite build`; nenhum diagnóstico de erro de código. Windows, E2E de browser, preview `server.mjs` em runtime, PTY standalone, rede externa real, provedor real e homologação humana não executados. F2 ainda não começou.
 - Sem alterar os serviços operacionais; sem push. Commit F1: `e90bc90` (`feat: fechar fronteira local F1 e autoridade de sessão`).
 
+## 2026-10-26 — F2 pausada antes de alteração: decisão necessária sobre primitive nativa
+- Revisão do escopo F2 confirmou que `territorio.ts` usa `path.resolve` lexical e `discos.ts` passa paths a `stat/readFile/writeFile/rename`; isso não demonstra contenção contra symlink/junction/reparse point nem TOCTOU.
+- As APIs path-based atuais não permitem provar a contenção de handles exigida pela SPEC F2. Não foi alterado código, instalação, configuração ou serviço para F2; nenhuma tentativa mutável foi executada.
+- Decisão arquitetural necessária: adicionar helper nativo handle-relative dentro do mesmo processo (sem serviço novo), com fail-closed por plataforma sem primitive segura. Teste Windows disponível nesta sessão: não. Aguardar confirmação antes de introduzir esse componente; F3 ainda não começou para manter a ordem D119.
+
 ## 2026-10-26 — Aprovação formal D118–D119 e início autorizado F1–F5 (preparo documental)
 - Baseline desta missão verificado: branch `docs/capacidades-d102-alinhamento`, HEAD `8b2f90e28a061017eeaa378903624bef0a4d2557`, árvore inicialmente limpa; nove canônicos lidos e rastreabilidade das seis SPECs revisada.
 - `05` registra D118 (remoção administrativa normal segue D117: in-flight pode terminar; chamadas futuras no mesmo run bloqueadas, sem fallback, preservando resultados e informando motivo) antes de qualquer implementação F5-B; D119 aprova formalmente, para implementação somente nesta missão, F1–F4/F5-A/F5-B em commits separados. `06` preserva os contratos das SPECs e atualiza apenas seus estados de aprovação.
