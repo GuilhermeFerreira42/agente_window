@@ -239,6 +239,12 @@ Os cenários abaixo orientam investigação/SPEC futura, não autorizam iniciar 
 
 **Medição e relatório:** separar implementação observada, teste-fonte, teste executado, relato histórico e homologação humana. Para D101/D112, registrar versões, configurações, limites, provedor/modelo, rodadas, dados sanitizados e não comparabilidade. Código/documentação isolados não demonstram paridade; não declarar superioridade sem teste comparável.
 
+### 3.13 Plano de testes proposto F1–F8 (aguardando SPEC/aprovação; não executado)
+
+Os casos detalhados, componentes, erros e critérios mensuráveis estão nas propostas não definitivas PROP-F1–F4 e na avaliação F5–F8 de `06` (“Auditoria técnica F1–F8”). Este índice não transforma aqueles casos em autorização de teste. Antes de executar: aprovação do escopo/SPEC, ambiente seguro, fixtures descartáveis e limites prévios. Manter a regra dos testes E2E mutáveis: fixture isolada na porta prevista (5175), nunca repo-backed 5174; não iniciar servidor nem acessar rede externa nesta etapa.
+
+A futura bateria deve separar: (1) teste de autoridade e limite local (D103–D105), incluindo rota de revelação de chave sem registrar valor; (2) contenção física de symlink/junction/reparse point por SO; (3) cancelamento/aprovação/continuação concorrente; (4) criação exclusiva e escrita condicional sob colisão/falha; (5) enforcement server-side de Perguntar/Planejar/Agir e correspondência de modelo; (6) comportamento real do indicador/anexos; (7) restart/claim apenas quando M7 tiver SPEC; (8) limites de varredura/leitura e proteção de segredos após medição. “Não testado” em sistema/permissão não disponível não conta como aprovado. F1–F8 permanecem não reproduzidos e não homologados nesta rodada.
+
 ## 4. Becos sem saída (não tente de novo)
 
 ### 4.1 Memória

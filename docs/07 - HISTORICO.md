@@ -1,5 +1,12 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-26 — Auditoria técnica F1–F8 e propostas aguardando aprovação (somente documentação)
+- Inspecionados os handlers da prefeitura/session-persistence, Casa Agir (`rotas.ts`, `agir.ts`, `territorio.ts`, `discos.ts`), testes-fonte correspondentes, Vite host config, Explorer `vite-plugin-fs.ts`/`FsHost`, cliente do Agir, `App.tsx`/ChatInput e rotas/repositório de provedores. Distinguida evidência estática de comportamento não reproduzido.
+- `06` recebeu PROP-F1 (autoridade, workspace/sessão e local-only), PROP-F2 (symlink/junction/reparse/TOCTOU), PROP-F3 (cancelamento invalida approvals e claims concorrentes) e PROP-F4 (`criar` exclusivo, `escrever` versionado e sem fallback direto), todas explicitamente **propostas aguardando aprovação**. Incluída avaliação F5–F8 com evidência confirmada, riscos/hipóteses, dependências, testes, critérios, regressão/rollback e limites. Registradas decisões indispensáveis abertas sobre confiança local, mapeamento de modos e picker de modelo.
+- Revisão cruzada com D103–D112, D68/D69, D37, D93/D94, D97, Fatia 13 §2G/DEBT-23, M1–M8, Gate D98 e regras de fixture. D98 não foi iniciado/concluído; sequência Gate D98 → 13 → 14 → 15 e M1→M2→M3→M4 preservada. Nenhuma homologação histórica 07–12 foi reaberta.
+- Atualizados `03`, `04`, `08` e `09` para refletir estado, arquitetura e o caráter apenas planejado dos testes; permanecem exatamente nove documentos canônicos. Código, configuração operacional, testes, processos, portas, binds e ambiente permaneceram intocados; sem push.
+- Baseline Git desta rodada: `2312fb2087639277b86a089df5a4a95290e2e254`, branch `docs/capacidades-d102-alinhamento`. Commit documental desta revisão: `eb7d4b9` (`docs: propor hardening técnico F1-F4 e avaliar F5-F8`), árvore apenas documental.
+
 ## 2026-10-26 — Alinhamento pós-auditoria D102 (D103–D112; documentação e planejamento)
 - Incorporadas individualmente as dez decisões aprovadas pelo dono em `05` D103–D112: autoridade do servidor, permissões por workspace, acesso local, semântica criar/escrever, cancelamento, modos, sequência M1–M4, fronteiras IC, prioridade F1–F4 e gate comparativo/SPEC D101.
 - `03` atualiza o estado; `04` registra contratos futuros sem afirmá-los como código; `06` consolida F1–F8, fronteiras IC e rastreabilidade de todas as CAP; `08`/`09` registram critérios preliminares e cenários de teste futuros. `02` preserva objetivos CAP e metodologia D101 com ponte para as decisões novas; `01` atualiza o handoff.

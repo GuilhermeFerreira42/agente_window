@@ -78,6 +78,12 @@ Os snapshots abaixo foram investigados como fontes de mecanismos e evidências d
 
 **Divergência observada, somente leitura:** `platform/apps/workbench-v2/vite.config.ts` define `server.host` e `preview.host` como `0.0.0.0` e `allowedHosts: true`; isso não impõe nem demonstra acesso local-only (alcance efetivo também depende de rede/firewall/proxy). O script externo `/home/user/restore-code-server.sh`, quando executado, usa `--bind-addr 0.0.0.0:8080 --auth none`; code-server é régua/ambiente, não autenticação nem autorização do produto. O PTY server define `PTY_HOST || 127.0.0.1` como bind padrão, enquanto a configuração efetiva em runtime pode depender do ambiente. Nesta tarefa não foi localizado processo/listener code-server, e nenhuma configuração, porta, bind ou inicialização foi alterada. Detalhamento e limites de verificação em `09`.
 
+## 1.7 Revisão técnica F1–F8 — propostas aguardando aprovação (2026-10-26)
+
+A inspeção estática posterior a D103–D112 e as **propostas técnicas ainda não aprovadas** estão consolidadas em `06`, na seção “Auditoria técnica F1–F8”. Esta seção não muda as Regras Duras, os contratos D93/D97, o terminal congelado ou a arquitetura. F1–F4 são requisitos de segurança a especificar antes de ampliar autonomia; F5–F8 têm dependências distintas e não devem ser tratados como quatro bloqueios iguais. A revisão preserva Monolito Modular/Single Port: autoridade comum na prefeitura e decisões de domínio nas casas existentes, sem microserviço, sem importar interiores privados e sem alterar `explorer-search/{core,server}` sem autorização expressa.
+
+O estado encontrado é somente evidência de código/documentação; os riscos não foram reproduzidos em runtime. Nenhuma proposta declara correção, superioridade, homologação ou autorização de implementação. A validação futura deve seguir `09` e manter separados os testes do agente, D98/Explorer, code-server de medição e homologação humana.
+
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |
 |---|---|---|---|

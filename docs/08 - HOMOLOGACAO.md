@@ -36,7 +36,7 @@ Esta lista orienta investigação e SPEC futura; não afirma que os riscos ocorr
 | **F7 — reinício/retomada** | Estado/efeitos são conciliados após reinício; sem execução duplicada nem permissão expirada. | M7 somente planejamento. |
 | **F8 — limites/segredos** | Busca/leitura têm limites e cancelamento observáveis; credenciais não vazam em logs/respostas; rota de revelação avaliada. | Cobertura incompleta; não auditada integralmente. |
 
-Nenhum critério acima autoriza execução nesta tarefa. Aceite futuro não reabre homologações 07–12; resultados das correções devem ficar no escopo autorizado correspondente.
+A revisão estática de F1–F8 e as propostas técnicas correspondentes constam em `06`, explicitamente aguardando aprovação. Esta tabela continua sendo roteiro de validação futura, não resultado: nenhuma hipótese foi reproduzida, nenhum critério passou e nenhuma CAP foi homologada por análise de código. Nenhum critério acima autoriza execução nesta tarefa. Aceite futuro não reabre homologações históricas 07–12; resultados de correções devem ficar no escopo autorizado correspondente.
 
 ## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, atualizado em 26/10/2026)
 
