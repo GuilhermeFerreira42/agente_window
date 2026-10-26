@@ -19,7 +19,7 @@
 // ============================================================================
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AlvoConversa, ObterAlvo } from '../../conversa'
+import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
 import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples, ModoAgir } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
@@ -40,6 +40,7 @@ export interface ContextoAgir {
 
 export interface DependenciasAgir {
   obterAlvo: ObterAlvo
+  iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
   /** A permissão de sessão é gravada somente pelo servidor após decisão do dono. */
@@ -118,7 +119,7 @@ function cancelarExecucao(execucao: ExecucaoAgir, motivo: 'requested' | 'disconn
  * MESMO fluxo com orçamento cheio. Teto de mapa (não de iterações!): as mais
  * velhas caem fora para a memória não crescer sem limite.
  */
-const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo }>()
+const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa }>()
 const MAX_RETOMADAS = 20
 
 function sendJson(res: ServerResponse, status: number, corpo: unknown): void {
@@ -150,6 +151,15 @@ type PedidoValidado = {
   sessionId: string
   chatId: string
   modo: ModoAgir
+  selecaoModelo: SelecaoModelo
+}
+
+function validarSelecaoModelo(valor: unknown): SelecaoModelo | null {
+  if (valor === undefined || valor === null || (typeof valor === 'object' && (valor as { tipo?: unknown }).tipo === 'auto')) return { tipo: 'auto' }
+  if (!valor || typeof valor !== 'object') return null
+  const selecao = valor as { tipo?: unknown; providerId?: unknown; modelId?: unknown }
+  if (selecao.tipo !== 'explicita' || typeof selecao.providerId !== 'string' || !selecao.providerId || typeof selecao.modelId !== 'string' || !selecao.modelId) return null
+  return { tipo: 'explicita', providerId: selecao.providerId, modelId: selecao.modelId }
 }
 
 /** Valida o pedido da tela (histórico visível + fluxo + território candidato). */
@@ -177,8 +187,10 @@ function validarPedido(corpo: Record<string, unknown>): { ok: true; pedido: Pedi
   if (modo !== 'agent' && modo !== 'edit' && modo !== 'ask' && modo !== 'plan') {
     return { ok: false, message: 'Modo inválido ou ausente; use agent, edit, ask ou plan.' }
   }
+  const selecaoModelo = validarSelecaoModelo(corpo.modelSelection)
+  if (!selecaoModelo) return { ok: false, message: 'Seleção de modelo inválida; escolha Auto ou um par providerId/modelId do catálogo.' }
   // `workspace` e `permissoes` antigos são deliberadamente ignorados: não são autoridade.
-  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, modo } }
+  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, modo, selecaoModelo } }
 }
 
 function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
@@ -187,14 +199,14 @@ function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
 
 /** Guarda a retomada quando o teto pausou OU um erro transitório
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
-function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo): void {
+function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa): void {
   retomarPorFluxo.delete(fluxo)
   const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
     (resultado.codigoErro === 'tempo' || resultado.codigoErro === 'endereco' || resultado.codigoErro === 'http')
   if ((pausouNoTeto || caiuTransitorio) && resultado.mensagensParaRetomar) {
-    retomarPorFluxo.set(fluxo, { mensagens: resultado.mensagensParaRetomar, contexto })
+    retomarPorFluxo.set(fluxo, { mensagens: resultado.mensagensParaRetomar, contexto, alvo })
     while (retomarPorFluxo.size > MAX_RETOMADAS) {
       const maisAntigo = retomarPorFluxo.keys().next()
       if (maisAntigo.done) break
@@ -242,7 +254,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const executores = criarExecutoresReais(fio.raiz)
   try {
     resultado = await rodarAgir({
-      vizinho: criarVizinhoReal(fio.alvo),
+      vizinho: criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo),
       historico: fio.mensagens,
       executores,
       teto: fio.teto,
@@ -433,9 +445,16 @@ async function tratarAgir(
     return true
   }
 
-  const { alvo, erro } = await deps.obterAlvo()
+  const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
   if (!alvo) {
     sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
+    return true
+  }
+  if (alvo.toolCallingCapability !== 'supported') {
+    const motivo = alvo.toolCallingCapability === 'unsupported'
+      ? `O modelo ${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo} não oferece suporte a chamadas de ferramentas.`
+      : `O suporte a chamadas de ferramentas do modelo ${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo} não foi verificado. Agir foi bloqueado sem iniciar uma chamada.`
+    sendErro(res, 409, 'sem_canal_nativo', motivo.trim())
     return true
   }
 
@@ -467,7 +486,7 @@ async function tratarAgir(
     alvo,
     teto,
   }, deps)
-  guardarRetomada(fluxo, resultado, contextoFluxo)
+  guardarRetomada(fluxo, resultado, contextoFluxo, alvo)
   return true
 }
 
@@ -512,12 +531,8 @@ async function tratarContinuar(
   // Claim antes de qualquer await: somente uma continuação pode consumir a pausa.
   continuacoesEmClaim.add(fluxo)
 
-  const { alvo, erro } = await deps.obterAlvo()
-  if (!alvo) {
-    continuacoesEmClaim.delete(fluxo)
-    sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
-    return true
-  }
+  // Continuação mantém exatamente o par resolvido no início do run.
+  const alvo = retomada.alvo
 
   let teto: number
   try {
@@ -548,7 +563,7 @@ async function tratarContinuar(
     alvo,
     teto,
   }, deps)
-  guardarRetomada(fluxo, resultado, retomada.contexto)
+  guardarRetomada(fluxo, resultado, retomada.contexto, retomada.alvo)
   return true
 }
 

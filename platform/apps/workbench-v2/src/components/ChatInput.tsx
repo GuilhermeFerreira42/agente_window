@@ -16,6 +16,8 @@ import {
 import type { Attachment, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { workspaceFiles } from '../data'
 import { DragTypes } from '../domain/dragAndDrop'
+import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
+import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 
 interface ChatInputProps {
   session: Session
@@ -24,7 +26,7 @@ interface ChatInputProps {
   mode: string
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
-  onSend: (text: string, attachments: Attachment[]) => void
+  onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void
   onStop: () => void
   onApprove: (chatId?: string) => void
   composerDrafts?: Record<string, ComposerDraft>
@@ -40,12 +42,20 @@ const modes = [
   { id: 'plan', label: 'Planejar', description: 'Descreva o plano de execução' },
 ]
 
-const models = [
-  { id: 'Auto', description: 'Escolher automaticamente' },
-  { id: 'Claude Sonnet 4', description: 'Rápido e equilibrado' },
-  { id: 'GPT-5', description: 'Raciocínio avançado' },
-  { id: 'GPT-5 mini', description: 'Resposta rápida' },
-]
+const MODEL_AUTO = 'Auto'
+function tokenDoPar(providerId: string, modelId: string): string {
+  return `pair:${encodeURIComponent(providerId)}:${encodeURIComponent(modelId)}`
+}
+function selecaoDoToken(token: string): SelecaoModelo {
+  if (token === MODEL_AUTO) return { tipo: 'auto' }
+  const partes = token.startsWith('pair:') ? token.slice(5).split(':') : []
+  if (partes.length !== 2) return { tipo: 'explicita', providerId: '', modelId: '' }
+  try {
+    return { tipo: 'explicita', providerId: decodeURIComponent(partes[0]), modelId: decodeURIComponent(partes[1]) }
+  } catch {
+    return { tipo: 'explicita', providerId: '', modelId: '' }
+  }
+}
 
 interface SpeechRecognitionLike {
   continuous: boolean
@@ -126,6 +136,7 @@ export function ChatInput({
   const [modeOpen, setModeOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
+  const [catalogoModelos, setCatalogoModelos] = useState<ItemCatalogoModelo[]>([])
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false)
   const [attachmentPickerView, setAttachmentPickerView] = useState<AttachmentPickerView>('sources')
   const [isFileDropTarget, setIsFileDropTarget] = useState(false)
@@ -156,8 +167,17 @@ export function ChatInput({
   const contextPercent = Math.min(92, 18 + Math.round(text.length / 9) + attachments.length * 4)
   const normalizedWorkspaceQuery = workspaceQuery.trim().toLocaleLowerCase()
   const filteredWorkspaceFiles = workspaceFiles.filter((file) => file.toLocaleLowerCase().includes(normalizedWorkspaceQuery)).slice(0, 8)
+  const modelOptions = [
+    { id: MODEL_AUTO, label: 'Auto', description: 'Resolve o padrão configurado no início de cada execução' },
+    ...catalogoModelos.map((item) => ({
+      id: tokenDoPar(item.providerId, item.modelId),
+      label: item.label,
+      description: item.capability === 'unknown' ? 'Compatibilidade com ferramentas não verificada' : `Tool calling: ${item.capability}`,
+    })),
+  ]
+  const selectedModelLabel = modelOptions.find((item) => item.id === model)?.label ?? (model === MODEL_AUTO ? 'Auto' : `Indisponível — ${model}`)
   const normalizedModelQuery = modelQuery.trim().toLocaleLowerCase()
-  const filteredModels = models.filter((item) => `${item.id} ${item.description}`.toLocaleLowerCase().includes(normalizedModelQuery))
+  const filteredModels = modelOptions.filter((item) => `${item.label} ${item.description}`.toLocaleLowerCase().includes(normalizedModelQuery))
 
   const updateDraft = (updater: (current: ComposerDraft) => ComposerDraft) => {
     if (onChangeComposerDraft) {
@@ -269,6 +289,16 @@ export function ChatInput({
   }, [modeOpen, mode])
 
   useEffect(() => {
+    let ativo = true
+    const atualizarCatalogo = () => {
+      void carregarEstado().then((estado) => { if (ativo) setCatalogoModelos(estado.catalogo ?? []) }).catch(() => { if (ativo) setCatalogoModelos([]) })
+    }
+    atualizarCatalogo()
+    window.addEventListener('focus', atualizarCatalogo)
+    return () => { ativo = false; window.removeEventListener('focus', atualizarCatalogo) }
+  }, [])
+
+  useEffect(() => {
     if (!modelOpen) return
 
     modelSearchRef.current?.focus()
@@ -339,7 +369,7 @@ export function ChatInput({
 
     submitLockRef.current = true
     appendHistoryEntry(getCurrentHistoryEntry())
-    onSend(text.trim(), attachments.map((attachment) => ({ ...attachment })))
+    onSend(text.trim(), attachments.map((attachment) => ({ ...attachment })), selecaoDoToken(model))
     updateDraft(() => createEmptyDraft())
   }
 
@@ -711,7 +741,7 @@ export function ChatInput({
                 }
               }}
             >
-              <span>{model}</span><ChevronDown size={11} />
+              <span>{selectedModelLabel}</span><ChevronDown size={11} />
             </button>
             {modelOpen && (
               <div className="popover model-popover" role="menu" aria-label="Selecionar modelo" onKeyDown={handleModelMenuKeyDown}>
@@ -740,7 +770,7 @@ export function ChatInput({
                       onClick={() => selectModel(item.id)}
                     >
                       <Sparkles size={12} aria-hidden="true" />
-                      <span>{item.id}</span>
+                      <span>{item.label}</span>
                       <span className="popover-option-description">{item.description}</span>
                       {item.id === model && <Check size={12} aria-hidden="true" />}
                     </button>

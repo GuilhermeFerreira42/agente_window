@@ -10,6 +10,7 @@ export type {
   CategoriaTeste,
   Descritor,
   EstadoProvedores,
+  ItemCatalogoModelo,
   Protocolo,
   ProvedorConfig,
   ProvedorNaTela,
@@ -22,3 +23,4 @@ export { DESCRITORES, descritorPorId } from './descritores/registro'
 
 /** A tela da casa (cliente). O síndico (`App.tsx`) monta só isto. */
 export { ProvidersView } from './ui/ProvidersView'
+export { carregarEstado } from './ui/client/api'

@@ -11,7 +11,7 @@
 // NOTA: os sinais são combinados NA MÃO (não usamos `AbortSignal.any`): o
 // ambiente de teste (jsdom) não o implementa e o teste é a régua da casa.
 // ============================================================================
-import type { AlvoConversa, CategoriaErro, ErroConversa, EventoChat, MensagemChat } from '../contract'
+import type { AlvoConversa, CategoriaErro, ConfigChamadaModelo, ErroConversa, EventoChat, IniciarChamadaModelo, MensagemChat } from '../contract'
 import { montarPedido } from './requisicao'
 import { criarFramer } from './streaming'
 
@@ -176,16 +176,40 @@ export async function executarConversa(
   messages: MensagemChat[],
   emitir: Emitir,
   sinalExterno?: AbortSignal,
+  iniciarModelo?: IniciarChamadaModelo,
 ): Promise<void> {
   const sinal = criarSinalConversa(sinalExterno)
   try {
-    const pedido = montarPedido(alvo, messages)
+    const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
+      const alvoAtual: AlvoConversa = config ? {
+        ...alvo,
+        providerId: config.providerId,
+        modelId: config.modelId,
+        protocolo: config.protocolo,
+        baseUrl: config.baseUrl,
+        modelo: config.modelId,
+        apiKey: config.apiKey,
+        temperatura: config.temperatura,
+        maxSaida: config.maxSaida,
+      } : alvo
+      const pedido = montarPedido(alvoAtual, messages)
+      return fetch(pedido.url, { ...pedido.init, signal: sinal.signal })
+    }
 
     let resposta: Response
     try {
-      resposta = await fetch(pedido.url, { ...pedido.init, signal: sinal.signal })
+      if (iniciarModelo) {
+        if (!alvo.providerId || !alvo.modelId) throw Object.assign(new Error('O alvo desta execução não tem identidade exata de provedor/modelo.'), { code: 'selection_unavailable' })
+        resposta = await iniciarModelo(alvo.providerId, alvo.modelId, (config) => iniciarFetch(config))
+      } else {
+        resposta = await iniciarFetch()
+      }
     } catch (erro) {
       if (sinal.silenciado()) return // Parar: nada a declarar
+      const code = (erro as { code?: string })?.code
+      if (code === 'model_disabled' || code === 'selection_unavailable' || code === 'credential_unavailable') {
+        throw new ErroChat(code === 'credential_unavailable' ? 'chave' : code, (erro as Error).message)
+      }
       if (sinal.estourou() || (erro as { name?: string })?.name === 'TimeoutError') throw erroTempo(sinal.motivo())
       throw erroEndereco()
     }

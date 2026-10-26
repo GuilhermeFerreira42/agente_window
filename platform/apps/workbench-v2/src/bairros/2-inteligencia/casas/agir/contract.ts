@@ -47,6 +47,8 @@ export type CategoriaErroAgir =
   | 'configuracao' // argumento obrigatório faltando ou torto
   | 'territorio' // caminho fora da pasta de trabalho (executado na C2)
   | 'chave' // 401/403 — chave inválida ou ausente
+  | 'model_disabled' // par exato foi desabilitado/removido antes da chamada
+  | 'selection_unavailable' // provedor indisponível antes da chamada
   | 'endereco' // não alcançou o serviço
   | 'tempo' // serviço lento/parado
   | 'http' // outro erro do serviço (429, 5xx, 400…)

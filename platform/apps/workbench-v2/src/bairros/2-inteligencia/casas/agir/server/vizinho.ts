@@ -9,7 +9,7 @@
 // conversa: 60 s até o primeiro byte · 5 min no total. Provedor que ignorou
 // o stream e respondeu corpo inteiro → o próprio extrator da casa resolve.
 // ============================================================================
-import type { AlvoConversa } from '../../conversa' // barrel da casa vizinha (LEGO)
+import type { AlvoConversa, ConfigChamadaModelo, IniciarChamadaModelo } from '../../conversa' // barrel da casa vizinha (LEGO)
 import type {
   CategoriaErroAgir,
   MensagemAgir,
@@ -342,13 +342,12 @@ export function criarFramerSSE(): Framer {
  * Fábrica do vizinho real de um protocolo/alvo. O loop chama o resultado
  * uma vez por iteração do agente.
  */
-export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {}): VizinhoProvedor {
+export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {}, iniciarModelo?: IniciarChamadaModelo): VizinhoProvedor {
   const primeiroByteMs = ajustes.primeiroByteMs ?? TIMEOUT_PRIMEIRO_BYTE_MS
   const totalMs = ajustes.totalMs ?? TIMEOUT_TOTAL_MS
   const ociosoMs = ajustes.ociosoMs ?? TIMEOUT_OCIOSO_MS
 
   return async (mensagens, opcoes?: OpcoesVizinho): Promise<RespostaIteracao> => {
-    const { url, corpo } = corpoDePedido(alvo, mensagens)
     const controlador = new AbortController()
     let byteViu = false
     let motivoTempo: 'primeiro' | 'total' | 'ocioso' | null = null
@@ -385,12 +384,33 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
     let bruto = ''
 
     try {
-      const resposta = await fetch(url, {
-        method: 'POST',
-        headers: cabecalhos(alvo),
-        body: JSON.stringify(corpo),
-        signal: controlador.signal,
-      })
+      const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
+        const alvoAtual: AlvoConversa = config ? {
+          ...alvo,
+          providerId: config.providerId,
+          modelId: config.modelId,
+          protocolo: config.protocolo,
+          baseUrl: config.baseUrl,
+          modelo: config.modelId,
+          apiKey: config.apiKey,
+          temperatura: config.temperatura,
+          maxSaida: config.maxSaida,
+        } : alvo
+        const { url, corpo } = corpoDePedido(alvoAtual, mensagens)
+        return fetch(url, {
+          method: 'POST',
+          headers: cabecalhos(alvoAtual),
+          body: JSON.stringify(corpo),
+          signal: controlador.signal,
+        })
+      }
+      let resposta: Response
+      if (iniciarModelo) {
+        if (!alvo.providerId || !alvo.modelId) throw Object.assign(new Error('O alvo desta execução não tem identidade exata de provedor/modelo.'), { code: 'selection_unavailable' })
+        resposta = await iniciarModelo(alvo.providerId, alvo.modelId, (config) => iniciarFetch(config))
+      } else {
+        resposta = await iniciarFetch()
+      }
       if (!resposta.ok) throw erroPorStatus(resposta.status)
       if (resposta.body === null) throw new ErroVizinho('resposta', 'O serviço respondeu sem corpo.')
       byteViu = true
@@ -454,6 +474,10 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         throw new ErroVizinho('tempo', `A resposta não terminou em ${limite}.`)
       }
       if (erro instanceof ErroVizinho) throw erro
+      const code = (erro as { code?: string })?.code
+      if (code === 'model_disabled' || code === 'selection_unavailable' || code === 'credential_unavailable') {
+        throw new ErroVizinho(code === 'credential_unavailable' ? 'chave' : code, (erro as Error).message)
+      }
       throw new ErroVizinho('endereco', 'Não deu para alcançar o serviço. Verifique se ele está ligado (no caso do Ollama, se está rodando na sua máquina).')
     } finally {
       clearTimeout(timerPrimeiro)

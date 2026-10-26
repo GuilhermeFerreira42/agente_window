@@ -9,6 +9,9 @@
 export type {
   AlvoConversa,
   AlvoOuErro,
+  ConfigChamadaModelo,
+  IniciarChamadaModelo,
+  SelecaoModelo,
   CategoriaErro,
   ErroConversa,
   EventoChat,

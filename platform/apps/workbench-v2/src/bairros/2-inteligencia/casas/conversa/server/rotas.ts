@@ -12,7 +12,7 @@
 // O "Parar" da tela fecha ESTA conexão → o sinal aborta o provedor (SPEC §3.4).
 // ============================================================================
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { EventoChat, ObterAlvo, PedidoChat } from '../contract'
+import type { EventoChat, IniciarChamadaModelo, ObterAlvo, PedidoChat, SelecaoModelo } from '../contract'
 import { ErroChat, ehErroChat, executarConversa } from './conversar'
 
 const ROTAS_CONHECIDAS = ['/api/chat']
@@ -59,6 +59,14 @@ function validarPedido(corpo: Record<string, unknown>): { ok: true; pedido: Pedi
   return { ok: true, pedido: { messages: messages as PedidoChat['messages'] } }
 }
 
+function lerSelecaoModelo(valor: unknown): SelecaoModelo | null {
+  if (valor === undefined || valor === null || (typeof valor === 'object' && (valor as { tipo?: unknown }).tipo === 'auto')) return { tipo: 'auto' }
+  if (!valor || typeof valor !== 'object') return null
+  const selecao = valor as { tipo?: unknown; providerId?: unknown; modelId?: unknown }
+  if (selecao.tipo !== 'explicita' || typeof selecao.providerId !== 'string' || !selecao.providerId || typeof selecao.modelId !== 'string' || !selecao.modelId) return null
+  return { tipo: 'explicita', providerId: selecao.providerId, modelId: selecao.modelId }
+}
+
 function escreverEvento(res: ServerResponse, evento: EventoChat): void {
   res.write(`data: ${JSON.stringify(evento)}\n\n`)
 }
@@ -68,6 +76,7 @@ export async function tratarRotasConversa(
   res: ServerResponse,
   url: URL,
   obterAlvo: ObterAlvo,
+  iniciarModelo?: IniciarChamadaModelo,
 ): Promise<boolean> {
   const metodo = req.method ?? 'GET'
   if (url.pathname !== '/api/chat' || metodo !== 'POST') return false
@@ -86,7 +95,12 @@ export async function tratarRotasConversa(
     return true
   }
 
-  const { alvo, erro } = await obterAlvo()
+  const selecao = lerSelecaoModelo(corpo.modelSelection)
+  if (!selecao) {
+    sendErro(res, 400, 'configuracao', 'Seleção de modelo inválida; escolha Auto ou um par providerId/modelId do catálogo.')
+    return true
+  }
+  const { alvo, erro } = await obterAlvo(selecao)
   if (!alvo) {
     sendErro(
       res,
@@ -109,8 +123,8 @@ export async function tratarRotasConversa(
   req.on('close', aoFechar)
 
   try {
-    await executarConversa(alvo, validacao.pedido.messages, (evento) => escreverEvento(res, evento), abort.signal)
-    if (!abort.signal.aborted) escreverEvento(res, { type: 'done', model: alvo.modelo })
+    await executarConversa(alvo, validacao.pedido.messages, (evento) => escreverEvento(res, evento), abort.signal, iniciarModelo)
+    if (!abort.signal.aborted) escreverEvento(res, { type: 'done', model: alvo.providerId && alvo.modelId ? `${alvo.providerId} / ${alvo.modelId}` : alvo.modelo })
   } catch (erro) {
     if (!abort.signal.aborted) {
       if (ehErroChat(erro)) {

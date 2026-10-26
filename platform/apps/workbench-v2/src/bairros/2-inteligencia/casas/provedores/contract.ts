@@ -38,7 +38,12 @@ export interface ProvedorConfig {
   /** Só no genérico (nome do serviço: "Groq", "LM Studio"...). */
   nome?: string
   baseUrl: string
+  /** Modelo padrão do provedor, mantido como Auto/default compatível. */
   modelo: string
+  /** Modelos explicitamente habilitados; identificadores exatos/case-sensitive. */
+  modelosHabilitados?: string[]
+  /** Provedor presente mas desabilitado fica indisponível sem apagar histórico/preferências. */
+  habilitado?: boolean
   apiKey?: string
   contexto?: number
   maxSaida?: number
@@ -46,7 +51,7 @@ export interface ProvedorConfig {
 }
 
 export interface ArquivoProvedores {
-  versao: 2
+  versao: 3
   /** Provedor que o chat vai usar (FATIA 09). */
   ativo: string | null
   provedores: Record<string, ProvedorConfig>
@@ -58,6 +63,8 @@ export interface ProvedorNaTela {
   nome: string
   baseUrl: string
   modelo: string
+  modelosHabilitados: string[]
+  habilitado: boolean
   contexto: number
   maxSaida: number
   temperatura: number
@@ -69,8 +76,18 @@ export interface ProvedorNaTela {
   variavelAmbiente: string | null
 }
 
+export interface ItemCatalogoModelo {
+  providerId: string
+  modelId: string
+  label: string
+  protocol: Protocolo
+  /** Descobrir /models não comprova suporte a tool calling. */
+  capability: 'supported' | 'unsupported' | 'unknown'
+}
+
 export interface EstadoProvedores {
   provedores: ProvedorNaTela[]
+  catalogo: ItemCatalogoModelo[]
   ativo: string | null
   /** 'fixture' = arquivo de teste (E2E); 'repo-home' = arquivo real do dono. */
   storage: 'fixture' | 'repo-home'

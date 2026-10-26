@@ -66,6 +66,8 @@ export function ProvidersView() {
     nome: daTela?.nome,
     baseUrl: daTela?.baseUrl ?? descritor?.baseUrlPadrao ?? '',
     modelo: daTela?.modelo ?? '',
+    modelosHabilitados: daTela?.modelosHabilitados ?? [],
+    habilitado: daTela?.habilitado ?? true,
     contexto: daTela?.contexto ?? descritor?.padroes.contexto,
     maxSaida: daTela?.maxSaida ?? descritor?.padroes.maxSaida,
     temperatura: daTela?.temperatura ?? descritor?.padroes.temperatura,
@@ -97,6 +99,12 @@ export function ProvidersView() {
     } catch (motivo) {
       setErro(motivo instanceof Error ? motivo.message : String(motivo))
     }
+  }
+
+  function alternarModeloHabilitado(modelId: string, habilitar: boolean) {
+    const atuais = Array.isArray(rascunho.modelosHabilitados) ? rascunho.modelosHabilitados : []
+    const proximos = habilitar ? [...new Set([...atuais, modelId])] : atuais.filter((id) => id !== modelId)
+    editar({ modelosHabilitados: proximos })
   }
 
   const alvoDaChamada = () => ({
@@ -145,6 +153,8 @@ export function ProvidersView() {
           nome: p.nome,
           baseUrl: p.baseUrl,
           modelo: p.modelo,
+          modelosHabilitados: p.modelosHabilitados,
+          habilitado: p.habilitado,
           contexto: p.contexto,
           maxSaida: p.maxSaida,
           temperatura: p.temperatura,
@@ -259,6 +269,14 @@ export function ProvidersView() {
             ) : null}
           </div>
 
+          <label className="providers-field">
+            <span className="providers-label">Disponibilidade do provedor</span>
+            <span className="providers-hint">
+              <input type="checkbox" aria-label="Provedor habilitado" checked={rascunho.habilitado !== false} onChange={(e) => editar({ habilitado: e.target.checked })} />
+              Habilitado para novas chamadas (desabilitar não apaga configuração nem histórico)
+            </span>
+          </label>
+
           {descritor?.generico ? (
             <label className="providers-field">
               <span className="providers-label">Nome do serviço</span>
@@ -360,7 +378,27 @@ export function ProvidersView() {
                 ))}
               </select>
             ) : null}
-            <span className="providers-hint">escolha da lista ou digite o nome à mão — os dois sempre valem</span>
+            {(modelos[selecionado]?.length ?? 0) > 0 ? (
+              <div className="providers-model-candidates" aria-label="Habilitar modelos disponíveis">
+                {(modelos[selecionado] ?? []).map((modelId) => (
+                  <label key={modelId} className="providers-hint">
+                    <input
+                      type="checkbox"
+                      aria-label={`Habilitar modelo ${modelId}`}
+                      checked={(rascunho.modelosHabilitados ?? []).includes(modelId)}
+                      onChange={(e) => alternarModeloHabilitado(modelId, e.target.checked)}
+                    />
+                    Habilitar {modelId}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {rascunho.modelo.trim() && !(rascunho.modelosHabilitados ?? []).includes(rascunho.modelo.trim()) ? (
+              <button type="button" className="providers-btn is-secondary" onClick={() => alternarModeloHabilitado(rascunho.modelo.trim(), true)}>
+                Habilitar modelo padrão atual
+              </button>
+            ) : null}
+            <span className="providers-hint">Descobertos são candidatos; cada par precisa ser habilitado explicitamente. O ID é case-sensitive.</span>
           </div>
 
           {avisoBusca ? (

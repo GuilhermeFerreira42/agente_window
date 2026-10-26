@@ -15,6 +15,7 @@ import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-intel
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
 import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
 import { obterAlvoDeConversa } from './chatAlvo'
+import { iniciarChamadaModelo } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 
 const API_PREFIX = '/api/sessions'
@@ -158,11 +159,12 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   if (rotaPertenceAoModuloConversa(url.pathname)) {
-    if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa)) return true
+    if (await tratarRotasConversa(request, response, url, obterAlvoDeConversa, iniciarChamadaModelo)) return true
   }
   if (rotaPertenceAoModuloAgir(url.pathname)) {
     if (await tratarRotasAgir(request, response, url, {
       obterAlvo: obterAlvoDeConversa,
+      iniciarModelo: iniciarChamadaModelo,
       resolverContexto: resolverContextoAgir,
       concederPermissaoSessao: grantSessionTool,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido

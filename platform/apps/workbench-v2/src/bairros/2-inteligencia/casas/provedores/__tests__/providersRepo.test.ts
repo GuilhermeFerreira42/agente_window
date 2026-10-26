@@ -1,6 +1,6 @@
 // Casa Provedores — testes do repositório do arquivo (FATIA 08).
 // Cobrem as decisões do dono: D81 (arquivo fora do repo + 0600 + segunda tranca),
-// D83 (máscara/reveal), D84 (arquivo manda; ambiente é reserva) e a migração v1→v2.
+// D83 (máscara/reveal), D84 (arquivo manda; ambiente é reserva), migração v1/v2→v3 e gate exato de início.
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,7 +11,8 @@ import {
   caminhoDoArquivo,
   lerArquivo,
   mascararChave,
-  migrarV1ParaV2,
+  migrarV1ParaV3,
+  iniciarChamadaModelo,
   resolverChave,
   revelarChave,
   salvarArquivo,
@@ -42,7 +43,7 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
     const modo = (await stat(caminho)).mode & 0o777
     expect(modo, 'o arquivo da chave precisa ser restrito ao dono').toBe(0o600)
     const lido = await lerArquivo(caminho)
-    expect(lido.versao).toBe(2)
+    expect(lido.versao).toBe(3)
     expect(lido.ativo).toBe('openai')
     expect(lido.provedores.openai.apiKey).toBe('sk-teste-123456')
   })
@@ -118,25 +119,80 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
   })
 
   it('migra o formato antigo (v1) preservando o endereço do Ollama e quem estava ativo', () => {
-    const v2 = migrarV1ParaV2({
+    const migrado = migrarV1ParaV3({
       openai: { enabled: true },
       gemini: { enabled: false },
       ollama: { enabled: true, baseUrl: 'http://localhost:11434/' },
     })
-    expect(v2.versao).toBe(2)
-    expect(v2.provedores.ollama.baseUrl).toBe('http://localhost:11434')
-    expect(v2.provedores.openai.baseUrl).toBe('https://api.openai.com/v1')
-    expect(v2.provedores.gemini).toBeUndefined()
-    expect(v2.ativo).toBe('openai')
-    expect(JSON.stringify(v2)).not.toContain('apiKey')
+    expect(migrado.versao).toBe(3)
+    expect(migrado.provedores.ollama.baseUrl).toBe('http://localhost:11434')
+    expect(migrado.provedores.openai.baseUrl).toBe('https://api.openai.com/v1')
+    expect(migrado.provedores.gemini).toBeUndefined()
+    expect(migrado.ativo).toBe('openai')
+    expect(JSON.stringify(migrado)).not.toContain('apiKey')
   })
 
-  it('ler arquivo v1 do disco devolve v2 (migração transparente)', async () => {
+  it('ler arquivo v1 do disco devolve v3; Ollama sem modelo fica sem modelos habilitados', async () => {
     const caminho = await arquivoTemporario()
     await writeFile(caminho, JSON.stringify({ ollama: { enabled: true, baseUrl: 'http://localhost:11434' } }), 'utf8')
     const lido = await lerArquivo(caminho)
-    expect(lido.versao).toBe(2)
+    expect(lido.versao).toBe(3)
     expect(lido.provedores.ollama?.baseUrl).toBe('http://localhost:11434')
+    expect(lido.provedores.ollama?.modelo).toBe('')
+    expect(lido.provedores.ollama?.modelosHabilitados).toEqual([])
+    expect(lido.provedores.ollama?.habilitado).toBe(true)
+  })
+
+  it('migra v2 habilitando só o modelo padrão antigo, sem inventar um catálogo', async () => {
+    const caminho = await arquivoTemporario()
+    await writeFile(caminho, JSON.stringify({ versao: 2, ativo: 'openai', provedores: {
+      openai: { baseUrl: 'https://api.openai.com/v1', modelo: 'gpt-4o', apiKey: 'sk-migrada' },
+      ollama: { baseUrl: 'http://localhost:11434', modelo: '' },
+    } }), 'utf8')
+    const lido = await lerArquivo(caminho)
+    expect(lido.versao).toBe(3)
+    expect(lido.provedores.openai.modelosHabilitados).toEqual(['gpt-4o'])
+    expect(lido.provedores.openai.habilitado).toBe(true)
+    expect(lido.provedores.ollama.modelosHabilitados).toEqual([])
+  })
+
+  it('lineariza remoção com início da chamada: chamada já iniciada termina, a próxima é bloqueada', async () => {
+    const caminho = await arquivoTemporario()
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: {
+      baseUrl: 'https://api.openai.com/v1', modelo: 'gpt-4o', modelosHabilitados: ['gpt-4o'], apiKey: 'sk-fixture',
+    } } }, caminho)
+
+    let sinalizarInicio!: () => void
+    let concluir!: (valor: string) => void
+    const iniciou = new Promise<void>((resolve) => { sinalizarInicio = resolve })
+    const jaIniciada = iniciarChamadaModelo('openai', 'gpt-4o', (config) => {
+      expect(config.modelId).toBe('gpt-4o')
+      expect(config.apiKey).toBe('sk-fixture')
+      sinalizarInicio()
+      return new Promise<string>((resolve) => { concluir = resolve })
+    }, caminho)
+    await iniciou
+
+    await salvarArquivo({ ativo: null, provedores: {} }, caminho)
+    concluir('resposta que já estava em voo')
+    await expect(jaIniciada).resolves.toBe('resposta que já estava em voo')
+    await expect(iniciarChamadaModelo('openai', 'gpt-4o', async () => 'não deve iniciar', caminho))
+      .rejects.toMatchObject({ code: 'selection_unavailable' })
+  })
+
+  it('bloqueia modelo desabilitado e provedor desabilitado antes do fetch', async () => {
+    const caminho = await arquivoTemporario()
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: {
+      baseUrl: 'https://api.openai.com/v1', modelo: 'gpt-4o', modelosHabilitados: [], apiKey: 'sk-fixture',
+    } } }, caminho)
+    await expect(iniciarChamadaModelo('openai', 'gpt-4o', async () => 'não', caminho))
+      .rejects.toMatchObject({ code: 'model_disabled' })
+
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: {
+      baseUrl: 'https://api.openai.com/v1', modelo: 'gpt-4o', modelosHabilitados: ['gpt-4o'], habilitado: false,
+    } } }, caminho)
+    await expect(iniciarChamadaModelo('openai', 'gpt-4o', async () => 'não', caminho))
+      .rejects.toMatchObject({ code: 'selection_unavailable' })
   })
 
   it('D83: revelar devolve a chave inteira; sem chave ou id errado, recusa', async () => {

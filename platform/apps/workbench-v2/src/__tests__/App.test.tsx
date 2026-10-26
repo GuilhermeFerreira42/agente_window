@@ -28,6 +28,10 @@ beforeEach(() => {
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url === '/api/providers') return Promise.resolve(new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
+      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
+    ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -54,6 +58,10 @@ function responderChatComSSE(
 ): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
+      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
+    ] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -314,34 +322,33 @@ describe('App session flows', () => {
     await waitFor(() => expect(payload?.mode).toBe('edit'))
   })
 
-  it('persiste o modelo por sessão e nested chat e usa a seleção no envio', async () => {
+  it('persiste a preferência exata por sessão e nested chat e transmite o par no envio', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
 
-    await user.click(screen.getByRole('button', { name: 'Claude Sonnet 4' }))
-    await user.click(screen.getByRole('button', { name: /^GPT-5 mini Resposta/ }))
-    expect(screen.getByRole('button', { name: 'GPT-5 mini' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Auto' }))
+    await user.click(await screen.findByRole('button', { name: /OpenAI — GPT-5 mini/ }))
+    expect(screen.getByRole('button', { name: 'OpenAI — GPT-5 mini' })).toBeInTheDocument()
 
     await user.click(nestedChat('Ajustes de UI'))
-    expect(screen.getByRole('button', { name: 'Claude Sonnet 4' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Auto' })).toBeInTheDocument()
     await user.click(nestedChat('Implementação principal'))
-    expect(screen.getByRole('button', { name: 'GPT-5 mini' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'OpenAI — GPT-5 mini' })).toBeInTheDocument()
 
     await user.click(sessionRow('Revisar alterações do workbench'))
-    expect(screen.getByRole('button', { name: 'Claude Sonnet 4' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Auto' })).toBeInTheDocument()
     await user.click(sessionRow('Replicar a Janela de Agentes'))
-    expect(screen.getByRole('button', { name: 'GPT-5 mini' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'OpenAI — GPT-5 mini' })).toBeInTheDocument()
 
     await user.click(sessionRow('Ajustar layout single-pane'))
-    await user.click(screen.getByRole('button', { name: 'Claude Sonnet 4' }))
-    await user.click(screen.getByRole('button', { name: /^GPT-5 Raciocínio/ }))
+    await user.click(screen.getByRole('button', { name: 'Auto' }))
+    await user.click(await screen.findByRole('button', { name: /^OpenAI — GPT-5 Compatibilidade com ferramentas não verificada$/ }))
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
     await user.type(input, 'usar o modelo selecionado')
+    let payload: Record<string, unknown> | undefined
+    responderChatComSSE(['modelo exato'], 'done', 5, (body) => { payload = body })
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
-    expect(screen.getByText('Trabalhando')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
-    // O rodapé da bolha mostra o modelo EFETIVO da tentativa (SPEC §3.9).
-    await waitFor(() => expect(screen.getByText(/· GPT-5$/)).toBeInTheDocument(), { timeout: 2500 })
+    await waitFor(() => expect(payload?.modelSelection).toEqual({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5' }))
   })
 
   it('envia o payload com anexo local, exibe o contexto e limpa o chip após submit', async () => {

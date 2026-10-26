@@ -21,6 +21,7 @@ import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligenc
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
+import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 
 const modeLabels: Record<string, string> = {
   agent: 'Agente',
@@ -37,7 +38,7 @@ interface ChatPanelProps {
   onSelectChat: (chatId: string) => void
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
-  onSend: (text: string, attachments: Attachment[]) => void
+  onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void
   onStop: () => void
   onApprove: (chatId?: string) => void
   onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
@@ -370,7 +371,7 @@ export function ChatPanel({
       )}
       <div className="chat-content">
         <div className="chat-messages" ref={listaRef} onScroll={aoRolar}>
-          {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [])} /> : activeChat.messages.map((message) => (
+          {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [], { tipo: 'auto' })} /> : activeChat.messages.map((message) => (
             <MessageRow
               key={message.id}
               message={message}

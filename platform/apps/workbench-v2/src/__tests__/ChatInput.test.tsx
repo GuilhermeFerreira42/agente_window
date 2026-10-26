@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../components/ChatInput'
@@ -10,6 +10,19 @@ const chat: NestedChat = {
   status: 'completed',
   messages: [],
 }
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    provedores: [],
+    ativo: null,
+    storage: 'fixture',
+    catalogo: [
+      { providerId: 'openai', modelId: 'gpt-4o', label: 'OpenAI — gpt-4o', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-4o-mini', label: 'OpenAI — gpt-4o-mini', protocol: 'openai-chat', capability: 'unknown' },
+    ],
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+})
+afterEach(() => vi.unstubAllGlobals())
 
 const session: Session = {
   id: 'session-test',
@@ -30,7 +43,7 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
   const props: React.ComponentProps<typeof ChatInput> = {
     session,
     activeChat: chat,
-    model: 'Claude Sonnet 4',
+    model: 'Auto',
     mode: 'agent',
     onChangeModel: vi.fn(),
     onChangeMode: vi.fn(),
@@ -52,7 +65,7 @@ describe('ChatInput', () => {
     await user.type(input, '  revisar a sessão  ')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
-    expect(onSend).toHaveBeenCalledWith('revisar a sessão', [])
+    expect(onSend).toHaveBeenCalledWith('revisar a sessão', [], { tipo: 'auto' })
     expect(input).toHaveValue('')
   })
 
@@ -65,7 +78,7 @@ describe('ChatInput', () => {
     await user.type(input, 'enviar por teclado')
     await user.keyboard('{Enter}')
 
-    expect(onSend).toHaveBeenCalledWith('enviar por teclado', [])
+    expect(onSend).toHaveBeenCalledWith('enviar por teclado', [], { tipo: 'auto' })
     expect(input).toHaveValue('')
 
     await user.type(input, 'linha um')
@@ -89,7 +102,7 @@ describe('ChatInput', () => {
     await user.keyboard('{Enter}')
 
     expect(onSend).toHaveBeenCalledTimes(1)
-    expect(onSend).toHaveBeenCalledWith('enviar pelo atalho', [])
+    expect(onSend).toHaveBeenCalledWith('enviar pelo atalho', [], { tipo: 'auto' })
   })
 
   it('impede envio vazio ou somente com whitespace', async () => {
@@ -160,7 +173,7 @@ describe('ChatInput', () => {
     await user.upload(fileInput, file)
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
-    expect(onSend).toHaveBeenCalledWith('', [expect.objectContaining({ name: 'contexto.md', kind: 'local' })])
+    expect(onSend).toHaveBeenCalledWith('', [expect.objectContaining({ name: 'contexto.md', kind: 'local' })], { tipo: 'auto' })
     expect(screen.queryByText('contexto.md')).not.toBeInTheDocument()
   })
 
@@ -337,53 +350,46 @@ describe('ChatInput', () => {
     expect(screen.queryByRole('menu', { name: 'Selecionar modo' })).not.toBeInTheDocument()
   })
 
-  it('troca o modelo pelo popover', async () => {
+  it('lista pares sanitizados do catálogo, filtra e guarda o par provider/model exato', async () => {
     const user = userEvent.setup()
     const onChangeModel = vi.fn()
     renderInput({ onChangeModel })
 
-    await user.click(screen.getByRole('button', { name: 'Claude Sonnet 4' }))
-    await user.click(screen.getByRole('button', { name: /GPT-5 mini/ }))
-
-    expect(onChangeModel).toHaveBeenCalledWith('GPT-5 mini')
-  })
-
-  it('filtra modelos, marca a seleção e devolve o foco após escolher', async () => {
-    const user = userEvent.setup()
-    const onChangeModel = vi.fn()
-    renderInput({ onChangeModel })
-
-    const trigger = screen.getByRole('button', { name: 'Claude Sonnet 4' })
+    const trigger = screen.getByRole('button', { name: 'Auto' })
     await user.click(trigger)
     expect(screen.getByRole('menu', { name: 'Selecionar modelo' })).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Buscar modelos' })).toHaveFocus()
-    expect(screen.getByRole('button', { name: /^Claude Sonnet 4 Rápido/, pressed: true })).toBeInTheDocument()
+    const auto = await screen.findByRole('button', { name: /Auto Resolve o padrão/, pressed: true })
+    expect(auto).toBeInTheDocument()
 
     const search = screen.getByRole('searchbox', { name: 'Buscar modelos' })
-    await user.type(search, 'GPT-5 mini')
-    expect(screen.getByRole('button', { name: /^GPT-5 mini Resposta/, pressed: false })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^GPT-5 mini Resposta/ }))
+    await user.type(search, 'gpt-4o-mini')
+    const candidato = await screen.findByRole('button', { name: /OpenAI — gpt-4o-mini/, pressed: false })
+    await user.click(candidato)
 
-    expect(onChangeModel).toHaveBeenCalledWith('GPT-5 mini')
+    expect(onChangeModel).toHaveBeenCalledWith('pair:openai:gpt-4o-mini')
     expect(trigger).toHaveFocus()
   })
 
-  it('navega no model picker com teclado e fecha com Escape', async () => {
+  it('navega no catálogo dinâmico com teclado e fecha com Escape', async () => {
     const user = userEvent.setup()
     const onChangeModel = vi.fn()
     renderInput({ onChangeModel })
 
-    const trigger = screen.getByRole('button', { name: 'Claude Sonnet 4' })
+    const trigger = screen.getByRole('button', { name: 'Auto' })
     await user.click(trigger)
     const search = screen.getByRole('searchbox', { name: 'Buscar modelos' })
     expect(search).toHaveFocus()
+    await screen.findAllByRole('button', { name: /OpenAI — gpt-4o/ })
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /^Claude Sonnet 4 Rápido/ })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /Auto Resolve o padrão/ })).toHaveFocus()
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /^GPT-5 Raciocínio/ })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o Compatibilidade/ })).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o-mini Compatibilidade/ })).toHaveFocus()
     await user.keyboard('{Enter}')
 
-    expect(onChangeModel).toHaveBeenCalledWith('GPT-5')
+    expect(onChangeModel).toHaveBeenCalledWith('pair:openai:gpt-4o-mini')
     expect(trigger).toHaveFocus()
 
     await user.click(trigger)

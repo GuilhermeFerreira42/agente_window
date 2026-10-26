@@ -20,6 +20,7 @@ import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT }
 import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
+import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
 import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
@@ -549,7 +550,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [selectedDiffFileBySession, setSelectedDiffFileBySession] = useState<Record<string, string | undefined>>({})
   // The original input model stores picker state with the active conversation.
   // Keep the mock equivalent keyed by session plus nested chat, not globally.
-  const [modelByChat, setModelByChat] = useState<Record<string, string>>({})
+  const [modelByChat, setModelByChat] = useState<Record<string, string>>(() => {
+    try {
+      const salvo: unknown = JSON.parse(localStorage.getItem('agente-window:model-by-chat:v3') ?? '{}')
+      return salvo && typeof salvo === 'object' && !Array.isArray(salvo) ? salvo as Record<string, string> : {}
+    } catch {
+      return {}
+    }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('agente-window:model-by-chat:v3', JSON.stringify(modelByChat)) } catch { /* preferência local é best-effort; backend sempre valida */ }
+  }, [modelByChat])
   const [modeByChat, setModeByChat] = useState<Record<string, string>>({})
   const [composerDrafts, setComposerDrafts] = useState<Record<string, ComposerDraft>>({})
   const [composerHistoryByChat, setComposerHistoryByChat] = useState<Record<string, ComposerHistoryEntry[]>>({})
@@ -663,7 +674,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const checksExpanded = checksExpandedBySession[activeSession.id] ?? true
   const expandedFolders = expandedFoldersBySession[activeSession.id] ?? {}
   const chatKey = `${activeSession.id}:${activeChatId}`
-  const selectedModel = modelByChat[chatKey] ?? 'Claude Sonnet 4'
+  const selectedModel = modelByChat[chatKey] ?? 'Auto'
   const selectedMode = modeByChat[chatKey] ?? 'agent'
   const visibleEditorTabs = useMemo(() => hasSessions ? getEditorTabsVisibleForSession(editorTabs, activeSession.id) : [], [hasSessions, editorTabs, activeSession.id])
   // Tipo da aba ativa — usado para "gate" da ação Toggle Details (só faz sentido
@@ -1852,6 +1863,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     responseId: string,
     historico: MensagemSimples[],
     aoConcluir?: () => void,
+    modelSelection: SelecaoModelo = { tipo: 'auto' },
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
@@ -1859,6 +1871,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const controle = enviarAgir(
       {
         mensagens: historico,
+        modelSelection,
         // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
         // aprovações desta resposta — nada vaza para a próxima troca. As
         // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
@@ -1933,13 +1946,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     agirAtivas.current.set(runKey, controle)
   }
 
-  const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }) => {
+  const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }, modelSelection: SelecaoModelo = { tipo: 'auto' }) => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
     const attachmentText = attachments.length > 0 ? `Arquivos anexados: ${attachments.map((item) => item.name).join(', ')}` : ''
     const messageContent = [text.trim(), attachmentText].filter(Boolean).join('\n\n')
     const requestLabel = text.trim() || attachments.map((item) => item.name).join(', ')
     const responseId = `response-${Date.now()}`
+    const requestedModel = modelSelection.tipo === 'auto' ? 'Auto' : `${modelSelection.providerId} / ${modelSelection.modelId}`
     const userMessage = {
       id: `message-${Date.now()}`,
       role: 'user' as const,
@@ -1953,7 +1967,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       role: 'assistant' as const,
       content: '',
       time: timeLabel(),
-      model: selectedModel,
+      model: requestedModel,
       running: true,
       inicioEm: Date.now(),
     }
@@ -1994,7 +2008,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
     // servidor, a resposta chega em pedaços e as ferramentas viram cartões
     // com aprovação do dono (SPEC PARTE 2D).
-    iniciarAgirReal(sessionId, chatId, responseId, historico)
+    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection)
   }
 
   const handleStop = async () => {
@@ -2217,7 +2231,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
         onChangeModel={(nextModel) => setModelByChat((current) => ({ ...current, [sessionChatKey]: nextModel }))}
         onChangeMode={(nextMode) => setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))}
-        onSend={handleSend}
+        onSend={(text, attachments, modelSelection) => handleSend(text, attachments, undefined, modelSelection)}
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}
         onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}

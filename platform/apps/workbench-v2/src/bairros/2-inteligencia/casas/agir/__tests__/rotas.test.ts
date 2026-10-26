@@ -65,7 +65,7 @@ const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
 const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
 
-const ALVO: AlvoConversa = { protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'm', apiKey: 'sk-123' }
+const ALVO: AlvoConversa = { protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'm', apiKey: 'sk-123', toolCallingCapability: 'supported' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
@@ -174,6 +174,17 @@ describe('rotas — POST /api/agir', () => {
     expect(semProvedor.statusCode).toBe(409)
     expect(JSON.parse(semProvedor.corpo())).toMatchObject({ code: 'sem_provedor' })
     expect(semProvedor.corpo()).not.toContain('data: ')
+  })
+
+  it('bloqueia fail-closed modelos sem prova explícita de tool calling antes de abrir o fio', async () => {
+    for (const capacidade of ['unknown', 'unsupported'] as const) {
+      const res = fakeRes()
+      const deps = { ...DEPS, obterAlvo: async () => ({ alvo: { ...ALVO, toolCallingCapability: capacidade } }) }
+      expect(await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, deps)).toBe(true)
+      expect(res.statusCode).toBe(409)
+      expect(JSON.parse(res.corpo())).toMatchObject({ code: 'sem_canal_nativo' })
+      expect(res.corpo()).not.toContain('data: ')
+    }
   })
 
   it('exige identidade de sessão/conversa no corpo antes de iniciar', async () => {
@@ -438,7 +449,7 @@ describe('F3 — cancelamento terminal e claims de geração', () => {
   })
 
   it('uma aprovação é consumida uma vez; duplicata não dispara outro efeito', async () => {
-    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    stubProvedor([SSE_TOOL.replace('ola.txt', 'f3-uma-vez.txt'), SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
     const pedido = JSON.stringify({ mode: 'agent', messages: [{ role: 'user', content: 'crie f3-uma-vez.txt' }], fluxo: 'f3-approval-once' })
     const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
@@ -451,7 +462,11 @@ describe('F3 — cancelamento terminal e claims de geração', () => {
     await tratarRotasAgir(fakeReq(body), duplicada, URL_APROVAR, DEPS)
     expect(duplicada.statusCode).toBe(409)
     await fio
-    expect(await readFile(path.join(raiz, 'ola.txt'), 'utf8')).toBe('oi')
+    const resultados = frames(res).filter((evento) => evento.type === 'tool_result')
+    expect(resultados).toHaveLength(1)
+    expect(resultados[0]).toMatchObject({ type: 'tool_result', id: 'c1', ok: false })
+    expect(String(resultados[0].resumo)).toContain('contenção segura F2')
+    await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).rejects.toThrow()
   })
 
   it('duas continuations concorrentes fazem claim único', async () => {

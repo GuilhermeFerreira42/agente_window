@@ -69,8 +69,8 @@ export async function tratarRotasProvedores(req: IncomingMessage, res: ServerRes
 
   if (url.pathname === '/api/providers' && metodo === 'GET') {
     const arquivo = await lerArquivo()
-    const { provedores, ativo } = estadoParaTela(arquivo)
-    sendJson(res, 200, { provedores, ativo, storage: armazenamentoAtual(), caminho: caminhoDoArquivo() })
+    const { provedores, catalogo, ativo } = estadoParaTela(arquivo)
+    sendJson(res, 200, { provedores, catalogo, ativo, storage: armazenamentoAtual(), caminho: caminhoDoArquivo() })
     return true
   }
 
@@ -78,8 +78,8 @@ export async function tratarRotasProvedores(req: IncomingMessage, res: ServerRes
     try {
       const corpo = await lerCorpo(req)
       const salvo = await salvarArquivo(corpo as unknown as SalvarProvedoresInput)
-      const { provedores, ativo } = estadoParaTela(salvo)
-      sendJson(res, 200, { provedores, ativo, storage: armazenamentoAtual() })
+      const { provedores, catalogo, ativo } = estadoParaTela(salvo)
+      sendJson(res, 200, { provedores, catalogo, ativo, storage: armazenamentoAtual() })
     } catch (erro) {
       sendErro(res, 400, (erro as Error).message)
     }

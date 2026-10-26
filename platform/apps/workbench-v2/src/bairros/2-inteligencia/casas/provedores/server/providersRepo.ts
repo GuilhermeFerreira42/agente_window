@@ -5,12 +5,12 @@
 //      (0600; o Git nem o enxerga; o `.gitignore` do repo é a segunda tranca).
 // D83: a chave só sai INTEIRA pelo caminho do "olhinho" (rota de reveal).
 // D84: chave salva manda; variável de ambiente é reserva (a tela mostra a origem).
-// Migração v1 → v2 com backup `.bak-<carimbo>` antes de reescrever.
+// Migração v1/v2 → v3 com backup `.bak-<carimbo>` antes de reescrever.
 // ============================================================================
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { ArquivoProvedores, ProvedorConfig, ProvedorNaTela, SalvarProvedoresInput } from '../contract'
+import type { ArquivoProvedores, ProvedorConfig, ProvedorNaTela, Protocolo, SalvarProvedoresInput } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
 
 // Re-export MÍNIMO (glicose da prefeitura): quem monta o alvo da conversa
@@ -27,7 +27,21 @@ export function armazenamentoAtual(): 'fixture' | 'repo-home' {
   return process.env.AGENTE_WINDOW_PROVIDERS_PATH ? 'fixture' : 'repo-home'
 }
 
-const VAZIO: ArquivoProvedores = { versao: 2, ativo: null, provedores: {} }
+const VAZIO: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
+
+// Mutex em processo compartilhado por salvar e por linearizar o início do fetch.
+let caudaMutex: Promise<void> = Promise.resolve()
+async function adquirirMutex(): Promise<() => void> {
+  const anterior = caudaMutex
+  let liberar!: () => void
+  caudaMutex = new Promise<void>((resolve) => { liberar = resolve })
+  await anterior
+  return liberar
+}
+async function sobMutex<T>(operacao: () => Promise<T>): Promise<T> {
+  const liberar = await adquirirMutex()
+  try { return await operacao() } finally { liberar() }
+}
 
 /** Máscara (D83): nunca menos que 4 pontos + os 4 últimos caracteres. */
 export function mascararChave(chave: string): string {
@@ -43,18 +57,23 @@ function eArquivoV1(valor: unknown): valor is Record<string, { enabled?: boolean
   return v.versao === undefined && (v.openai !== undefined || v.gemini !== undefined || v.ollama !== undefined)
 }
 
-/** v1 → v2: preserva o que dava para preservar (o resto o dono redigita na tela). */
-export function migrarV1ParaV2(v1: Record<string, { enabled?: boolean; baseUrl?: string }>): ArquivoProvedores {
-  const saida: ArquivoProvedores = { versao: 2, ativo: null, provedores: {} }
+/** v1 → v3: preserva provedores; modelos sem seleção explícita ficam desabilitados. */
+export function migrarV1ParaV3(v1: Record<string, { enabled?: boolean; baseUrl?: string }>): ArquivoProvedores {
+  const saida: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
   if (typeof v1.ollama?.baseUrl === 'string' && v1.ollama.baseUrl.trim()) {
-    saida.provedores.ollama = { baseUrl: v1.ollama.baseUrl.trim().replace(/\/$/, ''), modelo: '' }
+    saida.provedores.ollama = {
+      baseUrl: v1.ollama.baseUrl.trim().replace(/\/$/, ''),
+      modelo: '',
+      modelosHabilitados: [],
+      habilitado: true,
+    }
   }
   if (v1.openai?.enabled) {
-    saida.provedores.openai = { baseUrl: descritorPorId('openai')!.baseUrlPadrao, modelo: '' }
+    saida.provedores.openai = { baseUrl: descritorPorId('openai')!.baseUrlPadrao, modelo: '', modelosHabilitados: [], habilitado: true }
     saida.ativo = 'openai'
   }
   if (v1.gemini?.enabled) {
-    saida.provedores.gemini = { baseUrl: descritorPorId('gemini')!.baseUrlPadrao, modelo: '' }
+    saida.provedores.gemini = { baseUrl: descritorPorId('gemini')!.baseUrlPadrao, modelo: '', modelosHabilitados: [], habilitado: true }
     saida.ativo ??= 'gemini'
   }
   return saida
@@ -71,6 +90,15 @@ function validarProvedor(id: string, bruto: ProvedorConfig, guardados: ProvedorC
   if (!baseUrl) throw new Error(`${id}: informe o endereço do serviço (ex.: https://api.groq.com/openai/v1).`)
   if (!/^https?:\/\//.test(baseUrl)) throw new Error(`${id}: o endereço deve começar com http:// ou https://`)
   const limpo: ProvedorConfig = { baseUrl: baseUrl.replace(/\/+$/, ''), modelo: bruto.modelo.trim() }
+  if (bruto.modelosHabilitados !== undefined && (!Array.isArray(bruto.modelosHabilitados) || bruto.modelosHabilitados.some((modelo) => typeof modelo !== 'string' || modelo.trim() === ''))) {
+    throw new Error(`${id}: modelosHabilitados deve conter apenas identificadores de modelo não vazios.`)
+  }
+  if (bruto.habilitado !== undefined && typeof bruto.habilitado !== 'boolean') throw new Error(`${id}: habilitado deve ser verdadeiro ou falso.`)
+  const habilitados = Array.isArray(bruto.modelosHabilitados)
+    ? bruto.modelosHabilitados.map((modelo) => modelo.trim())
+    : limpo.modelo ? [limpo.modelo] : []
+  limpo.modelosHabilitados = [...new Set(habilitados)]
+  limpo.habilitado = bruto.habilitado !== false
   if (descritor.generico) {
     const nome = (bruto.nome ?? '').trim()
     if (!nome) throw new Error('Compatível com OpenAI: dê um nome ao serviço (ex.: Groq).')
@@ -99,7 +127,7 @@ export function validarEntrada(input: SalvarProvedoresInput, atual: ArquivoProve
   if (!input || typeof input !== 'object' || !input.provedores || typeof input.provedores !== 'object') {
     throw new Error('Payload inválido: falta `provedores`.')
   }
-  const saida: ArquivoProvedores = { versao: 2, ativo: null, provedores: {} }
+  const saida: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
   for (const [id, bruto] of Object.entries(input.provedores)) {
     saida.provedores[id] = validarProvedor(id, bruto as ProvedorConfig, atual.provedores[id])
   }
@@ -123,11 +151,24 @@ export async function lerArquivo(caminho = caminhoDoArquivo()): Promise<ArquivoP
   } catch {
     throw new Error(`O arquivo de provedores está corrompido: ${caminho}. Há um backup .bak ao lado.`)
   }
-  if (eArquivoV1(bruto)) return migrarV1ParaV2(bruto)
-  if (bruto && typeof bruto === 'object' && (bruto as { versao?: unknown }).versao === 2) {
-    const v2 = bruto as ArquivoProvedores
-    if (!v2.provedores || typeof v2.provedores !== 'object') return VAZIO
-    return v2
+  if (eArquivoV1(bruto)) return migrarV1ParaV3(bruto)
+  if (bruto && typeof bruto === 'object') {
+    const versao = (bruto as { versao?: unknown }).versao
+    if (versao === 2) {
+      const v2 = bruto as { ativo: string | null; provedores?: Record<string, ProvedorConfig> }
+      if (!v2.provedores || typeof v2.provedores !== 'object' || Array.isArray(v2.provedores)) throw new Error(`Formato v2 inválido em ${caminho}.` )
+      const provedores: Record<string, ProvedorConfig> = {}
+      for (const [id, config] of Object.entries(v2.provedores)) {
+        const modelo = typeof config.modelo === 'string' ? config.modelo.trim() : ''
+        provedores[id] = { ...config, modelosHabilitados: modelo ? [modelo] : [], habilitado: true }
+      }
+      return { versao: 3, ativo: v2.ativo ?? null, provedores }
+    }
+    if (versao === 3) {
+      const v3 = bruto as ArquivoProvedores
+      if (!v3.provedores || typeof v3.provedores !== 'object' || Array.isArray(v3.provedores)) throw new Error(`Formato v3 inválido em ${caminho}.`)
+      return v3
+    }
   }
   throw new Error(`Formato não reconhecido em ${caminho}.`)
 }
@@ -146,14 +187,74 @@ async function backupSeExistir(caminho: string): Promise<string | null> {
 }
 
 export async function salvarArquivo(input: SalvarProvedoresInput, caminho = caminhoDoArquivo()): Promise<ArquivoProvedores> {
-  const atual = await lerArquivo(caminho)
-  const validado = validarEntrada(input, atual)
-  await mkdir(dirname(caminho), { recursive: true })
-  await backupSeExistir(caminho)
-  const temporario = `${caminho}.tmp-${process.pid}`
-  await writeFile(temporario, `${JSON.stringify(validado, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-  await rename(temporario, caminho)
-  return validado
+  return sobMutex(async () => {
+    const atual = await lerArquivo(caminho)
+    const validado = validarEntrada(input, atual)
+    await mkdir(dirname(caminho), { recursive: true })
+    await backupSeExistir(caminho)
+    const temporario = `${caminho}.tmp-${process.pid}`
+    await writeFile(temporario, `${JSON.stringify(validado, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+    await rename(temporario, caminho)
+    return validado
+  })
+}
+
+export interface ConfigChamadaModelo {
+  providerId: string
+  modelId: string
+  protocolo: Protocolo
+  baseUrl: string
+  apiKey: string | null
+  temperatura?: number
+  maxSaida?: number
+}
+
+/**
+ * Lineariza validação do par habilitado com o início do fetch.
+ * O callback deve iniciar o request sincronamente e devolver sua Promise; o
+ * mutex é liberado antes de aguardar headers/body, permitindo disable normal
+ * enquanto a chamada já iniciada termina. Revogação de credencial continua
+ * sujeita ao AbortSignal do run quando suportado.
+ */
+export async function iniciarChamadaModelo<T>(
+  providerId: string,
+  modelId: string,
+  iniciar: (config: ConfigChamadaModelo) => Promise<T>,
+  caminho = caminhoDoArquivo(),
+): Promise<T> {
+  const liberar = await adquirirMutex()
+  let resposta: Promise<T>
+  try {
+    const arquivo = await lerArquivo(caminho)
+    const provedor = arquivo.provedores[providerId]
+    if (!provedor || provedor.habilitado === false) {
+      throw Object.assign(new Error(`O provedor ${providerId} foi removido ou desabilitado antes da chamada.`), { code: 'selection_unavailable' })
+    }
+    if (!Array.isArray(provedor.modelosHabilitados) || !provedor.modelosHabilitados.includes(modelId)) {
+      throw Object.assign(new Error(`O modelo ${modelId} foi desabilitado ou removido antes da chamada.`), { code: 'model_disabled' })
+    }
+    const descritor = descritorPorId(providerId)
+    if (!descritor) throw Object.assign(new Error('O provedor selecionado não é mais reconhecido.'), { code: 'selection_unavailable' })
+    const { chave } = resolverChave(providerId, arquivo)
+    if (!descritor.chaveOpcional && !chave) {
+      throw Object.assign(new Error(`A credencial de ${providerId} foi removida ou está indisponível.`), { code: 'credential_unavailable' })
+    }
+    const config: ConfigChamadaModelo = {
+      providerId,
+      modelId,
+      protocolo: descritor.protocolo,
+      baseUrl: (provedor.baseUrl || descritor.baseUrlPadrao).replace(/\/+$/, ''),
+      apiKey: chave,
+      temperatura: provedor.temperatura,
+      maxSaida: provedor.maxSaida,
+    }
+    // Não usar `await`: iniciar() precisa começar o fetch enquanto o mutex
+    // ainda ordena com salvarArquivo, mas a resposta pode terminar depois.
+    resposta = iniciar(config)
+  } finally {
+    liberar()
+  }
+  return resposta!
 }
 
 /** De onde a chave viria agora (D84): salva > ambiente; nada = null. */
@@ -167,17 +268,32 @@ export function resolverChave(id: string, arquivo: ArquivoProvedores): { chave: 
 }
 
 /** O estado que a TELA recebe (D83: chave só mascarada; origem visível — D84). */
-export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: ProvedorNaTela[]; ativo: string | null } {
+export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: ProvedorNaTela[]; catalogo: import('../contract').ItemCatalogoModelo[]; ativo: string | null } {
   const provedores: ProvedorNaTela[] = []
+  const catalogo: import('../contract').ItemCatalogoModelo[] = []
   for (const descritor of DESCRITORES) {
     const salvo = arquivo.provedores[descritor.id]
     if (!salvo) continue
     const { chave, origem } = resolverChave(descritor.id, arquivo)
+    if (salvo.habilitado !== false && Array.isArray(salvo.modelosHabilitados)) {
+      for (const modelId of salvo.modelosHabilitados) {
+        if (typeof modelId !== 'string' || modelId.length === 0) continue
+        catalogo.push({
+          providerId: descritor.id,
+          modelId,
+          label: `${descritor.generico ? salvo.nome ?? descritor.nome : descritor.nome} — ${modelId}`,
+          protocol: descritor.protocolo,
+          capability: 'unknown',
+        })
+      }
+    }
     provedores.push({
       id: descritor.id,
       nome: descritor.generico ? salvo.nome ?? descritor.nome : descritor.nome,
       baseUrl: salvo.baseUrl,
       modelo: salvo.modelo,
+      modelosHabilitados: Array.isArray(salvo.modelosHabilitados) ? salvo.modelosHabilitados : [],
+      habilitado: salvo.habilitado !== false,
       contexto: salvo.contexto ?? descritor.padroes.contexto,
       maxSaida: salvo.maxSaida ?? descritor.padroes.maxSaida,
       temperatura: salvo.temperatura ?? descritor.padroes.temperatura,
@@ -186,7 +302,7 @@ export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: Proved
       variavelAmbiente: descritor.variavelAmbiente ?? null,
     })
   }
-  return { provedores, ativo: arquivo.ativo }
+  return { provedores, catalogo, ativo: arquivo.ativo }
 }
 
 /** D83 — o "olhinho": devolve a chave INTEIRA de UM provedor (rota com no-store). */

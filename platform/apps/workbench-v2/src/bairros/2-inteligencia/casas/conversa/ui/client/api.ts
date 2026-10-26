@@ -5,7 +5,7 @@
 // A chave nunca aparece: o navegador conversa COM O SERVIDOR DO APP, e só ele
 // fala com o provedor.
 // ============================================================================
-import type { CategoriaErro, EventoChat, MensagemChat } from '../../contract'
+import type { CategoriaErro, EventoChat, MensagemChat, SelecaoModelo } from '../../contract'
 import { criarFramerSSE } from '../../server/streaming'
 
 export interface OuvintesConversa {
@@ -22,7 +22,7 @@ export interface ControleConversa {
   abortar: () => void
 }
 
-export function enviarConversa(messages: MensagemChat[], ouvintes: OuvintesConversa): ControleConversa {
+export function enviarConversa(messages: MensagemChat[], ouvintes: OuvintesConversa, modelSelection: SelecaoModelo = { tipo: 'auto' }): ControleConversa {
   const controlador = new AbortController()
   void (async () => {
     let encerrou = false
@@ -30,7 +30,7 @@ export function enviarConversa(messages: MensagemChat[], ouvintes: OuvintesConve
       const resposta = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({ messages, modelSelection }),
         signal: controlador.signal,
       })
 

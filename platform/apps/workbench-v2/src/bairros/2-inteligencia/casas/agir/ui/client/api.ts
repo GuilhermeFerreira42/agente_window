@@ -30,6 +30,7 @@ export interface OuvintesAgir {
 
 export interface EntradaAgir {
   mensagens: MensagemSimples[]
+  modelSelection?: { tipo: 'auto' } | { tipo: 'explicita'; providerId: string; modelId: string }
   fluxo: string
   sessionId: string
   chatId: string
@@ -197,6 +198,7 @@ function abrirFio(url: string, corpo: unknown, escopo: EscopoRun, ouvintes: Ouvi
 export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): ControleAgir {
   return abrirFio('/api/agir', {
     messages: entrada.mensagens,
+    modelSelection: entrada.modelSelection ?? { tipo: 'auto' },
     fluxo: entrada.fluxo,
     sessionId: entrada.sessionId,
     chatId: entrada.chatId,
