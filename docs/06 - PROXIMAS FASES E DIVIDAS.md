@@ -633,6 +633,18 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 - Plataforma: o build script não gera addon em Windows/macOS (há stub-fonte opcional); o loader informa indisponibilidade; sem fallback. Não há implementação de junction/reparse-point nem teste real Windows nesta missão; F2 não concluída/homologada. Para teste, exigir validação real no Windows antes de liberar qualquer operação ali.
 - Evidência atual: `npm run build:fs-boundary` passou no Linux x64 / Node 20.20.2 / kernel 6.1.158; `npm run typecheck` passou; 5 suítes focadas, 38/38 (22 testes dedicados a FS/lixeira/excluir), incluindo symlink e worker concorrente que alterna diretório/symlink durante read/create/write. Essas evidências não substituem a bateria integral da SPEC nem homologação. Commit `f850fc5`; sem push.
 
+### Registro técnico de implementação F3 (2026-10-26; SPEC D119 preservada)
+
+- `runId` aleatório e geração server-side vinculam SSE, approvals e `/api/agir/cancel`; cancelamento valida sessão/chat/workspace, marca terminal, invalida cartões pendentes e aborta o provedor. Respostas de approval antigas/duplicadas recebem 409; apenas uma continuação pode consumir uma pausa. A UI espera ACK do servidor e, sem ACK, não marca a execução como parada.
+- Resultado de ferramenta já iniciada é preservado; cancelamento não inicia próxima ferramenta/iteração. O cliente continua drenando o SSE após ACK para receber resultado concluído. F3 ainda não está homologada; Windows e cenários E2E reais não foram executados nesta rodada.
+- Evidência: `npm run typecheck` passou; `agir.test.ts` + `rotas.test.ts` 37/37; casos focados de Parar em `App.test.tsx` 2/2; teste de approval da UI 1/1. Avisos do mock de `/fs/workspace` no ambiente de teste são esperados e não invalidaram os casos; a suíte integral App teve resultados históricos intermitentes fora dos testes focados. Commit `3bef5af`; sem push.
+
+### Registro técnico de implementação F4 (2026-10-26; SPEC D119 preservada)
+
+- `criar` mantém a primitiva Linux `renameat2(RENAME_NOREPLACE)`: destino existente retorna conflito sem substituir bytes; foram acrescentados testes para colisão e duas criações concorrentes no mesmo destino.
+- **Escrita Agir está deliberadamente bloqueada e falha fechada.** A validação de inode seguida por `renameat2` não oferece CAS atômico: um escritor externo pode mudar o arquivo depois da checagem e antes do rename. Não há primitive demonstrada de commit condicional à versão aprovada nem lock obrigatório para escritores externos; por isso o executor não chama `writeAtomic`, não usa fallback, e reporta que nenhum byte foi alterado. O helper antigo permanece no backend F2, mas não é caminho de execução permitido para `escrever` Agir.
+- Evidência Linux: `discos.test.ts` 13/13 e `npm run typecheck` passaram; Windows não testado. F4 está **parcialmente implementada**, sem escrita segura habilitada, sem matriz completa de falhas/injeções e sem homologação. Documentar atomicidade/versão não substitui prova do commit condicional. Commit de implementação será registrado após validação Git; sem push.
+
 ### SPEC CANDIDATA FINALIZADA F3 — cancelamento como invalidação terminal de aprovação (D107)
 
 **Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.

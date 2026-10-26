@@ -172,15 +172,11 @@ export function criarExecutoresReais(raiz: string): ExecutoresDisco {
     const porta = prepararPorta(raizResolvida, pedido.argumentos.caminho)
     if (!porta.ok) return falha(porta.resumo)
     if (!fs) return falhaF2()
-    try {
-      fs.writeAtomic(porta.relativo, Buffer.from(String(pedido.argumentos.conteudo), 'utf8'))
-    } catch (erro) {
-      if ((erro as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        return falha(`"${String(pedido.argumentos.caminho)}" não existe ainda — peça a ferramenta "criar" para arquivos novos.`)
-      }
-      return falha(`Não deu para reescrever "${String(pedido.argumentos.caminho)}" com segurança (link, mudança concorrente ou falha do disco).`)
-    }
-    return { ok: true, resumo: `Arquivo "${String(pedido.argumentos.caminho)}" reescrito por substituição atômica segura.` }
+    // F4: path+inode revalidados antes de rename não constituem CAS — há uma
+    // janela para escritor externo trocar/modificar o destino após a checagem.
+    // Como não há primitive comprovada para condicionar o commit à versão
+    // observada na aprovação, escrita Agir falha fechada e não toca no arquivo.
+    return falha(`Escrita bloqueada: esta plataforma ainda não oferece commit condicional seguro à versão aprovada de "${String(pedido.argumentos.caminho)}". Nenhum byte foi alterado; releia/revise e use o editor normal.`)
   }
 
   const excluir: ExecutorFerramenta = async (pedido) => {

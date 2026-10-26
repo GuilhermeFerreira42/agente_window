@@ -27,6 +27,23 @@ describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () =
     await expect(readFile(caminhoAbsoluto('sub/ola.txt'), 'utf8')).resolves.toBe('olá, dono!')
   })
 
+  it('criar em destino existente falha sem substituir bytes já presentes', async () => {
+    const colisao = await exec.criar({ id: '1b', ferramenta: 'criar', argumentos: { caminho: 'sub/ola.txt', conteudo: 'não substituir' } })
+    expect(colisao.ok).toBe(false)
+    expect(colisao.resumo).toContain('já existe')
+    await expect(readFile(caminhoAbsoluto('sub/ola.txt'), 'utf8')).resolves.toBe('olá, dono!')
+  })
+
+  it('duas criações concorrentes no mesmo destino: uma vence e a outra preserva o vencedor', async () => {
+    const resultados = await Promise.all([
+      exec.criar({ id: 'race-a', ferramenta: 'criar', argumentos: { caminho: 'corrida.txt', conteudo: 'A' } }),
+      exec.criar({ id: 'race-b', ferramenta: 'criar', argumentos: { caminho: 'corrida.txt', conteudo: 'B' } }),
+    ])
+    expect(resultados.filter((resultado) => resultado.ok)).toHaveLength(1)
+    expect(resultados.filter((resultado) => !resultado.ok && resultado.resumo.includes('já existe'))).toHaveLength(1)
+    await expect(readFile(caminhoAbsoluto('corrida.txt'), 'utf8')).resolves.toMatch(/^(A|B)$/)
+  })
+
   it('ler devolve o conteúdo para o MODELO e o resumo para a TELA', async () => {
     const r = await exec.ler({ id: '2', ferramenta: 'ler', argumentos: { caminho: 'sub/ola.txt' } })
     expect(r.ok).toBe(true)
@@ -45,14 +62,14 @@ describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () =
     expect(r.conteudo).toContain('sub/')
   })
 
-  it('escrever EXIGE arquivo existente e sobrescreve por completo', async () => {
-    const nova = await exec.escrever({ id: '5', ferramenta: 'escrever', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'x' } })
-    expect(nova.ok).toBe(false)
-    expect(nova.resumo).toContain('"criar"')
+  it('escrever falha fechada sem CAS demonstrável e preserva os bytes do arquivo', async () => {
+    const ausente = await exec.escrever({ id: '5', ferramenta: 'escrever', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'x' } })
+    expect(ausente.ok).toBe(false)
     await exec.criar({ id: '6', ferramenta: 'criar', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'primeira versão' } })
     const reescrito = await exec.escrever({ id: '7', ferramenta: 'escrever', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'segunda versão maior' } })
-    expect(reescrito.ok).toBe(true)
-    await expect(readFile(caminhoAbsoluto('novo-aqui.txt'), 'utf8')).resolves.toBe('segunda versão maior')
+    expect(reescrito.ok).toBe(false)
+    expect(reescrito.resumo).toContain('commit condicional seguro')
+    await expect(readFile(caminhoAbsoluto('novo-aqui.txt'), 'utf8')).resolves.toBe('primeira versão')
   })
 
   it('buscar acha por pedaço do nome, recursivo, IGNORANDO node_modules', async () => {
@@ -86,7 +103,7 @@ describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () =
 
   it('o resto da pasta fica intacto (pasta temporária só com o que os testes criaram)', async () => {
     const itens = await readdir(raiz)
-    expect(itens.sort()).toEqual(['node_modules', 'novo-aqui.txt', 'sub'])
+    expect(itens.sort()).toEqual(['corrida.txt', 'node_modules', 'novo-aqui.txt', 'sub'])
   })
 
   it('buscar não atravessa symlink para nomes externos', async () => {
