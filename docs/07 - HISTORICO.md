@@ -3,9 +3,9 @@
 ## 2026-10-26 — Implementação F1 (em revisão final; sem homologação)
 - Implementado boundary local em Vite e `server.mjs`, binds loopback, Host/Origin estritos e rejeição de upgrade WebSocket sem origem autorizada; credenciais/serviços externos não foram usados.
 - Grants SQLite por sessão + workspace substituem `localStorage` como autoridade; as rotas Agir resolvem sessão/conversa/raiz/grants persistidos e revalidam contexto antes do provider e imediatamente antes de executar ferramenta. Sessões novas são persistidas antes do primeiro run.
-- Typecheck passou; suíte focada (5 arquivos) 43/43; `App.test.tsx` 46 passou / 13 skipped. Vite com fixtures em `/tmp`: GET same-origin 200, cross-origin PUT 403, POST sem Origin 403, Host inválido 403, tentativa WebSocket PTY de origem hostil rejeitada.
-- `npm run build` falhou por limite de heap do Node durante `vite build`; nenhum diagnóstico de erro de código. Windows, E2E de browser, preview `server.mjs` em runtime, PTY standalone, rede externa real, provedor real e homologação humana não executados. F1 aguarda revisão final/commit; F2 ainda não começou.
-- Sem alterar os serviços operacionais; sem push. O commit da implementação F1 e seu hash serão anotados após a revisão deste diff.
+- Typecheck passou; suíte focada (5 arquivos) 43/43; `App.test.tsx` 46 passou / 13 skipped. Vite com fixtures em `/tmp`: GET same-origin 200, cross-origin PUT 403, POST sem Origin 403, Host inválido 403, tentativa WebSocket PTY de origem hostil rejeitada; override Vite para bind externo recusado (exit 1, sem listener).
+- `npm run build` falhou por limite de heap do Node durante `vite build`; nenhum diagnóstico de erro de código. Windows, E2E de browser, preview `server.mjs` em runtime, PTY standalone, rede externa real, provedor real e homologação humana não executados. F2 ainda não começou.
+- Sem alterar os serviços operacionais; sem push. Commit F1: `e90bc90` (`feat: fechar fronteira local F1 e autoridade de sessão`).
 
 ## 2026-10-26 — Aprovação formal D118–D119 e início autorizado F1–F5 (preparo documental)
 - Baseline desta missão verificado: branch `docs/capacidades-d102-alinhamento`, HEAD `8b2f90e28a061017eeaa378903624bef0a4d2557`, árvore inicialmente limpa; nove canônicos lidos e rastreabilidade das seis SPECs revisada.
