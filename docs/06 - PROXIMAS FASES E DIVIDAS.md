@@ -540,7 +540,7 @@ M5–M8 mantêm os nomes/estudos prévios no `arquivo_morto` como **material his
 
 ## Auditoria técnica F1–F8 — SPECs candidatas F1–F5 e avaliação F6–F8 (26/10/2026)
 
-> **Estado e autoridade:** F1–F4, F5-A e F5-B estão **finalizadas como SPECs candidatas — aguardando aprovação do dono**; não são SPECs aprovadas para implementação nem autorização de execução. D103–D117 são decisões/restrições aprovadas para orientar o desenho, não prova de que o código já as cumpra. Esta rodada foi inspeção estática; nenhum teste, serviço, trace, benchmark, provedor real ou homologação foi executado. Código de produção, configurações operacionais e roadmap não foram alterados. F6–F8 permanecem avaliações, sem SPEC nesta rodada.
+> **Estado e autoridade no fechamento da auditoria:** as seis SPECs estavam candidatas e aguardavam o dono naquele registro. **D119 (05) aprova agora F1–F4, F5-A e F5-B para implementação restrita nesta missão**, sem alterar seus critérios abaixo nem declarar testes/homologação. D103–D118 orientam os contratos, sem provar comportamento do código. A auditoria original foi estática; nenhum teste, serviço, trace, benchmark, provedor real ou homologação ocorreu naquela rodada. F6–F8 permanecem avaliações, sem SPEC aprovada.
 >
 > **Vocabulário de evidência:** “confirmado estaticamente” significa que a lógica/payload está visível no baseline; não significa execução ou exploração reproduzida. “Risco” descreve consequência plausível ainda não reproduzida. “Não observado” significa que a cobertura consultada não permite afirmar presença/ausência além do trecho examinado.
 
@@ -558,7 +558,7 @@ M5–M8 mantêm os nomes/estudos prévios no `arquivo_morto` como **material his
 
 ### SPEC CANDIDATA FINALIZADA F1 — autoridade da API, vínculo sessão/workspace e acesso local (D103–D105/D113)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
 
 
 **Evidência estática.** `/api/agir` recebe `workspace`, `fluxo` e `permissoes` no corpo; `validarPedido` valida forma/tipo, e `pastaDeTrabalhoAgir` canoniza/exige diretório, mas não consulta o registro persistido para comprovar que aquele workspace pertence à sessão/fluxo. `permissoesPorFluxo` aceita a lista filtrada enviada pelo browser; o cliente persiste “Permitir na Sessão” localmente e a reenvia. `obterAlvoDeConversa()` escolhe provedor/modelo/chave da configuração local ativa, não de uma identidade autenticada da chamada. As rotas de sessão, workspace, provider/reveal, `/fs/*`, Git e PTY também precisam ser incluídas no inventário de superfície; uma guarda apenas em `/api/agir` seria incompleta. O middleware central `sessionPersistencePlugin` é ponto natural de política comum, mantendo a autorização de domínio em cada casa/serviço. A configuração Vite atual não impõe local-only.
@@ -599,7 +599,7 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 ### SPEC CANDIDATA FINALIZADA F2 — contenção física de caminho, links e reparse points (D106/D111)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
 
 
 **Evidência estática.** `verificarTerritorio()` usa `path.resolve` e compara prefixo por segmento (com tratamento de caixa/prefixo Windows); não consulta `realpath`/`lstat` do alvo. Os testes `territorio.test.ts` cobrem escapes lexicais e simulação `path.win32`, não symlink/junction. Os executores chamam `stat/readFile/writeFile/rename` depois da guarda; operações podem seguir links simbólicos. `FsHost.toFsPath()` também é lexical. Não há prova de exploração reproduzida nem teste de link encontrado na suíte examinada.
@@ -626,7 +626,7 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 ### SPEC CANDIDATA FINALIZADA F3 — cancelamento como invalidação terminal de aprovação (D107)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
 
 
 **Evidência estática.** A rota registra `req.on('close')` depois de consumir o corpo e usa esse evento para abortar; não há listener explícito de fechamento da resposta nem race entre `AbortSignal` e a Promise que espera a aprovação. `rodarAgir()` aguarda `pedirAprovacao()` e, quando ela resolve, chama o executor sem uma nova checagem do sinal entre a aprovação e o efeito. A rota `/api/agir/aprovar` resolve pelo par texto `(fluxo,id)` enquanto o resolver estiver no mapa. Testes cobrem negar/aprovar e fluxo morto, mas não corrida de cancelamento, resposta atrasada/duplicada, duas continuações ou mutação depois do abort. Isso é lacuna estática; não foi reproduzida.
@@ -653,7 +653,7 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 ### SPEC CANDIDATA FINALIZADA F4 — criar exclusivo, escrever condicional e gravação segura (D106)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. O conteúdo especifica contrato futuro; não afirma implementação, teste ou homologação.
 
 
 **Evidência estática.** Em `agir/server/discos.ts`, `criar` faz `stat`; se o destino já for arquivo regular, não recusa e segue para `gravarAtomico`, cujo `rename` pode substituir o destino. `escrever` só verifica `stat().isFile()` e regrava sem token de versão nem fila por caminho. `gravarAtomico` tenta `rename`, mas, se ele falha, cai para `writeFile(destino, ...)`, que não é atômico e pode truncar/substituir. Não há teste de colisão, mutação concorrente ou falha de rename em `discos.test.ts`. O `FsHost` interno tem fila por URI e temp+rename, porém não oferece compare-and-swap nem recusa symlink e não é chamado por Agir; não é solução drop-in.
@@ -682,7 +682,7 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 ### SPEC CANDIDATA FINALIZADA F5-A — enforcement dos modos no servidor (D108, D114)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. Baseada em inspeção estática; não autoriza implementação/teste de aceitação e não muda a homologação histórica da FATIA 10.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. Baseada em inspeção estática, que não prova implementação nem substitui testes de aceitação; não muda a homologação histórica da FATIA 10.
 
 **Problema e evidência estática.** `ChatInput.tsx` oferece `agent`, `edit`, `ask`, `plan`; `App.tsx` mantém `modeByChat` em estado React e anota `mode` na mensagem local. O cliente `agir/ui/client/api.ts` envia mensagens, fluxo, workspace e permissões, mas não serializa o modo. A rota Agir valida mensagens/contexto e executa o mesmo loop que registra/executa ferramentas. `modeByChat` não é estado durável de `NestedChat`; transcript persiste as mensagens já enviadas, não necessariamente a escolha corrente do compositor. `/api/chat` também não aceita uma política de modo. Nenhum ataque ou tentativa de escrita em Ask/Plan foi reproduzido: conclusão exclusivamente estática.
 
@@ -708,7 +708,7 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 ### SPEC CANDIDATA FINALIZADA F5-B — catálogo de modelos e seleção efetiva (D115–D117, DEBT-14)
 
-**Estado:** SPEC candidata finalizada — aguardando aprovação do dono. D115–D117 estão aprovadas como decisões; contrato, migração e execução continuam planejados, não implementados. Não migrar arquivo real do usuário nem chamar provedor nesta etapa.
+**Estado:** SPEC candidata aprovada para implementação por D119; implementação, teste e homologação permanecem estados separados. D115–D118 estão aprovadas como decisões; contrato, migração e execução continuam planejados, não implementados. Não migrar arquivo real do usuário nem chamar provedor nesta etapa.
 
 **Problema e evidência estática.** `ChatInput.tsx` contém uma lista fixa (`Auto`, `Claude Sonnet 4`, `GPT-5`, `GPT-5 mini`). `App.tsx` guarda `modelByChat` em estado React volátil, aplica defaults fixos e registra string de modelo/modo nas mensagens; `agir/ui/client/api.ts` não transmite seleção de modelo. `session-persistence/chatAlvo.ts` ignora o seletor e resolve `ArquivoProvedores.ativo` + `provedores[id].modelo` + chave/configuração do backend. O SSE/`done` apresenta o alvo do servidor; portanto o valor visível pode diferir do que foi enviado. Na Casa Provedores, `providers.json` v2 persiste **um único `modelo` por provedor**; `POST /api/providers/models` usa `listarModelos`, mas `ProvidersView.tsx` guarda a resposta apenas em `useState` local para a sessão da tela; escolher um item salva o campo único `modelo`. `DESCRITORES.modelosLocais` são sugestões, não catálogo autoritativo. `GET /api/providers` devolve estado redigido, mas não uma lista comum para o chat. Nenhuma chamada ou divergência foi reproduzida durante esta etapa; são fatos lidos no código. Compatibilidade verificada: resolver o alvo antes de abrir SSE (como já faz `chatAlvo.ts`) é compatível com Auto no início do run; contrato atual não transmite escolha explícita nem Auto. Incompatibilidade comprovada com D117: Agir cria um `AlvoConversa` fixo por run e fecha a mesma closure `vizinho` em todas as iterações; não relê habilitação entre chamadas ao provedor. Isso terá de mudar para gate por chamada, mantendo IDs fixos.
 
@@ -781,7 +781,12 @@ A passagem crítica releu decisões, contratos, exceções, corridas, aceites e 
 9. **Testes e rollback geral.** Todo plano acima é futuro e precisa de aprovação por escopo, fixtures descartáveis, cobertura unit/integration/E2E e aceite humano `08`; testes não rodam contra workspace real/5174. Regressão deve verificar funcionalidades homologadas que intersectam cada mudança; rollback por casa/commit, sem stash, reset, alteração operacional, push ou mudança destrutiva.
 10. **Operações expressamente proibidas nesta proposta.** Implementar ou homologar; habilitar rede/LAN; iniciar Vite/code-server/PTY/stubs; ler/expor credenciais reais; adicionar login, plugin, MCP, tool, terminal ou capacidade nova sem decisão; escrever/apagar fora de fixture; alterar D37/D93/D97, Fatias 13–20, numeração, M1–M8, Gate D98, referência congelada ou qualquer código/configuração operacional.
 
-**Decisões do dono fechadas:** D113–D117, inclusive Auto no início de cada run e bloqueio de toda chamada ainda não iniciada após disable. **Soluções técnicas propostas para avaliação:** Vite integrado local em loopback com Host/Origin exatos (preview/code-server separados); schema v3 compatível com `ativo+modelo`, habilitação por par e migração com backup; gate/mutex compartilhado entre salvar disable e invocar `fetch`. A garantia linearizável cobre mudanças administrativas pela instância do app; edição externa do arquivo é relida por chamada, mas escritor externo sem protocolo de lock não recebe tal garantia e pode exigir fail-closed. As seis SPECs seguem candidatas, não autorização de implementação.
+**Decisões do dono fechadas:** D113–D119; D116 mantém Auto no início de cada run, D117 trata disable e D118 remoção normal, e D119 autoriza apenas as seis SPECs desta missão. **Soluções técnicas propostas no planejamento (a confirmar contra o código durante a obra):** Vite integrado local em loopback com Host/Origin exatos (preview/code-server separados); schema compatível com `ativo+modelo`, habilitação por par e migração com backup; gate/mutex compartilhado entre salvamento administrativo e início de `fetch`. A garantia linearizável deve cobrir mudanças administrativas pela instância do app; edição externa do arquivo sem protocolo de lock pode exigir fail-closed. Aprovação não prova implementação nem homologação; F6–F8, D98, Fatias 13–20 e iniciativas M continuam fora desta autorização.
+
+
+### Atualização de autorização — D118/D119 (2026-10-26)
+
+D118 registra a semântica de remoção normal antes de F5-B: chamada já iniciada pode terminar; as seguintes são bloqueadas inclusive no mesmo run; resultados concluídos são preservados, motivo informado e sem fallback. D119 aprova somente as seis SPECs F1–F4/F5-A/F5-B para implementação nesta missão, na ordem F1→F2→F3→F4→F5-A→F5-B. Os parágrafos de proibição no registro original descrevem o estado anterior à aprovação e não autorizam D98, Fatias 13–20, F6–F8 ou iniciativas M. Nenhum resultado de teste/homologação é implícito.
 
 ## Matriz de rastreabilidade da visão V1.0 — CAP-01 a CAP-20 (D100; revisada com D103–D117)
 

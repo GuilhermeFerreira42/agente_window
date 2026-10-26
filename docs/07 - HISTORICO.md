@@ -1,5 +1,11 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-26 — Aprovação formal D118–D119 e início autorizado F1–F5 (preparo documental)
+- Baseline desta missão verificado: branch `docs/capacidades-d102-alinhamento`, HEAD `8b2f90e28a061017eeaa378903624bef0a4d2557`, árvore inicialmente limpa; nove canônicos lidos e rastreabilidade das seis SPECs revisada.
+- `05` registra D118 (remoção administrativa normal segue D117: in-flight pode terminar; chamadas futuras no mesmo run bloqueadas, sem fallback, preservando resultados e informando motivo) antes de qualquer implementação F5-B; D119 aprova formalmente, para implementação somente nesta missão, F1–F4/F5-A/F5-B em commits separados. `06` preserva os contratos das SPECs e atualiza apenas seus estados de aprovação.
+- Autorização não equivale a teste nem homologação. D98, Fatias 13–20, F6–F8 e M1–M8 fora de execução; sem push. Nesta etapa de registro, nenhuma alteração de código, teste, build, servidor, provedor real ou homologação ocorreu; implementação ainda não começou.
+- Commit documental de D118/D119 e status será registrado após validação Git; hashes de implementação e evidências serão acrescentados por frente.
+
 ## 2026-10-26 — D116–D117 e fechamento de seis SPECs candidatas (somente documentação)
 - Estado inicial conferido: branch `docs/capacidades-d102-alinhamento`, HEAD `ccad9c806fe43f0100db4319c5b8009a42aaa949`, árvore limpa, nove docs canônicos. Nenhuma alteração preexistente foi descartada.
 - `05` recebeu D116 (`Auto` resolve padrão Provedores no início de cada execução, fixa e exibe o par efetivo, sem router/fallback) e D117 (chamada upstream já iniciada pode concluir; toda chamada ainda não iniciada, inclusive no mesmo run, é revalidada/bloqueada após disable). D103–D115 preservadas; decisões não afirmam implementação, teste ou homologação.
