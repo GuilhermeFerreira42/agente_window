@@ -290,3 +290,11 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 - `providers.json` não contém `apiKey`; OpenAI/Gemini usam apenas status das env vars e Ollama guarda somente `baseUrl` HTTP(S).
 
 - A troca de workspace em sessão existente usa identidade explícita `{ sessionId, path }`; nunca há “sessão ativa global” no backend. UI coordena persistência, `/fs/workspace` e `/api/pty/cwd`, com compensação para o caminho anterior se uma etapa falhar.
+
+## 1.6 Implementação técnica F2 — limites vigentes (2026-10-26; D119)
+
+- Investigação prévia e decisão de implementação estão registradas em `06`, antes da adoção do helper. A fronteira é addon N-API C++ integrado no mesmo processo do Workbench; não cria serviço, servidor, porta ou processo auxiliar.
+- No Linux, um descritor raiz fixado e `openat2` com `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS`, `RESOLVE_NO_MAGICLINKS` e `RESOLVE_NO_XDEV` confinem leitura/listagem/busca/criação/escrita. A enumeração usa descritor de diretório e não segue symlink; criação exclusiva usa `renameat2(RENAME_NOREPLACE)`. O addon falha fechado se a syscall não existir/for bloqueada.
+- Exclusão/lixeira permanece bloqueada porque o fluxo anterior usava paths e não fechava TOCTOU. Windows/macOS não geram addon no script de build e o loader marca indisponível (há somente um stub-fonte opcional); sem fallback path-based e sem declarar a garantia testada. Nenhum teste real Windows foi executado; junctions/reparse points e Windows seguem pendentes.
+- Limites conhecidos: operação síncrona N-API; staging substitui inode com modo 0600 (não preserva ACL/modo); `fsync` do diretório/durabilidade após queda não prometidos. F4 ainda deve validar versão observada antes de permitir escrita; não confundir o recheck de inode F2 com CAS de conteúdo.
+- Evidência parcial, não homologação: build helper Linux, typecheck e 5 suítes focadas 38/38 passaram (22 testes nos quatro arquivos F2 e 16 de rota); worker concorrente alternou diretório real/symlink durante read/create/write e sentinelas fora permaneceram intactas. Commit parcial `ba3240c`. Cobertura de teste integral da SPEC e teste real Windows ainda faltam. Até então, falhas ficam bloqueadas e nenhuma alegação de segurança Windows é permitida.

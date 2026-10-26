@@ -3,21 +3,24 @@
 // temporária — criar/ler/listar/buscar/escrever, escrita atômica e a trava
 // de território ligada em cada ferramenta.
 // ============================================================================
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { criarExecutoresReais } from '../server/discos'
+import { fsSeguroDisponivel } from '../server/fsSeguro'
 
 const raiz = await mkdtemp(path.join(tmpdir(), 'agir-c2-'))
 const exec = criarExecutoresReais(raiz)
 const caminhoAbsoluto = (relativo: string): string => path.join(raiz, relativo)
 
 afterAll(async () => {
+  exec.fechar()
   await rm(raiz, { recursive: true, force: true })
+  await rm(`${raiz}-outside`, { recursive: true, force: true })
 })
 
-describe('Executores reais (disco de verdade)', () => {
+describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () => {
   it('criar grava o conteúdo exato (e cria subpastas no caminho)', async () => {
     const r = await exec.criar({ id: '1', ferramenta: 'criar', argumentos: { caminho: 'sub/ola.txt', conteudo: 'olá, dono!' } })
     expect(r.ok).toBe(true)
@@ -78,11 +81,22 @@ describe('Executores reais (disco de verdade)', () => {
   it('ler em pasta (não arquivo): recusa honesta apontando "listar"', async () => {
     const r = await exec.ler({ id: '13', ferramenta: 'ler', argumentos: { caminho: 'sub' } })
     expect(r.ok).toBe(false)
-    expect(r.resumo).toContain('"listar"')
+    expect(r.resumo).toContain('tipo de arquivo não permitido')
   })
 
   it('o resto da pasta fica intacto (pasta temporária só com o que os testes criaram)', async () => {
     const itens = await readdir(raiz)
     expect(itens.sort()).toEqual(['node_modules', 'novo-aqui.txt', 'sub'])
+  })
+
+  it('buscar não atravessa symlink para nomes externos', async () => {
+    const externo = `${raiz}-outside`
+    await mkdir(externo, { recursive: true })
+    await writeFile(path.join(externo, 'segredo-externo.txt'), 'sanitizado', 'utf8')
+    await symlink(externo, path.join(raiz, 'atalho-externo'))
+    const r = await exec.buscar({ id: '14', ferramenta: 'buscar', argumentos: { padrao: 'segredo-externo' } })
+    expect(r.ok).toBe(true)
+    expect(r.conteudo).toBe('')
+    await rm(externo, { recursive: true, force: true })
   })
 })

@@ -179,11 +179,12 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
   contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
+  const executores = criarExecutoresReais(fio.raiz)
   try {
     resultado = await rodarAgir({
       vizinho: criarVizinhoReal(fio.alvo),
       historico: fio.mensagens,
-      executores: criarExecutoresReais(fio.raiz),
+      executores,
       teto: fio.teto,
       emitir: (evento) => {
         if (abort.signal.aborted || res.writableEnded) return
@@ -224,6 +225,7 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
       escreverEvento(res, { type: 'error', code: 'resposta', message: 'Erro inesperado do servidor ao agir.' })
     }
   } finally {
+    executores.fechar()
     pendentesPorFluxo.delete(fluxo)
     permissoesPorFluxo.delete(fluxo)
     contextoPorFluxo.delete(fluxo)

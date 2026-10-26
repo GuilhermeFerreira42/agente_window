@@ -1,5 +1,13 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-26 — F2 parcial Linux: helper handle-relative; exclusão/plataformas não validadas bloqueadas
+- Investigação avaliou previamente `@cocalc/openat2@0.2.0` (Linux, sem enumeração necessária) e `fs-safe@0.25.0` (superfície maior, mas sem prova suficiente das garantias concorrentes e com fallback/complexidade incompatíveis). Sob a autorização D119 do dono, foi implementado addon N-API C++ integrado no processo; nenhum serviço/processo adicional.
+- Linux: root handle + `openat2` com resolução beneath/no symlinks/no magiclinks/no-cross-device; leitura, listagem, busca, criação exclusiva e escrita em staging. Exclusão/lixeira e prévia ficam fail-closed: nenhum path-based access; Windows/macOS recebem stub indisponível, sem fallback.
+- Build helper `npm run build:fs-boundary` passou em Linux x64, Node 20.20.2/kernel 6.1.158; `npm run typecheck` passou; 5 suítes focadas passaram **38/38** (22 nos quatro arquivos de filesystem/lixeira/excluir e 16 rotas), incluindo symlink, hardlink, traversal, busca sem seguir links e worker concorrente substituindo diretório por symlink durante read/create/write. Fixtures temporárias; nenhuma credencial, configuração global ou serviço real.
+- Limites: sem testes Windows/junction/reparse; sem exclusão real, homologação ou bateria integral; execução N-API síncrona; write substitui inode com modo 0600, sem preservar ACL/modo; sem garantia de durabilidade após queda. F2 permanece parcial e não homologada. F4 ainda terá de validar versão de conteúdo.
+- Suíte global após a frente: 934 passou / 13 falharam / 22 skip; falhas em `App.test.tsx` (regen), `TerminalPanel.test.tsx` (9, já no baseline histórico) e contratos visuais `iconLabels`/`themeTokens`/`visualStates` (3); não foi reproduzido o baseline integral nesta rodada. Nenhuma falha nos testes focados F2.
+- Commit F2 parcial: `ba3240c` (`feat: confinar operações Agir no Linux e falhar fechado`); sem push.
+
 ## 2026-10-26 — Implementação F1 (em revisão final; sem homologação)
 - Implementado boundary local em Vite e `server.mjs`, binds loopback, Host/Origin estritos e rejeição de upgrade WebSocket sem origem autorizada; credenciais/serviços externos não foram usados.
 - Grants SQLite por sessão + workspace substituem `localStorage` como autoridade; as rotas Agir resolvem sessão/conversa/raiz/grants persistidos e revalidam contexto antes do provider e imediatamente antes de executar ferramenta. Sessões novas são persistidas antes do primeiro run.
@@ -7,10 +15,10 @@
 - `npm run build` falhou por limite de heap do Node durante `vite build`; nenhum diagnóstico de erro de código. Windows, E2E de browser, preview `server.mjs` em runtime, PTY standalone, rede externa real, provedor real e homologação humana não executados. F2 ainda não começou.
 - Sem alterar os serviços operacionais; sem push. Commit F1: `e90bc90` (`feat: fechar fronteira local F1 e autoridade de sessão`).
 
-## 2026-10-26 — F2 pausada antes de alteração: decisão necessária sobre primitive nativa
+## 2026-10-26 — F2 pausada antes de alteração (estado anterior à autorização posterior do dono)
 - Revisão do escopo F2 confirmou que `territorio.ts` usa `path.resolve` lexical e `discos.ts` passa paths a `stat/readFile/writeFile/rename`; isso não demonstra contenção contra symlink/junction/reparse point nem TOCTOU.
 - As APIs path-based atuais não permitem provar a contenção de handles exigida pela SPEC F2. Não foi alterado código, instalação, configuração ou serviço para F2; nenhuma tentativa mutável foi executada.
-- Decisão arquitetural necessária: adicionar helper nativo handle-relative dentro do mesmo processo (sem serviço novo), com fail-closed por plataforma sem primitive segura. Teste Windows disponível nesta sessão: não. Aguardar confirmação antes de introduzir esse componente; F3 ainda não começou para manter a ordem D119.
+- Naquele momento, foi registrada a necessidade de autorização arquitetural para helper nativo handle-relative. O dono autorizou depois a opção 1 com investigação prévia e sem processo novo; esse bloqueio foi então removido e a implementação parcial F2 consta na entrada cronologicamente mais recente. F3 ainda segue a sequência D119.
 
 ## 2026-10-26 — Aprovação formal D118–D119 e início autorizado F1–F5 (preparo documental)
 - Baseline desta missão verificado: branch `docs/capacidades-d102-alinhamento`, HEAD `8b2f90e28a061017eeaa378903624bef0a4d2557`, árvore inicialmente limpa; nove canônicos lidos e rastreabilidade das seis SPECs revisada.
