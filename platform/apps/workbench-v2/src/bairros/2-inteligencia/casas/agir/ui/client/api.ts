@@ -7,6 +7,7 @@ import type {
   FerramentaId,
   MensagemSimples,
   PedidoFerramenta,
+  ModoAgir,
 } from '../../contract'
 import { criarFramerSSE } from '../../server/vizinho'
 
@@ -32,6 +33,7 @@ export interface EntradaAgir {
   fluxo: string
   sessionId: string
   chatId: string
+  mode: ModoAgir
 }
 
 export interface IdentidadeExecucaoAgir {
@@ -198,6 +200,7 @@ export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): Contro
     fluxo: entrada.fluxo,
     sessionId: entrada.sessionId,
     chatId: entrada.chatId,
+    mode: entrada.mode,
   }, { fluxo: entrada.fluxo, sessionId: entrada.sessionId, chatId: entrada.chatId }, ouvintes)
 }
 

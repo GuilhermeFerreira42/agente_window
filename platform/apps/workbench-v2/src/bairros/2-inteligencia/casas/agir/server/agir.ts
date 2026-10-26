@@ -52,6 +52,8 @@ export interface OpcoesAgir {
   pedirAprovacao?: (pedido: PedidoFerramenta) => Promise<boolean>
   /** Revalida sessão e workspace autoritativos antes de chamadas/effects. */
   validarContexto?: (pedido?: PedidoFerramenta) => boolean
+  /** Política server-side por modo; mensagem de bloqueio evita approval/executor. */
+  bloquearFerramenta?: (pedido: PedidoFerramenta) => string | null
   /** Parar: o mesmo sinal da conversa (09) — interrompido = silêncio. */
   sinal?: AbortSignal
 }
@@ -158,6 +160,13 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         mensagens.push({ papel: 'ferramenta', conteudo: `NÃO EXECUTADO: ${motivo}`, pedidoId: pedido.id, ferramenta: pedido.ferramenta })
         emitir({ type: 'error', code: 'loop', message: 'A IA repetiu a mesma ação 3 vezes seguidas e foi parada por segurança. Reformule o pedido com mais detalhes ou comece uma conversa nova.' })
         return { status: 'loop_bloqueado', textoFinal: '', iteracoes: iteracao }
+      }
+
+      const bloqueioPolitica = opcoes.bloquearFerramenta?.(pedido)
+      if (bloqueioPolitica) {
+        emitir({ type: 'tool_result', id: pedido.id, ferramenta: pedido.ferramenta, ok: false, resumo: bloqueioPolitica })
+        mensagens.push({ papel: 'ferramenta', conteudo: `NÃO EXECUTADO: ${bloqueioPolitica}`, pedidoId: pedido.id, ferramenta: pedido.ferramenta })
+        continue
       }
 
       let liberado = true

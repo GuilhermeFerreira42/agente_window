@@ -21,7 +21,7 @@ import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -1865,6 +1865,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         fluxo: `${sessionId}:${chatId}:${responseId}`,
         sessionId,
         chatId,
+        mode: (modeByChat[`${sessionId}:${chatId}`] ?? 'agent') as ModoAgir,
       },
       criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir),
     )

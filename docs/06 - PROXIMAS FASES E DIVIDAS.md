@@ -643,7 +643,13 @@ A API resolve `sessionId` server-side por `session-persistence` e exige sessão 
 
 - `criar` mantém a primitiva Linux `renameat2(RENAME_NOREPLACE)`: destino existente retorna conflito sem substituir bytes; foram acrescentados testes para colisão e duas criações concorrentes no mesmo destino.
 - **Escrita Agir está deliberadamente bloqueada e falha fechada.** A validação de inode seguida por `renameat2` não oferece CAS atômico: um escritor externo pode mudar o arquivo depois da checagem e antes do rename. Não há primitive demonstrada de commit condicional à versão aprovada nem lock obrigatório para escritores externos; por isso o executor não chama `writeAtomic`, não usa fallback, e reporta que nenhum byte foi alterado. O helper antigo permanece no backend F2, mas não é caminho de execução permitido para `escrever` Agir.
-- Evidência Linux: `discos.test.ts` 13/13 e `npm run typecheck` passaram; Windows não testado. F4 está **parcialmente implementada**, sem escrita segura habilitada, sem matriz completa de falhas/injeções e sem homologação. Documentar atomicidade/versão não substitui prova do commit condicional. Commit de implementação será registrado após validação Git; sem push.
+- Evidência Linux: `discos.test.ts` 13/13 e `npm run typecheck` passaram; Windows não testado. F4 está **parcialmente implementada**, sem escrita segura habilitada, sem matriz completa de falhas/injeções e sem homologação. Documentar atomicidade/versão não substitui prova do commit condicional. Commit `a7d37ba`; sem push.
+
+### Registro técnico de implementação F5-A (2026-10-26; SPEC D119 preservada)
+
+- A UI transmite enum estrito `agent|edit|ask|plan`; a rota rejeita ausência/valor inválido antes de consultar o provedor. O servidor fixa o modo no contexto da execução e preserva o snapshot ao continuar uma pausa.
+- Ask/Plan aceitam somente `ler/listar/buscar`; tool-call mutável é recusado no loop antes de approval/executor com motivo tipado no resultado. Agent/Edit compartilham os mesmos grants/aprovações. UI não é autoridade; política é imposta no backend.
+- Evidência: `npm run typecheck`; `rotas.test.ts` + `agir.test.ts` 42/42; teste de envio do modo na UI 1/1. Sem E2E/matriz Windows e sem homologação. Commit será registrado após validação Git; sem push.
 
 ### SPEC CANDIDATA FINALIZADA F3 — cancelamento como invalidação terminal de aprovação (D107)
 

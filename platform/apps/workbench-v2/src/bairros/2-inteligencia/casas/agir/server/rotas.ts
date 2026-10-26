@@ -20,7 +20,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
-import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples } from '../contract'
+import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples, ModoAgir } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
 import { permiteSessao } from './ferramentas'
@@ -56,6 +56,7 @@ interface ContextoFluxo {
   sessionId: string
   chatId: string
   raiz: string
+  modo: ModoAgir
 }
 type EstadoExecucao = 'running' | 'awaiting-approval' | 'cancel-requested' | 'cancelled' | 'completed' | 'paused'
 interface ExecucaoAgir extends ContextoFluxo {
@@ -148,6 +149,7 @@ type PedidoValidado = {
   fluxo: string
   sessionId: string
   chatId: string
+  modo: ModoAgir
 }
 
 /** Valida o pedido da tela (histórico visível + fluxo + território candidato). */
@@ -171,8 +173,12 @@ function validarPedido(corpo: Record<string, unknown>): { ok: true; pedido: Pedi
   if (!sessionId || !chatId) {
     return { ok: false, message: 'Pedido sem identidade da sessão/conversa; o servidor não iniciou a execução.' }
   }
+  const modo = corpo.mode
+  if (modo !== 'agent' && modo !== 'edit' && modo !== 'ask' && modo !== 'plan') {
+    return { ok: false, message: 'Modo inválido ou ausente; use agent, edit, ask ou plan.' }
+  }
   // `workspace` e `permissoes` antigos são deliberadamente ignorados: não são autoridade.
-  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId } }
+  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, modo } }
 }
 
 function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
@@ -230,7 +236,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   const { fluxo } = fio
   permissoesPorFluxo.set(fluxo, new Set(fio.permissoes))
-  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz })
+  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   const executores = criarExecutoresReais(fio.raiz)
@@ -276,6 +282,13 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido!.ferramenta)) return false
         permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
         return true
+      },
+      bloquearFerramenta: (pedido) => {
+        if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
+          const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
+          return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
+        }
+        return null
       },
       sinal: abort.signal,
     })
@@ -441,7 +454,7 @@ async function tratarAgir(
     return true
   }
   retomarPorFluxo.delete(fluxo)
-  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz }
+  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: validacao.pedido.modo }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   const resultado = await executarFioAgir(res, {
     execucao,

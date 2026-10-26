@@ -20,6 +20,7 @@ export type {
   FerramentaId,
   MensagemAgir,
   MensagemSimples,
+  ModoAgir,
   OpcoesVizinho,
   PedidoFerramenta,
   ProtocoloAgir,

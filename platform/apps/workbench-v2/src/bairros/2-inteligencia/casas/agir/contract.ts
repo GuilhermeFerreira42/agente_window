@@ -15,6 +15,9 @@ export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 /** As 6 ferramentas (D72 + FATIA 12 soma `excluir`) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
 export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
 
+/** IDs visuais estritos; o servidor mapeia agent/edit para a mesma política. */
+export type ModoAgir = 'agent' | 'edit' | 'ask' | 'plan'
+
 /**
  * Argumentos como CHEGAM do modelo (canal nativo): tudo `unknown` de
  * propósito — quem valida antes de executar é a casa (C2), nunca confiamos

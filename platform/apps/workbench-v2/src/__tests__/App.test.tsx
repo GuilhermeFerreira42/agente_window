@@ -46,8 +46,13 @@ beforeEach(() => {
 })
 
 /** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
-function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' = 'done', atrasoMs = 25): void {
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+function responderChatComSSE(
+  textos: string[],
+  fecharCom: 'done' | 'sem-done' = 'done',
+  atrasoMs = 25,
+  aoReceberPedido?: (corpo: Record<string, unknown>) => void,
+): void {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
@@ -56,6 +61,7 @@ function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' = 
       return new Response(JSON.stringify({ status: 'cancelled' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (url !== '/api/agir') throw new Error('fetch inesperado no teste')
+    if (typeof init?.body === 'string') aoReceberPedido?.(JSON.parse(init.body) as Record<string, unknown>)
     const codificar = new TextEncoder()
     const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
     if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))
@@ -297,6 +303,15 @@ describe('App session flows', () => {
 
     await user.click(sessionRow('Replicar a Janela de Agentes'))
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.click(screen.getByRole('button', { name: 'Agente' }))
+    await user.click(screen.getByRole('button', { name: /Editar/ }))
+    let payload: Record<string, unknown> | undefined
+    responderChatComSSE(['modo serializado'], 'done', 5, (body) => { payload = body })
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'verificar modo')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(payload?.mode).toBe('edit'))
   })
 
   it('persiste o modelo por sessão e nested chat e usa a seleção no envio', async () => {
