@@ -19,9 +19,26 @@ A diretriz de paridade funcional/desempenho aprovada em D101 não declara que o 
 
 Classificar cada critério/cenário como **superior**, **equivalente**, **inferior**, **inconclusivo**, **não testado** ou **não comparável**, com evidência que sustente o estado. Não omitir falhas/rodadas nem tratar teste automatizado com stub como validação de provedor real. O responsável avalia a evidência e a conclusão funcional; sem avaliação/reprodução suficiente, não marcar paridade como aceita. Relatos históricos não reproduzidos permanecem identificados como relatos. Esta seção não cria critério de aceite retroativo para Fatias 07–12, não reabre homologações históricas e não inicia D98.
 
-**D102 — aprovação limitada ao planejamento (26/10/2026):** M5–M8 foram formalizadas para planejamento e IC-01–IC-09 são propostas sujeitas à auditoria Arena. Nenhuma CAP foi homologada por essa decisão. Na validação futura, verificar separadamente: comportamento especificado, autorizações e segurança, qualidade do resultado, regressões, retomada e origem dos dados. SPECs definitivas somente após revisão independente e decisões do dono (`05` D102, `06`).
+**D102 e decisões pós-auditoria D103–D112:** M5–M8 continuam exclusivamente em planejamento; F1–F8 continuam pendências estáticas, não reproduzidas nem corrigidas. Nenhuma CAP foi homologada por estas decisões ou por atualização documental. A validação futura deve separar comportamento especificado, autorização, segurança, qualidade, regressões, retomada, origem dos dados e resultado reproduzido. SPECs definitivas dependem do gate D112 e de aprovação do dono (`05`, `06`).
 
-## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, 25/10/2026)
+## Validação futura dos achados F1–F8 (planejamento; não é homologação atual)
+
+Esta lista orienta investigação e SPEC futura; não afirma que os riscos ocorreram em runtime nem que qualquer critério tenha passado. A execução depende de autorização por escopo e critérios previamente acordados. Homologação permanece com o dono.
+
+| Achado | Demonstração humana futura mínima | Estado agora |
+|---|---|---|
+| **F1 — autoridade/workspace** | Solicitação adulterada não muda pasta, sessão ou permissão; acesso ao app/API restrito ao computador local; operação autorizada pelo servidor. | Não reproduzido; divergência/configuração documentada. |
+| **F2 — symlink/junction** | Tentativa de leitura/escrita fora do projeto via link é recusada em Windows e POSIX, sem revelar conteúdo. | Não testado. |
+| **F3 — cancelamento** | Parar invalida cartões pendentes; resposta posterior não executa nem retoma. | Risco estático; não reproduzido. |
+| **F4 — colisão/falha** | `criar` preserva arquivo existente; `escrever` detecta edição concorrente; falha não deixa conteúdo parcial/substituição silenciosa. | Contrato futuro D106; código não corrigido. |
+| **F5 — modo/modelo** | Perguntar/Planejar não escrevem; Agir usa alvo validado pelo servidor e coerente com UI. | Não validado. |
+| **F6 — contexto/anexo** | Estimativa não se apresenta como medição; fica claro o conteúdo realmente enviado ao modelo. | Não validado. |
+| **F7 — reinício/retomada** | Estado/efeitos são conciliados após reinício; sem execução duplicada nem permissão expirada. | M7 somente planejamento. |
+| **F8 — limites/segredos** | Busca/leitura têm limites e cancelamento observáveis; credenciais não vazam em logs/respostas; rota de revelação avaliada. | Cobertura incompleta; não auditada integralmente. |
+
+Nenhum critério acima autoriza execução nesta tarefa. Aceite futuro não reabre homologações 07–12; resultados das correções devem ficar no escopo autorizado correspondente.
+
+## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, atualizado em 26/10/2026)
 
 A tabela de cobertura e lacunas fica **somente no `06`** (“Matriz de rastreabilidade da visão V1.0”); a descrição oficial das CAP e dos cinco cenários continua no `02`. **Este bloco orienta o aceite humano futuro e não reabre as Fatias 07–12.**
 

@@ -73,7 +73,7 @@ São objetivos que devem orientar a evolução do produto, **não escolhas antec
 - Verificabilidade dos resultados.
 - Preservação das decisões e aprovações humanas.
 
-**Atualização de governança D102 (26/10/2026):** o dono aprovou a organização documental D1–D6: M5–M8 para planejamento, propostas IC para lacunas, sequência numérica preservada, segurança restritiva, comparação por código/especificações/testes e elaboração de SPECs definitivas **após auditoria independente**. As 20 CAP continuam sendo visão, não implementação. O detalhamento com dependências e status únicos fica no `06`; D102 consta no `05`.
+**Atualização de governança:** D102 aprovou M5–M8 apenas para planejamento e ICs como propostas. As decisões pós-auditoria D103–D112 estão registradas no `05`; o estado, os riscos e a rastreabilidade permanecem no `03` e `06`. A visão CAP-01–CAP-20 e a metodologia D101 desta seção continuam vigentes, sem alegar implementação ou homologação.
 
 ### 1.6 Diretriz estratégica de paridade e desempenho — D101
 

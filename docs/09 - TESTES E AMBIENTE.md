@@ -131,6 +131,7 @@ sudo sysctl -w fs.inotify.max_user_watches=1048576 fs.inotify.max_user_instances
 ### 3.2 Servidores — sempre via `start_process` (nunca em bash de fundo), bind 0.0.0.0
 - Fixture: `FS_TEST_ROOT=file:///tmp/explorer-fs-fixture npx vite --host 0.0.0.0 --port 5175 --strictPort`
 - Repo: `npx vite --host 0.0.0.0 --port 5174 --strictPort`
+- **Observação de segurança (D105, inspeção 2026-10-26):** `vite.config.ts` define `host: '0.0.0.0'` para server/preview e `allowedHosts: true`; isso não impõe local-only (alcance real também depende de firewall/proxy). `/home/user/restore-code-server.sh` usa `--bind-addr 0.0.0.0:8080 --auth none` quando executado; é ambiente de medição, não proteção das APIs do produto. O PTY server usa `PTY_HOST || 127.0.0.1` como padrão no código, mas a configuração efetiva depende do ambiente. Nesta inspeção não havia processo/listener do code-server; nenhum servidor, bind, porta, script ou configuração operacional foi iniciado/alterado. Acesso local e autorização por operação são requisitos separados (D103/D105).
 - **Aquecer** com uma carga manual antes da bateria (cold-start Vite+Monaco > 30 s de timeout do 1º teste).
 ### 3.3 Reseed da fixture (antes de CADA spec de fixture)
 Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e a 1ª requisição falha. Apague **só o conteúdo** e re-semeie. Função pronta: `reseed()` em `platform/apps/workbench-v2/run-antiregressao.sh` (`bash -c 'source <(sed -n "/^reseed()/,/^}/p" run-antiregressao.sh); reseed'`).
@@ -161,8 +162,9 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11` → `excluir_fatia12`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 + 5/5 = 23/23**.
 - **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`.db` + memória do Vite + `*.jsonl`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*`/`EXCLUIR-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409 workspace), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado). **NUNCA zerar o banco** (`resetApp` exige ≥1 `.session-row` — banco zerado = falha em massa) e **NUNCA semear via `PUT /api/sessions`** (corpo mínimo quebra o boot da UI) — seed só pela UI (§3.6).
 
-### 3.8 D98/PERF — protocolo da confirmação técnica (autorizado, mas aguarda validação documental)
-- **Gate atual (D99):** não iniciar trace, benchmark nem protótipo até o dono validar a consolidação documental. Nenhuma confirmação D98 foi executada nesta etapa.
+### 3.8 D98/PERF — protocolo da confirmação técnica (gate aberto; relatório preliminar não o conclui)
+- **Estado verificado:** existe o relatório preliminar arquivado `docs/arquivo_morto/auditorias_2026-10-25/D98_RELATORIO_PRELIMINAR.md`: inspeção estática mais medições sintéticas isoladas; não houve trace CDP do produto real, SPEC quantitativa aprovada ou encerramento do gate. Isso é evidência histórica, não execução desta rodada nem autorização nova.
+- **Gate atual:** não iniciar trace, benchmark nem protótipo nesta tarefa. Qualquer continuação futura depende da avaliação do dono e do protocolo/gates aplicáveis. Fatia 13 segue não iniciada.
 - **Base:** D98 (`05`) + roadmap (`06`, entre 12 e 13, sem renumeração) + carta em `/home/user/notas_temporarias/carta_contexto_chat_arena_bug_desempenho.md` (fora do repo). Alvos a investigar: `platform/apps/workbench-v2/src/modules/explorer-search/`; superfície/UI e, apenas no escopo autorizado, `core/`/`server/`.
 - **Ambiente isolado após validação:** Vite de teste na **5175** (nunca 5174); fixtures descartáveis em `/tmp` (repo Git fictício com N arquivos untracked); entre turnos reinstalar (`npm ci` + `PLAYWRIGHT_BROWSERS_PATH=...` + chromium). Nenhum dado real do usuário deve ser alterado.
 - **Passo 1 — trace:** depois do gate, medir SCM com 5k/10k alterações e correlacionar tempo de `/git/status`, tarefas longas, commits React e elementos DOM/renderizados. Alegação de que Git é rápido e UI é gargalo é hipótese da carta, não fato confirmado.
@@ -218,6 +220,24 @@ Para cada CAP e cenário que entrar em uma SPEC aprovada, registrar um caso de p
 **Gates:** sem SPEC/decisão, classificar como **não planejado para execução**; sem teste, **não testado**; evidência parcial não equivale a conformidade da CAP inteira. Metodologia comparativa D101 continua em §3.10; não confundir com homologação humana. Testes históricos não são repetidos por este adendo.
 
 **D98 (preliminar externo de 25/10):** medição sintética isolada e inspeção estática documentadas em cópia de `arquivo_morto/auditorias_2026-10-25/D98_RELATORIO_PRELIMINAR.md`; não houve execução comprovada de trace CDP end-to-end no aplicativo real nem demonstração de ganho em React do produto. O relatório é insumo **hipotético/preliminar**, não baseline homologada para SPEC quantitativa. Respeitar §3.8 e a aprovação pertinente antes de novos traces/alterações.
+
+### 3.12 Plano preliminar de verificação D103–D112 (não executado; não é SPEC)
+
+Os cenários abaixo orientam investigação/SPEC futura, não autorizam iniciar D98, executar testes, alterar serviços ou afirmar aprovação. A execução depende de decisão por escopo, ambiente seguro e critérios definidos previamente.
+
+| Tema | Verificação futura mínima | Limite/estado desta rodada |
+|---|---|---|
+| **Acesso local / F1** | Verificar Vite, preview, proxy, WebSocket/PTY e code-server em computador local e origem externa; demonstrar que a rede não alcança app/API indevidamente. Separar isso da autorização de cada tool. | Inspeção estática: Vite `0.0.0.0` + `allowedHosts: true`; script code-server `0.0.0.0:8080` + `--auth none`; nenhum listener observado. Sem teste de rede, alteração ou startup. |
+| **Autoridade / F1** | Solicitações com workspace, sessão e permissões adulterados devem ser rejeitadas pelo servidor e vinculadas ao projeto autorizado. | Requisito D103/D104; não reproduzido. |
+| **Caminhos / F2** | Matriz POSIX/Windows para `..`, caminho absoluto, symlink/junction, troca de link e alvo concorrente; tentar ler/criar/editar/mover/excluir fora do escopo. | Testes-fonte revistos cobrem apenas aspectos lexicais; não executados. |
+| **Colisão / atomicidade / F4** | `criar` em destino existente, mutação entre leitura e escrita, rename/write falhando, interrupção e concorrência; comparar bytes antes/depois. | Sem teste executado; usar fixture, nunca arquivos reais do usuário. |
+| **Parada / aprovação / F3** | Parar antes/durante/depois de cartão pendente; resposta atrasada, duplicada e concorrente; provar ausência de side effect após invalidação. | Estático, não reproduzido; sem teste executado. |
+| **Modos/modelo / F5** | Em cada modo, tentar tool read/write; manipular payload cliente; comparar seleção UI, alvo validado e provedor ativo. | D108 futuro; sem mudança de comportamento. |
+| **Contexto/anexo / F6** | Comparar indicador com `usage` do provedor; testar provedor sem usage, arquivo pequeno/grande e anexo apenas por nome. | Estático; sem chamada real. |
+| **Retomada / F7** | Reiniciar em estados diversos; verificar efeitos, autorização, concorrência e idempotência antes de continuação. | M7 planejada; sem restart test. |
+| **Busca/segredos / F8** | Árvore ampla, sem correspondência, arquivo grande, limites/cancelamento, redação de logs e rota de revelação em ambiente autorizado sem registrar valor de chave. | JSON de provedor observado sem criptografia e com `0600`; proteção integral da rota não auditada; sem credencial real. |
+
+**Medição e relatório:** separar implementação observada, teste-fonte, teste executado, relato histórico e homologação humana. Para D101/D112, registrar versões, configurações, limites, provedor/modelo, rodadas, dados sanitizados e não comparabilidade. Código/documentação isolados não demonstram paridade; não declarar superioridade sem teste comparável.
 
 ## 4. Becos sem saída (não tente de novo)
 

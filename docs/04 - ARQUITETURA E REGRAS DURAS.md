@@ -63,6 +63,21 @@ Os snapshots abaixo foram investigados como fontes de mecanismos e evidências d
 
 **Limites da investigação e riscos:** mecanismos foram inspecionados estaticamente e, quando presentes, foram lidos testes-fonte dos projetos externos; isso não é homologação no Agente Window nem comprovação de que o defeito correspondente ocorra no nosso fluxo. Na base atual, a guarda lexical de caminhos não demonstra contenção física contra symlinks/junctions/TOCTOU; a semântica observada de `criar` pode sobrescrever um arquivo regular existente; mapas de aprovação/continuidade são em memória; overwrite, symlink e retomada após reinício não foram reproduzidos end-to-end nesta investigação. São riscos estáticos/pendências de prova, não declaração de falha reproduzida nem de correção. Nenhum teste do produto, benchmark ou Gate D98 decorre deste registro.
 
+
+## 1.6 Requisitos de segurança e autoridade aprovados após D102 (D103–D108, 2026-10-26)
+
+**Natureza:** regras aprovadas para orientar planejamento e SPECs futuras. Não descrevem o comportamento atual, não reabrem retroativamente homologações e não autorizam correções nesta rodada. Fonte de decisão: `05` D103–D108; matriz de riscos, estado observado e critérios preliminares: `06` e `09`.
+
+- **Autoridade do servidor:** workspace, sessão, modo e permissões são validados no servidor. Campos da interface são solicitações, nunca prova de consentimento. Reaproveitar a arquitetura modular, casas, contratos e serviços existentes antes de propor componentes novos.
+- **Escopo da autorização:** permissões futuras vinculam-se à identidade do projeto/workspace e à sessão pertinente. Troca de pasta, identidade de projeto ou sessão requer revalidação e invalidação do que não se aplica.
+- **Acesso local:** a política atual de produto é acesso somente no computador instalado. A restrição de rede ao próprio computador é distinta da autorização de cada ferramenta. Acesso por outros computadores da rede local fica como evolução futura, sem implementação aprovada.
+- **Ferramentas de arquivo:** `criar` é exclusivo para destino inexistente; `escrever` opera em arquivo existente, considerando a versão/identidade observada. Conflito não migra para sobrescrita automática. SPEC futura deve cobrir atomicidade, falhas parciais, concorrência, symlinks/junctions e Windows.
+- **Cancelamento:** cancelar invalida aprovações pendentes; nenhuma aprovação atrasada reativa uma execução. Continuação legítima revalida estado e autorização.
+- **Modos e modelo:** Perguntar e Planejar não produzem efeitos de escrita; Agir usa somente ferramentas autorizadas. O backend impõe o modo e valida a correspondência entre modelo escolhido e alvo ativo, sem aceitar credenciais/provedores arbitrários enviados pelo cliente.
+- Estes contratos futuros **não alteram o terminal congelado**, o Monolito Modular ou a sequência D98 → 13 → 14 → 15 → M1 → M2 → M3 → M4. F1–F4 bloqueiam a ampliação de autonomia até passarem pelos gates próprios; M8 não adia a investigação de segurança transversal.
+
+**Divergência observada, somente leitura:** `platform/apps/workbench-v2/vite.config.ts` define `server.host` e `preview.host` como `0.0.0.0` e `allowedHosts: true`; isso não impõe nem demonstra acesso local-only (alcance efetivo também depende de rede/firewall/proxy). O script externo `/home/user/restore-code-server.sh`, quando executado, usa `--bind-addr 0.0.0.0:8080 --auth none`; code-server é régua/ambiente, não autenticação nem autorização do produto. O PTY server define `PTY_HOST || 127.0.0.1` como bind padrão, enquanto a configuração efetiva em runtime pode depender do ambiente. Nesta tarefa não foi localizado processo/listener code-server, e nenhuma configuração, porta, bind ou inicialização foi alterada. Detalhamento e limites de verificação em `09`.
+
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |
 |---|---|---|---|

@@ -1,5 +1,12 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-26 — Alinhamento pós-auditoria D102 (D103–D112; documentação e planejamento)
+- Incorporadas individualmente as dez decisões aprovadas pelo dono em `05` D103–D112: autoridade do servidor, permissões por workspace, acesso local, semântica criar/escrever, cancelamento, modos, sequência M1–M4, fronteiras IC, prioridade F1–F4 e gate comparativo/SPEC D101.
+- `03` atualiza o estado; `04` registra contratos futuros sem afirmá-los como código; `06` consolida F1–F8, fronteiras IC e rastreabilidade de todas as CAP; `08`/`09` registram critérios preliminares e cenários de teste futuros. `02` preserva objetivos CAP e metodologia D101 com ponte para as decisões novas; `01` atualiza o handoff.
+- Corrigida a sugestão D102 de especificar M1/M2 em paralelo; sequência aprovada M1→M2→M3→M4 preservada. IC-07 absorvida sob Central de Diagnósticos D99; IC-08 delimitada a teste pelo agente; IC-09 reclassificada como governança D101; IC-02 dividida em trilhas de arquivos e produção documental. Nenhuma Fatia 13–20 foi renumerada ou reescopada.
+- F1–F8 continuam pendências: inspeção estática, sem reprodução, correção, teste, homologação ou SPEC definitiva. D98 permanece aberto e não concluído (relatório preliminar arquivado, sem trace do produto real); Fatia 13 não iniciada.
+- Código, configuração operacional, portas e binds inalterados; sem testes/build/trace/benchmark/provedor real ou push. Commit documental atômico desta revisão: `docs: alinhar decisões pós-auditoria D102` (hash registrado no relatório de entrega).
+
 ## 2026-10-26 — D102: decisões D1–D6 e preparação para auditoria independente da Arena (somente docs)
 - Aprovação do dono: M5–M8 formalizadas **para planejamento**; IC-01–IC-09 propostas sem numeração de fatias; Gate D98 e Fatias 13–20 preservados; segurança restritiva; comparação por código, especificações e testes; SPECs definitivas após auditoria independente e correções aprovadas.
 - `05` registra D102; `06` é fonte única de iniciativas, dependências e questões abertas; `02`, `03`, `08`, `09` ajustados com referências e gates. Nenhuma CAP declarada entregue, nenhuma SPEC aprovada, nenhuma ação de produção, benchmark, instalação ou push autorizada por esta decisão.
