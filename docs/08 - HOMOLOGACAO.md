@@ -19,6 +19,8 @@ A diretriz de paridade funcional/desempenho aprovada em D101 não declara que o 
 
 Classificar cada critério/cenário como **superior**, **equivalente**, **inferior**, **inconclusivo**, **não testado** ou **não comparável**, com evidência que sustente o estado. Não omitir falhas/rodadas nem tratar teste automatizado com stub como validação de provedor real. O responsável avalia a evidência e a conclusão funcional; sem avaliação/reprodução suficiente, não marcar paridade como aceita. Relatos históricos não reproduzidos permanecem identificados como relatos. Esta seção não cria critério de aceite retroativo para Fatias 07–12, não reabre homologações históricas e não inicia D98.
 
+**D102 — aprovação limitada ao planejamento (26/10/2026):** M5–M8 foram formalizadas para planejamento e IC-01–IC-09 são propostas sujeitas à auditoria Arena. Nenhuma CAP foi homologada por essa decisão. Na validação futura, verificar separadamente: comportamento especificado, autorizações e segurança, qualidade do resultado, regressões, retomada e origem dos dados. SPECs definitivas somente após revisão independente e decisões do dono (`05` D102, `06`).
+
 ## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, 25/10/2026)
 
 A tabela de cobertura e lacunas fica **somente no `06`** (“Matriz de rastreabilidade da visão V1.0”); a descrição oficial das CAP e dos cinco cenários continua no `02`. **Este bloco orienta o aceite humano futuro e não reabre as Fatias 07–12.**

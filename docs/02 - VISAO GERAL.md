@@ -73,6 +73,8 @@ São objetivos que devem orientar a evolução do produto, **não escolhas antec
 - Verificabilidade dos resultados.
 - Preservação das decisões e aprovações humanas.
 
+**Atualização de governança D102 (26/10/2026):** o dono aprovou a organização documental D1–D6: M5–M8 para planejamento, propostas IC para lacunas, sequência numérica preservada, segurança restritiva, comparação por código/especificações/testes e elaboração de SPECs definitivas **após auditoria independente**. As 20 CAP continuam sendo visão, não implementação. O detalhamento com dependências e status únicos fica no `06`; D102 consta no `05`.
+
 ### 1.6 Diretriz estratégica de paridade e desempenho — D101
 
 **O Agente Window deverá evoluir até oferecer capacidades funcionais comparáveis às dos agentes de programação avançados utilizados como referência, buscando desempenho, eficiência, estabilidade e experiência de uso equivalentes ou superiores nos cenários em que isso puder ser demonstrado por avaliações reproduzíveis.**
@@ -117,7 +119,7 @@ Não confundir a fidelidade de referência VS Code 1.135 (D66/D71, 90%/10% como 
 - **07 Destravar** ✅ 15/10 · **08 Conectar** ✅ 17/10 (D89) · **09 Conversar** ✅ 18/10 (D92) · **10 Agir** ✅ 19/10 (D94) — **MVP FECHADO** · **11 Teto+Continuar+Config** ✅ 21/10 (D96) · **12 DELETE-micro** ✅ 21/10 (D97).
 - **PERF (micro, D98)** — desempenho SCM/Explorer em pastas gigantes — entre a 12 e a 13, sem renumerar. Confirmação técnica autorizada em princípio; aguarda validação desta atualização documental antes de iniciar. Nenhuma mudança permanente de produção sem SPEC e aprovação.
 - **13 Terminal-para-o-agente** (SPEC 2G + decisão específica de DEBT-23 na abertura) · **14 Barra+Personalizações+skills** (SPEC 2H) · **15 Janela única de abas** (SPEC 2I, abre por DEBT-12) · **16 Terminal 2.0 visual** · **17 Refinamentos** · **18–20** (painéis, sessões isoladas, navegador/polimento). A numeração e a ordem canônicas não mudam nesta consolidação.
-- **Futuro aprovado, sem autorização de implementação:** Central de Diagnósticos permanente (SPEC própria pendente); planejamento inicial de contexto **M1–M4**. **M5–M8** ficam para planejamento posterior. Os rótulos M não são números oficiais de fatia.
+- **Futuro aprovado, sem autorização de implementação:** Central de Diagnósticos permanente (SPEC própria pendente); planejamento inicial de contexto **M1–M4**. **M5–M8** estão formalizadas **somente para planejamento** em D102; complementos **IC-01–IC-09** são propostas documentais, sem SPEC ou implementação autorizada. Os rótulos M não são números oficiais de fatia.
 
 > Tabela de conversão antigo→novo e o detalhe de cada fatia: `06 - PROXIMAS FASES E DIVIDAS.md` (Partes 2 e 3).
 

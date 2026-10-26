@@ -1,5 +1,11 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-26 — D102: decisões D1–D6 e preparação para auditoria independente da Arena (somente docs)
+- Aprovação do dono: M5–M8 formalizadas **para planejamento**; IC-01–IC-09 propostas sem numeração de fatias; Gate D98 e Fatias 13–20 preservados; segurança restritiva; comparação por código, especificações e testes; SPECs definitivas após auditoria independente e correções aprovadas.
+- `05` registra D102; `06` é fonte única de iniciativas, dependências e questões abertas; `02`, `03`, `08`, `09` ajustados com referências e gates. Nenhuma CAP declarada entregue, nenhuma SPEC aprovada, nenhuma ação de produção, benchmark, instalação ou push autorizada por esta decisão.
+- Git: commit documental herdado anterior separado do(s) commit(s) D102 para rastreabilidade. Próxima atividade = **Arena audita e contradiz**, depois dono decide correções. Sem encerrar D98.
+
+
 ## 2026-10-25 — Auditoria documental CAP-01–CAP-20 e alinhamento do roadmap (sem código)
 - **Pedido do dono:** conferir e atualizar o ZIP completo para que CAP, fatias numéricas e iniciativas M estejam rastreáveis, antes de qualquer implementação. Trabalho exclusivamente documental sobre cópia do workspace enviado; **sem commit/push e sem execução de código de produção ou testes do app**.
 - `02`: ponte explícita para a matriz sem duplicar visão D100/D101. `06`: matriz CAP-01–20 com base existente, responsáveis **candidatos**, lacunas, dependências, cenário e evidência esperada. `03`: registro da auditoria e diferenciação do D98 preliminar posterior. `08`: roteiro humano dos cinco cenários. `09`: protocolo técnico para evidências CAP/SPEC/teste/aceite.

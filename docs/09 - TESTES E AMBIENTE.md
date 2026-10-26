@@ -177,6 +177,8 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - Se o ambiente/acesso/autorização não estiver disponível, registrar o teste real como **bloqueado/não executado**; não substituir por um stub e chamá-lo de teste real.
 - Testes automatizados e validação de integração não substituem a **homologação funcional do dono** (`08`).
 
+**D102 — método triplo, aprovado apenas como governança documental (26/10/2026):** para cada CAP, verificar (a) **código** com arquivos/commits e fronteiras observadas, (b) **especificações/documentação pública** versionadas, separando promessa de implementação, e (c) **testes/métricas reproduzíveis** sob condições equivalentes. Não registrar superioridade/equivalência sem (c) pertinente; quando comparação real não for viável, marcar não testado, inconclusivo ou não comparável. Evitar importar código de referências com licença/proveniência inadequadas. Esta metodologia não autoriza executar D98, alterar produção ou criar SPEC definitiva antes do gate de auditoria Arena.
+
 ### 3.10 Metodologia comparativa reproduzível — D101 (2026-10-24)
 
 Esta metodologia permite avaliar uma capacidade do Agente Window contra referências relevantes, inclusive os cinco cenários de `02 §1.4`, sem presumir paridade, inventar metas ou ampliar o roadmap. Uma alegação comparativa é válida apenas para o cenário, versão/configuração e condições realmente testados.
