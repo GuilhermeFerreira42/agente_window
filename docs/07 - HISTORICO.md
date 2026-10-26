@@ -6,7 +6,7 @@
 - Build helper `npm run build:fs-boundary` passou em Linux x64, Node 20.20.2/kernel 6.1.158; `npm run typecheck` passou; 5 suítes focadas passaram **38/38** (22 nos quatro arquivos de filesystem/lixeira/excluir e 16 rotas), incluindo symlink, hardlink, traversal, busca sem seguir links e worker concorrente substituindo diretório por symlink durante read/create/write. Fixtures temporárias; nenhuma credencial, configuração global ou serviço real.
 - Limites: sem testes Windows/junction/reparse; sem exclusão real, homologação ou bateria integral; execução N-API síncrona; write substitui inode com modo 0600, sem preservar ACL/modo; sem garantia de durabilidade após queda. F2 permanece parcial e não homologada. F4 ainda terá de validar versão de conteúdo.
 - Suíte global após a frente: 934 passou / 13 falharam / 22 skip; falhas em `App.test.tsx` (regen), `TerminalPanel.test.tsx` (9, já no baseline histórico) e contratos visuais `iconLabels`/`themeTokens`/`visualStates` (3); não foi reproduzido o baseline integral nesta rodada. Nenhuma falha nos testes focados F2.
-- Commit F2 parcial: `ba3240c` (`feat: confinar operações Agir no Linux e falhar fechado`); sem push.
+- Commit F2 parcial: `f850fc5` (`feat: confinar operações Agir no Linux e falhar fechado`); sem push.
 
 ## 2026-10-26 — Implementação F1 (em revisão final; sem homologação)
 - Implementado boundary local em Vite e `server.mjs`, binds loopback, Host/Origin estritos e rejeição de upgrade WebSocket sem origem autorizada; credenciais/serviços externos não foram usados.
