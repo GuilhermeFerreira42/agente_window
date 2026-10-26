@@ -44,12 +44,10 @@ export interface OuvintesAgir {
 export interface EntradaAgir {
   /** Histórico visível da conversa + a mensagem nova. */
   mensagens: MensagemSimples[]
-  /** A sessão dona desta conversa (identifica os cartões no servidor). */
+  /** Contexto solicitado; servidor resolve sessão, raiz e grants persistidos. */
   fluxo: string
-  /** A pasta de trabalho da sessão — o servidor valida antes de usar. */
-  workspace?: string
-  /** Ferramentas já liberadas "para a sessão" pelo dono (Q2a). */
-  permissoes?: string[]
+  sessionId: string
+  chatId: string
 }
 
 export interface ControleAgir {
@@ -158,30 +156,30 @@ export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): Contro
     {
       messages: entrada.mensagens,
       fluxo: entrada.fluxo,
-      ...(entrada.workspace ? { workspace: entrada.workspace } : {}),
-      ...(entrada.permissoes && entrada.permissoes.length > 0 ? { permissoes: entrada.permissoes } : {}),
+      sessionId: entrada.sessionId,
+      chatId: entrada.chatId,
     },
     ouvintes,
   )
 }
 
 /** FATIA 11 — retoma o MESMO fluxo pausado no teto (orçamento cheio). */
-export function continuarAgir(fluxo: string, permissoes: string[], ouvintes: OuvintesAgir): ControleAgir {
-  return abrirFio('/api/agir/continuar', { fluxo, ...(permissoes.length > 0 ? { permissoes } : {}) }, ouvintes)
+export function continuarAgir(sessionId: string, chatId: string, fluxo: string, ouvintes: OuvintesAgir): ControleAgir {
+  return abrirFio('/api/agir/continuar', { sessionId, chatId, fluxo }, ouvintes)
 }
 
 /** O dono respondeu o cartão. `false` = a execução já não esperava mais. */
 export async function responderAprovacao(
+  sessionId: string,
   fluxo: string,
   id: string,
   decisao: DecisaoAprovacao,
-  ferramenta?: FerramentaId,
 ): Promise<boolean> {
   try {
     const resposta = await fetch('/api/agir/aprovar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fluxo, id, decisao, ...(ferramenta ? { ferramenta } : {}) }),
+      body: JSON.stringify({ sessionId, fluxo, id, decisao }),
     })
     return resposta.ok
   } catch {

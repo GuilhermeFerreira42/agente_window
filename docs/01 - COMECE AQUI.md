@@ -79,7 +79,7 @@ agente_window/
 1. O workspace é a fonte de verdade. Reinspecione antes de afirmar que algo falta.
 2. **Nunca** resetar sessão, apagar arquivos do usuário, restaurar `legacy/` (foi removida de propósito) ou fazer ação irreversível sem ordem explícita.
 3. Um `.txt` que é tarball renomeado **não** se lê como texto (ver cabeçalho de `restore-code-server.sh`).
-4. Servidores **sempre** via `start_process`, bind `0.0.0.0`. code-server na **8080 com `--auth none`**, abrindo `/home/user/agente_window`; é ambiente de **medição** (régua do VS Code 1.135), não de produção.
+4. Servidores de teste/produto **sempre** via `start_process`. O Vite do produto Agente Window é local-only: bind `127.0.0.1`, Host/Origin exatos; não sobrescrever com `0.0.0.0`. Serviços de preview Arena só podem usar bind externo quando explicitamente necessários e compatíveis com a política de segurança do escopo. O code-server na **8080 com `--auth none`**, abrindo `/home/user/agente_window`, é ambiente independente de **medição** (régua do VS Code 1.135), não proteção nem runtime de produção.
 5. Não derrubar o 8080 ou o Vite sem necessidade; se derrubar por RAM, avisar e **religar ao final**. Verificar no fim de cada interação se o 8080 está de pé (quando o turno o exigia).
 6. Clones grandes e runtimes ficam em `/home/user/.cache` (fora do snapshot), nunca em `/tmp`.
 7. **Proibido** buildar VS Code/code-server da fonte (RAM ~1,9 GB).

@@ -19,7 +19,7 @@ A diretriz de paridade funcional/desempenho aprovada em D101 não declara que o 
 
 Classificar cada critério/cenário como **superior**, **equivalente**, **inferior**, **inconclusivo**, **não testado** ou **não comparável**, com evidência que sustente o estado. Não omitir falhas/rodadas nem tratar teste automatizado com stub como validação de provedor real. O responsável avalia a evidência e a conclusão funcional; sem avaliação/reprodução suficiente, não marcar paridade como aceita. Relatos históricos não reproduzidos permanecem identificados como relatos. Esta seção não cria critério de aceite retroativo para Fatias 07–12, não reabre homologações históricas e não inicia D98.
 
-**D102 e decisões pós-auditoria D103–D117:** M5–M8 continuam exclusivamente em planejamento; F1–F8 seguem sem reprodução/correção/homologação nesta missão. D113–D117 aprovam fronteira local, modos, identidade/fonte do modelo, Auto por execução e bloqueio da próxima chamada após disable; não são resultados de teste. Nenhuma CAP foi homologada por estas decisões ou por atualização documental. A validação futura deve separar comportamento especificado, autorização, segurança, qualidade, regressões, retomada, origem dos dados e resultado reproduzido. F1–F4 e F5-A/F5-B estão finalizadas como SPECs candidatas aguardando aprovação do dono; SPECs definitivas e sua aceitação dependem do gate D112 e da autorização do dono (`05`, `06`).
+**Registro da auditoria D102–D117 (anterior à aprovação D119):** F1–F8 então não haviam sido reproduzidas/corrigidas/homologadas. D113–D117 aprovam fronteira local, modos, identidade/fonte do modelo, Auto por execução e bloqueio após disable; decisões não são resultados de teste. **Estado vigente D119:** as SPECs F1–F4/F5-A/F5-B estão aprovadas para implementação restrita, sem equivalência a teste/aceite. F1 recebeu implementação e evidência técnica parcial descrita em `09`; não há homologação humana nem aprovação de qualquer CAP por esta missão. A validação deve separar comportamento especificado, autorização, segurança, qualidade, regressões, retomada, origem dos dados e resultado reproduzido. F2–F5-B ainda não iniciadas nesta atualização.
 
 ## Validação futura dos achados F1–F8 (planejamento; não é homologação atual)
 
@@ -27,7 +27,7 @@ Esta lista orienta investigação e SPEC futura; não afirma que os riscos ocorr
 
 | Achado | Demonstração humana futura mínima | Estado agora |
 |---|---|---|
-| **F1 — autoridade/workspace** | Solicitação adulterada não muda pasta, sessão ou permissão; acesso ao app/API restrito ao computador local; operação autorizada pelo servidor. | Não reproduzido; divergência/configuração documentada. |
+| **F1 — autoridade/workspace** | Solicitação adulterada não muda pasta, sessão ou permissão; acesso ao app/API restrito ao computador local; operação autorizada pelo servidor. | Boundary local, grants/contexto server-side e revalidação foram implementados; typecheck + 43 testes focados, App 46 pass/13 skip e cinco checks HTTP/WebSocket com fixture passaram. Critérios completos, Windows, E2E funcional e homologação humana ainda não verificados. |
 | **F2 — symlink/junction** | Tentativa de leitura/escrita fora do projeto via link é recusada em Windows e POSIX, sem revelar conteúdo. | Não testado. |
 | **F3 — cancelamento** | Parar invalida cartões pendentes; resposta posterior não executa nem retoma. | Risco estático; não reproduzido. |
 | **F4 — colisão/falha** | `criar` preserva arquivo existente; `escrever` detecta edição concorrente; falha não deixa conteúdo parcial/substituição silenciosa. | Contrato futuro D106; código não corrigido. |
@@ -36,7 +36,7 @@ Esta lista orienta investigação e SPEC futura; não afirma que os riscos ocorr
 | **F7 — reinício/retomada** | Estado/efeitos são conciliados após reinício; sem execução duplicada nem permissão expirada. | M7 somente planejamento. |
 | **F8 — limites/segredos** | Busca/leitura têm limites e cancelamento observáveis; credenciais não vazam em logs/respostas; rota de revelação avaliada. | Cobertura incompleta; não auditada integralmente. |
 
-A revisão estática de F1–F8 e as seis SPECs candidatas finalizadas F1–F4/F5-A/F5-B constam em `06`, aguardando aprovação do dono. Esta tabela continua sendo roteiro de validação futura, não resultado: nenhuma hipótese foi reproduzida, nenhum critério passou e nenhuma CAP foi homologada por análise de código. Nenhum critério acima autoriza execução nesta tarefa. Aceite futuro não reabre homologações históricas 07–12; resultados de correções devem ficar no escopo autorizado correspondente.
+A revisão estática original de F1–F8 e as seis SPECs aprovadas por D119 constam em `06`. Esta tabela continua sendo roteiro de validação/aceite, não declaração de conformidade: F1 tem evidência automatizada parcial registrada em `09`, mas seus critérios completos não foram aprovados e nenhuma CAP foi homologada nesta missão. D119 autoriza apenas F1–F4/F5-A/F5-B; F6–F8, D98, Fatias 13–20 e iniciativas M continuam fora do escopo. Aceite futuro não reabre homologações históricas 07–12; resultados de correções devem ficar no escopo autorizado correspondente.
 
 ## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, atualizado em 26/10/2026)
 

@@ -47,7 +47,16 @@ function fakeRes(): ResFalsa {
 }
 
 function fakeReq(corpo = '', metodo = 'POST'): IncomingMessage {
-  const req = Readable.from([Buffer.from(corpo)]) as Readable & { method?: string }
+  let corpoEfetivo = corpo
+  if (corpo) {
+    try {
+      const valor = JSON.parse(corpo) as Record<string, unknown>
+      if (valor && typeof valor === 'object') {
+        corpoEfetivo = JSON.stringify({ sessionId: 'sessao-1', chatId: 'chat-1', ...valor })
+      }
+    } catch { /* preserva payload inválido para os casos de erro */ }
+  }
+  const req = Readable.from([Buffer.from(corpoEfetivo)]) as Readable & { method?: string }
   req.method = metodo
   return req as unknown as IncomingMessage
 }
@@ -60,10 +69,18 @@ const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
 const raiz = await mkdtemp(path.join(tmpdir(), 'agir-rotas-'))
+const grantsPorSessao = new Map<string, Set<'criar' | 'escrever'>>()
+const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferramenta: 'criar' | 'escrever') => {
+  const grants = grantsPorSessao.get(sessionId) ?? new Set<'criar' | 'escrever'>()
+  grants.add(ferramenta)
+  grantsPorSessao.set(sessionId, grants)
+})
 const DEPS = {
   obterAlvo: alvoOk,
-  pastaDeTrabalho: (caminho: string | undefined) =>
-    caminho && caminho !== '/fora' ? { ok: true as const, raiz } : { ok: false as const, message: 'Nenhuma pasta de trabalho ativa nesta sessão.' },
+  resolverContexto: (sessionId: string, chatId: string) => sessionId && chatId
+    ? { ok: true as const, raiz, permissoes: [...(grantsPorSessao.get(sessionId) ?? [])] }
+    : { ok: false as const, message: 'Contexto da sessão inválido.' },
+  concederPermissaoSessao,
   lerTeto: async () => 25,
 }
 
@@ -118,6 +135,8 @@ async function esperaFio(res: ResFalsa, contem: string, tentativas = 60): Promis
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
+  grantsPorSessao.clear()
 })
 
 describe('rotas — POST /api/agir', () => {
@@ -144,12 +163,21 @@ describe('rotas — POST /api/agir', () => {
     expect(semProvedor.corpo()).not.toContain('data: ')
   })
 
-  it('sem pasta de trabalho → 409 honesto (o território vem da prefeitura)', async () => {
+  it('exige identidade de sessão/conversa no corpo antes de iniciar', async () => {
     const res = fakeRes()
-    const corpo = JSON.stringify({ messages: [{ role: 'user', content: 'oi' }], fluxo: 's', workspace: '/fora' })
+    const corpo = JSON.stringify({ messages: [{ role: 'user', content: 'oi' }], fluxo: 's', sessionId: '', chatId: 'chat-1' })
     expect(await tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)).toBe(true)
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.corpo()).message).toContain('identidade da sessão')
+  })
+
+  it('sem sessão persistida válida → 409 antes de abrir o fio (o browser não escolhe território)', async () => {
+    const res = fakeRes()
+    const corpo = JSON.stringify({ messages: [{ role: 'user', content: 'oi' }], fluxo: 's', workspace: raiz })
+    const deps = { ...DEPS, resolverContexto: () => ({ ok: false as const, message: 'Sessão não registrada.' }) }
+    expect(await tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, deps)).toBe(true)
     expect(res.statusCode).toBe(409)
-    expect(JSON.parse(res.corpo()).message).toContain('Nenhuma pasta de trabalho')
+    expect(JSON.parse(res.corpo()).message).toContain('Sessão não registrada')
   })
 
   it('ciclo completo: tool → approval → NEGAR → tool_result "dono negou" → resposta em texto', async () => {
@@ -193,27 +221,45 @@ describe('rotas — POST /api/agir', () => {
     expect(tipos.filter((t) => t === 'approval')).toHaveLength(1)
     expect(tipos.filter((t) => t === 'tool_result')).toHaveLength(2)
     expect(tipos[tipos.length - 1]).toBe('done')
+    expect(concederPermissaoSessao).toHaveBeenCalledWith('sessao-1', raiz, 'criar')
   })
 
-  it('permissão que chega NO PEDIDO já vale (o dono liberou numa iteração anterior — C4)', async () => {
+  it('campo de permissão forjado pelo browser é ignorado; o cartão continua obrigatório', async () => {
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
     const corpo = JSON.stringify({
       messages: [{ role: 'user', content: 'crie o ola.txt' }],
       fluxo: 'sessao-3',
-      workspace: 'raiz-real',
+      workspace: '/fora',
       permissoes: ['criar'],
     })
-    await tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
-    const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['iteracao', 'tool', 'tool_result', 'iteracao', 'chunk', 'done']) // sem approval nenhum
+    const fio = tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-3', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await fio
+    expect(concederPermissaoSessao).not.toHaveBeenCalled()
   })
 
   it('aprovar para fluxo morto → 409 honesto', async () => {
     const res = fakeRes()
     expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fantasma', id: 'c1', decisao: 'permitir' })), res, URL_APROVAR, DEPS)).toBe(true)
     expect(res.statusCode).toBe(409)
-    expect(JSON.parse(res.corpo()).message).toContain('já não espera mais')
+    expect(JSON.parse(res.corpo()).message).toContain('já expirou')
+  })
+
+  it('approval de outra sessão não consome nem executa o cartão', async () => {
+    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    const estranho = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'permitir', sessionId: 'outra-sessao' })), estranho, URL_APROVAR, DEPS)
+    expect(estranho.statusCode).toBe(409)
+    expect(JSON.parse(estranho.corpo()).message).toContain('não pertence à sessão')
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await fio
+    expect(frames(res).some((evento) => evento.type === 'tool_result' && evento.ok === true)).toBe(false)
   })
 })
 

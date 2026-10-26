@@ -3,7 +3,7 @@
 // texto puro · ferramenta→texto · negação do dono · teto de iteracoes ·
 // Parar antes e no meio · o comportamento dos executores falsos.
 // ============================================================================
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, RespostaIteracao, VizinhoProvedor } from '../contract'
 import { TETO_PADRAO, rodarAgir } from '../server/agir'
 import { criarExecutoresFalsos, ehMexida } from '../server/ferramentas'
@@ -199,6 +199,41 @@ describe('O loop do agente (rodarAgir)', () => {
     expect(ultimoResultado.ok).toBe(false)
     expect(ultimoResultado.resumo).toContain('Bloqueado: 3 chamadas idênticas')
     expect(eventos.at(-1)).toMatchObject({ type: 'error', code: 'loop' })
+  })
+
+  it('revalida sessão/workspace antes do provider e bloqueia contexto inválido', async () => {
+    const vizinho = vi.fn(async () => ({ texto: 'não deve chamar', pedidos: [] }))
+    const executar = vi.fn(async () => ({ ok: true, resumo: 'não deve executar' }))
+    const eventos: EventoAgir[] = []
+    const resultado = await rodarAgir({
+      vizinho,
+      historico: [{ papel: 'usuario', conteudo: 'oi' }],
+      executores: { ...EXECUTORES, criar: executar },
+      emitir: (evento) => eventos.push(evento),
+      validarContexto: () => false,
+    })
+    expect(vizinho).not.toHaveBeenCalled()
+    expect(executar).not.toHaveBeenCalled()
+    expect(resultado).toMatchObject({ status: 'erro', codigoErro: 'fluxo' })
+    expect(eventos.at(-1)).toMatchObject({ type: 'error', code: 'fluxo' })
+  })
+
+  it('revalida novamente após aprovação, imediatamente antes de executar a ferramenta', async () => {
+    let checks = 0
+    const executar = vi.fn(async () => ({ ok: true, resumo: 'executada' }))
+    const eventos: EventoAgir[] = []
+    const resultado = await rodarAgir({
+      vizinho: async () => ({ texto: '', pedidos: [{ id: 'ctx-1', ferramenta: 'criar', argumentos: { caminho: 'x.txt', conteudo: 'x' } }] }),
+      historico: [{ papel: 'usuario', conteudo: 'crie x.txt' }],
+      executores: { ...EXECUTORES, criar: executar },
+      emitir: (evento) => eventos.push(evento),
+      pedirAprovacao: async () => true,
+      validarContexto: () => ++checks === 1,
+    })
+    expect(checks).toBe(2)
+    expect(executar).not.toHaveBeenCalled()
+    expect(resultado).toMatchObject({ status: 'erro', codigoErro: 'fluxo' })
+    expect(eventos.at(-1)).toMatchObject({ type: 'error', code: 'fluxo' })
   })
 
   it('Parar ANTES de começar: silêncio total (sem evento nenhum) — lição da 09', async () => {

@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url'
 import { assertNodePtyAvailable, createPtyWebSocketBridge, PTY_WS_PATH } from '../../../platform/services/pty-server/dist/singlePort.js'
 import { WebSocketServer } from 'ws'
 import { createExplorerFsServer, FS_WATCH_PATH } from './dist-fs-server/server/fs/index.js'
+import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const DIST_DIR = path.resolve(__dirname, 'dist')
-const HOST = process.env.HOST || '0.0.0.0'
+const HOST = process.env.HOST || '127.0.0.1'
 const PORT = Number(process.env.PORT) || 4173
+if (!isLoopbackBind(HOST)) throw new Error('[server.mjs] Preview local exige HOST loopback; não exponha à LAN.')
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -71,6 +73,12 @@ async function start() {
   })
 
   const server = http.createServer((req, res) => {
+    const localDecision = validateLocalRequest(req)
+    if (!localDecision.ok) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ code: 'local_only', message: 'Acesso local de mesma origem obrigatório.' }))
+      return
+    }
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`)
 
     if (url.pathname === '/health') {
@@ -110,6 +118,9 @@ async function start() {
     sendFile(res, path.join(DIST_DIR, 'index.html'))
   })
 
+  server.prependListener('upgrade', (req, socket) => {
+    if (!validateLocalRequest(req, { requireOrigin: true }).ok) socket.destroy()
+  })
   const detachUpgrade = bridge.attachToServer(server)
   server.on('upgrade', (req, socket, head) => {
     fsServer.tryHandleUpgrade(req, socket, head)

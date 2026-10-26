@@ -78,11 +78,11 @@ Os snapshots abaixo foram investigados como fontes de mecanismos e evidências d
 
 **Divergência observada, somente leitura:** `platform/apps/workbench-v2/vite.config.ts` define `server.host` e `preview.host` como `0.0.0.0` e `allowedHosts: true`; isso não impõe nem demonstra acesso local-only (alcance efetivo também depende de rede/firewall/proxy). O script externo `/home/user/restore-code-server.sh`, quando executado, usa `--bind-addr 0.0.0.0:8080 --auth none`; code-server é régua/ambiente, não autenticação nem autorização do produto. O PTY server define `PTY_HOST || 127.0.0.1` como bind padrão, enquanto a configuração efetiva em runtime pode depender do ambiente. Nesta tarefa não foi localizado processo/listener code-server, e nenhuma configuração, porta, bind ou inicialização foi alterada. Detalhamento e limites de verificação em `09`.
 
-## 1.7 Revisão técnica F1–F8 — propostas aguardando aprovação (2026-10-26)
+## 1.7 Revisão técnica F1–F8 — registro da auditoria anterior à D119 (2026-10-26)
 
-A inspeção estática posterior a D103–D112 e as **propostas técnicas ainda não aprovadas** estão consolidadas em `06`, na seção “Auditoria técnica F1–F8”. Esta seção não muda as Regras Duras, os contratos D93/D97, o terminal congelado ou a arquitetura. F1–F4 são requisitos de segurança a especificar antes de ampliar autonomia; F5–F8 têm dependências distintas e não devem ser tratados como quatro bloqueios iguais. A revisão preserva Monolito Modular/Single Port: autoridade comum na prefeitura e decisões de domínio nas casas existentes, sem microserviço, sem importar interiores privados e sem alterar `explorer-search/{core,server}` sem autorização expressa.
+A inspeção estática posterior a D103–D112 e as propostas técnicas daquele momento estão consolidadas em `06`, na seção “Auditoria técnica F1–F8”. D119 aprovou depois somente F1–F4/F5-A/F5-B para implementação nesta missão; F6–F8 continuam fora do escopo. Esta seção não muda as Regras Duras, os contratos D93/D97, o terminal congelado ou a arquitetura. A revisão preserva Monolito Modular/Single Port: autoridade comum na prefeitura e decisões de domínio nas casas existentes, sem microserviço, sem importar interiores privados e sem alterar `explorer-search/{core,server}` sem autorização expressa.
 
-O estado encontrado é somente evidência de código/documentação; os riscos não foram reproduzidos em runtime. Nenhuma proposta declara correção, superioridade, homologação ou autorização de implementação. A validação futura deve seguir `09` e manter separados os testes do agente, D98/Explorer, code-server de medição e homologação humana.
+O estado encontrado naquela auditoria era evidência estática; os riscos não haviam sido reproduzidos em runtime. Nenhuma proposta declarava correção, superioridade ou homologação. A validação deve seguir `09` e manter separados os testes do agente, D98/Explorer, code-server de medição e homologação humana.
 
 ## 1.8 Alinhamento aprovado F1–F5 (D113–D117, 2026-10-26)
 
@@ -92,6 +92,10 @@ O estado encontrado é somente evidência de código/documentação; os riscos n
 - **Auto (D116):** preserva opção do seletor; resolve padrão autoritativo Provedores em `(providerId, modelId)` no começo de cada execução, registra/exibe alvo efetivo e nunca roteia/faz fallback.
 - **Desabilitação (D117):** chamada upstream já iniciada pode terminar; cada chamada ainda não iniciada, mesmo no mesmo run, revalida habilitação e é bloqueada, sem troca. Parar, revogação de grants/sessão, segurança e credenciais continuam sob seus contratos superiores.
 - **Limite:** são decisões e requisitos de planejamento, não descrição do comportamento atual, SPEC definitiva, teste ou autorização de implementação. A decomposição F5-A/F5-B e evidências ficam em `06`; nenhuma casa, ferramenta, fatia ou iniciativa nova é criada por este registro.
+
+## 1.9 Implementação F1 — estado observado em 2026-10-26 (não homologada)
+
+O estado atual da F1 (D119) está registrado em `03`, `06` e `09`. Vite/preview estão configurados para loopback local; `server/local-boundary.mjs` aplica Host/Origin e rejeição de origens cross-site antes das rotas; grants por sessão/workspace e contexto de Agir são validados no backend; a execução revalida esse contexto no início de cada iteração e imediatamente antes do executor de ferramenta. Verificações disponíveis: typecheck, 43 testes focados, App 46 pass/13 skip, cinco checks HTTP/WebSocket contra Vite com fixtures e recusa de bind externo passaram. A compilação completa abortou por limite de heap Node; Windows, E2E funcional, code-server/PTY standalone e homologação humana não foram verificados. Isto registra evidência parcial, não conclui a frente nem altera seus critérios aprovados.
 
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |

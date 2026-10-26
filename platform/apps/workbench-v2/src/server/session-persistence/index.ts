@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, getSessionRecord, listSessionRecords, upsertSessionRecord } from './database'
+import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRecords, revokeSessionToolGrants, upsertSessionRecord } from './database'
+import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
@@ -92,6 +93,10 @@ async function listSessions(): Promise<Session[]> {
 }
 
 async function saveSession(session: Session): Promise<void> {
+  const existing = getSessionRecord(session.id)
+  const oldActivePath = existing?.worktreePath || existing?.workspacePath
+  const nextActivePath = session.worktreePath || session.workspacePath
+  if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
   const slug = session.slug || sanitizePath(session.workspacePath)
   const now = Date.now()
   const entries = transcriptEntries(session)
@@ -119,17 +124,6 @@ async function saveSession(session: Session): Promise<void> {
  * FATIA 10 — o território do agente: a prefeitura valida a pasta informada
  * pela sessão e entrega a RAIZ real (o navegador nunca define território).
  */
-const pastaDeTrabalhoAgir = (caminho: string | undefined): { ok: true; raiz: string } | { ok: false; message: string } => {
-  if (caminho === undefined || caminho.trim() === '') {
-    return { ok: false, message: 'Nenhuma pasta de trabalho ativa nesta sessão — escolha a pasta para o agente poder agir.' }
-  }
-  const checagem = validateWorkspacePath(caminho)
-  if (!checagem.valid || !checagem.exists || !checagem.isDir) {
-    return { ok: false, message: 'A pasta de trabalho desta sessão não está acessível. Escolha a pasta de novo.' }
-  }
-  return { ok: true, raiz: checagem.realpath }
-}
-
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
@@ -152,6 +146,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     const current = sessions.find((session) => session.id === input.sessionId)
     if (!current) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
     const session: Session = { ...current, workspace: workspace.name, workspacePath: workspace.path, worktreePath: null, branch: null }
+    revokeSessionToolGrants(session.id)
     await saveSession(session)
     await rememberWorkspace(workspace.path)
     sendJson(response, 200, { session, workspace })
@@ -168,7 +163,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (rotaPertenceAoModuloAgir(url.pathname)) {
     if (await tratarRotasAgir(request, response, url, {
       obterAlvo: obterAlvoDeConversa,
-      pastaDeTrabalho: pastaDeTrabalhoAgir,
+      resolverContexto: resolverContextoAgir,
+      concederPermissaoSessao: grantSessionTool,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
     })) return true
   }

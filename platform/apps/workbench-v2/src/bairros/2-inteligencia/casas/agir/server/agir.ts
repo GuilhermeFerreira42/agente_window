@@ -50,6 +50,8 @@ export interface OpcoesAgir {
    * direto (não há rota ligada, impossível chegar aqui da tela).
    */
   pedirAprovacao?: (pedido: PedidoFerramenta) => Promise<boolean>
+  /** Revalida sessão e workspace autoritativos antes de chamadas/effects. */
+  validarContexto?: (pedido?: PedidoFerramenta) => boolean
   /** Parar: o mesmo sinal da conversa (09) — interrompido = silêncio. */
   sinal?: AbortSignal
 }
@@ -95,6 +97,11 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
   for (let iteracao = 1; iteracao <= teto; iteracao += 1) {
     if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
+    if (opcoes.validarContexto && !opcoes.validarContexto()) {
+      const message = 'A sessão ou a pasta de trabalho mudou; a execução foi bloqueada sem trocar de contexto.'
+      emitir({ type: 'error', code: 'fluxo', message })
+      return { status: 'erro', textoFinal: '', iteracoes: iteracao - 1, codigoErro: 'fluxo' }
+    }
     emitir({ type: 'iteracao', iteracao, teto })
 
     let resposta: RespostaIteracao
@@ -166,6 +173,12 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       const textoNegacao = pedido.ferramenta === 'excluir'
         ? 'O dono negou esta exclusão — nada sumiu.'
         : 'O dono negou esta mexida — nada foi escrito.'
+      if (liberado && opcoes.validarContexto && !opcoes.validarContexto(pedido)) {
+        const motivo = 'A sessão ou a pasta mudou após a autorização; a ação não foi executada.'
+        emitir({ type: 'tool_result', id: pedido.id, ferramenta: pedido.ferramenta, ok: false, resumo: motivo })
+        emitir({ type: 'error', code: 'fluxo', message: motivo })
+        return { status: 'erro', textoFinal: '', iteracoes: iteracao, codigoErro: 'fluxo' }
+      }
       const resultado: ResultadoFerramenta = liberado
         ? await executores[pedido.ferramenta](pedido)
         : { ok: false, resumo: textoNegacao }

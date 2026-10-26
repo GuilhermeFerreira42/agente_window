@@ -188,30 +188,6 @@ const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
 /** FATIA 09 (§3.8): qual sessão estava aberta — o F5 volta para ELA e a
  * conversa (restaurada do .jsonl) aparece na hora. */
 const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
-/** FATIA 10 (Q2a): ferramentas que o dono liberou "na sessão" — sobrevivem ao F5. */
-const PERMISSOES_AGIR_KEY = 'workbench.agir.permissoes.v1'
-type PermissoesAgir = Record<string, string[]>
-const lerPermissoesAgir = (): PermissoesAgir => {
-  try {
-    const bruto = window.localStorage.getItem(PERMISSOES_AGIR_KEY)
-    return bruto ? (JSON.parse(bruto) as PermissoesAgir) : {}
-  } catch {
-    return {}
-  }
-}
-const permissoesDeSessao = (sessionId: string): string[] => lerPermissoesAgir()[sessionId] ?? []
-const salvarPermissaoSessao = (sessionId: string, ferramenta: string): void => {
-  const todas = lerPermissoesAgir()
-  const atuais = todas[sessionId] ?? []
-  if (!atuais.includes(ferramenta)) {
-    todas[sessionId] = [...atuais, ferramenta]
-    try {
-      window.localStorage.setItem(PERMISSOES_AGIR_KEY, JSON.stringify(todas))
-    } catch {
-      // armazenamento indisponível: a liberação vale só neste fluxo
-    }
-  }
-}
 type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
 function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
   try {
@@ -1500,6 +1476,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
         mainChatId: chatId,
       }
+      // F1: registrar sessão/contexto no servidor antes de abrir qualquer execução Agir.
+      await persistSession(next)
       setSessions((current) => [next, ...current])
       setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
       setActiveSessionId(id)
@@ -1885,15 +1863,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         // aprovações desta resposta — nada vaza para a próxima troca. As
         // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
         fluxo: `${sessionId}:${chatId}:${responseId}`,
-        workspace: sessions.find((session) => session.id === sessionId)?.workspacePath ?? undefined,
-        permissoes: permissoesDeSessao(sessionId),
+        sessionId,
+        chatId,
       },
       criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir),
     )
     agirAtivas.current.set(runKey, controle)
   }
 
-  /** O dono respondeu um cartão: guarda "na sessão" (Q2a) e responde ao servidor. */
+  /** O dono respondeu um cartão; o servidor grava grants de sessão após validar o contexto. */
   const decidirFerramenta = (sessionId: string, chatId: string, messageId: string, ferramentaId: string, decisao: DecisaoAprovacao): void => {
     const sessao = sessions.find((item) => item.id === sessionId)
     const chat = sessao?.chats.find((item) => item.id === chatId)
@@ -1912,10 +1890,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }))
     }
     marcar('executando')
-    if (decisao === 'sessao' && (carta.ferramenta === 'criar' || carta.ferramenta === 'escrever')) {
-      salvarPermissaoSessao(sessionId, carta.ferramenta)
-    }
-    void responderAprovacao(`${sessionId}:${chatId}:${messageId}`, carta.id, decisao, carta.ferramenta).then((aceita) => {
+    void responderAprovacao(sessionId, `${sessionId}:${chatId}:${messageId}`, carta.id, decisao).then((aceita) => {
       if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
     })
   }
@@ -1948,8 +1923,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }
     })
     const controle = continuarAgir(
+      sessionId,
+      chatId,
       `${sessionId}:${chatId}:${messageId}`,
-      permissoesDeSessao(sessionId),
       criarOuvintesAgir(sessionId, chatId, messageId, mensagem.content, () => marcar('expirado')),
     )
     agirAtivas.current.set(runKey, controle)
