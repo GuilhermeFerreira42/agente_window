@@ -167,6 +167,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         // cartão). O loop apenas pergunta e espera.
         liberado = await pedirAprovacao(pedido)
       }
+      // Cancelamento é terminal: um cartão resolvido tarde nunca autoriza efeito.
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
 
       // RF12-2: a negação do `excluir` diz "nada sumiu" (o "dono negou" a
       // tela usa para pintar o cartão de negado — mantido nos dois textos).
@@ -179,6 +181,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         emitir({ type: 'error', code: 'fluxo', message: motivo })
         return { status: 'erro', textoFinal: '', iteracoes: iteracao, codigoErro: 'fluxo' }
       }
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
       const resultado: ResultadoFerramenta = liberado
         ? await executores[pedido.ferramenta](pedido)
         : { ok: false, resumo: textoNegacao }
@@ -197,6 +200,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         pedidoId: pedido.id,
         ferramenta: pedido.ferramenta,
       })
+      // Preserva o resultado já concluído; não inicia outra chamada/tool após terminalização.
+      if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao }
     }
   }
 

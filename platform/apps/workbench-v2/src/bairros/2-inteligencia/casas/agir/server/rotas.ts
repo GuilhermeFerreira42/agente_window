@@ -17,6 +17,7 @@
 // rota guarda o diálogo por fluxo para o "Continuar" retomar com orçamento
 // cheio (RF11-3); pedido novo no mesmo fluxo descarta a retomada.
 // ============================================================================
+import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
 import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples } from '../contract'
@@ -25,7 +26,7 @@ import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
 import { permiteSessao } from './ferramentas'
 import { criarVizinhoReal } from './vizinho'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar']
+const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -56,12 +57,61 @@ interface ContextoFluxo {
   chatId: string
   raiz: string
 }
+type EstadoExecucao = 'running' | 'awaiting-approval' | 'cancel-requested' | 'cancelled' | 'completed' | 'paused'
+interface ExecucaoAgir extends ContextoFluxo {
+  runId: string
+  generation: number
+  fluxo: string
+  estado: EstadoExecucao
+  controller: AbortController
+  pendentes: Map<string, AprovacaoPendente>
+  motivoCancelamento?: 'requested' | 'disconnect'
+}
 
 /** Permissões carregadas da autoridade server-side para o escopo da sessão/pasta. */
 const permissoesPorFluxo = new Map<string, Set<string>>()
-/** Cartões aguardando o dono, por fluxo: pedidoId → pedido + resolver. */
-const pendentesPorFluxo = new Map<string, Map<string, AprovacaoPendente>>()
 const contextoPorFluxo = new Map<string, ContextoFluxo>()
+const execucaoPorFluxo = new Map<string, ExecucaoAgir>()
+const execucaoPorId = new Map<string, ExecucaoAgir>()
+const geracaoPorFluxo = new Map<string, number>()
+const continuacoesEmClaim = new Set<string>()
+const MAX_EXECUCOES_MEMORIA = 500
+function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
+  const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
+  geracaoPorFluxo.set(fluxo, generation)
+  const execucao: ExecucaoAgir = {
+    ...contexto,
+    fluxo,
+    runId: randomUUID(),
+    generation,
+    estado: 'running',
+    controller: new AbortController(),
+    pendentes: new Map(),
+  }
+  execucaoPorFluxo.set(fluxo, execucao)
+  execucaoPorId.set(execucao.runId, execucao)
+  while (execucaoPorId.size > MAX_EXECUCOES_MEMORIA) {
+    const idAntigo = execucaoPorId.keys().next()
+    if (idAntigo.done) break
+    const antiga = execucaoPorId.get(idAntigo.value)
+    if (antiga && execucaoPorFluxo.get(antiga.fluxo) === antiga) break
+    execucaoPorId.delete(idAntigo.value)
+  }
+  return execucao
+}
+
+function cancelarExecucao(execucao: ExecucaoAgir, motivo: 'requested' | 'disconnect'): boolean {
+  if (execucao.estado === 'cancelled' || execucao.estado === 'completed' || execucao.estado === 'paused') return false
+  execucao.estado = 'cancel-requested'
+  execucao.motivoCancelamento = motivo
+  const pendentes = [...execucao.pendentes.values()]
+  execucao.pendentes.clear()
+  for (const pendente of pendentes) pendente.resolver(false)
+  execucao.estado = 'cancelled'
+  execucao.controller.abort()
+  return true
+}
+
 /**
  * Diálogos pausados no teto, por fluxo (FATIA 11): o "Continuar" retoma o
  * MESMO fluxo com orçamento cheio. Teto de mapa (não de iterações!): as mais
@@ -148,6 +198,7 @@ function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: Cont
 }
 
 interface FioAgir {
+  execucao: ExecucaoAgir
   fluxo: string
   sessionId: string
   chatId: string
@@ -162,20 +213,23 @@ interface FioAgir {
  * O corredor SSE compartilhado: pedido novo e "continuar" passam por aqui —
  * mesmos cartões, mesmo Parar silencioso, mesma faxina no fim.
  */
-async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: FioAgir, deps: DependenciasAgir): Promise<ResultadoAgir> {
+async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: DependenciasAgir): Promise<ResultadoAgir> {
   res.statusCode = 200
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Agir-Run-Id', fio.execucao.runId)
+  res.setHeader('X-Agir-Generation', String(fio.execucao.generation))
   res.flushHeaders?.()
 
-  const abort = new AbortController()
-  const aoFechar = (): void => abort.abort()
-  req.on('close', aoFechar)
+  const abort = fio.execucao.controller
+  const aoFechar = (): void => {
+    if (!res.writableEnded) cancelarExecucao(fio.execucao, 'disconnect')
+  }
+  res.on?.('close', aoFechar)
 
   const { fluxo } = fio
   permissoesPorFluxo.set(fluxo, new Set(fio.permissoes))
-  pendentesPorFluxo.set(fluxo, new Map())
   contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
@@ -187,7 +241,9 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
       executores,
       teto: fio.teto,
       emitir: (evento) => {
-        if (abort.signal.aborted || res.writableEnded) return
+        if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
+        // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
+        // mas não envie novas respostas, cartões ou continuações após a terminalização.
         // O rodapé da tela mostra o modelo EFETIVO (o configurado no provedor
         // ativo — mesma régua da casa Conversa, §3.9), mesmo que o fio do
         // provedor não carimbe o modelo em cada pedaço.
@@ -198,16 +254,19 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
         // RF12-3: sessão liberada NÃO cobre `excluir` (cinto + suspensório com
         // o filtro de entrada — mesmo que 'excluir' chegue, nunca auto-libera).
         if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) return true // Q2a
-        if (abort.signal.aborted) return false
-        // FATIA 12: o cartão do `excluir` mostra o que o servidor viu no disco
-        // (prévia do arquivo ou contagem da pasta — RF12-6).
+        if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
+        fio.execucao.estado = 'awaiting-approval'
         const previa = pedido.ferramenta === 'excluir'
           ? await descreverAlvoExcluir(fio.raiz, pedido.argumentos.caminho)
           : undefined
-        escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}) })
-        return await new Promise<boolean>((resolve) => {
-          pendentesPorFluxo.get(fluxo)?.set(pedido.id, { resolver: resolve, pedido })
+        if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
+        const liberado = await new Promise<boolean>((resolve) => {
+          fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
+          escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}) })
         })
+        fio.execucao.pendentes.delete(pedido.id)
+        if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
+        return liberado
       },
       validarContexto: (pedido) => {
         const permissoesAtuais = permissoesPorFluxo.get(fluxo)
@@ -226,11 +285,20 @@ async function executarFioAgir(req: IncomingMessage, res: ServerResponse, fio: F
     }
   } finally {
     executores.fechar()
-    pendentesPorFluxo.delete(fluxo)
+    for (const pendente of fio.execucao.pendentes.values()) pendente.resolver(false)
+    fio.execucao.pendentes.clear()
+    if (fio.execucao.estado !== 'cancelled') {
+      fio.execucao.estado = resultado.status === 'interrompido'
+        ? 'cancelled'
+        : resultado.status === 'iteracoes_excedidas' || (resultado.status === 'erro' && ['tempo', 'endereco', 'http'].includes(resultado.codigoErro ?? ''))
+          ? 'paused'
+          : 'completed'
+    }
+    if (execucaoPorFluxo.get(fluxo) === fio.execucao) execucaoPorFluxo.delete(fluxo)
     permissoesPorFluxo.delete(fluxo)
     contextoPorFluxo.delete(fluxo)
-    req.off?.('close', aoFechar)
-    res.end()
+    res.off?.('close', aoFechar)
+    if (!res.writableEnded) res.end()
   }
   return resultado
 }
@@ -247,25 +315,31 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
   const fluxo = typeof corpo.fluxo === 'string' ? corpo.fluxo.trim() : ''
   const id = typeof corpo.id === 'string' ? corpo.id.trim() : ''
   const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
+  const runId = typeof corpo.runId === 'string' ? corpo.runId.trim() : ''
+  const generation = Number(corpo.generation)
   const decisao = corpo.decisao
   const decisaoValida = decisao === 'permitir' || decisao === 'negar' || decisao === 'sessao'
-  if (fluxo === '' || id === '' || sessionId === '' || !decisaoValida) {
-    sendErro(res, 400, 'configuracao', 'Resposta de aprovação inválida (fluxo, id, sessionId e decisao são obrigatórios).')
+  if (fluxo === '' || id === '' || sessionId === '' || runId === '' || !Number.isSafeInteger(generation) || generation < 1 || !decisaoValida) {
+    sendErro(res, 400, 'configuracao', 'Resposta de aprovação inválida (fluxo, runId, generation, id, sessionId e decisao são obrigatórios).')
     return true
   }
-  const contexto = contextoPorFluxo.get(fluxo)
-  if (!contexto || contexto.sessionId !== sessionId) {
-    sendErro(res, 409, 'fluxo', 'Esta aprovação não pertence à sessão ativa ou já expirou.')
+  const execucao = execucaoPorId.get(runId)
+  if (!execucao || execucao.fluxo !== fluxo || execucao.generation !== generation || execucao.estado !== 'awaiting-approval' || execucaoPorFluxo.get(fluxo) !== execucao) {
+    sendErro(res, 409, 'approval_expired', 'Esta aprovação expirou, pertence a outra geração ou a execução já terminou.')
     return true
   }
-  const contextoAtual = deps.resolverContexto(contexto.sessionId, contexto.chatId)
-  if (!contextoAtual.ok || contextoAtual.raiz !== contexto.raiz) {
+  if (execucao.sessionId !== sessionId) {
+    sendErro(res, 409, 'fluxo', 'Esta aprovação não pertence à sessão ativa.')
+    return true
+  }
+  const contextoAtual = deps.resolverContexto(execucao.sessionId, execucao.chatId)
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz) {
     sendErro(res, 409, 'fluxo', 'A sessão ou a pasta mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
     return true
   }
-  const pendente = pendentesPorFluxo.get(fluxo)?.get(id)
-  if (!pendente) {
-    sendErro(res, 409, 'fluxo', 'Esta execução já não espera mais resposta (a página recarregou ou ela terminou). Envie a mensagem de novo.')
+  const pendente = execucao.pendentes.get(id)
+  if (!pendente || execucao.controller.signal.aborted) {
+    sendErro(res, 409, 'approval_expired', 'Esta execução já não espera mais resposta (a aprovação expirou ou já foi consumida).')
     return true
   }
   if (decisao === 'sessao') {
@@ -274,12 +348,50 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
       return true
     }
     const ferramenta = pendente.pedido.ferramenta as 'criar' | 'escrever'
-    deps.concederPermissaoSessao(contexto.sessionId, contexto.raiz, ferramenta)
+    deps.concederPermissaoSessao(execucao.sessionId, execucao.raiz, ferramenta)
     permissoesPorFluxo.get(fluxo)?.add(ferramenta)
   }
-  pendentesPorFluxo.get(fluxo)?.delete(id)
+  execucao.pendentes.delete(id)
+  execucao.estado = 'running'
   pendente.resolver(decisao !== 'negar')
   sendJson(res, 200, { ok: true })
+  return true
+}
+
+/** POST /api/agir/cancel — invalidation terminal, vinculada à identidade F1 e à geração. */
+async function tratarCancelar(req: IncomingMessage, res: ServerResponse, deps: DependenciasAgir): Promise<boolean> {
+  let corpo: Record<string, unknown>
+  try {
+    corpo = await lerCorpo(req)
+  } catch (erro) {
+    sendErro(res, 400, 'configuracao', (erro as Error).message)
+    return true
+  }
+  const fluxo = typeof corpo.fluxo === 'string' ? corpo.fluxo.trim() : ''
+  const runId = typeof corpo.runId === 'string' ? corpo.runId.trim() : ''
+  const generation = Number(corpo.generation)
+  const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
+  const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
+  if (!fluxo || !runId || !Number.isSafeInteger(generation) || generation < 1 || !sessionId || !chatId) {
+    sendErro(res, 400, 'configuracao', 'Cancelamento inválido (fluxo, runId, generation, sessionId e chatId são obrigatórios).')
+    return true
+  }
+  const execucao = execucaoPorId.get(runId)
+  if (!execucao || execucao.fluxo !== fluxo || execucao.generation !== generation || execucao.sessionId !== sessionId || execucao.chatId !== chatId) {
+    sendErro(res, 409, 'approval_expired', 'A execução não existe mais ou esta identidade expirou.')
+    return true
+  }
+  const contextoAtual = deps.resolverContexto(sessionId, chatId)
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz) {
+    sendErro(res, 409, 'fluxo', 'A sessão ou pasta não corresponde; o cancelamento não foi aplicado.')
+    return true
+  }
+  const cancelada = cancelarExecucao(execucao, 'requested')
+  sendJson(res, 200, {
+    status: cancelada ? 'cancelled' : 'already_terminal',
+    runId,
+    generation,
+  })
   return true
 }
 
@@ -322,11 +434,17 @@ async function tratarAgir(
     return true
   }
 
-  // ---- Pré-condições ok: pedido novo descarta retomada velha e abre o fio ----
+  // Claim síncrono: duas requisições no mesmo fluxo nunca iniciam dois runs.
   const { fluxo, sessionId, chatId } = validacao.pedido
+  if (execucaoPorFluxo.has(fluxo) || continuacoesEmClaim.has(fluxo)) {
+    sendErro(res, 409, 'already_running', 'Já existe uma execução ativa para esta conversa.')
+    return true
+  }
   retomarPorFluxo.delete(fluxo)
   const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz }
-  const resultado = await executarFioAgir(req, res, {
+  const execucao = criarExecucao(fluxo, contextoFluxo)
+  const resultado = await executarFioAgir(res, {
+    execucao,
     fluxo,
     sessionId,
     chatId,
@@ -363,6 +481,10 @@ async function tratarContinuar(
     sendErro(res, 409, 'fluxo', 'Nada para retomar aqui (esta execução já terminou ou o servidor reiniciou). Envie a mensagem de novo.')
     return true
   }
+  if (execucaoPorFluxo.has(fluxo) || continuacoesEmClaim.has(fluxo)) {
+    sendErro(res, 409, 'already_running', 'Esta pausa já está sendo retomada por outra requisição.')
+    return true
+  }
   const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
   const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
   if (sessionId !== retomada.contexto.sessionId || chatId !== retomada.contexto.chatId) {
@@ -374,9 +496,12 @@ async function tratarContinuar(
     sendErro(res, 409, 'fluxo', 'A sessão ou a pasta mudou; a continuação foi invalidada.')
     return true
   }
+  // Claim antes de qualquer await: somente uma continuação pode consumir a pausa.
+  continuacoesEmClaim.add(fluxo)
 
   const { alvo, erro } = await deps.obterAlvo()
   if (!alvo) {
+    continuacoesEmClaim.delete(fluxo)
     sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
     return true
   }
@@ -385,12 +510,22 @@ async function tratarContinuar(
   try {
     teto = await deps.lerTeto()
   } catch (erro) {
+    continuacoesEmClaim.delete(fluxo)
     sendErro(res, 409, 'configuracao', (erro as Error).message)
     return true
   }
 
   // Território e grants são relidos do registro persistido; payload do browser não é autoridade.
-  const resultado = await executarFioAgir(req, res, {
+  if (retomarPorFluxo.get(fluxo) !== retomada || execucaoPorFluxo.has(fluxo)) {
+    continuacoesEmClaim.delete(fluxo)
+    sendErro(res, 409, 'already_running', 'A pausa já foi consumida ou invalidada por outra requisição.')
+    return true
+  }
+  retomarPorFluxo.delete(fluxo)
+  const execucao = criarExecucao(fluxo, retomada.contexto)
+  continuacoesEmClaim.delete(fluxo)
+  const resultado = await executarFioAgir(res, {
+    execucao,
     fluxo,
     sessionId,
     chatId,
@@ -413,6 +548,7 @@ export async function tratarRotasAgir(
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
   if (url.pathname === '/api/agir/aprovar') return tratarAprovar(req, res, deps)
+  if (url.pathname === '/api/agir/cancel') return tratarCancelar(req, res, deps)
   if (url.pathname === '/api/agir/continuar') return tratarContinuar(req, res, deps)
   if (url.pathname === '/api/agir') return tratarAgir(req, res, deps)
   return false

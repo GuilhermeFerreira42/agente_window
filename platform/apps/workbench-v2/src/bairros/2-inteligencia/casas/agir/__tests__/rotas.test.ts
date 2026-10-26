@@ -63,6 +63,7 @@ function fakeReq(corpo = '', metodo = 'POST'): IncomingMessage {
 
 const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
+const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
 
 const ALVO: AlvoConversa = { protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'm', apiKey: 'sk-123' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
@@ -94,6 +95,17 @@ function frames(res: ResFalsa): Record<string, unknown>[] {
     .split('\n\n')
     .filter(Boolean)
     .map((linha) => JSON.parse(linha.replace(/^data: /, '')) as Record<string, unknown>)
+}
+
+function identity(res: ResFalsa): { runId: string; generation: number } {
+  return {
+    runId: res.cabecalhos['x-agir-run-id'],
+    generation: Number(res.cabecalhos['x-agir-generation']),
+  }
+}
+
+function approvalBody(res: ResFalsa, fields: Record<string, unknown>): string {
+  return JSON.stringify({ ...fields, ...identity(res) })
 }
 
 /** Fio SSE falso do PROVEDOR: uma sequência de respostas por chamada de fetch. */
@@ -143,6 +155,7 @@ describe('rotas — POST /api/agir', () => {
   it('reconhece só o caminho e o método certos', async () => {
     expect(rotaPertenceAoModuloAgir('/api/agir')).toBe(true)
     expect(rotaPertenceAoModuloAgir('/api/agir/aprovar')).toBe(true)
+    expect(rotaPertenceAoModuloAgir('/api/agir/cancel')).toBe(true)
     expect(rotaPertenceAoModuloAgir('/api/agirx')).toBe(false)
     const res = fakeRes()
     expect(await tratarRotasAgir(fakeReq(PEDIDO_BASE, 'GET'), res, URL_AGIR, DEPS)).toBe(false)
@@ -188,7 +201,7 @@ describe('rotas — POST /api/agir', () => {
     expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
 
     const aprovar = fakeRes()
-    const corpoNegar = JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })
+    const corpoNegar = approvalBody(res, { fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })
     expect(await tratarRotasAgir(fakeReq(corpoNegar), aprovar, URL_APROVAR, DEPS)).toBe(true)
     expect(aprovar.statusCode).toBe(200)
 
@@ -213,7 +226,7 @@ describe('rotas — POST /api/agir', () => {
     await esperaFio(res, '"type":"approval"')
     expect(frames(res).filter((e) => e.type === 'approval')).toHaveLength(1) // só a 1.ª pergunta
     const primeiro = fakeRes()
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-2', id: 'c1', decisao: 'sessao', ferramenta: 'criar' })), primeiro, URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-2', id: 'c1', decisao: 'sessao', ferramenta: 'criar' })), primeiro, URL_APROVAR, DEPS)
     await esperaFio(res, '"type":"done"')
     await fio
 
@@ -236,16 +249,16 @@ describe('rotas — POST /api/agir', () => {
     const fio = tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
     expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-3', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-3', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
     await fio
     expect(concederPermissaoSessao).not.toHaveBeenCalled()
   })
 
   it('aprovar para fluxo morto → 409 honesto', async () => {
     const res = fakeRes()
-    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fantasma', id: 'c1', decisao: 'permitir' })), res, URL_APROVAR, DEPS)).toBe(true)
+    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fantasma', id: 'c1', decisao: 'permitir', runId: 'nao-existe', generation: 1 })), res, URL_APROVAR, DEPS)).toBe(true)
     expect(res.statusCode).toBe(409)
-    expect(JSON.parse(res.corpo()).message).toContain('já expirou')
+    expect(JSON.parse(res.corpo()).message).toContain('expirou')
   })
 
   it('approval de outra sessão não consome nem executa o cartão', async () => {
@@ -254,10 +267,10 @@ describe('rotas — POST /api/agir', () => {
     const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
     const estranho = fakeRes()
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'permitir', sessionId: 'outra-sessao' })), estranho, URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-1', id: 'c1', decisao: 'permitir', sessionId: 'outra-sessao' })), estranho, URL_APROVAR, DEPS)
     expect(estranho.statusCode).toBe(409)
     expect(JSON.parse(estranho.corpo()).message).toContain('não pertence à sessão')
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
     await fio
     expect(frames(res).some((evento) => evento.type === 'tool_result' && evento.ok === true)).toBe(false)
   })
@@ -346,7 +359,7 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
       expect(String(cartao.previa)).toContain('exclusão está bloqueada')
       expect(String(cartao.previa)).toContain('nenhum item foi lido ou removido')
       const aprovar = fakeRes()
-      expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-f2', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
+      expect(await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-f2', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
       expect(aprovar.statusCode).toBe(200)
       await fio
       const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
@@ -368,11 +381,11 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
     const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
     const tentativa = fakeRes()
-    expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12b', id: 'x2', decisao: 'sessao', ferramenta: 'excluir' })), tentativa, URL_APROVAR, DEPS)).toBe(true)
+    expect(await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-12b', id: 'x2', decisao: 'sessao', ferramenta: 'excluir' })), tentativa, URL_APROVAR, DEPS)).toBe(true)
     expect(tentativa.statusCode).toBe(400)
     expect(JSON.parse(tentativa.corpo()).message).toContain('sempre pergunta')
     // o fio segue pendente: negar termina limpo e nada some
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12b', id: 'x2', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-12b', id: 'x2', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
     await fio
     const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
     expect(String(resultado.resumo)).toContain('dono negou')
@@ -388,8 +401,77 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
     const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"') // perguntou mesmo com "sessão liberada"
     expect(frames(res).some((e) => e.type === 'approval')).toBe(true)
-    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-12c', id: 'x3', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-12c', id: 'x3', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
     await fio
     expect(await readFile(path.join(raiz, 'alvo-12c.txt'), 'utf8')).toBe('c')
+  })
+})
+
+describe('F3 — cancelamento terminal e claims de geração', () => {
+  it('Parar durante approval invalida o cartão; approval tardio não executa', async () => {
+    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'crie ola.txt' }], fluxo: 'f3-cancel-aproval' })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    const id = identity(res)
+    expect(id.runId).toBeTruthy()
+    expect(id.generation).toBe(1)
+
+    const cancelRes = fakeRes()
+    const cancelBody = JSON.stringify({ fluxo: 'f3-cancel-aproval', sessionId: 'sessao-1', chatId: 'chat-1', ...id })
+    await tratarRotasAgir(fakeReq(cancelBody), cancelRes, URL_CANCEL, DEPS)
+    expect(cancelRes.statusCode).toBe(200)
+    expect(JSON.parse(cancelRes.corpo())).toMatchObject({ status: 'cancelled', ...id })
+    await fio
+
+    const atraso = fakeRes()
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'f3-cancel-aproval', id: 'c1', decisao: 'permitir' })), atraso, URL_APROVAR, DEPS)
+    expect(atraso.statusCode).toBe(409)
+    expect(JSON.parse(atraso.corpo()).code).toBe('approval_expired')
+    expect(frames(res).some((evento) => evento.type === 'tool_result')).toBe(false)
+    await expect(readFile(path.join(raiz, 'ola.txt'), 'utf8')).rejects.toThrow()
+
+    const repetido = fakeRes()
+    await tratarRotasAgir(fakeReq(cancelBody), repetido, URL_CANCEL, DEPS)
+    expect(JSON.parse(repetido.corpo())).toMatchObject({ status: 'already_terminal', ...id })
+  })
+
+  it('uma aprovação é consumida uma vez; duplicata não dispara outro efeito', async () => {
+    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'crie f3-uma-vez.txt' }], fluxo: 'f3-approval-once' })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    const body = approvalBody(res, { fluxo: 'f3-approval-once', id: 'c1', decisao: 'permitir' })
+    const primeira = fakeRes()
+    await tratarRotasAgir(fakeReq(body), primeira, URL_APROVAR, DEPS)
+    expect(primeira.statusCode).toBe(200)
+    const duplicada = fakeRes()
+    await tratarRotasAgir(fakeReq(body), duplicada, URL_APROVAR, DEPS)
+    expect(duplicada.statusCode).toBe(409)
+    await fio
+    expect(await readFile(path.join(raiz, 'ola.txt'), 'utf8')).toBe('oi')
+  })
+
+  it('duas continuations concorrentes fazem claim único', async () => {
+    stubProvedor([SSE_BUSCAR, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const deps = { ...DEPS, lerTeto: async () => 1 }
+    const pedido = JSON.stringify({ messages: [{ role: 'user', content: 'busque txt' }], fluxo: 'f3-continue-once' })
+    const pausa = fakeRes()
+    await tratarRotasAgir(fakeReq(pedido), pausa, URL_AGIR, deps)
+    expect(frames(pausa).at(-1)).toMatchObject({ type: 'teto' })
+
+    const corpo = JSON.stringify({ fluxo: 'f3-continue-once', sessionId: 'sessao-1', chatId: 'chat-1' })
+    const a = fakeRes()
+    const b = fakeRes()
+    const resultados = await Promise.all([
+      tratarRotasAgir(fakeReq(corpo), a, URL_CONTINUAR, deps),
+      tratarRotasAgir(fakeReq(corpo), b, URL_CONTINUAR, deps),
+    ])
+    expect(resultados).toEqual([true, true])
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409])
+    const negada = a.statusCode === 409 ? a : b
+    expect(JSON.parse(negada.corpo()).code).toBe('already_running')
   })
 })

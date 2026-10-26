@@ -20,20 +20,26 @@ const editorTab = (name: string | RegExp) => within(document.querySelector('.edi
 // O layout é persistido em localStorage (visibilidade global + estado por
 // sessão). Cada teste começa com um estado limpo para não herdar layout de
 // outro — importante agora que a visibilidade da barra auxiliar é por sessão.
+let streamsAgirAbertos: Set<ReadableStreamDefaultController<Uint8Array>>
+
 beforeEach(() => {
   window.localStorage.clear()
-  // FATIA 09: o /api/agir do teste fica SUSPENSO até o Parar abortar (ou até o
-  // teste substituir o fetch por um fio SSE). Sem isto o fetch do jsdom falha
-  // na hora e o chat nunca fica "Trabalhando" — quebrando os fluxos de Parar.
+  streamsAgirAbertos = new Set()
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).includes('/api/agir')) {
-      return new Promise<Response>((_resolve, reject) => {
-        const sinal = init?.signal
-        const abortar = () => reject(new DOMException('Aborted', 'AbortError'))
-        if (sinal?.aborted) abortar()
-        else sinal?.addEventListener('abort', abortar)
-      })
+    const url = String(input)
+    if (url.endsWith('/api/agir/cancel')) {
+      for (const stream of streamsAgirAbertos) {
+        try { stream.close() } catch { /* stream já encerrado */ }
+      }
+      return Promise.resolve(new Response(JSON.stringify({ status: 'cancelled' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
+    if (url === '/api/agir') {
+      const fio = new ReadableStream<Uint8Array>({ start(controller) { streamsAgirAbertos.add(controller) } })
+      return Promise.resolve(new Response(fio, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'run-test', 'X-Agir-Generation': '1' },
+      }))
     }
     return fetchOriginal(input, init)
   })
@@ -42,17 +48,25 @@ beforeEach(() => {
 /** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
 function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' = 'done', atrasoMs = 25): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
-    if (!String(input).includes('/api/agir')) throw new Error('fetch inesperado no teste')
+    const url = String(input)
+    if (url.endsWith('/api/agir/cancel')) {
+      for (const stream of streamsAgirAbertos) {
+        try { stream.close() } catch { /* stream já encerrado */ }
+      }
+      return new Response(JSON.stringify({ status: 'cancelled' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (url !== '/api/agir') throw new Error('fetch inesperado no teste')
     const codificar = new TextEncoder()
     const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
     if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))
     const fio = new ReadableStream<Uint8Array>({
       start(controller) {
+        streamsAgirAbertos.add(controller)
         // Atraso entre frames: o fio é ASSÍNCRONO como o do servidor, e o teste
         // consegue observar o estado "em andamento" antes do fim.
         let indice = 0
         const passo = () => {
-          if (indice >= pedacos.length) { controller.close(); return }
+          if (indice >= pedacos.length) { streamsAgirAbertos.delete(controller); controller.close(); return }
           controller.enqueue(pedacos[indice])
           indice += 1
           setTimeout(passo, atrasoMs)
@@ -60,7 +74,7 @@ function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' = 
         setTimeout(passo, atrasoMs)
       },
     })
-    return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'run-test', 'X-Agir-Generation': '1' } })
   })
 }
 

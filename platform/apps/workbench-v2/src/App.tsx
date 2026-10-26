@@ -21,7 +21,7 @@ import { initialPluginDiscoveries } from './agentPluginsData'
 import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -1890,7 +1890,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }))
     }
     marcar('executando')
-    void responderAprovacao(sessionId, `${sessionId}:${chatId}:${messageId}`, carta.id, decisao).then((aceita) => {
+    const identidade: IdentidadeExecucaoAgir | null = agirAtivas.current.get(`${sessionId}:${chatId}`)?.identidade() ?? null
+    void responderAprovacao(sessionId, `${sessionId}:${chatId}:${messageId}`, carta.id, decisao, identidade).then((aceita) => {
       if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
     })
   }
@@ -1995,46 +1996,57 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     iniciarAgirReal(sessionId, chatId, responseId, historico)
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
     const sessionId = activeSession.id
-    // FATIA 09: derruba o fio REAL desta sessão no servidor (o provedor para de
-    // ser consumido) — e a bolha guarda o texto que já chegou (SPEC §3.4).
-    for (const [key, controle] of agirAtivas.current) {
-      if (key.startsWith(`${sessionId}:`)) {
-        controle.abortar()
-        agirAtivas.current.delete(key)
-      }
+    const ativos = [...agirAtivas.current.entries()].filter(([key]) => key.startsWith(`${sessionId}:`))
+    if (ativos.length === 0) return
+    const respostas = await Promise.all(ativos.map(async ([key, controle]) => ({
+      key,
+      estado: await controle.abortar(),
+    })))
+    const chatsCancelados = new Set(respostas.filter((item) => item.estado === 'cancelled').map((item) => item.key.slice(sessionId.length + 1)))
+    const aguardandoAck = respostas.some((item) => item.estado === 'pending')
+    for (const item of respostas) {
+      if (item.estado === 'cancelled') agirAtivas.current.delete(item.key)
     }
-    // CancelAction in the workbench cancels the request owned by the current
-    // session, not merely the nested chat currently visible in the UI. Clear
-    // every residual timer for that session so switching chats cannot leave a
-    // run completing after the user pressed Stop.
+    if (chatsCancelados.size > 0) {
+      updateSession(sessionId, (session) => {
+        let next = session
+        for (const chatId of chatsCancelados) {
+          if (next.chats.some((chat) => chat.id === chatId)) next = updateSessionAndChatStatus(next, chatId, 'completed')
+        }
+        return {
+          ...next,
+          chats: next.chats.map((chat) => {
+            if (!chatsCancelados.has(chat.id)) return chat
+            return {
+              ...chat,
+              status: 'completed',
+              messages: chat.messages.map((message) => message.running ? {
+                ...message,
+                content: message.content.trim()
+                  ? message.content
+                  : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
+                running: false,
+                cancelled: true,
+                time: timeLabel(),
+                ferramentas: message.ferramentas?.map((carta) =>
+                  carta.status === 'aguardando' || carta.status === 'executando'
+                    ? { ...carta, status: 'expirado' as const, resumo: 'A execução foi cancelada; este cartão não pode mais executar.' }
+                    : carta,
+                ),
+              } : message),
+            }
+          }),
+        }
+      })
+    }
+    if (aguardandoAck) {
+      notify('Parada solicitada; confirmação pendente. A execução continua ativa até o servidor confirmar.')
+      return
+    }
     clearPendingTimersForSession(sessionId)
-    updateSession(sessionId, (session) => {
-      const next = updateSessionStatus(session, 'completed')
-      return {
-        ...next,
-        chats: next.chats.map((chat) => {
-          const hasRunningResponse = chat.messages.some((message) => message.running)
-          if (chat.status !== 'working' && !hasRunningResponse) return chat
-          return {
-            ...chat,
-            status: 'completed',
-            messages: chat.messages.map((message) => message.running ? {
-              ...message,
-              // Preserva o parcial (SPEC §3.4); o placeholder só para bolha vazia.
-              content: message.content.trim()
-                ? message.content
-                : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
-              running: false,
-              cancelled: true,
-              time: timeLabel(),
-            } : message),
-          }
-        }),
-      }
-    })
-    notify('Execução interrompida')
+    if (chatsCancelados.size > 0) notify('Execução interrompida')
   }
 
   const handleRegenerate = (chatId: string, messageId: string) => {

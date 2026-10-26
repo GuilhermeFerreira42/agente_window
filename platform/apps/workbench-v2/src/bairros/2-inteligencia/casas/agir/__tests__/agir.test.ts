@@ -290,6 +290,54 @@ describe('O loop do agente (rodarAgir)', () => {
     expect(eventos.at(-1)).not.toHaveProperty('retomavel')
   })
 
+  it('Parar durante executor já iniciado preserva o resultado concluído sem nova iteração', async () => {
+    const controle = new AbortController()
+    const eventos: EventoAgir[] = []
+    let iniciou!: () => void
+    let concluir!: (resultado: { ok: boolean; resumo: string }) => void
+    const iniciado = new Promise<void>((resolve) => { iniciou = resolve })
+    const efeito = new Promise<{ ok: boolean; resumo: string }>((resolve) => { concluir = resolve })
+    const fio = rodarAgir({
+      vizinho: async () => ({ texto: '', pedidos: [{ id: 'tool-in-flight', ferramenta: 'criar', argumentos: { caminho: 'feito.txt', conteudo: 'x' } }] }),
+      historico: [{ papel: 'usuario', conteudo: 'crie feito.txt' }],
+      executores: { ...EXECUTORES, criar: async () => { iniciou(); return efeito } },
+      emitir: (evento) => eventos.push(evento),
+      pedirAprovacao: async () => true,
+      sinal: controle.signal,
+    })
+    await iniciado
+    controle.abort()
+    concluir({ ok: true, resumo: 'arquivo criado' })
+    expect((await fio).status).toBe('interrompido')
+    expect(eventos.at(-1)).toMatchObject({ type: 'tool_result', id: 'tool-in-flight', ok: true, resumo: 'arquivo criado' })
+    expect(eventos.some((evento) => evento.type === 'done')).toBe(false)
+  })
+
+  it('Parar durante approval invalida resposta tardia antes do executor', async () => {
+    const controle = new AbortController()
+    const eventos: EventoAgir[] = []
+    const executar = vi.fn(async () => ({ ok: true, resumo: 'não deveria executar' }))
+    let entrouAprovacao!: () => void
+    let responder!: (permitir: boolean) => void
+    const aguardando = new Promise<void>((resolve) => { entrouAprovacao = resolve })
+    const decisao = new Promise<boolean>((resolve) => { responder = resolve })
+    const fio = rodarAgir({
+      vizinho: async () => ({ texto: '', pedidos: [{ id: 'late-1', ferramenta: 'criar', argumentos: { caminho: 'late.txt', conteudo: 'x' } }] }),
+      historico: [{ papel: 'usuario', conteudo: 'crie late.txt' }],
+      executores: { ...EXECUTORES, criar: executar },
+      emitir: (evento) => eventos.push(evento),
+      pedirAprovacao: async () => { entrouAprovacao(); return decisao },
+      sinal: controle.signal,
+    })
+    await aguardando
+    controle.abort()
+    responder(true)
+    const resultado = await fio
+    expect(resultado.status).toBe('interrompido')
+    expect(executar).not.toHaveBeenCalled()
+    expect(eventos.some((evento) => evento.type === 'tool_result')).toBe(false)
+  })
+
   it('Parar NO MEIO: a ferramenta seguinte não executa (checa antes de cada execução)', async () => {
     const controle = new AbortController()
     const eventos: EventoAgir[] = []
