@@ -177,7 +177,45 @@ Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e
 - Se o ambiente/acesso/autorização não estiver disponível, registrar o teste real como **bloqueado/não executado**; não substituir por um stub e chamá-lo de teste real.
 - Testes automatizados e validação de integração não substituem a **homologação funcional do dono** (`08`).
 
+### 3.10 Metodologia comparativa reproduzível — D101 (2026-10-24)
+
+Esta metodologia permite avaliar uma capacidade do Agente Window contra referências relevantes, inclusive os cinco cenários de `02 §1.4`, sem presumir paridade, inventar metas ou ampliar o roadmap. Uma alegação comparativa é válida apenas para o cenário, versão/configuração e condições realmente testados.
+
+**Antes de executar (na SPEC e no plano de teste):**
+1. Delimitar cenário/critério CAP de D100, tarefa e comportamento observável; escolher referência, produto/versão/commit e funcionalidades disponíveis. Distinguir objetivo do produto de capacidades já entregues.
+2. Fixar protocolo, script/checklist, fixtures e dados iniciais, ambiente (SO, hardware, runtime), versões e configurações de ambos os sistemas. Registrar todos os desvios e variáveis que não puderem ser equiparadas.
+3. Fixar antes de ver os resultados critérios de correção, segurança, estabilidade, completude, experiência e desempenho relevantes, incluindo como avaliar equivalência e tratamento de variação. **Não definir ou ajustar limiares depois para favorecer um resultado.** Metas quantitativas serão justificadas em SPEC após medições; este documento não estabelece números-alvo.
+4. Repetições, condições de cache/aquecimento, tamanho da fixture, timeout e método de coleta são definidos pela SPEC para o cenário; registrar cada rodada, falha, descarte e motivo. Um timeout ou execução incompleta não prova uma duração exata nem uma causa.
+
+**Controle do modelo/provedor versus overhead do produto:** quando a tarefa depender de IA, manter modelo/provedor, versão, parâmetros, prompt/contexto e condições de serviço tão equivalentes quanto possível. Registrar separadamente tempos/uso reportados pelo serviço, custos das fronteiras internas e tempo observado ponta a ponta. Comparar o Agente Window com a referência usando o mesmo modelo/provedor quando disponível; se não for possível, a comparação de qualidade ou velocidade do modelo é **não comparável** e deve ser relatada em trilha separada, sem atribuir essa diferença ao overhead do Agente Window. Para operações locais/UI, usar fixture e configuração equivalentes e instrumentar separadamente filesystem/Git, transporte, processamento e renderização quando a pergunta exigir localizar overhead. Não tratar números de backend isolados como experiência completa do usuário.
+
+**Evidência a preservar no relatório:** passos exatos para repetir; commits/tags dos produtos; script/testes e hash da fixture; ambiente e configurações sem segredos; dados brutos e logs sanitizados; critérios definidos antes; resultados de cada rodada; exceções, limitações e relação com o cenário. Nunca registrar chaves, credenciais, prompts/conteúdo sensível sem necessidade e autorização. Distinguir medições deste checkout de resultados históricos relatados e não reproduzidos. Testes-fonte de terceiros demonstram que há um caso de teste, não que nosso sistema passou nele.
+
+**Estados possíveis por critério/cenário:**
+- **Superior** — satisfaz os critérios pré-definidos e apresenta resultado melhor nas dimensões comparáveis, sustentado pelas evidências e método registrados.
+- **Equivalente** — satisfaz os critérios e a tolerância de equivalência definida previamente; não significa identidade absoluta.
+- **Inferior** — comparável sob as condições acordadas e falha os critérios ou obtém resultado pior, demonstrado pelas evidências.
+- **Inconclusivo** — evidência insuficiente, variável não controlada relevante, resultados instáveis, timeout sem medida válida ou critério não resolvido.
+- **Não testado** — não foi executada avaliação pertinente; plano, hipótese ou presença de testes não muda este estado.
+- **Não comparável** — referência, tarefa, ambiente ou variável essencial não pôde ser alinhada; os dados podem ser informativos, mas não sustentam uma classificação ordinal.
+
+O estado é atribuído a cada critério e cenário, não ao produto inteiro por extrapolação. Só se pode agregar cenários usando regra de agregação aprovada previamente em SPEC. Ausência de resultado “inferior” não comprova equivalência. Resultados negativos não são omitidos e não se convertem em correção sem mudança implementada e reavaliada.
+
+**Escopo e estado:** D98 mantém seu próprio gate e protocolo em §3.8; esta metodologia geral não inicia trace, benchmark, protótipo ou fatia, nem autoriza alteração permanente. Nesta atualização documental não foram executados testes comparativos, benchmark, trace, provedores reais ou homologação; D98 continua aguardando a avaliação solicitada. Nenhum resultado de paridade ou superioridade é declarado.
+
 ---
+
+### 3.11 Protocolo de evidência CAP → SPEC → teste → aceite (auditoria 2026-10-25)
+
+O `06` contém a **única matriz de vínculo CAP-01–CAP-20** e seus destinos confirmados ou candidatos; `02` define as capacidades e cenários, `08` define a avaliação humana. Este item descreve **como produzir evidências futuras**, não executa testes nem cria SPEC.
+
+Para cada CAP e cenário que entrar em uma SPEC aprovada, registrar um caso de prova com: **ID CAP/cenário**; fatia/iniciativa **aprovada**; SPEC/versão/contratos; código/commit/ambiente; fixture e integridade; provedor/modelo real ou stub **explicitamente diferenciado**; pré-condições; ações, chamadas de ferramentas e resultados; métricas/limiares fixados **antes** das rodadas; repetição, erros e cancelamento; regressões afetadas; artefatos; parecer técnico e aceite humano pendente ou efetuado.
+
+**Cobertura mínima a planejar:** cenário 1 = escala e correção do mapa arquitetural; cenário 2 = plano, filesystem, comandos, Git e testes; cenário 3 = reinício/rehidratação sem duplicar side effects; cenário 4 = instalação/remoção e permissão de integração; cenário 5 = ciclo multi-sessão com decisões/documentação/execução. A associação de CAPs a cenários permanece **proposta** no `06`, não é critério técnico aprovado.
+
+**Gates:** sem SPEC/decisão, classificar como **não planejado para execução**; sem teste, **não testado**; evidência parcial não equivale a conformidade da CAP inteira. Metodologia comparativa D101 continua em §3.10; não confundir com homologação humana. Testes históricos não são repetidos por este adendo.
+
+**D98 (preliminar externo de 25/10):** medição sintética isolada e inspeção estática documentadas em cópia de `arquivo_morto/auditorias_2026-10-25/D98_RELATORIO_PRELIMINAR.md`; não houve execução comprovada de trace CDP end-to-end no aplicativo real nem demonstração de ganho em React do produto. O relatório é insumo **hipotético/preliminar**, não baseline homologada para SPEC quantitativa. Respeitar §3.8 e a aprovação pertinente antes de novos traces/alterações.
 
 ## 4. Becos sem saída (não tente de novo)
 

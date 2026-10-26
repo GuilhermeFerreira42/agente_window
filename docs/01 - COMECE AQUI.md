@@ -29,14 +29,14 @@ agente_window/
 ├── platform/                 (o código — apps/workbench-v2)
 └── docs/
     ├── 01 - COMECE AQUI.md               ← este arquivo: entrada, regras de trabalho, rotina de atualização
-    ├── 02 - VISAO GERAL.md               ← o que é o projeto, stack, onde está cada coisa (curto)
+    ├── 02 - VISAO GERAL.md               ← o que é o projeto, stack, visão CAP-01–CAP-20 (D100) e diretriz D101
     ├── 03 - ESTADO ATUAL.md              ← onde a obra parou: HEAD, placar, pendências, próximo passo
     ├── 04 - ARQUITETURA E REGRAS DURAS.md← como é construído + o que é intocável (terminal, core/server, App.tsx)
-    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D99… — a lista cresce; ver o fim do arquivo) — não reabrir
+    ├── 05 - DECISOES.md                  ← decisões fechadas (D1–D101… — a lista cresce; ver o fim do arquivo) — não reabrir
     ├── 06 - PROXIMAS FASES E DIVIDAS.md  ← próximas subfatias/fatias, dívidas e decisões ainda a deliberar
     ├── 07 - HISTORICO.md                 ← changelog + diário de sessão (único lugar de histórico)
     ├── 08 - HOMOLOGACAO.md               ← DO HUMANO: o que cada fatia prova e quando está "pronto" (curto, sem comando)
-    ├── 09 - TESTES E AMBIENTE.md         ← DA IA: 5174 × 5175, reseed, flakes, bateria, becos sem saída
+    ├── 09 - TESTES E AMBIENTE.md         ← DA IA: 5174 × 5175, reseed, bateria e metodologia comparativa D101
     └── arquivo_morto/                    ← tudo que envelheceu: docs antigos, raspagens, prints, planos fechados
 ```
 

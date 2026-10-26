@@ -1,6 +1,20 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-25 — Auditoria documental CAP-01–CAP-20 e alinhamento do roadmap (sem código)
+- **Pedido do dono:** conferir e atualizar o ZIP completo para que CAP, fatias numéricas e iniciativas M estejam rastreáveis, antes de qualquer implementação. Trabalho exclusivamente documental sobre cópia do workspace enviado; **sem commit/push e sem execução de código de produção ou testes do app**.
+- `02`: ponte explícita para a matriz sem duplicar visão D100/D101. `06`: matriz CAP-01–20 com base existente, responsáveis **candidatos**, lacunas, dependências, cenário e evidência esperada. `03`: registro da auditoria e diferenciação do D98 preliminar posterior. `08`: roteiro humano dos cinco cenários. `09`: protocolo técnico para evidências CAP/SPEC/teste/aceite.
+- **Sem decisões novas ou escopo aprovado:** Fatias 13–20 preservadas (D95); M1–M4 continuam aprovadas só para planejamento (D99); M5–M8 continuam propostas históricas; não houve aprovação de tools Git/web, planner, plugins/MCP completos, retomada, memória ou Central de Diagnósticos.
+- **D98:** relatório isolado anterior arquivado como evidência preliminar; trace real, baseline oficial e SPEC quantitativa continuam pendentes. As medições não comprovam correção do gargalo. A aprovação do dono para qualquer etapa executiva continua necessária.
+- Evidências auxiliares arquivadas em `arquivo_morto/auditorias_2026-10-25/`. **Aguardar revisão humana** do alinhamento e deliberação sobre destinos; nenhuma fatia iniciada.
+
+
 > Único lugar de histórico (changelog + diário de sessão). Entradas mais novas no topo, com data e commits. O diário detalhado de set/out 2026 (antigo `12`, 1.700 linhas) está íntegro em `docs/arquivo_morto/12-DOCUMENTACAO-VIVA.md`; o antigo `16` (handoff da IA executora) em `docs/arquivo_morto/16-…`.
+
+## 2026-10-24 — Diretriz D101 e atualização comparativa dos canônicos (documental)
+- Formalizada em `02 §1.6` e `05` D101 a diretriz aprovada de buscar paridade funcional e desempenho/eficiência/estabilidade/experiência equivalentes ou superiores somente quando comprovados por avaliações reproduzíveis, por cenário. A CAP-01–CAP-20 e os cinco cenários de D100 permanecem limites; sem metas numéricas inventadas, mudança de roadmap ou autorização de implementação.
+- `04 §1.5` registra commits, mecanismos, usos potenciais, custos, limites, proveniência/licenças e condições para eventual avaliação dos cinco projetos investigados. OpenClaude fica conceitual por restrição de proveniência; Qwen Code corrigido para Apache-2.0 conforme o snapshot, sem reutilização autorizada. `03`, `06`, `08` e `09 §3.10` atualizados para estado, ordem, aceitação humana e protocolo comparativo reproduzível; resultados classificados por critério/cenário como superior, equivalente, inferior, inconclusivo, não testado ou não comparável.
+- Preservadas decisões e contratos existentes, a sequência D98 → 13 → 14 → 15 → planejamento M1–M4 e Fatias 16–20, os estados históricos de homologação e alterações locais preexistentes em `02`, `05` e `08`. Nenhum documento novo foi criado; arquivos históricos/fora do escopo permaneceram intocados.
+- Nenhum código, dependência, configuração, teste, benchmark, trace, provedor real, homologação, commit ou push foi executado. D98 permanece sem início e aguardando a avaliação do dono deste pacote documental. HEAD local observado antes das edições: `261b0a6b538bfd2f769a1703cd8fd4fa08b44eb9`.
 
 ## 2026-10-23 — Consolidação documental D99 (sem código nem testes)
 - Atualizados pontualmente os nove canônicos `01`–`09`: decisões aprovadas e limites de autorização; gate de validação antes da confirmação D98; revisão D91 opção C; Central de Diagnósticos como futuro sujeito a SPEC; M1–M4 como planejamento não numerado, M5–M8 posteriores; princípios de privacidade; dependências estáticas M1–M4 × Fatias 13–15 sem mudar ordem oficial. Corrigidas referências à carta PERF para seu caminho real em `/home/user/notas_temporarias/`.

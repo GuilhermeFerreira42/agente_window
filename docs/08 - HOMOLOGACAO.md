@@ -13,6 +13,28 @@
 
 ---
 
+## Avaliação comparativa D101 — evidência não equivale a homologação
+
+A diretriz de paridade funcional/desempenho aprovada em D101 não declara que o produto já seja paritário ou superior, nem substitui a homologação humana de uma fatia. Para incluir uma alegação comparativa no pacote de homologação de um cenário CAP/D100, apresentar o protocolo e os critérios pré-definidos, referência e versões/commits, ambiente/configuração, fixture e passos repetíveis, resultados brutos por rodada, desvios/limitações e a separação entre desempenho do modelo/provedor e overhead do Agente Window (`09 §3.10`). Critérios quantitativos só entram na SPEC depois de medições; não se inventam alvos numéricos nem se extrapola um cenário para a V1 inteira.
+
+Classificar cada critério/cenário como **superior**, **equivalente**, **inferior**, **inconclusivo**, **não testado** ou **não comparável**, com evidência que sustente o estado. Não omitir falhas/rodadas nem tratar teste automatizado com stub como validação de provedor real. O responsável avalia a evidência e a conclusão funcional; sem avaliação/reprodução suficiente, não marcar paridade como aceita. Relatos históricos não reproduzidos permanecem identificados como relatos. Esta seção não cria critério de aceite retroativo para Fatias 07–12, não reabre homologações históricas e não inicia D98.
+
+## Gate humano de rastreabilidade CAP-01–CAP-20 e cinco cenários D100 (planejamento, 25/10/2026)
+
+A tabela de cobertura e lacunas fica **somente no `06`** (“Matriz de rastreabilidade da visão V1.0”); a descrição oficial das CAP e dos cinco cenários continua no `02`. **Este bloco orienta o aceite humano futuro e não reabre as Fatias 07–12.**
+
+Antes de marcar uma capacidade ou cenário como **pronto**, confira: (1) SPEC e destino aprovados; (2) demonstração da tarefa real; (3) comportamento com erro, recusa e cancelamento; (4) registro de evidências e limitações; (5) sua aprovação explícita. UI semelhante à referência, tool anunciada ao modelo e teste unitário isolado não substituem demonstração end-to-end nem sua homologação.
+
+| Cenário da visão | Demonstração humana mínima futura | Situação hoje |
+|---|---|---|
+| **1. Projeto grande** | Abrir um repositório representativo; pedir mapa arquitetural com caminhos/fontes e verificar precisão, responsividade e escala | Critérios e SPEC integrada pendentes |
+| **2. Implementação de função** | Solicitar tarefa com SPEC, revisar plano e permissões, conferir mudanças, testes, Git e relatório honesto | Integração de tools/planner/Git/testes pendente |
+| **3. Continuidade** | Interromper tarefa, reiniciar aplicação e verificar o estado físico antes de retomar, sem repetir operação destrutiva | M5/M6/M7 e contrato de retomada pendentes |
+| **4. Extensibilidade** | Configurar integração permitida, conferir compatibilidade, permissões e remoção | Fatia 14 cobre skills v1, não plugins/MCP completos |
+| **5. Colaboração longa** | Conduzir requisitos→decisões→documentação→execução→testes→continuidade em várias sessões | Cenário transversal ainda sem teste de aceite final |
+
+**Resultado de avaliação:** para cada CAP e cada cenário, registrar evidências separadas e estado *não testado*, *parcial*, *aprovado no escopo da SPEC* ou *bloqueado*. Para qualquer alegação de paridade/superioridade D101, usar os seis estados técnicos definidos no `09 §3.10` e a seção de avaliação comparativa acima. Não marcar as 20 CAP como homologadas por inferência de Fatias 07–12.
+
 ## Homologação FATIA 07 — 2026-10-15 (declaração do dono, com evidências)
 - **Entregas homologadas:** DEBT-09 (`a69137d`) · DEBT-06 caminho C (`62cf055`) · DEBT-04 (nada a expurgar) · onda 1 da faxina D74 (`9985b9e`) · quarentena pontual dos 2 E2E da Aux (`e182960`).
 - **Evidências (externas ao repo, em `validacao_fatia07/`):** `sonda_01_debt09.cjs` · `sonda_02_debt06_landing.cjs` · `sonda_03_debt06_sessao.cjs` (PID novo + `readlink /proc/<pid>/cwd` = pasta nova) · `sonda_05_aux_bar.cjs` + prints `01a`…`05d` (arquivos removidos na limpeza de 21/10, por ordem do dono).
@@ -208,6 +230,9 @@ Os seguintes casos devem existir antes de considerar o Terminal liberado:
 # PARTE B — Quando está pronto (antigo 08 — Critérios de Homologação)
 ## Objetivo
 Definir quando uma entrega pode ser apresentada como pronta para aceite funcional, sem depender de interpretação subjetiva.
+
+## Referência aos cenários da Visão V1.0
+Os cinco cenários de aceitação da Visão de Capacidades Finais V1.0 estão registrados integralmente em `docs/02 - VISAO GERAL.md §1.4`, que é a fonte canônica de suas descrições. Use essa referência ao avaliar a cobertura da visão; registre aqui as evidências e os resultados de homologação aplicáveis, sem duplicar os textos dos cenários. A referência não declara que eles estejam implementados, testados ou homologados.
 
 ## Gate de homologação da documentação
 Antes de liberar implementação ampla, `docs/01` a `09` precisam estar coerentes com o código (cumprido em 2026-10-03).

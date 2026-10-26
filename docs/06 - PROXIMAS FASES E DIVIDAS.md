@@ -4,9 +4,11 @@
 > - **Regra de ouro:** Todo débito técnico e todo o roadmap do projeto vivem estritamente aqui (não criar arquivos separados como `TECHNICAL_DEBT.md` ou `ROADMAP.md`).
 > - **Princípio de bloqueio:** Nenhuma fatia nova é iniciada enquanto existirem dívidas bloqueantes da fatia anterior. **Flexibilizado conscientemente pela D63/D64** para os itens de *refinamento* (foram para a FATIA 17 (pós-D95; era 13), fora do caminho crítico do MVP).
 > - **Régua de medição:** 90 % do produto é réplica fiel da **"Agents Window" do VS Code** (**D66**, 2026-10-13 — régua: code-server 8080 / VS Code real); 10 % é customizado (chassi direito com terminal + tela de Provedores estilo **Cline**).
-> - **Atualizado:** 2026-10-23 — **consolidação D99**: confirma D98 aguardando validação documental; registra Central de Diagnósticos futura e M1–M4 como planejamento não numerado; análise estática das dependências M1–M4 com Fatias 13–15 sem alterar ordem nem numeração. Mantém histórico da arquitetura D68–D75 e da renumeração D63–D67.
+> - **Atualizado:** 2026-10-24 — **D101** acrescenta diretriz documental de paridade/desempenho demonstrável e critérios comparativos em `docs/09`; sem alterar roadmap, escopo, dependências ou numeração. Mantém o registro D99 de D98 aguardando validação e M1–M4 como planejamento não numerado, com análise estática de dependências 13–15. Mantém histórico da arquitetura D68–D75 e da renumeração D63–D67.
 
 > **Nota de vigência — D91 revisada pela D99 (2026-10-23):** Arena responde pelos testes técnicos automatizados e deve também realizar testes técnicos com provedores reais quando houver acesso legítimo, ambiente seguro e autorização. Se não for possível, registrar explicitamente como bloqueado/não executado. Stubs servem para testes controlados, mas **não comprovam funcionamento com provedores reais**. A homologação funcional do aplicativo permanece com o usuário. Menções abaixo a “validação real pelo dono” preservam o plano/histórico anterior à D99 e não substituem esta regra vigente.
+>
+> **Nota de vigência — D101 (2026-10-24):** buscar paridade funcional e desempenho equivalente ou superior depende de avaliação reproduzível por cenário; metodologia, controle das condições e estados dos resultados ficam em `docs/09`. Critérios quantitativos são propostos em SPEC após medições. Esta diretriz não cria fatias, dívida, marco de homologação, dependência ou autorização para alterar a sequência vigente: **Gate D98 → Fatia 13 → Fatia 14 → Fatia 15 → planejamento M1 → M2 → M3 → M4**, seguida do planejamento M5–M8 conforme decisões aplicáveis, preservando Fatias 16–20 e as homologações históricas 07–12. M1–M4 não estão implementadas; a diretriz não inicia D98 nem Fatia 13.
 
 ---
 
@@ -458,6 +460,57 @@ Todas as fatias estruturadas sob o padrão **especificação prévia, escopo ver
 **Sequência recomendada, sem alterar ordem ou numeração oficial:** concluir o gate D98 (após validação documental) → Fatia 13 (com decisão própria de DEBT-23 na abertura) → Fatia 14 → Fatia 15, mantendo a ordem canônica; então abrir as SPECs da iniciativa na ordem **M1 → M2 → M3 → M4**. M1 e M2 podem ser especificadas em paralelo, mas M3 só depois de ambas; M4 só depois de M2. A recomendação de executar memória depois da 15 é por estabilidade de contratos e menor risco de retrabalho/conflitos, não por dependência funcional dura. O estudo preservado pode conter posições hipotéticas M1–M8: elas não são oficiais nem substituem esta decisão.
 
 ---
+
+## Matriz de rastreabilidade da visão V1.0 — CAP-01 a CAP-20 (auditoria documental de 2026-10-25)
+
+**Natureza:** instrumento de rastreabilidade e identificação de lacunas, **não** nova decisão, fatia, SPEC, autorização de implementação ou homologação. Fonte da **definição** de cada capacidade: `02 §1.3`; cinco cenários: `02 §1.4`; decisões D95, D98–D101 em `05`. Os vínculos abaixo são **candidatos documentais** quando assim marcados; continuam sujeitos à decisão explícita do dono. A coluna "evidência/aceite necessário" não afirma que esses testes foram executados.
+
+**Legenda:** **H** = base previamente homologada, somente no escopo da fatia original; **P** = fase/SPEC existente ou iniciativa aprovada para planejamento, sem cobertura total da CAP; **C** = candidato *não aprovado*; **L** = lacuna de destino/SPEC. Uma mesma CAP pode combinar estados. **UI existente ≠ ferramenta disponível para o agente**; **visão D100 ≠ autorização de implementação**; **M1–M4 ≠ fatias numeradas**.
+
+| CAP | Cobertura observada / vínculo preservado | Entrega ou decisão ainda necessária | Evidência/aceite a especificar | Estado documental |
+|---|---|---|---|---|
+| **01** Grandes projetos | Explorer/Search existentes; D98 para desempenho SCM/Explorer | C: investigação de grandes repositórios *pelo agente*, seleção eficiente e escala, sem assumir D98 como solução integral | Fixture grande, busca, vínculos arquiteturais, latência/responsividade e fonte verificável | H parcial + L |
+| **02** Compreensão arquitetural | Fatia 10: Agir e tools de arquivos (base) | C: protocolo de descoberta de arquitetura, relações e evidências; definir SPEC e destino | Mapa de módulos/dependências cotejado com fonte e erro conhecido | H parcial + L |
+| **03** Documentação técnica | Fatia 10: leitura e escrita autorizada (base) | C: contrato de documentação consistente e revisão por evidência; SPEC/destino | Documento produzido + rastreabilidade aos arquivos/decisões; teste de regressão | H parcial + L |
+| **04** Operações de arquivo | Fatias 10 e 12: tools de arquivos e exclusão para lixeira; Explorer UI; DEBT-19 | C: mover/renomear *como tool*, semântica criar-sem-sobrescrever, realpath/symlink, atomicidade; decisões e SPEC próprias | Criar/ler/editar/mover/excluir, colisão, permissão, symlink, rollback/efeitos | H parcial + L |
+| **05** Terminal/comandos | Fatia 13 — SPEC 2G; Fatia 16 terminal visual **é outra entrega** | Decidir DEBT-23 na abertura de 13; preservar terminal humano independente | Execução controlada, aprovação, timeout/cancelamento, output e território | P (13) |
+| **06** Git/versionamento | SCM visual; DEBT-18; Fatia 19 worktrees/sessões | C: *tools Git do agente* (status/diff/stage/commit) com permissões e SPEC; não atribuir implicitamente à 19 | Status/diff e operações autorizadas em fixture; rastreabilidade e segurança | H parcial + L |
+| **07** Pesquisa externa | Fatia 20: navegador **visual**; DEBT-20 | C: tool de pesquisa web do agente com proveniência, segurança, limites e SPEC separada | Pesquisa real, links/fontes auditáveis, erros e limites de rede | L |
+| **08** Memória persistente | Estudo histórico **M5** no `arquivo_morto` | Deliberar se formaliza M5, escopo, retenção, isolamento, privacidade e SPEC | Persistência entre sessões, correção/edição/expurgo, não confundir estado com memória | C (M5) |
+| **09** Gestão de contexto | **M1–M3** aprovadas **somente para planejamento** (D99) | SPECs, orçamento real e integração por provedor após contratos estáveis 13/14 | Contagem real/estimada identificada; transcript fiel e compactação sem perda crítica | P (M1–M3) |
+| **10** Recuperação | M4 (busca **manual**, planejamento); estudo histórico M6 (pelo agente) | Decidir escopo de recuperação automática/cross-session, indexação e SPEC | Recall verificável, fontes, limites, isolamento de conversas | P (M4) + C (M6) |
+| **11** Planejamento de tarefas | Agir básico na Fatia 10 **não** é planner | C: plano estruturado com dependências, estados/critério pronto; destino e SPEC | Plano aprovado, acompanhamento/replanejamento, execução alinhada | L |
+| **12** Autonomia controlada | Fatias 10–12; Fatia 13 amplia ferramentas mediante SPEC/decisão | C: testes end-to-end de limites, retomada e não repetição de side effects | Tarefa multi-etapa, cartões/negação, cancelamento e verificação do estado | H parcial + P + L |
+| **13** Permissões/segurança | D93, Fatias 10/12, Fatia 13; DEBT-23 | Decisão separada sobre acesso externo/YOLO/permanente; SPEC para symlink, criação e atomicidade | Escapes e ações destrutivas negadas; testes Windows/Linux, aprovações | H parcial + P + L |
+| **14** Provedores/modelos | Fatia 08 homologada; conversa/Agir 09/10; D93 canal nativo | C: matriz de compatibilidade de tool calling/contexto/usage por provedor | Testes por protocolo/modelo suportado; erros honestos e segredo no servidor | H base + L |
+| **15** Extensibilidade | Fatia 14 — SPEC 2H **skills v1** | C: plugins/MCP, hooks/skills automáticas: destino, autorização, contrato, SPEC próprios | Instalar/configurar/remover integração, permissão e isolamento | P (14 parcial) + L |
+| **16** Continuidade interrompida | Fatia 11 Continuar após teto/erro **não** equivale a reinício; M7 histórico | Decidir M7; SPEC para reidratação/efeitos já feitos/aprovação expirada | Reinício real durante task, rechecagem, sem executar novamente ações perigosas | H parcial + C (M7) |
+| **17** Interface integrada | Fatias 15–20, com escopos visuais definidos em D95 | Integração final e critério transversal sem expandir as SPECs existentes | Navegação/abas/sessões/terminal responsivos com regressão de UX | P (15–20) |
+| **18** Observabilidade | Central de Diagnósticos futura aprovada, **SPEC própria pendente** | Deliberar fatia/destino, escopo de logs, privacidade e diagnóstico | Erros auditáveis, correlação de tool/provider, sem expor credenciais | P (visão) + L |
+| **19** Verificação/testes | `09` metodologia; Fatia 13 habilitará comandos do agente | C: seleção/execução/registro de testes pelo agente e limite de ações; SPEC própria | Executou/não executou/falhou + comando/saída/ambiente e critérios | P parcial + L |
+| **20** Ciclo completo | Integração de CAP-01–19 e cinco cenários D100 | Gate final transversal e dependências da cobertura efetivamente aprovada | Cinco cenários ponta a ponta com evidências, sem extrapolar paridade global | L (aceite final) |
+
+### Dependências e destinos — sem alteração unilateral de roadmap
+
+- **Sequência numérica preservada:** D98 (gate isolado) → 13 (terminal do agente, SPEC 2G e DEBT-23 a decidir) → 14 (skills/personalização, SPEC 2H) → 15 (abas, SPEC 2I) → 16 (terminal 2.0 visual) → 17 (refinamentos/Command Center) → 18 (painéis) → 19 (worktrees/sessões) → 20 (polimento/navegador). A ordem de planejamento M1–M4 após 15 é orientação vigente e **não** numeração de fatias; qualquer agenda de execução depende de SPEC/aprovação. O D98 não implementa CAP-01 integralmente.
+- **M1 e M2** podem ser especificadas em paralelo após estabilização de contratos pertinentes; **M3 depende de M1+M2**, **M4 de M2**. Somente **planejamento inicial** de M1–M4 está aprovado por D99. Nenhuma iniciativa M tem autorização de implementação.
+- **M5–M8** constam no estudo arquivado (memória de projeto, recuperação pelo agente, reconstrução após interrupção, hardening/privacidade/homologação). Continuam **propostas históricas não aprovadas**. A numeração hipotética de fatias nesse estudo não substitui as fatias oficiais 13–20 nem constitui compromisso de adoção.
+- **Lacunas sem destino formal:** tools Git do agente; tool de pesquisa externa; planner; plugins/MCP completos; tools mover/renomear e segurança de FS; testes inteligentes do agente; matriz de compatibilidade; Central de Diagnósticos (já prevista, SPEC pendente); aceite V1 transversal. **Proposta de decisão futura**, não alteração desta entrega.
+- **DEBT-18/19/20** continuam separadas dos respectivos recursos completos do agente: SCM rico, Explorer UI e Browser visual, por si só, não entregam Git-agent, file-tools ou web-tool.
+- **Gate de aprovação antes de agir:** para cada CAP ainda parcial, dono valida destino e prioridades → SPEC descreve contrato, segurança, dependências, teste e *não fazer* → aprovação explícita → código/testes → homologação do dono. Os cinco cenários D100 e a política D101 orientam aceites, mas não autorizam novas fatias.
+
+### Matriz mínima cenário final → cobertura exigida (proposta de planejamento)
+
+| Cenário de `02 §1.4` | CAP essenciais a verificar (candidatas, não cobertura aprovada) | Bloqueio documental identificado |
+|---|---|---|
+| 1. Compreensão de projetos grandes | 01, 02, 09, 10, 13, 14 | Bench de escala + protocolo de compreensão/recuperação |
+| 2. Desenvolvimento de funcionalidades | 03, 04, 05, 06, 11, 12, 13, 19 | Ferramentas Git, planner, testes e segurança |
+| 3. Continuidade de tarefas | 08, 09, 10, 13, 16 | Decisão M5/M6/M7, checkpoint e idempotência |
+| 4. Extensibilidade | 13, 14, 15, 18 | Integrações além de skills v1; compatibilidade/diagnóstico |
+| 5. Projetos complexos colaborativos | 02, 03, 08, 09, 10, 11, 12, 16, 17, 20 | Fluxo transversal de longa duração e aceite da V1 |
+
+**Uso:** esta matriz orienta a elaboração *futura* de SPECs e do roteiro do `08`, com protocolo técnico no `09`. Não é uma prova de cobertura executada nem libera mudanças de código.
+
 
 # PARTE 4 — Débitos Técnicos Secundários & Históricos
 
