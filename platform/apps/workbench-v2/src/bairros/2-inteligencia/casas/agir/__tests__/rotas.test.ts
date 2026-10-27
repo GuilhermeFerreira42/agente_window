@@ -12,6 +12,7 @@ import { Readable } from 'node:stream'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../server/rotas'
+import { fsSeguroDisponivel } from '../server/fsSeguro'
 
 type ResFalsa = ServerResponse & {
   statusCode: number
@@ -465,9 +466,13 @@ describe('F3 — cancelamento terminal e claims de geração', () => {
     await fio
     const resultados = frames(res).filter((evento) => evento.type === 'tool_result')
     expect(resultados).toHaveLength(1)
-    expect(resultados[0]).toMatchObject({ type: 'tool_result', id: 'c1', ok: false })
-    expect(String(resultados[0].resumo)).toContain('contenção segura F2')
-    await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).rejects.toThrow()
+    expect(resultados[0]).toMatchObject({ type: 'tool_result', id: 'c1', ok: fsSeguroDisponivel })
+    if (fsSeguroDisponivel) {
+      await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).resolves.toBe('oi')
+    } else {
+      expect(String(resultados[0].resumo)).toContain('contenção segura F2')
+      await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).rejects.toThrow()
+    }
   })
 
   it('duas continuations concorrentes fazem claim único', async () => {
