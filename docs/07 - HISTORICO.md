@@ -1,5 +1,13 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-27 — Continuidade F1–F5-B (D119), sem push ou homologação
+- F1 atualizado em `b2c49b4`: rotas locais sensíveis exigem Fetch Metadata nas leituras sem Origin; mutações exigem Origin exato e JSON. Unit `localBoundary` 6/6, typecheck e diff-check passaram; E2E/preview continuam pendentes.
+- F3 teste atualizado em commit separado `3d8695d`: claim único de aprovação agora é validado com addon nativo disponível ou indisponível; rotas+Agir 43/43. A falha anterior era pressuposto desatualizado sobre F2, não quebra do claim.
+- Achado impeditivo para alegação ampla F2: harness isolado observou `createExclusive` publicar transitoriamente em `outside/slot` enquanto o diretório-pai era renomeado concorrentemente. Sem correção; F2 permanece incompleta. Windows não testado; exclusão fail-closed.
+- F5-B: documentação oficial DeepSeek confirma tool calls em thinking mode, porém exige replay de `reasoning_content`; adaptador atual não o preserva e não desabilita thinking. Mantém `unknown`/fail-closed; sem chamadas reais/credenciais. Fontes e detalhes em `03`, `06` e `09`.
+- Regressão de 12 arquivos: 175 passou / 17 skipped / 1 falhou em App regeneração; teste isolado passou. Sem baseline integral novo, causalidade inconclusiva. `npm audit`: 9 dev alertas (3 critical/2 high/4 moderate), produção zero; sem upgrades.
+- Worktree temporário de comparação removido; sem novos serviços, E2E navegador, push ou homologação. Status/commits rastreáveis em `03`.
+
 ## 2026-10-26 — F2 parcial Linux: helper handle-relative; exclusão/plataformas não validadas bloqueadas
 - Investigação avaliou previamente `@cocalc/openat2@0.2.0` (Linux, sem enumeração necessária) e `fs-safe@0.25.0` (superfície maior, mas sem prova suficiente das garantias concorrentes e com fallback/complexidade incompatíveis). Sob a autorização D119 do dono, foi implementado addon N-API C++ integrado no processo; nenhum serviço/processo adicional.
 - Linux: root handle + `openat2` com resolução beneath/no symlinks/no magiclinks/no-cross-device; leitura, listagem, busca, criação exclusiva e escrita em staging. Exclusão/lixeira e prévia ficam fail-closed: nenhum path-based access; Windows/macOS recebem stub indisponível, sem fallback.
