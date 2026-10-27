@@ -97,6 +97,10 @@ O estado encontrado naquela auditoria era evidência estática; os riscos não h
 
 O estado atual da F1 (D119) está registrado em `03`, `06` e `09`. Vite/preview estão configurados para loopback local; `server/local-boundary.mjs` aplica Host/Origin e rejeição de origens cross-site antes das rotas; grants por sessão/workspace e contexto de Agir são validados no backend; a execução revalida esse contexto no início de cada iteração e imediatamente antes do executor de ferramenta. Verificações disponíveis: typecheck, 43 testes focados, App 46 pass/13 skip, cinco checks HTTP/WebSocket contra Vite com fixtures e recusa de bind externo passaram. A compilação completa abortou por limite de heap Node; Windows, E2E funcional, code-server/PTY standalone e homologação humana não foram verificados. Isto registra evidência parcial, não conclui a frente nem altera seus critérios aprovados.
 
+## 1.10 Diretriz vigente F2/F4 — D121 (2026-10-27)
+
+D121 substitui, somente para F2/F4 desta missão, a barreira absoluta ao workspace e a exigência de resistir a um processo malicioso da mesma conta descritas em registros anteriores. Caminhos relativos usam a raiz do workspace server-side; caminhos absolutos/externos explicitamente solicitados podem ser usados sob permissões normais do sistema operacional. O workspace é base de resolução, não sandbox. Node.js direto e APIs normais do SO; helper nativo permanece desativado. `criar` publica exclusivamente e nunca sobrescreve destino existente. `escrever` exige leitura prévia na execução e compara hash/fingerprint/identidade; conflito observável recusa, arquivo com múltiplos hardlinks é bloqueado e não há fallback parcial. Isto reduz erros acidentais, mas não é CAS universal nem impede TOCTOU contra outro processo que altera caminhos entre syscalls. Esse adversário da mesma conta está fora do modelo aceito e o risco é documentado; nenhum claim de contenção física é permitido. Agir/Edit server-side registrado dispensa confirmações repetitivas para criar/escrever; Perguntar/Planejar são read-only; excluir continua indisponível. O payload de `/api/agir` não escolhe modo/grants; a rota explícita de seleção valida o enum e guarda modo no servidor. F1, F3, F5-A, F5-B e D120 não são enfraquecidos. Linux tem testes; Windows real e homologação humana pendentes.
+
 ## 2. Arquitetura em 4 camadas (de `03`)
 | Camada | Responsabilidade | Exemplos de componentes | Dependências permitidas |
 |---|---|---|---|
@@ -291,7 +295,9 @@ Ver `docs/arquivo_morto/README.md`: `FATIA-05_LAYOUT_BYTE_A_BYTE/`, `docs/arquiv
 
 - A troca de workspace em sessão existente usa identidade explícita `{ sessionId, path }`; nunca há “sessão ativa global” no backend. UI coordena persistência, `/fs/workspace` e `/api/pty/cwd`, com compensação para o caminho anterior se uma etapa falhar.
 
-## 1.6 Implementação técnica F2 — limites vigentes (2026-10-26; D119)
+## 1.6 Implementação técnica F2 — snapshot histórico pré-D121 (2026-10-26; D119)
+
+> Conteúdo arquivado para rastreabilidade. D121 desativou a arquitetura nativa descrita e alterou o critério de acesso; não é descrição do estado vigente. Ver §1.10.
 
 - Investigação prévia e decisão de implementação estão registradas em `06`, antes da adoção do helper. A fronteira é addon N-API C++ integrado no mesmo processo do Workbench; não cria serviço, servidor, porta ou processo auxiliar.
 - No Linux, um descritor raiz fixado e `openat2` com `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS`, `RESOLVE_NO_MAGICLINKS` e `RESOLVE_NO_XDEV` confinem leitura/listagem/busca/criação/escrita. A enumeração usa descritor de diretório e não segue symlink; criação exclusiva usa `renameat2(RENAME_NOREPLACE)`. O addon falha fechado se a syscall não existir/for bloqueada.

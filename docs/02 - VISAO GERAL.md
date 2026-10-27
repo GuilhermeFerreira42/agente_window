@@ -73,7 +73,7 @@ São objetivos que devem orientar a evolução do produto, **não escolhas antec
 - Verificabilidade dos resultados.
 - Preservação das decisões e aprovações humanas.
 
-**Atualização de governança:** D102 aprovou M5–M8 apenas para planejamento e ICs como propostas. As decisões pós-auditoria D103–D117 estão registradas no `05`; o estado fica em `03`; riscos e SPECs candidatas finalizadas F1–F4/F5-A/F5-B, aguardando aprovação, ficam em `06`. A visão CAP-01–CAP-20 e a metodologia D101 desta seção continuam vigentes, sem alegar implementação ou homologação.
+**Atualização de governança:** D102 aprovou M5–M8 apenas para planejamento e ICs como propostas. Decisões D103–D121 estão no `05`; estado em `03`; contratos e SPECs em `06`. D119 autoriza F1–F4/F5-A/F5-B, D120 rege `verified`/`declared`; D121 atualiza somente F2/F4 para acesso solicitado fora do workspace sob permissões normais do SO, com risco TOCTOU da mesma conta declarado. Nenhuma frente desta missão está homologada. A visão CAP-01–CAP-20 e metodologia D101 continuam vigentes, sem alegar implementação ou homologação.
 
 ### 1.6 Diretriz estratégica de paridade e desempenho — D101
 
