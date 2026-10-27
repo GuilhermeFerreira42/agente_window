@@ -246,7 +246,7 @@ describe('App session flows', () => {
     // O toast "Regenerando resposta" é intermediário (depende do tempo do fio);
     // o que importa é o RESULTADO: conteúdo novinho + aviso de conclusão.
     await waitFor(() => expect(screen.getByText(/Nova tentativa em/)).toBeInTheDocument(), { timeout: 5000 })
-    expect(screen.getByRole('status')).toHaveTextContent('Resposta regenerada')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Resposta regenerada'), { timeout: 2000 })
     // O done carrega o modelo EFETIVO do provedor (SPEC §3.9).
     expect(within(responseRow).getByText(/· stub-model/)).toBeInTheDocument()
   })
