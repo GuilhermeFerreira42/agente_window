@@ -26,10 +26,14 @@ import { ehFerramentaConhecida } from './ferramentas'
 
 export class ErroVizinho extends Error {
   readonly code: CategoriaErroAgir
-  constructor(code: CategoriaErroAgir, message: string) {
+  readonly httpStatus?: number
+  readonly explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null
+  constructor(code: CategoriaErroAgir, message: string, httpStatus?: number, explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null) {
     super(message)
     this.name = 'ErroVizinho'
     this.code = code
+    this.httpStatus = httpStatus
+    this.explicitIncompatibility = explicitIncompatibility
   }
 }
 
@@ -46,6 +50,10 @@ export interface AjustesVizinho {
   primeiroByteMs?: number
   totalMs?: number
   ociosoMs?: number
+  /** Só a verificação consentida: anuncia apenas ler, cuja execução é um stub em memória. */
+  toolCallingProbe?: boolean
+  /** Callback interno recebe corpo HTTP apenas para classificar; texto bruto nunca sai do servidor. */
+  classificarToolCallingIncompatibilidade?: (status: number, corpo: string) => 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null
 }
 
 // ── Enquadração (espelho de streaming.ts da casa Conversa) ──────────────────
@@ -98,23 +106,50 @@ function framerNDJSON(): Framer {
 }
 
 // ── Erros honestos por status (espelho de conversar.ts, com a dica do Q4b) ──
-function erroPorStatus(status: number): ErroVizinho {
-  if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida (erro ${status}). Confira a chave em Provedores.`)
+async function lerErroLimitado(resposta: Response, limite = 16_384): Promise<string> {
+  if (!resposta.body) return ''
+  const leitor = resposta.body.getReader()
+  const decodificador = new TextDecoder()
+  let texto = ''
+  let bytesLidos = 0
+  try {
+    while (bytesLidos < limite) {
+      const { done, value } = await leitor.read()
+      if (done) break
+      const parte = value.subarray(0, Math.max(0, limite - bytesLidos))
+      bytesLidos += parte.byteLength
+      texto += decodificador.decode(parte, { stream: true })
+      if (parte.byteLength < value.byteLength) break
+    }
+    texto += decodificador.decode()
+    return texto
+  } catch {
+    return texto
+  } finally {
+    await leitor.cancel().catch(() => undefined)
+  }
+}
+
+function erroPorStatus(status: number, explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null): ErroVizinho {
+  if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida (erro ${status}). Confira a chave em Provedores.`, status)
   if (status === 400) {
     return new ErroVizinho(
       'sem_canal_nativo',
-      'O serviço recusou o pedido com ferramentas (erro 400). Uma causa comum: este modelo/provedor não tem o canal nativo de ferramentas — nesse caso ele conversa, mas não age (decisão Q4, D93). Confira também o nome do modelo e o endereço.',
+      'O serviço recusou o pedido com ferramentas. Confira o modelo, endpoint e protocolo; uma falha 400 isolada não prova incompatibilidade.',
+      status,
+      explicitIncompatibility,
     )
   }
-  if (status === 429) return new ErroVizinho('http', 'O serviço pediu uma pausa por excesso de pedidos (erro 429). Aguarde um instante.')
-  if (status === 404) return new ErroVizinho('http', 'O serviço não encontrou o endereço ou o modelo (erro 404). Confira ambos em Provedores.')
-  return new ErroVizinho('http', `O serviço respondeu com o erro ${status}. Tente novamente em instantes.`)
+  if (status === 429) return new ErroVizinho('http', 'O serviço pediu uma pausa por excesso de pedidos (erro 429). Aguarde um instante.', status)
+  if (status === 404) return new ErroVizinho('http', 'O serviço não encontrou o endereço ou o modelo (erro 404). Confira ambos em Provedores.', status)
+  if (status === 422) return new ErroVizinho('http', 'O serviço não aceitou o pedido. Confira o formato do endpoint e tente novamente.', status, explicitIncompatibility)
+  return new ErroVizinho('http', `O serviço respondeu com o erro ${status}. Tente novamente em instantes.`, status)
 }
 
 // ── Corpo do pedido: idioma nativo de cada protocolo, agora COM ferramentas ─
-function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[]): { url: string; corpo: Record<string, unknown> } {
+function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[], toolCallingProbe = false): { url: string; corpo: Record<string, unknown> } {
   const baseUrl = alvo.baseUrl.replace(/\/+$/, '')
-  const anuncio = anunciarFerramentas(alvo.protocolo)
+  const anuncio = toolCallingProbe ? anunciarFerramentas(alvo.protocolo, ['ler']) : anunciarFerramentas(alvo.protocolo)
   const traduzido = traduzirHistorico(alvo.protocolo, mensagens)
   const temperatura = typeof alvo.temperatura === 'number' ? { temperature: alvo.temperatura } : {}
 
@@ -396,7 +431,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           temperatura: config.temperatura,
           maxSaida: config.maxSaida,
         } : alvo
-        const { url, corpo } = corpoDePedido(alvoAtual, mensagens)
+        const { url, corpo } = corpoDePedido(alvoAtual, mensagens, ajustes.toolCallingProbe === true)
         return fetch(url, {
           method: 'POST',
           headers: cabecalhos(alvoAtual),
@@ -411,7 +446,14 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
       } else {
         resposta = await iniciarFetch()
       }
-      if (!resposta.ok) throw erroPorStatus(resposta.status)
+      if (!resposta.ok) {
+        let incompatibilidadeExplícita: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null
+        if (ajustes.classificarToolCallingIncompatibilidade) {
+          const corpoErro = await lerErroLimitado(resposta)
+          incompatibilidadeExplícita = ajustes.classificarToolCallingIncompatibilidade(resposta.status, corpoErro)
+        }
+        throw erroPorStatus(resposta.status, incompatibilidadeExplícita)
+      }
       if (resposta.body === null) throw new ErroVizinho('resposta', 'O serviço respondeu sem corpo.')
       byteViu = true
       rearmarOcioso()

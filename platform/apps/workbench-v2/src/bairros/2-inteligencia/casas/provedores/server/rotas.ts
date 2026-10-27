@@ -15,8 +15,10 @@ import type { SalvarProvedoresInput } from '../contract'
 import { descritorPorId } from '../descritores/registro'
 import { listarModelos, testarConexao, type AlvoConexao } from './probe'
 import { armazenamentoAtual, caminhoDoArquivo, estadoParaTela, lerArquivo, resolverChave, revelarChave, salvarArquivo } from './providersRepo'
+import { AGIR_TOOL_ADAPTER_VERSION } from '../../agir'
+import { ToolCallingVerificationError, verificarToolCalling } from '../../agir/server/toolCallingCapability'
 
-const ROTAS_CONHECIDAS = ['/api/providers', '/api/providers/test', '/api/providers/models', '/api/providers/reveal']
+const ROTAS_CONHECIDAS = ['/api/providers', '/api/providers/test', '/api/providers/models', '/api/providers/reveal', '/api/providers/tool-calling/verify']
 
 export function rotaPertenceAoModulo(pathname: string): boolean {
   return ROTAS_CONHECIDAS.includes(pathname)
@@ -69,7 +71,7 @@ export async function tratarRotasProvedores(req: IncomingMessage, res: ServerRes
 
   if (url.pathname === '/api/providers' && metodo === 'GET') {
     const arquivo = await lerArquivo()
-    const { provedores, catalogo, ativo } = estadoParaTela(arquivo)
+    const { provedores, catalogo, ativo } = estadoParaTela(arquivo, AGIR_TOOL_ADAPTER_VERSION)
     sendJson(res, 200, { provedores, catalogo, ativo, storage: armazenamentoAtual(), caminho: caminhoDoArquivo() })
     return true
   }
@@ -78,10 +80,31 @@ export async function tratarRotasProvedores(req: IncomingMessage, res: ServerRes
     try {
       const corpo = await lerCorpo(req)
       const salvo = await salvarArquivo(corpo as unknown as SalvarProvedoresInput)
-      const { provedores, catalogo, ativo } = estadoParaTela(salvo)
+      const { provedores, catalogo, ativo } = estadoParaTela(salvo, AGIR_TOOL_ADAPTER_VERSION)
       sendJson(res, 200, { provedores, catalogo, ativo, storage: armazenamentoAtual() })
     } catch (erro) {
       sendErro(res, 400, (erro as Error).message)
+    }
+    return true
+  }
+
+  if (url.pathname === '/api/providers/tool-calling/verify' && metodo === 'POST') {
+    try {
+      const corpo = await lerCorpo(req)
+      const providerId = typeof corpo.providerId === 'string' ? corpo.providerId : ''
+      const modelId = typeof corpo.modelId === 'string' ? corpo.modelId : ''
+      if (!providerId || !modelId) {
+        sendErro(res, 400, 'Informe o par exato de provedor e modelo.')
+        return true
+      }
+      const resultado = await verificarToolCalling(providerId, modelId, corpo.consent === true)
+      sendJson(res, 200, resultado, { 'Cache-Control': 'no-store' })
+    } catch (erro) {
+      if (erro instanceof ToolCallingVerificationError) {
+        sendErro(res, erro.status, erro.message)
+        return true
+      }
+      sendErro(res, 500, 'Não foi possível salvar a verificação. Nenhuma credencial ou resposta do provedor foi registrada na interface.')
     }
     return true
   }

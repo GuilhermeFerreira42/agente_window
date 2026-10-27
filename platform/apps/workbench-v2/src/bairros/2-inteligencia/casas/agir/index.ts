@@ -28,6 +28,7 @@ export type {
   ResultadoFerramenta,
   VizinhoProvedor,
 } from './contract'
+export { AGIR_TOOL_ADAPTER_VERSION } from './contract'
 
 /** O loop do agente (motor da casa — puro, sem node:*). */
 export { TETO_PADRAO, rodarAgir } from './server/agir'

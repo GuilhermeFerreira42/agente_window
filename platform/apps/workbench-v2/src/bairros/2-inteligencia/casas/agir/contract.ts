@@ -12,6 +12,9 @@
  */
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
+/** Versão do adaptador e do canary; incrementar se anúncio/tradução/contrato de Agir mudar. */
+export const AGIR_TOOL_ADAPTER_VERSION = 'agir-tool-adapter-v1'
+
 /** As 6 ferramentas (D72 + FATIA 12 soma `excluir`) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
 export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
 

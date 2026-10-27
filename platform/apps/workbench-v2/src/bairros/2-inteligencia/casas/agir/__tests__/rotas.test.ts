@@ -65,7 +65,7 @@ const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
 const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
 
-const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123', toolCallingCapability: 'supported' }
+const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123', toolCallingCapability: 'verified' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
@@ -177,7 +177,7 @@ describe('rotas — POST /api/agir', () => {
   })
 
   it('bloqueia fail-closed modelos sem prova explícita de tool calling antes de abrir o fio', async () => {
-    for (const capacidade of ['unknown', 'unsupported'] as const) {
+    for (const capacidade of ['declared', 'unknown', 'incompatible'] as const) {
       const res = fakeRes()
       const deps = { ...DEPS, obterAlvo: async () => ({ alvo: { ...ALVO, toolCallingCapability: capacidade } }) }
       expect(await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, deps)).toBe(true)

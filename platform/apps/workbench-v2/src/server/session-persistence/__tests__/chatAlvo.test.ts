@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { obterAlvoDeConversa } from '../chatAlvo'
-import { salvarArquivo } from '../../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { AGIR_TOOL_ADAPTER_VERSION } from '../../../bairros/2-inteligencia/casas/agir'
+import { fingerprintToolCalling, registrarToolCallingAssessment, salvarArquivo } from '../../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 
 let pastaFixture: string | null = null
 
@@ -49,6 +50,48 @@ describe('alvo de conversa — resolução F5-B', () => {
 
     const explicito = await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'anthropic', modelId: 'claude-fixture' })
     expect(explicito.alvo).toMatchObject({ providerId: 'anthropic', modelId: 'claude-fixture', modelo: 'claude-fixture' })
+  })
+
+  it('só libera capability para a prova válida do mesmo par e configuração atual', async () => {
+    await configurarFixture()
+    const caminho = process.env.AGENTE_WINDOW_PROVIDERS_PATH!
+    const fingerprint = fingerprintToolCalling({
+      providerId: 'openai',
+      modelId: 'gpt-5',
+      baseUrl: 'https://fixture.invalid/v1',
+      protocol: 'openai-chat',
+      adapterVersion: AGIR_TOOL_ADAPTER_VERSION,
+      apiKey: 'sk-fixture-nao-real',
+    })
+    await registrarToolCallingAssessment('openai', 'gpt-5', {
+      status: 'verified',
+      fingerprint,
+      adapterVersion: AGIR_TOOL_ADAPTER_VERSION,
+      checkedAt: '2026-10-27T12:00:00.000Z',
+      reason: 'roundtrip_verified',
+    }, caminho)
+
+    expect((await obterAlvoDeConversa({ tipo: 'auto' })).alvo?.toolCallingCapability).toBe('verified')
+    expect((await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5-mini' })).alvo?.toolCallingCapability).toBe('unknown')
+
+    await salvarArquivo({
+      ativo: 'openai',
+      provedores: {
+        openai: {
+          baseUrl: 'https://fixture.invalid/v1',
+          modelo: 'gpt-5',
+          modelosHabilitados: ['gpt-5', 'gpt-5-mini'],
+          apiKey: 'another-fake-fixture-key',
+        },
+        anthropic: {
+          baseUrl: 'https://fixture.invalid/v1',
+          modelo: 'claude-fixture',
+          modelosHabilitados: ['claude-fixture'],
+          apiKey: 'fixture-nao-real',
+        },
+      },
+    }, caminho)
+    expect((await obterAlvoDeConversa({ tipo: 'auto' })).alvo?.toolCallingCapability).toBe('unknown')
   })
 
   it('par explícito removido/desabilitado falha sem fallback para Auto', async () => {

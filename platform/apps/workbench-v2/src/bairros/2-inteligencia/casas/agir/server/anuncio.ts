@@ -38,10 +38,13 @@ function esquemaDe(id: string): Record<string, unknown> {
  * O campo de anúncio no formato que CADA protocolo espera — entra direto no
  * corpo do pedido HTTP.
  */
-export function anunciarFerramentas(protocolo: ProtocoloAgir): Record<string, unknown> {
+export function anunciarFerramentas(protocolo: ProtocoloAgir, permitidas?: readonly string[]): Record<string, unknown> {
+  const ferramentas = permitidas
+    ? catalogoFerramentas.filter((f) => permitidas.includes(f.id))
+    : catalogoFerramentas
   if (protocolo === 'anthropic') {
     return {
-      tools: catalogoFerramentas.map((f) => ({
+      tools: ferramentas.map((f) => ({
         name: f.id,
         description: f.descricao,
         input_schema: esquemaDe(f.id),
@@ -52,7 +55,7 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir): Record<string, un
     return {
       tools: [
         {
-          functionDeclarations: catalogoFerramentas.map((f) => ({
+          functionDeclarations: ferramentas.map((f) => ({
             name: f.id,
             description: f.descricao,
             parameters: esquemaDe(f.id),
@@ -63,7 +66,7 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir): Record<string, un
   }
   // openai-chat e ollama falam a mesma língua de anúncio:
   return {
-    tools: catalogoFerramentas.map((f) => ({
+    tools: ferramentas.map((f) => ({
       type: 'function',
       function: { name: f.id, description: f.descricao, parameters: esquemaDe(f.id) },
     })),

@@ -5,12 +5,13 @@
 //      (0600; o Git nem o enxerga; o `.gitignore` do repo é a segunda tranca).
 // D83: a chave só sai INTEIRA pelo caminho do "olhinho" (rota de reveal).
 // D84: chave salva manda; variável de ambiente é reserva (a tela mostra a origem).
-// Migração v1/v2 → v3 com backup `.bak-<carimbo>` antes de reescrever.
+// Migração v1/v2/v3 → v4 para avaliações server-side de tool calling; backup antes de reescrever.
 // ============================================================================
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { ArquivoProvedores, ProvedorConfig, ProvedorNaTela, Protocolo, SalvarProvedoresInput } from '../contract'
+import type { ArquivoProvedores, ItemCatalogoModelo, ProvedorConfig, ProvedorNaTela, Protocolo, SalvarProvedoresInput, ToolCallingAssessmentRecord, ToolCallingAssessmentView, ToolCallingCapabilityStatus, ToolCallingCheckReason } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
 
 // Re-export MÍNIMO (glicose da prefeitura): quem monta o alvo da conversa
@@ -27,7 +28,68 @@ export function armazenamentoAtual(): 'fixture' | 'repo-home' {
   return process.env.AGENTE_WINDOW_PROVIDERS_PATH ? 'fixture' : 'repo-home'
 }
 
-const VAZIO: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
+const VAZIO: ArquivoProvedores = { versao: 4, ativo: null, provedores: {}, toolCallingAssessments: {} }
+
+const STATUS_TOOL_CALLING = new Set<ToolCallingCapabilityStatus>(['declared', 'verified', 'unknown', 'incompatible'])
+const MOTIVOS_TOOL_CALLING = new Set<ToolCallingCheckReason>([
+  'roundtrip_verified', 'explicit_tools_unsupported', 'adapter_missing_field', 'adapter_parameter_unsupported', 'authentication_failure', 'network_failure',
+  'provider_error', 'no_tool_call', 'invalid_tool_call', 'continuation_failed', 'configuration_changed',
+])
+
+function sanitizarVerificacoes(valor: unknown): ArquivoProvedores['toolCallingAssessments'] {
+  const saida: ArquivoProvedores['toolCallingAssessments'] = {}
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return saida
+  for (const [providerId, modelosBrutos] of Object.entries(valor as Record<string, unknown>)) {
+    if (!descritorPorId(providerId) || !modelosBrutos || typeof modelosBrutos !== 'object' || Array.isArray(modelosBrutos)) continue
+    const modelos: Record<string, ToolCallingAssessmentRecord> = {}
+    for (const [modelId, bruto] of Object.entries(modelosBrutos as Record<string, unknown>)) {
+      if (!modelId || !bruto || typeof bruto !== 'object') continue
+      const item = bruto as Partial<ToolCallingAssessmentRecord>
+      if (!STATUS_TOOL_CALLING.has(item.status as ToolCallingCapabilityStatus) ||
+          typeof item.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(item.fingerprint) ||
+          typeof item.adapterVersion !== 'string' || item.adapterVersion.length > 100 ||
+          typeof item.checkedAt !== 'string' || !Number.isFinite(Date.parse(item.checkedAt)) ||
+          !MOTIVOS_TOOL_CALLING.has(item.reason as ToolCallingCheckReason)) continue
+      modelos[modelId] = {
+        status: item.status as ToolCallingCapabilityStatus,
+        fingerprint: item.fingerprint,
+        adapterVersion: item.adapterVersion,
+        checkedAt: item.checkedAt,
+        reason: item.reason as ToolCallingCheckReason,
+      }
+    }
+    if (Object.keys(modelos).length) saida[providerId] = modelos
+  }
+  return saida
+}
+
+export interface ToolCallingFingerprintInput {
+  providerId: string
+  modelId: string
+  baseUrl: string
+  protocol: Protocolo
+  adapterVersion: string
+  apiKey: string | null
+  temperature?: number
+  maxOutput?: number
+}
+
+/** Hash local que não revela a chave; nunca retorne/logue partes de configuração secreta. */
+export function fingerprintToolCalling(input: ToolCallingFingerprintInput): string {
+  const credentialDigest = createHash('sha256').update(input.apiKey ?? '').digest('hex')
+  const canonical = JSON.stringify({
+    providerId: input.providerId,
+    modelId: input.modelId,
+    baseUrl: input.baseUrl.trim().replace(/\/+$/, ''),
+    protocol: input.protocol,
+    adapterVersion: input.adapterVersion,
+    schemaVersion: 'read-canary-v1',
+    temperature: input.temperature ?? null,
+    maxOutput: input.maxOutput ?? null,
+    credentialDigest,
+  })
+  return createHash('sha256').update(canonical).digest('hex')
+}
 
 // Mutex em processo compartilhado por salvar e por linearizar o início do fetch.
 let caudaMutex: Promise<void> = Promise.resolve()
@@ -57,9 +119,9 @@ function eArquivoV1(valor: unknown): valor is Record<string, { enabled?: boolean
   return v.versao === undefined && (v.openai !== undefined || v.gemini !== undefined || v.ollama !== undefined)
 }
 
-/** v1 → v3: preserva provedores; modelos sem seleção explícita ficam desabilitados. */
-export function migrarV1ParaV3(v1: Record<string, { enabled?: boolean; baseUrl?: string }>): ArquivoProvedores {
-  const saida: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
+/** v1 → v4: preserva provedores; modelos sem seleção explícita ficam desabilitados. */
+export function migrarV1ParaV4(v1: Record<string, { enabled?: boolean; baseUrl?: string }>): ArquivoProvedores {
+  const saida: ArquivoProvedores = { versao: 4, ativo: null, provedores: {}, toolCallingAssessments: {} }
   if (typeof v1.ollama?.baseUrl === 'string' && v1.ollama.baseUrl.trim()) {
     saida.provedores.ollama = {
       baseUrl: v1.ollama.baseUrl.trim().replace(/\/$/, ''),
@@ -127,13 +189,30 @@ export function validarEntrada(input: SalvarProvedoresInput, atual: ArquivoProve
   if (!input || typeof input !== 'object' || !input.provedores || typeof input.provedores !== 'object') {
     throw new Error('Payload inválido: falta `provedores`.')
   }
-  const saida: ArquivoProvedores = { versao: 3, ativo: null, provedores: {} }
+  const copiasDeVerificacoes = Object.fromEntries(
+    Object.entries(atual.toolCallingAssessments ?? {}).map(([providerId, modelos]) => [providerId, { ...modelos }]),
+  )
+  const saida: ArquivoProvedores = { versao: 4, ativo: null, provedores: {}, toolCallingAssessments: copiasDeVerificacoes }
   for (const [id, bruto] of Object.entries(input.provedores)) {
     saida.provedores[id] = validarProvedor(id, bruto as ProvedorConfig, atual.provedores[id])
   }
   const ativo = input.ativo ?? null
   if (ativo !== null && !saida.provedores[ativo]) throw new Error(`Provedor ativo inexistente: ${ativo}`)
   saida.ativo = ativo
+  // Verificações ficam só no servidor e são invalidadas por mudanças no endpoint,
+  // credencial salva ou parâmetros que alteram o pedido ao adaptador.
+  for (const id of Object.keys(saida.toolCallingAssessments)) if (!saida.provedores[id]) delete saida.toolCallingAssessments[id]
+  for (const [id, config] of Object.entries(saida.provedores)) {
+    const anterior = atual.provedores[id]
+    const mudouBase = !anterior || (anterior.baseUrl ?? '').replace(/\/+$/, '') !== config.baseUrl.replace(/\/+$/, '')
+    const mudouChave = (anterior?.apiKey ?? '') !== (config.apiKey ?? '')
+    const mudouPedido = (anterior?.temperatura ?? null) !== (config.temperatura ?? null) || (anterior?.maxSaida ?? null) !== (config.maxSaida ?? null)
+    if (mudouBase || mudouChave || mudouPedido) { delete saida.toolCallingAssessments[id]; continue }
+    const permitidos = new Set(config.modelosHabilitados ?? [])
+    const verificacoes = saida.toolCallingAssessments[id] ?? {}
+    for (const modelId of Object.keys(verificacoes)) if (!permitidos.has(modelId)) delete verificacoes[modelId]
+    if (Object.keys(verificacoes).length === 0) delete saida.toolCallingAssessments[id]
+  }
   return saida
 }
 
@@ -151,7 +230,7 @@ export async function lerArquivo(caminho = caminhoDoArquivo()): Promise<ArquivoP
   } catch {
     throw new Error(`O arquivo de provedores está corrompido: ${caminho}. Há um backup .bak ao lado.`)
   }
-  if (eArquivoV1(bruto)) return migrarV1ParaV3(bruto)
+  if (eArquivoV1(bruto)) return migrarV1ParaV4(bruto)
   if (bruto && typeof bruto === 'object') {
     const versao = (bruto as { versao?: unknown }).versao
     if (versao === 2) {
@@ -162,12 +241,17 @@ export async function lerArquivo(caminho = caminhoDoArquivo()): Promise<ArquivoP
         const modelo = typeof config.modelo === 'string' ? config.modelo.trim() : ''
         provedores[id] = { ...config, modelosHabilitados: modelo ? [modelo] : [], habilitado: true }
       }
-      return { versao: 3, ativo: v2.ativo ?? null, provedores }
+      return { versao: 4, ativo: v2.ativo ?? null, provedores, toolCallingAssessments: {} }
     }
     if (versao === 3) {
-      const v3 = bruto as ArquivoProvedores
+      const v3 = bruto as { ativo: string | null; provedores: Record<string, ProvedorConfig> }
       if (!v3.provedores || typeof v3.provedores !== 'object' || Array.isArray(v3.provedores)) throw new Error(`Formato v3 inválido em ${caminho}.`)
-      return v3
+      return { versao: 4, ativo: v3.ativo ?? null, provedores: v3.provedores, toolCallingAssessments: {} }
+    }
+    if (versao === 4) {
+      const v4 = bruto as Partial<ArquivoProvedores>
+      if (!v4.provedores || typeof v4.provedores !== 'object' || Array.isArray(v4.provedores)) throw new Error(`Formato v4 inválido em ${caminho}.`)
+      return { versao: 4, ativo: v4.ativo ?? null, provedores: v4.provedores, toolCallingAssessments: sanitizarVerificacoes(v4.toolCallingAssessments) }
     }
   }
   throw new Error(`Formato não reconhecido em ${caminho}.`)
@@ -196,6 +280,57 @@ export async function salvarArquivo(input: SalvarProvedoresInput, caminho = cami
     await writeFile(temporario, `${JSON.stringify(validado, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
     await rename(temporario, caminho)
     return validado
+  })
+}
+
+export async function registrarToolCallingAssessment(
+  providerId: string,
+  modelId: string,
+  record: ToolCallingAssessmentRecord,
+  caminho = caminhoDoArquivo(),
+): Promise<void> {
+  if (record.status === 'verified' && record.reason !== 'roundtrip_verified') {
+    throw new Error('Uma capability só pode ser marcada como verified após round-trip completo.')
+  }
+  if (record.status === 'incompatible' && record.reason !== 'explicit_tools_unsupported' && record.reason !== 'adapter_missing_field' && record.reason !== 'adapter_parameter_unsupported') {
+    throw new Error('Incompatible exige evidência explícita de suporte ausente ou contrato do adaptador.')
+  }
+  if (record.status !== 'verified' && record.reason === 'roundtrip_verified') {
+    throw new Error('Round-trip completo deve usar o estado verified.')
+  }
+  await sobMutex(async () => {
+    const arquivo = await lerArquivo(caminho)
+    const provedor = arquivo.provedores[providerId]
+    const descritor = descritorPorId(providerId)
+    if (!provedor || provedor.habilitado === false || !descritor || !(provedor.modelosHabilitados ?? []).includes(modelId)) {
+      throw Object.assign(new Error('A configuração do par mudou durante a verificação; resultado descartado.'), { code: 'configuration_changed' })
+    }
+    const { chave } = resolverChave(providerId, arquivo)
+    const atual = fingerprintToolCalling({
+      providerId,
+      modelId,
+      baseUrl: (provedor.baseUrl || descritor.baseUrlPadrao).replace(/\/+$/, ''),
+      protocol: descritor.protocolo,
+      adapterVersion: record.adapterVersion,
+      apiKey: chave,
+      temperature: provedor.temperatura,
+      maxOutput: provedor.maxSaida,
+    })
+    if (atual !== record.fingerprint) {
+      throw Object.assign(new Error('A configuração mudou durante a verificação; resultado descartado.'), { code: 'configuration_changed' })
+    }
+    const proximo: ArquivoProvedores = {
+      ...arquivo,
+      toolCallingAssessments: {
+        ...arquivo.toolCallingAssessments,
+        [providerId]: { ...(arquivo.toolCallingAssessments[providerId] ?? {}), [modelId]: record },
+      },
+    }
+    await mkdir(dirname(caminho), { recursive: true })
+    await backupSeExistir(caminho)
+    const temporario = `${caminho}.tmp-${process.pid}-cap-${Date.now()}`
+    await writeFile(temporario, `${JSON.stringify(proximo, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+    await rename(temporario, caminho)
   })
 }
 
@@ -268,9 +403,9 @@ export function resolverChave(id: string, arquivo: ArquivoProvedores): { chave: 
 }
 
 /** O estado que a TELA recebe (D83: chave só mascarada; origem visível — D84). */
-export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: ProvedorNaTela[]; catalogo: import('../contract').ItemCatalogoModelo[]; ativo: string | null } {
+export function estadoParaTela(arquivo: ArquivoProvedores, adapterVersion = ''): { provedores: ProvedorNaTela[]; catalogo: ItemCatalogoModelo[]; ativo: string | null } {
   const provedores: ProvedorNaTela[] = []
-  const catalogo: import('../contract').ItemCatalogoModelo[] = []
+  const catalogo: ItemCatalogoModelo[] = []
   for (const descritor of DESCRITORES) {
     const salvo = arquivo.provedores[descritor.id]
     if (!salvo) continue
@@ -278,12 +413,28 @@ export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: Proved
     if (salvo.habilitado !== false && Array.isArray(salvo.modelosHabilitados)) {
       for (const modelId of salvo.modelosHabilitados) {
         if (typeof modelId !== 'string' || modelId.length === 0) continue
+        const check = arquivo.toolCallingAssessments?.[descritor.id]?.[modelId]
+        const fingerprint = adapterVersion ? fingerprintToolCalling({
+          providerId: descritor.id,
+          modelId,
+          baseUrl: salvo.baseUrl || descritor.baseUrlPadrao,
+          protocol: descritor.protocolo,
+          adapterVersion,
+          apiKey: chave,
+          temperature: salvo.temperatura,
+          maxOutput: salvo.maxSaida,
+        }) : ''
+        const atual = check && check.adapterVersion === adapterVersion && check.fingerprint === fingerprint
+        const assessment: ToolCallingAssessmentView = atual
+          ? { status: check.status, checkedAt: check.checkedAt, reason: check.reason }
+          : { status: 'unknown', checkedAt: null, reason: null }
         catalogo.push({
           providerId: descritor.id,
           modelId,
           label: `${descritor.generico ? salvo.nome ?? descritor.nome : descritor.nome} — ${modelId}`,
           protocol: descritor.protocolo,
-          capability: 'unknown',
+          capability: assessment.status,
+          assessment,
         })
       }
     }

@@ -48,6 +48,9 @@
 .providers-eye:hover{background:var(--vscode-toolbar-hoverBackground)}
 .providers-hint{color:var(--vscode-descriptionForeground);font-size:11px;display:flex;align-items:center;gap:5px;line-height:1.5}
 .providers-hint.is-ok{color:var(--vscode-testing-iconPassed)}
+.providers-capability{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px;padding:11px 12px;border:1px solid var(--vscode-widget-border);border-radius:7px;background:var(--vscode-editorWidget-background)}
+.providers-capability-status{display:flex;align-items:center;gap:7px;font-size:12px;line-height:1.5}
+.providers-canary-consent input{accent-color:var(--vscode-focusBorder)}
 
 .providers-adv{border:1px solid var(--vscode-widget-border);border-radius:7px;padding:12px 14px;background:var(--vscode-editorWidget-background)}
 .providers-adv summary{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;color:var(--vscode-foreground)}

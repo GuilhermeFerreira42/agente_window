@@ -20,7 +20,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
-import type { DecisaoAprovacao, EventoAgir, MensagemAgir, MensagemSimples, ModoAgir } from '../contract'
+import type { EventoAgir, MensagemAgir, MensagemSimples, ModoAgir, PedidoFerramenta } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
 import { permiteSessao } from './ferramentas'
@@ -51,7 +51,7 @@ export interface DependenciasAgir {
 
 interface AprovacaoPendente {
   resolver: (liberado: boolean) => void
-  pedido: import('../contract').PedidoFerramenta
+  pedido: PedidoFerramenta
 }
 interface ContextoFluxo {
   sessionId: string
@@ -455,11 +455,14 @@ async function tratarAgir(
     sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
     return true
   }
-  if (alvo.toolCallingCapability !== 'supported') {
-    const motivo = alvo.toolCallingCapability === 'unsupported'
-      ? `O modelo ${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo} não oferece suporte a chamadas de ferramentas.`
-      : `O suporte a chamadas de ferramentas do modelo ${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo} não foi verificado. Agir foi bloqueado sem iniciar uma chamada.`
-    sendErro(res, 409, 'sem_canal_nativo', motivo.trim())
+  if (alvo.toolCallingCapability !== 'verified') {
+    const par = `${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo}`.trim()
+    const motivo = alvo.toolCallingCapability === 'incompatible'
+      ? `O canary identificou incompatibilidade explícita de tool calling para ${par}. Agir foi bloqueado.`
+      : alvo.toolCallingCapability === 'declared'
+        ? `Há apenas declaração de tool calling para ${par}; falta round-trip verificado. Agir foi bloqueado.`
+        : `O tool calling de ${par} não tem prova válida para a configuração atual. Verifique em Provedores; Agir foi bloqueado sem iniciar uma chamada.`
+    sendErro(res, 409, 'sem_canal_nativo', motivo)
     return true
   }
 

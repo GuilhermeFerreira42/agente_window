@@ -5,13 +5,26 @@
 // avisos honestos do teste de conexão · 8 provedores (7 nativos + genérico).
 // ============================================================================
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, CircleAlert, Eye, EyeOff, Gauge, LoaderCircle, Save, Search, Settings2, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
-import type { EstadoProvedores, ProvedorConfig, ProvedorNaTela, ResultadoTeste } from '../contract'
+import { CheckCircle2, CircleAlert, Eye, EyeOff, Gauge, LoaderCircle, Save, Search, Settings2, ShieldCheck, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
+import type { EstadoProvedores, ProvedorConfig, ProvedorNaTela, ResultadoTeste, ResultadoVerificacaoToolCalling, ToolCallingCheckReason } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
-import { buscarModelos, carregarEstado, revelarChave, salvar, testar } from './client/api'
+import { buscarModelos, carregarEstado, revelarChave, salvar, testar, verificarToolCalling } from './client/api'
 import '../providers.css'
 
 type Grupo = { titulo: string; itens: { id: string; nome: string; tag?: string }[] }
+
+function textoMotivoCapability(motivo: ToolCallingCheckReason | null | undefined): string {
+  switch (motivo) {
+    case 'authentication_failure': return 'Autenticação ausente/rejeitada; isso não indica incompatibilidade.'
+    case 'network_failure': return 'Falha de rede; isso não indica incompatibilidade.'
+    case 'provider_error': return 'Falha operacional do provedor; isso não indica incompatibilidade.'
+    case 'no_tool_call': return 'O modelo não pediu a ferramenta no canary; a evidência é inconclusiva.'
+    case 'invalid_tool_call': return 'O pedido não correspondeu ao canary inofensivo.'
+    case 'continuation_failed': return 'O round-trip não foi completado.'
+    case 'configuration_changed': return 'A configuração mudou; o resultado não é válido.'
+    default: return ''
+  }
+}
 
 export function ProvidersView() {
   const [estado, setEstado] = useState<EstadoProvedores | null>(null)
@@ -24,6 +37,8 @@ export function ProvidersView() {
   const [revelada, setRevelada] = useState<Record<string, boolean>>({})
   const [modelos, setModelos] = useState<Record<string, string[]>>({})
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null)
+  const [resultadoCapability, setResultadoCapability] = useState<ResultadoVerificacaoToolCalling | null>(null)
+  const [consentirCanary, setConsentirCanary] = useState(false)
   const [avisoBusca, setAvisoBusca] = useState('')
   const [ocupado, setOcupado] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -74,15 +89,25 @@ export function ProvidersView() {
   }
   const chaveDigitada = chaveEditada[selecionado]
   const chaveVisivel = revelada[selecionado] === true
+  const modeloVerificacao = rascunho.modelo.trim()
+  const avaliacaoModelo = estado?.catalogo.find((item) => item.providerId === selecionado && item.modelId === modeloVerificacao)
+  const possuiRascunhoRelevante = rascunhos[selecionado] !== undefined || chaveDigitada !== undefined
+  const parSalvoHabilitado = daTela?.habilitado === true && daTela.modelosHabilitados.includes(modeloVerificacao)
+  const semCredencialObrigatoria = !descritor?.chaveOpcional && !daTela?.chaveMascarada
+  const parProntoParaVerificar = Boolean(modeloVerificacao && daTela && parSalvoHabilitado && !possuiRascunhoRelevante && !semCredencialObrigatoria)
 
   function editar(mudanca: Partial<ProvedorConfig>) {
     setRascunhos((atual) => ({ ...atual, [selecionado]: { ...rascunho, ...mudanca } }))
+    setConsentirCanary(false)
+    setResultadoCapability(null)
     setSalvo(false)
   }
 
   function aoTrocarDeProvedor(id: string) {
     setSelecionado(id)
     setResultado(null)
+    setResultadoCapability(null)
+    setConsentirCanary(false)
     setAvisoBusca('')
     setErro('')
   }
@@ -113,6 +138,28 @@ export function ProvidersView() {
     modelo: rascunho.modelo,
     ...(chaveDigitada ? { apiKey: chaveDigitada } : {}),
   })
+
+  async function aoVerificarToolCalling() {
+    if (!parProntoParaVerificar || !consentirCanary) return
+    setOcupado('canary')
+    setErro('')
+    setResultadoCapability(null)
+    setConsentirCanary(false)
+    try {
+      const resposta = await verificarToolCalling({ providerId: selecionado, modelId: modeloVerificacao, consent: true })
+      setResultadoCapability(resposta)
+      setEstado((atual) => atual ? {
+        ...atual,
+        catalogo: atual.catalogo.map((item) => item.providerId === selecionado && item.modelId === modeloVerificacao
+          ? { ...item, capability: resposta.status, assessment: { status: resposta.status, checkedAt: resposta.checkedAt, reason: resposta.reason } }
+          : item),
+      } : atual)
+    } catch (motivo) {
+      setErro(motivo instanceof Error ? motivo.message : 'A verificação não foi concluída.')
+    } finally {
+      setOcupado('')
+    }
+  }
 
   async function aoTestar() {
     setOcupado('testar')
@@ -172,6 +219,8 @@ export function ProvidersView() {
 
   async function aoSalvar() {
     setSalvando(true)
+    setConsentirCanary(false)
+    setResultadoCapability(null)
     setErro('')
     try {
       const proximo = await salvar({ ativo: estado?.ativo ?? null, provedores: montarProvedores() })
@@ -189,6 +238,8 @@ export function ProvidersView() {
   }
 
   async function aoDefinirAtivo() {
+    setConsentirCanary(false)
+    setResultadoCapability(null)
     setEstado((atual) => (atual ? { ...atual, ativo: selecionado } : atual))
     setRascunhos((atual) => ({ ...atual }))
     setSalvo(false)
@@ -307,6 +358,8 @@ export function ProvidersView() {
                 value={chaveVisivel ? (chaveEditada[selecionado] ?? daTela?.chaveMascarada ?? '') : chaveDigitada ?? ''}
                 onChange={(e) => {
                   setChaveEditada((atual) => ({ ...atual, [selecionado]: e.target.value }))
+                  setConsentirCanary(false)
+                  setResultadoCapability(null)
                   setRevelada((atual) => ({ ...atual, [selecionado]: true }))
                   setSalvo(false)
                 }}
@@ -399,6 +452,42 @@ export function ProvidersView() {
               </button>
             ) : null}
             <span className="providers-hint">Descobertos são candidatos; cada par precisa ser habilitado explicitamente. O ID é case-sensitive.</span>
+            <div className="providers-capability" aria-label="Verificação de chamadas de ferramentas">
+              <div className="providers-capability-status" role="status">
+                <ShieldCheck size={14} />
+                {possuiRascunhoRelevante ? 'Rascunho não salvo; o estado abaixo descreve a configuração salva. ' : ''}
+                {avaliacaoModelo?.capability === 'verified'
+                  ? `Tool calling verificado por round-trip${avaliacaoModelo.assessment.checkedAt ? ` · ${new Date(avaliacaoModelo.assessment.checkedAt).toLocaleString()}` : ''}${resultadoCapability?.cached ? ' · resultado armazenado, sem nova chamada' : ''}`
+                  : avaliacaoModelo?.capability === 'incompatible'
+                    ? 'Incompatível por evidência explícita do protocolo/adaptador. Falhas de rede ou autenticação não significam incompatibilidade.'
+                    : avaliacaoModelo?.capability === 'declared'
+                      ? 'Suporte apenas declarado; Agir continua bloqueado até um round-trip verificado.'
+                      : 'Desconhecido / sem prova válida. Agir permanece bloqueado.'}
+                {avaliacaoModelo?.capability === 'unknown' && avaliacaoModelo.assessment.reason
+                  ? ` · ${textoMotivoCapability(avaliacaoModelo.assessment.reason)}`
+                  : ''}
+              </div>
+              <p className="providers-hint">
+                O canary anuncia somente <code>ler</code>, sem workspace, escrita, comandos ou efeitos externos. Pode fazer até duas requisições e consumir créditos/custos do provedor. O resultado não concede permissões ao agente.
+              </p>
+              {!parProntoParaVerificar ? (
+                <p className="providers-hint">{semCredencialObrigatoria ? 'Configure uma credencial primeiro; nenhuma verificação será iniciada sem ela.' : 'Salve primeiro o provedor e habilite exatamente este modelo; mudanças não salvas não podem ser verificadas.'}</p>
+              ) : (
+                <>
+                  <label className="providers-hint providers-canary-consent">
+                    <input type="checkbox" checked={consentirCanary} disabled={ocupado === 'canary'} onChange={(e) => setConsentirCanary(e.target.checked)} />
+                    Autorizo agora o canary para {selecionado} / {modeloVerificacao} e aceito possíveis custos.
+                  </label>
+                  <button type="button" className="providers-btn is-secondary" onClick={() => void aoVerificarToolCalling()} disabled={!consentirCanary || ocupado === 'canary'}>
+                    {ocupado === 'canary' ? <LoaderCircle size={13} className="spin" /> : <ShieldCheck size={13} />}
+                    {ocupado === 'canary' ? 'Verificando…' : avaliacaoModelo?.capability === 'verified' ? 'Usar verificação armazenada' : 'Verificar tool calling'}
+                  </button>
+                </>
+              )}
+              {resultadoCapability && !resultadoCapability.cached ? (
+                <span className="providers-hint">Resultado persistido para este par e configuração: {resultadoCapability.status.replace('_', ' ')}. Alterações relevantes invalidam a prova.</span>
+              ) : null}
+            </div>
           </div>
 
           {avisoBusca ? (

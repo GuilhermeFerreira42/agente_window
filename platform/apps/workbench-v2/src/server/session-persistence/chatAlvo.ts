@@ -3,7 +3,8 @@
 // Só aqui as casas Provedores e Conversa se encontram; segredo nunca vai ao browser.
 // ============================================================================
 import type { AlvoOuErro, SelecaoModelo } from '../../bairros/2-inteligencia/casas/conversa'
-import { descritorPorId, lerArquivo, resolverChave } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { descritorPorId, fingerprintToolCalling, lerArquivo, resolverChave } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { AGIR_TOOL_ADAPTER_VERSION } from '../../bairros/2-inteligencia/casas/agir'
 
 export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto' }): Promise<AlvoOuErro> {
   const arquivo = await lerArquivo()
@@ -42,13 +43,26 @@ export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto
     return { alvo: null, erro: { code: 'chave', message: `A credencial do provedor ${id} está indisponível. Confira-a em Provedores.` } }
   }
 
+  const fingerprint = fingerprintToolCalling({
+    providerId: id,
+    modelId,
+    baseUrl,
+    protocol: descritor.protocolo,
+    adapterVersion: AGIR_TOOL_ADAPTER_VERSION,
+    apiKey: chave,
+    temperature: salvo.temperatura,
+    maxOutput: salvo.maxSaida,
+  })
+  const prova = arquivo.toolCallingAssessments?.[id]?.[modelId]
+  const toolCallingCapability = prova && prova.adapterVersion === AGIR_TOOL_ADAPTER_VERSION && prova.fingerprint === fingerprint
+    ? prova.status
+    : 'unknown'
+
   return {
     alvo: {
       providerId: id,
       modelId,
-      // A listagem de modelos não prova suporte a tool calling; até existir
-      // uma verificação confiável por par, Agir deve bloquear este alvo.
-      toolCallingCapability: 'unknown',
+      toolCallingCapability,
       protocolo: descritor.protocolo,
       baseUrl,
       modelo: modelId,

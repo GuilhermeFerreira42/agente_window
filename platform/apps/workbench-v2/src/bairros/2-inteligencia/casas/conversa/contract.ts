@@ -63,7 +63,7 @@ export interface AlvoConversa {
   providerId?: string
   modelId?: string
   /** Agir só inicia quando há prova explícita de suporte; ausente é unknown/fail-closed. */
-  toolCallingCapability?: 'supported' | 'unsupported' | 'unknown'
+  toolCallingCapability?: 'declared' | 'verified' | 'unknown' | 'incompatible'
   protocolo: ProtocoloConversa
   baseUrl: string
   modelo: string
