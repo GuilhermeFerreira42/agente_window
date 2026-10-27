@@ -12,12 +12,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
 
+let controladorFio: ReadableStreamDefaultController<Uint8Array> | null = null
+
 beforeEach(() => {
   window.localStorage.clear()
-  // /api/agir pendente até o teste instalar um fio (ou até o Parar abortar).
-  const fetchOriginal = globalThis.fetch.bind(globalThis)
+  controladorFio = null
+  // A rota de cancelamento é separada do endpoint SSE e confirma o ACK F3.
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).includes('/api/agir')) {
+    const url = String(input)
+    if (url === '/api/agir/cancel') {
+      try { controladorFio?.close() } catch { /* fio já terminou */ }
+      return Promise.resolve(new Response(JSON.stringify({ status: 'cancelled' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
+    if (url === '/api/agir') {
       return new Promise<Response>((_resolve, reject) => {
         const sinal = init?.signal
         const abortar = () => reject(new DOMException('Aborted', 'AbortError'))
@@ -25,19 +32,25 @@ beforeEach(() => {
         else sinal?.addEventListener('abort', abortar)
       })
     }
-    return fetchOriginal(input, init)
+    throw new Error(`fetch inesperado no teste: ${url}`)
   })
 })
 
 /** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
 function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 'aberto' = 'done', atrasoMs = 40): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
-    if (!String(input).includes('/api/agir')) throw new Error('fetch inesperado no teste')
+    const url = String(input)
+    if (url === '/api/agir/cancel') {
+      try { controladorFio?.close() } catch { /* fio já terminou */ }
+      return new Response(JSON.stringify({ status: 'cancelled' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (url !== '/api/agir') throw new Error(`fetch inesperado no teste: ${url}`)
     const codificar = new TextEncoder()
     const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
     if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))
     const fio = new ReadableStream<Uint8Array>({
       start(controller) {
+        controladorFio = controller
         let indice = 0
         const passo = () => {
           if (indice >= pedacos.length) {
@@ -51,7 +64,11 @@ function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 
         setTimeout(passo, atrasoMs)
       },
     })
-    return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    return new Response(fio, { status: 200, headers: {
+      'Content-Type': 'text/event-stream',
+      'X-Agir-Run-Id': 'run-fatia09-test',
+      'X-Agir-Generation': '1',
+    } })
   })
 }
 
