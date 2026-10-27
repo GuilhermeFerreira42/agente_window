@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../components/ChatInput'
 import type { NestedChat, Session } from '../types'
@@ -369,6 +369,27 @@ describe('ChatInput', () => {
 
     expect(onChangeModel).toHaveBeenCalledWith('pair:openai:gpt-4o-mini')
     expect(trigger).toHaveFocus()
+  })
+
+  it('revalida o catálogo ao abrir o seletor sem reiniciar a janela', async () => {
+    const user = userEvent.setup()
+    const resposta = (modelId: string, label: string) => new Response(JSON.stringify({
+      provedores: [],
+      ativo: null,
+      storage: 'fixture',
+      catalogo: [{ providerId: 'fixture', modelId, label, protocol: 'openai-chat', capability: 'unknown' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const fetchCatalogo = vi.fn()
+      .mockResolvedValueOnce(resposta('modelo-antigo', 'Fixture — modelo-antigo'))
+      .mockResolvedValueOnce(resposta('modelo-novo', 'Fixture — modelo-novo'))
+    vi.stubGlobal('fetch', fetchCatalogo)
+    renderInput()
+
+    await waitFor(() => expect(fetchCatalogo).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: 'Auto' }))
+    expect(await screen.findByRole('button', { name: /Fixture — modelo-novo/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Fixture — modelo-antigo/ })).not.toBeInTheDocument()
+    expect(fetchCatalogo).toHaveBeenCalledTimes(2)
   })
 
   it('navega no catálogo dinâmico com teclado e fecha com Escape', async () => {

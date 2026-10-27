@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft,
   AtSign,
@@ -137,6 +137,7 @@ export function ChatInput({
   const [modelOpen, setModelOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
   const [catalogoModelos, setCatalogoModelos] = useState<ItemCatalogoModelo[]>([])
+  const catalogoRequestRef = useRef(0)
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false)
   const [attachmentPickerView, setAttachmentPickerView] = useState<AttachmentPickerView>('sources')
   const [isFileDropTarget, setIsFileDropTarget] = useState(false)
@@ -288,15 +289,27 @@ export function ChatInput({
     return () => document.removeEventListener('pointerdown', handleOutsidePointerDown, true)
   }, [modeOpen, mode])
 
-  useEffect(() => {
-    let ativo = true
-    const atualizarCatalogo = () => {
-      void carregarEstado().then((estado) => { if (ativo) setCatalogoModelos(estado.catalogo ?? []) }).catch(() => { if (ativo) setCatalogoModelos([]) })
-    }
-    atualizarCatalogo()
-    window.addEventListener('focus', atualizarCatalogo)
-    return () => { ativo = false; window.removeEventListener('focus', atualizarCatalogo) }
+  const atualizarCatalogoModelos = useCallback(() => {
+    const requisicao = ++catalogoRequestRef.current
+    void carregarEstado()
+      .then((estado) => { if (requisicao === catalogoRequestRef.current) setCatalogoModelos(estado.catalogo ?? []) })
+      .catch(() => { if (requisicao === catalogoRequestRef.current) setCatalogoModelos([]) })
   }, [])
+
+  useEffect(() => {
+    atualizarCatalogoModelos()
+    window.addEventListener('focus', atualizarCatalogoModelos)
+    return () => {
+      catalogoRequestRef.current += 1
+      window.removeEventListener('focus', atualizarCatalogoModelos)
+    }
+  }, [atualizarCatalogoModelos])
+
+  // Atualiza ao abrir o seletor: mudanças feitas em Provedores aparecem sem
+  // reiniciar a aplicação ou depender de uma troca de foco da janela.
+  useEffect(() => {
+    if (modelOpen) atualizarCatalogoModelos()
+  }, [modelOpen, atualizarCatalogoModelos])
 
   useEffect(() => {
     if (!modelOpen) return
