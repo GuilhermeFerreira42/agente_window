@@ -120,14 +120,17 @@ describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () =
 
 it('F2 permanece fail-closed em todas as operações enquanto rename concorrente não está contido', async () => {
   expect(fsSeguroDisponivel).toBe(false)
+  const sentinela = caminhoAbsoluto('sentinela-f4.txt')
+  await writeFile(sentinela, 'bytes originais')
   const resultados = await Promise.all([
     exec.ler({ id: 'closed-read', ferramenta: 'ler', argumentos: { caminho: 'ausente.txt' } }),
     exec.listar({ id: 'closed-list', ferramenta: 'listar', argumentos: { caminho: '.' } }),
     exec.buscar({ id: 'closed-search', ferramenta: 'buscar', argumentos: { padrao: 'qualquer' } }),
     exec.criar({ id: 'closed-create', ferramenta: 'criar', argumentos: { caminho: 'nao-criar.txt', conteudo: 'x' } }),
-    exec.escrever({ id: 'closed-write', ferramenta: 'escrever', argumentos: { caminho: 'ausente.txt', conteudo: 'x' } }),
+    exec.escrever({ id: 'closed-write', ferramenta: 'escrever', argumentos: { caminho: 'sentinela-f4.txt', conteudo: 'tentativa insegura' } }),
   ])
   expect(resultados.every((resultado) => !resultado.ok)).toBe(true)
   expect(resultados.every((resultado) => resultado.resumo.includes('contenção segura F2'))).toBe(true)
   await expect(readFile(caminhoAbsoluto('nao-criar.txt'), 'utf8')).rejects.toThrow()
+  await expect(readFile(sentinela, 'utf8')).resolves.toBe('bytes originais')
 })
