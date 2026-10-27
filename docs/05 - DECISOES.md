@@ -172,3 +172,11 @@ Estas decisões substituem ou fecham as alternativas marcadas como abertas na au
 | **D119** | Aprovação das SPECs candidatas F1–F4, F5-A e F5-B para implementação nesta missão | O dono aprova, sem alteração de conteúdo, as seis SPECs candidatas identificadas na auditoria técnica F1–F8 de `docs/06`: F1 segurança/autoridade local; F2 contenção física do workspace; F3 cancelamento terminal seguro; F4 criação exclusiva/escrita condicional; F5-A enforcement server-side dos modos; F5-B catálogo/seleção/execução de modelos. Autoriza implementação apenas desses seis escopos, na ordem F1→F2→F3→F4→F5-A→F5-B, ajustes apenas por dependência técnica real, com fixtures isoladas, testes e commits separados. Aprovação de SPEC não é teste nem homologação. F6–F8, D98, Fatias 13–20 e iniciativas M não são aprovados nem iniciados; sem push. |
 
 D118 é condição documental prévia de F5-B. D119 registra aprovação de implementação distinta da homologação humana prevista em `docs/08`; os textos e critérios das seis SPECs permanecem rastreáveis em `docs/06`.
+
+## 12. Decisão de execução F5-B — capability declarada adiada (D120, 2026-10-27)
+
+| # | Decisão | Valor travado |
+|---|---|---|
+| **D120** | Adiar a fonte do estado `declared`; exigir verificação efetiva para Agir | A implementação de uma fonte/proveniência para `declared` fica para evolução futura. Nesta versão, somente uma avaliação `verified` válida para o par `(providerId, modelId)` e para a configuração/adaptador atuais pode liberar o modo Agir. Ausência, expiração/invalidação ou divergência da prova mantém o par bloqueado (`unknown`); `declared` nunca equivale a `verified` e não libera Agir. `incompatible` permanece bloqueado. Não inferir declaração por nome, protocolo, listagem de modelos ou documentação genérica. Preservar canary opt-in, prova vinculada à configuração, persistência/invalidação e fail-closed já implementados. D120 não autoriza chamadas reais, credenciais reais, mudança de provedores ou auto-homologação. |
+
+D120 ajusta a aceitação operacional de F5-B sem remover proteção e sem ampliar D119 a D98, Fatia 13 ou outras iniciativas. A fonte de `declared` não é requisito de entrega nesta versão; sua origem, escopo, atualidade e validade deverão ser especificados antes de qualquer implementação futura.
