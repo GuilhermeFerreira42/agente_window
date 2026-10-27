@@ -90,7 +90,7 @@ export function ProvidersView() {
   const chaveDigitada = chaveEditada[selecionado]
   const chaveVisivel = revelada[selecionado] === true
   const modeloVerificacao = rascunho.modelo.trim()
-  const avaliacaoModelo = estado?.catalogo.find((item) => item.providerId === selecionado && item.modelId === modeloVerificacao)
+  const avaliacaoModelo = estado?.catalogo?.find((item) => item.providerId === selecionado && item.modelId === modeloVerificacao)
   const possuiRascunhoRelevante = rascunhos[selecionado] !== undefined || chaveDigitada !== undefined
   const parSalvoHabilitado = daTela?.habilitado === true && daTela.modelosHabilitados.includes(modeloVerificacao)
   const semCredencialObrigatoria = !descritor?.chaveOpcional && !daTela?.chaveMascarada

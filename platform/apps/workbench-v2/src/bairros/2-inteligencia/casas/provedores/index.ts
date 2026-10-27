@@ -2,7 +2,8 @@
 // modules → Casa Provedores — BARREL ÚNICO (fronteira LEGO).
 // Fora da casa, importa-se APENAS este caminho:
 //   ./bairros/2-inteligencia/casas/provedores
-// Nada de subpastas (descubra violações em __tests__/frontier.test.ts).
+// Nada de subpastas de implementação. A única porta irmã explícita é
+// `./server` para consumidores backend; ela não deve ser importada pelo browser.
 // ============================================================================
 
 export type {

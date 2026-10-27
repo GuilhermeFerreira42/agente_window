@@ -5,17 +5,17 @@
 // ============================================================================
 import { randomBytes } from 'node:crypto'
 import type { AlvoConversa, ConfigChamadaModelo, IniciarChamadaModelo } from '../../conversa'
-import type { ToolCallingAssessmentRecord, ToolCallingCheckReason, ToolCallingCapabilityStatus } from '../../provedores/contract'
 import { AGIR_TOOL_ADAPTER_VERSION } from '../contract'
 import type { PedidoFerramenta } from '../contract'
-import { descritorPorId } from '../../provedores/descritores/registro'
+import type { ToolCallingAssessmentRecord, ToolCallingCheckReason, ToolCallingCapabilityStatus } from '../../provedores/server'
 import {
+  descritorPorId,
   fingerprintToolCalling,
   iniciarChamadaModelo,
   lerArquivo,
   registrarToolCallingAssessment,
   resolverChave,
-} from '../../provedores/server/providersRepo'
+} from '../../provedores/server'
 import { ErroVizinho, criarVizinhoReal } from './vizinho'
 
 const TIMEOUT_PROBE_MS = 12_000

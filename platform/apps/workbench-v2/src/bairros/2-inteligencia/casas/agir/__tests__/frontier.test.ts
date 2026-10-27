@@ -80,6 +80,9 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
           if (destino.startsWith(CASA + '/')) continue // interno
           const outraCasa = destino.startsWith(CASAS + '/') ? destino.slice(CASAS.length + 1) : null
           if (outraCasa !== null) {
+            // A Casa Provedores expõe uma porta pública separada para o backend;
+            // consumidores server-side não podem furar esse barrel até providersRepo.
+            if (outraCasa === 'provedores/server') continue
             if (outraCasa.includes('/')) infratores.push(`${relative(CASA, arquivo)} → ${alvo} (abaixo do barrel de outra casa)`)
             continue
           }
