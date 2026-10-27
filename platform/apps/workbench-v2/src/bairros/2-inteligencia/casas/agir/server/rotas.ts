@@ -9,9 +9,9 @@
 // O TERRITÓRIO não vem de confiança: a prefeitura injeta `pastaDeTrabalho`,
 // que valida a pasta informada pela tela e devolve a raiz real (o navegador
 // nunca define território por conta própria).
-// Q1=(a)/Q2=(a) (D93): só CRIAR/ESCREVER passam pelo cartão; "Permitir na
-// Sessão" vale enquanto durar o fluxo desta conversa no servidor (e o
-// navegador guarda a permissão para reenviar no próximo pedido — C4).
+// Regra atual F5-A/F2-F4: Agir/Edit autorizam criar/escrever sem cartão
+// repetitivo; exclusão, por ser destrutiva, segue manual e individual. O modo
+// efetivo é registrado separadamente no servidor; o payload do run não manda.
 // FATIA 11: o TETO vem da casa Config — a prefeitura injeta `lerTeto` (a casa
 // Agir NUNCA importa outra casa abaixo do barrel — LEGO). Ao bater o teto, a
 // rota guarda o diálogo por fluxo para o "Continuar" retomar com orçamento
@@ -26,7 +26,7 @@ import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
 import { permiteSessao } from './ferramentas'
 import { criarVizinhoReal } from './vizinho'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel']
+const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -45,6 +45,9 @@ export interface DependenciasAgir {
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
   /** A permissão de sessão é gravada somente pelo servidor após decisão do dono. */
   concederPermissaoSessao: (sessionId: string, raiz: string, ferramenta: 'criar' | 'escrever') => void
+  /** Modo escolhido explicitamente no seletor; nunca é lido do payload de /api/agir. */
+  lerModo: (sessionId: string, chatId: string) => ModoAgir | null
+  definirModo: (sessionId: string, chatId: string, modo: ModoAgir) => void
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
 }
@@ -58,6 +61,7 @@ interface ContextoFluxo {
   chatId: string
   raiz: string
   modo: ModoAgir
+  modoSelecionadoNoServidor: boolean
 }
 type EstadoExecucao = 'running' | 'awaiting-approval' | 'cancel-requested' | 'cancelled' | 'completed' | 'paused'
 interface ExecucaoAgir extends ContextoFluxo {
@@ -150,7 +154,6 @@ type PedidoValidado = {
   fluxo: string
   sessionId: string
   chatId: string
-  modo: ModoAgir
   selecaoModelo: SelecaoModelo
 }
 
@@ -183,14 +186,11 @@ function validarPedido(corpo: Record<string, unknown>): { ok: true; pedido: Pedi
   if (!sessionId || !chatId) {
     return { ok: false, message: 'Pedido sem identidade da sessão/conversa; o servidor não iniciou a execução.' }
   }
-  const modo = corpo.mode
-  if (modo !== 'agent' && modo !== 'edit' && modo !== 'ask' && modo !== 'plan') {
-    return { ok: false, message: 'Modo inválido ou ausente; use agent, edit, ask ou plan.' }
-  }
   const selecaoModelo = validarSelecaoModelo(corpo.modelSelection)
   if (!selecaoModelo) return { ok: false, message: 'Seleção de modelo inválida; escolha Auto ou um par providerId/modelId do catálogo.' }
-  // `workspace` e `permissoes` antigos são deliberadamente ignorados: não são autoridade.
-  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, modo, selecaoModelo } }
+  // `workspace`, `permissoes` e `mode` do payload são deliberadamente ignorados:
+  // o contexto e o modo efetivo vêm da autoridade server-side.
+  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, selecaoModelo } }
 }
 
 function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
@@ -248,7 +248,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   const { fluxo } = fio
   permissoesPorFluxo.set(fluxo, new Set(fio.permissoes))
-  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo })
+  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   const executores = criarExecutoresReais(fio.raiz)
@@ -274,6 +274,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
+        // No modo Agir, criar/escrever já estão autorizados pelo modo escolhido;
+        // não repetir cartões para cada edição. Excluir continua sempre manual.
+        if (fio.execucao.modoSelecionadoNoServidor && (fio.execucao.modo === 'agent' || fio.execucao.modo === 'edit') && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever')) return true
         // RF12-3: sessão liberada NÃO cobre `excluir` (cinto + suspensório com
         // o filtro de entrada — mesmo que 'excluir' chegue, nunca auto-libera).
         if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) return true // Q2a
@@ -295,7 +298,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         const permissoesAtuais = permissoesPorFluxo.get(fluxo)
         const usouGrantDeSessao = !!pedido && permiteSessao(pedido.ferramenta) && !!permissoesAtuais?.has(pedido.ferramenta)
         const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
-        if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz) return false
+        if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo) return false
         if (usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido!.ferramenta)) return false
         permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
         return true
@@ -363,8 +366,8 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     return true
   }
   const contextoAtual = deps.resolverContexto(execucao.sessionId, execucao.chatId)
-  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz) {
-    sendErro(res, 409, 'fluxo', 'A sessão ou a pasta mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || (deps.lerModo(execucao.sessionId, execucao.chatId) ?? 'agent') !== execucao.modo) {
+    sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
     return true
   }
   const pendente = execucao.pendentes.get(id)
@@ -449,6 +452,10 @@ async function tratarAgir(
     sendErro(res, 409, 'configuracao', contexto.message)
     return true
   }
+  // Default conservador é Agent + aprovação manual. A seleção explícita do
+  // servidor aplica a política do modo e ignora o `mode` de /api/agir.
+  const modoSelecionado = deps.lerModo(validacao.pedido.sessionId, validacao.pedido.chatId)
+  const modoEfetivo = modoSelecionado ?? 'agent'
 
   const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
   if (!alvo) {
@@ -481,7 +488,7 @@ async function tratarAgir(
     return true
   }
   retomarPorFluxo.delete(fluxo)
-  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: validacao.pedido.modo }
+  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   const resultado = await executarFioAgir(res, {
     execucao,
@@ -532,8 +539,8 @@ async function tratarContinuar(
     return true
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
-  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz) {
-    sendErro(res, 409, 'fluxo', 'A sessão ou a pasta mudou; a continuação foi invalidada.')
+  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || (deps.lerModo(sessionId, chatId) ?? 'agent') !== retomada.contexto.modo) {
+    sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; a continuação foi invalidada.')
     return true
   }
   // Claim antes de qualquer await: somente uma continuação pode consumir a pausa.
@@ -575,6 +582,26 @@ async function tratarContinuar(
   return true
 }
 
+async function tratarSelecionarModo(req: IncomingMessage, res: ServerResponse, deps: DependenciasAgir): Promise<boolean> {
+  let corpo: Record<string, unknown>
+  try { corpo = await lerCorpo(req) } catch (erro) {
+    sendErro(res, 400, 'configuracao', (erro as Error).message)
+    return true
+  }
+  const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
+  const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
+  const modo = corpo.mode
+  if (!sessionId || !chatId || sessionId.length > 200 || chatId.length > 200 || (modo !== 'agent' && modo !== 'edit' && modo !== 'ask' && modo !== 'plan')) {
+    sendErro(res, 400, 'configuracao', 'Seleção de modo inválida; sessão, conversa e modo conhecido são obrigatórios.')
+    return true
+  }
+  // Somente registra a seleção visual; nenhuma permissão de arquivo é concedida
+  // aqui. Cada execução ainda precisa resolver sessão/workspace no servidor.
+  deps.definirModo(sessionId, chatId, modo)
+  sendJson(res, 200, { ok: true, mode: modo })
+  return true
+}
+
 export async function tratarRotasAgir(
   req: IncomingMessage,
   res: ServerResponse,
@@ -583,6 +610,7 @@ export async function tratarRotasAgir(
 ): Promise<boolean> {
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
+  if (url.pathname === '/api/agir/mode') return tratarSelecionarModo(req, res, deps)
   if (url.pathname === '/api/agir/aprovar') return tratarAprovar(req, res, deps)
   if (url.pathname === '/api/agir/cancel') return tratarCancelar(req, res, deps)
   if (url.pathname === '/api/agir/continuar') return tratarContinuar(req, res, deps)

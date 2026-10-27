@@ -1,7 +1,8 @@
 // ============================================================================
 // Casa Agir — contrato da FATIA 10 (ferramentas de arquivo + permissões).
-// Regras duras (SPEC PARTE 2D): a IA SÓ PROPÕE mexidas — o dono aprova no
-// cartão; nada sai da pasta de trabalho (trava de território — C2);
+// O modo efetivo é registrado no servidor; Perguntar/Planejar são somente leitura.
+// Agir permite criar/escrever sem confirmação repetitiva; operações destrutivas
+// continuam exigindo cartão individual. O workspace ancora caminhos relativos.
 // Q4 (D93) = canal NATIVO: cada protocolo tem seu extrator de pedidos.
 // ============================================================================
 /**

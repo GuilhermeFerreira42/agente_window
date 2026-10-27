@@ -1,88 +1,52 @@
-// ============================================================================
-// Provas da TRAVA DE TERRITÓRIO — ninguém sai da pasta de trabalho, nem com
-// caminho relativo, nem com absoluto, nem com `..`, nem em outro disco.
-// O caso Windows (o dono é Windows) é provado com o path.win32 injetado.
-// ============================================================================
+// O workspace é base para paths relativos, não fronteira de confinamento.
 import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { verificarTerritorio } from '../server/territorio'
 
-const RAIZ = path.resolve('/casa/trabalho')
+const RAIZ = path.resolve('/fixture/workspace')
 
-describe('Trava de território (posix)', () => {
-  it('caminho relativo dentro: liberado e resolvido', () => {
-    const v = verificarTerritorio(RAIZ, 'docs/nota.md')
-    expect(v).toEqual({ liberado: true, caminho: path.resolve(RAIZ, 'docs/nota.md') })
+describe('Resolução de caminhos locais (posix)', () => {
+  it('resolve relativo a partir do workspace', () => {
+    expect(verificarTerritorio(RAIZ, 'docs/nota.md')).toEqual({
+      liberado: true,
+      caminho: path.resolve(RAIZ, 'docs/nota.md'),
+    })
   })
-  it('caminho absoluto DENTRO da pasta: liberado (lição do teste do dono, 18/10)', () => {
-    const v = verificarTerritorio(RAIZ, `${RAIZ}/AGENTS.md`)
-    expect(v.liberado).toBe(true)
+  it('aceita caminho absoluto dentro do workspace', () => {
+    expect(verificarTerritorio(RAIZ, `${RAIZ}/AGENTS.md`).liberado).toBe(true)
   })
-  it('`..` que escapa: recusa honesta', () => {
-    const v = verificarTerritorio(RAIZ, '../segredos.txt')
-    expect(v.liberado).toBe(false)
-    if (!v.liberado) expect(v.motivo).toContain('Fora da pasta')
+  it('aceita caminho absoluto fora e travessia explícita para outro projeto', () => {
+    expect(verificarTerritorio(RAIZ, '/tmp/outro-projeto/arquivo.txt')).toEqual({
+      liberado: true,
+      caminho: '/tmp/outro-projeto/arquivo.txt',
+    })
+    expect(verificarTerritorio(RAIZ, '../outro-projeto/arquivo.txt').liberado).toBe(true)
   })
-  it('absoluto de fora: recusa honesta', () => {
-    const v = verificarTerritorio(RAIZ, '/etc/passwd')
-    expect(v.liberado).toBe(false)
-  })
-  it('pardisposição (`..` no meio que continua dentro): liberado', () => {
-    const v = verificarTerritorio(RAIZ, 'docs/../nota.md')
-    expect(v.liberado).toBe(true)
-  })
-  it('caminho vazio/não-texto: recusa honesta', () => {
+  it('rejeita somente entradas ausentes, não-texto ou com NUL', () => {
     expect(verificarTerritorio(RAIZ, '').liberado).toBe(false)
     expect(verificarTerritorio(RAIZ, '   ').liberado).toBe(false)
     expect(verificarTerritorio(RAIZ, undefined).liberado).toBe(false)
     expect(verificarTerritorio(RAIZ, 42).liberado).toBe(false)
+    expect(verificarTerritorio(RAIZ, 'a\0b').liberado).toBe(false)
   })
 })
 
-describe('Trava de território (win32 — o dono é Windows)', () => {
-  const RAIZ_W = 'C:\\Users\\Usuario\\Desktop\\agente_window'
-  it('absoluto do Windows DENTRO da pasta: liberado', () => {
-    const v = verificarTerritorio(RAIZ_W, 'C:\\Users\\Usuario\\Desktop\\agente_window\\AGENTS.md', path.win32)
-    expect(v.liberado).toBe(true)
+describe('Resolução de caminhos locais (win32 — simulado)', () => {
+  const raizWindows = 'C:\\Users\\Fixture\\workspace'
+  it('resolve relativo, absoluto e outro drive com path.win32', () => {
+    expect(verificarTerritorio(raizWindows, 'docs\\nota.md', path.win32)).toMatchObject({
+      liberado: true,
+      caminho: 'C:\\Users\\Fixture\\workspace\\docs\\nota.md',
+    })
+    expect(verificarTerritorio(raizWindows, 'D:\\fixtures\\outro\\arquivo.txt', path.win32)).toMatchObject({
+      liberado: true,
+      caminho: 'D:\\fixtures\\outro\\arquivo.txt',
+    })
   })
-  it('relativo do Windows: liberado', () => {
-    const v = verificarTerritorio(RAIZ_W, 'docs\\arquivo.md', path.win32)
-    expect(v.liberado).toBe(true)
-  })
-  it('outro ramo do disco: recusa honesta', () => {
-    const v = verificarTerritorio(RAIZ_W, 'C:\\Windows\\system32\\x.dll', path.win32)
-    expect(v.liberado).toBe(false)
-  })
-  it('`..` escapando no Windows: recusa honesta', () => {
-    const v = verificarTerritorio(RAIZ_W, '..\\outro-projeto\\x.txt', path.win32)
-    expect(v.liberado).toBe(false)
-  })
-})
-
-describe('Trava de território (win32 real — C5, o teste do dono)', () => {
-  const RAIZ_W = 'C:\\Users\\Usuario\\Desktop\\agente_window'
-  // A raiz chega via realpath (caixa do disco + às vezes prefixo \\?\); o
-  // modelo digita com a caixa "bonita" e barras `/` — tudo dentro libera.
-  it('realpath x digitado: caixa diferente + barras `/` liberam (vscode-main)', () => {
-    const raizReal = 'c:\\users\\usuario\\desktop\\agente_window' // caixa do disco
-    const v = verificarTerritorio(raizReal, 'C:/Users/Usuario/Desktop/agente_window/vscode-main', path.win32)
-    expect(v.liberado).toBe(true)
-  })
-  it('raiz com prefixo \\?\\ (realpath do Windows) não trava absoluto de dentro', () => {
-    const v = verificarTerritorio('\\\\?\\C:\\Users\\Usuario\\Desktop\\agente_window', 'C:\\Users\\Usuario\\Desktop\\agente_window\\vscode-main', path.win32)
-    expect(v.liberado).toBe(true)
-  })
-  it('absoluto com barra inicial (`/C:/...`, jeito do modelo) libera', () => {
-    const v = verificarTerritorio(RAIZ_W, '/C:/Users/Usuario/Desktop/agente_window/vscode-main', path.win32)
-    expect(v.liberado).toBe(true)
-  })
-  it('pasta irmã com prefixo parecido (`ws` x `ws2`) continua RECUSADA', () => {
-    const v = verificarTerritorio('C:\\Users\\Usuario\\Desktop\\agente_window', 'C:\\USERS\\USUARIO\\DESKTOP\\AGENTE_WINDOW2\\x.txt', path.win32)
-    expect(v.liberado).toBe(false)
-    if (!v.liberado) expect(v.motivo).toContain('Fora da pasta')
-  })
-  it('outro disco continua RECUSADO mesmo com caixa alta', () => {
-    const v = verificarTerritorio(RAIZ_W, 'D:\\COISAS\\x.txt', path.win32)
-    expect(v.liberado).toBe(false)
+  it('normaliza o formato /C:/ usado por alguns modelos', () => {
+    expect(verificarTerritorio(raizWindows, '/C:/Users/Fixture/workspace/a.txt', path.win32)).toMatchObject({
+      liberado: true,
+      caminho: 'C:\\Users\\Fixture\\workspace\\a.txt',
+    })
   })
 })

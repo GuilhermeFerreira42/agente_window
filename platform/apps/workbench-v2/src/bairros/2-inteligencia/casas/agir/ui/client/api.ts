@@ -28,6 +28,19 @@ export interface OuvintesAgir {
   onError: (code: CategoriaErroAgir, message: string, detalhe?: DetalheErroAgir) => void
 }
 
+export async function selecionarModoAgir(sessionId: string, chatId: string, mode: ModoAgir, signal?: AbortSignal): Promise<void> {
+  const resposta = await fetch('/api/agir/mode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, chatId, mode }),
+    signal,
+  })
+  if (resposta.ok) return
+  let mensagem = 'Não foi possível registrar o modo no servidor; a execução não foi iniciada.'
+  try { const corpo = await resposta.json() as { message?: string }; if (corpo.message) mensagem = corpo.message } catch { /* fallback local acima */ }
+  throw new Error(mensagem)
+}
+
 export interface EntradaAgir {
   mensagens: MensagemSimples[]
   modelSelection?: { tipo: 'auto' } | { tipo: 'explicita'; providerId: string; modelId: string }
@@ -62,7 +75,7 @@ async function bombearFio(
         const corpo = (await resposta.json()) as { code?: CategoriaErroAgir; message?: string }
         if (corpo && typeof corpo.code === 'string') code = corpo.code
         if (corpo && typeof corpo.message === 'string') message = corpo.message
-      } catch {}
+      } catch { /* mantém a mensagem genérica e honesta acima */ }
       if (!paradaSolicitada()) ouvintes.onError(code, message)
       return
     }

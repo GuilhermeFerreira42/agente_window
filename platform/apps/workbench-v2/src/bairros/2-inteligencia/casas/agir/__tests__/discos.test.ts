@@ -1,136 +1,129 @@
-// ============================================================================
-// Provas das MÃOS DE VERDADE (conquista 2): disco de verdade em pasta
-// temporária — criar/ler/listar/buscar/escrever, escrita atômica e a trava
-// de território ligada em cada ferramenta.
-// ============================================================================
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+// Testes práticos das ferramentas com diretórios temporários isolados.
+// Nada aponta para documentos pessoais nem para caminhos reais do usuário.
+import { link, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { criarExecutoresReais } from '../server/discos'
-import { fsSeguroDisponivel } from '../server/fsSeguro'
 
-const raiz = await mkdtemp(path.join(tmpdir(), 'agir-c2-'))
-const exec = criarExecutoresReais(raiz)
-const caminhoAbsoluto = (relativo: string): string => path.join(raiz, relativo)
+let raiz: string
+let outroProjeto: string
+let exec: ReturnType<typeof criarExecutoresReais>
+const pedido = (ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever', argumentos: Record<string, unknown>) => ({
+  id: `${ferramenta}-fixture`, ferramenta, argumentos,
+})
+
+beforeAll(async () => {
+  raiz = await mkdtemp(path.join(tmpdir(), 'agir-workspace-fixture-'))
+  outroProjeto = await mkdtemp(path.join(tmpdir(), 'agir-outro-projeto-fixture-'))
+  exec = criarExecutoresReais(raiz)
+  await mkdir(path.join(raiz, 'docs'), { recursive: true })
+  await writeFile(path.join(raiz, 'docs', 'nota.md'), 'conteúdo interno original', 'utf8')
+  await writeFile(path.join(outroProjeto, 'arquivo-projeto.txt'), 'conteúdo do segundo projeto', 'utf8')
+})
 
 afterAll(async () => {
-  exec.fechar()
-  await rm(raiz, { recursive: true, force: true })
-  await rm(`${raiz}-outside`, { recursive: true, force: true })
+  exec?.fechar()
+  if (raiz) await rm(raiz, { recursive: true, force: true })
+  if (outroProjeto) await rm(outroProjeto, { recursive: true, force: true })
 })
 
-describe.skipIf(!fsSeguroDisponivel)('Executores reais (disco de verdade)', () => {
-  it('criar grava o conteúdo exato (e cria subpastas no caminho)', async () => {
-    const r = await exec.criar({ id: '1', ferramenta: 'criar', argumentos: { caminho: 'sub/ola.txt', conteudo: 'olá, dono!' } })
-    expect(r.ok).toBe(true)
-    await expect(readFile(caminhoAbsoluto('sub/ola.txt'), 'utf8')).resolves.toBe('olá, dono!')
+describe('Executores reais de disco — fixtures temporárias', () => {
+  it('lê arquivo dentro do workspace por caminho relativo e absoluto', async () => {
+    const relativo = await exec.ler(pedido('ler', { caminho: 'docs/nota.md' }))
+    const absoluto = await exec.ler(pedido('ler', { caminho: path.join(raiz, 'docs', 'nota.md') }))
+    expect(relativo).toMatchObject({ ok: true, conteudo: 'conteúdo interno original' })
+    expect(absoluto.ok).toBe(true)
   })
 
-  it('criar em destino existente falha sem substituir bytes já presentes', async () => {
-    const colisao = await exec.criar({ id: '1b', ferramenta: 'criar', argumentos: { caminho: 'sub/ola.txt', conteudo: 'não substituir' } })
+  it('lê, lista e edita um caminho explícito fora do workspace, conforme as permissões do SO', async () => {
+    const arquivoExterno = path.join(outroProjeto, 'arquivo-projeto.txt')
+    const lido = await exec.ler(pedido('ler', { caminho: arquivoExterno }))
+    const listado = await exec.listar(pedido('listar', { caminho: outroProjeto }))
+    const editado = await exec.escrever(pedido('escrever', { caminho: arquivoExterno, conteudo: 'edição autorizada no projeto externo' }))
+    expect(lido).toMatchObject({ ok: true, conteudo: 'conteúdo do segundo projeto' })
+    expect(listado.ok).toBe(true)
+    expect(listado.conteudo).toContain('arquivo-projeto.txt')
+    expect(editado.ok).toBe(true)
+    await expect(readFile(arquivoExterno, 'utf8')).resolves.toBe('edição autorizada no projeto externo')
+  })
+
+  it('cria no outro projeto e preserva uma colisão sem sobrescrever', async () => {
+    const destino = path.join(outroProjeto, 'novo.txt')
+    const criado = await exec.criar(pedido('criar', { caminho: destino, conteudo: 'primeira versão' }))
+    const colisao = await exec.criar(pedido('criar', { caminho: destino, conteudo: 'não sobrescrever' }))
+    expect(criado.ok).toBe(true)
     expect(colisao.ok).toBe(false)
     expect(colisao.resumo).toContain('já existe')
-    await expect(readFile(caminhoAbsoluto('sub/ola.txt'), 'utf8')).resolves.toBe('olá, dono!')
+    await expect(readFile(destino, 'utf8')).resolves.toBe('primeira versão')
   })
 
-  it('duas criações concorrentes no mesmo destino: uma vence e a outra preserva o vencedor', async () => {
+  it('duas criações concorrentes no mesmo destino: só uma vence', async () => {
+    const destino = path.join(raiz, 'corrida.txt')
     const resultados = await Promise.all([
-      exec.criar({ id: 'race-a', ferramenta: 'criar', argumentos: { caminho: 'corrida.txt', conteudo: 'A' } }),
-      exec.criar({ id: 'race-b', ferramenta: 'criar', argumentos: { caminho: 'corrida.txt', conteudo: 'B' } }),
+      exec.criar(pedido('criar', { caminho: destino, conteudo: 'A' })),
+      exec.criar(pedido('criar', { caminho: destino, conteudo: 'B' })),
     ])
-    expect(resultados.filter((resultado) => resultado.ok)).toHaveLength(1)
-    expect(resultados.filter((resultado) => !resultado.ok && resultado.resumo.includes('já existe'))).toHaveLength(1)
-    await expect(readFile(caminhoAbsoluto('corrida.txt'), 'utf8')).resolves.toMatch(/^(A|B)$/)
+    expect(resultados.filter((r) => r.ok)).toHaveLength(1)
+    expect(resultados.filter((r) => !r.ok && r.resumo.includes('já existe'))).toHaveLength(1)
+    await expect(readFile(destino, 'utf8')).resolves.toMatch(/^(A|B)$/)
   })
 
-  it('ler devolve o conteúdo para o MODELO e o resumo para a TELA', async () => {
-    const r = await exec.ler({ id: '2', ferramenta: 'ler', argumentos: { caminho: 'sub/ola.txt' } })
-    expect(r.ok).toBe(true)
-    expect(r.conteudo).toBe('olá, dono!')
-    expect(r.resumo).toContain('caracteres')
+  it('escrever exige leitura prévia nesta execução e então atualiza o arquivo', async () => {
+    const destino = path.join(raiz, 'docs', 'editavel.txt')
+    await writeFile(destino, 'antes', 'utf8')
+    const semLeitura = await exec.escrever(pedido('escrever', { caminho: destino, conteudo: 'não gravar' }))
+    expect(semLeitura.ok).toBe(false)
+    expect(semLeitura.resumo).toContain('releia')
+    await exec.ler(pedido('ler', { caminho: destino }))
+    const gravado = await exec.escrever(pedido('escrever', { caminho: destino, conteudo: 'depois' }))
+    expect(gravado.ok).toBe(true)
+    await expect(readFile(destino, 'utf8')).resolves.toBe('depois')
   })
 
-  it('aceita caminho ABSOLUTO dentro da pasta (jeito do dono e do modelo)', async () => {
-    const r = await exec.ler({ id: '3', ferramenta: 'ler', argumentos: { caminho: caminhoAbsoluto('sub/ola.txt') } })
-    expect(r.ok).toBe(true)
+  it('escrever detecta alteração desde a leitura e preserva os bytes concorrentes', async () => {
+    const destino = path.join(raiz, 'docs', 'conflito.txt')
+    await writeFile(destino, 'versão lida', 'utf8')
+    await exec.ler(pedido('ler', { caminho: destino }))
+    await writeFile(destino, 'versão concorrente', 'utf8')
+    const resultado = await exec.escrever(pedido('escrever', { caminho: destino, conteudo: 'tentativa obsoleta' }))
+    expect(resultado.ok).toBe(false)
+    expect(resultado.resumo).toContain('Conflito')
+    await expect(readFile(destino, 'utf8')).resolves.toBe('versão concorrente')
   })
 
-  it('listar marca pastas com "/" e ordena', async () => {
-    const r = await exec.listar({ id: '4', ferramenta: 'listar', argumentos: { caminho: '.' } })
-    expect(r.ok).toBe(true)
-    expect(r.conteudo).toContain('sub/')
+  it('buscar funciona em outro projeto quando o diretório é explícito', async () => {
+    const resultado = await exec.buscar(pedido('buscar', { caminho: outroProjeto, padrao: 'projeto' }))
+    expect(resultado.ok).toBe(true)
+    expect(resultado.conteudo).toContain('arquivo-projeto.txt')
   })
 
-  it('escrever falha fechada sem CAS demonstrável e preserva os bytes do arquivo', async () => {
-    const ausente = await exec.escrever({ id: '5', ferramenta: 'escrever', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'x' } })
-    expect(ausente.ok).toBe(false)
-    await exec.criar({ id: '6', ferramenta: 'criar', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'primeira versão' } })
-    const reescrito = await exec.escrever({ id: '7', ferramenta: 'escrever', argumentos: { caminho: 'novo-aqui.txt', conteudo: 'segunda versão maior' } })
-    expect(reescrito.ok).toBe(false)
-    expect(reescrito.resumo).toContain('commit condicional seguro')
-    await expect(readFile(caminhoAbsoluto('novo-aqui.txt'), 'utf8')).resolves.toBe('primeira versão')
+  it('escrever recusa hard link para não romper a identidade compartilhada', async () => {
+    const destino = path.join(raiz, 'docs', 'hardlink-origem.txt')
+    const alias = path.join(raiz, 'docs', 'hardlink-alias.txt')
+    await writeFile(destino, 'compartilhado', 'utf8')
+    await link(destino, alias)
+    await exec.ler(pedido('ler', { caminho: destino }))
+    const resultado = await exec.escrever(pedido('escrever', { caminho: destino, conteudo: 'não substituir' }))
+    expect(resultado.ok).toBe(false)
+    expect(resultado.resumo).toContain('hard links')
+    await expect(readFile(destino, 'utf8')).resolves.toBe('compartilhado')
+    await expect(readFile(alias, 'utf8')).resolves.toBe('compartilhado')
   })
 
-  it('buscar acha por pedaço do nome, recursivo, IGNORANDO node_modules', async () => {
-    await exec.criar({ id: '8', ferramenta: 'criar', argumentos: { caminho: 'node_modules/armadilha/novo-x.txt', conteudo: 'não' } })
-    const r = await exec.buscar({ id: '9', ferramenta: 'buscar', argumentos: { padrao: 'novo' } })
-    expect(r.ok).toBe(true)
-    expect(r.conteudo?.split('\n')).toEqual(['novo-aqui.txt'])
+  it('buscar no workspace não segue symlink para outro projeto', async () => {
+    await symlink(outroProjeto, path.join(raiz, 'atalho-externo'))
+    const resultado = await exec.buscar(pedido('buscar', { caminho: raiz, padrao: 'arquivo-projeto' }))
+    expect(resultado.ok).toBe(true)
+    expect(resultado.conteudo).toBe('')
   })
 
-  it('FORA do território: recusa honesta sem tocar disco', async () => {
-    const fora = await exec.criar({ id: '10', ferramenta: 'criar', argumentos: { caminho: '../fora.txt', conteudo: 'não' } })
-    expect(fora.ok).toBe(false)
-    expect(fora.resumo).toContain('Fora da pasta')
-    await expect(readFile(path.resolve(raiz, '../fora.txt'), 'utf8')).rejects.toThrow()
-  })
-
-  it('recusa honesta quando falta argumento (nada executa no escuro)', async () => {
-    const semCaminho = await exec.criar({ id: '11', ferramenta: 'criar', argumentos: { conteudo: 'x' } })
-    const semConteudo = await exec.criar({ id: '12', ferramenta: 'criar', argumentos: { caminho: 'a.txt' } })
-    expect(semCaminho.ok).toBe(false)
-    expect(semCaminho.resumo).toContain('faltou caminho')
-    expect(semConteudo.ok).toBe(false)
-    expect(semConteudo.resumo).toContain('faltou conteudo')
-  })
-
-  it('ler em pasta (não arquivo): recusa honesta apontando "listar"', async () => {
-    const r = await exec.ler({ id: '13', ferramenta: 'ler', argumentos: { caminho: 'sub' } })
-    expect(r.ok).toBe(false)
-    expect(r.resumo).toContain('tipo de arquivo não permitido')
-  })
-
-  it('o resto da pasta fica intacto (pasta temporária só com o que os testes criaram)', async () => {
+  it('erros e entradas vazias falham sem modificar o fixture', async () => {
+    const vazio = await exec.ler(pedido('ler', { caminho: '  ' }))
+    const pasta = await exec.ler(pedido('ler', { caminho: raiz }))
     const itens = await readdir(raiz)
-    expect(itens.sort()).toEqual(['corrida.txt', 'node_modules', 'novo-aqui.txt', 'sub'])
+    expect(vazio.ok).toBe(false)
+    expect(pasta.ok).toBe(false)
+    expect(itens).toContain('docs')
   })
-
-  it('buscar não atravessa symlink para nomes externos', async () => {
-    const externo = `${raiz}-outside`
-    await mkdir(externo, { recursive: true })
-    await writeFile(path.join(externo, 'segredo-externo.txt'), 'sanitizado', 'utf8')
-    await symlink(externo, path.join(raiz, 'atalho-externo'))
-    const r = await exec.buscar({ id: '14', ferramenta: 'buscar', argumentos: { padrao: 'segredo-externo' } })
-    expect(r.ok).toBe(true)
-    expect(r.conteudo).toBe('')
-    await rm(externo, { recursive: true, force: true })
-  })
-})
-
-it('F2 permanece fail-closed em todas as operações enquanto rename concorrente não está contido', async () => {
-  expect(fsSeguroDisponivel).toBe(false)
-  const sentinela = caminhoAbsoluto('sentinela-f4.txt')
-  await writeFile(sentinela, 'bytes originais')
-  const resultados = await Promise.all([
-    exec.ler({ id: 'closed-read', ferramenta: 'ler', argumentos: { caminho: 'ausente.txt' } }),
-    exec.listar({ id: 'closed-list', ferramenta: 'listar', argumentos: { caminho: '.' } }),
-    exec.buscar({ id: 'closed-search', ferramenta: 'buscar', argumentos: { padrao: 'qualquer' } }),
-    exec.criar({ id: 'closed-create', ferramenta: 'criar', argumentos: { caminho: 'nao-criar.txt', conteudo: 'x' } }),
-    exec.escrever({ id: 'closed-write', ferramenta: 'escrever', argumentos: { caminho: 'sentinela-f4.txt', conteudo: 'tentativa insegura' } }),
-  ])
-  expect(resultados.every((resultado) => !resultado.ok)).toBe(true)
-  expect(resultados.every((resultado) => resultado.resumo.includes('contenção segura F2'))).toBe(true)
-  await expect(readFile(caminhoAbsoluto('nao-criar.txt'), 'utf8')).rejects.toThrow()
-  await expect(readFile(sentinela, 'utf8')).resolves.toBe('bytes originais')
 })

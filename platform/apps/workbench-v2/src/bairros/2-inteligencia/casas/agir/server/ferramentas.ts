@@ -8,7 +8,6 @@ import type {
   ArgumentosFerramenta,
   ExecutorFerramenta,
   FerramentaId,
-  ResultadoFerramenta,
 } from '../contract'
 
 export interface DescritorFerramenta {
@@ -21,36 +20,36 @@ export interface DescritorFerramenta {
   obrigatorios: Array<keyof ArgumentosFerramenta>
 }
 
-/** As 6 mãos — todas de ARQUIVO, dentro da pasta de trabalho (a 6ª, `excluir`, é da FATIA 12). */
+/** As 6 mãos — operações de arquivo sob as permissões normais da conta local. */
 export const catalogoFerramentas: DescritorFerramenta[] = [
   {
     id: 'ler',
     titulo: 'Ler arquivo',
-    descricao: 'Lê o conteúdo de um arquivo da pasta de trabalho.',
+    descricao: 'Lê um arquivo local. Caminhos relativos partem da pasta de trabalho; caminhos absolutos também são aceitos.',
     obrigatorios: ['caminho'],
   },
   {
     id: 'listar',
     titulo: 'Listar pasta',
-    descricao: 'Lista o que existe dentro de uma pasta da pasta de trabalho.',
+    descricao: 'Lista uma pasta local. Caminhos relativos partem da pasta de trabalho; caminhos absolutos também são aceitos.',
     obrigatorios: ['caminho'],
   },
   {
     id: 'buscar',
     titulo: 'Buscar arquivos',
-    descricao: 'Busca arquivos pelo nome/padrão dentro da pasta de trabalho.',
+    descricao: 'Busca arquivos locais pelo nome/padrão; sem caminho, começa na pasta de trabalho.',
     obrigatorios: ['padrao'],
   },
   {
     id: 'criar',
     titulo: 'Criar arquivo',
-    descricao: 'Cria um arquivo novo com o conteúdo dado (escrita atômica).',
+    descricao: 'Cria um arquivo local novo com o conteúdo dado; nunca substitui destino existente.',
     obrigatorios: ['caminho', 'conteudo'],
   },
   {
     id: 'escrever',
     titulo: 'Escrever arquivo',
-    descricao: 'Sobrescreve um arquivo existente com o conteúdo dado (escrita atômica).',
+    descricao: 'Atualiza arquivo local existente após leitura na execução atual; se detectar mudança concorrente, não grava.',
     obrigatorios: ['caminho', 'conteudo'],
   },
   {
@@ -69,8 +68,8 @@ export function ehFerramentaConhecida(nome: unknown): nome is FerramentaId {
 }
 
 /**
- * Q1=(a) (D93) + RF12-1: LER/LISTAR/BUSCAR são de graça; CRIAR/ESCREVER/
- * EXCLUIR são MEXIDA — sempre passam pelo cartão do dono.
+ * Leituras não alteram estado. Criar/escrever são operações autorizadas pelo
+ * modo Agir; excluir é destrutiva e sempre passa pelo cartão do dono.
  */
 export function ehMexida(ferramenta: FerramentaId): boolean {
   return ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir'

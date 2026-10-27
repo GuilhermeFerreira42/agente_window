@@ -16,7 +16,7 @@ function pedidoExcluir(caminho: unknown): PedidoFerramenta {
   return { id: 'e1', ferramenta: 'excluir', argumentos: { caminho } }
 }
 
-describe('excluir F2 — bloqueio controlado até lixeira segura', () => {
+describe('excluir — fora do escopo desta missão e fail-closed', () => {
   it('preserva arquivo e pasta e não tenta mover nem remover', async () => {
     await writeFile(path.join(raiz, 'alvo.txt'), 'fixture sanitizada', 'utf8')
     await mkdir(path.join(raiz, 'caixa'))
@@ -36,24 +36,24 @@ describe('excluir F2 — bloqueio controlado até lixeira segura', () => {
     }
   })
 
-  it('recusa caminho externo e a própria raiz antes de qualquer operação de disco', async () => {
+  it('não executa exclusão em caminho externo nem na raiz enquanto a ferramenta não existe', async () => {
     const executores = criarExecutoresReais(raiz)
     try {
       const fora = await executores.excluir(pedidoExcluir('../fora.txt'))
       const raizInteira = await executores.excluir(pedidoExcluir('.'))
       expect(fora.ok).toBe(false)
-      expect(fora.resumo).toContain('Fora da pasta')
+      expect(fora.resumo).toContain('Exclusão bloqueada')
       expect(raizInteira.ok).toBe(false)
-      expect(raizInteira.resumo).toContain('pasta de trabalho inteira')
+      expect(raizInteira.resumo).toContain('Exclusão bloqueada')
     } finally {
       executores.fechar()
     }
   })
 
-  it('prévia explica bloqueio sem abrir nem inspecionar o caminho', async () => {
+  it('prévia informa indisponibilidade sem abrir nem inspecionar o caminho', async () => {
     const previa = await descreverAlvoExcluir(raiz, 'sumido-ou-symlink.txt')
-    expect(previa).toContain('exclusão está bloqueada')
-    expect(previa).toContain('nenhum item foi lido ou removido')
-    expect(await descreverAlvoExcluir(raiz, '../fora.txt')).toContain('Fora da pasta')
+    expect(previa).toContain('exclusão não está disponível')
+    expect(previa).toContain('nenhum item foi lido, movido ou removido')
+    expect(await descreverAlvoExcluir(raiz, '../fora.txt')).toBe(previa)
   })
 })

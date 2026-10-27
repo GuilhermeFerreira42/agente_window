@@ -12,6 +12,7 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { definirModoAgir, lerModoAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
 import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
 import { obterAlvoDeConversa } from './chatAlvo'
@@ -167,6 +168,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       iniciarModelo: iniciarChamadaModelo,
       resolverContexto: resolverContextoAgir,
       concederPermissaoSessao: grantSessionTool,
+      lerModo: lerModoAgir,
+      definirModo: definirModoAgir,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
     })) return true
   }

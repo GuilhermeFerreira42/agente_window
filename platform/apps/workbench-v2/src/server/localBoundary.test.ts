@@ -35,6 +35,11 @@ describe('local product boundary', () => {
       'content-type': 'application/json; charset=utf-8', 'sec-fetch-site': 'same-origin',
     }, 'POST', 5174, '/api/providers')).ok).toBe(true)
     expect(validateLocalRequest(request({
+      host: 'localhost:5174', origin: 'http://localhost:5174',
+      'content-type': 'application/json', 'sec-fetch-site': 'same-origin',
+    }, 'POST', 5174, '/api/agir/mode')).ok).toBe(true)
+    expect(validateLocalRequest(request({ host: 'localhost:5174' }, 'POST', 5174, '/api/agir/mode')).ok).toBe(false)
+    expect(validateLocalRequest(request({
       host: 'localhost:5174', origin: 'http://attacker.test', 'content-type': 'application/json',
     }, 'POST', 5174, '/api/providers')).ok).toBe(false)
     expect(validateLocalRequest(request({

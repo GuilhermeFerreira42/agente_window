@@ -64,6 +64,7 @@ function fakeReq(corpo = '', metodo = 'POST'): IncomingMessage {
 const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
 const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
+const URL_MODE = new URL('http://localhost/api/agir/mode')
 
 const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123', toolCallingCapability: 'verified' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
@@ -71,6 +72,8 @@ const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
 const raiz = await mkdtemp(path.join(tmpdir(), 'agir-rotas-'))
 const grantsPorSessao = new Map<string, Set<'criar' | 'escrever'>>()
+const modosPorConversa = new Map<string, 'agent' | 'edit' | 'ask' | 'plan'>()
+const chaveModo = (sessionId: string, chatId: string): string => `${sessionId}\\0${chatId}`
 const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferramenta: 'criar' | 'escrever') => {
   const grants = grantsPorSessao.get(sessionId) ?? new Set<'criar' | 'escrever'>()
   grants.add(ferramenta)
@@ -82,6 +85,8 @@ const DEPS = {
     ? { ok: true as const, raiz, permissoes: [...(grantsPorSessao.get(sessionId) ?? [])] }
     : { ok: false as const, message: 'Contexto da sessão inválido.' },
   concederPermissaoSessao,
+  lerModo: (sessionId: string, chatId: string) => modosPorConversa.get(chaveModo(sessionId, chatId)) ?? null,
+  definirModo: (sessionId: string, chatId: string, modo: 'agent' | 'edit' | 'ask' | 'plan') => { modosPorConversa.set(chaveModo(sessionId, chatId), modo) },
   lerTeto: async () => 25,
 }
 
@@ -108,6 +113,12 @@ function approvalBody(res: ResFalsa, fields: Record<string, unknown>): string {
   return JSON.stringify({ ...fields, ...identity(res) })
 }
 
+async function registrarModo(mode: 'agent' | 'edit' | 'ask' | 'plan', sessionId = 'sessao-1', chatId = 'chat-1'): Promise<void> {
+  const res = fakeRes()
+  await tratarRotasAgir(fakeReq(JSON.stringify({ sessionId, chatId, mode })), res, URL_MODE, DEPS)
+  expect(res.statusCode).toBe(200)
+}
+
 /** Fio SSE falso do PROVEDOR: uma sequência de respostas por chamada de fetch. */
 function stubProvedor(respostas: string[]): void {
   let chamada = 0
@@ -125,6 +136,8 @@ const PEDIDO_BASE = JSON.stringify({
 })
 
 const SSE_TOOL = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'criar', arguments: '{"caminho":"ola.txt","conteudo":"oi"}' } }] } }] })}\n\n`
+const SSE_LER_F5 = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'read-f5', function: { name: 'ler', arguments: '{"caminho":"f5-edit.txt"}' } }] } }] })}\n\n`
+const SSE_ESCREVER_F5 = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'write-f5', function: { name: 'escrever', arguments: '{"caminho":"f5-edit.txt","conteudo":"depois"}' } }] } }] })}\n\n`
 const SSE_DUAS_FERRAMENTAS = `data: ${JSON.stringify({
   choices: [{
     delta: {
@@ -149,6 +162,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
   grantsPorSessao.clear()
+  modosPorConversa.clear()
 })
 
 describe('rotas — POST /api/agir', () => {
@@ -368,8 +382,8 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
       const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
       await esperaFio(res, '"type":"approval"')
       const cartao = frames(res).find((e) => e.type === 'approval') as Record<string, unknown>
-      expect(String(cartao.previa)).toContain('exclusão está bloqueada')
-      expect(String(cartao.previa)).toContain('nenhum item foi lido ou removido')
+      expect(String(cartao.previa)).toContain('exclusão não está disponível')
+      expect(String(cartao.previa)).toContain('nenhum item foi lido, movido ou removido')
       const aprovar = fakeRes()
       expect(await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-f2', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
       expect(aprovar.statusCode).toBe(200)
@@ -465,9 +479,8 @@ describe('F3 — cancelamento terminal e claims de geração', () => {
     await fio
     const resultados = frames(res).filter((evento) => evento.type === 'tool_result')
     expect(resultados).toHaveLength(1)
-    expect(resultados[0]).toMatchObject({ type: 'tool_result', id: 'c1', ok: false })
-    expect(String(resultados[0].resumo)).toContain('contenção segura F2')
-    await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).rejects.toThrow()
+    expect(resultados[0]).toMatchObject({ type: 'tool_result', id: 'c1', ok: true })
+    await expect(readFile(path.join(raiz, 'f3-uma-vez.txt'), 'utf8')).resolves.toBe('oi')
   })
 
   it('duas continuations concorrentes fazem claim único', async () => {
@@ -492,21 +505,27 @@ describe('F3 — cancelamento terminal e claims de geração', () => {
   })
 })
 
-describe('F5-A — política de modo imposta pela rota/loop', () => {
-  it('modo ausente é 400 antes de consultar o provedor', async () => {
-    const fetchStub = vi.fn()
-    vi.stubGlobal('fetch', fetchStub)
-    const res = fakeRes()
-    await tratarRotasAgir(fakeReq(JSON.stringify({ messages: [{ role: 'user', content: 'oi' }], fluxo: 'f5-missing-mode' })), res, URL_AGIR, DEPS)
-    expect(res.statusCode).toBe(400)
-    expect(JSON.parse(res.corpo()).message).toContain('Modo inválido ou ausente')
-    expect(fetchStub).not.toHaveBeenCalled()
-  })
-
-  it.each(['ask', 'plan'] as const)('%s não executa criar nem pede approval mesmo com tool-call adulterado', async (mode) => {
+describe('F5-A — política de modo imposta pelo servidor', () => {
+  it('o campo mode do pedido de execução não escolhe o modo efetivo', async () => {
+    await registrarModo('ask')
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
-    const pedido = JSON.stringify({ mode, messages: [{ role: 'user', content: 'crie f5-modo.txt' }], fluxo: `f5-${mode}-write` })
+    // Payload adulterado pede Agent; o modo separado e registrado no servidor é Perguntar.
+    const pedido = JSON.stringify({ mode: 'agent', messages: [{ role: 'user', content: 'crie f5-modo-spoof.txt' }], fluxo: 'f5-mode-spoof' })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"tool_result"')
+    const eventos = frames(res)
+    expect(eventos.some((evento) => evento.type === 'approval')).toBe(false)
+    expect(String((eventos.find((evento) => evento.type === 'tool_result') as Record<string, unknown>).resumo)).toContain('somente leitura')
+    await fio
+    await expect(readFile(path.join(raiz, 'f5-modo-spoof.txt'), 'utf8')).rejects.toThrow()
+  })
+
+  it.each(['ask', 'plan'] as const)('%s bloqueia criação/escrita mesmo com tool-call', async (mode) => {
+    await registrarModo(mode)
+    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ mode: 'agent', messages: [{ role: 'user', content: 'crie f5-modo.txt' }], fluxo: `f5-${mode}-write` })
     const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"tool_result"')
     const eventos = frames(res)
@@ -517,10 +536,11 @@ describe('F5-A — política de modo imposta pela rota/loop', () => {
   })
 
   it('Continuar preserva o snapshot Planejar da execução pausada', async () => {
+    await registrarModo('plan')
     stubProvedor([SSE_BUSCAR, SSE_TOOL.replace('ola.txt', 'f5-continued.txt'), SSE_TOOL_DEPOIS_DE_RESULTADO])
     const deps = { ...DEPS, lerTeto: async () => 1 }
     const pausa = fakeRes()
-    const pedido = JSON.stringify({ mode: 'plan', messages: [{ role: 'user', content: 'pesquise e depois crie' }], fluxo: 'f5-plan-continue' })
+    const pedido = JSON.stringify({ mode: 'agent', messages: [{ role: 'user', content: 'pesquise e depois crie' }], fluxo: 'f5-plan-continue' })
     await tratarRotasAgir(fakeReq(pedido), pausa, URL_AGIR, deps)
     expect(frames(pausa).at(-1)).toMatchObject({ type: 'teto' })
 
@@ -533,15 +553,30 @@ describe('F5-A — política de modo imposta pela rota/loop', () => {
     await expect(readFile(path.join(raiz, 'f5-continued.txt'), 'utf8')).rejects.toThrow()
   })
 
-  it('edit mantém a política de aprovação mutável igual a agent', async () => {
-    stubProvedor([SSE_TOOL.replace('ola.txt', 'f5-edit.txt'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+  it.each(['agent', 'edit'] as const)('%s não pede confirmação repetida para criar autorizado pelo modo', async (mode) => {
+    await registrarModo(mode)
+    stubProvedor([SSE_TOOL.replace('ola.txt', `f5-${mode}.txt`), SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
-    const pedido = JSON.stringify({ mode: 'edit', messages: [{ role: 'user', content: 'crie f5-edit.txt' }], fluxo: 'f5-edit-same-policy' })
+    const pedido = JSON.stringify({ mode: 'ask', messages: [{ role: 'user', content: 'crie arquivo' }], fluxo: `f5-${mode}-no-prompt` })
     const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
-    await esperaFio(res, '"type":"approval"')
-    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(true)
-    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'f5-edit-same-policy', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await esperaFio(res, '"type":"done"')
     await fio
-    await expect(readFile(path.join(raiz, 'f5-edit.txt'), 'utf8')).rejects.toThrow()
+    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(false)
+    await expect(readFile(path.join(raiz, `f5-${mode}.txt`), 'utf8')).resolves.toBe('oi')
+  })
+
+  it.each(['agent', 'edit'] as const)('%s não pede confirmação repetida para escrever após leitura', async (mode) => {
+    await registrarModo(mode)
+    await writeFile(path.join(raiz, 'f5-edit.txt'), 'antes', 'utf8')
+    stubProvedor([SSE_LER_F5, SSE_ESCREVER_F5, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const pedido = JSON.stringify({ mode: 'ask', messages: [{ role: 'user', content: 'leia e edite o arquivo' }], fluxo: `f5-${mode}-edit-no-prompt` })
+    const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"done"')
+    await fio
+    const eventos = frames(res)
+    expect(eventos.some((evento) => evento.type === 'approval')).toBe(false)
+    expect(eventos.filter((evento) => evento.type === 'tool_result' && evento.ok === true)).toHaveLength(2)
+    await expect(readFile(path.join(raiz, 'f5-edit.txt'), 'utf8')).resolves.toBe('depois')
   })
 })

@@ -32,6 +32,7 @@ beforeEach(() => {
       { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
       { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
     ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    if (url === '/api/agir/mode') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -62,6 +63,7 @@ function responderChatComSSE(
       { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
       { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
     ] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir/mode') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -267,6 +269,34 @@ describe('App session flows', () => {
 
     await new Promise((resolve) => window.setTimeout(resolve, 1100))
     expect(screen.queryByText(/Estou trabalhando em/)).not.toBeInTheDocument()
+  })
+
+  it('Parar aborta a seleção de modo pendente e não inicia a execução', async () => {
+    const user = userEvent.setup()
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()
+    let signal: AbortSignal | undefined
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/agir/mode') {
+        signal = init?.signal ?? undefined
+        return new Promise<Response>((_resolve, reject) => {
+          const abortar = () => reject(new DOMException('Aborted', 'AbortError'))
+          if (signal?.aborted) abortar()
+          else signal?.addEventListener('abort', abortar, { once: true })
+        })
+      }
+      return fallback ? fallback(input, init) : Promise.resolve(new Response(null, { status: 204 }))
+    })
+    render(<App initialSessionSnapshot={testSessions} />)
+
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'parar antes do início')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(signal).toBeDefined())
+    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
+
+    expect(signal?.aborted).toBe(true)
+    expect(fetchSpy.mock.calls.some(([input]) => String(input) === '/api/agir')).toBe(false)
+    expect(screen.getByText(/Execução interrompida antes da resposta/)).toBeInTheDocument()
   })
 
   it('cancela o request da sessão mesmo após trocar para outro nested chat', async () => {

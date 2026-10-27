@@ -22,7 +22,7 @@ import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAprovacao, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, responderAprovacao, selecionarModoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -1867,22 +1867,40 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
-
-    const controle = enviarAgir(
-      {
-        mensagens: historico,
-        modelSelection,
-        // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
-        // aprovações desta resposta — nada vaza para a próxima troca. As
-        // permissões "na sessão" (Q2a) atravessam trocas pelo localStorage.
-        fluxo: `${sessionId}:${chatId}:${responseId}`,
-        sessionId,
-        chatId,
-        mode: (modeByChat[`${sessionId}:${chatId}`] ?? 'agent') as ModoAgir,
+    const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
+    const entrada = {
+      mensagens: historico,
+      modelSelection,
+      // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
+      // aprovações desta resposta — nada vaza para a próxima troca.
+      fluxo: `${sessionId}:${chatId}:${responseId}`,
+      sessionId,
+      chatId,
+      // O servidor ignora este campo; o modo é enviado separadamente pelo
+      // comando de seleção e permanece independente da resposta do modelo.
+      mode: modo,
+    }
+    const ouvintes = criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir)
+    let real: ControleAgir | null = null
+    let canceladaAntesDoInicio = false
+    const controladorModo = new AbortController()
+    const controle: ControleAgir = {
+      identidade: () => real?.identidade() ?? null,
+      abortar: async () => {
+        if (real) return real.abortar()
+        canceladaAntesDoInicio = true
+        controladorModo.abort()
+        return 'cancelled'
       },
-      criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir),
-    )
+    }
     agirAtivas.current.set(runKey, controle)
+    void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(() => {
+      if (canceladaAntesDoInicio) return
+      real = enviarAgir(entrada, ouvintes)
+    }).catch((erro: unknown) => {
+      if (canceladaAntesDoInicio) return
+      ouvintes.onError('configuracao', erro instanceof Error ? erro.message : 'Não foi possível registrar o modo de execução.')
+    })
   }
 
   /** O dono respondeu um cartão; o servidor grava grants de sessão após validar o contexto. */
