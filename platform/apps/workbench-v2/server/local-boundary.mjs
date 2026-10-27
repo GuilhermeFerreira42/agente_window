@@ -24,15 +24,26 @@ export function validateLocalRequest(request, { requireOrigin = false } = {}) {
     return { ok: false, reason: 'host_port' }
   }
 
-  const fetchSite = request.headers?.['sec-fetch-site']
-  if (typeof fetchSite === 'string' && fetchSite.toLowerCase() === 'cross-site') {
-    return { ok: false, reason: 'cross_site' }
-  }
-
+  const fetchSiteHeader = request.headers?.['sec-fetch-site']
+  const fetchSite = typeof fetchSiteHeader === 'string' ? fetchSiteHeader.toLowerCase() : null
   const originHeader = request.headers?.origin
   const method = String(request.method || 'GET').toUpperCase()
+  const safeMethod = SAFE_METHODS.has(method)
+  let pathname = '/'
+  try {
+    pathname = new URL(request.url || '/', `http://${host.host}`).pathname
+  } catch {
+    return { ok: false, reason: 'path' }
+  }
+  // APIs and filesystem/Git/PTY routes may expose private local state. A
+  // browser read without Origin is accepted only when Fetch Metadata proves
+  // same-origin; bare address-bar/non-browser reads remain limited to static UI.
+  const sensitivePath = /^\/(?:api|fs|git|pty)(?:\/|$)/.test(pathname)
+  if (fetchSite === 'cross-site') return { ok: false, reason: 'cross_site' }
+
   if (typeof originHeader !== 'string' || originHeader === '') {
-    if (requireOrigin || !SAFE_METHODS.has(method)) return { ok: false, reason: 'origin_required' }
+    if (requireOrigin || !safeMethod) return { ok: false, reason: 'origin_required' }
+    if (sensitivePath && fetchSite !== 'same-origin') return { ok: false, reason: 'same_origin_required' }
     return { ok: true }
   }
 
@@ -46,6 +57,13 @@ export function validateLocalRequest(request, { requireOrigin = false } = {}) {
   const expectedOrigin = new URL(`${protocol}//${host.host}`).origin
   if (origin.protocol !== protocol || origin.origin !== expectedOrigin) {
     return { ok: false, reason: 'origin_mismatch' }
+  }
+  if (!safeMethod && sensitivePath) {
+    if (fetchSite !== null && fetchSite !== 'same-origin') return { ok: false, reason: 'fetch_site' }
+    const contentType = request.headers?.['content-type']
+    if (typeof contentType !== 'string' || !/^application\/json(?:\s*;|\s*$)/i.test(contentType.trim())) {
+      return { ok: false, reason: 'json_required' }
+    }
   }
   return { ok: true }
 }
