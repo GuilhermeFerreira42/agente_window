@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module'
 import * as nodePath from 'node:path'
 
 export type EntradaDiretorioSegura = {
@@ -15,37 +14,15 @@ export interface RaizDiscoSegura {
   close(): void
 }
 
-type Binding = {
-  supported: boolean
-  SandboxRoot: new (rootPath: string) => RaizDiscoSegura
-}
+// Temporarily keep every Agir filesystem operation fail-closed. A controlled
+// rename race showed that a directory fd resolved beneath root can be moved
+// outside the workspace before read/publication completes. openat2 protects
+// path resolution, not the later namespace move; do not expose the native
+// addon to product flows until the F2 guarantee is resolved and re-tested.
+export const fsSeguroDisponivel = false
 
-const requireFromWorkbench = createRequire(nodePath.resolve(process.cwd(), 'package.json'))
-let binding: Binding | null = null
-try {
-  binding = requireFromWorkbench(
-    nodePath.resolve(
-      process.cwd(),
-      'server',
-      'agir-fs-native',
-      'build',
-      'Release',
-      'agente_window_fs_boundary.node',
-    ),
-  ) as Binding
-} catch {
-  // Ausência do addon sempre significa operações F2 bloqueadas, nunca FS Node path-based.
-}
-
-export const fsSeguroDisponivel = binding?.supported === true
-
-export function abrirRaizDiscoSegura(raiz: string): RaizDiscoSegura | null {
-  if (!fsSeguroDisponivel || binding === null) return null
-  try {
-    return new binding.SandboxRoot(nodePath.resolve(raiz))
-  } catch {
-    return null
-  }
+export function abrirRaizDiscoSegura(_raiz: string): RaizDiscoSegura | null {
+  return null
 }
 
 export function caminhoRelativoSeguro(raiz: string, caminho: string): string {

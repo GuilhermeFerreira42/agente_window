@@ -146,7 +146,7 @@ describeNative('helper F2 — openat2, sem fallback pathname', () => {
   })
 })
 
-it('sem helper compilado, declara indisponibilidade em vez de usar fs path-based', () => {
-  if (fsSeguroDisponivel) return
+it('mantém indisponível a API de disco até haver garantia contra rename concorrente', () => {
+  expect(fsSeguroDisponivel).toBe(false)
   expect(abrirRaizDiscoSegura(raiz)).toBeNull()
 })

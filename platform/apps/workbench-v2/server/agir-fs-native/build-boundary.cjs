@@ -1,13 +1,6 @@
-const { spawnSync } = require('node:child_process')
-
-if (process.platform !== 'linux') {
-  console.log(`[F2] Native boundary is not validated on ${process.platform}; addon build skipped and disk operations remain fail-closed.`)
-  process.exit(0)
-}
-
-const nodeGyp = require.resolve('node-gyp/bin/node-gyp.js')
-const result = spawnSync(process.execPath, [nodeGyp, 'rebuild', '--directory', 'server/agir-fs-native'], {
-  cwd: process.cwd(),
-  stdio: 'inherit',
-})
-process.exit(result.status ?? 1)
+// F2 safety gate: do not build/package the current native helper. openat2
+// protects path resolution but does not prevent an opened directory from being
+// renamed outside the workspace while an operation is in flight. Re-enable the
+// addon only after the namespace-move guarantee is resolved and race-tested.
+console.log('[F2] Native boundary build disabled: concurrent parent-directory rename is not contained.')
+process.exit(0)
