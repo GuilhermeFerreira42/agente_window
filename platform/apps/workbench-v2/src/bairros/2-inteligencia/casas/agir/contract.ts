@@ -102,7 +102,7 @@ export type EventoAgir =
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
   | { type: 'approval'; pedido: PedidoFerramenta; previa?: string }
-  | { type: 'iteracao'; iteracao: number; teto: number }
+  | { type: 'iteracao'; iteracao: number; teto: number; model?: string }
   | { type: 'teto'; iteracoes: number; teto: number }
   | { type: 'done'; model?: string }
   | { type: 'error'; code: CategoriaErroAgir; message: string; retomavel?: boolean; iteracoes?: number; teto?: number }

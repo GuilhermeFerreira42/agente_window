@@ -1776,12 +1776,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           }
         })
       },
-      onIteracao: (iteracao, teto) => {
+      onIteracao: (iteracao, teto, modelo) => {
         updateSession(sessionId, (session) => ({
           ...session,
           chats: session.chats.map((chat) => chat.id === chatId ? {
             ...chat,
-            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, iteracaoAtual: iteracao, tetoAtual: teto } : message),
+            messages: chat.messages.map((message) => (message.id === responseId && message.running) ? { ...message, model: modelo ?? message.model, iteracaoAtual: iteracao, tetoAtual: teto } : message),
           } : chat),
         }))
       },

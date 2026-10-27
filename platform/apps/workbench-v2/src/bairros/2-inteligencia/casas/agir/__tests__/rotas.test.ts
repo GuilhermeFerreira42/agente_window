@@ -65,7 +65,7 @@ const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
 const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
 
-const ALVO: AlvoConversa = { protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'm', apiKey: 'sk-123', toolCallingCapability: 'supported' }
+const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123', toolCallingCapability: 'supported' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
@@ -209,6 +209,7 @@ describe('rotas — POST /api/agir', () => {
     const res = fakeRes()
     const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
+    expect(frames(res)[0]).toMatchObject({ type: 'iteracao', model: 'openai / gpt-fixture' })
     expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
 
     const aprovar = fakeRes()

@@ -23,7 +23,7 @@ export interface OuvintesAgir {
   onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string) => void
   onApproval: (pedido: PedidoFerramenta, previa?: string) => void
   onTeto: (iteracoes: number, teto: number) => void
-  onIteracao?: (iteracao: number, teto: number) => void
+  onIteracao?: (iteracao: number, teto: number, modelo?: string) => void
   onDone: (modelo?: string) => void
   onError: (code: CategoriaErroAgir, message: string, detalhe?: DetalheErroAgir) => void
 }
@@ -83,7 +83,7 @@ async function bombearFio(
           encerrou = true
           ouvintes.onTeto(evento.iteracoes, evento.teto)
           return false
-        } else if (evento.type === 'iteracao') ouvintes.onIteracao?.(evento.iteracao, evento.teto)
+        } else if (evento.type === 'iteracao') ouvintes.onIteracao?.(evento.iteracao, evento.teto, evento.model)
         else if (evento.type === 'error') {
           encerrou = true
           const detalhe: DetalheErroAgir = {}

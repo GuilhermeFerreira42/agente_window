@@ -252,6 +252,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   const executores = criarExecutoresReais(fio.raiz)
+  const modeloEfetivo = fio.alvo.providerId && fio.alvo.modelId
+    ? `${fio.alvo.providerId} / ${fio.alvo.modelId}`
+    : fio.alvo.modelo
   try {
     resultado = await rodarAgir({
       vizinho: criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo),
@@ -262,10 +265,12 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
         // mas não envie novas respostas, cartões ou continuações após a terminalização.
-        // O rodapé da tela mostra o modelo EFETIVO (o configurado no provedor
-        // ativo — mesma régua da casa Conversa, §3.9), mesmo que o fio do
-        // provedor não carimbe o modelo em cada pedaço.
-        escreverEvento(res, evento.type === 'done' ? { type: 'done', model: fio.alvo.modelo } : evento)
+        // A tela recebe o par resolvido já na primeira iteração (antes da
+        // chamada externa), além de no evento terminal; Auto nunca fica
+        // visualmente ambíguo durante o run.
+        if (evento.type === 'done') escreverEvento(res, { type: 'done', model: modeloEfetivo })
+        else if (evento.type === 'iteracao') escreverEvento(res, { ...evento, model: modeloEfetivo })
+        else escreverEvento(res, evento)
       },
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
