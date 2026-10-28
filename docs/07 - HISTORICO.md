@@ -1,5 +1,8 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-28 — validação independente D98 no Windows, sem mudança de produção
+- Baseline `fd913db`; diagnóstico real e protótipos temporários preservados em `arquivo_morto/auditorias_2026-10-28/d98/windows/`. Estado em 03; método, resultados, falhas, proposta mínima e critérios candidatos em 09 §3.8.1. Gate aberto; sem implementação, Fatia 13, iniciativas M, push ou homologação.
+
 ## 2026-10-28 — investigação D98 iniciada/continuada (Gate aberto; sem produção)
 - Ordem explícita do dono dispensou somente o antigo pré-gate de validação documental. Em fixtures descartáveis e Vite 5175, coletados traces CDP do SCM 1k e da expansão Explorer 1k; Explorer 5k expirou antes de a UI inicial carregar (`ERR_INSUFFICIENT_RESOURCES`), sem `/fs/list`/`/fs/stat` e sem medida de expansão.
 - Git isolado: `GitHost.status` mediana 20,116 ms/5k e 33,308 ms/10k; `buildGroups` 3,059/5,319 ms; parser 0,290/0,611 ms. API `/git/status` 36,376/53,514 ms; Git CLI 6,169/9,999 ms — etapas distintas, não atribuir como comparáveis.

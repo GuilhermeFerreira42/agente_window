@@ -197,6 +197,92 @@ A tentativa Explorer 5k expirou após 60 s esperando `.agent-sessions-workbench`
 
 **Não fazer:** não usar 5174/projetos reais; não alterar produção; não iniciar Fatia 13 ou iniciativas M; não misturar pendências F1–F5-B com D98; não declarar a tentativa Explorer 5k como resultado; não transformar protótipo, benchmark sintético ou hipótese em causa provada/homologação. Parar para revisão independente após entregar a síntese.
 
+### 3.8.1 D98 — validação independente Windows (2026-10-28; sem otimização de produção)
+
+**A. Baseline/ambiente.** Branch `docs/capacidades-d102-alinhamento`, HEAD `fd913db3d442511ae40a1d94ea2a2dfaaab88f4e` confirmado; código de produção idêntico ao baseline anterior `59dfc32`. Havia uma edição local preexistente no último parágrafo do reteste Windows F1–F5-B; foi preservada separadamente. Windows 11 Pro 23H2/build 22631.6199, i5-10400 (6 cores/12 threads), RAM visível 16.602.528 KiB (~15,83 GiB); livre no snapshot durante o piloto 1.520.528 KiB (~1,45 GiB), sem medição contínua do mínimo. SSD SATA Kingston SA400S37240G, C: NTFS, ~9,94 GB livres no início. Node 24.16.0, npm 11.13.0, Git 2.44.0.windows.1, Edge headless 156.0.4314.50, viewport 1400×900. Máquina compartilhada com outros processos; não foi obtido ambiente Windows ocioso nem desativado antivírus/indexação. Não há evidência que atribua um resultado específico ao antivírus. Nenhuma configuração global alterada.
+
+**B. Critérios consultados.** D98/D99 e autorização de 28/10 em `05`; micro-fatia PERF em `06`; protocolo `09 §3.8` e D101 §3.10; homologação humana em `08`. Investigar SCM+Explorer juntos, conferir hipótese com trace e protótipo em fixture, separar backend/render/recursos, derivar SPEC quantitativa e aguardar aprovação. Não existe SLA numérico aprovado. Terminal, App, Explorer core/server e demais fontes de produção permaneceram intactos. Fatia 13, iniciativas M e F1–F5-B não foram abertos nem corrigidos.
+
+**Pacote/reprodução:** `arquivo_morto/auditorias_2026-10-28/d98/windows/README.md`, scripts, `results-summary.json`, `environment.json`, `manifest.json` e `raw/` (JSON/logs comprimidos sem reserialização; traces CDP gzip originais). Dados temporários e fixtures fora do repo: `C:\Users\Usuario\.codex\visualizations\2026\10\27\01a17f37-97c4-74a2-87bb-d6fbbbe5b243\d98-windows-20261028`. Nenhum arquivo pessoal, provedor ou credencial real acessado. Um Vite por vez, somente 127.0.0.1:5175, HOME/USERPROFILE/arquivos de configuração isolados. `start_process` não está disponível nesta sessão; subprocessos Node controlados, com timeouts de operação, encerrados ao final.
+
+**Método.** Fixtures SCM com 1k/5k/10k arquivos untracked e um sentinel tracked; Explorer com duas pastas de 1k/5k arquivos. Um piloto manteve os 6k untracked, como o gerador Linux; para o A/B principal os arquivos do Explorer foram commitados somente no repo fictício, separando o custo da lista SCM oculta. Essa diferença impede comparar diretamente o tempo Windows com os 10,4 s Linux. O Windows não recebeu o protótipo Linux (não versionado); foi criado outro, reutilizando o markup e callbacks atuais das linhas SCM, sem biblioteca nova.
+
+Instrumentação e experiências são transformações de módulos em memória por plugin Vite externo, não edições nas fontes. Explorer: mesmo wrapper de medida nos dois braços; original sem limite versus fila de 16 operações `stat` completas (inclui leitura/parse do JSON). SCM: Profiler externo e janela temporária de 32 recursos, usando as mesmas linhas/ações. Foram feitas quatro execuções por braço/volume no app: r1 com trace, r2–r4 sem trace; alternância A/B no Explorer. Tabelas usam **três amostras independentes sem trace**; p95 é o quantil empírico superior dessas três, na prática o máximo observado, não estimativa robusta de SLA. Backend: uma amostra de aquecimento e sete warm por volume. Componente isolado: três amostras por braço/volume, ordem A/B alternada. Cache de disco/Vite não foi esvaziado; não chamar de cold boot. SCM real e experimental foram rodados em blocos separados, possível efeito de ordem/cache.
+
+Medições: requisições até corpo concluído, filas/concorrência, erros, long tasks via PerformanceObserver, atraso de timer de 50 ms como proxy de responsividade, DOM, JS heap e métricas CDP de CPU/TaskDuration. CPU CDP não equivale a percentual global do Windows; JS heap não é RSS nem memória total. RSS/peak resident e mínimo contínuo de RAM **não foram medidos**. A medida de scroll é deslocamento até dois RAF, não uma sessão longa de scroll com frame time distribuído. As falhas e amostras com trace ficaram preservadas.
+
+**C. Explorer, aplicativo real — conclusão de linhas e metadados.** A conclusão exige N operações terminadas e sem erros, não apenas linhas no DOM. Cada expansão gerou uma listagem e exatamente N stats; todos terminaram com sucesso nos dois braços Windows.
+
+| Volume | Braço | Total p50 / p95 | Pico HTTP stat | Falhas de stat/transporte | DOM do documento |
+|---|---|---:|---:|---:|---:|
+| 1k | original | 1.098 / 1.129 ms | 1.000 | 0 | ~11,6k |
+| 1k | limite 16 | 1.107 / 1.419 ms | 16 | 0 | ~11,6k |
+| 5k | original | 5.018 / 5.029 ms | 5.000 | 0 | 55.668 |
+| 5k | limite 16 | 5.128 / 5.153 ms | 16 | 0 | 55.668 |
+
+Em 5k, a janela entre primeiro stat e último stat terminado teve mediana **3.289 ms original / 3.565 ms limitada**; do último stat ao snapshot após paint, ~**1.637 / 1.424 ms**. São janelas observadas com transporte/parse/render sobrepostos, não uma decomposição aditiva de CPU ou percentual causal puro. Limitar não acelerou o total: ~+0,8% em 1k e +2,2% em 5k, variação sem demonstração estatística de regressão. A contenção do pico, de 5.000 para 16, é comprovada. Não houve erros em Windows para comprovar melhora da taxa de erros.
+
+A soma mediana das long tasks 5k caiu aproximadamente de 2,45 s para 1,40 s, mas o máximo ainda foi **949 ms original / 871 ms limitada**. Timer de 50 ms atrasou até **1.600 / 1.445 ms**. A interface responde depois, porém não permanece continuamente fluida durante a expansão. Scroll após a conclusão: mediana ~29/30 ms; heap ~82,0/80,6 MiB. TaskDuration CDP durante a operação: mediana ~3,74/4,27 s, sem alegar CPU global. Portanto há custo substancial no cliente além da simultaneidade de requests.
+
+A amostra 5k original **com trace** levou 14.800 ms, versus 5.202 ms limitada; o trace registra ~309k/~312k eventos. Esse contraste não foi usado como ganho de 3×: as três amostras sem trace não o repetem. Há interação provável com a captura/pressão de eventos ou outro estado transitório; a causa exata do outlier não foi provada. Nenhuma medição falhou no boot/expansão 5k desta rodada Windows.
+
+**Interação Explorer/SCM:** no piloto Explorer 1k com 6k untracked, houve 6.000 linhas SCM presentes antes de selecionar SCM e ~131.626 nós DOM; expansão ~1.298 ms. No A/B com Git limpo, SCM tinha zero recursos e DOM Explorer 1k ~11,6k. O `ChangesList` pode estar montado oculto, contribuindo para memória/boot mesmo com Explorer ativo. A confirmação não permite atribuir exatamente quantos ms do piloto pertencem à lista oculta; não subtrair execuções distintas como prova causal.
+
+**D/E/F. SCM, aplicativo real e componente isolado.** No app, o serviço já carregara os recursos e a lista oculta antes da ativação de SCM. A coluna “ativar” mede clique da Activity Bar até linhas/estado e dois RAF: **não é boot total nem tempo desde escolha da pasta**. O Profiler confirma o primeiro render com N recursos mesmo antes de abrir SCM. A experiência virtualizada foi aplicada somente pelo plugin de diagnóstico; não entrou no produto.
+
+| Volume | App original: ativar p50 | App janela: ativar p50 | DOM original → janela | Heap JS original → janela |
+|---|---:|---:|---:|---:|
+| 1k | 247 ms | 81 ms | 20.673 → 1.411 | ~38,0 → 24,7 MiB |
+| 5k | 1.014 ms | 84 ms | 100.720 → 1.411 | ~69,2 → 25,9 MiB |
+| 10k | 1.774 ms | 82 ms | 200.767 → 1.411 | ~129,9 → 27,3 MiB |
+
+Todos os 12 cenários por braço do app completaram (r1 com trace + r2–r4 sem trace), sem crash/erro de API registrado. Maior long task observada até a leitura pós-abertura: 177/818/1.680 ms no original (1k/5k/10k), contra 152/148/148 ms no experimental; esses máximos incluem boot/contexto e não são exclusivamente SCM. Primeiro render Profiler com N recursos: ~164/685/1.349 ms original, ~7/11/7 ms janela. Os dados do refresh mostram duas atualizações de lista (loading e resultado); os tempos e commits individuais estão nos JSON. `refreshObservedMs` inclui uma espera fixa de 800 ms do harness: **não é benchmark exato de refresh até utilizável**. Scroll após carga: medianas original 22/50/85 ms, janela ~35 ms. Em 1k o scroll sintético virtual foi mais lento; não esconder esse resultado.
+
+No componente isolado, montagem síncrona e atualização controlada até dois RAF:
+
+| Volume | Montagem p50 atual → janela | DOM atual → janela | Atualização p50 atual → janela |
+|---|---:|---:|---:|
+| 1k | 173 → 21 ms | 20.048 → 692 | 163 → 39 ms |
+| 5k | 729 → 20 ms | 100.048 → 692 | 767 → 42 ms |
+| 10k | 1.464 → 19 ms | 200.048 → 692 | 1.736 → 35 ms |
+
+A evidência de ganho não ficou restrita ao componente: também apareceu ao ativar SCM no app real. Ainda assim, o markup do protótipo envolve viewport/spacers e reduz grupos; ganho não prova equivalência funcional. Os ~370 nós do protótipo Linux e os 692 desta janela Windows são experimentos diferentes, não regressão do mesmo protótipo.
+
+**Git/API isolados, p50 de sete amostras warm (mesma fixture Windows por volume):**
+
+| Volume | Git CLI | GitHost.status | HTTP /git/status | buildGroups | Parser | Bytes JSON |
+|---|---:|---:|---:|---:|---:|---:|
+| 1k | 43,2 ms | 82,5 ms | 86,2 ms | 0,23 ms | 0,08 ms | 230.045 |
+| 5k | 49,1 ms | 99,6 ms | 142,1 ms | 0,85 ms | 0,29 ms | 1.150.045 |
+| 10k | 58,2 ms | 132,1 ms | 203,8 ms | 2,05 ms | 0,86 ms | 2.310.045 |
+
+GitHost executa também rev-parse/validação e transformação; HTTP adiciona serialização/transporte. São camadas distintas, não valores intercambiáveis. As APIs Windows foram mais lentas que as medianas Linux publicadas; versões, máquina, payload e caminhos diferem. A longa raiz temporária Windows aumenta URIs/JSON; não atribuir todo o delta ao SO/Git. Parser/buildGroups não são o gargalo dominante observado nesses volumes; ~204 ms de API em 10k ainda importa e não deve ser chamado “zero”.
+
+**Funcionalidade e estabilidade:** no componente atual, **10/10** verificações dirigidas passaram. Na janela experimental, **7/10** passaram: clique/Enter mantém callback de abrir; Tab alcança ação; stage/unstage reais via HTTP 204 funcionam; refresh mantém os 1.000 recursos; bytes são preservados; árvore continua exposta semanticamente. **Três reprovações do protótipo:** badge mostra apenas o subconjunto visível; foco se perde quando a linha sai da janela; não alcançou corretamente o último arquivo após stage/unstage/refresh. Preservar callbacks/role não demonstra acessibilidade completa: leitor de tela, posições totais, seleção/foco fora da janela, navegação cruzando fronteira e grupos/actions globais ainda exigem aceite. Não aprovar o protótipo para produção.
+
+No aplicativo original, **9/9** verificações de estabilidade passaram: criação observada automaticamente pelo Explorer, criação/modificação vistas no Git, remoção observada pelo Explorer, SCM atualizado enquanto Explorer estava ativo, stage/unstage reais, retorno a Git limpo e bytes originais restaurados. Somente fixtures foram modificadas; conferência final dos 22.000 arquivos gerados e três sentinels encontrou os bytes esperados, sem staged residual e com Explorer Git limpo (`fixture-integrity.json.gz`). Não houve perda de dados observada. Não houve suíte global nova: nenhuma fonte/dependência de produção mudou; o reteste F1–F5-B anterior não foi reaberto.
+
+**Falhas de medição preservadas:** piloto isolado não executou React por faltar preâmbulo do Vite no HTML servido pelo harness; reparado com `transformIndexHtml`. Piloto SCM mediu ativação, mas refresh falhou por seletor de ação oculta; repetido com hover/seletor visível. Primeira verificação funcional esperava HTTP 200 para stage; o contrato é 204, e a ação havia funcionado; restaurado o index da fixture e repetido com assert de sucesso 2xx. São falhas do harness, não defeitos/crashes do produto. Logs/JSON desses primeiros ensaios permanecem no pacote. Erros de sintaxe em geradores auxiliares foram corrigidos antes das execuções válidas.
+
+**G. Diagnóstico e comparação Linux/Windows (dez perguntas):**
+
+1. **Comprovado:** o `Promise.all` por filho gera N stats concorrentes; os picos 1k/5k foram observados. Não é hipótese abstrata.
+2. **Parcela causal:** metadata/HTTP/parse ocupam ~3,3 s na expansão 5k, e há ~1,6 s posteriores até snapshot/paint; não são parcelas puras/somáveis de CPU. Não se pode imputar todos os 10,4 s Linux ao fan-out.
+3. **Limite de concorrência:** reduz comprovadamente o pico e parte do bloqueio acumulado; não melhorou tempo total nem demonstrou redução de erros neste Windows, onde não ocorreram erros.
+4. **SCM eager:** gargalo relevante comprovado no componente e no app real, inclusive montado oculto. Crescimento ~20 nós por recurso e tarefas >1 s em 10k.
+5. **Virtualização:** benefício mensurável confirmado também no fluxo real de ativação, sem alegar ganho no boot total.
+6. **Paridade:** tecnicamente viável preservar handlers e ações, mas o protótipo atual reprovou foco, fim do scroll e totais. Equivalência completa não demonstrada.
+7. **Erros/crashes:** Windows não reproduziu crashes/ERR_INSUFFICIENT_RESOURCES. Traces Linux e a tentativa 5k anterior continuam válidos como evidência limitada; baixa memória, pressão de requests/DOM e profiling são explicações prováveis, não OOM provado nem causa única fechada.
+8. **Outras causas:** lista SCM oculta, duas renders no refresh, DOM/layout do Explorer, custo Windows de processos Git/API, tamanho de URIs/payload, cache/pressão externa e overhead do trace. Não medir somente Git CLI.
+9. **Suficiência para SPEC:** sim para uma SPEC mínima de render SCM e contenção de concorrência, com ressalvas e metas candidatas; não para prometer que somente limitar stats eliminará a lentidão do Explorer. Janela/produção do Explorer exige confirmação funcional/causal adicional antes de fechar essa parte da solução.
+10. **Gate:** permanece aberto até SPEC quantitativa revisada/aprovada, implementação especificamente autorizada, regressão funcional/acessível e evidências de estabilidade, incluindo aceite humano. A investigação não homologa D98.
+
+**H. Proposta mínima, não implementada:** janela visível no SCM existente, preservando identidade URI+grupo e callbacks; contagens/ações derivadas dos grupos completos, foco/seleção independentes do DOM, viewport/scroll corretos após refresh. Fila limitada/cancelável para stats do Explorer dentro das portas existentes, sem alterar o contrato congelado ou introduzir helper/serviço/worker; “16” é candidato ensaiado, não constante aprovada. Não criar framework genérico de listas nem adicionar biblioteca por inferência. Investigar em experimento próprio o custo de render/layout das linhas Explorer antes de prometer virtualizá-lo ou definir sua solução definitiva.
+
+**I. Critérios candidatos para futura SPEC — NÃO aprovados:** zero perda de dados, zero erro silencioso de stat, completude N/N explícita; fila com limite mensurável, descarte/cancelamento em troca de workspace/colapso; manter ordenação/readonly/mtime, seleção, foco, Enter/Tab/Delete, ações de grupo completas, rollback/erros existentes e último recurso acessível após refresh. Candidatos SCM até 10k no ambiente definido: ativação p95 ≤200 ms, montagem isolada ≤50 ms, atualização controlada ≤75 ms, documento ≤2.500 nós e heap JS pós-carga ≤40 MiB — margens sobre os resultados do protótipo, não metas retroativamente aceitas nem portáveis sem baseline local. Comparar também scroll pequeno (não piorar 1k sem justificativa), long tasks por fase, refresh real até paint e foco/ARIA com tecnologia assistiva. Explorer: orçamento provisório de não regressão ≤10% do p95 local em execução sem trace (o outlier 1k limitado não satisfaz esse candidato); pico limitado e fila encerrada ao cancelar; orçamento de responsividade não pode aceitar os bloqueios atuais de ~1,4–1,6 s. O alvo final de render Explorer deve vir de experimento adicional, não de número inventado. Repetir com mais amostras/cache controlado e fixtures representativas antes de adotar percentis como SLA.
+
+**J/K. Fechamento:** somente canônicos 03/06/07/09 e artefatos diagnósticos em arquivo morto foram alterados. Produção, lockfile e dependências intactos, nove canônicos preservados; sem push. A edição preexistente no 09 não faz parte do commit da investigação. Pronto para **elaborar/revisar uma SPEC mínima com as lacunas acima explícitas**; não pronto para aprovar o protótipo, implementar automaticamente ou declarar o Gate concluído. Servidores/Edge de teste encerrados. Parar e aguardar avaliação do dono.
+
 ### 3.9 Responsabilidade e segurança dos testes com provedores reais (D91, opção C; reafirmado D99)
 - Arena executa testes técnicos automatizados: unitários, integração, E2E, regressão e benchmarks.
 - Um provedor real só pode ser validado com ambiente legítimo, acesso seguro e autorização. Nunca solicitar, registrar ou expor chaves/credenciais em conversa, código, documentos ou logs.
