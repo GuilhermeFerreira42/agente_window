@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-28T15:10:30.6679896-03:00",
+  "os": {
+    "Caption": "Microsoft Windows 11 Pro",
+    "Version": "10.0.22631",
+    "BuildNumber": "22631",
+    "TotalVisibleMemorySize": 16602528,
+    "FreePhysicalMemory": 3044012
+  },
+  "cpu": {
+    "Name": "Intel(R) Core(TM) i5-10400 CPU @ 2.90GHz",
+    "NumberOfCores": 6,
+    "NumberOfLogicalProcessors": 12
+  },
+  "node": "v24.16.0",
+  "npm": "11.13.0",
+  "head": "70eba74d6f5b1f28c96d956fdd6106bc28624387",
+  "branch": "docs/capacidades-d102-alinhamento",
+  "fixtureReuse": "d98-windows-20261028/fixtures",
+  "scope": "diagnostics and proposed specifications only"
+}

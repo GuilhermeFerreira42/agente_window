@@ -1,5 +1,8 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-28 — continuação D98: SPECs candidatas e profiling final do Explorer
+- Baseline `70eba74`; somente documentação e diagnósticos. SPECs propostas no 06, estado no 03 e medições adicionais no 09 §3.8.2; pacote `d98/windows/continuacao`. Sem implementação de produção, aprovação de SPEC, homologação, push, Fatia 13 ou iniciativas M.
+
 ## 2026-10-28 — validação independente D98 no Windows, sem mudança de produção
 - Baseline `fd913db`; diagnóstico real e protótipos temporários preservados em `arquivo_morto/auditorias_2026-10-28/d98/windows/`. Estado em 03; método, resultados, falhas, proposta mínima e critérios candidatos em 09 §3.8.1. Gate aberto; sem implementação, Fatia 13, iniciativas M, push ou homologação.
 

@@ -1,0 +1,6 @@
+{
+  "src/modules/explorer-search/core/treeState.ts": "cde294c05d309a6598716e10edadd41fa602b7b3ddc4a2dbb107ef2cf5d34ee2",
+  "src/modules/explorer-search/core/fs/browserFsPort.ts": "c6eb024feeee757087cae9d4a47bca44a58e47291868598ca9bf938dc6e62a4f",
+  "src/modules/explorer-search/ui/ExplorerView.tsx": "f4ce015066743349bd7d169564d17b34d02ebeecddfea295a40595b9c539d367",
+  "src/modules/explorer-search/ui/attach/changes/ChangesList.tsx": "84187003d377ae705b97378dee6e062896c0b3adc0487fbe2a838f0363a98ead"
+}
