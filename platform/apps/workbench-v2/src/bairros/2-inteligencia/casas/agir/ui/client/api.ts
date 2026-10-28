@@ -54,7 +54,7 @@ export interface IdentidadeExecucaoAgir {
   runId: string
   generation: number
 }
-export type EstadoCancelamentoAgir = 'cancelled' | 'already_terminal' | 'pending'
+export type EstadoCancelamentoAgir = 'cancelled' | 'cancelled_with_effects' | 'already_terminal' | 'pending'
 
 export interface ControleAgir {
   identidade: () => IdentidadeExecucaoAgir | null
@@ -169,6 +169,7 @@ function abrirFio(url: string, corpo: unknown, escopo: EscopoRun, ouvintes: Ouvi
         if (!resposta.ok) return 'pending'
         const corpoResposta = await resposta.json() as { status?: unknown }
         if (corpoResposta.status === 'cancelled') return 'cancelled'
+        if (corpoResposta.status === 'cancelled_with_effects') return 'cancelled_with_effects'
         if (corpoResposta.status === 'already_terminal') return 'already_terminal'
         return 'pending'
       } catch {

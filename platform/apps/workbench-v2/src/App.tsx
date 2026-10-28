@@ -98,6 +98,10 @@ import {
   type NewSessionViewState,
 } from './domain/newSessionViewState'
 
+function ehModoAgir(value: unknown): value is ModoAgir {
+  return value === 'agent' || value === 'edit' || value === 'ask' || value === 'plan'
+}
+
 // Breakpoints do original (layoutPolicy.ts): phone ≤600px, tablet ≤1024px, e o
 // single-pane só é acionado em plataformas móveis (toque). Encolher uma janela de
 // desktop nunca deve virar single-pane — por isso o gate por toque/SO.
@@ -561,7 +565,23 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   useEffect(() => {
     try { localStorage.setItem('agente-window:model-by-chat:v3', JSON.stringify(modelByChat)) } catch { /* preferência local é best-effort; backend sempre valida */ }
   }, [modelByChat])
-  const [modeByChat, setModeByChat] = useState<Record<string, string>>({})
+  const [modeByChat, setModeByChat] = useState<Record<string, ModoAgir>>(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem('agente-window:mode-by-chat:v1') ?? '{}')
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {}
+      const valid: Record<string, ModoAgir> = {}
+      for (const [key, value] of Object.entries(saved)) {
+        if (key.length > 400) continue
+        if (ehModoAgir(value)) valid[key] = value
+      }
+      return valid
+    } catch {
+      return {}
+    }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('agente-window:mode-by-chat:v1', JSON.stringify(modeByChat)) } catch { /* a escolha local é best-effort; o servidor valida o enum a cada execução */ }
+  }, [modeByChat])
   const [composerDrafts, setComposerDrafts] = useState<Record<string, ComposerDraft>>({})
   const [composerHistoryByChat, setComposerHistoryByChat] = useState<Record<string, ComposerHistoryEntry[]>>({})
   const [approved, setApproved] = useState(false)
@@ -2037,10 +2057,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       key,
       estado: await controle.abortar(),
     })))
-    const chatsCancelados = new Set(respostas.filter((item) => item.estado === 'cancelled').map((item) => item.key.slice(sessionId.length + 1)))
+    const chatsCancelados = new Set(respostas.filter((item) => item.estado === 'cancelled' || item.estado === 'cancelled_with_effects').map((item) => item.key.slice(sessionId.length + 1)))
+    const chatsComEfeitosConfirmados = new Set(respostas.filter((item) => item.estado === 'cancelled_with_effects').map((item) => item.key.slice(sessionId.length + 1)))
     const aguardandoAck = respostas.some((item) => item.estado === 'pending')
     for (const item of respostas) {
-      if (item.estado === 'cancelled') agirAtivas.current.delete(item.key)
+      if (item.estado === 'cancelled' || item.estado === 'cancelled_with_effects') agirAtivas.current.delete(item.key)
     }
     if (chatsCancelados.size > 0) {
       updateSession(sessionId, (session) => {
@@ -2057,9 +2078,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               status: 'completed',
               messages: chat.messages.map((message) => message.running ? {
                 ...message,
-                content: message.content.trim()
-                  ? message.content
-                  : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
+                content: chatsComEfeitosConfirmados.has(chat.id)
+                  ? `${message.content.trim() ? `${message.content.trim()}\n\n` : ''}Execução interrompida; alterações já concluídas foram mantidas. Confira os cartões das ferramentas.`
+                  : message.content.trim()
+                    ? message.content
+                    : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
                 running: false,
                 cancelled: true,
                 time: timeLabel(),
@@ -2079,7 +2102,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       return
     }
     clearPendingTimersForSession(sessionId)
-    if (chatsCancelados.size > 0) notify('Execução interrompida')
+    if (chatsComEfeitosConfirmados.size > 0) notify('Execução interrompida; alterações já concluídas foram mantidas')
+    else if (chatsCancelados.size > 0) notify('Execução interrompida')
   }
 
   const handleRegenerate = (chatId: string, messageId: string) => {
@@ -2248,7 +2272,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         mode={modeByChat[sessionChatKey] ?? selectedMode}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
         onChangeModel={(nextModel) => setModelByChat((current) => ({ ...current, [sessionChatKey]: nextModel }))}
-        onChangeMode={(nextMode) => setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))}
+        onChangeMode={(nextMode) => {
+          if (ehModoAgir(nextMode)) setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))
+        }}
         onSend={(text, attachments, modelSelection) => handleSend(text, attachments, undefined, modelSelection)}
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}

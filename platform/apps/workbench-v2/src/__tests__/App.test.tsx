@@ -299,6 +299,43 @@ describe('App session flows', () => {
     expect(screen.getByText(/Execução interrompida antes da resposta/)).toBeInTheDocument()
   })
 
+  it('avisa quando Parar interrompe o run mas uma mutação já foi confirmada', async () => {
+    const user = userEvent.setup()
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()
+    let sse: ReadableStreamDefaultController<Uint8Array> | undefined
+    const encoder = new TextEncoder()
+    const frame = (event: unknown) => encoder.encode(`data: ${JSON.stringify(event)}\\n\\n`)
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/agir/mode') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+      if (url === '/api/agir') {
+        const body = new ReadableStream<Uint8Array>({ start(controller) {
+          sse = controller
+          controller.enqueue(frame({ type: 'tool', pedido: { id: 'commit-1', ferramenta: 'criar', argumentos: { caminho: 'fixture.txt', conteudo: 'feito' } } }))
+        } })
+        return Promise.resolve(new Response(body, { status: 200, headers: {
+          'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'run-commit', 'X-Agir-Generation': '1',
+        } }))
+      }
+      if (url === '/api/agir/cancel') {
+        sse?.enqueue(frame({ type: 'tool_result', id: 'commit-1', ferramenta: 'criar', ok: true, resumo: 'Arquivo criado.' }))
+        sse?.close()
+        return Promise.resolve(new Response(JSON.stringify({ status: 'cancelled_with_effects' }), { status: 200 }))
+      }
+      return fallback ? fallback(input, init) : Promise.resolve(new Response(null, { status: 204 }))
+    })
+    render(<App initialSessionSnapshot={testSessions} />)
+
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'pare após a criação')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await screen.findByText('Trabalhando')
+    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
+
+    expect(screen.getAllByText(/alterações já concluídas foram mantidas/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/interrompida antes da resposta/)).not.toBeInTheDocument()
+  })
+
   it('cancela o request da sessão mesmo após trocar para outro nested chat', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
@@ -350,6 +387,27 @@ describe('App session flows', () => {
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'verificar modo')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     await waitFor(() => expect(payload?.mode).toBe('edit'))
+  })
+
+  it('restaura Perguntar após recarga da página sem promover para Agente', async () => {
+    const user = userEvent.setup()
+    const primeiraMontagem = render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.click(screen.getByRole('button', { name: 'Agente' }))
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    expect(screen.getByRole('button', { name: 'Perguntar' })).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('agente-window:mode-by-chat:v1') ?? '{}')).toMatchObject({ 's3:s3-main': 'ask' })
+
+    primeiraMontagem.unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    expect(screen.getByRole('button', { name: 'Perguntar' })).toBeInTheDocument()
+
+    let payload: Record<string, unknown> | undefined
+    responderChatComSSE(['modo restaurado'], 'done', 5, (body) => { payload = body })
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'confirmar Perguntar restaurado')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(payload?.mode).toBe('ask'))
   })
 
   it('persiste a preferência exata por sessão e nested chat e transmite o par no envio', async () => {

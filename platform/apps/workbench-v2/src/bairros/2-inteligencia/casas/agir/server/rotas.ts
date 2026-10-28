@@ -20,9 +20,9 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
-import type { EventoAgir, MensagemAgir, MensagemSimples, ModoAgir, PedidoFerramenta } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
-import { criarExecutoresReais, descreverAlvoExcluir } from './discos'
+import { criarExecutoresReais, descreverAlvoExcluir, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
 import { criarVizinhoReal } from './vizinho'
 
@@ -48,6 +48,8 @@ export interface DependenciasAgir {
   /** Modo escolhido explicitamente no seletor; nunca é lido do payload de /api/agir. */
   lerModo: (sessionId: string, chatId: string) => ModoAgir | null
   definirModo: (sessionId: string, chatId: string, modo: ModoAgir) => void
+  /** Fábrica injetável para testar a barreira de commit de ferramentas mutáveis. */
+  criarExecutores?: (raiz: string) => ExecutoresDisco
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
 }
@@ -71,6 +73,8 @@ interface ExecucaoAgir extends ContextoFluxo {
   estado: EstadoExecucao
   controller: AbortController
   pendentes: Map<string, AprovacaoPendente>
+  efeitoMutavelEmAndamento?: Promise<ResultadoFerramenta>
+  mutacoesConfirmadas: number
   motivoCancelamento?: 'requested' | 'disconnect'
 }
 
@@ -93,6 +97,7 @@ function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
     estado: 'running',
     controller: new AbortController(),
     pendentes: new Map(),
+    mutacoesConfirmadas: 0,
   }
   execucaoPorFluxo.set(fluxo, execucao)
   execucaoPorId.set(execucao.runId, execucao)
@@ -106,16 +111,30 @@ function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   return execucao
 }
 
-function cancelarExecucao(execucao: ExecucaoAgir, motivo: 'requested' | 'disconnect'): boolean {
-  if (execucao.estado === 'cancelled' || execucao.estado === 'completed' || execucao.estado === 'paused') return false
+function execucaoTerminal(execucao: ExecucaoAgir): boolean {
+  return execucao.estado === 'cancelled' || execucao.estado === 'completed' || execucao.estado === 'paused'
+}
+
+/** Impede novo trabalho; uma ferramenta mutável já iniciada ainda precisa encerrar antes do ACK. */
+function solicitarCancelamento(execucao: ExecucaoAgir, motivo: 'requested' | 'disconnect'): boolean {
+  if (execucaoTerminal(execucao)) return false
+  if (execucao.estado === 'cancel-requested') return true
   execucao.estado = 'cancel-requested'
   execucao.motivoCancelamento = motivo
   const pendentes = [...execucao.pendentes.values()]
   execucao.pendentes.clear()
   for (const pendente of pendentes) pendente.resolver(false)
-  execucao.estado = 'cancelled'
   execucao.controller.abort()
   return true
+}
+
+async function concluirCancelamento(execucao: ExecucaoAgir): Promise<'cancelled' | 'cancelled_with_effects'> {
+  // Ponto de não retorno: uma mutação entrou no executor. Não afirmamos parada
+  // antes de ela terminar; aguardamos o resultado atômico e informamos se publicou.
+  const efeitoEmAndamento = execucao.efeitoMutavelEmAndamento
+  if (efeitoEmAndamento) await efeitoEmAndamento.catch(() => undefined)
+  if (execucao.estado === 'cancel-requested') execucao.estado = 'cancelled'
+  return execucao.mutacoesConfirmadas > 0 ? 'cancelled_with_effects' : 'cancelled'
 }
 
 /**
@@ -242,7 +261,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   const abort = fio.execucao.controller
   const aoFechar = (): void => {
-    if (!res.writableEnded) cancelarExecucao(fio.execucao, 'disconnect')
+    if (!res.writableEnded) solicitarCancelamento(fio.execucao, 'disconnect')
   }
   res.on?.('close', aoFechar)
 
@@ -251,7 +270,28 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
-  const executores = criarExecutoresReais(fio.raiz)
+  const executoresDisco = (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
+  const executores: Record<FerramentaId, ExecutorFerramenta> = { ...executoresDisco }
+  for (const ferramenta of ['criar', 'escrever'] as const) {
+    const executar = executoresDisco[ferramenta]
+    executores[ferramenta] = async (pedido) => {
+      if (abort.signal.aborted || fio.execucao.estado !== 'running') {
+        return { ok: false, resumo: 'Cancelada antes de iniciar a alteração; o arquivo não foi publicado.' }
+      }
+      // Registra a operação antes de ceder o event loop. O cancel endpoint
+      // aguarda esta Promise e só então confirma se houve publicação.
+      const operacao = Promise.resolve().then(() => executar(pedido)).then((resultado) => {
+        if (resultado.ok) fio.execucao.mutacoesConfirmadas += 1
+        return resultado
+      })
+      fio.execucao.efeitoMutavelEmAndamento = operacao
+      try {
+        return await operacao
+      } finally {
+        if (fio.execucao.efeitoMutavelEmAndamento === operacao) delete fio.execucao.efeitoMutavelEmAndamento
+      }
+    }
+  }
   const modeloEfetivo = fio.alvo.providerId && fio.alvo.modelId
     ? `${fio.alvo.providerId} / ${fio.alvo.modelId}`
     : fio.alvo.modelo
@@ -317,7 +357,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       escreverEvento(res, { type: 'error', code: 'resposta', message: 'Erro inesperado do servidor ao agir.' })
     }
   } finally {
-    executores.fechar()
+    executoresDisco.fechar()
     for (const pendente of fio.execucao.pendentes.values()) pendente.resolver(false)
     fio.execucao.pendentes.clear()
     if (fio.execucao.estado !== 'cancelled') {
@@ -419,9 +459,18 @@ async function tratarCancelar(req: IncomingMessage, res: ServerResponse, deps: D
     sendErro(res, 409, 'fluxo', 'A sessão ou pasta não corresponde; o cancelamento não foi aplicado.')
     return true
   }
-  const cancelada = cancelarExecucao(execucao, 'requested')
+  if (execucaoTerminal(execucao)) {
+    sendJson(res, 200, {
+      status: 'already_terminal',
+      runId,
+      generation,
+    })
+    return true
+  }
+  solicitarCancelamento(execucao, 'requested')
+  const status = await concluirCancelamento(execucao)
   sendJson(res, 200, {
-    status: cancelada ? 'cancelled' : 'already_terminal',
+    status,
     runId,
     generation,
   })

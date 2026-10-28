@@ -12,6 +12,7 @@ import { Readable } from 'node:stream'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../server/rotas'
+import { criarExecutoresReais, type ExecutoresDisco } from '../server/discos'
 
 type ResFalsa = ServerResponse & {
   statusCode: number
@@ -434,6 +435,47 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
 })
 
 describe('F3 — cancelamento terminal e claims de geração', () => {
+  it('Parar aguarda mutação já iniciada e não confirma antes da publicação', async () => {
+    await registrarModo('agent')
+    stubProvedor([SSE_TOOL.replace('ola.txt', 'f3-cancel-race.txt'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    let avisarInicio!: () => void
+    let liberarCommit!: () => void
+    const inicio = new Promise<void>((resolve) => { avisarInicio = resolve })
+    const barreiraCommit = new Promise<void>((resolve) => { liberarCommit = resolve })
+    const deps = {
+      ...DEPS,
+      criarExecutores: (raizExecucao: string): ExecutoresDisco => {
+        const base = criarExecutoresReais(raizExecucao)
+        return {
+          ...base,
+          criar: async (pedido) => {
+            avisarInicio()
+            await barreiraCommit
+            return base.criar(pedido)
+          },
+        }
+      },
+    }
+    const res = fakeRes()
+    const fluxo = 'f3-cancel-race'
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ messages: [{ role: 'user', content: 'crie arquivo' }], fluxo })), res, URL_AGIR, deps)
+    await inicio
+
+    const cancelRes = fakeRes()
+    const cancelBody = JSON.stringify({ fluxo, sessionId: 'sessao-1', chatId: 'chat-1', ...identity(res) })
+    const cancelRequest = tratarRotasAgir(fakeReq(cancelBody), cancelRes, URL_CANCEL, deps)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(cancelRes.ended).toBe(false)
+    await expect(readFile(path.join(raiz, 'f3-cancel-race.txt'), 'utf8')).rejects.toThrow()
+
+    liberarCommit()
+    await cancelRequest
+    await fio
+    expect(JSON.parse(cancelRes.corpo())).toMatchObject({ status: 'cancelled_with_effects' })
+    await expect(readFile(path.join(raiz, 'f3-cancel-race.txt'), 'utf8')).resolves.toBe('oi')
+    expect(frames(res).some((evento) => evento.type === 'tool_result' && evento.ok === true)).toBe(true)
+  })
+
   it('Parar durante approval invalida o cartão; approval tardio não executa', async () => {
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
