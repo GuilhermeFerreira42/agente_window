@@ -2,15 +2,17 @@
 // Casa Provedores — repositório do arquivo de configuração (servidor).
 //
 // D81: o arquivo mora FORA do projeto — `~/.agente_window/providers.json`
-//      (0600; o Git nem o enxerga; o `.gitignore` do repo é a segunda tranca).
+//      (0600 em POSIX; ACL privada verificada em Windows; o Git nem o enxerga).
 // D83: a chave só sai INTEIRA pelo caminho do "olhinho" (rota de reveal).
 // D84: chave salva manda; variável de ambiente é reserva (a tela mostra a origem).
 // Migração v1/v2/v3 → v4 para avaliações server-side de tool calling; backup antes de reescrever.
 // ============================================================================
-import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { execFile } from 'node:child_process'
+import { lstat, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import type { ArquivoProvedores, ItemCatalogoModelo, ProvedorConfig, ProvedorNaTela, Protocolo, SalvarProvedoresInput, ToolCallingAssessmentRecord, ToolCallingAssessmentView, ToolCallingCapabilityStatus, ToolCallingCheckReason } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
 
@@ -29,6 +31,94 @@ export function armazenamentoAtual(): 'fixture' | 'repo-home' {
 }
 
 const VAZIO: ArquivoProvedores = { versao: 4, ativo: null, provedores: {}, toolCallingAssessments: {} }
+const executarArquivo = promisify(execFile)
+
+const SCRIPT_ACL_PRIVADA = String.raw`
+$ErrorActionPreference = 'Stop'
+$p = $env:AGENTE_WINDOW_CREDENTIAL_PATH
+if (-not $p -or -not (Test-Path -LiteralPath $p -PathType Leaf)) { throw 'Credential file is missing.' }
+$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = Get-Acl -LiteralPath $p
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($entry in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($entry) }
+$acl.SetOwner($sid)
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, [System.Security.AccessControl.FileSystemRights]::FullControl, [System.Security.AccessControl.AccessControlType]::Allow)
+[void]$acl.AddAccessRule($rule)
+Set-Acl -LiteralPath $p -AclObject $acl
+$check = Get-Acl -LiteralPath $p
+$entries = @($check.Access)
+if (-not $check.AreAccessRulesProtected -or $entries.Count -ne 1) { throw 'Credential ACL verification failed.' }
+$entry = $entries[0]
+$entrySid = $entry.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value
+$hasFullControl = ($entry.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl
+if ($entrySid -ne $sid.Value -or $entry.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or -not $hasFullControl -or $entry.IsInherited) { throw 'Credential ACL verification failed.' }
+`
+
+/** POSIX mode bits do not create a private DACL on Windows; set and verify the current user's ACL. */
+async function aplicarAclPrivada(caminho: string): Promise<void> {
+  if (process.platform !== 'win32') return
+  try {
+    await executarArquivo('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCRIPT_ACL_PRIVADA], {
+      windowsHide: true,
+      timeout: 10_000,
+      env: { ...process.env, AGENTE_WINDOW_CREDENTIAL_PATH: caminho },
+    })
+  } catch {
+    throw new Error('Não foi possível confirmar uma ACL privada para o arquivo de credenciais; acesso bloqueado.')
+  }
+}
+
+async function protegerCredenciaisExistentes(caminho: string): Promise<void> {
+  if (process.platform !== 'win32') return
+  const pasta = dirname(caminho)
+  let entradas: Array<{ name: string }> = []
+  try { entradas = await readdir(pasta, { withFileTypes: true }) } catch (erro) {
+    if ((erro as { code?: string }).code === 'ENOENT') return
+    throw erro
+  }
+  const nome = basename(caminho)
+  for (const entrada of entradas) {
+    if (entrada.name !== nome && !entrada.name.startsWith(`${nome}.bak-`) && !entrada.name.startsWith(`${nome}.tmp-`)) continue
+    const alvo = join(pasta, entrada.name)
+    const info = await lstat(alvo).catch((erro: unknown) => {
+      if ((erro as { code?: string }).code === 'ENOENT') return undefined
+      throw erro
+    })
+    if (!info) continue
+    if (info.isSymbolicLink()) throw new Error('Arquivo de credenciais ou backup não pode ser um link; acesso bloqueado.')
+    if (info.isFile()) await aplicarAclPrivada(alvo)
+  }
+}
+
+/** Cria com modo POSIX ou ACL Windows já restrito, antes de gravar bytes secretos. */
+async function escreverArquivoPrivado(caminho: string, conteudo: string): Promise<void> {
+  const arquivo = await open(caminho, 'wx', 0o600)
+  try {
+    await aplicarAclPrivada(caminho)
+    await arquivo.writeFile(conteudo, 'utf8')
+    await arquivo.sync()
+    await arquivo.close()
+  } catch (erro) {
+    await arquivo.close().catch(() => undefined)
+    await unlink(caminho).catch(() => undefined)
+    throw erro
+  }
+}
+
+async function publicarArquivoPrivado(caminho: string, conteudo: string): Promise<void> {
+  const temporario = `${caminho}.tmp-${process.pid}-${randomUUID()}`
+  let publicado = false
+  try {
+    await escreverArquivoPrivado(temporario, conteudo)
+    await rename(temporario, caminho)
+    publicado = true
+    await aplicarAclPrivada(caminho)
+  } catch (erro) {
+    await unlink(temporario).catch(() => undefined)
+    if (publicado && process.platform === 'win32') await unlink(caminho).catch(() => undefined)
+    throw erro
+  }
+}
 
 const STATUS_TOOL_CALLING = new Set<ToolCallingCapabilityStatus>(['declared', 'verified', 'unknown', 'incompatible'])
 const MOTIVOS_TOOL_CALLING = new Set<ToolCallingCheckReason>([
@@ -217,6 +307,7 @@ export function validarEntrada(input: SalvarProvedoresInput, atual: ArquivoProve
 }
 
 export async function lerArquivo(caminho = caminhoDoArquivo()): Promise<ArquivoProvedores> {
+  await protegerCredenciaisExistentes(caminho)
   let texto: string
   try {
     texto = await readFile(caminho, 'utf8')
@@ -261,8 +352,8 @@ async function backupSeExistir(caminho: string): Promise<string | null> {
   try {
     const texto = await readFile(caminho, 'utf8')
     const carimbo = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
-    const destino = `${caminho}.bak-${carimbo}`
-    await writeFile(destino, texto, { encoding: 'utf8', mode: 0o600 })
+    const destino = `${caminho}.bak-${carimbo}-${randomUUID()}`
+    await escreverArquivoPrivado(destino, texto)
     return destino
   } catch (erro) {
     if ((erro as { code?: string }).code !== 'ENOENT') throw erro
@@ -276,9 +367,7 @@ export async function salvarArquivo(input: SalvarProvedoresInput, caminho = cami
     const validado = validarEntrada(input, atual)
     await mkdir(dirname(caminho), { recursive: true })
     await backupSeExistir(caminho)
-    const temporario = `${caminho}.tmp-${process.pid}`
-    await writeFile(temporario, `${JSON.stringify(validado, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-    await rename(temporario, caminho)
+    await publicarArquivoPrivado(caminho, `${JSON.stringify(validado, null, 2)}\n`)
     return validado
   })
 }
@@ -328,9 +417,7 @@ export async function registrarToolCallingAssessment(
     }
     await mkdir(dirname(caminho), { recursive: true })
     await backupSeExistir(caminho)
-    const temporario = `${caminho}.tmp-${process.pid}-cap-${Date.now()}`
-    await writeFile(temporario, `${JSON.stringify(proximo, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-    await rename(temporario, caminho)
+    await publicarArquivoPrivado(caminho, `${JSON.stringify(proximo, null, 2)}\n`)
   })
 }
 

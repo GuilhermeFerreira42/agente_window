@@ -1,10 +1,11 @@
 // Casa Provedores — testes do repositório do arquivo (FATIA 08).
-// Cobrem as decisões do dono: D81 (arquivo fora do repo + 0600 + segunda tranca),
+// Cobrem as decisões do dono: D81 (arquivo fora do repo + 0600 POSIX/DACL Windows + segunda tranca),
 // D83 (máscara/reveal), D84 (arquivo manda; ambiente é reserva), migração v1/v2/v3→v4 e gate exato de início.
-import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   armazenamentoAtual,
@@ -41,11 +42,43 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
       caminho,
     )
     const modo = (await stat(caminho)).mode & 0o777
-    expect(modo, 'o arquivo da chave precisa ser restrito ao dono').toBe(0o600)
+    if (process.platform !== 'win32') {
+      expect(modo, 'POSIX: o arquivo da chave precisa ser restrito ao dono').toBe(0o600)
+    }
     const lido = await lerArquivo(caminho)
     expect(lido.versao).toBe(4)
     expect(lido.ativo).toBe('openai')
     expect(lido.provedores.openai.apiKey).toBe('sk-teste-123456')
+  })
+
+  it.skipIf(process.platform !== 'win32')('Windows: arquivo e backups limitam a DACL ao SID atual', async () => {
+    const caminho = await arquivoTemporario()
+    const pasta = resolve(caminho, '..')
+    const env = { ...process.env, AGENTE_WINDOW_ACL_TEST_PATH: caminho }
+    const powershell = (script: string, target = caminho): string => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      encoding: 'utf8', windowsHide: true, env: { ...env, AGENTE_WINDOW_ACL_TEST_PATH: target },
+    }).trim()
+    try {
+      const sidAtual = powershell('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value')
+      const assertAclPrivada = (arquivo: string) => {
+        const acl = JSON.parse(powershell('$p=$env:AGENTE_WINDOW_ACL_TEST_PATH; $a=Get-Acl -LiteralPath $p; $e=@($a.Access); if (-not $a.AreAccessRulesProtected -or $e.Count -ne 1) { throw "ACL is not private" }; $r=$e[0]; [pscustomobject]@{sid=$r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value; accessType=$r.AccessControlType.ToString(); fullControl=(($r.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl); inherited=$r.IsInherited} | ConvertTo-Json -Compress', arquivo)) as { sid: string; accessType: string; fullControl: boolean; inherited: boolean }
+        expect(acl, `DACL de ${basename(arquivo)} deve ser privada para o usuário atual`).toEqual({
+          sid: sidAtual, accessType: 'Allow', fullControl: true, inherited: false,
+        })
+      }
+      await writeFile(caminho, JSON.stringify({
+        versao: 4, ativo: null, toolCallingAssessments: {},
+        provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } },
+      }), 'utf8')
+      await lerArquivo(caminho)
+      assertAclPrivada(caminho)
+      await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } } }, caminho)
+      await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture-2', apiKey: 'fixture-not-a-real-key' } } }, caminho)
+      const arquivos = [caminho, ...(await readdir(pasta)).filter((nome) => nome.startsWith('providers.json.bak-')).map((nome) => join(pasta, nome))]
+      for (const arquivo of arquivos) assertAclPrivada(arquivo)
+    } finally {
+      await rm(pasta, { recursive: true, force: true })
+    }
   })
 
   it('a segunda gravação faz backup .bak-<carimbo> antes de reescrever (nada se perde)', async () => {
