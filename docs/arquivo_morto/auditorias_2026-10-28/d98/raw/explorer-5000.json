@@ -1,0 +1,38 @@
+{
+  "scenario": "Explorer 5000",
+  "fixture": "/tmp/d98-fixtures/explorer",
+  "folder": "children-5000",
+  "startedAt": "2026-10-28T15:48:02.862Z",
+  "requests": [],
+  "responses": [],
+  "consoleErrorSamples": [
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES"
+  ],
+  "consoleErrorCounts": {
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES": 1
+  },
+  "requestFailedCounts": {},
+  "pageErrors": [],
+  "progress": [],
+  "phase": "boot",
+  "error": "TimeoutError: page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('.agent-sessions-workbench') to be visible\n",
+  "crashState": {
+    "url": "http://127.0.0.1:5175/",
+    "ready": "complete",
+    "body": ""
+  },
+  "listRequests": {
+    "started": 0,
+    "completed": 0
+  },
+  "statRequests": {
+    "started": 0,
+    "completed": 0
+  },
+  "responseDurations": {
+    "count": 0,
+    "p50ms": null,
+    "p95ms": null
+  },
+  "finishedAt": "2026-10-28T15:49:03.803Z"
+}

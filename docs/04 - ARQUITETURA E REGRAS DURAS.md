@@ -45,7 +45,7 @@ Estas diretrizes registram decisões de produto, **não** escolhem implementaç�
 - **M1–M4 (primeiro conjunto de planejamento, sem numeração oficial):** M1 medir/orçar contexto; M2 transcript estruturado; M3 checkpoints/compactação; M4 busca manual no histórico. M5–M8 só entram em planejamento posterior. Nada aqui autoriza implementação.
 - **Privacidade para memória/contexto:** armazenamento local preferencialmente em `~/.agente_window`; isolamento entre projetos e conversas; transcript original preservado; aprovação humana para gravar memória persistente de projeto; exportação e exclusão explícitas; proteger credenciais e dados sensíveis; nenhuma telemetria externa presumida; não reexecutar ferramentas interrompidas. Retenção e limpeza detalhadas exigem SPEC.
 - **Medição honesta de contexto:** preferir `usage` real do provedor; sem isso, estimativa claramente identificada ou estado indisponível. Limites por modelo/provedor, configuráveis manualmente e com origem indicada; alertas em 75% e 90%.
-- **D98/PERF:** autorização somente para investigação técnica após validação deste pacote documental. Fixture/protótipo isolado e trace são experimentais; não alteram produção. Qualquer mudança permanente exige SPEC, critérios quantitativos derivados das medições e aprovação explícita.
+- **D98/PERF:** o dono autorizou explicitamente em 2026-10-28 a investigação técnica sem validação documental prévia. Fixture/protótipo isolado e trace são experimentais; não alteram produção. A autorização não libera mudança permanente: esta exige SPEC, critérios quantitativos derivados das medições e aprovação explícita.
 
 ## 1.5 Referências técnicas externas para avaliação (D101, 2026-10-24)
 

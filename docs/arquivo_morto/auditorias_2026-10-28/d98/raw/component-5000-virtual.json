@@ -1,0 +1,77 @@
+{
+  "n": 5000,
+  "mode": "virtual",
+  "url": "http://127.0.0.1:5175/d98-harness.html?n=5000&mode=virtual",
+  "httpStatus": 200,
+  "initial": {
+    "result": {
+      "mode": "virtual",
+      "fixtureCount": 5000,
+      "apiMs": 79.79999999981374,
+      "payloadBytes": 650045,
+      "entries": 5000,
+      "groups": [
+        {
+          "id": "workingTree",
+          "items": 5000
+        }
+      ],
+      "rootPath": "/tmp/d98-fixtures/scm-5000",
+      "readyAt": 447.1000000005588,
+      "domNodes": 370,
+      "renderedRows": 26
+    },
+    "profile": [
+      {
+        "phase": "mount",
+        "actualDuration": 12.600000000558794,
+        "baseDuration": 5.999999998137355,
+        "startTime": 413.20000000018626,
+        "commitTime": 426.29999999981374
+      }
+    ],
+    "longTasks": [],
+    "errorText": null,
+    "nodeCount": 370,
+    "rowCount": 26,
+    "renderedResourceRows": 24,
+    "bodyTextLength": 480
+  },
+  "afterScroll": {
+    "nodeCount": 382,
+    "rowCount": 26,
+    "renderedResourceRows": 26,
+    "scrollTop": 109524,
+    "scrollHeight": 110088,
+    "profile": [
+      {
+        "phase": "mount",
+        "actualDuration": 12.600000000558794,
+        "baseDuration": 5.999999998137355,
+        "startTime": 413.20000000018626,
+        "commitTime": 426.29999999981374
+      },
+      {
+        "phase": "update",
+        "actualDuration": 6.5,
+        "baseDuration": 2.4999999990686774,
+        "startTime": 481.90000000037253,
+        "commitTime": 488.79999999981374
+      }
+    ],
+    "longTasks": []
+  },
+  "perf": {
+    "Nodes": 867,
+    "LayoutCount": 0,
+    "RecalcStyleCount": 0,
+    "LayoutDuration": 0,
+    "RecalcStyleDuration": 0,
+    "ScriptDuration": 0,
+    "TaskDuration": 0.000016,
+    "JSHeapUsedSize": 5935680,
+    "JSHeapTotalSize": 8450048
+  },
+  "errors": [],
+  "fatal": null
+}

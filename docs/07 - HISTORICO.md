@@ -1,5 +1,11 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-28 — investigação D98 iniciada/continuada (Gate aberto; sem produção)
+- Ordem explícita do dono dispensou somente o antigo pré-gate de validação documental. Em fixtures descartáveis e Vite 5175, coletados traces CDP do SCM 1k e da expansão Explorer 1k; Explorer 5k expirou antes de a UI inicial carregar (`ERR_INSUFFICIENT_RESOURCES`), sem `/fs/list`/`/fs/stat` e sem medida de expansão.
+- Git isolado: `GitHost.status` mediana 20,116 ms/5k e 33,308 ms/10k; `buildGroups` 3,059/5,319 ms; parser 0,290/0,611 ms. API `/git/status` 36,376/53,514 ms; Git CLI 6,169/9,999 ms — etapas distintas, não atribuir como comparáveis.
+- `ChangesList` real isolado: 1k = 20.052 nós DOM/182 ms de React Profiler; 5k = 100.052 nós/998 ms, duas long tasks ~1.037 e 793 ms. Protótipo temporário virtualizado 1k/5k/10k manteve 370 nós/commit inicial ~13 ms; evidência exploratória, não mudança de produção nem SPEC.
+- Hipótese causal reforçada: fan-out ilimitado de stats na expansão e renderização eager; sem causa-raiz exclusiva fechada. Gate D98 segue aberto, sem SPEC quantitativa/aprovação, mudança de produção, Fatia 13, iniciativas M ou push. Detalhes, limitações, trace e JSON: `09 §3.8` e `docs/arquivo_morto/auditorias_2026-10-28/d98/`.
+
 ## 2026-10-28 — reteste Windows e correção estreita de reaplicação da ACL
 - Baseline `24d1054`/`253d8e1` auditado; correção de ACL, reforço de teste Windows e consolidação documental no mesmo grupo funcional. Relatório auxiliar preservado em arquivo morto. Estado em 03, resultados e evidências em 09; sem push, homologação, D98 ou Fatia 13.
 

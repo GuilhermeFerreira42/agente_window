@@ -1,0 +1,416 @@
+{
+  "scenario": "Explorer 1000",
+  "fixture": "/tmp/d98-fixtures/explorer",
+  "folder": "children-1000",
+  "startedAt": "2026-10-28T15:45:46.421Z",
+  "requests": [],
+  "responses": [
+    {
+      "path": "/fs/stat",
+      "at": 6230.35558,
+      "phase": "boot",
+      "status": 200,
+      "responseAt": 6246.203475
+    },
+    {
+      "path": "/fs/list",
+      "at": 6248.559663,
+      "phase": "boot",
+      "status": 200,
+      "responseAt": 6264.611649
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6265.257136,
+      "phase": "boot",
+      "status": 200,
+      "responseAt": 6265.332684
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6265.284734,
+      "phase": "boot",
+      "status": 200,
+      "responseAt": 6276.226029
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6265.30421,
+      "phase": "boot",
+      "status": 200,
+      "responseAt": 6276.250575
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6512.803814,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6516.890048
+    },
+    {
+      "path": "/fs/list",
+      "at": 6516.959628,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6520.254925
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6524.151728,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6524.226942
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6524.178183,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6524.43835
+    },
+    {
+      "path": "/fs/stat",
+      "at": 6524.199658,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6525.73664
+    },
+    {
+      "path": "/fs/list",
+      "at": 6591.344578,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 6600.021179
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.841423,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9235.257789
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.879371,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9235.505501
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.901714,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9235.532531
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.920169,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9235.558599
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.936299,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9235.575062
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.952107,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9236.05652
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7155.969006,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9236.078544
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7157.564522,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9236.096275
+    },
+    {
+      "path": "/fs/stat",
+      "at": 7157.618543,
+      "phase": "expand",
+      "status": 200,
+      "responseAt": 9236.11157
+    },
+    {
+      "truncated": 878
+    }
+  ],
+  "consoleErrors": [
+    "Warning: Attempted to synchronously unmount a root while React was already rendering. React cannot finish unmounting the root until the current render has completed, which may lead to a race condition.%s \n    at App (http://127.0.0.1:5175/src/App.tsx:229:27)\n    at TerminalSessionProvider (http://127.0.0.1:5175/src/providers/TerminalSessionProvider.tsx:53:43)",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES",
+    "Failed to load resource: net::ERR_INSUFFICIENT_RESOURCES"
+  ],
+  "pageErrors": [],
+  "progress": [
+    {
+      "kind": "stat-start",
+      "count": 500,
+      "at": 8843.844722,
+      "phase": "expand"
+    },
+    {
+      "kind": "stat-start",
+      "count": 1000,
+      "at": 9008.559758,
+      "phase": "expand"
+    },
+    {
+      "kind": "stat-done",
+      "count": 500,
+      "at": 15367.450451,
+      "phase": "expand"
+    }
+  ],
+  "phase": "settled",
+  "expandStart": 6492.748786,
+  "expandStartList": 1,
+  "expandStartStats": 4,
+  "expandLongTaskOffset": 3,
+  "expandEnd": 16916.259973,
+  "expandMs": 10423.51,
+  "ui": {
+    "rows": 1003,
+    "treeItems": 1003,
+    "domNodes": 11562,
+    "longTasks": [
+      {
+        "startTime": 5223.100000000559,
+        "duration": 190
+      },
+      {
+        "startTime": 5419.200000000186,
+        "duration": 94
+      },
+      {
+        "startTime": 5693.100000000559,
+        "duration": 61
+      },
+      {
+        "startTime": 5954.299999999814,
+        "duration": 368
+      },
+      {
+        "startTime": 7367.5,
+        "duration": 101
+      },
+      {
+        "startTime": 8074.799999999814,
+        "duration": 106
+      },
+      {
+        "startTime": 8932.5,
+        "duration": 106
+      },
+      {
+        "startTime": 11280.400000000373,
+        "duration": 101
+      },
+      {
+        "startTime": 11933,
+        "duration": 108
+      },
+      {
+        "startTime": 15689.900000000373,
+        "duration": 335
+      }
+    ],
+    "lastRow": "file:///tmp/d98-fixtures/explorer/.gitignore"
+  },
+  "expandLongTasks": [
+    {
+      "startTime": 5954.299999999814,
+      "duration": 368
+    },
+    {
+      "startTime": 7367.5,
+      "duration": 101
+    },
+    {
+      "startTime": 8074.799999999814,
+      "duration": 106
+    },
+    {
+      "startTime": 8932.5,
+      "duration": 106
+    },
+    {
+      "startTime": 11280.400000000373,
+      "duration": 101
+    },
+    {
+      "startTime": 11933,
+      "duration": 108
+    },
+    {
+      "startTime": 15689.900000000373,
+      "duration": 335
+    }
+  ],
+  "expandRequestCounts": {
+    "listStarted": 2,
+    "listCompleted": 2,
+    "statStarted": 1004,
+    "statCompleted": 891
+  },
+  "expandRequestTimingMs": {
+    "count": 893,
+    "p50": 6520.126,
+    "p95": 7358.65,
+    "max": 7431.462
+  },
+  "scrollInputToFrameMs": 66.87,
+  "cdpMetrics": {
+    "JSEventListeners": 3296,
+    "Nodes": 13997,
+    "LayoutDuration": 0.122128,
+    "RecalcStyleDuration": 0.102428,
+    "ScriptDuration": 0.749414,
+    "TaskDuration": 3.480876,
+    "JSHeapUsedSize": 33950104,
+    "JSHeapTotalSize": 36392960
+  },
+  "trace": {
+    "events": 88374,
+    "bytes": 16140833,
+    "gzBytes": 1218837
+  },
+  "listRequests": {
+    "started": 3,
+    "completed": 3
+  },
+  "statRequests": {
+    "started": 1008,
+    "completed": 895
+  },
+  "responseDurations": {
+    "count": 898,
+    "p50ms": 6520.045198,
+    "p95ms": 7358.649751000001
+  },
+  "finishedAt": "2026-10-28T15:46:26.880Z"
+}

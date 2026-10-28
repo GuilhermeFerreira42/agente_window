@@ -98,7 +98,7 @@ Não confundir a fidelidade de referência VS Code 1.135 (D66/D71, 90%/10% como 
 ## 3. Onde está cada coisa
 | O quê | Onde |
 |---|---|
-| Código do app | `platform/apps/workbench-v2/src/` — `App.tsx` (wiring), `shell/` (Activity Bar, Side Bar, sash, DnD, painel de views), `components/` (AuxiliaryBar = editor anexo, terminal **intocável**, Titlebar, Chat), `modules/explorer-search/` (`core/` e `server/` **congelados (exceção D98 limitada à investigação autorizada após validação documental; mudança permanente exige SPEC e aprovação — ver `05`)**; `ui/` montagem), `styles/theme.css` (tokens dark/light), `domain/` (layout/persistência) |
+| Código do app | `platform/apps/workbench-v2/src/` — `App.tsx` (wiring), `shell/` (Activity Bar, Side Bar, sash, DnD, painel de views), `components/` (AuxiliaryBar = editor anexo, terminal **intocável**, Titlebar, Chat), `modules/explorer-search/` (`core/` e `server/` **sem mudança permanente; investigação D98 explicitamente autorizada em 2026-10-28, sem validação documental prévia; qualquer alteração permanente exige SPEC quantitativa e aprovação — ver `05`/`09 §3.8`**; `ui/` montagem), `styles/theme.css` (tokens dark/light), `domain/` (layout/persistência) |
 | Serviço PTY | `platform/services/pty-server/` (**intocável**) |
 | Testes | `src/__tests__/` (Vitest) · `e2e/sessao_*.spec.ts` (Playwright) · `run-antiregressao.sh` (bateria com reseed) |
 | Documentação ativa | `docs/01…09` (este conjunto canônico) |
@@ -117,7 +117,7 @@ Não confundir a fidelidade de referência VS Code 1.135 (D66/D71, 90%/10% como 
 - **05 Chassis-Right:** Activity Bar e Side Bar à direita, DnD de views, Outline/Timeline, maximizar editor (100 % homologada).
 - **06 Workspace & Chat base:** persistência, Empty State 768 px, base de sessões (implementada).
 - **07 Destravar** ✅ 15/10 · **08 Conectar** ✅ 17/10 (D89) · **09 Conversar** ✅ 18/10 (D92) · **10 Agir** ✅ 19/10 (D94) — **MVP FECHADO** · **11 Teto+Continuar+Config** ✅ 21/10 (D96) · **12 DELETE-micro** ✅ 21/10 (D97).
-- **PERF (micro, D98)** — desempenho SCM/Explorer em pastas gigantes — entre a 12 e a 13, sem renumerar. Confirmação técnica autorizada em princípio; aguarda validação desta atualização documental antes de iniciar. Nenhuma mudança permanente de produção sem SPEC e aprovação.
+- **PERF (micro, D98)** — desempenho SCM/Explorer em pastas gigantes — entre a 12 e a 13, sem renumerar. Investigação técnica explicitamente autorizada pelo dono em 2026-10-28, sem depender de validação documental prévia; medições iniciais estão em `09 §3.8`, gate segue aberto. Nenhuma mudança permanente de produção sem SPEC quantitativa derivada das medições e aprovação explícita.
 - **13 Terminal-para-o-agente** (SPEC 2G + decisão específica de DEBT-23 na abertura) · **14 Barra+Personalizações+skills** (SPEC 2H) · **15 Janela única de abas** (SPEC 2I, abre por DEBT-12) · **16 Terminal 2.0 visual** · **17 Refinamentos** · **18–20** (painéis, sessões isoladas, navegador/polimento). A numeração e a ordem canônicas não mudam nesta consolidação.
 - **Futuro aprovado, sem autorização de implementação:** Central de Diagnósticos permanente (SPEC própria pendente); planejamento inicial de contexto **M1–M4**. **M5–M8** estão formalizadas **somente para planejamento** em D102; complementos **IC-01–IC-09** são propostas documentais, sem SPEC ou implementação autorizada. Os rótulos M não são números oficiais de fatia.
 
