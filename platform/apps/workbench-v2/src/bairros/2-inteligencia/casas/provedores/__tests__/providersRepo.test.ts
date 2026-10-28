@@ -54,7 +54,7 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
   it.skipIf(process.platform !== 'win32')('Windows: arquivo e backups limitam a DACL ao SID atual', async () => {
     const caminho = await arquivoTemporario()
     const pasta = resolve(caminho, '..')
-    const env = { ...process.env, AGENTE_WINDOW_ACL_TEST_PATH: caminho }
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')), AGENTE_WINDOW_ACL_TEST_PATH: caminho }
     const powershell = (script: string, target = caminho): string => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
       encoding: 'utf8', windowsHide: true, env: { ...env, AGENTE_WINDOW_ACL_TEST_PATH: target },
     }).trim()
@@ -71,6 +71,9 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
         provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } },
       }), 'utf8')
       await lerArquivo(caminho)
+      assertAclPrivada(caminho)
+      // Reaplicar a DACL já protegida deve funcionar sem SeSecurityPrivilege.
+      expect((await lerArquivo(caminho)).provedores.openai.apiKey).toBe('fixture-not-a-real-key')
       assertAclPrivada(caminho)
       await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } } }, caminho)
       await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture-2', apiKey: 'fixture-not-a-real-key' } } }, caminho)

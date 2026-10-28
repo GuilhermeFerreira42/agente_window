@@ -524,3 +524,72 @@ Onde mora a proteção de cada comportamento da fatia (servidor em `casas/agir/s
 | Cartão reforçado | sem-desfazer + prévia/contagem do servidor, sem botão de sessão | `CartaoFerramenta` + E2E T1/T5 |
 | Negar | "nada sumiu"; arquivo continua na pasta e fora da lixeira | negação no loop + E2E T2 |
 | Régua geral | 08+09+10+11+12 sem regressão | 23/23 na ordem canônica + `e2eAssertionContract.test.ts` |
+
+## Reteste independente Windows — 2026-10-28 (F1–F5-B; sem homologação)
+
+**Baseline:** branch `docs/capacidades-d102-alinhamento`, HEAD `24d10542a980d2c84a6dee67b85be92db001a7aa`, árvore inicialmente limpa. Confirmados `253d8e1` (F3/F5-A) e `24d1054` (ACL). Os nove canônicos não receberam a auditoria Windows anterior neste checkout; seus resultados foram recuperados das evidências externas, sem inventar um registro anterior inexistente no 09. Este registro substitui como evidência atual o relatório auxiliar de 27/10, preservado em `arquivo_morto/auditoria-windows-correcoes-2026-10-27.md`. Voltaram a existir somente nove arquivos ativos na raiz de docs.
+
+**Ambiente:** Windows x64 23H2, build 22631.6199, volume C: NTFS; Node 24.16.0, npm 11.13.0, Edge headless real via Playwright. Dependências instaladas com `npm ci --ignore-scripts`, seguido de rebuild de better-sqlite3 e node-pty. HOME e USERPROFILE isolados, provedores OpenAI-compatible fictícios em loopback, provas canary simuladas `verified`. Nenhuma credencial ou chamada real. Servidores temporários controlados por subprocesso com timeout e encerramento: `start_process` não está disponível nesta sessão Windows. D98/Fatia 13 não executados.
+
+**Evidência externa, fora do Git:** `C:\Users\Usuario\.codex\visualizations\2026\10\27\01a17f37-97c4-74a2-87bb-d6fbbbe5b243\retest-20261028`. Subpastas: raiz = baseline Arena; `clean` = diagnóstico de ambiente, sem alteração de produto; `fixed` = correção ACL e testes; `final` = integração com barreira de provedor corrigida. Auditoria anterior preservada na pasta irmã `audit-windows`. Scripts, JSON, logs e screenshots permanecem fora do repositório.
+
+### Achado novo, reprodução e correção estreita da ACL
+
+**Reprovado no baseline Arena:** salvar provedor fictício via HTTP devolveu 400; nenhuma prova `verified` podia ser estabelecida. A primeira aplicação da DACL funcionava; a segunda aplicação de `Set-Acl` no arquivo já privado falhava com `SeSecurityPrivilege`. A verificação pós-rename então removia o arquivo principal. Reproduzido fora do aplicativo, com três aplicações sucessivas: primeira passa, seguintes falham (`clean/acl-reapply.log`). Não era uma falha de F3 nem de catálogo: os testes dependentes ficaram impedidos pela gravação de credenciais.
+
+Havia também contaminação de `PSModulePath` do PowerShell 7 herdada pelo Windows PowerShell 5.1 lançado via Node: `Microsoft.PowerShell.Security` falhava ao carregar com membros de TypeData duplicados. A normalização do ambiente resolveu somente esse impedimento, e expôs a falha real de reaplicação da ACL. Logs originais preservados; nenhum teste foi ignorado para ocultá-los.
+
+**Correção autorizada dentro do contrato D81:** aplicar o mesmo objeto de segurança por `[System.IO.File]::SetAccessControl`, preservando proprietário, DACL privada e verificação final; remover somente `PSModulePath` do ambiente do subprocesso para ele resolver os próprios módulos. Não há helper nativo nem nova arquitetura. Teste Windows reforçado com leitura repetida do mesmo arquivo já protegido; seu inspetor independente também resolve módulos nativos. Variante direta passou três aplicações sucessivas antes da alteração de produção.
+
+**Aprovado após correção:** `fixed/acl-ntfs.json`: três cenários, com snapshots reais das DACLs. Arquivo preexistente herdado corrigido; principal, temporários e backups com herança desativada e exatamente uma ACE Allow/FullControl não herdada para o SID atual. O observador interceptou `writeFile` para inspecionar temporários/backups antes dos bytes fictícios. Falha EIO injetada no rename preservou os bytes originais e removeu temporários. Teste Windows do repositório executado, não ignorado.
+
+**Limites:** inspeção de DACL não simula login de outro usuário/administrador; não promete isolamento contra administrador. Falha arbitrária na verificação após rename continua fail-closed e pode deixar somente o backup anterior, sem restauração automática do principal; esse ramo não recebeu nova injeção específica. Reaplicar/verificar ACLs de todos os backups em cada leitura custa subprocessos e cresce com o histórico: timeouts observados e registrados abaixo, sem cache ou relaxamento das permissões.
+
+### F3 — resultado integrado da corrida original
+
+**Aprovado:** `fixed/cancel-before-commit-2.json`, 14/14. Mesmo preload externo da auditoria anterior suspende `fs.link` imediatamente antes da publicação. Arquivo ausente na barreira; pedido de cancelamento permanece sem ACK durante 600 ms; liberação publica os bytes completos; somente então resposta `cancelled_with_effects`. SSE bruto em `fixed/cancel-before-commit-events-2.txt`. A antiga confirmação prematura não foi reproduzida após a correção F3.
+
+**Aprovado no Edge:** cancelamento durante publicação mantém o arquivo e exibe a mensagem de que alterações já concluídas foram mantidas; screenshot `fixed/f3-ui-effects.png`. Cancelar resposta atrasada antes de iniciar a mutação impediu criação. Os 29 testes de rotas Agir passaram, incluindo aprovação pendente invalidada, aprovação tardia, consumo único e continuations concorrentes. Os testes de arquivo incluem duas criações concorrentes com um vencedor e escritores que detectam versão obsoleta. Não se alega rollback nem proteção contra corrida maliciosa da mesma conta, conforme D121.
+
+### F5-A — modos e política
+
+**Aprovado no Edge:** Perguntar sobrevive à recarga; Agente, Editar, Perguntar e Planejar sobrevivem a recargas individuais; Planejar sobrevive ao fechamento/reabertura do navegador com perfil persistente. Duas conversas com modos distintos mantêm suas escolhas ao alternar e recarregar. JSON malformado, array e modo desconhecido em localStorage são descartados; o modo desconhecido não é enviado como concessão. Registros e screenshots na integração. Não foi reiniciado o executável desktop Codex: o ciclo de vida testado foi o aplicativo web em Edge.
+
+**Política server-side aprovada:** Perguntar/Planejar recusam mutações, inclusive payload forjado com modo Agente, grants e workspace externo; sessão inexistente é recusada. Valores conhecidos são preferências locais, não grants. Restauração não altera as validações do backend; modo conhecido é registrado explicitamente antes de executar.
+
+### Regressão, comparabilidade e limites
+
+- Baseline Arena sem correções locais: focada 84 pass/14 fail/13 skip; global 897 pass/75 fail/26 skip. Falhas ACL explicam a maior parte da diferença nova; logs/JSON preservados na raiz da evidência.
+- Após correção, runner original sob carga: focada 96 pass/2 fail/13 skip; global 915 pass/57 fail/26 skip. Falhas novas são timeouts de 20 s, não relaxados no código nem nos testes versionados.
+- Runner diagnóstico externo: mesmo conteúdo dos testes, `vizinho.test.ts` em Node (fetch nativo não aceita AbortSignal de jsdom), teto 60 s e quatro workers. Focada **98 pass/0 fail/13 skip**: App 49/13, rotas Agir 29/0, providersRepo 17/0 (inclui ACL Windows), rotas Provedores 3/0.
+- A primeira global ajustada ficou 933 pass/39 fail/26 skip porque o harness omitiu `AGENTE_WINDOW_TEST_HOME`, fazendo seis testes de contexto/banco se autoignorarem. O flag foi corrigido e a execução completa repetida; placar final registrado abaixo. Nenhum resultado omitido ou tratado como aprovação.
+- Testes adicionais reais de arquivos: **21/21**, incluindo paths externos Unicode, links/junctions, conflitos, criação exclusiva, erro de rename, compartilhamento Windows e exclusão bloqueada. F2/F4 mantêm D121.
+- Typecheck passou após a correção; lint dirigido dos dois arquivos alterados passou. Lint global: **103 erros/19 avisos**, dívida distribuída anterior; sem alegar lint global verde. Build Vite e typecheck passaram no Windows, inclusive após a correção; avisos de chunks grandes permanecem. O wrapper executou `tsc -b --force` e `vite build` separadamente; não reativou helper nativo.
+- Comparação anterior: 923/51/20 original e 934/40/20 ajustada; 21/21 arquivos e 23/1 integração. A alteração de runner/timeout e o flag de isolamento são explícitos; não comparar 933/39/26 como se fosse a mesma cobertura. A falha antiga do assert POSIX 0600 desapareceu da suíte Windows, substituída por inspeção real de DACL.
+
+**39 falhas residuais da global ajustada:** 12 históricas em TerminalPanel (9), iconLabels (1), themeTokens (1), visualStates (1); 27 de portabilidade/expectativas Windows: gitHost (10, `mkdir` como executável Unix), worktrees (1, CRLF), fsHost (2, URI), searchEngine (2, URI), fronteiras de quatro casas (11, separadores), territorio (1, descrição POSIX versus path nativo). Nenhum desses arquivos foi alterado. A classificação deriva das mensagens individuais e da comparação com a auditoria anterior, não de uma suposta suíte global verde.
+
+**Prioridades:** P1 no baseline = gravação ACL bloqueada, corrigida localmente; P2 = custo crescente de subprocessos ACL e timeouts, dívida Windows/runner, lint e falhas globais; P2 = recuperação operacional após falha arbitrária pós-publicação ainda depende de backup. F3 original e persistência Perguntar corrigidas nos cenários reproduzidos. Provedores reais e homologação humana não executados. Não há homologação automática nem autorização implícita para D98/Fatia 13.
+
+### Fechamento dos placares e parecer
+
+Global ajustada final, com `AGENTE_WINDOW_TEST_HOME` habilitado: **939 pass/39 fail/20 skip, 998 testes em 121 arquivos (108 arquivos pass/13 fail)**. Comparação por nome de teste com o JSON da auditoria anterior: **zero falhas novas**; removida somente a falha `providersRepo: salva em 0600 e relê`. Ganho de cinco aprovados em relação a 934/40/20 é consistente com quatro testes adicionados e a antiga falha corrigida. Os seis testes de contexto/grants SQLite executaram e passaram. O runner original e os timeouts continuam reprovados e não foram sobrescritos por esse resultado diagnóstico.
+
+| Frente | Situação no escopo testado |
+|---|---|
+| F1 | Sessão/contexto/grants no servidor, Host/Origin e payload forjado passaram; seis testes de persistência/contexto executados. |
+| F2 | Leitura externa e interna, links estáticos e paths Windows passaram nos testes adicionais, respeitando D121. |
+| F3 | Corrida original passou em HTTP e UI; cancelamento pré-mutação, pós-conclusão e aprovação pendente/tardia passaram; concorrência coberta por rotas e disco. |
+| F4 | Criação exclusiva, leitura prévia, conflito observável e falhas de publicação passaram; não se alega CAS universal. |
+| F5-A | Quatro modos, recarga, perfil reaberto, conversas distintas, armazenamento inválido e política server-side passaram. |
+| F5-B | Catálogo inicial, seleção explícita de par, Auto, prova verified e bloqueio sem fallback passaram; atualização tardia de catálogo na UI é discriminada no resultado E2E final abaixo. |
+
+**Parecer:** a evidência resolve os defeitos reproduzidos de F3/Perguntar e valida DACL real após a correção adicional. Não permite declarar homologação global: persistem 39 falhas, lint global reprovado, timeouts, limites de recuperação e homologação humana pendente. É possível o dono avaliar depois uma autorização específica de investigação D98 com essas ressalvas; o reteste não fecha o Gate nem o inicia. Nenhuma implementação da Fatia 13.
+
+**E2E final e repetição dirigida (sem somar cenários sobrepostos):**
+
+- `fixed/integration-v3.json`: 26 pass/2 fail. Um fail era o harness de F5-B que supunha início de fetch após uma espera fixa de 1 s; foi substituído por barreira real no provedor fictício. O outro foi atualização de catálogo na UI além do teto de 10 s. F3 UI com efeito foi executado e passou nesta execução.
+- `final/integration-v3.json`: **27 pass/3 fail** em fixture de longa duração. A barreira corrigida de F5-B, cancelamento após publicação e aprovação pendente/tardia passaram. Três falhas ao fim: UI não voltou a Enviar em 15 s; o teste F3 UI seguinte ficou impedido pelo estado anterior; catálogo novo não apareceu em 10 s. Não se considera a falha em cascata uma nova reprodução da corrida F3. Todos os logs originais foram mantidos.
+- `e2e-repeat/integration-v3.json`: **6/6**, fixture nova, repetindo setup simulado, navegador, parada e atualização do catálogo com os mesmos limites originais, sem remover assertions. Portanto parada/catalogo não falham de forma determinística em fixture curta. Uma leitura HTTP do catálogo na fixture longa mediu 5.295 ms (`final/catalog-timing.json`), compatível com o custo da reaplicação de ACLs, mas insuficiente para atribuir toda intermitência exclusivamente a essa causa. F5-B fica aprovado nos contratos funcionais exercitados, com ressalva P2 de latência/intermitência E2E. A estabilidade da execução longa ainda impede homologação ampla.
+
+**Mudanças desta missão:** somente o repositório de Provedores e seu teste Windows, mais consolidação nos canônicos 03/06/07/09 e arquivamento do relatório auxiliar. Nenhuma alteração em F3, App, terminal, Explorer core/server ou EditorArea. Um único grupo funcional de correção ACL e evidências; sem push. Ao entregar, encerrar servidores/Edge de teste e aguardar avaliação do dono. Relatório e código não iniciam D98/Fatia 13.

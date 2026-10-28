@@ -1,5 +1,8 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-28 — reteste Windows e correção estreita de reaplicação da ACL
+- Baseline `24d1054`/`253d8e1` auditado; correção de ACL, reforço de teste Windows e consolidação documental no mesmo grupo funcional. Relatório auxiliar preservado em arquivo morto. Estado em 03, resultados e evidências em 09; sem push, homologação, D98 ou Fatia 13.
+
 ## 2026-10-27 — Continuidade F1–F5-B (D119), sem push ou homologação
 - F1 atualizado em `b2c49b4`: rotas locais sensíveis exigem Fetch Metadata nas leituras sem Origin; mutações exigem Origin exato e JSON. Unit `localBoundary` 6/6, typecheck e diff-check passaram; E2E/preview continuam pendentes.
 - F3 teste atualizado em commit separado `3d8695d`: claim único de aprovação agora é validado com addon nativo disponível ou indisponível; rotas+Agir 43/43. A falha anterior era pressuposto desatualizado sobre F2, não quebra do claim.

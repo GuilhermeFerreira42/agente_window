@@ -1,5 +1,7 @@
 # Auditoria Windows — correções estreitas e resultados
 
+> ARQUIVADO EM 2026-10-28. Snapshot das correções Linux em `253d8e1`/`24d1054`; não comprova Windows. Substituído, para resultados atuais, pelo reteste em `../09 - TESTES E AMBIENTE.md`, seção de 2026-10-28. Conteúdo histórico preservado abaixo.
+
 **Data:** 2026-10-27
 
 **Escopo:** F3 (cancelamento/publicação), F5-A (persistência do modo Perguntar) e ACL do arquivo de credenciais. D98 e Fatia 13 não foram iniciados.

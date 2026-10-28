@@ -44,7 +44,7 @@ foreach ($entry in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($entry) }
 $acl.SetOwner($sid)
 $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, [System.Security.AccessControl.FileSystemRights]::FullControl, [System.Security.AccessControl.AccessControlType]::Allow)
 [void]$acl.AddAccessRule($rule)
-Set-Acl -LiteralPath $p -AclObject $acl
+[System.IO.File]::SetAccessControl($p, $acl)
 $check = Get-Acl -LiteralPath $p
 $entries = @($check.Access)
 if (-not $check.AreAccessRulesProtected -or $entries.Count -ne 1) { throw 'Credential ACL verification failed.' }
@@ -61,7 +61,8 @@ async function aplicarAclPrivada(caminho: string): Promise<void> {
     await executarArquivo('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCRIPT_ACL_PRIVADA], {
       windowsHide: true,
       timeout: 10_000,
-      env: { ...process.env, AGENTE_WINDOW_CREDENTIAL_PATH: caminho },
+      // Windows PowerShell must resolve its own modules, not inherited PowerShell 7 modules.
+      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')), AGENTE_WINDOW_CREDENTIAL_PATH: caminho },
     })
   } catch {
     throw new Error('Não foi possível confirmar uma ACL privada para o arquivo de credenciais; acesso bloqueado.')
