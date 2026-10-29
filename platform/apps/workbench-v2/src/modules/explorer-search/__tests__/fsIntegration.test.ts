@@ -94,6 +94,29 @@ describe('fs single-port — probes HTTP (curl-style DoD)', () => {
     expect(body.size).toBe(4);
   });
 
+  it('POST /fs/statBatch returns complete metadata and per-item boundary errors', async () => {
+    const res = await probe('/fs/statBatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uris: [uri('README.md'), uri('../outside.txt')] }),
+    });
+    expect(res.status).toBe(200);
+    const results = (await json(res)).results as Array<Record<string, unknown>>;
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ ok: true, stat: { kind: 'file', size: 4, readonly: false } });
+    expect(results[1]).toMatchObject({ ok: false, code: 'forbidden_path', status: 403 });
+  });
+
+  it('POST /fs/statBatch rejects more than 64 URIs', async () => {
+    const res = await probe('/fs/statBatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uris: Array.from({ length: 65 }, () => uri('README.md')) }),
+    });
+    expect(res.status).toBe(400);
+    expect((await json(res)).code).toBe('invalid_query');
+  });
+
   it('fluxo completo: createFile(wx 409 no duplicado) → write → read → copy → rename → delete', async () => {
     const post = (p: string, body: Record<string, unknown>) =>
       probe(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

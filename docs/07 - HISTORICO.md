@@ -1,5 +1,10 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-29 — D98-SCM e D98-Explorer implementadas em commits locais separados
+- Etapa A/SCM preservada em `4f277db`; Etapa B/Explorer concluída após A em `29b1399`, sem push. Explorer usa fila compartilhada com batching interno limitado e `/fs/statBatch`, preserva a interface `FileSystemPortLike`, gera/descarta resultados por geração, coalesce repaints por frame e virtualiza a janela sem truncar a árvore.
+- Validações Linux: 0 e 1 arquivo, 3 repetições cada; 1k e 5k, 7/7 cada; expansão máxima observada 266 ms (1k) e 997,5 ms (5k), timer 32,5/94,4 ms, long-task máxima 59 ms (<150 ms). E2E funcional seletivo 6/6; upload/DnD permaneceu 403 na fronteira local, sem mudança de F1–F4.
+- Typecheck e ESLint dirigido passaram; Vitest focal 80/80. Global 989 passou, 12 falhou, 27 skipped; build Vite não concluiu por OOM/timeout. O lote de 64 difere do limite proposto de 16 operações; A/B pareado, build verde, upload browser e Windows permanecem pendentes. Não declarar homologação. Detalhes e comandos para Codex/Windows em `09 §3.8.4` e `arquivo_morto/auditorias_2026-10-28/d98/linux/Explorer-implementation-2026-10-29.md`.
+
 ## 2026-10-28 — continuação D98: SPECs candidatas e profiling final do Explorer
 - Baseline `70eba74`; somente documentação e diagnósticos. SPECs propostas no 06, estado no 03 e medições adicionais no 09 §3.8.2; pacote `d98/windows/continuacao`. Sem implementação de produção, aprovação de SPEC, homologação, push, Fatia 13 ou iniciativas M.
 

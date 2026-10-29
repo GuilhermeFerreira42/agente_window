@@ -299,6 +299,31 @@ export async function createExplorerFsServer(
             sendJson(res, 200, await host.stat(needUri()));
             return true;
           }
+          case '/fs/statBatch': {
+            const uris = body.uris;
+            if (!Array.isArray(uris) || uris.length === 0 || uris.length > 64) {
+              res.statusCode = 400;
+              sendJson(res, 400, { code: 'invalid_query', message: 'statBatch exige entre 1 e 64 URIs' });
+              return true;
+            }
+            const results = await Promise.all(uris.map(async (value): Promise<
+              | { ok: true; stat: Awaited<ReturnType<FsHost['stat']>> }
+              | { ok: false; code: string; message: string; status: number }
+            > => {
+              if (typeof value !== 'string') {
+                return { ok: false, code: 'invalid_query', message: 'URI de stat inválida', status: 400 };
+              }
+              try {
+                return { ok: true, stat: await host.stat(value as WorkspaceUri) };
+              } catch (error) {
+                const typed = error as FsHttpError;
+                const code = typeof typed.code === 'string' ? typed.code : 'io';
+                return { ok: false, code, message: typed.message ?? String(error), status: statusOf(code) };
+              }
+            }));
+            sendJson(res, 200, { results });
+            return true;
+          }
           case '/fs/createFile': {
             await host.createFile(needUri(), body.content as string | undefined);
             res.statusCode = 201;

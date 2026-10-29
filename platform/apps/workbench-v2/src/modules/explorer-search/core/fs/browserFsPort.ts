@@ -27,9 +27,18 @@ export class BrowserFsError extends Error {
   }
 }
 
+type BrowserFsStat = Awaited<ReturnType<FileSystemPortLike['stat']>>;
+type PendingStat = { uri: WorkspaceUri; resolve(stat: BrowserFsStat): void; reject(error: unknown): void };
+type StatBatchResult =
+  | { ok: true; stat: BrowserFsStat }
+  | { ok: false; code: string; message: string; status: number };
+const STAT_BATCH_SIZE = 64;
+
 export class BrowserFsPort implements FileSystemPortLike {
   private readonly base: string;
   private readonly watchClient: ExplorerFsWatchClient;
+  private readonly pendingStats: PendingStat[] = [];
+  private statFlushScheduled = false;
 
   constructor(options: BrowserFsPortOptions) {
     this.base = options.baseUrl ?? '';
@@ -93,11 +102,44 @@ export class BrowserFsPort implements FileSystemPortLike {
     ).then((r) => r.entries);
   }
 
-  stat(input: { uri: WorkspaceUri }) {
-    return this.post<{ uri: WorkspaceUri; size: number; mtimeMs: number; readonly: boolean; kind: 'file' | 'directory' }>(
-      '/fs/stat',
-      { uri: input.uri },
-    );
+  stat(input: { uri: WorkspaceUri }): Promise<BrowserFsStat> {
+    return new Promise<BrowserFsStat>((resolve, reject) => {
+      this.pendingStats.push({ uri: input.uri, resolve, reject });
+      if (this.statFlushScheduled) return;
+      this.statFlushScheduled = true;
+      queueMicrotask(() => this.flushStatBatch());
+    });
+  }
+
+  private flushStatBatch(): void {
+    this.statFlushScheduled = false;
+    const batch = this.pendingStats.splice(0, STAT_BATCH_SIZE);
+    if (batch.length === 0) return;
+    const request: Promise<StatBatchResult[]> = batch.length === 1
+      ? this.post<BrowserFsStat>('/fs/stat', { uri: batch[0].uri }).then((stat) => [{ ok: true, stat }])
+      : this.post<{ results: StatBatchResult[] }>('/fs/statBatch', { uris: batch.map((item) => item.uri) })
+        .then((response) => {
+          if (!Array.isArray(response.results) || response.results.length !== batch.length) {
+            throw new BrowserFsError('io', 'Resposta inválida do lote de stat', 500);
+          }
+          return response.results;
+        });
+
+    void request.then(
+      (results) => {
+        results.forEach((result, index) => {
+          const pending = batch[index];
+          if (result.ok) pending.resolve(result.stat);
+          else pending.reject(new BrowserFsError(result.code, result.message, result.status));
+        });
+      },
+      (error: unknown) => { for (const pending of batch) pending.reject(error); },
+    ).finally(() => {
+      if (this.pendingStats.length > 0 && !this.statFlushScheduled) {
+        this.statFlushScheduled = true;
+        queueMicrotask(() => this.flushStatBatch());
+      }
+    });
   }
 
   readFile(input: { uri: WorkspaceUri }) {

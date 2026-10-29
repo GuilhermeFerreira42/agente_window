@@ -22,7 +22,8 @@ import type {
   WorkspaceUri,
 } from '../contract';
 import { Emitter } from './emitter';
-import { ExplorerItem, ExplorerModel } from './explorerModel';
+import type { ExplorerItem } from './explorerModel';
+import { ExplorerModel } from './explorerModel';
 import { TreeState } from './treeState';
 import { collectDroppedFiles, uploadFiles } from './transfer/upload';
 import { downloadFiles } from './transfer/download';
@@ -58,32 +59,37 @@ export class ExplorerService implements IExplorerSearchApi {
 
   // ---- raiz ----
   async openFolder(input: { uri: WorkspaceUri }): Promise<void> {
-    const stat = await this.fs.stat({ uri: input.uri });
+    const generation = this.tree.beginGeneration();
+    const stat = await this.tree.stat(input.uri, generation);
+    if (!stat || !this.tree.isCurrentGeneration(generation)) return;
     if (stat.kind !== 'directory') {
       throw new Error(`openFolder: "${input.uri}" não é uma pasta`);
     }
+    if (this.root?.resource !== input.uri) this.tree.resetForRoot();
     this.model.clearRoot();
-    this.root = this.model.setRoot({
+    const root = this.model.setRoot({
       uri: input.uri,
       kind: 'directory',
       name: uriBasename(input.uri),
     });
-    if (this.root) {
-      await this.tree.ensureResolved(this.root);
-      this.tree.expand(this.root);
-    }
+    this.root = root;
+    await this.tree.ensureResolved(root, generation);
+    if (!this.tree.isCurrentGeneration(generation) || this.root !== root) return;
+    this.tree.expand(root);
     this.events.fire({ type: 'explorer.rootChanged', uri: input.uri });
   }
 
   // ---- navegação ----
   async open(input: { uri: WorkspaceUri }): Promise<void> {
     const item = this.mustFind(input.uri);
+    const generation = this.tree.currentGeneration;
     if (item.isDirectory) {
       if (this.tree.isExpanded(item.resource)) {
         this.tree.collapse(item);
         this.events.fire({ type: 'explorer.nodeCollapsed', uri: item.resource });
       } else {
-        await this.tree.ensureResolved(item);
+        await this.tree.ensureResolved(item, generation);
+        if (!this.tree.isCurrentGeneration(generation) || this.model.findClosest(item.resource) !== item) return;
         this.tree.expand(item);
         this.events.fire({ type: 'explorer.nodeExpanded', uri: item.resource });
       }
@@ -105,27 +111,30 @@ export class ExplorerService implements IExplorerSearchApi {
   }
 
   async refresh(options?: { uri?: WorkspaceUri }): Promise<void> {
-    // espelho upstream explorerService.refresh (:342): forgetChildren (mantém
-    // expansão e seleção — A2.6) seguido de re-resolve preguiçoso.
+    // Refresh invalidates queued/in-flight metadata work from the old snapshot,
+    // then resolves the current expanded model before publishing one snapshot.
     if (!this.root) return;
     const target = options?.uri ? this.model.findClosest(options.uri) : this.root;
-    if (!target) return;
-    if (target.isDirectory) {
-      target.forgetChildren();
-      await this.tree.ensureResolved(target);
-      // upstream tree.refresh(): descendentes expandidos são re-resolvidos
-      // (senão a UI mostra a pasta aberta e vazia até novo clique).
-      await this.resolveExpandedDescendants(target);
-      // A UI redesenha a cada evento do serviço — sem este aviso ela
-      // continuaria mostrando a lista velha (prova: pós-11, prova A).
-      this.events.fire({ type: 'explorer.refreshed', uri: target.resource })
-    }
+    if (!target || !target.isDirectory) return;
+    const root = this.root;
+    const generation = this.tree.beginGeneration();
+    target.forgetChildren();
+    await this.tree.ensureResolved(target, generation);
+    if (!this.tree.isCurrentGeneration(generation) || this.root !== root) return;
+    // A subdirectory refresh can invalidate queued stats elsewhere too. Rewalk
+    // the expanded model; already-resolved branches are cache hits, unresolved
+    // branches are resumed so a cancelled old-generation load cannot leave a
+    // visible expanded branch empty.
+    await this.resolveExpandedDescendants(root, generation);
+    if (!this.tree.isCurrentGeneration(generation) || this.root !== root) return;
+    this.events.fire({ type: 'explorer.refreshed', uri: target.resource });
   }
 
-  private async resolveExpandedDescendants(dir: ExplorerItem): Promise<void> {
-    for (const child of await this.tree.ensureResolved(dir)) {
+  private async resolveExpandedDescendants(dir: ExplorerItem, generation: number): Promise<void> {
+    for (const child of await this.tree.ensureResolved(dir, generation)) {
+      if (!this.tree.isCurrentGeneration(generation)) return;
       if (child.isDirectory && this.tree.isExpanded(child.resource)) {
-        await this.resolveExpandedDescendants(child);
+        await this.resolveExpandedDescendants(child, generation);
       }
     }
   }
@@ -133,7 +142,9 @@ export class ExplorerService implements IExplorerSearchApi {
   async expand(input: { uri: WorkspaceUri }): Promise<void> {
     const item = this.mustFind(input.uri);
     if (item.isDirectory) {
-      await this.tree.ensureResolved(item);
+      const generation = this.tree.currentGeneration;
+      await this.tree.ensureResolved(item, generation);
+      if (!this.tree.isCurrentGeneration(generation) || this.model.findClosest(item.resource) !== item) return;
       this.tree.expand(item);
       this.events.fire({ type: 'explorer.nodeExpanded', uri: item.resource });
     }
@@ -443,10 +454,15 @@ export class ExplorerService implements IExplorerSearchApi {
   }
 
   private async refreshAfterOp(dirUri: WorkspaceUri): Promise<void> {
+    const generation = this.tree.beginGeneration();
+    const root = this.root;
     const parent = this.model.findClosest(dirUri);
     if (parent) {
       parent.forgetChildren();
-      await this.tree.ensureResolved(parent);
+      await this.tree.ensureResolved(parent, generation);
+      if (root && this.tree.isCurrentGeneration(generation) && this.root === root) {
+        await this.resolveExpandedDescendants(root, generation);
+      }
     } else if (this.root) {
       await this.refresh();
     }

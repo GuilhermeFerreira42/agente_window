@@ -29,6 +29,7 @@ import {
 } from '../core/menus/viewTitleMenus';
 import type { ExplorerViewId, ExplorerViewsVisibility } from '../core/menus/viewTitleMenus';
 import { saveBlob } from './transfer/saveBlob';
+import { computeVirtualTreeRange } from './virtualTreeWindow';
 import type { ExplorerActiveFileApi } from './activeFileApi';
 import type { OutlineRow } from '../core/outline/outlineModel';
 import type { TimelineItem } from '../core/timeline/timelineModel';
@@ -254,7 +255,31 @@ const RowShell: React.FC<RowShellProps> = ({ depth, index, isDir, expanded, clas
 class ViewRenderTick {
   private listeners = new Set<() => void>();
   private v = 0;
-  bump(): void { this.v++; for (const l of [...this.listeners]) l(); }
+  private scheduled = false;
+  private cancelPending: (() => void) | null = null;
+  bump(): void {
+    if (this.scheduled) return;
+    this.scheduled = true;
+    const flush = () => {
+      this.scheduled = false;
+      this.cancelPending = null;
+      this.v++;
+      for (const listener of [...this.listeners]) listener();
+    };
+    if (typeof globalThis.requestAnimationFrame === 'function') {
+      const handle = globalThis.requestAnimationFrame(flush);
+      this.cancelPending = () => globalThis.cancelAnimationFrame(handle);
+    } else {
+      const handle = globalThis.setTimeout(flush, 0);
+      this.cancelPending = () => globalThis.clearTimeout(handle);
+    }
+  }
+  dispose(): void {
+    this.cancelPending?.();
+    this.cancelPending = null;
+    this.scheduled = false;
+    this.listeners.clear();
+  }
   subscribe = (l: () => void): (() => void) => { this.listeners.add(l); return () => this.listeners.delete(l); };
   snapshot = (): number => this.v;
 }
@@ -281,6 +306,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   if (!tickRef.current) tickRef.current = new ViewRenderTick();
   const tick = tickRef.current;
   const version = React.useSyncExternalStore(tick.subscribe, tick.snapshot, tick.snapshot);
+  React.useEffect(() => () => tick.dispose(), [tick]);
 
   // ---- estado local ----
   const [expandedPanes, setExpandedPanes] = React.useState<Record<PaneId, boolean>>({
@@ -316,6 +342,18 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   const dragData = React.useRef<DndData | null>(null);
   const anchorRef = React.useRef<WorkspaceUri | null>(null); // âncora do Shift+click
   const listRef = React.useRef<HTMLDivElement>(null);
+  const pendingScrollAnchorRef = React.useRef<{
+    uri: WorkspaceUri;
+    index: number;
+    offset: number;
+    nextUri?: WorkspaceUri;
+    previousUri?: WorkspaceUri;
+    focusedUri: WorkspaceUri | null;
+    focusedNextUri?: WorkspaceUri;
+    focusedPreviousUri?: WorkspaceUri;
+  } | null>(null);
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const [viewportHeight, setViewportHeight] = React.useState(ROW_HEIGHT * 20);
   const viewletFocusRef = React.useRef(false);
 
   // ---- derivado do serviço ----
@@ -326,12 +364,82 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   const rows = allRows
     .filter((r) => r.item !== root)
     .map((r) => ({ item: r.item, depth: r.depth - rootDepth - 1 }));
+  const rowsRef = React.useRef(rows);
+  rowsRef.current = rows;
   const selection = service.getSelection();
   const selectionSet = new Set(selection);
   const focusedUri = selection[selection.length - 1] ?? null;
   const clip = service.getClipboardState();
   const cutSet = new Set(clip.kind === 'cut' ? clip.uris : []);
   const rootName = root ? (root.name || uriBasename(root.resource)) : '';
+  const focusedRowIndex = rows.findIndex((row) => row.item.resource === focusedUri);
+  const inlineCreateIndex = inlineEdit && inlineEdit.mode !== 'rename'
+    ? (inlineEdit.parentUri === root?.resource ? 0 : rows.findIndex((row) => row.item.resource === inlineEdit.parentUri) + 1)
+    : -1;
+  const focusedIndex = focusedRowIndex >= 0 && inlineCreateIndex >= 0 && inlineCreateIndex <= focusedRowIndex
+    ? focusedRowIndex + 1
+    : focusedRowIndex;
+
+  React.useLayoutEffect(() => {
+    const element = listRef.current;
+    pendingScrollAnchorRef.current = null;
+    if (element) element.scrollTop = 0;
+    setScrollTop(0);
+  }, [root?.resource]);
+
+  React.useLayoutEffect(() => {
+    const element = listRef.current;
+    if (!element) return;
+    const updateHeight = () => setViewportHeight(Math.max(ROW_HEIGHT, element.clientHeight || ROW_HEIGHT * 20));
+    updateHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [expandedPanes.folders, root?.resource]);
+
+  React.useLayoutEffect(() => {
+    const element = listRef.current;
+    if (!element || focusedIndex < 0) return;
+    const top = focusedIndex * ROW_HEIGHT;
+    const bottom = top + ROW_HEIGHT;
+    const height = element.clientHeight || viewportHeight;
+    let nextScrollTop = element.scrollTop;
+    if (top < nextScrollTop) nextScrollTop = top;
+    else if (bottom > nextScrollTop + height) nextScrollTop = Math.max(0, bottom - height);
+    if (nextScrollTop !== element.scrollTop) {
+      element.scrollTop = nextScrollTop;
+      setScrollTop(nextScrollTop);
+    }
+  }, [focusedIndex, focusedUri, viewportHeight]);
+
+  React.useLayoutEffect(() => {
+    const anchor = pendingScrollAnchorRef.current;
+    const element = listRef.current;
+    if (!anchor || !element) return;
+    const indexFor = (uri?: WorkspaceUri) => uri ? rows.findIndex((row) => row.item.resource === uri) : -1;
+    const anchorIndex = [anchor.uri, anchor.nextUri, anchor.previousUri]
+      .map(indexFor)
+      .find((candidate) => candidate >= 0);
+    // A concorrência pode publicar primeiro um snapshot parcial/obsoleto. Não
+    // descarte a âncora nem mova para o topo; aguarde a próxima geração visível.
+    if (anchorIndex == null) return;
+
+    pendingScrollAnchorRef.current = null;
+    const nextTop = Math.max(0, anchorIndex * ROW_HEIGHT + anchor.offset);
+    element.scrollTop = nextTop;
+    setScrollTop(nextTop);
+    if (anchor.focusedUri && service.findItem(anchor.focusedUri)?.resource !== anchor.focusedUri) {
+      const neighborIndex = [anchor.focusedNextUri, anchor.focusedPreviousUri]
+        .map(indexFor)
+        .find((candidate) => candidate >= 0);
+      if (neighborIndex != null) {
+        const neighborUri = rows[neighborIndex].item.resource;
+        const retainedSelection = service.getSelection().filter((uri) => service.findItem(uri)?.resource === uri && uri !== neighborUri);
+        service.select({ uris: [...retainedSelection, neighborUri] });
+      }
+    }
+  }, [version, rows, service]);
 
   // ---- eventos do serviço → re-render + Open Editors + Timeline ----
   React.useEffect(() => service.onEvent((e: ExplorerSearchEvent) => {
@@ -437,6 +545,25 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
 
   const refreshAll = React.useCallback(() => {
     resetUploadDirCache();
+    const element = listRef.current;
+    const currentRows = rowsRef.current;
+    const index = element ? Math.min(currentRows.length - 1, Math.floor(element.scrollTop / ROW_HEIGHT)) : -1;
+    const row = index >= 0 ? currentRows[index] : undefined;
+    const focusedUri = service.getSelection().at(-1) ?? null;
+    const focusedIndex = focusedUri ? currentRows.findIndex((item) => item.item.resource === focusedUri) : -1;
+    const anchor = element && row
+      ? {
+          uri: row.item.resource,
+          index,
+          offset: element.scrollTop - index * ROW_HEIGHT,
+          nextUri: currentRows[index + 1]?.item.resource,
+          previousUri: currentRows[index - 1]?.item.resource,
+          focusedUri,
+          focusedNextUri: focusedIndex >= 0 ? currentRows[focusedIndex + 1]?.item.resource : undefined,
+          focusedPreviousUri: focusedIndex > 0 ? currentRows[focusedIndex - 1]?.item.resource : undefined,
+        }
+      : null;
+    pendingScrollAnchorRef.current = anchor;
     void service.refresh().then(() => tick.bump(), () => tick.bump());
   }, [service, tick]);
 
@@ -797,20 +924,27 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
     }
   }
   const rowCount = rows.length + (inlineEdit && inlineEdit.mode !== 'rename' ? 1 : 0);
+  const virtualRange = computeVirtualTreeRange({
+    totalCount: rowCount,
+    scrollTop,
+    viewportHeight,
+    rowHeight: ROW_HEIGHT,
+    overscan: 4,
+  });
 
   void version;
 
   const renderRows = (): React.ReactNode[] => {
     const out: React.ReactNode[] = [];
-    let vi = 0;
-    const pushInline = () => {
+    const isCreating = inlineEdit != null && inlineEdit.mode !== 'rename';
+    const pushInline = (index: number) => {
       const isRename = inlineEdit!.mode === 'rename';
       const target = isRename && inlineEdit!.targetUri ? service.findItem(inlineEdit!.targetUri) : null;
       const isDir = isRename ? !!target?.isDirectory : inlineEdit!.mode === 'create-folder';
       const cls = target ? iconLabelClasses(target, ['explorer-item-edited']) : `monaco-icon-label ${isDir ? 'folder-icon' : 'file-icon'} explorer-item explorer-item-edited`;
       out.push(
-        <RowShell key="__inline" depth={inlineEdit!.depth} index={vi++} isDir={isDir} expanded={false} className="focused"
-          aria={{ 'aria-level': inlineEdit!.depth + 1, 'aria-label': isRename ? 'Rename' : 'New' }}>
+        <RowShell key="__inline" depth={inlineEdit!.depth} index={index} isDir={isDir} expanded={false} className="focused"
+          aria={{ 'aria-level': inlineEdit!.depth + 1, 'aria-label': isRename ? 'Rename' : 'New', 'aria-posinset': index + 1, 'aria-setsize': rowCount }}>
           <div className={cls} style={{ display: 'flex' }}>
             <div className="monaco-icon-label-container">
               <InlineInput defaultValue={target?.name ?? ''} error={inlineEdit!.error} onCommit={commitInline} onCancel={cancelInline} />
@@ -819,11 +953,21 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
         </RowShell>,
       );
     };
-    if (inlineEdit && inlineEdit.mode !== 'rename' && inlineIndex === 0) pushInline();
-    rows.forEach((r, i) => {
-      const { item, depth } = r;
+
+    for (let index = virtualRange.start; index < virtualRange.end; index++) {
+      if (inlineEdit?.mode === 'rename' && inlineIndex === index) {
+        pushInline(index);
+        continue;
+      }
+      if (isCreating && inlineIndex === index) {
+        pushInline(index);
+        continue;
+      }
+      const sourceIndex = isCreating && index > inlineIndex ? index - 1 : index;
+      const row = rows[sourceIndex];
+      if (!row) continue;
+      const { item, depth } = row;
       const uri = item.resource;
-      if (inlineEdit?.mode === 'rename' && inlineIndex === i) { pushInline(); return; }
       const expanded = item.isDirectory && service.isExpandedUri(uri);
       const selected = selectionSet.has(uri);
       const focused = focusedUri === uri;
@@ -832,7 +976,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
         <RowShell
           key={uri}
           depth={depth}
-          index={vi++}
+          index={index}
           isDir={item.isDirectory}
           expanded={expanded}
           dataUri={uri}
@@ -842,6 +986,8 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
             'aria-level': depth + 1,
             'aria-label': item.name,
             'aria-selected': selected,
+            'aria-posinset': index + 1,
+            'aria-setsize': rowCount,
             ...(item.isDirectory ? { 'aria-expanded': expanded } : {}),
           }}
           onTwistie={() => openRow(uri)}
@@ -863,8 +1009,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
           </div>
         </RowShell>,
       );
-      if (inlineEdit && inlineEdit.mode !== 'rename' && inlineIndex === i + 1) pushInline();
-    });
+    }
     return out;
   };
 
@@ -901,7 +1046,6 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                 ) : (
                   <div className={`explorer-folders-view file-icon-themable-tree show-file-icons align-icons-and-twisties${dropTargetUri === root.resource ? ' drop-target-root' : ''}`}>
                     <div
-                      ref={listRef}
                       className={`monaco-list list_id_1 mouse-support${listFocused ? ' focused' : ''}${selection.length > 1 ? ' selection-multiple' : selection.length === 1 ? ' selection-single' : ' selection-none'}`}
                       role="tree"
                       aria-label="Files Explorer"
@@ -914,7 +1058,12 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                       onDragOver={(ev) => { if (!(ev.target as HTMLElement).closest('[role="treeitem"]')) onDragOverTarget(null, ev); }}
                       onDrop={onDrop}
                     >
-                      <div className="monaco-scrollable-element" role="presentation">
+                      <div
+                        ref={listRef}
+                        className="monaco-scrollable-element"
+                        role="presentation"
+                        onScroll={(ev) => setScrollTop(ev.currentTarget.scrollTop)}
+                      >
                         <div className="monaco-list-rows" style={{ height: rowCount * ROW_HEIGHT }}>
                           {renderRows()}
                         </div>

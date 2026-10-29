@@ -5,6 +5,8 @@
 // ============================================================================
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserFsPort, BrowserFsError } from '../core/fs/browserFsPort';
+import { ExplorerItem } from '../core/explorerModel';
+import { TreeState } from '../core/treeState';
 import type { ExplorerFsWatchClient } from '../core/watchClient';
 import type { WorkspaceUri } from '../contract';
 
@@ -67,6 +69,71 @@ describe('browserFsPort — mapeamento endpoint↔método (04_10 §2.1/04_15 4.3
     const rf = await port.readFile({ uri: U('a.txt') });
     expect(rf.content).toBe('x');
     expect(fetchRecs[2].url).toBe(`/fs/read?uri=${encodeURIComponent(U('a.txt'))}`);
+  });
+
+  it('coalesces concurrent stat calls into bounded 64-item transport batches', async () => {
+    fetchImpl = async (url, init) => {
+      if (!url.endsWith('/fs/statBatch')) return okJson({ uri: U('single'), size: 1, mtimeMs: 1, readonly: false, kind: 'file' });
+      const uris = (JSON.parse(String(init?.body)) as { uris: WorkspaceUri[] }).uris;
+      return okJson({ results: uris.map((uri) => ({
+        ok: true,
+        stat: { uri, size: 1, mtimeMs: 1, readonly: false, kind: 'file' },
+      })) });
+    };
+    const stats = await Promise.all(Array.from({ length: 100 }, (_, index) => port.stat({ uri: U(`file-${index}.txt`) })));
+
+    expect(stats).toHaveLength(100);
+    const batches = fetchRecs.filter((record) => record.url.endsWith('/fs/statBatch'));
+    expect(batches).toHaveLength(2);
+    expect(JSON.parse(String(batches[0].init?.body)).uris).toHaveLength(64);
+    expect(JSON.parse(String(batches[1].init?.body)).uris).toHaveLength(36);
+  });
+
+  it('preserves per-URI errors in a stat batch without failing successful siblings', async () => {
+    fetchImpl = async () => okJson({ results: [
+      { ok: true, stat: { uri: U('ok.txt'), size: 1, mtimeMs: 1, readonly: false, kind: 'file' } },
+      { ok: false, code: 'file_not_found', message: 'gone', status: 404 },
+    ] });
+    const results = await Promise.allSettled([
+      port.stat({ uri: U('ok.txt') }),
+      port.stat({ uri: U('gone.txt') }),
+    ]);
+    expect(results[0].status).toBe('fulfilled');
+    expect(results[1]).toMatchObject({ status: 'rejected', reason: { code: 'file_not_found', status: 404 } });
+  });
+
+  it('TreeState descarta resultado de statBatch já iniciado após avançar a geração', async () => {
+    const rootUri = U('root');
+    let listCalls = 0;
+    let announceOldBatch!: () => void;
+    let releaseOldBatch!: () => void;
+    const oldBatchStarted = new Promise<void>((resolve) => { announceOldBatch = resolve; });
+    const oldBatchGate = new Promise<void>((resolve) => { releaseOldBatch = resolve; });
+    const statResult = (uri: WorkspaceUri) => ({ ok: true, stat: { uri, size: 1, mtimeMs: 1, readonly: false, kind: 'file' as const } });
+    fetchImpl = async (url, init) => {
+      if (url.startsWith('/fs/list?')) {
+        listCalls++;
+        const names = listCalls === 1 ? ['old-a.txt', 'old-b.txt'] : ['new-a.txt', 'new-b.txt'];
+        return okJson({ entries: names.map((name) => ({ uri: U(`root/${name}`), name, kind: 'file' })) });
+      }
+      const uris = (JSON.parse(String(init?.body)) as { uris: WorkspaceUri[] }).uris;
+      if (uris.some((uri) => uri.endsWith('old-a.txt'))) {
+        announceOldBatch();
+        await oldBatchGate;
+      }
+      return okJson({ results: uris.map(statResult) });
+    };
+    const tree = new TreeState(port, () => 'default');
+    const root = new ExplorerItem({ uri: rootUri, kind: 'directory' });
+    const obsolete = tree.ensureResolved(root);
+    await oldBatchStarted;
+
+    const generation = tree.beginGeneration();
+    await tree.ensureResolved(root, generation);
+    expect([...root.children.keys()].sort()).toEqual(['new-a.txt', 'new-b.txt']);
+    releaseOldBatch();
+    expect(await obsolete).toEqual([]);
+    expect([...root.children.keys()].sort()).toEqual(['new-a.txt', 'new-b.txt']);
   });
 
   it('readFileBinary adiciona binary=1 e maxBytes; sem maxBytes omite o parâmetro', async () => {

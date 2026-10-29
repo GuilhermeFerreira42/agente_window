@@ -112,6 +112,55 @@ describe('explorerService — openFolder / navegação', () => {
     expect(service.getVisibleRows().map((r) => r.item.name)).toContain('newDir');
     expect(fs.calls.list).toBeGreaterThan(listsBefore);
   });
+
+  it('refresh mais recente vence, descarta metadados obsoletos e preserva expansão', async () => {
+    class DelayedRefreshFs extends FakeFsPort {
+      holdFirstWave = false;
+      started = 0;
+      private release!: () => void;
+      readonly gate = new Promise<void>((resolve) => { this.release = resolve; });
+      releaseWave(): void { this.release(); }
+      override async stat(input: { uri: WorkspaceUri }) {
+        if (this.holdFirstWave && this.started < 16) {
+          this.started++;
+          await this.gate;
+        }
+        return super.stat(input);
+      }
+    }
+    const delayedFs = new DelayedRefreshFs(ROOT);
+    delayedFs.seed([{ path: '/ws/src', kind: 'directory' }, { path: '/ws/src/initial.txt', kind: 'file' }]);
+    const delayedService = new ExplorerService(delayedFs);
+    const refreshEvents: ExplorerSearchEvent[] = [];
+    delayedService.onEvent((event) => refreshEvents.push(event));
+    await delayedService.openFolder({ uri: ROOT });
+    const src = asWorkspaceUri('/ws/src');
+    await delayedService.expand({ uri: src });
+    for (let index = 0; index < 40; index++) {
+      await delayedFs.createFile({ uri: asWorkspaceUri(`/ws/src/old-${String(index).padStart(2, '0')}.txt`) });
+    }
+    delayedFs.holdFirstWave = true;
+    const obsoleteRefresh = delayedService.refresh({ uri: src });
+    const deadline = Date.now() + 1_000;
+    while (delayedFs.started < 16) {
+      if (Date.now() > deadline) throw new Error('timed out waiting for old refresh stats');
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+
+    const removedUri = asWorkspaceUri('/ws/src/old-00.txt');
+    await delayedFs.remove({ uri: removedUri });
+    await delayedFs.createFile({ uri: asWorkspaceUri('/ws/src/latest.txt') });
+    const latestRefresh = delayedService.refresh({ uri: src });
+    delayedFs.releaseWave();
+    await Promise.all([obsoleteRefresh, latestRefresh]);
+
+    const srcItem = delayedService.getModelRoot()!.find(src)!;
+    expect(delayedService.getTreeForTests().isExpanded(src)).toBe(true);
+    expect(srcItem.getChild('latest.txt')).not.toBeNull();
+    expect(srcItem.getChild('old-00.txt')).toBeUndefined();
+    expect(srcItem.children.size).toBe(41);
+    expect(refreshEvents.filter((event) => event.type === 'explorer.refreshed' && event.uri === src)).toHaveLength(1);
+  });
 });
 
 describe('explorerService — criar (convenção Q3: URI final)', () => {
@@ -287,6 +336,7 @@ describe('explorerService — sort / seleção / portas de teste', () => {
 
   it('openFolder outra pasta re-raíza o módulo (Q4 single-root)', async () => {
     await boot();
+    service.select({ uris: [asWorkspaceUri('/ws/README.md')] });
     fs.seed([
       { path: '/ws/proj2', kind: 'directory' },
       { path: '/ws/proj2/a.ts', kind: 'file' },
@@ -295,6 +345,44 @@ describe('explorerService — sort / seleção / portas de teste', () => {
     expect(service.getModelRoot()!.resource).toBe('file:///ws/proj2');
     expect(childNames(asWorkspaceUri('/ws/proj2'))).toEqual(['a.ts']);
     expect(events.filter((e) => e.type === 'explorer.rootChanged')).toHaveLength(2);
+    expect(service.getSelection()).toEqual([]);
+  });
+
+  it('ignora openFolder antigo quando uma nova raiz vence a corrida', async () => {
+    class DelayedRootFs extends FakeFsPort {
+      private releaseOld!: () => void;
+      readonly oldGate = new Promise<void>((resolve) => { this.releaseOld = resolve; });
+      oldStarted = false;
+      releaseOldRoot(): void { this.releaseOld(); }
+      override async stat(input: { uri: WorkspaceUri }) {
+        if (input.uri === asWorkspaceUri('/ws/old-root')) {
+          this.oldStarted = true;
+          await this.oldGate;
+        }
+        return super.stat(input);
+      }
+    }
+    const delayed = new DelayedRootFs(ROOT);
+    delayed.seed([
+      { path: '/ws/old-root', kind: 'directory' },
+      { path: '/ws/new-root', kind: 'directory' },
+      { path: '/ws/new-root/current.txt', kind: 'file' },
+    ]);
+    const racingService = new ExplorerService(delayed);
+    const raceEvents: ExplorerSearchEvent[] = [];
+    racingService.onEvent((event) => raceEvents.push(event));
+    const obsoleteOpen = racingService.openFolder({ uri: asWorkspaceUri('/ws/old-root') });
+    while (!delayed.oldStarted) await new Promise((resolve) => setTimeout(resolve, 1));
+
+    await racingService.openFolder({ uri: asWorkspaceUri('/ws/new-root') });
+    delayed.releaseOldRoot();
+    await obsoleteOpen;
+
+    expect(racingService.getModelRoot()?.resource).toBe('file:///ws/new-root');
+    expect(raceEvents.filter((event) => event.type === 'explorer.rootChanged')).toEqual([
+      { type: 'explorer.rootChanged', uri: asWorkspaceUri('/ws/new-root') },
+    ]);
+    expect(racingService.getTreeForTests().getSelection()).toEqual([]);
   });
 
   it('dispose limpa listeners e raiz', async () => {

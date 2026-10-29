@@ -18,7 +18,7 @@
 :is(.attach-viewlet, .scm-viewlet) .scm-view .monaco-list-rows { position: relative; width: 100%; }
 /* 22 px por linha (`.scm-view .monaco-list-row { line-height: 22px }`) */
 :is(.attach-viewlet, .scm-viewlet) .scm-view .monaco-list-row {
-  position: relative; box-sizing: border-box; overflow: hidden; width: 100%;
+  position: absolute; left: 0; box-sizing: border-box; overflow: hidden; width: 100%;
   height: 22px; line-height: 22px; cursor: pointer; touch-action: none;
 }
 :is(.attach-viewlet, .scm-viewlet) .scm-view .monaco-list-row.cursor-default { cursor: default; }
@@ -126,7 +126,7 @@
 :is(.attach-viewlet, .scm-viewlet) .tab[data-kind="changes"] { padding-right: 10px; }
 
 /* 4.7-c: lista sem alterações (repo limpo) — texto secundário, mesma família do "no repo" */
-:is(.attach-viewlet, .scm-viewlet) .scm-view .scm-empty { padding: 6px 20px; color: var(--vscode-descriptionForeground); font-size: 13px; line-height: 22px; user-select: none; }
+:is(.attach-viewlet, .scm-viewlet) .scm-empty { padding: 0 20px; color: var(--vscode-descriptionForeground); font-size: 13px; line-height: 22px; user-select: none; }
 /* 4.7-c: badge de contagem na aba fixa "Changes" (tokens de badge do tema; some com 0) */
 :is(.attach-viewlet, .scm-viewlet) .tab .tab-badge { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; line-height: 18px; text-align: center; font-weight: 400; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 

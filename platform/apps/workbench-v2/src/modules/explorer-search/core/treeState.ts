@@ -13,6 +13,16 @@ const EXPLORER_EXCLUDED_NAMES: ReadonlySet<string> = new Set<string>(EXPLORER_DE
 import { ExplorerItem } from './explorerModel';
 import { uriIsEqualOrParent, uriJoinPath, uriPath, uriRelative } from './uri';
 
+const MAX_CONCURRENT_STATS = 64;
+type FileStat = Awaited<ReturnType<FileSystemPortLike['stat']>>;
+type PendingStat = {
+  generation: number;
+  uri: WorkspaceUri;
+  resolve(value: FileStat | undefined): void;
+  reject(error: unknown): void;
+};
+type Resolution = { generation: number; promise: Promise<ExplorerItem[]> };
+
 export interface VisibleExplorerRow {
   item: ExplorerItem;
   depth: number;
@@ -23,6 +33,10 @@ export class TreeState {
   private readonly expanded = new Set<WorkspaceUri>();
   private readonly selected = new Set<WorkspaceUri>();
   private focusUri: WorkspaceUri | null = null;
+  private generation = 0;
+  private activeStats = 0;
+  private readonly pendingStats: PendingStat[] = [];
+  private readonly resolutions = new Map<WorkspaceUri, Resolution>();
 
   constructor(
     private readonly fs: FileSystemPortLike,
@@ -103,40 +117,116 @@ export class TreeState {
     this.selected.clear();
     this.focusUri = null;
   }
+  resetForRoot(): void {
+    this.expanded.clear();
+    this.clearSelection();
+  }
   getSelection(): WorkspaceUri[] {
     return [...this.selected];
   }
 
-  // ---- lazy loading (port ExplorerDataSource:92) ----
-  /** Resolve filhos de um item do modelo UMA vez por diretório; chamadas
-   *  subsequentes não relêem o disco (A2.1). */
-  async ensureResolved(item: ExplorerItem): Promise<ExplorerItem[]> {
-    if (!item.isDirectory) return []; // arquivos não têm filhos (guard p/ callers genéricos)
-    if (item.isDirectoryResolved) return this.childrenOf(item);
-    // FilesFilter upstream (`files.exclude` `**/<nome>`): descarta antes do stat.
+  // ---- lazy loading + shared stat queue (port ExplorerDataSource:92) ----
+  /** Invalida trabalho não iniciado e torna obsoletos resultados em voo.
+   *  Operações de filesystem já iniciadas terminam normalmente para liberar
+   *  seus slots; nenhum resultado de uma geração antiga é aplicado à árvore. */
+  beginGeneration(): number {
+    this.generation++;
+    this.resolutions.clear();
+    const retained: PendingStat[] = [];
+    for (const task of this.pendingStats) {
+      if (task.generation === this.generation) retained.push(task);
+      else task.resolve(undefined);
+    }
+    this.pendingStats.length = 0;
+    this.pendingStats.push(...retained);
+    this.drainStats();
+    return this.generation;
+  }
+
+  get currentGeneration(): number {
+    return this.generation;
+  }
+
+  isCurrentGeneration(generation: number): boolean {
+    return generation === this.generation;
+  }
+
+  /** Usa a mesma fila limitada para stats de raiz e metadados dos filhos. */
+  stat(uri: WorkspaceUri, generation = this.generation): Promise<FileStat | undefined> {
+    if (!this.isCurrentGeneration(generation)) return Promise.resolve(undefined);
+    return new Promise<FileStat | undefined>((resolve, reject) => {
+      this.pendingStats.push({ generation, uri, resolve, reject });
+      this.drainStats();
+    });
+  }
+
+  private drainStats(): void {
+    while (this.activeStats < MAX_CONCURRENT_STATS && this.pendingStats.length > 0) {
+      const task = this.pendingStats.shift()!;
+      if (!this.isCurrentGeneration(task.generation)) {
+        task.resolve(undefined);
+        continue;
+      }
+      this.activeStats++;
+      void Promise.resolve()
+        .then(() => this.fs.stat({ uri: task.uri }))
+        .then(
+          (result) => task.resolve(this.isCurrentGeneration(task.generation) ? result : undefined),
+          (error: unknown) => {
+            if (this.isCurrentGeneration(task.generation)) task.reject(error);
+            else task.resolve(undefined);
+          },
+        )
+        .finally(() => {
+          this.activeStats--;
+          this.drainStats();
+        });
+    }
+  }
+
+  /** Resolve filhos de um item UMA vez por diretório; chamadas concorrentes
+   *  compartilham a mesma listagem e os mesmos stats. */
+  ensureResolved(item: ExplorerItem, generation = this.generation): Promise<ExplorerItem[]> {
+    if (!item.isDirectory || !this.isCurrentGeneration(generation)) return Promise.resolve([]);
+    if (item.isDirectoryResolved) return Promise.resolve(this.childrenOf(item));
+    const existing = this.resolutions.get(item.resource);
+    if (existing?.generation === generation) return existing.promise;
+
+    const promise = this.resolveDirectory(item, generation);
+    this.resolutions.set(item.resource, { generation, promise });
+    void promise.then(
+      () => { if (this.resolutions.get(item.resource)?.promise === promise) this.resolutions.delete(item.resource); },
+      () => { if (this.resolutions.get(item.resource)?.promise === promise) this.resolutions.delete(item.resource); },
+    );
+    return promise;
+  }
+
+  private async resolveDirectory(item: ExplorerItem, generation: number): Promise<ExplorerItem[]> {
     const entries = (await this.fs.list({ uri: item.resource }))
       .filter((e) => !EXPLORER_EXCLUDED_NAMES.has(e.name));
-    // Upstream: IFileStat vem COMPLETO (mtime, readonly) de statDir. Nossa
-    // lista (contrato congelado 04_10 §2.1) só carrega uri/name/kind — então
-    // enriquecemos com stat() em lote (1x por diretório = A2.1) para o
-    // FileSorter 'modified' e para a política readonly do DnD funcionarem.
+    if (!this.isCurrentGeneration(generation)) return [];
+    // Enrich metadata with bounded complete operations. A failed stat preserves
+    // the existing fallback (undefined mtime/readonly); fixtures with failures
+    // are not considered N/N metadata-complete in the acceptance harness.
     const stats = await Promise.all(
       entries.map(async (e): Promise<readonly [WorkspaceUri, { mtimeMs: number; readonly: boolean } | undefined]> => {
         try {
-          const s = await this.fs.stat({ uri: e.uri });
-          return [e.uri, { mtimeMs: s.mtimeMs, readonly: s.readonly }] as const;
+          const stat = await this.stat(e.uri, generation);
+          if (!stat) return [e.uri, undefined] as const;
+          return [e.uri, { mtimeMs: stat.mtimeMs, readonly: stat.readonly }] as const;
         } catch {
           return [e.uri, undefined] as const;
         }
       }),
     );
+    if (!this.isCurrentGeneration(generation)) return [];
     const statByUri = new Map(stats);
     item.children.clear();
-    for (const e of entries) {
-      const st = statByUri.get(e.uri);
+    for (const entry of entries) {
+      const stat = statByUri.get(entry.uri);
       item.addChild(
         new ExplorerItem(
-          { uri: e.uri, name: e.name, kind: e.kind, mtimeMs: st?.mtimeMs, readonly: st?.readonly },
+          { uri: entry.uri, name: entry.name, kind: entry.kind, mtimeMs: stat?.mtimeMs, readonly: stat?.readonly },
           item,
         ),
       );

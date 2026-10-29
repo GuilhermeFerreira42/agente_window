@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ExplorerView } from '../ui/ExplorerView';
 import { ExplorerService } from '../core/explorerService';
 import { FakeFsPort } from './fakeFs';
@@ -43,7 +43,10 @@ beforeEach(() => {
   contextKeys = new Map();
   menus = {
     register: (cmd) => { registered.set(cmd.id, () => cmd.run()); return () => registered.delete(cmd.id); },
-    execute: async (id) => { await registered.get(id)?.() ?? undefined; },
+    execute: async (id) => {
+      const run = registered.get(id);
+      if (run) await run();
+    },
     setContext: (k, v) => { contextKeys.set(k, v); },
     getContext: (k) => contextKeys.get(k),
   };
@@ -106,6 +109,53 @@ describe('ExplorerView — header (A1.1–A1.5)', () => {
 });
 
 describe('ExplorerView — árvore lazy (VAL-EXP-01/A2.1)', () => {
+  it('virtualiza 5.000 itens sem truncar a árvore e teclado End revela o último item', async () => {
+    const manyFs = new FakeFsPort(ROOT);
+    manyFs.seed(Array.from({ length: 5_000 }, (_, index) => ({
+      path: `/ws/item-${String(index).padStart(5, '0')}.txt`,
+      kind: 'file' as const,
+    })));
+    const manyService = new ExplorerService(manyFs);
+    await manyService.openFolder({ uri: ROOT });
+    render(
+      <ExplorerView service={manyService} menus={menus} contextMenu={{ open: (input) => menuOpen.push(input) }} fs={manyFs} />,
+    );
+    const tree = screen.getByRole('tree');
+    await waitFor(() => expect(tree.querySelectorAll('[role="treeitem"]').length).toBeLessThanOrEqual(36));
+    expect(tree.querySelectorAll('[role="treeitem"]').length).toBeGreaterThan(0);
+    expect(tree.querySelector('.monaco-list-rows')?.getAttribute('style')).toContain('110000px');
+    expect(tree.querySelector('[aria-setsize="5000"]')).not.toBeNull();
+
+    fireEvent.keyDown(tree, { key: 'End' });
+    const last = await screen.findByText('item-04999.txt');
+    const lastRow = last.closest('[role="treeitem"]');
+    expect(lastRow?.getAttribute('data-index')).toBe('4999');
+    expect(lastRow?.getAttribute('aria-posinset')).toBe('5000');
+    expect(lastRow?.getAttribute('aria-setsize')).toBe('5000');
+    expect(tree.querySelectorAll('[role="treeitem"]').length).toBeLessThanOrEqual(36);
+  });
+
+  it('coalesce várias notificações do serviço em um único commit visual por frame', async () => {
+    await service.openFolder({ uri: ROOT });
+    const commits: number[] = [];
+    render(
+      <React.Profiler id="explorer" onRender={(_, __, ___, ____, _____, commitTime) => commits.push(commitTime)}>
+        <ExplorerView service={service} menus={menus} contextMenu={{ open: (input) => menuOpen.push(input) }} fs={fs} />
+      </React.Profiler>,
+    );
+    await screen.findByText('README.md');
+    const before = commits.length;
+
+    await act(async () => {
+      service.select({ uris: [asWorkspaceUri('/ws/README.md')] });
+      service.select({ uris: [asWorkspaceUri('/ws/src')] });
+      service.select({ uris: [asWorkspaceUri('/ws/docs')] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(commits.length - before).toBe(1);
+  });
+
   it('expandir lê UMA vez; colapsar+re-expandir NÃO relê', async () => {
     await bootView();
     const before = fs.calls.list;

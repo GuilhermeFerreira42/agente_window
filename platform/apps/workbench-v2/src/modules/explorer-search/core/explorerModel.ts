@@ -207,9 +207,12 @@ export class ExplorerItem {
     if (!uriIsEqualOrParent(resource, this.resource)) return null;
     // Se mergulhar num diretório não resolvido, não há filhos a buscar.
     const parts = uriPath(resource).slice(uriPath(this.resource).length).split('/').filter(Boolean);
-    let node: ExplorerItem = this;
-    for (const part of parts) {
-      const next: ExplorerItem | undefined = node.getChild(part);
+    if (parts.length === 0) return this;
+    const first = this.getChild(parts[0]);
+    if (!first) return null;
+    let node: ExplorerItem = first;
+    for (let index = 1; index < parts.length; index++) {
+      const next: ExplorerItem | undefined = node.getChild(parts[index]);
       if (!next) return null;
       node = next;
     }
