@@ -5,10 +5,10 @@
  * - DEBT-09: Provedores abre pelo menu da conta MESMO na tela inicial (landing,
  *   sem sessões). A aba `providers` é global (sem dono de sessão) e passa a
  *   abrir o editor central ao lado da landing.
- * - DEBT-06 (opção C aprovada pelo dono): trocar a pasta da sessão reinicia o
- *   painel do terminal — o shell novo nasce já na pasta nova (a chave do painel
- *   inclui a pasta). E, na tela inicial, a pasta escolhida já comanda o Explorer
- *   (o efeito de boot reage a `explorerWorkspacePath`).
+ * - DEBT-06: a pasta escolhida na landing comanda o Explorer sem mensagem/F5.
+ *   Na sessão ativa, a troca atualiza o contexto de novas operações sem remontar
+ *   o painel nem destruir os shells que já estavam abertos; o E2E D98 cobre o PTY
+ *   novo no workspace novo e a preservação do WebSocket existente.
  *
  * O arquivo é isolado de `App.test.tsx` de propósito: lá o painel do terminal é
  * mockado como `null` e a troca de pasta real do Explorer não pode ser observada.
@@ -42,9 +42,9 @@ vi.mock('../services/sessions/sessionsClient', async (importOriginal) => {
   }
 })
 
-// Stub do painel do terminal: expõe a pasta recebida em `data-workspace`. Com o
-// conserto, a troca de pasta REMONTA o painel (nó novo); sem ele, o React só
-// atualizaria o atributo no mesmo nó.
+// Stub do painel do terminal: expõe a pasta recebida em `data-workspace`.
+// O contrato atual conserva o painel/sessões abertas e atualiza somente o
+// contexto usado para criar novos terminais.
 vi.mock('../components/TerminalPanel', () => ({
   TerminalPanel: (props: { workspace: string }) => <div data-testid="terminal-stub" data-workspace={props.workspace} />,
 }))
@@ -110,7 +110,7 @@ describe('FATIA 07 — Destravar', () => {
     expect(before).toBe(0)
   })
 
-  it('DEBT-06: trocar a pasta da sessão reinicia o painel do terminal na pasta nova', async () => {
+  it('DEBT-06: trocar a pasta atualiza o contexto sem remontar o painel do terminal', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
 
@@ -124,8 +124,9 @@ describe('FATIA 07 — Destravar', () => {
 
     await waitFor(() => {
       const panelAfter = screen.getByTestId('terminal-stub')
-      // Nó novo = painel remontado = shell novo já nascendo na pasta nova.
-      expect(panelAfter).not.toBe(panelBefore)
+      // O painel fica montado para preservar shells/WebSocket; a prop nova vale
+      // para os terminais que forem criados após a troca. O PTY real é coberto no E2E.
+      expect(panelAfter).toBe(panelBefore)
       expect(panelAfter).toHaveAttribute('data-workspace', '/tmp/pasta-nova')
     })
   })

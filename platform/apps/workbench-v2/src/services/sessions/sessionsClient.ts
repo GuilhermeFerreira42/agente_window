@@ -62,7 +62,9 @@ export async function validateSessionWorkspace(path: string): Promise<WorkspaceD
 }
 
 export async function pickSessionWorkspace(): Promise<WorkspaceDescriptor | undefined> {
-  const response = await expectOk(await fetch('/api/workspaces/pick', { method: 'POST' }))
+  const response = await expectOk(await fetch('/api/workspaces/pick', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+  }))
   return ((await response.json()) as { workspace: WorkspaceDescriptor | null }).workspace ?? undefined
 }
 
@@ -87,5 +89,7 @@ export async function createSessionWorktree(workspacePath: string, slug: string,
 
 export async function removePersistedSession(sessionId: string, force = false): Promise<void> {
   const query = force ? '?force=true' : ''
-  await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, { method: 'DELETE' }))
+  await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+  }))
 }

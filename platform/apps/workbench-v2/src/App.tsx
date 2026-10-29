@@ -262,8 +262,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // a pasta escolhida em "Usar esta pasta" já comanda o Explorer — o efeito de boot
   // abaixo reage a esta dependência, então a árvore troca na hora (sem mensagem no
   // chat e sem F5). Com sessão ativa, a pasta continua vindo da sessão (inalterado).
-  const explorerWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
+  const selectedLandingWorkspacePath = newSessionLanding ? selectedWorkspace?.path : undefined
+  const currentSessionWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
     ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
+  // A landing can sit above older sessions. Its selected folder is a pending
+  // context for the new session and must drive Explorer before the first chat
+  // message; it must not rewrite the older persisted session.
+  const explorerWorkspacePath = selectedLandingWorkspacePath
+    ?? currentSessionWorkspacePath
     ?? (sessions.length === 0 ? selectedWorkspace?.path : undefined)
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
@@ -1436,9 +1442,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     if (landingVisible) {
       try {
         const workspace = await validateSessionWorkspace(path)
-        setSelectedWorkspace(workspace)
         const response = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: workspace.path }) })
         if (!response.ok) throw new Error(`Falha ao atualizar Explorer (${response.status})`)
+        setSelectedWorkspace(workspace)
         document.title = workspace.path
         notify(`Workspace selecionado: ${workspace.path}`)
         return
@@ -1455,18 +1461,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       const { session } = await changeSessionWorkspace(activeSession.id, path)
       const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
       if (!fsResponse.ok) throw new Error(`Falha ao atualizar Explorer (${fsResponse.status})`)
-      const ptyResponse = await fetch('/api/pty/cwd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: activeSession.id, path: session.workspacePath }) })
-      if (!ptyResponse.ok) throw new Error(`Falha ao atualizar terminal (${ptyResponse.status})`)
+      // TerminalPanel observes the committed workspace prop and opens a fresh
+      // PTY there while keeping existing shells and their live WS state intact.
       setSessions((current) => current.map((candidate) => candidate.id === session.id ? session : candidate))
       document.title = session.workspacePath
       notify(`Workspace alterado para ${session.workspacePath}`)
     } catch (error) {
-      // Compensação: se a persistência já mudou antes de FS/PTY falhar, restaura o
-      // workspace anterior para não deixar sessão, Explorer e terminal divergentes.
+      // Compensação: se a persistência já mudou antes de o Explorer falhar, restaura
+      // o workspace anterior; terminais vivos não foram alterados nesta etapa.
       try {
         await changeSessionWorkspace(activeSession.id, previousPath)
         await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
-        await fetch('/api/pty/cwd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: activeSession.id, path: previousPath }) })
       } catch { /* o erro original é o relevante para o usuário */ }
       throw error
     } finally { setWorkspaceChangePending(false) }
@@ -1477,6 +1482,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     try {
       const workspace = await pickSessionWorkspace()
       if (workspace) await handleChangeActiveWorkspace(workspace.path)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Falha ao abrir o seletor de pastas')
     } finally { setWorkspacePickerPending(false) }
   }
 
@@ -2610,17 +2617,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                 renderView={renderShellView}
               />
             )}
-            {/* FATIA 07 (DEBT-06, opção C aprovada 15/10): a chave inclui a pasta da
-                sessão — ao trocar de pasta o painel remonta e o shell novo já nasce na
-                pasta nova (o servidor usa o `cwd` enviado no `open`). A decisão
-                "cd em shell vivo × shell novo" será reavaliada na FATIA 16 (pós-D95), com
-                inspeção lado a lado do code-server 8080. */}
+            {/* D60 / DEBT-06: o contexto de workspace só reinicia a criação de PTYs;
+                a chave da sessão permanece estável para não desmontar os shells já abertos.
+                Em uma landing sem sessões, o workspace pendente também inicia novos PTYs. */}
             <TerminalPanel
-              key={`${activeSession.id}|${activeSession.worktreePath ?? activeSession.workspacePath}`}
+              key={activeSession.id}
               visible={terminalVisible && !customViewActive}
               sessionId={activeSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={activeSession.worktreePath ?? activeSession.workspacePath}
+              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (activeSession.worktreePath ?? activeSession.workspacePath)}
               onClose={() => setTerminalVisible(false)}
             />
           </div>

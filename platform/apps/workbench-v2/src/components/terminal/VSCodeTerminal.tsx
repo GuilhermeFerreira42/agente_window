@@ -231,6 +231,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   const terminalsRef = useRef<Record<string, { term: Terminal; fit: FitAddon; opened: boolean }>>({});
   const containerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pendingOutputRef = useRef<Record<string, string>>({});
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
+  const lastTerminalWorkspaceRef = useRef(workspace);
   const wsRef = useRef<WebSocket | null>(null);
   const wsQueueRef = useRef<string[]>([]);
   const activeIdRef = useRef<string | null>(null);
@@ -296,6 +299,16 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     setShellMenuOpen(false);
     return instId;
   }, [activeProfileId, instances.length, sendWs, workspace]);
+
+  // D60 / DEBT-06: a troca de workspace cria um shell novo no cwd confirmado,
+  // sem fechar o WebSocket, descartar o xterm ou reiniciar processos existentes.
+  // Se o painel estiver oculto, a troca fica pendente até o próximo uso; o boot
+  // da conexão usa workspaceRef.current.
+  useEffect(() => {
+    if (workspace === lastTerminalWorkspaceRef.current || !visible) return;
+    lastTerminalWorkspaceRef.current = workspace;
+    if (workspace && instances.some((instance) => instance.status === 'open')) createTerminal();
+  }, [workspace, visible, instances, createTerminal]);
 
   // Dividir terminal (split horizontal ao lado)
   const splitTerminal = useCallback((direction: 'horizontal' | 'vertical' = 'horizontal') => {
@@ -475,7 +488,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
               sessionId: firstId,
               cols: 80,
               rows: 24,
-              cwd: workspace || undefined,
+              cwd: workspaceRef.current || undefined,
             })
           );
           return [firstInst];
@@ -489,7 +502,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                   sessionId: inst.id,
                   cols: inst.cols,
                   rows: inst.rows,
-                  cwd: workspace || undefined,
+                  cwd: workspaceRef.current || undefined,
                 })
               );
             }
@@ -588,7 +601,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       ws.close();
       wsRef.current = null;
     };
-  }, [workspace]);
+  }, [_workbenchSessionId]);
 
   // Montagem do xterm
   const mountTerminal = useCallback(

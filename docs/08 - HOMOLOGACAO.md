@@ -118,6 +118,14 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 **HOMOLOGADA (D97, 21/10):** palavras do dono: *"a fatia 12 ja esta homologada"*. Cobre a tool `excluir` (arquivo+pasta → lixeira do SO, com contagem) + cartão reforçado (sem desfazer-direto, sem botão de sessão) + sessão nunca cobre (RF12-3) + território = pasta ativa + os 2 fixes do teste real (C4 switch PowerShell + C5 território no Windows). Prova automatizada: tsc 0 · unit 935✓/12✗ pré/16skip · E2E `excluir_fatia12` 5/5 · régua 08–12 23/23. **Registro honesto:** o retest no Windows real dos C4+C5 não foi confirmado neste chat (homologação por declaração, padrão D94). Pós-homologação: conversar o ajuste do teto na Config (pedido dele).
 5. Diga "homologada" ou liste o que falhou. Depois conversamos o ajuste do teto na Config (seu pedido) e a FATIA 13.
 
+## Registro D98 — desempenho e regressões confirmados manualmente; Gate aberto (2026-10-29)
+
+**Declaração do dono:** os objetivos principais de desempenho/funcionamento D98, incluindo o desempenho do Explorer, foram homologados manualmente no Windows. O dono confirmou também que os seis comportamentos pós-homologação REG-01–REG-06 funcionam, incluindo o seletor nativo, a atualização imediata do Explorer e a preservação dos terminais abertos ao trocar workspace. Esta declaração humana é registrada como tal; não equivale, por si só, ao encerramento formal do Gate D98.
+
+**Evidência técnica:** commits locais `1082fb2` (correções) e `b895a8b` (testes). Cobertura Linux: E2E REG 6/6; SCM 1/1 e Explorer 1/1 em fixture isolada 1k; Vitest focal 11 arquivos/93; typecheck passou. Regressão geral 991/1030 aprovados, 12 falhos e 27 ignorados; os 12 asserts falhos reproduzem os quatro arquivos com falhas já existentes no baseline `3f5c33c`. Build oficial terminou sem sucesso por OOM no Vite. Detalhes, limites e distinção entre validação manual e automatizada ficam em `09 §3.8.5`.
+
+**Estado e decisão:** os seis fluxos e o desempenho foram confirmados pelo dono no Windows ✅ · validação automatizada Linux executada com os limites acima ✅ · resultado separado de Codex independente não disponível/não alegado · encerramento formal do Gate D98 pendente da decisão explícita do dono. Não reiniciar otimizações, iniciar Fatia 13/M ou fazer push.
+
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 
 > **Este é o teste que você roda após a entrega da 6.1 para homologar o fechamento de dívidas.** Baseado diretamente nos pontos gravados no seu vídeo.
