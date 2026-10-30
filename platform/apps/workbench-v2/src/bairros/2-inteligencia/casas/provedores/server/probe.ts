@@ -82,6 +82,16 @@ const URL_DE_MODELOS: Record<Protocolo, (baseUrl: string) => string> = {
   gemini: (baseUrl) => `${baseUrl}/models`,
   ollama: (baseUrl) => `${baseUrl}/api/tags`,
 }
+const URL_CATALOGO_CLOUD_OLLAMA = 'https://ollama.com/api/tags'
+
+/** A API pública usa nomes de inferência; o daemon local roteia Cloud com tags cloud. */
+function aliasCloudLocal(idPublico: string): string {
+  return idPublico.includes(':') ? `${idPublico}-cloud` : `${idPublico}:cloud`
+}
+
+function familiaCloud(id: string): string {
+  return id.split(':', 1)[0].replace(/-cloud$/i, '')
+}
 
 function cabecalhos(protocolo: Protocolo, apiKey: string | null): Record<string, string> {
   return CABECALHOS[protocolo](apiKey)
@@ -141,7 +151,54 @@ export async function listarModelos(alvo: AlvoConexao): Promise<ResultadoModelos
   if (resposta.status >= 400) {
     return { ok: false, modelos: [], mensagem: categoriaPorStatus(resposta.status).mensagem }
   }
-  const modelos = extrairModelos(descritor.protocolo, resposta.corpo)
+
+  let modelos = extrairModelos(descritor.protocolo, resposta.corpo)
+  let mensagem: string | undefined
+  if (descritor.protocolo === 'ollama') {
+    const corpo = resposta.corpo as { models?: unknown } | null
+    if (!corpo || !Array.isArray(corpo.models)) {
+      return { ok: false, modelos: [], mensagem: 'O Ollama respondeu em um formato inesperado; a lista de modelos não foi atualizada.' }
+    }
+    if (corpo.models.length > 0 && modelos.length === 0) {
+      return { ok: false, modelos: [], mensagem: 'O Ollama respondeu, mas nenhum identificador de modelo válido foi encontrado.' }
+    }
+
+    // A API local lista modelos registrados no daemon. A lista pública do Ollama Cloud
+    // complementa a descoberta sem alterar a URL usada para executar as chamadas.
+    const host = new URL(alvo.baseUrl).hostname.toLowerCase()
+    if (host !== 'ollama.com') {
+      try {
+        const respostaCloud = await buscar(URL_CATALOGO_CLOUD_OLLAMA, { method: 'GET', headers: {} })
+        const corpoCloud = respostaCloud.corpo as { models?: unknown } | null
+        if (respostaCloud.status >= 400 || !corpoCloud || !Array.isArray(corpoCloud.models)) {
+          mensagem = 'Não foi possível consultar o catálogo Cloud do Ollama; exibindo somente os modelos do servidor configurado.'
+        } else {
+          const idsPublicos = extrairModelos('ollama', corpoCloud)
+          if (corpoCloud.models.length > 0 && idsPublicos.length === 0) {
+            mensagem = 'O catálogo Cloud do Ollama respondeu em um formato inesperado; exibindo somente os modelos do servidor configurado.'
+          } else {
+            const familiasCloudLocais = new Set(
+              modelos.filter((id) => /(?:-cloud|:cloud)$/i.test(id)).map(familiaCloud),
+            )
+            const aliasesCloud = idsPublicos
+              .map(aliasCloudLocal)
+              .filter((id) => !familiasCloudLocais.has(familiaCloud(id)))
+            modelos = [...new Set([...modelos, ...aliasesCloud])]
+          }
+        }
+      } catch {
+        mensagem = 'Não foi possível consultar o catálogo Cloud do Ollama; exibindo somente os modelos do servidor configurado.'
+      }
+    }
+
+    if (modelos.length === 0) {
+      return mensagem
+        ? { ok: false, modelos: [], mensagem }
+        : { ok: true, modelos: [], mensagem: 'O Ollama não retornou modelos locais nem Cloud.' }
+    }
+    return { ok: true, modelos, ...(mensagem ? { mensagem } : {}) }
+  }
+
   if (modelos.length === 0) {
     return { ok: false, modelos: [], mensagem: 'O serviço respondeu, mas não mostrou nenhum modelo. Você pode digitar o nome do modelo à mão.' }
   }

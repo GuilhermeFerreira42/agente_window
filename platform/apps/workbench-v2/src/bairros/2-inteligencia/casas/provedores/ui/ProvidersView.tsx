@@ -12,6 +12,11 @@ import { buscarModelos, carregarEstado, revelarChave, salvar, testar } from './c
 import '../providers.css'
 
 type Grupo = { titulo: string; itens: { id: string; nome: string; tag?: string }[] }
+type ConsultaModelos = {
+  estado: 'consultando' | 'atualizado' | 'falha'
+  modelos: string[]
+  mensagem?: string
+}
 const TEMPO_LIMITE_CARGA_MS = 10_000
 
 function estadoLocalInicial(): EstadoProvedores {
@@ -36,9 +41,8 @@ export function ProvidersView() {
   const [rascunhos, setRascunhos] = useState<Record<string, Partial<ProvedorConfig>>>({})
   const [chaveEditada, setChaveEditada] = useState<Record<string, string>>({})
   const [revelada, setRevelada] = useState<Record<string, boolean>>({})
-  const [modelos, setModelos] = useState<Record<string, string[]>>({})
+  const [consultasModelos, setConsultasModelos] = useState<Record<string, ConsultaModelos>>({})
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null)
-  const [avisoBusca, setAvisoBusca] = useState('')
   const [ocupado, setOcupado] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
@@ -108,6 +112,12 @@ export function ProvidersView() {
   }
   const chaveDigitada = chaveEditada[selecionado]
   const chaveVisivel = revelada[selecionado] === true
+  const consultaModelos = consultasModelos[selecionado]
+  const modelosDescobertos = consultaModelos?.estado === 'atualizado' ? consultaModelos.modelos : []
+  const modelosConfigurados = [...new Set(rascunho.modelosHabilitados ?? [])]
+  const modelosHabilitadosAusentes = consultaModelos?.estado === 'atualizado'
+    ? modelosConfigurados.filter((modelId) => !modelosDescobertos.includes(modelId))
+    : []
 
   function editar(mudanca: Partial<ProvedorConfig>) {
     selecaoInteragida.current = true
@@ -119,7 +129,6 @@ export function ProvidersView() {
     selecaoInteragida.current = true
     setSelecionado(id)
     setResultado(null)
-    setAvisoBusca('')
     setErro('')
   }
 
@@ -167,15 +176,31 @@ export function ProvidersView() {
 
   async function aoBuscarModelos() {
     if (!estadoCarregado) return
+    const providerId = selecionado
+    const alvo = alvoDaChamada()
     setOcupado('modelos')
-    setAvisoBusca('')
+    setConsultasModelos((atual) => ({
+      ...atual,
+      [providerId]: { estado: 'consultando', modelos: [] },
+    }))
     setErro('')
     try {
-      const resposta = await buscarModelos(alvoDaChamada())
-      if (resposta.ok) setModelos((atual) => ({ ...atual, [selecionado]: resposta.modelos }))
-      else setAvisoBusca(resposta.mensagem ?? 'Não foi possível listar os modelos.')
+      const resposta = await buscarModelos(alvo)
+      setConsultasModelos((atual) => ({
+        ...atual,
+        [providerId]: resposta.ok
+          ? { estado: 'atualizado', modelos: resposta.modelos, mensagem: resposta.mensagem }
+          : { estado: 'falha', modelos: [], mensagem: resposta.mensagem ?? 'Não foi possível listar os modelos.' },
+      }))
     } catch (motivo) {
-      setAvisoBusca(motivo instanceof Error ? motivo.message : String(motivo))
+      setConsultasModelos((atual) => ({
+        ...atual,
+        [providerId]: {
+          estado: 'falha',
+          modelos: [],
+          mensagem: motivo instanceof Error ? motivo.message : String(motivo),
+        },
+      }))
     } finally {
       setOcupado('')
     }
@@ -408,29 +433,29 @@ export function ProvidersView() {
                 {ocupado === 'modelos' ? <LoaderCircle size={13} className="spin" /> : <Search size={13} />} Buscar modelos
               </button>
             </div>
-            {(modelos[selecionado]?.length ?? 0) > 0 ? (
+            {modelosDescobertos.length > 0 ? (
               <select
                 className="providers-input"
                 aria-label={`Modelos disponíveis em ${descritor?.nome}`}
-                value={rascunho.modelo}
+                value={modelosDescobertos.includes(rascunho.modelo) ? rascunho.modelo : ''}
                 onChange={(e) => editar({ modelo: e.target.value })}
               >
                 <option value="">escolha um modelo…</option>
-                {(modelos[selecionado] ?? []).map((m) => (
+                {modelosDescobertos.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
                 ))}
               </select>
             ) : null}
-            {(modelos[selecionado]?.length ?? 0) > 0 ? (
+            {modelosDescobertos.length > 0 ? (
               <div className="providers-model-candidates" aria-label="Habilitar modelos disponíveis">
-                {(modelos[selecionado] ?? []).map((modelId) => (
+                {modelosDescobertos.map((modelId) => (
                   <label key={modelId} className="providers-hint">
                     <input
                       type="checkbox"
                       aria-label={`Habilitar modelo ${modelId}`}
-                      checked={(rascunho.modelosHabilitados ?? []).includes(modelId)}
+                      checked={modelosConfigurados.includes(modelId)}
                       onChange={(e) => alternarModeloHabilitado(modelId, e.target.checked)}
                     />
                     Habilitar {modelId}
@@ -438,7 +463,65 @@ export function ProvidersView() {
                 ))}
               </div>
             ) : null}
-            {rascunho.modelo.trim() && !(rascunho.modelosHabilitados ?? []).includes(rascunho.modelo.trim()) ? (
+            {modelosHabilitadosAusentes.length > 0 ? (
+              <div className="providers-model-candidates" role="group" aria-label="Modelos habilitados não encontrados">
+                <span className="providers-hint">Habilitado nas configurações, mas não retornado pela busca atual. A disponibilidade não foi confirmada; a configuração foi preservada.</span>
+                {modelosHabilitadosAusentes.map((modelId) => (
+                  <label key={modelId} className="providers-hint">
+                    <input
+                      type="checkbox"
+                      aria-label={`Desabilitar modelo configurado ${modelId}`}
+                      checked
+                      onChange={(e) => alternarModeloHabilitado(modelId, !e.target.checked)}
+                    />
+                    Configurado: {modelId}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'atualizado' && consultaModelos.mensagem && modelosDescobertos.length > 0 ? (
+              <div className="providers-banner is-warn" role="status">
+                <TriangleAlert size={14} /> {consultaModelos.mensagem}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'consultando' ? (
+              <div className="providers-banner" role="status">
+                {descritor?.protocolo === 'ollama' ? 'Consultando os modelos locais e o catálogo Cloud do Ollama…' : 'Consultando novamente o catálogo atual do provedor…'}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'atualizado' && modelosDescobertos.length === 0 ? (
+              <div className="providers-banner is-warn" role="status">
+                <TriangleAlert size={14} /> {consultaModelos.mensagem ?? 'A consulta foi concluída, mas não retornou nenhum modelo.'}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'falha' ? (
+              <div className="providers-banner is-warn" role="status">
+                <TriangleAlert size={14} /> {consultaModelos.mensagem ?? 'Não foi possível listar os modelos.'}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'falha' && modelosConfigurados.length > 0 ? (
+              <div className="providers-model-candidates" role="group" aria-label="Modelos habilitados sem disponibilidade confirmada">
+                <span className="providers-hint">A busca falhou; disponibilidade não confirmada. Os modelos habilitados continuam configurados.</span>
+                {modelosConfigurados.map((modelId) => (
+                  <label key={modelId} className="providers-hint">
+                    <input
+                      type="checkbox"
+                      aria-label={`Desabilitar modelo configurado ${modelId}`}
+                      checked
+                      onChange={(e) => alternarModeloHabilitado(modelId, !e.target.checked)}
+                    />
+                    Configurado: {modelId}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {consultaModelos?.estado === 'atualizado' && rascunho.modelo.trim() && !modelosDescobertos.includes(rascunho.modelo.trim()) ? (
+              <div className="providers-banner is-warn" role="status">
+                O modelo padrão “{rascunho.modelo.trim()}” não foi retornado nesta busca. A seleção salva foi mantida, mas a disponibilidade não foi confirmada.
+              </div>
+            ) : null}
+            {rascunho.modelo.trim() && !(rascunho.modelosHabilitados ?? []).includes(rascunho.modelo.trim()) &&
+              !(consultaModelos?.estado === 'atualizado' && !modelosDescobertos.includes(rascunho.modelo.trim())) ? (
               <button type="button" className="providers-btn is-secondary" onClick={() => alternarModeloHabilitado(rascunho.modelo.trim(), true)}>
                 Habilitar modelo padrão atual
               </button>
@@ -446,12 +529,6 @@ export function ProvidersView() {
             <span className="providers-hint">Descobertos são candidatos; cada par precisa ser habilitado explicitamente. O ID é case-sensitive.</span>
 
           </div>
-
-          {avisoBusca ? (
-            <div className="providers-banner is-warn" role="status">
-              <TriangleAlert size={14} /> {avisoBusca}
-            </div>
-          ) : null}
 
           <details className="providers-adv" open>
             <summary>

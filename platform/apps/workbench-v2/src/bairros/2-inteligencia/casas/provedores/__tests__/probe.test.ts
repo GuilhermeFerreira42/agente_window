@@ -76,6 +76,52 @@ describe('probe — teste de conexão (servidor → provedor)', () => {
     expect(chamadas[0].url).toBe('http://localhost:11434/api/tags')
   })
 
+  it('Ollama relê /api/tags a cada busca e devolve adições, remoções e catálogo vazio', async () => {
+    const snapshots = [
+      json({ models: [{ name: 'llama3.2:latest' }, { name: 'qwen2.5-coder:latest' }] }),
+      json({ models: [{ name: 'llama3.2:latest' }, { name: 'gemma4:latest' }] }),
+      json({ models: [] }),
+    ]
+    const chamadas = mockFetch(({ url }) =>
+      url === 'https://ollama.com/api/tags' ? json({ models: [] }) : snapshots.shift() ?? json({ models: [] }),
+    )
+    const alvo = { id: 'ollama', baseUrl: 'http://localhost:11434', apiKey: null }
+
+    expect(await listarModelos(alvo)).toEqual({ ok: true, modelos: ['llama3.2:latest', 'qwen2.5-coder:latest'] })
+    expect(await listarModelos(alvo)).toEqual({ ok: true, modelos: ['llama3.2:latest', 'gemma4:latest'] })
+    expect(await listarModelos(alvo)).toMatchObject({ ok: true, modelos: [] })
+    expect(chamadas.filter(({ url }) => url === 'http://localhost:11434/api/tags')).toHaveLength(3)
+    expect(chamadas.filter(({ url }) => url === 'https://ollama.com/api/tags')).toHaveLength(3)
+    expect(chamadas.every(({ init }) => init?.method === 'GET')).toBe(true)
+  })
+
+  it('complementa tags locais com aliases locais do catálogo Ollama Cloud', async () => {
+    const chamadas = mockFetch(({ url }) => url === 'https://ollama.com/api/tags'
+      ? json({ models: [{ name: 'gemma4:31b' }, { name: 'kimi-k3' }, { name: 'deepseek-v4-pro:0813' }] })
+      : json({ models: [{ name: 'hermes3:3b' }, { name: 'deepseek-v4-pro:cloud' }] }))
+    const resposta = await listarModelos({ id: 'ollama', baseUrl: 'http://localhost:11434', apiKey: null })
+
+    expect(resposta).toEqual({
+      ok: true,
+      modelos: ['hermes3:3b', 'deepseek-v4-pro:cloud', 'gemma4:31b-cloud', 'kimi-k3:cloud'],
+    })
+    expect(chamadas.map(({ url }) => url)).toEqual([
+      'http://localhost:11434/api/tags',
+      'https://ollama.com/api/tags',
+    ])
+    expect(chamadas[1].init?.headers).toEqual({})
+  })
+
+  it('mantém modelos locais se o catálogo Cloud estiver indisponível e informa a lista parcial', async () => {
+    mockFetch(({ url }) => url === 'https://ollama.com/api/tags'
+      ? new TypeError('network error')
+      : json({ models: [{ name: 'llama3.2:latest' }] }))
+    const resposta = await listarModelos({ id: 'ollama', baseUrl: 'http://localhost:11434', apiKey: null })
+
+    expect(resposta).toMatchObject({ ok: true, modelos: ['llama3.2:latest'] })
+    expect(resposta.mensagem).toMatch(/somente os modelos do servidor configurado/)
+  })
+
   it('chave inválida → categoria "chave" (401/403) com dica honesta', async () => {
     mockFetch(() => json({ error: 'invalid api key' }, 401))
     const r = await testarConexao({ id: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-errada' })
