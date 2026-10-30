@@ -1,0 +1,33 @@
+.session-persistence-notices {
+  flex: 0 0 auto;
+  max-height: 30vh;
+  overflow: auto;
+}
+
+.session-persistence-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-editorWarning-foreground);
+}
+
+.session-persistence-notice p {
+  margin: 4px 0 0;
+}
+
+.session-persistence-notice button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border: 1px solid var(--vscode-button-border);
+  cursor: pointer;
+}
+
+.session-persistence-notice button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

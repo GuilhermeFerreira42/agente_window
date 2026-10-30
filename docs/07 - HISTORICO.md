@@ -1,5 +1,10 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-10-30 — correção H01/H02/H03 da Task 01 de persistência
+
+- A auditoria independente anterior reprovou perda de mensagens em change-workspace, EPERM no writer direto Windows e ausência de indicação/recuperação após 409. Os três caminhos foram corrigidos, com regressões antes/depois e teste funcional Edge sobre dados descartáveis. Detalhes/evidências em `09 §3.24`; estado de aceite em `03`; SPEC/registro técnico em `investigacao_memoria_fatias_m/CORRECAO_PERSISTENCIA.md`.
+- Alterações anteriores da Task 01 preservadas. Sem nova dependência, migração SQLite, alteração de roadmap, Task 02 ou M1–M8. Sem commit/push e sem homologação oficial. Materiais temporários da auditoria anterior foram preservados; a limpeza bloqueada por política não foi novamente tentada.
+
 ## 2026-10-30 — correção da descoberta dos modelos Ollama Cloud
 
 - Evidência enviada pelo dono no Windows: `GET http://localhost:11434/api/tags` retorna somente `hermes3:3b`, `digitsflow/bonsai-8b:latest`, `qwen3-coder:480b-cloud` e `deepseek-v4-pro:cloud`; a resposta não contém Gemma4. Em seguida, `POST /api/show` reconheceu `gemma4:31b-cloud` e `gemma4:cloud`. Isso confirmou que o cliente estava mostrando a resposta do catálogo local, e não apenas retendo estado antigo da interface.

@@ -13,7 +13,10 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { persistSessionNoUnload, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { useSessionPersistence } from './services/sessions/useSessionPersistence'
+import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
+import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
 import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
 import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
@@ -312,7 +315,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       .then((restored) => {
         if (controller.signal.aborted) return
         // FATIA 10 (C4): cartão 'aguardando' que sobreviveu ao F5 vira 'expirado'.
-        const sanadas = sanarCartoesAposF5(restored)
+        const sanadas = sanarCartoesAposF5(restoreUnsavedSessions(restored))
         setSessions(sanadas)
         const first = restored[0]
         // FATIA 09 (§3.8): o F5 volta para a MESMA sessão que estava aberta.
@@ -332,28 +335,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     return () => controller.abort()
   }, [])
 
-  const sessionsRef = useRef(sessions)
-  sessionsRef.current = sessions
-  useEffect(() => {
-    if (!sessionsHydrated) return
-    const gravar = () => {
-      void Promise.all(sessions.filter((session) => !session.isDraft).map(persistSession))
-        .catch((error: unknown) => console.error('[sessions] persistence failed', error))
-    }
-    const timer = window.setTimeout(gravar, 150)
-    // FATIA 09 (§3.8): sem isto, um F5 nos 150 ms após o fim da resposta
-    // matava a página antes da gravação — a conversa "some" no reload.
-    const despejar = () => {
-      for (const session of sessionsRef.current) {
-        if (!session.isDraft) persistSessionNoUnload(session)
-      }
-    }
-    window.addEventListener('pagehide', despejar)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('pagehide', despejar)
-    }
-  }, [sessions, sessionsHydrated])
+  const persistence = useSessionPersistence(sessions, sessionsHydrated, (copy, source, savedSource) => {
+    setSessions((current) => [copy, ...current.flatMap((candidate) => {
+      if (candidate.id !== source.id || JSON.stringify(candidate) !== JSON.stringify(source)) return [candidate]
+      return savedSource ? [savedSource] : []
+    })])
+    setActiveSessionId(copy.id)
+    setVisibleSessionIds([copy.id])
+    setActiveChatBySession((current) => ({ ...current, [copy.id]: copy.mainChatId }))
+  })
 
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
   // FATIA-05 5.4 (RF-10): menu "Move Activity Bar …" — segundo host do mesmo menu de contexto do shell.
@@ -1455,26 +1445,33 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }
     if (!hasSessions) { setWorkspaceChangePending(false); return }
     const previousPath = activeSession.worktreePath ?? activeSession.workspacePath
+    let workspaceCommitted = false
     try {
       // Sessão recém-criada pode ainda não existir no servidor (ela só vai em
       // bloco no pagehide) — persiste ANTES de trocar a pasta, senão a troca
       // morre no 404 silencioso (o caso do teste manual do dono na FATIA 10:
       // sessão nova → digita a pasta → agente seguia na pasta antiga).
-      if (!activeSession.isDraft) await persistSessionNoUnload(activeSession)
+      if (!activeSession.isDraft) await persistSession(activeSession)
       const { session } = await changeSessionWorkspace(activeSession.id, path)
+      workspaceCommitted = true
       const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
       if (!fsResponse.ok) throw new Error(`Falha ao atualizar Explorer (${fsResponse.status})`)
       // TerminalPanel observes the committed workspace prop and opens a fresh
       // PTY there while keeping existing shells and their live WS state intact.
-      setSessions((current) => current.map((candidate) => candidate.id === session.id ? session : candidate))
+      setSessions((current) => current.map((candidate) => candidate.id === session.id ? {
+        ...candidate, workspace: session.workspace, workspacePath: session.workspacePath,
+        worktreePath: session.worktreePath, branch: session.branch, persistenceRevision: session.persistenceRevision,
+      } : candidate))
       document.title = session.workspacePath
       notify(`Workspace alterado para ${session.workspacePath}`)
     } catch (error) {
       // Compensação: se a persistência já mudou antes de o Explorer falhar, restaura
       // o workspace anterior; terminais vivos não foram alterados nesta etapa.
       try {
-        await changeSessionWorkspace(activeSession.id, previousPath)
-        await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
+        if (workspaceCommitted) {
+          await changeSessionWorkspace(activeSession.id, previousPath)
+          await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
+        }
       } catch { /* o erro original é o relevante para o usuário */ }
       throw error
     } finally { setWorkspaceChangePending(false) }
@@ -1584,6 +1581,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         return
       }
     }
+    try { removeSessionRecovery(id) } catch { notify('Sessão excluída; não foi possível limpar a cópia de recuperação no navegador.') }
     clearPendingTimersForSession(id)
     // (R-003) Excluir um draft abandonado descarta o rascunho pendente do
     // Management (deleteNewSession dispose — SESSIONS.md §Drafts).
@@ -2515,6 +2513,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
+      <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} />
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
         <SessionSidebar
           sessions={sessions}

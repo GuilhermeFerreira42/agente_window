@@ -127,6 +127,8 @@ export interface Session {
   /** Monotonic creation/update sort keys (list-owned, not provider timestamps). */
   createdSeq?: number
   updatedSeq?: number
+  /** Monotonic write token used to reject late/stale session snapshots. */
+  persistenceRevision?: number
 }
 
 export interface BrowserViewState {

@@ -22,6 +22,25 @@ import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
+
+// Serialize mutations and reads for one session in this single server process.
+// Besides protecting JSONL replacement, this keeps the SQLite catalog and its
+// transcript from being observed half-way through one save/delete operation.
+const sessionPersistenceQueues = new Map<string, Promise<void>>()
+
+function withSessionPersistenceQueue<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+  const previous = sessionPersistenceQueues.get(sessionId) ?? Promise.resolve()
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const tail = previous.then(() => gate, () => gate)
+  sessionPersistenceQueues.set(sessionId, tail)
+
+  const result = previous.catch(() => undefined).then(operation)
+  void tail.then(() => {
+    if (sessionPersistenceQueues.get(sessionId) === tail) sessionPersistenceQueues.delete(sessionId)
+  })
+  return result.finally(release)
+}
 const WORKSPACES_VALIDATE_ENDPOINT = '/api/workspaces/validate'
 const WORKSPACES_PICK_ENDPOINT = '/api/workspaces/pick'
 const WORKSPACES_RECENT_ENDPOINT = '/api/workspaces/recent'
@@ -32,6 +51,10 @@ export interface SessionPersistencePluginOptions {
 
 interface PersistedSessionPayload {
   session: Session
+}
+
+function validPersistenceRevision(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 async function readJson<T>(request: IncomingMessage): Promise<T> {
@@ -89,38 +112,73 @@ function sanarStatusAposF5(session: Session): Session {
 
 async function listSessions(): Promise<Session[]> {
   const records = listSessionRecords()
-  return Promise.all(records.map(async (record) => {
-    const session = JSON.parse(record.sessionJson) as Session
-    return sanarStatusAposF5(restoreMessages(session, await readTranscript(record.slug, record.id)))
-  }))
+  const sessions = await Promise.all(records.map((record) => withSessionPersistenceQueue(record.id, async () => {
+    // Re-read inside the queue: the record may have changed or been deleted
+    // while this GET waited for an in-flight save.
+    const current = getSessionRecord(record.id)
+    if (!current) return undefined
+    const session = JSON.parse(current.sessionJson) as Session
+    return sanarStatusAposF5(restoreMessages(session, await readTranscript(current.slug, current.id)))
+  })))
+  return sessions.filter((session): session is Session => session !== undefined)
 }
 
-async function saveSession(session: Session): Promise<void> {
-  const existing = getSessionRecord(session.id)
-  const oldActivePath = existing?.worktreePath || existing?.workspacePath
-  const nextActivePath = session.worktreePath || session.workspacePath
-  if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
-  const slug = session.slug || sanitizePath(session.workspacePath)
-  const now = Date.now()
-  const entries = transcriptEntries(session)
-  const metadata: Session = {
-    ...session,
-    slug,
-    worktreePath: session.worktreePath ?? null,
-    chats: session.chats.map((chat) => ({ ...chat, messages: [] })),
-  }
-  upsertSessionRecord({
-    id: session.id,
-    slug,
-    title: session.title,
-    workspacePath: session.workspacePath,
-    worktreePath: metadata.worktreePath ?? null,
-    messageCount: entries.length,
-    createdAt: session.createdSeq ?? now,
-    updatedAt: now,
-    sessionJson: JSON.stringify(metadata),
+async function saveSession(session: Session, clientSnapshot = false): Promise<{ saved: boolean; session: Session }> {
+  return withSessionPersistenceQueue(session.id, async () => {
+    const existing = getSessionRecord(session.id)
+    const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
+    const storedRevision = validPersistenceRevision(existingSession?.persistenceRevision)
+      ? existingSession.persistenceRevision
+      : 0
+    const incomingRevision = validPersistenceRevision(session.persistenceRevision)
+      ? session.persistenceRevision
+      : undefined
+
+    // Browser snapshots carry an increasing token. A delayed lower/equal token
+    // must never replace a newer transcript; unversioned legacy writes are
+    // accepted only until that session has entered the versioned protocol.
+    if (clientSnapshot && existing) {
+      if ((incomingRevision === undefined && storedRevision > 0)
+        || (incomingRevision !== undefined && incomingRevision <= storedRevision)) {
+        return { saved: false, session: existingSession ?? session }
+      }
+    }
+
+    const persistenceRevision = clientSnapshot && incomingRevision !== undefined
+      ? incomingRevision
+      : Math.max(storedRevision, incomingRevision ?? 0) + 1
+    if (!Number.isSafeInteger(persistenceRevision)) throw new Error(`Persistence revision exhausted for session ${session.id}`)
+
+    const oldActivePath = existing?.worktreePath || existing?.workspacePath
+    const nextActivePath = session.worktreePath || session.workspacePath
+    const slug = session.slug || sanitizePath(session.workspacePath)
+    const now = Date.now()
+    const entries = transcriptEntries(session)
+    const committedSession: Session = { ...session, slug, persistenceRevision }
+    const metadata: Session = {
+      ...committedSession,
+      worktreePath: session.worktreePath ?? null,
+      chats: session.chats.map((chat) => ({ ...chat, messages: [] })),
+    }
+
+    // JSONL is the message source of truth. Commit it atomically before moving
+    // the catalog pointer/count, so a failed transcript write leaves SQLite's
+    // prior record intact. The queue commits saves in admission order.
+    await writeTranscript(slug, session.id, entries)
+    if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
+    upsertSessionRecord({
+      id: session.id,
+      slug,
+      title: session.title,
+      workspacePath: session.workspacePath,
+      worktreePath: metadata.worktreePath ?? null,
+      messageCount: entries.length,
+      createdAt: session.createdSeq ?? now,
+      updatedAt: now,
+      sessionJson: JSON.stringify(metadata),
+    })
+    return { saved: true, session: committedSession }
   })
-  await writeTranscript(slug, session.id, entries)
 }
 
 /**
@@ -145,12 +203,27 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     const input = await readJson<{ sessionId: string; path: string }>(request)
     if (!input.sessionId) throw new Error('sessionId is required')
     const workspace = await validateWorkspace(input.path)
-    const sessions = await listSessions()
-    const current = sessions.find((session) => session.id === input.sessionId)
-    if (!current) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
-    const session: Session = { ...current, workspace: workspace.name, workspacePath: workspace.path, worktreePath: null, branch: null }
-    revokeSessionToolGrants(session.id)
-    await saveSession(session)
+    const session = await withSessionPersistenceQueue(input.sessionId, async () => {
+      // Read/patch the CURRENT catalog under one gate. A workspace operation
+      // never republishes messages from a snapshot obtained before this gate.
+      const record = getSessionRecord(input.sessionId)
+      if (!record) return undefined
+      const current = JSON.parse(record.sessionJson) as Session
+      const revision = (validPersistenceRevision(current.persistenceRevision) ? current.persistenceRevision : 0) + 1
+      if (!Number.isSafeInteger(revision)) throw new Error(`Persistence revision exhausted for session ${input.sessionId}`)
+      const entries = await readTranscript(record.slug, record.id)
+      const metadata: Session = {
+        ...current, workspace: workspace.name, workspacePath: workspace.path,
+        worktreePath: null, branch: null, persistenceRevision: revision,
+      }
+      revokeSessionToolGrants(record.id)
+      upsertSessionRecord({
+        ...record, workspacePath: workspace.path, worktreePath: null,
+        updatedAt: Date.now(), sessionJson: JSON.stringify(metadata),
+      })
+      return sanarStatusAposF5(restoreMessages(metadata, entries))
+    })
+    if (!session) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
     await rememberWorkspace(workspace.path)
     sendJson(response, 200, { session, workspace })
     return true
@@ -224,29 +297,44 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (url.pathname === API_PREFIX && request.method === 'PUT') {
     const { session } = await readJson<PersistedSessionPayload>(request)
-    await saveSession(session)
-    sendJson(response, 200, { ok: true })
+    if (session.persistenceRevision !== undefined && !validPersistenceRevision(session.persistenceRevision)) {
+      sendJson(response, 400, { code: 'invalid_session_revision', message: 'persistenceRevision must be a non-negative safe integer' })
+      return true
+    }
+    const result = await saveSession(session, true)
+    if (!result.saved) {
+      sendJson(response, 409, {
+        code: 'stale_session_snapshot',
+        message: 'A newer session snapshot is already persisted',
+        currentRevision: result.session.persistenceRevision ?? 0,
+      })
+      return true
+    }
+    sendJson(response, 200, { ok: true, persistenceRevision: result.session.persistenceRevision })
     return true
   }
 
   const match = url.pathname.match(/^\/api\/sessions\/([^/]+)$/)
   if (match && request.method === 'DELETE') {
     const id = decodeURIComponent(match[1])
-    const record = getSessionRecord(id)
-    if (record) {
+    const result = await withSessionPersistenceQueue(id, async () => {
+      const record = getSessionRecord(id)
+      if (!record) return { dirtyWorktree: undefined }
       if (record.worktreePath) {
         try {
           await removeWorktree(record.workspacePath, record.worktreePath, id, url.searchParams.get('force') === 'true')
         } catch (error) {
-          if (error instanceof WorktreeDirtyError) {
-            sendJson(response, 409, { code: 'worktree_dirty', message: error.message })
-            return true
-          }
+          if (error instanceof WorktreeDirtyError) return { dirtyWorktree: error.message }
           throw error
         }
       }
       await deleteTranscript(record.slug, id)
       deleteSessionRecord(id)
+      return { dirtyWorktree: undefined }
+    })
+    if (result.dirtyWorktree) {
+      sendJson(response, 409, { code: 'worktree_dirty', message: result.dirtyWorktree })
+      return true
     }
     sendJson(response, 200, { ok: true })
     return true
