@@ -14,10 +14,12 @@ const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   criar: 'Criar arquivo',
   escrever: 'Escrever arquivo',
   excluir: 'Excluir (lixeira)',
+  executar: 'Executar comando',
 }
 
 const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {
   aguardando: 'Esperando você permitir',
+  aguardando_continuacao: 'Aguardando decisão sobre o comando',
   executando: 'Executando…',
   ok: 'Feito',
   negado: 'Negado por você',
@@ -27,6 +29,7 @@ const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {
 
 const COR_STATUS: Record<FerramentaNoChat['status'], string> = {
   aguardando: '#e8b86b',
+  aguardando_continuacao: '#e8b86b',
   executando: '#9da5b4',
   ok: '#73c991',
   negado: '#f48771',
@@ -36,11 +39,11 @@ const COR_STATUS: Record<FerramentaNoChat['status'], string> = {
 
 export interface CartaoFerramentaProps {
   carta: FerramentaNoChat
-  /** Presente só quando o cartão está 'aguardando' — os 3 botões (D93). */
   onDecidir?: (decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirContinuacao?: (decisao: 'continuar' | 'parar') => void
 }
 
-export function CartaoFerramenta({ carta, onDecidir }: CartaoFerramentaProps) {
+export function CartaoFerramenta({ carta, onDecidir, onDecidirContinuacao }: CartaoFerramentaProps) {
   const cor = COR_STATUS[carta.status]
   return (
     <div
@@ -91,8 +94,21 @@ export function CartaoFerramenta({ carta, onDecidir }: CartaoFerramentaProps) {
         </pre>
       )}
 
-      {carta.resumo && carta.status !== 'aguardando' && (
+      {carta.status === 'executando' && carta.progresso && (
+        <pre style={{ margin: '6px 0 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace', fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 120, overflowY: 'auto' }}>{carta.progresso}</pre>
+      )}
+      {carta.resumo && carta.status !== 'aguardando' && carta.status !== 'aguardando_continuacao' && (
         <div style={{ marginTop: 4, opacity: 0.85 }}>{carta.resumo}</div>
+      )}
+
+      {carta.status === 'aguardando_continuacao' && onDecidirContinuacao && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ marginBottom: 6, color: '#e8b86b' }}>O comando continua ativo. Deseja aguardar mais dois minutos?</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => onDecidirContinuacao('continuar')} style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', border: `1px solid ${cor}`, background: 'transparent', color: cor }}>Continuar aguardando</button>
+            <button type="button" onClick={() => onDecidirContinuacao('parar')} style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', border: '1px solid #f48771', background: 'transparent', color: '#f48771' }}>Parar comando</button>
+          </div>
+        </div>
       )}
 
       {carta.status === 'aguardando' && onDecidir && (
@@ -113,7 +129,7 @@ export function CartaoFerramenta({ carta, onDecidir }: CartaoFerramentaProps) {
           >
             Negar
           </button>
-          {carta.ferramenta !== 'excluir' && (
+          {carta.ferramenta !== 'excluir' && carta.allowSession !== false && (
             <button
               type="button"
               aria-label="Permitir nesta sessão"

@@ -11,12 +11,16 @@ export type BrowserStatus = 'loading' | 'ready' | 'error'
 /** Cartão de ferramenta do agente (FATIA 10) preso a uma resposta do chat. */
 export interface FerramentaNoChat {
   id: string
-  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar'
   /** Caminho (ou padrão de busca) mostrado no cartão. */
   alvo: string
   /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */
   previa?: string
-  status: 'aguardando' | 'executando' | 'ok' | 'negado' | 'erro' | 'expirado'
+  status: 'aguardando' | 'aguardando_continuacao' | 'executando' | 'ok' | 'negado' | 'erro' | 'expirado'
+  /** O servidor indica se o grant de sessão é aceito por esta ferramenta/chamada. */
+  allowSession?: boolean
+  /** Saída recente limitada, enviada como progresso durante comando longo. */
+  progresso?: string
   /** Resumo honesto do resultado (texto do servidor). */
   resumo?: string
   /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */

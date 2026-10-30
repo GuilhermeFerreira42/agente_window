@@ -66,6 +66,13 @@ function getDatabase(): Database.Database {
       granted_at INTEGER NOT NULL,
       PRIMARY KEY (session_id, workspace_path, tool_id)
     );
+    CREATE TABLE IF NOT EXISTS session_command_grants (
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      workspace_path TEXT NOT NULL,
+      tool_id TEXT NOT NULL CHECK (tool_id = 'executar'),
+      granted_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, workspace_path, tool_id)
+    );
   `)
   return database
 }
@@ -109,16 +116,28 @@ export function getSessionRecord(id: string): SessionRecord | undefined {
   `).get(id) as SessionRecord | undefined
 }
 
-export type SessionToolGrant = 'criar' | 'escrever'
+export type SessionToolGrant = 'criar' | 'escrever' | 'executar'
 
 export function listSessionToolGrants(sessionId: string, workspacePath: string): SessionToolGrant[] {
-  const rows = getDatabase().prepare(
+  const db = getDatabase()
+  const arquivos = db.prepare(
     'SELECT tool_id AS toolId FROM session_tool_grants WHERE session_id = ? AND workspace_path = ?',
-  ).all(sessionId, workspacePath) as Array<{ toolId: SessionToolGrant }>
-  return rows.map((row) => row.toolId)
+  ).all(sessionId, workspacePath) as Array<{ toolId: 'criar' | 'escrever' }>
+  const comandos = db.prepare(
+    'SELECT tool_id AS toolId FROM session_command_grants WHERE session_id = ? AND workspace_path = ?',
+  ).all(sessionId, workspacePath) as Array<{ toolId: 'executar' }>
+  return [...arquivos.map((row) => row.toolId), ...comandos.map((row) => row.toolId)]
 }
 
 export function grantSessionTool(sessionId: string, workspacePath: string, toolId: SessionToolGrant): void {
+  if (toolId === 'executar') {
+    getDatabase().prepare(`
+      INSERT INTO session_command_grants (session_id, workspace_path, tool_id, granted_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(session_id, workspace_path, tool_id) DO NOTHING
+    `).run(sessionId, workspacePath, toolId, Date.now())
+    return
+  }
   getDatabase().prepare(`
     INSERT INTO session_tool_grants (session_id, workspace_path, tool_id, granted_at)
     VALUES (?, ?, ?, ?)
@@ -128,7 +147,9 @@ export function grantSessionTool(sessionId: string, workspacePath: string, toolI
 
 /** Workspace change revokes every session grant before the new root is used. */
 export function revokeSessionToolGrants(sessionId: string): void {
-  getDatabase().prepare('DELETE FROM session_tool_grants WHERE session_id = ?').run(sessionId)
+  const db = getDatabase()
+  db.prepare('DELETE FROM session_tool_grants WHERE session_id = ?').run(sessionId)
+  db.prepare('DELETE FROM session_command_grants WHERE session_id = ?').run(sessionId)
 }
 
 export function deleteSessionRecord(id: string): SessionRecord | undefined {

@@ -9,6 +9,7 @@ import {
   Paperclip,
   Plus,
   Send,
+  ShieldAlert,
   Square,
   Sparkles,
   X,
@@ -18,14 +19,17 @@ import { workspaceFiles } from '../data'
 import { DragTypes } from '../domain/dragAndDrop'
 import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
+import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 
 interface ChatInputProps {
   session: Session
   activeChat: NestedChat
   model: string
   mode: string
+  permission?: NivelPermissaoAgir
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
+  onChangePermission?: (permission: NivelPermissaoAgir) => Promise<void>
   onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void
   onStop: () => void
   onApprove: (chatId?: string) => void
@@ -106,8 +110,10 @@ export function ChatInput({
   activeChat,
   model,
   mode,
+  permission = 'manual',
   onChangeModel,
   onChangeMode,
+  onChangePermission = async () => undefined,
   onSend,
   onStop,
   onApprove,
@@ -134,6 +140,9 @@ export function ChatInput({
   })
   const pendingHistoryCursorRef = useRef<'start' | 'end' | null>(null)
   const [modeOpen, setModeOpen] = useState(false)
+  const [permissionOpen, setPermissionOpen] = useState(false)
+  const [permissionBusy, setPermissionBusy] = useState(false)
+  const [permissionError, setPermissionError] = useState<string | undefined>()
   const [modelOpen, setModelOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
   const [catalogoModelos, setCatalogoModelos] = useState<ItemCatalogoModelo[]>([])
@@ -173,7 +182,7 @@ export function ChatInput({
     ...catalogoModelos.map((item) => ({
       id: tokenDoPar(item.providerId, item.modelId),
       label: item.label,
-      description: item.capability === 'unknown' ? 'Compatibilidade com ferramentas não verificada' : `Tool calling: ${item.capability}`,
+      description: item.protocol,
     })),
   ]
   const selectedModelLabel = modelOptions.find((item) => item.id === model)?.label ?? (model === MODEL_AUTO ? 'Auto' : `Indisponível — ${model}`)
@@ -456,7 +465,29 @@ export function ChatInput({
   const selectMode = (nextMode: string) => {
     onChangeMode(nextMode)
     setModeOpen(false)
+    setPermissionOpen(false)
     modeButtonRef.current?.focus()
+  }
+
+  const selectPermission = async (nextPermission: NivelPermissaoAgir) => {
+    if (permissionBusy || nextPermission === permission) {
+      setPermissionOpen(false)
+      return
+    }
+    if (nextPermission === 'allow-all') {
+      const aceitou = window.confirm('ATENÇÃO — Permitir tudo: tools e comandos de terminal poderão executar sem confirmações individuais, acessar arquivos fora do workspace e modificar ou apagar dados, limitados pelos privilégios da sua conta no sistema operacional. Perguntar e Planejar continuam somente leitura; proteções do servidor e da origem local permanecem ativas. Você pode voltar a Permissões manuais a qualquer momento. Ativar?')
+      if (!aceitou) return
+    }
+    setPermissionBusy(true)
+    setPermissionError(undefined)
+    try {
+      await onChangePermission(nextPermission)
+      setPermissionOpen(false)
+    } catch (erro) {
+      setPermissionError(erro instanceof Error ? erro.message : 'Não foi possível alterar a permissão.')
+    } finally {
+      setPermissionBusy(false)
+    }
   }
 
   const handleModeMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -690,6 +721,39 @@ export function ChatInput({
                     {item.id === mode && <Check size={12} aria-hidden="true" />}
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+          <div className="permission-picker-wrap">
+            <button
+              className={`input-mode-button permission-mode-button${permissionOpen ? ' is-open' : ''}${permission === 'allow-all' ? ' is-risky' : ''}`}
+              type="button"
+              title={permission === 'allow-all' ? 'Permitir tudo está ativo — clique para revisar/desativar' : 'Permissões manuais'}
+              aria-label={permission === 'allow-all' ? 'Permitir tudo ativo' : 'Permissões manuais'}
+              aria-haspopup="menu"
+              aria-expanded={permissionOpen}
+              disabled={permissionBusy}
+              onClick={() => { setPermissionOpen((current) => !current); setModeOpen(false); setModelOpen(false) }}
+            >
+              {permission === 'allow-all' ? <ShieldAlert size={12} /> : <ShieldAlert size={12} />}
+              <span>{permission === 'allow-all' ? 'Permitir tudo' : 'Manual'}</span>
+              <ChevronDown size={11} />
+            </button>
+            {permissionOpen && (
+              <div className="popover mode-popover permission-popover" role="menu" aria-label="Nível de permissão">
+                <div className="popover-title">Permissão · independente do modo</div>
+                <button className={`popover-option${permission === 'manual' ? ' is-selected' : ''}`} role="menuitemradio" aria-checked={permission === 'manual'} type="button" onClick={() => void selectPermission('manual')}>
+                  <span>Permissões manuais</span>
+                  <span className="popover-option-description">Pede aprovação quando necessária; grants existentes continuam valendo.</span>
+                  {permission === 'manual' && <Check size={12} aria-hidden="true" />}
+                </button>
+                <button className={`popover-option permission-risk-option${permission === 'allow-all' ? ' is-selected' : ''}`} role="menuitemradio" aria-checked={permission === 'allow-all'} type="button" onClick={() => void selectPermission('allow-all')}>
+                  <ShieldAlert size={12} aria-hidden="true" />
+                  <span>Permitir tudo</span>
+                  <span className="popover-option-description">Sem confirmações individuais; limitado à conta do SO. Perguntar/Planejar continuam somente leitura.</span>
+                  {permission === 'allow-all' && <Check size={12} aria-hidden="true" />}
+                </button>
+                {permissionError && <div role="alert" className="permission-error">{permissionError}</div>}
               </div>
             )}
           </div>

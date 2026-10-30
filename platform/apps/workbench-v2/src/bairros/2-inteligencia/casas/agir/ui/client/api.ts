@@ -8,6 +8,7 @@ import type {
   MensagemSimples,
   PedidoFerramenta,
   ModoAgir,
+  NivelPermissaoAgir,
 } from '../../contract'
 import { criarFramerSSE } from '../../server/vizinho'
 
@@ -21,7 +22,9 @@ export interface OuvintesAgir {
   onChunk: (texto: string) => void
   onTool: (pedido: PedidoFerramenta) => void
   onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string) => void
-  onApproval: (pedido: PedidoFerramenta, previa?: string) => void
+  onApproval: (pedido: PedidoFerramenta, previa?: string, allowSession?: boolean) => void
+  onToolProgress?: (id: string, text: string) => void
+  onCommandWaiting?: (id: string) => void
   onTeto: (iteracoes: number, teto: number) => void
   onIteracao?: (iteracao: number, teto: number, modelo?: string) => void
   onDone: (modelo?: string) => void
@@ -38,6 +41,18 @@ export async function selecionarModoAgir(sessionId: string, chatId: string, mode
   if (resposta.ok) return
   let mensagem = 'Não foi possível registrar o modo no servidor; a execução não foi iniciada.'
   try { const corpo = await resposta.json() as { message?: string }; if (corpo.message) mensagem = corpo.message } catch { /* fallback local acima */ }
+  throw new Error(mensagem)
+}
+
+export async function selecionarPermissaoAgir(sessionId: string, chatId: string, permission: NivelPermissaoAgir): Promise<void> {
+  const resposta = await fetch('/api/agir/permission', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, chatId, permission }),
+  })
+  if (resposta.ok) return
+  let mensagem = 'Não foi possível registrar o nível de permissão no servidor.'
+  try { const corpo = await resposta.json() as { message?: string }; if (corpo.message) mensagem = corpo.message } catch { /* mensagem segura */ }
   throw new Error(mensagem)
 }
 
@@ -91,7 +106,9 @@ async function bombearFio(
         if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
         else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
         else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo)
-        else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido, evento.previa)
+        else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido, evento.previa, evento.allowSession)
+        else if (evento.type === 'tool_progress') ouvintes.onToolProgress?.(evento.id, evento.text)
+        else if (evento.type === 'command_waiting') ouvintes.onCommandWaiting?.(evento.id)
         else if (evento.type === 'teto') {
           encerrou = true
           ouvintes.onTeto(evento.iteracoes, evento.teto)
@@ -222,6 +239,27 @@ export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): Contro
 
 export function continuarAgir(sessionId: string, chatId: string, fluxo: string, ouvintes: OuvintesAgir): ControleAgir {
   return abrirFio('/api/agir/continuar', { sessionId, chatId, fluxo }, { fluxo, sessionId, chatId }, ouvintes)
+}
+
+export async function responderAguardarComando(
+  sessionId: string,
+  chatId: string,
+  fluxo: string,
+  id: string,
+  decisao: 'continuar' | 'parar',
+  identidade: IdentidadeExecucaoAgir | null,
+): Promise<boolean> {
+  if (!identidade) return false
+  try {
+    const resposta = await fetch('/api/agir/command-wait', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, chatId, fluxo, id, decisao, ...identidade }),
+    })
+    return resposta.ok
+  } catch {
+    return false
+  }
 }
 
 export async function responderAprovacao(

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EstadoProvedores, ResultadoVerificacaoToolCalling } from '../../contract'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EstadoProvedores } from '../../contract'
 
 const mocks = vi.hoisted(() => ({
   carregarEstado: vi.fn(),
@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   revelarChave: vi.fn(),
   salvar: vi.fn(),
   testar: vi.fn(),
-  verificarToolCalling: vi.fn(),
 }))
 
 vi.mock('../client/api', () => mocks)
@@ -37,37 +36,61 @@ const estadoFixture: EstadoProvedores = {
     modelId: 'fixture-model',
     label: 'OpenAI — fixture-model',
     protocol: 'openai-chat',
-    capability: 'unknown',
-    assessment: { status: 'unknown', checkedAt: null, reason: null },
   }],
 }
 
-describe('ProvidersView · consentimento do canary F5-B', () => {
+describe('ProvidersView · provedor sem requisito de canary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.carregarEstado.mockResolvedValue(structuredClone(estadoFixture))
-    mocks.verificarToolCalling.mockResolvedValue({
-      providerId: 'openai', modelId: 'fixture-model', status: 'verified',
-      checkedAt: '2026-10-27T12:00:00.000Z', reason: 'roundtrip_verified', cached: false,
-    } satisfies ResultadoVerificacaoToolCalling)
   })
 
-  it('avisa sobre custos, não chama sem autorização e exige clique após consentir', async () => {
-    render(<ProvidersView />)
-    const consentimento = await screen.findByLabelText(/Autorizo agora o canary/)
-    const botao = screen.getByRole('button', { name: 'Verificar tool calling' })
-    expect(screen.getByText(/consumir créditos\/custos/)).toBeTruthy()
-    expect(botao).toBeDisabled()
-    expect(mocks.verificarToolCalling).not.toHaveBeenCalled()
+  afterEach(() => vi.useRealTimers())
 
-    fireEvent.click(consentimento)
-    expect(botao).toBeEnabled()
-    expect(mocks.verificarToolCalling).not.toHaveBeenCalled()
-    fireEvent.click(botao)
-    await waitFor(() => expect(mocks.verificarToolCalling).toHaveBeenCalledWith({
-      providerId: 'openai', modelId: 'fixture-model', consent: true,
-    }))
-    await waitFor(() => expect(screen.getByText(/verificado por round-trip/i)).toBeTruthy())
-    expect(screen.getByLabelText(/Autorizo agora o canary/)).not.toBeChecked()
+  it('mantém a configuração e seleção de provedor sem apresentar fluxo de prova', async () => {
+    render(<ProvidersView />)
+    await waitFor(() => expect(mocks.carregarEstado).toHaveBeenCalled())
+    expect(await screen.findByLabelText('Modelo OpenAI')).toBeTruthy()
+    expect((screen.getByLabelText('Endereço do serviço OpenAI') as HTMLInputElement).value).toBe('https://mock.invalid/v1')
+    expect((screen.getByLabelText('Modelo OpenAI') as HTMLInputElement).value).toBe('fixture-model')
+    expect(screen.getByLabelText('usar este provedor no chat')).toBeTruthy()
+    expect(screen.queryByText(/canary|verificado por round-trip|tool calling/i)).toBeNull()
+  })
+
+  it('abre com opções locais enquanto a leitura está pendente e não inicia chamadas externas', () => {
+    mocks.carregarEstado.mockReturnValue(new Promise(() => {}))
+    render(<ProvidersView />)
+    expect(screen.getByRole('status').textContent).toContain('opções locais')
+    expect((screen.getByLabelText('Endereço do serviço OpenAI') as HTMLInputElement).value).toBe('https://api.openai.com/v1')
+    expect(screen.getByRole('button', { name: /Salvar provedores/ })).toHaveProperty('disabled', true)
+    expect(mocks.buscarModelos).not.toHaveBeenCalled()
+    expect(mocks.testar).not.toHaveBeenCalled()
+    expect(mocks.revelarChave).not.toHaveBeenCalled()
+  })
+
+  it('mostra falha da leitura sem esconder formulário nem deixar loader infinito', async () => {
+    mocks.carregarEstado.mockRejectedValue(new Error('Falha local de leitura'))
+    render(<ProvidersView />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha local de leitura')
+    expect(screen.getByLabelText('Endereço do serviço OpenAI')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Tentar carregar novamente' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Salvar provedores/ })).toHaveProperty('disabled', true)
+    expect(screen.queryByText(/Mostrando opções locais enquanto leio/)).toBeNull()
+  })
+
+  it('encerra leitura pendente pelo timeout e permite tentar novamente', async () => {
+    vi.useFakeTimers()
+    mocks.carregarEstado
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValueOnce(structuredClone(estadoFixture))
+    render(<ProvidersView />)
+    await act(async () => { vi.advanceTimersByTime(10_000) })
+    expect(screen.getByRole('alert').textContent).toContain('10 segundos')
+    expect((mocks.carregarEstado.mock.calls[0][0] as AbortSignal).aborted).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar carregar novamente' }))
+    await act(async () => { await Promise.resolve() })
+    expect(mocks.carregarEstado).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('Endereço do serviço OpenAI')).toBeTruthy()
   })
 })

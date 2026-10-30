@@ -26,14 +26,14 @@ function fakeRes(): ServerResponse & { body: string; headers: Record<string, str
   return response as unknown as ServerResponse & { body: string; headers: Record<string, string> }
 }
 
-describe('Casa Provedores · rota F5-B', () => {
+describe('Casa Provedores · rotas e catálogo', () => {
   let folder: string
   let oldPath: string | undefined
   const fetchSpy = vi.fn()
 
   beforeEach(async () => {
     oldPath = process.env.AGENTE_WINDOW_PROVIDERS_PATH
-    folder = await mkdtemp(join(tmpdir(), 'provedores-rota-canary-'))
+    folder = await mkdtemp(join(tmpdir(), 'provedores-rota-fixture-'))
     process.env.AGENTE_WINDOW_PROVIDERS_PATH = join(folder, 'providers.json')
     await salvarArquivo({
       ativo: 'openai',
@@ -58,59 +58,29 @@ describe('Casa Provedores · rota F5-B', () => {
     await rm(folder, { recursive: true, force: true })
   })
 
-  it('expõe a rota, mas sem consentimento explícito não chama o provedor', async () => {
+  it('não registra mais endpoint de verificação de tool calling', async () => {
     const url = new URL('http://localhost/api/providers/tool-calling/verify')
-    expect(rotaPertenceAoModulo(url.pathname)).toBe(true)
+    expect(rotaPertenceAoModulo(url.pathname)).toBe(false)
     const response = fakeRes()
-    const handled = await tratarRotasProvedores(
-      fakeReq(JSON.stringify({ providerId: 'openai', modelId: 'route-fixture', consent: false })),
-      response,
-      url,
-    )
-    expect(handled).toBe(true)
-    expect(response.statusCode).toBe(400)
-    expect(response.body).toContain('autorização explícita')
+    const handled = await tratarRotasProvedores(fakeReq(JSON.stringify({ providerId: 'openai', modelId: 'route-fixture' })), response, url)
+    expect(handled).toBe(false)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('com consentimento, a rota roda o round-trip simulado e só devolve o resumo sanitizado', async () => {
-    let chamadas = 0
-    const sse = (payload: unknown) => new Response(`data: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`, {
-      status: 200,
-      headers: { 'content-type': 'text/event-stream' },
-    })
-    fetchSpy.mockImplementation(async (_url: string, init: RequestInit) => {
-      chamadas += 1
-      const pedido = JSON.parse(String(init.body)) as { model: string; tools: Array<{ function?: { name?: string } }>; messages: Array<{ role: string; content?: string }> }
-      expect(pedido.model).toBe('route-fixture')
-      expect(pedido.tools.map((tool) => tool.function?.name)).toEqual(['ler'])
-      if (chamadas === 1) {
-        const caminhoCanary = (pedido.messages[0]?.content ?? '').match(/caminho igual a "([^"]+)"/)?.[1]
-        return sse({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'call-route', function: { name: 'ler', arguments: JSON.stringify({ caminho: caminhoCanary }) } }] } }] })
-      }
-      const retorno = pedido.messages.find((message) => message.role === 'tool')?.content ?? ''
-      return sse({ choices: [{ delta: { content: retorno } }] })
-    })
-    const response = fakeRes()
-    await tratarRotasProvedores(
-      fakeReq(JSON.stringify({ providerId: 'openai', modelId: 'route-fixture', consent: true })),
-      response,
-      new URL('http://localhost/api/providers/tool-calling/verify'),
-    )
-    expect(response.statusCode).toBe(200)
-    expect(response.headers['cache-control']).toBe('no-store')
-    expect(JSON.parse(response.body)).toMatchObject({ providerId: 'openai', modelId: 'route-fixture', status: 'verified', reason: 'roundtrip_verified', cached: false })
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
-    expect(response.body).not.toContain('test-only-not-a-real-credential')
-    expect(response.body).not.toContain('fingerprint')
-  })
-
-  it('GET não revela credencial, fingerprint nem registros internos', async () => {
+  it('GET entrega configuração local v4 sem revelar a chave nem depender de rede externa', async () => {
     const response = fakeRes()
     await tratarRotasProvedores(fakeReq('', 'GET'), response, new URL('http://localhost/api/providers'))
     expect(response.statusCode).toBe(200)
     expect(response.body).not.toContain('test-only-not-a-real-credential')
     expect(response.body).not.toContain('fingerprint')
-    expect(response.body).toContain('"status":"unknown"')
+    expect(response.body).toContain('route-fixture')
+    expect(response.body).not.toContain('capability')
+    expect(response.body).not.toContain('assessment')
+    expect(JSON.parse(response.body)).toMatchObject({
+      storage: 'fixture',
+      ativo: 'openai',
+      provedores: [{ id: 'openai', modelo: 'route-fixture', baseUrl: 'https://mock.invalid/v1' }],
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

@@ -1,11 +1,10 @@
 // Casa Provedores — testes do repositório do arquivo (FATIA 08).
-// Cobrem as decisões do dono: D81 (arquivo fora do repo + 0600 POSIX/DACL Windows + segunda tranca),
+// Cobrem as decisões do dono: D81 (arquivo fora do repo + 0600 POSIX/ACL normal do SO no Windows + segunda tranca),
 // D83 (máscara/reveal), D84 (arquivo manda; ambiente é reserva), migração v1/v2/v3→v4 e gate exato de início.
-import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   armazenamentoAtual,
@@ -32,6 +31,40 @@ afterEach(() => {
 })
 
 describe('provedoresRepo — arquivo, máscara e precedência', () => {
+  it('ignora avaliações canary legadas em v4 e não as grava de novo', async () => {
+    const caminho = await arquivoTemporario()
+    await writeFile(caminho, JSON.stringify({
+      versao: 4,
+      ativo: 'openai',
+      provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', modelosHabilitados: ['fixture'], habilitado: false, contexto: 16384, maxSaida: 4096, temperatura: 0.7, apiKey: 'fixture-not-a-real-key' } },
+      toolCallingAssessments: { openai: { fixture: { status: 'verified', fingerprint: 'f'.repeat(64) } } },
+    }), 'utf8')
+
+    const lido = await lerArquivo(caminho)
+    expect(lido.versao).toBe(4)
+    expect(lido.ativo).toBe('openai')
+    expect(lido.provedores.openai).toMatchObject({
+      baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', modelosHabilitados: ['fixture'],
+      habilitado: false, contexto: 16384, maxSaida: 4096, temperatura: 0.7, apiKey: 'fixture-not-a-real-key',
+    })
+    expect(lido).not.toHaveProperty('toolCallingAssessments')
+    await salvarArquivo({
+      ativo: lido.ativo,
+      provedores: lido.provedores,
+    }, caminho)
+    expect(JSON.parse(await readFile(caminho, 'utf8'))).not.toHaveProperty('toolCallingAssessments')
+  })
+
+  it('exibe erro real de arquivo corrompido sem repetir seu conteúdo', async () => {
+    const caminho = await arquivoTemporario()
+    const conteudoInvalido = 'JSON fixture inválido: fixture-not-a-real-key'
+    await writeFile(caminho, conteudoInvalido, 'utf8')
+    const erro = await lerArquivo(caminho).catch((motivo: unknown) => motivo)
+    expect(erro).toBeInstanceOf(Error)
+    expect((erro as Error).message).toContain('arquivo de provedores está corrompido')
+    expect((erro as Error).message).not.toContain('fixture-not-a-real-key')
+  })
+
   it('salva em 0600 e relê o que foi salvo', async () => {
     const caminho = await arquivoTemporario()
     await salvarArquivo(
@@ -51,34 +84,38 @@ describe('provedoresRepo — arquivo, máscara e precedência', () => {
     expect(lido.provedores.openai.apiKey).toBe('sk-teste-123456')
   })
 
-  it.skipIf(process.platform !== 'win32')('Windows: arquivo e backups limitam a DACL ao SID atual', async () => {
+  it.skipIf(process.platform !== 'win32')('Windows: lê e preserva configuração v4 usando as permissões normais da conta', async () => {
     const caminho = await arquivoTemporario()
     const pasta = resolve(caminho, '..')
-    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')), AGENTE_WINDOW_ACL_TEST_PATH: caminho }
-    const powershell = (script: string, target = caminho): string => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
-      encoding: 'utf8', windowsHide: true, env: { ...env, AGENTE_WINDOW_ACL_TEST_PATH: target },
-    }).trim()
+    const registro = {
+      versao: 4,
+      ativo: 'openai',
+      provedores: { openai: {
+        baseUrl: 'https://fixture.invalid/v1', modelo: 'existing-model',
+        modelosHabilitados: ['existing-model'], habilitado: true,
+        apiKey: 'fixture-not-a-real-key', contexto: 16384,
+      } },
+    }
     try {
-      const sidAtual = powershell('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value')
-      const assertAclPrivada = (arquivo: string) => {
-        const acl = JSON.parse(powershell('$p=$env:AGENTE_WINDOW_ACL_TEST_PATH; $a=Get-Acl -LiteralPath $p; $e=@($a.Access); if (-not $a.AreAccessRulesProtected -or $e.Count -ne 1) { throw "ACL is not private" }; $r=$e[0]; [pscustomobject]@{sid=$r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value; accessType=$r.AccessControlType.ToString(); fullControl=(($r.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl); inherited=$r.IsInherited} | ConvertTo-Json -Compress', arquivo)) as { sid: string; accessType: string; fullControl: boolean; inherited: boolean }
-        expect(acl, `DACL de ${basename(arquivo)} deve ser privada para o usuário atual`).toEqual({
-          sid: sidAtual, accessType: 'Allow', fullControl: true, inherited: false,
-        })
-      }
-      await writeFile(caminho, JSON.stringify({
-        versao: 4, ativo: null, toolCallingAssessments: {},
-        provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } },
-      }), 'utf8')
-      await lerArquivo(caminho)
-      assertAclPrivada(caminho)
-      // Reaplicar a DACL já protegida deve funcionar sem SeSecurityPrivilege.
-      expect((await lerArquivo(caminho)).provedores.openai.apiKey).toBe('fixture-not-a-real-key')
-      assertAclPrivada(caminho)
-      await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture', apiKey: 'fixture-not-a-real-key' } } }, caminho)
-      await salvarArquivo({ ativo: null, provedores: { openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'fixture-2', apiKey: 'fixture-not-a-real-key' } } }, caminho)
-      const arquivos = [caminho, ...(await readdir(pasta)).filter((nome) => nome.startsWith('providers.json.bak-')).map((nome) => join(pasta, nome))]
-      for (const arquivo of arquivos) assertAclPrivada(arquivo)
+      const conteudoOriginal = `${JSON.stringify(registro, null, 2)}\n`
+      await writeFile(caminho, conteudoOriginal, 'utf8')
+      const antes = await readFile(caminho, 'utf8')
+      const lido = await lerArquivo(caminho)
+      expect(lido.provedores.openai.apiKey).toBe('fixture-not-a-real-key')
+      expect(lido.provedores.openai.modelo).toBe('existing-model')
+      expect(await readFile(caminho, 'utf8')).toBe(antes)
+
+      await salvarArquivo({
+        ativo: lido.ativo,
+        provedores: {
+          ...lido.provedores,
+          openai: { ...lido.provedores.openai, modelo: 'updated-fixture-model' },
+        },
+      }, caminho)
+      const salvo = await lerArquivo(caminho)
+      expect(salvo.provedores.openai.apiKey).toBe('fixture-not-a-real-key')
+      expect(salvo.provedores.openai.modelo).toBe('updated-fixture-model')
+      expect((await (await import('node:fs/promises')).readdir(pasta)).some((nome) => nome.startsWith('providers.json.bak-'))).toBe(true)
     } finally {
       await rm(pasta, { recursive: true, force: true })
     }

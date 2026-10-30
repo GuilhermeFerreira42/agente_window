@@ -1,13 +1,31 @@
-# Dependency directories
+# Dependency directories and package-manager caches
 node_modules/
 jspm_dependencies/
+.pnpm-store/
+.npm/
+.yarn/cache/
 
-# Build outputs
+# Build outputs and framework/compiler caches
 dist/
 build/
 out/
+target/
 .vite/
 .turbo/
+.next/
+.nuxt/
+.output/
+.svelte-kit/
+.parcel-cache/
+.cache/
+.local/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 
 # Logs
 logs
@@ -17,16 +35,23 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local-only state, credentials and temporary test evidence
+.netrc
+.credentials/
+.secrets/
+playwright/.auth/
+.playwright-cli/
+playwright/.cache/
+
 # OS metadata
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment variables and local secrets (keep checked-in examples explicit)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.*.example
 
 # IDEs/Editors
 .vscode/

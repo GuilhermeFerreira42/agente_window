@@ -1,5 +1,5 @@
 // ============================================================================
-// Casa Agir — contrato da FATIA 10 (ferramentas de arquivo + permissões).
+// Casa Agir — contrato de ferramentas de arquivo e, na FATIA 13, execução one-shot.
 // O modo efetivo é registrado no servidor; Perguntar/Planejar são somente leitura.
 // Agir permite criar/escrever sem confirmação repetitiva; operações destrutivas
 // continuam exigindo cartão individual. O workspace ancora caminhos relativos.
@@ -13,11 +13,11 @@
  */
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
-/** Versão do adaptador e do canary; incrementar se anúncio/tradução/contrato de Agir mudar. */
-export const AGIR_TOOL_ADAPTER_VERSION = 'agir-tool-adapter-v1'
+/** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar'
 
-/** As 6 ferramentas (D72 + FATIA 12 soma `excluir`) — todas de ARQUIVO; terminal-visual é FATIA 16; terminal-agente é FATIA 13 (pós-D95). */
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir'
+/** Nível de aprovação separado do modo de trabalho. O servidor é autoridade. */
+export type NivelPermissaoAgir = 'manual' | 'allow-all'
 
 /** IDs visuais estritos; o servidor mapeia agent/edit para a mesma política. */
 export type ModoAgir = 'agent' | 'edit' | 'ask' | 'plan'
@@ -31,6 +31,8 @@ export interface ArgumentosFerramenta {
   caminho?: unknown
   padrao?: unknown
   conteudo?: unknown
+  /** Comando de shell explícito; cwd é sempre resolvido no servidor. */
+  comando?: unknown
 }
 
 /** Um pedido de ferramenta extraído do canal nativo do provedor. */
@@ -43,11 +45,10 @@ export interface PedidoFerramenta {
 
 /**
  * Categorias HONESTAS de falha (mesma ideia da casa Conversa — nada de
- * "erro genérico"). `sem_canal_nativo` é a consequência assumida do Q4=(b)
- * (D93): provedor/modelo sem canal de ferramentas não usa o Agir.
+ * "erro genérico"). Rejeições HTTP do provedor são erros recuperáveis e
+ * não alteram a seleção nem bloqueiam tentativas futuras.
  */
 export type CategoriaErroAgir =
-  | 'sem_canal_nativo' // o serviço/modelo não suporta ferramentas (Q4b, D93)
   | 'configuracao' // argumento obrigatório faltando ou torto
   | 'territorio' // caminho fora da pasta de trabalho (executado na C2)
   | 'chave' // 401/403 — chave inválida ou ausente
@@ -105,7 +106,9 @@ export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
-  | { type: 'approval'; pedido: PedidoFerramenta; previa?: string }
+  | { type: 'approval'; pedido: PedidoFerramenta; previa?: string; allowSession?: boolean }
+  | { type: 'tool_progress'; id: string; text: string }
+  | { type: 'command_waiting'; id: string }
   | { type: 'iteracao'; iteracao: number; teto: number; model?: string }
   | { type: 'teto'; iteracoes: number; teto: number }
   | { type: 'done'; model?: string }
@@ -144,7 +147,17 @@ export interface ResultadoFerramenta {
   resumo: string
   /** Conteúdo lido (ferramenta `ler`) — vai para o MODELO, não para a tela. */
   conteudo?: string
+  /** Metadado interno da rota para ACK de cancelamento com efeitos possíveis. */
+  efeitoIniciado?: boolean
 }
 
-/** Quem executa um pedido. C1 = falsos (prova do esqueleto); C2 = disco real. */
-export type ExecutorFerramenta = (pedido: PedidoFerramenta) => Promise<ResultadoFerramenta>
+/** Sinais e canais opcionais de execução; ferramentas antigas os ignoram. */
+export interface ContextoExecucaoFerramenta {
+  sinal?: AbortSignal
+  aoProgresso?: (texto: string) => void
+  /** Pergunta se deve continuar aguardando após cada janela de timeout. */
+  aguardarContinuacao?: () => Promise<boolean>
+}
+
+/** Quem executa um pedido. O loop e a rota continuam sendo donos de cancelamento e grants. */
+export type ExecutorFerramenta = (pedido: PedidoFerramenta, contexto?: ContextoExecucaoFerramenta) => Promise<ResultadoFerramenta>

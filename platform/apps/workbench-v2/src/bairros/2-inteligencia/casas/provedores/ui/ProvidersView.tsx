@@ -4,41 +4,40 @@
 // lista à esquerda com busca · formulário à direita · olhinho na chave (D83) ·
 // avisos honestos do teste de conexão · 8 provedores (7 nativos + genérico).
 // ============================================================================
-import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, CircleAlert, Eye, EyeOff, Gauge, LoaderCircle, Save, Search, Settings2, ShieldCheck, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
-import type { EstadoProvedores, ProvedorConfig, ProvedorNaTela, ResultadoTeste, ResultadoVerificacaoToolCalling, ToolCallingCheckReason } from '../contract'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CheckCircle2, CircleAlert, Eye, EyeOff, Gauge, LoaderCircle, Save, Search, Settings2, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
+import type { EstadoProvedores, ProvedorConfig, ProvedorNaTela, ResultadoTeste } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
-import { buscarModelos, carregarEstado, revelarChave, salvar, testar, verificarToolCalling } from './client/api'
+import { buscarModelos, carregarEstado, revelarChave, salvar, testar } from './client/api'
 import '../providers.css'
 
 type Grupo = { titulo: string; itens: { id: string; nome: string; tag?: string }[] }
+const TEMPO_LIMITE_CARGA_MS = 10_000
 
-function textoMotivoCapability(motivo: ToolCallingCheckReason | null | undefined): string {
-  switch (motivo) {
-    case 'authentication_failure': return 'Autenticação ausente/rejeitada; isso não indica incompatibilidade.'
-    case 'network_failure': return 'Falha de rede; isso não indica incompatibilidade.'
-    case 'provider_error': return 'Falha operacional do provedor; isso não indica incompatibilidade.'
-    case 'no_tool_call': return 'O modelo não pediu a ferramenta no canary; a evidência é inconclusiva.'
-    case 'invalid_tool_call': return 'O pedido não correspondeu ao canary inofensivo.'
-    case 'continuation_failed': return 'O round-trip não foi completado.'
-    case 'configuration_changed': return 'A configuração mudou; o resultado não é válido.'
-    default: return ''
+function estadoLocalInicial(): EstadoProvedores {
+  return {
+    storage: 'repo-home',
+    ativo: null,
+    catalogo: [],
+    provedores: [],
   }
 }
 
 export function ProvidersView() {
-  const [estado, setEstado] = useState<EstadoProvedores | null>(null)
+  const [estado, setEstado] = useState<EstadoProvedores>(estadoLocalInicial)
+  const [carregando, setCarregando] = useState(true)
+  const [estadoCarregado, setEstadoCarregado] = useState(false)
+  const [tentativaCarga, setTentativaCarga] = useState(0)
   const [erroCarregar, setErroCarregar] = useState('')
+  const selecaoInteragida = useRef(false)
   const [selecionado, setSelecionado] = useState('openai')
   const [busca, setBusca] = useState('')
   // Rascunhos: o que o dono está editando agora (chave só entra aqui se digitada/revelada).
-  const [rascunhos, setRascunhos] = useState<Record<string, ProvedorConfig>>({})
+  const [rascunhos, setRascunhos] = useState<Record<string, Partial<ProvedorConfig>>>({})
   const [chaveEditada, setChaveEditada] = useState<Record<string, string>>({})
   const [revelada, setRevelada] = useState<Record<string, boolean>>({})
   const [modelos, setModelos] = useState<Record<string, string[]>>({})
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null)
-  const [resultadoCapability, setResultadoCapability] = useState<ResultadoVerificacaoToolCalling | null>(null)
-  const [consentirCanary, setConsentirCanary] = useState(false)
   const [avisoBusca, setAvisoBusca] = useState('')
   const [ocupado, setOcupado] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -47,19 +46,38 @@ export function ProvidersView() {
 
   useEffect(() => {
     let ativo = true
-    carregarEstado()
+    const controlador = new AbortController()
+    setCarregando(true)
+    setErroCarregar('')
+    const temporizador = window.setTimeout(() => {
+      controlador.abort()
+      if (ativo) {
+        setCarregando(false)
+        setErroCarregar('A configuração local não respondeu em 10 segundos. As opções locais continuam disponíveis; tente carregar novamente.')
+      }
+    }, TEMPO_LIMITE_CARGA_MS)
+
+    carregarEstado(controlador.signal)
       .then((valor) => {
         if (!ativo) return
         setEstado(valor)
-        setSelecionado(valor.ativo ?? valor.provedores[0]?.id ?? 'openai')
+        setEstadoCarregado(true)
+        if (!selecaoInteragida.current) setSelecionado(valor.ativo ?? valor.provedores[0]?.id ?? 'openai')
       })
       .catch((motivo) => {
-        if (ativo) setErroCarregar(motivo instanceof Error ? motivo.message : String(motivo))
+        if (!ativo || controlador.signal.aborted) return
+        setErroCarregar(motivo instanceof Error ? motivo.message : String(motivo))
+      })
+      .finally(() => {
+        window.clearTimeout(temporizador)
+        if (ativo) setCarregando(false)
       })
     return () => {
       ativo = false
+      window.clearTimeout(temporizador)
+      controlador.abort()
     }
-  }, [])
+  }, [tentativaCarga])
 
   const grupos: Grupo[] = useMemo(() => {
     const nativos = DESCRITORES.filter((d) => !d.generico)
@@ -77,7 +95,7 @@ export function ProvidersView() {
 
   const descritor = descritorPorId(selecionado)
   const daTela: ProvedorNaTela | undefined = estado?.provedores.find((p) => p.id === selecionado)
-  const rascunho: ProvedorConfig = rascunhos[selecionado] ?? {
+  const rascunho: ProvedorConfig = {
     nome: daTela?.nome,
     baseUrl: daTela?.baseUrl ?? descritor?.baseUrlPadrao ?? '',
     modelo: daTela?.modelo ?? '',
@@ -86,33 +104,27 @@ export function ProvidersView() {
     contexto: daTela?.contexto ?? descritor?.padroes.contexto,
     maxSaida: daTela?.maxSaida ?? descritor?.padroes.maxSaida,
     temperatura: daTela?.temperatura ?? descritor?.padroes.temperatura,
+    ...rascunhos[selecionado],
   }
   const chaveDigitada = chaveEditada[selecionado]
   const chaveVisivel = revelada[selecionado] === true
-  const modeloVerificacao = rascunho.modelo.trim()
-  const avaliacaoModelo = estado?.catalogo?.find((item) => item.providerId === selecionado && item.modelId === modeloVerificacao)
-  const possuiRascunhoRelevante = rascunhos[selecionado] !== undefined || chaveDigitada !== undefined
-  const parSalvoHabilitado = daTela?.habilitado === true && daTela.modelosHabilitados.includes(modeloVerificacao)
-  const semCredencialObrigatoria = !descritor?.chaveOpcional && !daTela?.chaveMascarada
-  const parProntoParaVerificar = Boolean(modeloVerificacao && daTela && parSalvoHabilitado && !possuiRascunhoRelevante && !semCredencialObrigatoria)
 
   function editar(mudanca: Partial<ProvedorConfig>) {
-    setRascunhos((atual) => ({ ...atual, [selecionado]: { ...rascunho, ...mudanca } }))
-    setConsentirCanary(false)
-    setResultadoCapability(null)
+    selecaoInteragida.current = true
+    setRascunhos((atual) => ({ ...atual, [selecionado]: { ...atual[selecionado], ...mudanca } }))
     setSalvo(false)
   }
 
   function aoTrocarDeProvedor(id: string) {
+    selecaoInteragida.current = true
     setSelecionado(id)
     setResultado(null)
-    setResultadoCapability(null)
-    setConsentirCanary(false)
     setAvisoBusca('')
     setErro('')
   }
 
   async function aoClicarOlho() {
+    if (!estadoCarregado) return
     if (chaveVisivel) {
       setRevelada((atual) => ({ ...atual, [selecionado]: false }))
       return
@@ -139,29 +151,8 @@ export function ProvidersView() {
     ...(chaveDigitada ? { apiKey: chaveDigitada } : {}),
   })
 
-  async function aoVerificarToolCalling() {
-    if (!parProntoParaVerificar || !consentirCanary) return
-    setOcupado('canary')
-    setErro('')
-    setResultadoCapability(null)
-    setConsentirCanary(false)
-    try {
-      const resposta = await verificarToolCalling({ providerId: selecionado, modelId: modeloVerificacao, consent: true })
-      setResultadoCapability(resposta)
-      setEstado((atual) => atual ? {
-        ...atual,
-        catalogo: atual.catalogo.map((item) => item.providerId === selecionado && item.modelId === modeloVerificacao
-          ? { ...item, capability: resposta.status, assessment: { status: resposta.status, checkedAt: resposta.checkedAt, reason: resposta.reason } }
-          : item),
-      } : atual)
-    } catch (motivo) {
-      setErro(motivo instanceof Error ? motivo.message : 'A verificação não foi concluída.')
-    } finally {
-      setOcupado('')
-    }
-  }
-
   async function aoTestar() {
+    if (!estadoCarregado) return
     setOcupado('testar')
     setResultado(null)
     setErro('')
@@ -175,6 +166,7 @@ export function ProvidersView() {
   }
 
   async function aoBuscarModelos() {
+    if (!estadoCarregado) return
     setOcupado('modelos')
     setAvisoBusca('')
     setErro('')
@@ -218,9 +210,8 @@ export function ProvidersView() {
   }
 
   async function aoSalvar() {
+    if (!estadoCarregado) return
     setSalvando(true)
-    setConsentirCanary(false)
-    setResultadoCapability(null)
     setErro('')
     try {
       const proximo = await salvar({ ativo: estado?.ativo ?? null, provedores: montarProvedores() })
@@ -238,8 +229,7 @@ export function ProvidersView() {
   }
 
   async function aoDefinirAtivo() {
-    setConsentirCanary(false)
-    setResultadoCapability(null)
+    if (!estadoCarregado) return
     setEstado((atual) => (atual ? { ...atual, ativo: selecionado } : atual))
     setRascunhos((atual) => ({ ...atual }))
     setSalvo(false)
@@ -255,14 +245,6 @@ export function ProvidersView() {
     }
   }
 
-  if (!estado && !erroCarregar) {
-    return (
-      <section className="providers-view" aria-label="Provedores">
-        <p className="providers-loading">Carregando provedores…</p>
-      </section>
-    )
-  }
-
   return (
     <section className="providers-view" aria-label="Provedores">
       <header className="providers-head">
@@ -272,10 +254,20 @@ export function ProvidersView() {
         </p>
       </header>
 
+      {carregando && (
+        <div className="providers-banner is-warn" role="status">
+          <LoaderCircle size={14} className="spin" /> Mostrando opções locais enquanto leio as configurações salvas…
+        </div>
+      )}
       {erroCarregar && (
         <div className="providers-banner is-error" role="alert">
           <CircleAlert size={15} /> {erroCarregar}
         </div>
+      )}
+      {erroCarregar && (
+        <button type="button" className="providers-btn is-secondary" onClick={() => setTentativaCarga((n) => n + 1)}>
+          Tentar carregar novamente
+        </button>
       )}
 
       <div className="providers-cols">
@@ -357,9 +349,8 @@ export function ProvidersView() {
                 placeholder={daTela?.chaveMascarada ?? 'cole a chave aqui'}
                 value={chaveVisivel ? (chaveEditada[selecionado] ?? daTela?.chaveMascarada ?? '') : chaveDigitada ?? ''}
                 onChange={(e) => {
+                  selecaoInteragida.current = true
                   setChaveEditada((atual) => ({ ...atual, [selecionado]: e.target.value }))
-                  setConsentirCanary(false)
-                  setResultadoCapability(null)
                   setRevelada((atual) => ({ ...atual, [selecionado]: true }))
                   setSalvo(false)
                 }}
@@ -370,6 +361,7 @@ export function ProvidersView() {
                 aria-label={chaveVisivel ? 'Ocultar a chave' : 'Mostrar a chave'}
                 title={chaveVisivel ? 'Ocultar a chave' : 'Mostrar a chave'}
                 onClick={() => void aoClicarOlho()}
+                disabled={!estadoCarregado}
               >
                 {chaveVisivel ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
@@ -412,7 +404,7 @@ export function ProvidersView() {
                 placeholder="escolha da lista ou digite à mão"
                 onChange={(e) => editar({ modelo: e.target.value })}
               />
-              <button type="button" className="providers-btn is-secondary" onClick={() => void aoBuscarModelos()} disabled={ocupado === 'modelos'}>
+              <button type="button" className="providers-btn is-secondary" onClick={() => void aoBuscarModelos()} disabled={!estadoCarregado || ocupado === 'modelos'}>
                 {ocupado === 'modelos' ? <LoaderCircle size={13} className="spin" /> : <Search size={13} />} Buscar modelos
               </button>
             </div>
@@ -452,42 +444,7 @@ export function ProvidersView() {
               </button>
             ) : null}
             <span className="providers-hint">Descobertos são candidatos; cada par precisa ser habilitado explicitamente. O ID é case-sensitive.</span>
-            <div className="providers-capability" aria-label="Verificação de chamadas de ferramentas">
-              <div className="providers-capability-status" role="status">
-                <ShieldCheck size={14} />
-                {possuiRascunhoRelevante ? 'Rascunho não salvo; o estado abaixo descreve a configuração salva. ' : ''}
-                {avaliacaoModelo?.capability === 'verified'
-                  ? `Tool calling verificado por round-trip${avaliacaoModelo.assessment.checkedAt ? ` · ${new Date(avaliacaoModelo.assessment.checkedAt).toLocaleString()}` : ''}${resultadoCapability?.cached ? ' · resultado armazenado, sem nova chamada' : ''}`
-                  : avaliacaoModelo?.capability === 'incompatible'
-                    ? 'Incompatível por evidência explícita do protocolo/adaptador. Falhas de rede ou autenticação não significam incompatibilidade.'
-                    : avaliacaoModelo?.capability === 'declared'
-                      ? 'Suporte apenas declarado; Agir continua bloqueado até um round-trip verificado.'
-                      : 'Desconhecido / sem prova válida. Agir permanece bloqueado.'}
-                {avaliacaoModelo?.capability === 'unknown' && avaliacaoModelo.assessment.reason
-                  ? ` · ${textoMotivoCapability(avaliacaoModelo.assessment.reason)}`
-                  : ''}
-              </div>
-              <p className="providers-hint">
-                O canary anuncia somente <code>ler</code>, sem workspace, escrita, comandos ou efeitos externos. Pode fazer até duas requisições e consumir créditos/custos do provedor. O resultado não concede permissões ao agente.
-              </p>
-              {!parProntoParaVerificar ? (
-                <p className="providers-hint">{semCredencialObrigatoria ? 'Configure uma credencial primeiro; nenhuma verificação será iniciada sem ela.' : 'Salve primeiro o provedor e habilite exatamente este modelo; mudanças não salvas não podem ser verificadas.'}</p>
-              ) : (
-                <>
-                  <label className="providers-hint providers-canary-consent">
-                    <input type="checkbox" checked={consentirCanary} disabled={ocupado === 'canary'} onChange={(e) => setConsentirCanary(e.target.checked)} />
-                    Autorizo agora o canary para {selecionado} / {modeloVerificacao} e aceito possíveis custos.
-                  </label>
-                  <button type="button" className="providers-btn is-secondary" onClick={() => void aoVerificarToolCalling()} disabled={!consentirCanary || ocupado === 'canary'}>
-                    {ocupado === 'canary' ? <LoaderCircle size={13} className="spin" /> : <ShieldCheck size={13} />}
-                    {ocupado === 'canary' ? 'Verificando…' : avaliacaoModelo?.capability === 'verified' ? 'Usar verificação armazenada' : 'Verificar tool calling'}
-                  </button>
-                </>
-              )}
-              {resultadoCapability && !resultadoCapability.cached ? (
-                <span className="providers-hint">Resultado persistido para este par e configuração: {resultadoCapability.status.replace('_', ' ')}. Alterações relevantes invalidam a prova.</span>
-              ) : null}
-            </div>
+
           </div>
 
           {avisoBusca ? (
@@ -552,7 +509,7 @@ export function ProvidersView() {
 
           <div className="providers-foot">
             <label className="providers-radio">
-              <input type="radio" name="provedor-ativo" checked={estado?.ativo === selecionado} onChange={() => void aoDefinirAtivo()} />
+              <input type="radio" name="provedor-ativo" checked={estado?.ativo === selecionado} disabled={!estadoCarregado} onChange={() => void aoDefinirAtivo()} />
               usar este provedor no chat
             </label>
             <span className="providers-grow" />
@@ -565,10 +522,10 @@ export function ProvidersView() {
                 ''
               )}
             </span>
-            <button type="button" className="providers-btn is-secondary" onClick={() => void aoTestar()} disabled={ocupado === 'testar'}>
+            <button type="button" className="providers-btn is-secondary" onClick={() => void aoTestar()} disabled={!estadoCarregado || ocupado === 'testar'}>
               {ocupado === 'testar' ? <LoaderCircle size={13} className="spin" /> : <Wifi size={13} />} Testar conexão
             </button>
-            <button type="submit" className="providers-btn is-primary" disabled={salvando}>
+            <button type="submit" className="providers-btn is-primary" disabled={!estadoCarregado || salvando}>
               <Save size={13} /> {salvando ? 'Salvando…' : 'Salvar provedores'}
             </button>
           </div>

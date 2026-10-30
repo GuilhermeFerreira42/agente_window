@@ -20,13 +20,14 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
-import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, descreverAlvoExcluir, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
+import { comandoExigeAprovacaoIndividual, criarExecutorComando, type ResolverShellComando } from './executorComando'
 import { criarVizinhoReal } from './vizinho'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode']
+const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -43,11 +44,17 @@ export interface DependenciasAgir {
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
+  /** O shell padrão é resolvido pela prefeitura pelo detector compartilhado do PTY; esta casa não cria outro catálogo. */
+  resolverShell?: ResolverShellComando
+  /** Janela encurtável em testes controlados; produção usa o limite padrão do executor. */
+  timeoutComandoMs?: number
   /** A permissão de sessão é gravada somente pelo servidor após decisão do dono. */
-  concederPermissaoSessao: (sessionId: string, raiz: string, ferramenta: 'criar' | 'escrever') => void
+  concederPermissaoSessao: (sessionId: string, raiz: string, ferramenta: 'criar' | 'escrever' | 'executar') => void
   /** Modo escolhido explicitamente no seletor; nunca é lido do payload de /api/agir. */
   lerModo: (sessionId: string, chatId: string) => ModoAgir | null
   definirModo: (sessionId: string, chatId: string, modo: ModoAgir) => void
+  lerPermissao?: (sessionId: string, chatId: string, raiz: string) => NivelPermissaoAgir
+  definirPermissao?: (sessionId: string, chatId: string, raiz: string, nivel: NivelPermissaoAgir) => void
   /** Fábrica injetável para testar a barreira de commit de ferramentas mutáveis. */
   criarExecutores?: (raiz: string) => ExecutoresDisco
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
@@ -64,6 +71,7 @@ interface ContextoFluxo {
   raiz: string
   modo: ModoAgir
   modoSelecionadoNoServidor: boolean
+  permissao: NivelPermissaoAgir
 }
 type EstadoExecucao = 'running' | 'awaiting-approval' | 'cancel-requested' | 'cancelled' | 'completed' | 'paused'
 interface ExecucaoAgir extends ContextoFluxo {
@@ -73,6 +81,7 @@ interface ExecucaoAgir extends ContextoFluxo {
   estado: EstadoExecucao
   controller: AbortController
   pendentes: Map<string, AprovacaoPendente>
+  aguardandoComando: Map<string, (continuar: boolean) => void>
   efeitoMutavelEmAndamento?: Promise<ResultadoFerramenta>
   mutacoesConfirmadas: number
   motivoCancelamento?: 'requested' | 'disconnect'
@@ -97,6 +106,7 @@ function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
     estado: 'running',
     controller: new AbortController(),
     pendentes: new Map(),
+    aguardandoComando: new Map(),
     mutacoesConfirmadas: 0,
   }
   execucaoPorFluxo.set(fluxo, execucao)
@@ -124,6 +134,9 @@ function solicitarCancelamento(execucao: ExecucaoAgir, motivo: 'requested' | 'di
   const pendentes = [...execucao.pendentes.values()]
   execucao.pendentes.clear()
   for (const pendente of pendentes) pendente.resolver(false)
+  const esperas = [...execucao.aguardandoComando.values()]
+  execucao.aguardandoComando.clear()
+  for (const resolver of esperas) resolver(false)
   execucao.controller.abort()
   return true
 }
@@ -153,6 +166,10 @@ function sendJson(res: ServerResponse, status: number, corpo: unknown): void {
 
 function sendErro(res: ServerResponse, status: number, code: string, message: string): void {
   sendJson(res, status, { code, message })
+}
+
+function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string): NivelPermissaoAgir {
+  return deps.lerPermissao?.(sessionId, chatId, raiz) ?? 'manual'
 }
 
 async function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -267,11 +284,25 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   const { fluxo } = fio
   permissoesPorFluxo.set(fluxo, new Set(fio.permissoes))
-  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor })
+  contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor, permissao: fio.execucao.permissao })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   const executoresDisco = (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
-  const executores: Record<FerramentaId, ExecutorFerramenta> = { ...executoresDisco }
+  const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
+  const executores: Record<FerramentaId, ExecutorFerramenta> = {
+    ...executoresDisco,
+    executar: async (pedido, contexto) => {
+      if (abort.signal.aborted || fio.execucao.estado !== 'running') return { ok: false, resumo: 'Cancelado antes de iniciar; nenhum processo foi iniciado.' }
+      const operacao = executorComandoBase(pedido, contexto).then((resultado) => {
+        if (resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
+        return resultado
+      })
+      fio.execucao.efeitoMutavelEmAndamento = operacao
+      try { return await operacao } finally {
+        if (fio.execucao.efeitoMutavelEmAndamento === operacao) delete fio.execucao.efeitoMutavelEmAndamento
+      }
+    },
+  }
   for (const ferramenta of ['criar', 'escrever'] as const) {
     const executar = executoresDisco[ferramenta]
     executores[ferramenta] = async (pedido) => {
@@ -314,21 +345,32 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
-        // No modo Agir, criar/escrever já estão autorizados pelo modo escolhido;
-        // não repetir cartões para cada edição. Excluir continua sempre manual.
+        const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
+        // Permitir tudo retira os prompts individuais, mas não habilita a ferramenta
+        // excluir, cujo executor continua bloqueado/não implementado neste checkout.
+        if (nivelPermissao === 'allow-all' && pedido.ferramenta !== 'excluir') return true
+        // D121: Agent/Edit já dispensam prompts repetitivos de criar/escrever;
+        // isto não altera o contrato histórico dessas operações.
         if (fio.execucao.modoSelecionadoNoServidor && (fio.execucao.modo === 'agent' || fio.execucao.modo === 'edit') && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever')) return true
-        // RF12-3: sessão liberada NÃO cobre `excluir` (cinto + suspensório com
-        // o filtro de entrada — mesmo que 'excluir' chegue, nunca auto-libera).
-        if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) return true // Q2a
+        if (pedido.ferramenta === 'executar') {
+          const comando = typeof pedido.argumentos.comando === 'string' ? pedido.argumentos.comando : ''
+          const exigeAceiteIndividual = comandoExigeAprovacaoIndividual(comando)
+          if (!exigeAceiteIndividual && concedidas?.has('executar')) return true
+        } else if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) {
+          return true
+        }
         if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
         fio.execucao.estado = 'awaiting-approval'
         const previa = pedido.ferramenta === 'excluir'
           ? await descreverAlvoExcluir(fio.raiz, pedido.argumentos.caminho)
-          : undefined
+          : pedido.ferramenta === 'executar'
+            ? `Diretório inicial: ${fio.raiz}\\nShell: detectado pelo aplicativo\\nComando: ${String(pedido.argumentos.comando ?? '').slice(0, 400)}`
+            : undefined
         if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
+        const allowSession = permiteSessao(pedido.ferramenta) && !(pedido.ferramenta === 'executar' && comandoExigeAprovacaoIndividual(String(pedido.argumentos.comando ?? '')))
         const liberado = await new Promise<boolean>((resolve) => {
           fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
-          escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}) })
+          escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}), allowSession })
         })
         fio.execucao.pendentes.delete(pedido.id)
         if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
@@ -338,7 +380,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         const permissoesAtuais = permissoesPorFluxo.get(fluxo)
         const usouGrantDeSessao = !!pedido && permiteSessao(pedido.ferramenta) && !!permissoesAtuais?.has(pedido.ferramenta)
         const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
-        if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo) return false
+        if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
         if (usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido!.ferramenta)) return false
         permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
         return true
@@ -349,6 +391,17 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
         }
         return null
+      },
+      aguardarContinuacao: async (pedido) => {
+        if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
+        fio.execucao.estado = 'awaiting-approval'
+        const continuar = await new Promise<boolean>((resolve) => {
+          fio.execucao.aguardandoComando.set(pedido.id, resolve)
+          escreverEvento(res, { type: 'command_waiting', id: pedido.id })
+        })
+        fio.execucao.aguardandoComando.delete(pedido.id)
+        if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
+        return continuar
       },
       sinal: abort.signal,
     })
@@ -406,7 +459,7 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     return true
   }
   const contextoAtual = deps.resolverContexto(execucao.sessionId, execucao.chatId)
-  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || (deps.lerModo(execucao.sessionId, execucao.chatId) ?? 'agent') !== execucao.modo) {
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || (deps.lerModo(execucao.sessionId, execucao.chatId) ?? 'agent') !== execucao.modo || lerPermissaoEfetiva(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
     return true
   }
@@ -416,11 +469,15 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     return true
   }
   if (decisao === 'sessao') {
-    if (!permiteSessao(pendente.pedido.ferramenta)) {
-      sendErro(res, 400, 'configuracao', '"Permitir na Sessão" só vale para criar/escrever — excluir sempre pergunta, uma a uma (RF12-3).')
+    const comandoPerigoso = pendente.pedido.ferramenta === 'executar' && comandoExigeAprovacaoIndividual(String(pendente.pedido.argumentos.comando ?? ''))
+    if (!permiteSessao(pendente.pedido.ferramenta) || comandoPerigoso) {
+      const motivo = pendente.pedido.ferramenta === 'executar'
+        ? 'Comandos de alto risco não aceitam grant de sessão; sempre exigem aprovação individual.'
+        : 'Esta ferramenta não aceita grant de sessão; o cartão sempre pergunta antes de executar.'
+      sendErro(res, 400, 'configuracao', motivo)
       return true
     }
-    const ferramenta = pendente.pedido.ferramenta as 'criar' | 'escrever'
+    const ferramenta = pendente.pedido.ferramenta as 'criar' | 'escrever' | 'executar'
     deps.concederPermissaoSessao(execucao.sessionId, execucao.raiz, ferramenta)
     permissoesPorFluxo.get(fluxo)?.add(ferramenta)
   }
@@ -505,23 +562,13 @@ async function tratarAgir(
   // servidor aplica a política do modo e ignora o `mode` de /api/agir.
   const modoSelecionado = deps.lerModo(validacao.pedido.sessionId, validacao.pedido.chatId)
   const modoEfetivo = modoSelecionado ?? 'agent'
+  const permissaoEfetiva = lerPermissaoEfetiva(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
 
   const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
   if (!alvo) {
     sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
     return true
   }
-  if (alvo.toolCallingCapability !== 'verified') {
-    const par = `${alvo.providerId ?? ''} / ${alvo.modelId ?? alvo.modelo}`.trim()
-    const motivo = alvo.toolCallingCapability === 'incompatible'
-      ? `O canary identificou incompatibilidade explícita de tool calling para ${par}. Agir foi bloqueado.`
-      : alvo.toolCallingCapability === 'declared'
-        ? `Há apenas declaração de tool calling para ${par}; falta round-trip verificado. Agir foi bloqueado.`
-        : `O tool calling de ${par} não tem prova válida para a configuração atual. Verifique em Provedores; Agir foi bloqueado sem iniciar uma chamada.`
-    sendErro(res, 409, 'sem_canal_nativo', motivo)
-    return true
-  }
-
   let teto: number
   try {
     teto = await deps.lerTeto()
@@ -537,7 +584,7 @@ async function tratarAgir(
     return true
   }
   retomarPorFluxo.delete(fluxo)
-  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null }
+  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   const resultado = await executarFioAgir(res, {
     execucao,
@@ -588,7 +635,7 @@ async function tratarContinuar(
     return true
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
-  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || (deps.lerModo(sessionId, chatId) ?? 'agent') !== retomada.contexto.modo) {
+  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || (deps.lerModo(sessionId, chatId) ?? 'agent') !== retomada.contexto.modo || lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz) !== retomada.contexto.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; a continuação foi invalidada.')
     return true
   }
@@ -651,6 +698,83 @@ async function tratarSelecionarModo(req: IncomingMessage, res: ServerResponse, d
   return true
 }
 
+async function tratarSelecionarPermissao(req: IncomingMessage, res: ServerResponse, deps: DependenciasAgir): Promise<boolean> {
+  let corpo: Record<string, unknown>
+  try { corpo = await lerCorpo(req) } catch (erro) {
+    sendErro(res, 400, 'configuracao', (erro as Error).message)
+    return true
+  }
+  const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
+  const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
+  const nivel = corpo.permission
+  if (!sessionId || !chatId || sessionId.length > 200 || chatId.length > 200 || (nivel !== 'manual' && nivel !== 'allow-all')) {
+    sendErro(res, 400, 'configuracao', 'Seleção de permissão inválida; sessão, conversa e nível conhecido são obrigatórios.')
+    return true
+  }
+  const contexto = deps.resolverContexto(sessionId, chatId)
+  if (!contexto.ok) {
+    sendErro(res, 409, 'fluxo', contexto.message)
+    return true
+  }
+  if (!deps.definirPermissao) {
+    sendErro(res, 503, 'configuracao', 'A seleção de permissões não está conectada à autoridade server-side.')
+    return true
+  }
+  const anterior = lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz)
+  deps.definirPermissao(sessionId, chatId, contexto.raiz, nivel as NivelPermissaoAgir)
+  let cancelamento: 'none' | 'cancelled' | 'cancelled_with_effects' = 'none'
+  if (anterior === 'allow-all' && nivel === 'manual') {
+    const ativas = [...execucaoPorFluxo.values()].filter((execucao) => execucao.sessionId === sessionId && execucao.chatId === chatId)
+    for (const execucao of ativas) {
+      if (!solicitarCancelamento(execucao, 'requested')) continue
+      const status = await concluirCancelamento(execucao)
+      if (status === 'cancelled_with_effects') cancelamento = status
+      else if (cancelamento === 'none') cancelamento = 'cancelled'
+    }
+  }
+  sendJson(res, 200, { ok: true, permission: nivel, cancelledRun: cancelamento })
+  return true
+}
+
+async function tratarRespostaAguardarComando(req: IncomingMessage, res: ServerResponse, deps: DependenciasAgir): Promise<boolean> {
+  let corpo: Record<string, unknown>
+  try { corpo = await lerCorpo(req) } catch (erro) {
+    sendErro(res, 400, 'configuracao', (erro as Error).message)
+    return true
+  }
+  const fluxo = typeof corpo.fluxo === 'string' ? corpo.fluxo.trim() : ''
+  const id = typeof corpo.id === 'string' ? corpo.id.trim() : ''
+  const runId = typeof corpo.runId === 'string' ? corpo.runId.trim() : ''
+  const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
+  const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
+  const generation = Number(corpo.generation)
+  const decisao = corpo.decisao
+  if (!fluxo || !id || !runId || !sessionId || !chatId || !Number.isSafeInteger(generation) || generation < 1 || (decisao !== 'continuar' && decisao !== 'parar')) {
+    sendErro(res, 400, 'configuracao', 'Resposta de espera inválida; identidade da execução e decisão são obrigatórias.')
+    return true
+  }
+  const execucao = execucaoPorId.get(runId)
+  if (!execucao || execucao.fluxo !== fluxo || execucao.generation !== generation || execucao.sessionId !== sessionId || execucao.chatId !== chatId || execucao.estado !== 'awaiting-approval') {
+    sendErro(res, 409, 'approval_expired', 'A pergunta de espera expirou ou pertence a outra execução.')
+    return true
+  }
+  const contexto = deps.resolverContexto(sessionId, chatId)
+  if (!contexto.ok || contexto.raiz !== execucao.raiz || lerPermissaoEfetiva(deps, sessionId, chatId, execucao.raiz) !== execucao.permissao) {
+    sendErro(res, 409, 'fluxo', 'A sessão, pasta ou permissão mudou; a espera foi invalidada.')
+    return true
+  }
+  const resolver = execucao.aguardandoComando.get(id)
+  if (!resolver || execucao.controller.signal.aborted) {
+    sendErro(res, 409, 'approval_expired', 'O comando já não aguarda uma decisão.')
+    return true
+  }
+  execucao.aguardandoComando.delete(id)
+  execucao.estado = 'running'
+  resolver(decisao === 'continuar')
+  sendJson(res, 200, { ok: true })
+  return true
+}
+
 export async function tratarRotasAgir(
   req: IncomingMessage,
   res: ServerResponse,
@@ -660,6 +784,8 @@ export async function tratarRotasAgir(
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
   if (url.pathname === '/api/agir/mode') return tratarSelecionarModo(req, res, deps)
+  if (url.pathname === '/api/agir/permission') return tratarSelecionarPermissao(req, res, deps)
+  if (url.pathname === '/api/agir/command-wait') return tratarRespostaAguardarComando(req, res, deps)
   if (url.pathname === '/api/agir/aprovar') return tratarAprovar(req, res, deps)
   if (url.pathname === '/api/agir/cancel') return tratarCancelar(req, res, deps)
   if (url.pathname === '/api/agir/continuar') return tratarContinuar(req, res, deps)

@@ -4,7 +4,7 @@
 // tool_result → done), a NEGAÇÃO do dono e o "Permitir na Sessão" valendo
 // na segunda mexida — além do aprovar para fluxo morto.
 // ============================================================================
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
@@ -66,28 +66,37 @@ const URL_AGIR = new URL('http://localhost/api/agir')
 const URL_APROVAR = new URL('http://localhost/api/agir/aprovar')
 const URL_CANCEL = new URL('http://localhost/api/agir/cancel')
 const URL_MODE = new URL('http://localhost/api/agir/mode')
+const URL_PERMISSION = new URL('http://localhost/api/agir/permission')
+const URL_COMMAND_WAIT = new URL('http://localhost/api/agir/command-wait')
 
-const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123', toolCallingCapability: 'verified' }
+const ALVO: AlvoConversa = { providerId: 'openai', modelId: 'gpt-fixture', protocolo: 'openai-chat', baseUrl: 'http://stub.test/v1', modelo: 'gpt-fixture', apiKey: 'sk-123' }
 const alvoOk: ObterAlvo = async () => ({ alvo: ALVO })
 
 /** Raiz REAL em pasta temporária: os testes que executam ferramenta provam disco de verdade. */
 const raiz = await mkdtemp(path.join(tmpdir(), 'agir-rotas-'))
-const grantsPorSessao = new Map<string, Set<'criar' | 'escrever'>>()
+const grantsPorSessao = new Map<string, Set<'criar' | 'escrever' | 'executar'>>()
 const modosPorConversa = new Map<string, 'agent' | 'edit' | 'ask' | 'plan'>()
+const permissoesPorConversa = new Map<string, { nivel: 'manual' | 'allow-all'; raiz: string }>()
 const chaveModo = (sessionId: string, chatId: string): string => `${sessionId}\\0${chatId}`
-const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferramenta: 'criar' | 'escrever') => {
-  const grants = grantsPorSessao.get(sessionId) ?? new Set<'criar' | 'escrever'>()
+const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferramenta: 'criar' | 'escrever' | 'executar') => {
+  const grants = grantsPorSessao.get(sessionId) ?? new Set<'criar' | 'escrever' | 'executar'>()
   grants.add(ferramenta)
   grantsPorSessao.set(sessionId, grants)
 })
 const DEPS = {
   obterAlvo: alvoOk,
+  resolverShell: async () => ({ profile: { id: 'sh', label: 'sh', path: '/bin/sh' }, allProfiles: [{ id: 'sh', label: 'sh', path: '/bin/sh' }] }),
   resolverContexto: (sessionId: string, chatId: string) => sessionId && chatId
     ? { ok: true as const, raiz, permissoes: [...(grantsPorSessao.get(sessionId) ?? [])] }
     : { ok: false as const, message: 'Contexto da sessão inválido.' },
   concederPermissaoSessao,
   lerModo: (sessionId: string, chatId: string) => modosPorConversa.get(chaveModo(sessionId, chatId)) ?? null,
   definirModo: (sessionId: string, chatId: string, modo: 'agent' | 'edit' | 'ask' | 'plan') => { modosPorConversa.set(chaveModo(sessionId, chatId), modo) },
+  lerPermissao: (sessionId: string, chatId: string, workspace: string) => {
+    const escolha = permissoesPorConversa.get(chaveModo(sessionId, chatId))
+    return escolha?.raiz === workspace ? escolha.nivel : 'manual'
+  },
+  definirPermissao: (sessionId: string, chatId: string, workspace: string, nivel: 'manual' | 'allow-all') => { permissoesPorConversa.set(chaveModo(sessionId, chatId), { nivel, raiz: workspace }) },
   lerTeto: async () => 25,
 }
 
@@ -137,6 +146,7 @@ const PEDIDO_BASE = JSON.stringify({
 })
 
 const SSE_TOOL = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'criar', arguments: '{"caminho":"ola.txt","conteudo":"oi"}' } }] } }] })}\n\n`
+const SSE_COMANDO = (comando: string, id = 'cmd1') => `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name: 'executar', arguments: JSON.stringify({ comando }) } }] } }] })}\n\n`
 const SSE_LER_F5 = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'read-f5', function: { name: 'ler', arguments: '{"caminho":"f5-edit.txt"}' } }] } }] })}\n\n`
 const SSE_ESCREVER_F5 = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'write-f5', function: { name: 'escrever', arguments: '{"caminho":"f5-edit.txt","conteudo":"depois"}' } }] } }] })}\n\n`
 const SSE_DUAS_FERRAMENTAS = `data: ${JSON.stringify({
@@ -164,6 +174,7 @@ afterEach(() => {
   vi.clearAllMocks()
   grantsPorSessao.clear()
   modosPorConversa.clear()
+  permissoesPorConversa.clear()
 })
 
 describe('rotas — POST /api/agir', () => {
@@ -191,15 +202,44 @@ describe('rotas — POST /api/agir', () => {
     expect(semProvedor.corpo()).not.toContain('data: ')
   })
 
-  it('bloqueia fail-closed modelos sem prova explícita de tool calling antes de abrir o fio', async () => {
-    for (const capacidade of ['declared', 'unknown', 'incompatible'] as const) {
-      const res = fakeRes()
-      const deps = { ...DEPS, obterAlvo: async () => ({ alvo: { ...ALVO, toolCallingCapability: capacidade } }) }
-      expect(await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, deps)).toBe(true)
-      expect(res.statusCode).toBe(409)
-      expect(JSON.parse(res.corpo())).toMatchObject({ code: 'sem_canal_nativo' })
-      expect(res.corpo()).not.toContain('data: ')
-    }
+  it('inicia com capacidade desconhecida e aceita resposta normal sem chamadas de ferramenta', async () => {
+    const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
+      const pedido = JSON.parse(String(init.body)) as { tools: unknown[]; tool_choice: string }
+      expect(pedido.tools).toHaveLength(7)
+      expect(pedido.tool_choice).toBe('auto')
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Olá, posso responder diretamente.' } }] })}\n\n`, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    const res = fakeRes()
+    expect(await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)).toBe(true)
+    expect(res.statusCode).toBe(200)
+    expect(frames(res).some((frame) => frame.type === 'done')).toBe(true)
+    expect(res.corpo()).toContain('Olá, posso responder diretamente.')
+    expect(res.corpo()).not.toContain('sem_canal_nativo')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra a rejeição real do provedor e não tenta outro modelo', async () => {
+    const alvoSpy = vi.fn(alvoOk)
+    const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(String(init.body)).model).toBe('gpt-fixture')
+      return new Response(JSON.stringify({ error: { message: 'tool_choice unsupported for this endpoint; token sk-123' } }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, { ...DEPS, obterAlvo: alvoSpy })
+    const erro = frames(res).find((frame) => frame.type === 'error')
+    expect(erro).toMatchObject({ type: 'error', code: 'http' })
+    expect(erro?.message).toContain('tool_choice unsupported for this endpoint')
+    expect(erro?.message).not.toContain('sk-123')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(alvoSpy).toHaveBeenCalledTimes(1)
   })
 
   it('exige identidade de sessão/conversa no corpo antes de iniciar', async () => {
@@ -364,6 +404,173 @@ describe('FATIA 11 — teto e continuar no fio', () => {
     const res3 = fakeRes()
     await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-2' })), res3, URL_CONTINUAR, deps)
     expect(res3.statusCode).toBe(409)
+  })
+})
+
+describe('Fatia 13 — permission level e comando one-shot', () => {
+  const identidadeConversa = { sessionId: 'sessao-1', chatId: 'chat-1' }
+
+  it('Continue do cartão de timeout retoma a mesma execução one-shot', async () => {
+    await registrarModo('agent')
+    await tratarRotasAgir(fakeReq(JSON.stringify({ sessionId: 'sessao-1', chatId: 'chat-1', permission: 'allow-all' })), fakeRes(), URL_PERMISSION, DEPS)
+    const deps = { ...DEPS, timeoutComandoMs: 60 }
+    stubProvedor([SSE_COMANDO("sleep 0.1; printf 'continuacao-f13'"), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ sessionId: 'sessao-1', chatId: 'chat-1', messages: [{ role: 'user', content: 'execute uma espera segura' }], fluxo: 'f13-command-continue' })), res, URL_AGIR, deps)
+    await esperaFio(res, '"type":"command_waiting"')
+    const evento = frames(res).find((item) => item.type === 'command_waiting')
+    const continuar = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'f13-command-continue', id: evento?.id, ...identity(res), sessionId: 'sessao-1', chatId: 'chat-1', decisao: 'continuar' })), continuar, URL_COMMAND_WAIT, deps)
+    expect(continuar.statusCode).toBe(200)
+    await fio
+    expect(frames(res).some((item) => item.type === 'tool_result' && item.ok === true)).toBe(true)
+    expect(frames(res).at(-1)).toMatchObject({ type: 'done' })
+  }, 10_000)
+
+  it('valida a resposta de timeout e rejeita decisões de espera expiradas', async () => {
+    const incompleta = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({})), incompleta, URL_COMMAND_WAIT, DEPS)
+    expect(incompleta.statusCode).toBe(400)
+
+    const expirada = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'f13-closed', id: 'cmd-timeout', runId: 'run-expirado', sessionId: 'sessao-1', chatId: 'chat-1', generation: 1, decisao: 'continuar' })), expirada, URL_COMMAND_WAIT, DEPS)
+    expect(expirada.statusCode).toBe(409)
+    expect(JSON.parse(expirada.corpo()).code).toBe('approval_expired')
+  })
+
+  it('mantém Manual como padrão seguro e grava a seleção no servidor com escopo de workspace', async () => {
+    const semGravador = { ...DEPS, definirPermissao: undefined }
+    const indisponivel = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), indisponivel, URL_PERMISSION, semGravador)
+    expect(indisponivel.statusCode).toBe(503)
+
+    const permitirTudo = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), permitirTudo, URL_PERMISSION, DEPS)
+    expect(permitirTudo.statusCode).toBe(200)
+    expect(JSON.parse(permitirTudo.corpo())).toMatchObject({ permission: 'allow-all' })
+    expect(DEPS.lerPermissao('sessao-1', 'chat-1', raiz)).toBe('allow-all')
+    expect(DEPS.lerPermissao('sessao-1', 'chat-1', '/tmp/outro-workspace')).toBe('manual')
+
+    const voltarManual = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'manual' })), voltarManual, URL_PERMISSION, DEPS)
+    expect(JSON.parse(voltarManual.corpo())).toMatchObject({ permission: 'manual' })
+    expect(DEPS.lerPermissao('sessao-1', 'chat-1', raiz)).toBe('manual')
+  })
+
+  it('Permitir tudo não transforma Perguntar/Planejar em modos de execução', async () => {
+    await registrarModo('ask')
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), fakeRes(), URL_PERMISSION, DEPS)
+    const alvo = 'f13-ask-must-stay-readonly.txt'
+    stubProvedor([SSE_COMANDO(`touch ${alvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, mode: 'agent', messages: [{ role: 'user', content: 'use um comando' }], fluxo: 'f13-ask-readonly' })), res, URL_AGIR, DEPS)
+
+    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(false)
+    const resultado = frames(res).find((evento) => evento.type === 'tool_result')
+    expect(resultado).toMatchObject({ ok: false })
+    expect(String(resultado?.resumo)).toContain('somente leitura')
+    await expect(readFile(path.join(raiz, alvo), 'utf8')).rejects.toThrow()
+  })
+
+  it('em Manual, pede aprovação individual e a negação não inicia processo nem cria arquivo', async () => {
+    await registrarModo('agent')
+    const alvo = 'manual-command-nao-executado.txt'
+    stubProvedor([SSE_COMANDO(`touch ${alvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'use um comando seguro' }], fluxo: 'f13-manual' })), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(true)
+
+    const negar = fakeRes()
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'f13-manual', id: 'cmd1', decisao: 'negar' })), negar, URL_APROVAR, DEPS)
+    expect(negar.statusCode).toBe(200)
+    await fio
+    await expect(readFile(path.join(raiz, alvo), 'utf8')).rejects.toThrow()
+  })
+
+  it('Allow all suprime prompts individuais inclusive para padrão de alto risco, em fixture isolada', async () => {
+    await registrarModo('agent')
+    const permissao = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), permissao, URL_PERMISSION, DEPS)
+    const fixture = path.join(raiz, 'f13-high-risk-fixture')
+    await mkdir(fixture, { recursive: true })
+    await writeFile(path.join(fixture, 'keep.txt'), 'fixture segura', 'utf8')
+
+    stubProvedor([SSE_COMANDO('rm -rf ./f13-high-risk-fixture'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'remova somente a fixture temporária de teste' }], fluxo: 'f13-high-risk-all' })), res, URL_AGIR, DEPS)
+    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(false)
+    expect(frames(res).some((evento) => evento.type === 'tool_result' && evento.ok === true)).toBe(true)
+    await expect(readFile(path.join(fixture, 'keep.txt'), 'utf8')).rejects.toThrow()
+  })
+
+  it('Manual exige aprovação individual para alto risco mesmo com grant de execução', async () => {
+    await registrarModo('agent')
+    grantsPorSessao.set('sessao-1', new Set(['executar']))
+    const fixture = path.join(raiz, 'f13-high-risk-manual-fixture')
+    await mkdir(fixture, { recursive: true })
+    await writeFile(path.join(fixture, 'keep.txt'), 'não remover', 'utf8')
+    stubProvedor([SSE_COMANDO('rm -rf ./f13-high-risk-manual-fixture'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'remova fixture de teste' }], fluxo: 'f13-high-risk-manual' })), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"approval"')
+    expect(frames(res).find((evento) => evento.type === 'approval')).toMatchObject({ allowSession: false })
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'f13-high-risk-manual', id: 'cmd1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+    await fio
+    await expect(readFile(path.join(fixture, 'keep.txt'), 'utf8')).resolves.toBe('não remover')
+  })
+
+  it('Manual respeita grant de sessão server-side para comandos seguros posteriores', async () => {
+    await registrarModo('agent')
+    const primeiroAlvo = 'f13-session-grant-first.txt'
+    stubProvedor([SSE_COMANDO(`touch ${primeiroAlvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const primeiro = fakeRes()
+    const primeiroFio = tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'crie fixture segura' }], fluxo: 'f13-grant-first' })), primeiro, URL_AGIR, DEPS)
+    await esperaFio(primeiro, '"type":"approval"')
+    expect(frames(primeiro).find((evento) => evento.type === 'approval')).toMatchObject({ allowSession: true })
+    await tratarRotasAgir(fakeReq(approvalBody(primeiro, { fluxo: 'f13-grant-first', id: 'cmd1', decisao: 'sessao' })), fakeRes(), URL_APROVAR, DEPS)
+    await primeiroFio
+    expect(concederPermissaoSessao).toHaveBeenCalledWith('sessao-1', raiz, 'executar')
+
+    const segundoAlvo = 'f13-session-grant-second.txt'
+    stubProvedor([SSE_COMANDO(`touch ${segundoAlvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const segundo = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'crie outra fixture segura' }], fluxo: 'f13-grant-second' })), segundo, URL_AGIR, DEPS)
+    expect(frames(segundo).some((evento) => evento.type === 'approval')).toBe(false)
+    await expect(readFile(path.join(raiz, segundoAlvo), 'utf8')).resolves.toBe('')
+  })
+
+  it('Allow all explícito omite approval individual e executa só dentro do workspace ativo', async () => {
+    await registrarModo('agent')
+    const permissao = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), permissao, URL_PERMISSION, DEPS)
+    expect(permissao.statusCode).toBe(200)
+
+    const alvo = 'allow-all-command-fixture.txt'
+    stubProvedor([SSE_COMANDO(`touch ${alvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'use um comando seguro' }], fluxo: 'f13-allow-all' })), res, URL_AGIR, DEPS)
+    await fio
+
+    expect(frames(res).some((evento) => evento.type === 'approval')).toBe(false)
+    expect(frames(res).some((evento) => evento.type === 'tool_result' && evento.ok === true)).toBe(true)
+    await expect(readFile(path.join(raiz, alvo), 'utf8')).resolves.toBe('')
+  })
+
+  it('revogar Allow all para Manual cancela a execução one-shot em curso', async () => {
+    await registrarModo('agent')
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'allow-all' })), fakeRes(), URL_PERMISSION, DEPS)
+    const alvo = 'f13-revoked-must-not-exist.txt'
+    stubProvedor([SSE_COMANDO(`sleep 0.3; printf 'iniciado'; sleep 2; touch ${alvo}`), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, messages: [{ role: 'user', content: 'execute a fixture' }], fluxo: 'f13-revoke-active' })), res, URL_AGIR, DEPS)
+    await esperaFio(res, '"type":"tool_progress"')
+
+    const revogar = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ ...identidadeConversa, permission: 'manual' })), revogar, URL_PERMISSION, DEPS)
+    expect(revogar.statusCode).toBe(200)
+    await fio
+    await expect(readFile(path.join(raiz, alvo), 'utf8')).rejects.toThrow()
   })
 })
 

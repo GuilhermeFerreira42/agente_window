@@ -32,31 +32,25 @@ Nada de importar arquivo interno de outra casa (o teste `__tests__/frontier.test
   em `POST /api/providers/reveal` (`Cache-Control: no-store`). Nunca em log, nunca em URL.
 - **D84:** chave **salva manda**; variável de ambiente é reserva e a tela mostra a origem.
 
-## Capability de tool calling (F5-B)
+## Modelos no modo Agir (F5-B, regra vigente D122)
 
-O catálogo dinâmico registra `declared`, `verified`, `unknown` ou `incompatible` por par
-exato `(providerId, modelId)`. O estado `verified` só é liberado depois de um round-trip
-com o adaptador Agir e o endpoint/protocolo configurados. A prova server-side é vinculada
-por fingerprint à configuração relevante e à versão do adaptador; endpoint, credencial,
-parâmetros de chamada, remoção do modelo da lista habilitada ou versão incompatíveis fazem a prova deixar de valer. Provedor/modelo desabilitado bloqueia Agir enquanto estiver indisponível.
-O fingerprint não é enviado à interface, e segredo/token não entra no registro de resultado.
+O seletor mantém `Auto` e os pares explícitos `(providerId, modelId)` habilitados. Ao
+iniciar Agir, o servidor envia diretamente o pedido normal com o anúncio de ferramentas
+nativas do protocolo; não consulta `verified`, não exige capability conhecida e não roda
+canary. Uma resposta textual comum, sem chamada de ferramenta, é uma conclusão válida.
 
-A pessoa precisa marcar consentimento explícito na interface antes de `POST
-/api/providers/tool-calling/verify`. O aviso informa que o canary pode fazer até duas
-requisições e consumir créditos/custos. Ele anuncia apenas `ler`, usa um caminho e um
-marcador aleatórios inertes em memória e nunca passa por executor de workspace, filesystem,
-shell ou ferramentas com efeitos externos. O canary não concede grants nem altera as
-políticas do agente. Só uma prova válida `verified` libera o gate de Agir; estado ausente,
-`declared`, `unknown` ou `incompatible` permanece bloqueado. Erros transitórios de rede,
-autenticação e HTTP genérico permanecem `unknown`; incompatibilidade exige recusa explícita de tool calling, requisito de campo que o adaptador não preserva ou parâmetro do adaptador explicitamente recusado.
+Se o provedor rejeitar o pedido, a interface mostra o erro HTTP tipado e o detalhe legível
+que o próprio serviço retornou, com redação de credenciais. Isso não muda o modelo, não
+faz fallback e não bloqueia uma tentativa futura. A seleção/Auto, validação de habilitação,
+Manual/Permitir tudo e os quatro modos continuam independentes; Perguntar/Planejar seguem
+read-only, e Permitir tudo não é Autopilot nem contorna validação do servidor.
 
-O estado `declared` é reservado para declaração confiável futura; a listagem `/models` e o
-nome de modelo não são tratados como declaração de suporte. Nenhum round-trip com provedor
-real foi autorizado ou executado nesta implementação; testes usam `fetch` simulado e
-credencial fixture fictícia.
+Arquivos v4 antigos ainda podem conter `toolCallingAssessments`; a leitura ignora esse
+campo legado e um salvamento normal o omite. Nenhum fluxo atual consulta ou grava essas
+avaliações.
 
 ## Testes desta casa
 `__tests__/registro.test.ts` (catálogo) · `__tests__/providersRepo.test.ts` (arquivo,
 migração com backup, máscara, precedência, tranca do `.gitignore`) · `__tests__/probe.test.ts`
 (sucesso, 401, serviço que não lista, sem chave, timeout de 10 s — com `fetch` mockado) ·
-`__tests__/frontier.test.ts` (ninguém importa abaixo do barrel) · `__tests__/rotas.test.ts` (rota F5-B sem consentimento/sem chamadas e round-trip sanitizado com mock) · `ui/__tests__/ProvidersView.test.tsx` (aviso, checkbox de consentimento e ação) · `agir/__tests__/toolCallingCapability.test.ts` (round-trip, cache, falhas transitórias, incompatibilidade explícita e corrida de configuração, tudo com `fetch` simulado) · E2E `provedores_fatia08.spec.ts`.
+`__tests__/frontier.test.ts` (ninguém importa abaixo do barrel) · `__tests__/rotas.test.ts` (rota de verificação removida; GET do catálogo sem evidência/capability) · `ui/__tests__/ProvidersView.test.tsx` (configuração preservada sem prova) · `agir/__tests__/rotas.test.ts` (modelo sem capability inicia com ferramentas; resposta sem ferramentas é aceita; rejeição real mostra detalhe sem fallback) · `agir/__tests__/vizinho.test.ts` (protocolos/streaming e erros upstream) · E2E `provedores_fatia08.spec.ts`.

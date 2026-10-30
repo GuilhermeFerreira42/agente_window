@@ -1,5 +1,5 @@
 // ============================================================================
-// Casa Agir — catálogo das ferramentas do MVP (D72) + executores FALSOS (C1).
+// Casa Agir — catálogo das ferramentas e executores falsos para testes sem efeitos.
 // A C1 prova o esqueleto SEM tocar disco: os executores falsos devolvem
 // resumos marcados com "SIMULADO C1" para nenhum teste passar por engano.
 // A C2 troca os falsos por arquivos de verdade (fsHost, escrita atômica).
@@ -58,6 +58,12 @@ export const catalogoFerramentas: DescritorFerramenta[] = [
     descricao: 'Move um arquivo ou pasta da pasta de trabalho para a LIXEIRA do sistema (nunca apaga permanente; restaurar é pela lixeira). Sempre pede permissão ao dono, uma a uma.',
     obrigatorios: ['caminho'],
   },
+  {
+    id: 'executar',
+    titulo: 'Executar comando',
+    descricao: 'Executa um comando no shell padrão do aplicativo, em processo próprio, com diretório inicial igual à pasta de trabalho ativa. O comando pode acessar recursos conforme os privilégios da conta do sistema operacional.',
+    obrigatorios: ['comando'],
+  },
 ]
 
 const idsConhecidos = new Set<string>(catalogoFerramentas.map((f) => f.id))
@@ -72,7 +78,7 @@ export function ehFerramentaConhecida(nome: unknown): nome is FerramentaId {
  * modo Agir; excluir é destrutiva e sempre passa pelo cartão do dono.
  */
 export function ehMexida(ferramenta: FerramentaId): boolean {
-  return ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir'
+  return ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir' || ferramenta === 'executar'
 }
 
 /**
@@ -80,7 +86,7 @@ export function ehMexida(ferramenta: FerramentaId): boolean {
  * EXCLUIR (exclusão sempre pergunta, uma a uma, mesmo com sessão liberada).
  */
 export function permiteSessao(ferramenta: FerramentaId): boolean {
-  return ehMexida(ferramenta) && ferramenta !== 'excluir'
+  return (ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'executar')
 }
 
 /** Lista curta dos argumentos que vieram, para resumos honestos. */
@@ -91,6 +97,7 @@ function descreverArgumentos(argumentos: ArgumentosFerramenta): string {
   if (typeof argumentos.conteudo === 'string') {
     pedacos.push(`${argumentos.conteudo.length} caracteres de conteúdo`)
   }
+  if (typeof argumentos.comando === 'string') pedacos.push(`comando ${JSON.stringify(argumentos.comando.slice(0, 160))}`)
   return pedacos.length > 0 ? pedacos.join(', ') : 'sem argumentos'
 }
 
@@ -141,6 +148,9 @@ export function criarExecutoresFalsos(): Record<FerramentaId, ExecutorFerramenta
           resumo: `(SIMULADO C1) "${String(pedido.argumentos.caminho)}" iria para a lixeira — NADA sumiu (prova do esqueleto).`,
         }
       }
+      if (ferramenta === 'executar') {
+        return { ok: true, resumo: `(SIMULADO C1) comando aceito: ${String(pedido.argumentos.comando)} — nenhum processo foi iniciado.`, conteudo: 'SIMULADO C1: nenhum comando foi executado.' }
+      }
       const verbo = ferramenta === 'criar' ? 'criado' : 'gravado'
       return {
         ok: true,
@@ -155,5 +165,6 @@ export function criarExecutoresFalsos(): Record<FerramentaId, ExecutorFerramenta
     criar: falso('criar'),
     escrever: falso('escrever'),
     excluir: falso('excluir'),
+    executar: falso('executar'),
   }
 }

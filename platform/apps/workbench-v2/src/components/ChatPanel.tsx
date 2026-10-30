@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
+import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 
 const modeLabels: Record<string, string> = {
   agent: 'Agente',
@@ -35,13 +36,16 @@ interface ChatPanelProps {
   activeChatId: string
   model: string
   mode: string
+  permission?: NivelPermissaoAgir
   onSelectChat: (chatId: string) => void
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
+  onChangePermission?: (permission: NivelPermissaoAgir) => Promise<void>
   onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void
   onStop: () => void
   onApprove: (chatId?: string) => void
   onDecidirFerramenta: (chatId: string, messageId: string, ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirAguardarComando?: (chatId: string, messageId: string, ferramentaId: string, decisao: 'continuar' | 'parar') => void
   onDecidirContinuar: (chatId: string, messageId: string, continuarId: string, decisao: 'continuar' | 'parar') => void
   autoScroll?: boolean
   onCopy: (chatId: string, messageId: string, kind: ChatCopyKind) => void
@@ -179,11 +183,13 @@ function MessageRow({
   onRegenerate,
   onReport,
   onDecidirFerramenta,
+  onDecidirAguardarComando,
   onDecidirContinuar,
   canRegenerate,
 }: {
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
+  onDecidirAguardarComando: (ferramentaId: string, decisao: 'continuar' | 'parar') => void
   onDecidirContinuar: (continuarId: string, decisao: 'continuar' | 'parar') => void
   onCopy: (messageId: string, kind: ChatCopyKind) => void
   onCopyAll: () => void
@@ -231,6 +237,7 @@ function MessageRow({
                     key={carta.id}
                     carta={carta}
                     onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
+                    onDecidirContinuacao={carta.status === 'aguardando_continuacao' ? (decisao) => onDecidirAguardarComando(carta.id, decisao) : undefined}
                   />
                 ),
               })),
@@ -296,13 +303,16 @@ export function ChatPanel({
   activeChatId,
   model,
   mode,
+  permission = 'manual',
   onSelectChat,
   onChangeModel,
   onChangeMode,
+  onChangePermission = async () => undefined,
   onSend,
   onStop,
   onApprove,
   onDecidirFerramenta,
+  onDecidirAguardarComando = () => undefined,
   onDecidirContinuar,
   autoScroll,
   onCopy,
@@ -382,6 +392,7 @@ export function ChatPanel({
               onRegenerate={(messageId) => onRegenerate(activeChat.id, messageId)}
               onReport={(messageId) => onReport(activeChat.id, messageId)}
               onDecidirFerramenta={(ferramentaId, decisao) => onDecidirFerramenta(activeChat.id, message.id, ferramentaId, decisao)}
+              onDecidirAguardarComando={(ferramentaId, decisao) => onDecidirAguardarComando(activeChat.id, message.id, ferramentaId, decisao)}
               onDecidirContinuar={(continuarId, decisao) => onDecidirContinuar(activeChat.id, message.id, continuarId, decisao)}
               canRegenerate={message.id === lastAssistantMessageId}
             />
@@ -400,8 +411,10 @@ export function ChatPanel({
             activeChat={activeChat}
             model={model}
             mode={mode}
+            permission={permission}
             onChangeModel={onChangeModel}
             onChangeMode={onChangeMode}
+            onChangePermission={onChangePermission}
             onSend={onSend}
             onStop={onStop}
             onApprove={onApprove}

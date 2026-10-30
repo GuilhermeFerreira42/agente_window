@@ -87,7 +87,8 @@ export async function descreverAlvoExcluir(_raiz: string, entrada: unknown): Pro
   return 'A exclusão não está disponível nesta versão; nenhum item foi lido, movido ou removido.'
 }
 
-export type ExecutoresDisco = Record<FerramentaId, ExecutorFerramenta> & { fechar: () => void }
+export type FerramentasDeDisco = Exclude<FerramentaId, 'executar'>
+export type ExecutoresDisco = Record<FerramentasDeDisco, ExecutorFerramenta> & { fechar: () => void }
 
 export function criarExecutoresReais(raiz: string): ExecutoresDisco {
   const raizResolvida = nodePath.resolve(raiz)

@@ -54,6 +54,8 @@ export interface OpcoesAgir {
   validarContexto?: (pedido?: PedidoFerramenta) => boolean
   /** Política server-side por modo; mensagem de bloqueio evita approval/executor. */
   bloquearFerramenta?: (pedido: PedidoFerramenta) => string | null
+  /** Callback de espera longa do executor; não modifica o PTY humano. */
+  aguardarContinuacao?: (pedido: PedidoFerramenta) => Promise<boolean>
   /** Parar: o mesmo sinal da conversa (09) — interrompido = silêncio. */
   sinal?: AbortSignal
 }
@@ -183,7 +185,9 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       // tela usa para pintar o cartão de negado — mantido nos dois textos).
       const textoNegacao = pedido.ferramenta === 'excluir'
         ? 'O dono negou esta exclusão — nada sumiu.'
-        : 'O dono negou esta mexida — nada foi escrito.'
+        : pedido.ferramenta === 'executar'
+          ? 'O dono negou este comando — nenhum processo foi iniciado.'
+          : 'O dono negou esta mexida — nada foi escrito.'
       if (liberado && opcoes.validarContexto && !opcoes.validarContexto(pedido)) {
         const motivo = 'A sessão ou a pasta mudou após a autorização; a ação não foi executada.'
         emitir({ type: 'tool_result', id: pedido.id, ferramenta: pedido.ferramenta, ok: false, resumo: motivo })
@@ -192,7 +196,11 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       }
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
       const resultado: ResultadoFerramenta = liberado
-        ? await executores[pedido.ferramenta](pedido)
+        ? await executores[pedido.ferramenta](pedido, {
+            sinal,
+            aoProgresso: (text) => emitir({ type: 'tool_progress', id: pedido.id, text }),
+            aguardarContinuacao: () => opcoes.aguardarContinuacao?.(pedido) ?? Promise.resolve(false),
+          })
         : { ok: false, resumo: textoNegacao }
 
       emitir({

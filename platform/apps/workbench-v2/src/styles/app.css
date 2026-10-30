@@ -1951,6 +1951,7 @@ svg {
 }
 
 .input-mode-wrap,
+.permission-picker-wrap,
 .model-picker-wrap {
   position: relative;
 }
@@ -2127,6 +2128,36 @@ svg {
 .mode-popover {
   left: 0;
   bottom: 28px;
+}
+
+.permission-mode-button.is-risky {
+  color: var(--vscode-errorForeground);
+  font-weight: 600;
+}
+
+.permission-popover {
+  left: 0;
+  bottom: 28px;
+  width: min(320px, calc(100vw - 24px));
+}
+
+.permission-popover .popover-option {
+  min-height: 44px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.permission-popover .popover-option-description {
+  flex-basis: 100%;
+  margin: 0 0 0 19px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.permission-error {
+  padding: 6px 8px;
+  color: var(--vscode-errorForeground);
+  font-size: var(--vscode-fontSize-label2);
 }
 
 .model-popover {

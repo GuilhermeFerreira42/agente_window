@@ -22,7 +22,7 @@ import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAprovacao, selecionarModoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -571,6 +571,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   useEffect(() => {
     try { localStorage.setItem('agente-window:model-by-chat:v3', JSON.stringify(modelByChat)) } catch { /* preferência local é best-effort; backend sempre valida */ }
   }, [modelByChat])
+  // Nível de permissões é separado dos quatro modos e não é restaurado como
+  // Permitir tudo após recarregar o app: cada nova vida de UI volta a Manual.
+  const [permissionByChat, setPermissionByChat] = useState<Record<string, NivelPermissaoAgir>>({})
   const [modeByChat, setModeByChat] = useState<Record<string, ModoAgir>>(() => {
     try {
       const saved: unknown = JSON.parse(localStorage.getItem('agente-window:mode-by-chat:v1') ?? '{}')
@@ -1608,6 +1611,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       return next
     })
     setModeByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
+    setPermissionByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
     setModelByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
     setComposerDrafts((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
     setComposerHistoryByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
@@ -1754,16 +1758,22 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => [...cartoes, {
           id: pedido.id,
           ferramenta: pedido.ferramenta,
-          alvo: String(pedido.argumentos.caminho ?? pedido.argumentos.padrao ?? ''),
+          alvo: String(pedido.argumentos.comando ?? pedido.argumentos.caminho ?? pedido.argumentos.padrao ?? ''),
           status: 'executando',
           ordem: proximaOrdemCartao(),
         }])
       },
-      onApproval: (pedido: PedidoFerramenta, previaServidor?: string) => {
+      onApproval: (pedido: PedidoFerramenta, previaServidor?: string, allowSession?: boolean) => {
         const bruta = pedido.argumentos.conteudo
         // FATIA 12: a prévia do `excluir` vem do servidor (viu o disco); o resto usa o conteúdo do pedido.
         const previa = previaServidor ?? (typeof bruta === 'string' ? bruta.slice(0, 400) : undefined)
-        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', ...(previa !== undefined ? { previa } : {}) } : carta))
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === pedido.id ? { ...carta, status: 'aguardando', allowSession, ...(previa !== undefined ? { previa } : {}) } : carta))
+      },
+      onToolProgress: (id, texto) => {
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? { ...carta, progresso: texto } : carta))
+      },
+      onCommandWaiting: (id) => {
+        mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? { ...carta, status: 'aguardando_continuacao' } : carta))
       },
       onToolResult: (id, ferramenta, ok, resumo) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? {
@@ -1895,6 +1905,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
     const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
+    const permissao = permissionByChat[runKey] ?? 'manual'
     const entrada = {
       mensagens: historico,
       modelSelection,
@@ -1921,7 +1932,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       },
     }
     agirAtivas.current.set(runKey, controle)
-    void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(() => {
+    void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(async () => {
+      if (canceladaAntesDoInicio) return
+      await selecionarPermissaoAgir(sessionId, chatId, permissao)
       if (canceladaAntesDoInicio) return
       real = enviarAgir(entrada, ouvintes)
     }).catch((erro: unknown) => {
@@ -1952,6 +1965,38 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const identidade: IdentidadeExecucaoAgir | null = agirAtivas.current.get(`${sessionId}:${chatId}`)?.identidade() ?? null
     void responderAprovacao(sessionId, `${sessionId}:${chatId}:${messageId}`, carta.id, decisao, identidade).then((aceita) => {
       if (!aceita) marcar('expirado') // o fluxo já não esperava (recarregou/terminou)
+    })
+  }
+
+  /** Resposta ao timeout de um processo one-shot (não usa nem altera PTY humano). */
+  const decidirAguardarComando = (sessionId: string, chatId: string, messageId: string, ferramentaId: string, decisao: 'continuar' | 'parar'): void => {
+    const sessao = sessions.find((item) => item.id === sessionId)
+    const carta = sessao?.chats.find((chat) => chat.id === chatId)?.messages.find((item) => item.id === messageId)?.ferramentas?.find((item) => item.id === ferramentaId)
+    if (!sessao || !carta || carta.status !== 'aguardando_continuacao') return
+    updateSession(sessionId, (session) => ({
+      ...session,
+      chats: session.chats.map((chat) => chat.id === chatId ? {
+        ...chat,
+        messages: chat.messages.map((message) => message.id === messageId ? {
+          ...message,
+          ferramentas: (message.ferramentas ?? []).map((item) => item.id === ferramentaId ? { ...item, status: 'executando' } : item),
+        } : message),
+      } : chat),
+    }))
+    const fluxo = `${sessionId}:${chatId}:${messageId}`
+    const identidade = agirAtivas.current.get(`${sessionId}:${chatId}`)?.identidade() ?? null
+    void responderAguardarComando(sessionId, chatId, fluxo, ferramentaId, decisao, identidade).then((aceita) => {
+      if (aceita) return
+      updateSession(sessionId, (session) => ({
+        ...session,
+        chats: session.chats.map((chat) => chat.id === chatId ? {
+          ...chat,
+          messages: chat.messages.map((message) => message.id === messageId ? {
+            ...message,
+            ferramentas: (message.ferramentas ?? []).map((item) => item.id === ferramentaId ? { ...item, status: 'expirado', resumo: 'A espera do comando expirou; ele não foi retomado.' } : item),
+          } : message),
+        } : chat),
+      }))
     })
   }
 
@@ -2277,15 +2322,21 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         activeChatId={sessionChatId}
         model={modelByChat[sessionChatKey] ?? selectedModel}
         mode={modeByChat[sessionChatKey] ?? selectedMode}
+        permission={permissionByChat[sessionChatKey] ?? 'manual'}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
         onChangeModel={(nextModel) => setModelByChat((current) => ({ ...current, [sessionChatKey]: nextModel }))}
         onChangeMode={(nextMode) => {
           if (ehModoAgir(nextMode)) setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))
         }}
+        onChangePermission={async (nextPermission) => {
+          await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
+          setPermissionByChat((current) => ({ ...current, [sessionChatKey]: nextPermission }))
+        }}
         onSend={(text, attachments, modelSelection) => handleSend(text, attachments, undefined, modelSelection)}
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}
         onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}
+        onDecidirAguardarComando={(chatId, messageId, ferramentaId, decisao) => decidirAguardarComando(session.id, chatId, messageId, ferramentaId, decisao)}
         onDecidirContinuar={(chatId, messageId, continuarId, decisao) => decidirContinuar(session.id, chatId, messageId, continuarId, decisao)}
         autoScroll={autoScrollChat}
         composerDrafts={composerDrafts}

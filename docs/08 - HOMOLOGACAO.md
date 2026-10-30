@@ -19,7 +19,7 @@ A diretriz de paridade funcional/desempenho aprovada em D101 não declara que o 
 
 Classificar cada critério/cenário como **superior**, **equivalente**, **inferior**, **inconclusivo**, **não testado** ou **não comparável**, com evidência que sustente o estado. Não omitir falhas/rodadas nem tratar teste automatizado com stub como validação de provedor real. O responsável avalia a evidência e a conclusão funcional; sem avaliação/reprodução suficiente, não marcar paridade como aceita. Relatos históricos não reproduzidos permanecem identificados como relatos. Esta seção não cria critério de aceite retroativo para Fatias 07–12, não reabre homologações históricas e não inicia D98.
 
-**Registro histórico da auditoria D102–D117 e snapshot pré-D121:** decisões não eram resultados de teste; o registro integral permanece para rastreabilidade em `03`/`06`. **Estado corrente D119/D120/D121 (2026-10-27):** nenhuma F1–F5-B está homologada. F1 mantém local-only e autoridade/grants server-side; unit 6/6, sem E2E/preview/Windows. F2 agora usa paths absolutos ou relativos ao workspace sob permissões normais do SO, com limite TOCTOU documentado; não promete contenção física contra processo malicioso da mesma conta. F3 tem testes focados, sem homologação E2E. F4: criar exclusivo; escrita exige leitura e compara fingerprint; conflitos observáveis recusam, sem CAS universal; hardlinks múltiplos recusados. F5-A mantém Perguntar/Planejar sem mutações e modo Agir/Edit registrado server-side; F5-B: só evidência `verified` válida libera Agir; `declared` opcional conforme D120; nenhuma credencial/provedor real. Linux local foi testado; Windows e homologação humana pendentes.
+**Registro histórico da auditoria D102–D117 e snapshot pré-D121:** decisões não eram resultados de teste; o registro integral permanece para rastreabilidade em `03`/`06`. **Estado corrente D119/D120/D121/D122 (2026-10-29):** nenhuma F1–F5-B está homologada. D122 substitui em F5-B qualquer exigência de `verified`/canary: Agir inicia o par habilitado diretamente e rejeição real aparece como erro legível, sem fallback; detalhes e limites em `05`/`06`/`09`. D120 permanece apenas como histórico. F1 mantém local-only e autoridade/grants server-side; unit 6/6, sem E2E/preview/Windows. F2 agora usa paths absolutos ou relativos ao workspace sob permissões normais do SO, com limite TOCTOU documentado; não promete contenção física contra processo malicioso da mesma conta. F3 tem testes focados, sem homologação E2E. F4: criar exclusivo; escrita exige leitura e compara fingerprint; conflitos observáveis recusam, sem CAS universal; hardlinks múltiplos recusados. F5-A mantém Perguntar/Planejar sem mutações e modo Agir/Edit registrado server-side; F5-B inicia diretamente o par habilitado sem prova/canary, aceita resposta sem tool call e mostra rejeição HTTP real sem fallback; nenhuma credencial/provedor real. Linux local foi testado; Windows e homologação humana pendentes.
 
 ## Validação futura dos achados F1–F8 (planejamento; não é homologação atual)
 
@@ -81,7 +81,7 @@ Antes de marcar uma capacidade ou cenário como **pronto**, confira: (1) SPEC e 
 
 ## Roteiro histórico de Homologação — FATIA 10: AGIR — ✅ HISTORICAMENTE HOMOLOGADA (D94, 19/10)
 > **Nota D121:** o roteiro e a homologação D94 permanecem como registro histórico e não são reabertos. A recusa de `../fora.txt` abaixo refletia o contrato de território D93, substituído para esta missão por D121. Para F1–F5-B atual, valide caminhos externos apenas com fixtures temporárias e a matriz vigente em `06`; não use documentos pessoais nem declare homologação automática.
-Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de ferramentas**. **Aviso Q4b (D93):** se o modelo ativo (ex.: `gemma` no Ollama) não tiver tool calling nativo, o Agir mostra aviso honesto (`sem_canal_nativo`) e a conversa segue sem agir — nesse caso valide os passos 2–7 com um provedor que tenha o canal; a conversa normal funciona com qualquer provedor.
+Pré-requisitos (Windows): app na 5174 · provedor/modelo habilitado em fixture. D122: envie Agir diretamente, sem pré-requisito de prova/canary; valide anúncio normal de ferramentas. Uma resposta sem tool call deve concluir. Se o serviço rejeitar a API, confira o erro legível retornado e confirme que não houve troca/fallback e que nova tentativa não fica previamente bloqueada. Não use credenciais reais neste roteiro sem autorização própria.
 1. **Conversa normal (§6.1):** mande "oi" — responde como na 09, sem cartão.
 2. **O teste final do MVP (§6.2/3):** numa sessão com **pasta real** (interruptor no topo: digite o caminho da pasta e Enter), mande **"Crie o arquivo teste-homologacao.txt com o conteúdo: feito pela fatia 10"** → cartão com caminho + prévia + 3 botões. **Antes de permitir, confira no Explorador: o arquivo NÃO existe.** Clique **Permitir** → cartão "Feito" e o arquivo **existe** com o conteúdo exato.
 3. **Negar (§6.4):** "crie o arquivo nao-quero.txt" → cartão → **Negar** → cartão "Negado por você"; a IA segue sabendo do "não" e **nada é escrito**.
@@ -118,13 +118,31 @@ Pré-requisitos (Windows): app na 5174 · provedor ativo **com canal nativo de f
 **HOMOLOGADA (D97, 21/10):** palavras do dono: *"a fatia 12 ja esta homologada"*. Cobre a tool `excluir` (arquivo+pasta → lixeira do SO, com contagem) + cartão reforçado (sem desfazer-direto, sem botão de sessão) + sessão nunca cobre (RF12-3) + território = pasta ativa + os 2 fixes do teste real (C4 switch PowerShell + C5 território no Windows). Prova automatizada: tsc 0 · unit 935✓/12✗ pré/16skip · E2E `excluir_fatia12` 5/5 · régua 08–12 23/23. **Registro honesto:** o retest no Windows real dos C4+C5 não foi confirmado neste chat (homologação por declaração, padrão D94). Pós-homologação: conversar o ajuste do teto na Config (pedido dele).
 5. Diga "homologada" ou liste o que falhou. Depois conversamos o ajuste do teto na Config (seu pedido) e a FATIA 13.
 
-## Registro D98 — desempenho e regressões confirmados manualmente; Gate aberto (2026-10-29)
+## Registro D98 — Gate concluído e homologado pelo dono (2026-10-29)
 
-**Declaração do dono:** os objetivos principais de desempenho/funcionamento D98, incluindo o desempenho do Explorer, foram homologados manualmente no Windows. O dono confirmou também que os seis comportamentos pós-homologação REG-01–REG-06 funcionam, incluindo o seletor nativo, a atualização imediata do Explorer e a preservação dos terminais abertos ao trocar workspace. Esta declaração humana é registrada como tal; não equivale, por si só, ao encerramento formal do Gate D98.
+**Declaração do dono:** “concluí e homologuei o Gate D98 no meu ambiente Windows, incluindo as correções das regressões encontradas.” O dono confirmou também os seis comportamentos REG-01–REG-06 e o desempenho do Explorer. Registro como fechamento formal decidido pelo dono; não é uma inferência da IA.
 
-**Evidência técnica:** commits locais `1082fb2` (correções) e `b895a8b` (testes). Cobertura Linux: E2E REG 6/6; SCM 1/1 e Explorer 1/1 em fixture isolada 1k; Vitest focal 11 arquivos/93; typecheck passou. Regressão geral 991/1030 aprovados, 12 falhos e 27 ignorados; os 12 asserts falhos reproduzem os quatro arquivos com falhas já existentes no baseline `3f5c33c`. Build oficial terminou sem sucesso por OOM no Vite. Detalhes, limites e distinção entre validação manual e automatizada ficam em `09 §3.8.5`.
+**Evidência técnica de suporte:** commits locais `8ec2dda` (correções) e `8793b9e` (testes). Cobertura Linux: E2E REG 6/6; SCM 1/1 e Explorer 1/1 em fixture isolada 1k; Vitest focal 11 arquivos/93; typecheck passou. Regressão geral 991/1030 aprovados, 12 falhos e 27 ignorados; os 12 asserts falhos reproduzem os quatro arquivos com falhas já existentes no baseline `3f5c33c`. Build oficial terminou sem sucesso por OOM no Vite. O dono avaliou essas limitações e declarou o Gate concluído; placares e limites técnicos em `09 §3.8.5`.
 
-**Estado e decisão:** os seis fluxos e o desempenho foram confirmados pelo dono no Windows ✅ · validação automatizada Linux executada com os limites acima ✅ · resultado separado de Codex independente não disponível/não alegado · encerramento formal do Gate D98 pendente da decisão explícita do dono. Não reiniciar otimizações, iniciar Fatia 13/M ou fazer push.
+**Estado:** Gate D98 **fechado por decisão do dono** ✅ · não reabrir otimizações homologadas · Fatia 13 autorizada em sequência. A divergência arquitetural one-shot versus PTY persistente foi posteriormente resolvida por D126, opção A; o registro separado de homologação manual limitada da Fatia 13 vem a seguir. Fatias 14/15, iniciativas M e push continuam fora do escopo desta abertura.
+
+## Fatia 13 — homologação manual declarada pelo dono (Windows, 2026-10-29)
+
+**Declaração do dono:** o usuário informou que homologou manualmente no Windows os cenários abaixo. Este registro é a declaração de quem executou o aplicativo; não é teste automatizado executado pelo agente e não implica cobertura além dos casos explicitamente relatados.
+
+**Cenários relatados como exercitados:**
+- conversas no aplicativo;
+- leitura, criação e edição de arquivos;
+- comandos PowerShell reais executados pelo agente;
+- `Rename-Item`, com conteúdo do arquivo preservado;
+- permissões Manual e Permitir tudo nos cenários testados;
+- modos Perguntar e Planejar sem criação de arquivos;
+- uso de `Parar` para cancelar uma execução que estava aguardando havia 30 segundos;
+- confirmação de que o terminal humano permaneceu operacional.
+
+**Limites do aceite:** não se afirma que todos os comandos, padrões de risco, shells, permissões ou provedores tenham sido testados. O aceite não demonstra confinamento do processo ao workspace, isolamento contra outros usuários da máquina, reversão dos efeitos anteriores ao cancelamento, nem cobre cenários não relatados; o shell herda os privilégios normais da conta do sistema. Não há, neste registro, log/vídeo ou resultado de E2E automatizado do Windows anexado. O teste de espera de 30 segundos não altera o timeout de produto de 2 minutos nem a opção de continuar.
+
+A decisão técnica de executor one-shot separado do PTY humano consta em `05` (D126), `04 §1.11` e `06`; a evidência automatizada Linux desta missão está separada em `09 §3.22`. A ferramenta `excluir` continua bloqueada por decisão anterior; a execução de comandos shell não a habilita.
 
 ## Roteiro de Homologação — FATIA 6.1: Fechamento de Dívidas Críticas (Windows 5174 real)
 

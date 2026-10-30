@@ -62,8 +62,6 @@ export interface AlvoConversa {
   /** Obrigatórios para alvos reais; opcionais somente em fixtures legadas de teste. */
   providerId?: string
   modelId?: string
-  /** Agir só inicia quando há prova explícita de suporte; ausente é unknown/fail-closed. */
-  toolCallingCapability?: 'declared' | 'verified' | 'unknown' | 'incompatible'
   protocolo: ProtocoloConversa
   baseUrl: string
   modelo: string

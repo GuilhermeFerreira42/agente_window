@@ -10,36 +10,6 @@
 /** Como o serviço fala: define qual adaptador de conexão é usado no servidor. */
 export type Protocolo = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
-/** Capability é evidência sobre o par configurado, não uma permissão de ferramenta. */
-export type ToolCallingCapabilityStatus = 'declared' | 'verified' | 'unknown' | 'incompatible'
-export type ToolCallingCheckReason =
-  | 'roundtrip_verified'
-  | 'explicit_tools_unsupported'
-  | 'adapter_missing_field'
-  | 'adapter_parameter_unsupported'
-  | 'authentication_failure'
-  | 'network_failure'
-  | 'provider_error'
-  | 'no_tool_call'
-  | 'invalid_tool_call'
-  | 'continuation_failed'
-  | 'configuration_changed'
-
-/** Registro apenas de servidor; fingerprint é derivado e nunca vai à interface. */
-export interface ToolCallingAssessmentRecord {
-  status: ToolCallingCapabilityStatus
-  fingerprint: string
-  adapterVersion: string
-  checkedAt: string
-  reason: ToolCallingCheckReason
-}
-
-export interface ToolCallingAssessmentView {
-  status: ToolCallingCapabilityStatus
-  checkedAt: string | null
-  reason: ToolCallingCheckReason | null
-}
-
 /** Verbete declarativo de um provedor — é DADO, não tela (openclaude/04). */
 export interface Descritor {
   id: string
@@ -85,8 +55,6 @@ export interface ArquivoProvedores {
   /** Provedor que o chat vai usar (FATIA 09). */
   ativo: string | null
   provedores: Record<string, ProvedorConfig>
-  /** Só escrita no backend; o PUT da tela jamais pode forjar uma verificação. */
-  toolCallingAssessments: Record<string, Record<string, ToolCallingAssessmentRecord>>
 }
 
 /** Provedor como a TELA vê: a chave nunca vem inteira (D83 — só sob clique). */
@@ -113,9 +81,6 @@ export interface ItemCatalogoModelo {
   modelId: string
   label: string
   protocol: Protocolo
-  /** Status da evidência atual para este par e adaptador. */
-  capability: ToolCallingCapabilityStatus
-  assessment: ToolCallingAssessmentView
 }
 
 export interface EstadoProvedores {
@@ -142,15 +107,6 @@ export interface ResultadoModelos {
   ok: boolean
   modelos: string[]
   mensagem?: string
-}
-
-export interface ResultadoVerificacaoToolCalling {
-  providerId: string
-  modelId: string
-  status: ToolCallingCapabilityStatus
-  checkedAt: string
-  cached: boolean
-  reason: ToolCallingCheckReason
 }
 
 /** Payload do PUT: apiKey ausente = mantém a guardada; '' = apaga. */

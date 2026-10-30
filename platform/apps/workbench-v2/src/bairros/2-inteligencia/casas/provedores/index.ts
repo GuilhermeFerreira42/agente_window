@@ -18,11 +18,6 @@ export type {
   ResultadoModelos,
   ResultadoTeste,
   SalvarProvedoresInput,
-  ToolCallingAssessmentRecord,
-  ToolCallingAssessmentView,
-  ToolCallingCapabilityStatus,
-  ToolCallingCheckReason,
-  ResultadoVerificacaoToolCalling,
 } from './contract'
 
 export { DESCRITORES, descritorPorId } from './descritores/registro'

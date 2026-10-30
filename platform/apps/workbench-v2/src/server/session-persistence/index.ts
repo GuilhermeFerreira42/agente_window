@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRecords, revokeSessionToolGrants, upsertSessionRecord } from './database'
+import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRecords, revokeSessionToolGrants, upsertSessionRecord, type SessionToolGrant } from './database'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
@@ -12,7 +12,8 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
-import { definirModoAgir, lerModoAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
+import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
+import { resolveShell } from '../../../../../services/pty-server/src/shellDetector'
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
 import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
 import { obterAlvoDeConversa } from './chatAlvo'
@@ -167,9 +168,12 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       obterAlvo: obterAlvoDeConversa,
       iniciarModelo: iniciarChamadaModelo,
       resolverContexto: resolverContextoAgir,
-      concederPermissaoSessao: grantSessionTool,
+      resolverShell: resolveShell,
+      concederPermissaoSessao: (sessionId, raiz, ferramenta) => grantSessionTool(sessionId, raiz, ferramenta as SessionToolGrant),
       lerModo: lerModoAgir,
       definirModo: definirModoAgir,
+      lerPermissao: lerPermissaoAgir,
+      definirPermissao: definirPermissaoAgir,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
     })) return true
   }

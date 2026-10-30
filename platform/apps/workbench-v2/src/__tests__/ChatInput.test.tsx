@@ -17,8 +17,8 @@ beforeEach(() => {
     ativo: null,
     storage: 'fixture',
     catalogo: [
-      { providerId: 'openai', modelId: 'gpt-4o', label: 'OpenAI — gpt-4o', protocol: 'openai-chat', capability: 'unknown' },
-      { providerId: 'openai', modelId: 'gpt-4o-mini', label: 'OpenAI — gpt-4o-mini', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-4o', label: 'OpenAI — gpt-4o', protocol: 'openai-chat' },
+      { providerId: 'openai', modelId: 'gpt-4o-mini', label: 'OpenAI — gpt-4o-mini', protocol: 'openai-chat' },
     ],
   }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 })
@@ -56,6 +56,23 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
 }
 
 describe('ChatInput', () => {
+  it('exige confirmação explícita para Permitir tudo e deixa Manual sem confirmação', async () => {
+    const user = userEvent.setup()
+    const onChangePermission = vi.fn(async () => undefined)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderInput({ onChangePermission })
+
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(confirm.mock.calls[0][0]).toContain('privilégios da sua conta no sistema operacional')
+    expect(onChangePermission).not.toHaveBeenCalled()
+
+    confirm.mockReturnValue(true)
+    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    await waitFor(() => expect(onChangePermission).toHaveBeenCalledWith('allow-all'))
+  })
+
   it('envia texto e limpa o composer', async () => {
     const user = userEvent.setup()
     const onSend = vi.fn()
@@ -377,7 +394,7 @@ describe('ChatInput', () => {
       provedores: [],
       ativo: null,
       storage: 'fixture',
-      catalogo: [{ providerId: 'fixture', modelId, label, protocol: 'openai-chat', capability: 'unknown' }],
+      catalogo: [{ providerId: 'fixture', modelId, label, protocol: 'openai-chat' }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const fetchCatalogo = vi.fn()
       .mockResolvedValueOnce(resposta('modelo-antigo', 'Fixture — modelo-antigo'))
@@ -405,9 +422,9 @@ describe('ChatInput', () => {
     await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('button', { name: /Auto Resolve o padrão/ })).toHaveFocus()
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o Compatibilidade/ })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o openai-chat/ })).toHaveFocus()
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o-mini Compatibilidade/ })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /OpenAI — gpt-4o-mini openai-chat/ })).toHaveFocus()
     await user.keyboard('{Enter}')
 
     expect(onChangeModel).toHaveBeenCalledWith('pair:openai:gpt-4o-mini')

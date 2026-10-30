@@ -24,6 +24,13 @@ function esquemaDe(id: string): Record<string, unknown> {
       }
     case 'excluir':
       return { type: 'object', properties: { caminho }, required: ['caminho'], additionalProperties: false }
+    case 'executar':
+      return {
+        type: 'object',
+        properties: { comando: { type: 'string', minLength: 1, maxLength: 32768, description: 'Comando completo. Será iniciado no shell padrão do aplicativo, com cwd fixado pelo servidor na pasta ativa; não inclua cwd separado.' } },
+        required: ['comando'],
+        additionalProperties: false,
+      }
     default: // criar · escrever
       return {
         type: 'object',

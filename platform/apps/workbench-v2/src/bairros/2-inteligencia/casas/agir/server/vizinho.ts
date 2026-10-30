@@ -27,13 +27,11 @@ import { ehFerramentaConhecida } from './ferramentas'
 export class ErroVizinho extends Error {
   readonly code: CategoriaErroAgir
   readonly httpStatus?: number
-  readonly explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null
-  constructor(code: CategoriaErroAgir, message: string, httpStatus?: number, explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null) {
+  constructor(code: CategoriaErroAgir, message: string, httpStatus?: number) {
     super(message)
     this.name = 'ErroVizinho'
     this.code = code
     this.httpStatus = httpStatus
-    this.explicitIncompatibility = explicitIncompatibility
   }
 }
 
@@ -50,10 +48,6 @@ export interface AjustesVizinho {
   primeiroByteMs?: number
   totalMs?: number
   ociosoMs?: number
-  /** Só a verificação consentida: anuncia apenas ler, cuja execução é um stub em memória. */
-  toolCallingProbe?: boolean
-  /** Callback interno recebe corpo HTTP apenas para classificar; texto bruto nunca sai do servidor. */
-  classificarToolCallingIncompatibilidade?: (status: number, corpo: string) => 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null
 }
 
 // ── Enquadração (espelho de streaming.ts da casa Conversa) ──────────────────
@@ -130,26 +124,59 @@ async function lerErroLimitado(resposta: Response, limite = 16_384): Promise<str
   }
 }
 
-function erroPorStatus(status: number, explicitIncompatibility: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null): ErroVizinho {
-  if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida (erro ${status}). Confira a chave em Provedores.`, status)
+function detalheErro(corpo: string, chave: string | null): string {
+  let mensagem = ''
+  try {
+    const bruto: unknown = JSON.parse(corpo)
+    if (bruto && typeof bruto === 'object') {
+      const objeto = bruto as Record<string, unknown>
+      const erro = objeto.error
+      if (typeof erro === 'string') mensagem = erro
+      else if (erro && typeof erro === 'object') {
+        const detalhe = erro as Record<string, unknown>
+        if (typeof detalhe.message === 'string') mensagem = detalhe.message
+        else if (typeof detalhe.detail === 'string') mensagem = detalhe.detail
+      }
+      if (!mensagem && typeof objeto.message === 'string') mensagem = objeto.message
+      if (!mensagem && typeof objeto.detail === 'string') mensagem = objeto.detail
+    }
+  } catch {
+    mensagem = corpo
+  }
+  mensagem = [...mensagem]
+    .map((caractere) => {
+      const codigo = caractere.codePointAt(0) ?? 0
+      return codigo < 32 || codigo === 127 ? ' ' : caractere
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [credencial omitida]')
+    .replace(/\b(?:sk|key|token)-[A-Za-z0-9_-]{8,}\b/gi, '[credencial omitida]')
+  if (chave && chave.length >= 4) mensagem = mensagem.split(chave).join('[credencial omitida]')
+  return mensagem.trim().slice(0, 360)
+}
+
+function erroPorStatus(status: number, corpoErro = '', chave: string | null = null): ErroVizinho {
+  const detalhe = detalheErro(corpoErro, chave)
+  const complemento = detalhe ? ` Detalhe do serviço: ${detalhe}` : ''
+  if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida ou sem autorização (erro ${status}). Confira a chave em Provedores.${complemento}`, status)
   if (status === 400) {
     return new ErroVizinho(
-      'sem_canal_nativo',
-      'O serviço recusou o pedido com ferramentas. Confira o modelo, endpoint e protocolo; uma falha 400 isolada não prova incompatibilidade.',
+      'http',
+      `O serviço recusou o pedido com ferramentas (erro 400). Confira modelo, endpoint e protocolo; a rejeição não bloqueia novas tentativas.${complemento}`,
       status,
-      explicitIncompatibility,
     )
   }
-  if (status === 429) return new ErroVizinho('http', 'O serviço pediu uma pausa por excesso de pedidos (erro 429). Aguarde um instante.', status)
-  if (status === 404) return new ErroVizinho('http', 'O serviço não encontrou o endereço ou o modelo (erro 404). Confira ambos em Provedores.', status)
-  if (status === 422) return new ErroVizinho('http', 'O serviço não aceitou o pedido. Confira o formato do endpoint e tente novamente.', status, explicitIncompatibility)
-  return new ErroVizinho('http', `O serviço respondeu com o erro ${status}. Tente novamente em instantes.`, status)
+  if (status === 429) return new ErroVizinho('http', `O serviço pediu uma pausa por excesso de pedidos (erro 429). Aguarde um instante.${complemento}`, status)
+  if (status === 404) return new ErroVizinho('http', `O serviço não encontrou o endereço ou o modelo (erro 404). Confira ambos em Provedores.${complemento}`, status)
+  if (status === 422) return new ErroVizinho('http', `O serviço não aceitou o pedido (erro 422). Confira o formato do endpoint e tente novamente.${complemento}`, status)
+  return new ErroVizinho('http', `O serviço respondeu com o erro ${status}.${complemento || ' Tente novamente em instantes.'}`, status)
 }
 
 // ── Corpo do pedido: idioma nativo de cada protocolo, agora COM ferramentas ─
-function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[], toolCallingProbe = false): { url: string; corpo: Record<string, unknown> } {
+function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[]): { url: string; corpo: Record<string, unknown> } {
   const baseUrl = alvo.baseUrl.replace(/\/+$/, '')
-  const anuncio = toolCallingProbe ? anunciarFerramentas(alvo.protocolo, ['ler']) : anunciarFerramentas(alvo.protocolo)
+  const anuncio = anunciarFerramentas(alvo.protocolo)
   const traduzido = traduzirHistorico(alvo.protocolo, mensagens)
   const temperatura = typeof alvo.temperatura === 'number' ? { temperature: alvo.temperatura } : {}
 
@@ -431,7 +458,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           temperatura: config.temperatura,
           maxSaida: config.maxSaida,
         } : alvo
-        const { url, corpo } = corpoDePedido(alvoAtual, mensagens, ajustes.toolCallingProbe === true)
+        const { url, corpo } = corpoDePedido(alvoAtual, mensagens)
         return fetch(url, {
           method: 'POST',
           headers: cabecalhos(alvoAtual),
@@ -447,12 +474,8 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         resposta = await iniciarFetch()
       }
       if (!resposta.ok) {
-        let incompatibilidadeExplícita: 'tools_unsupported' | 'adapter_missing_field' | 'adapter_parameter_unsupported' | null = null
-        if (ajustes.classificarToolCallingIncompatibilidade) {
-          const corpoErro = await lerErroLimitado(resposta)
-          incompatibilidadeExplícita = ajustes.classificarToolCallingIncompatibilidade(resposta.status, corpoErro)
-        }
-        throw erroPorStatus(resposta.status, incompatibilidadeExplícita)
+        const corpoErro = await lerErroLimitado(resposta)
+        throw erroPorStatus(resposta.status, corpoErro, alvo.apiKey)
       }
       if (resposta.body === null) throw new ErroVizinho('resposta', 'O serviço respondeu sem corpo.')
       byteViu = true

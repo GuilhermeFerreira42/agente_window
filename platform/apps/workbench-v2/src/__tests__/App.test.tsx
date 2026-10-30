@@ -29,10 +29,10 @@ beforeEach(() => {
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url === '/api/providers') return Promise.resolve(new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
-      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
-      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat' },
+      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat' },
     ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
-    if (url === '/api/agir/mode') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -60,10 +60,10 @@ function responderChatComSSE(
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
-      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat', capability: 'unknown' },
-      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat', capability: 'unknown' },
+      { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat' },
+      { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat' },
     ] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    if (url === '/api/agir/mode') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     if (url.endsWith('/api/agir/cancel')) {
       for (const stream of streamsAgirAbertos) {
         try { stream.close() } catch { /* stream já encerrado */ }
@@ -430,7 +430,7 @@ describe('App session flows', () => {
 
     await user.click(sessionRow('Ajustar layout single-pane'))
     await user.click(screen.getByRole('button', { name: 'Auto' }))
-    await user.click(await screen.findByRole('button', { name: /^OpenAI — GPT-5 Compatibilidade com ferramentas não verificada$/ }))
+    await user.click(await screen.findByRole('button', { name: /^OpenAI — GPT-5 openai-chat/ }))
     const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
     await user.type(input, 'usar o modelo selecionado')
     let payload: Record<string, unknown> | undefined

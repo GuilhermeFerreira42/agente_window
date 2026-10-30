@@ -21,6 +21,7 @@ export type {
   MensagemAgir,
   MensagemSimples,
   ModoAgir,
+  NivelPermissaoAgir,
   OpcoesVizinho,
   PedidoFerramenta,
   ProtocoloAgir,
@@ -28,7 +29,6 @@ export type {
   ResultadoFerramenta,
   VizinhoProvedor,
 } from './contract'
-export { AGIR_TOOL_ADAPTER_VERSION } from './contract'
 
 /** O loop do agente (motor da casa — puro, sem node:*). */
 export { TETO_PADRAO, rodarAgir } from './server/agir'
@@ -45,5 +45,5 @@ export type { DescritorFerramenta } from './server/ferramentas'
 export { extrairFerramentas } from './server/extracao'
 
 /** A tela fala com a casa SÓ por aqui (as URLs moram na casa, FT-05). */
-export { continuarAgir, enviarAgir, responderAprovacao, selecionarModoAgir } from './ui/client/api'
+export { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir } from './ui/client/api'
 export type { ControleAgir, EntradaAgir, IdentidadeExecucaoAgir, OuvintesAgir } from './ui/client/api'

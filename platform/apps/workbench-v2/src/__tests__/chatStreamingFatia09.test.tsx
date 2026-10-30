@@ -20,7 +20,7 @@ beforeEach(() => {
   // A rota de cancelamento é separada do endpoint SSE e confirma o ACK F3.
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (url === '/api/agir/mode') {
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') {
       return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url === '/fs/workspace') return Promise.resolve(new Response(null, { status: 404 }))
@@ -45,7 +45,7 @@ beforeEach(() => {
 function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 'aberto' = 'done', atrasoMs = 40): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input)
-    if (url === '/api/agir/mode') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url === '/fs/workspace') return new Response(null, { status: 404 })
     if (url === '/api/sessions') return new Response(null, { status: 204 })
     if (url === '/api/agir/cancel') {
