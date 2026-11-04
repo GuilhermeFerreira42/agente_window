@@ -1,7 +1,7 @@
 // ============================================================================
 // Casa Agir — LIXEIRA por sistema (FATIA 12, RNF12-1): o `excluir` NUNCA
 // apaga — só move para a lixeira do SO, e restaurar é fora do app.
-// Windows = Lixeira real (via PowerShell + FileSystem do .NET, sem
+// Windows = Lixeira real (PowerShell + IFileOperation, sink e destino conferidos, sem
 // dependência nova); Linux = XDG Trash (`~/.local/share/Trash`, feito à mão
 // — funciona até em servidor sem interface, pois é só pasta + bilhete).
 // Sem lixeira no sistema = erro honesto (nunca apagar permanente escondido).
@@ -28,6 +28,7 @@ import type * as FsPromises from 'node:fs/promises'
 import { mkdir, readdir, rename, stat, lstat, open, unlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import * as nodePath from 'node:path'
+import { CODIGO_LIXEIRA_WINDOWS } from './lixeiraWindows'
 
 /** Teto da contagem de pasta (passou disso, o cartão diz "mais de…"). */
 export const LIMITE_CONTAGEM = 20000
@@ -156,14 +157,14 @@ async function moverXdg(absoluto: string, pastaTrash: string, antes: string, opc
  * Comando PowerShell que manda UM caminho para a Lixeira real do Windows
  * (pura — testável sem Windows; quem executa é o `executar` injetável).
  */
-export function comandoLixeiraWindows(absoluto: string, ehPasta: boolean): { comando: string; args: string[] } {
+export function comandoLixeiraWindows(absoluto: string, _ehPasta: boolean): { comando: string; args: string[] } {
+  void _ehPasta // assinatura existente preservada; IFileOperation atende ambos os tipos.
   const escapado = absoluto.replace(/'/g, "''")
-  const verbo = ehPasta ? 'DeleteDirectory' : 'DeleteFile'
-  const script = `Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::${verbo}('${escapado}','OnlyErrorDialogs','SendToRecycleBin')`
+  const script = `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); Add-Type -TypeDefinition @'\n${CODIGO_LIXEIRA_WINDOWS}\n'@; $destino=[AgentWindowTrash.Recycle]::Move('${escapado}'); @{destino=$destino} | ConvertTo-Json -Compress`
   // FATIA 12 C4: os switches são os OFICIAIS do powershell.exe 5.1
   // (about_PowerShell_exe) — `-NonFatal` NÃO existe e fazia o Windows
   // recusar TODA exclusão (o dono provou no teste real).
-  return { comando: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', script] }
+  return { comando: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-STA', '-Command', script] }
 }
 
 function executarPadrao(comando: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
@@ -190,16 +191,21 @@ export function detalheErroWindows(erro: unknown): string {
   return linha.length > 300 ? `${linha.slice(0, 300)}…` : linha
 }
 
-async function moverWindows(absoluto: string, ehPasta: boolean, opcoes: OpcoesLixeira): Promise<ResultadoLixeira> {
+async function moverWindows(absoluto: string, ehPasta: boolean, antes: string, opcoes: OpcoesLixeira): Promise<ResultadoLixeira> {
   const { comando, args } = comandoLixeiraWindows(absoluto, ehPasta)
+  let destino: string | undefined
   try {
-    await (opcoes.executar ?? executarPadrao)(comando, args)
+    const { stdout } = await (opcoes.executar ?? executarPadrao)(comando, args)
+    const retorno = JSON.parse(stdout) as { destino?: unknown }
+    if (typeof retorno.destino !== 'string' || !/^[a-z]:\\\$Recycle\.Bin\\/i.test(retorno.destino)) throw new Error('Destino recuperável não confirmado')
+    destino = retorno.destino
+    if (identidadeDe(await (opcoes.operacoes?.lstat ?? lstat)(destino)) !== antes) throw new Error('Identidade do item na Lixeira divergente')
   } catch (erro) {
     // Timeout/erro de processo não prova ausência de efeito. Só afirmamos
     // origem intacta quando a versão aprovada ainda pode ser observada nela.
     const intacta = opcoes.validar ? await opcoes.validar().catch(() => false) : false
     if (!intacta) return {
-      ok: false, efeitoIniciado: true,
+      ok: false, efeitoIniciado: true, destino,
       motivo: `O Windows não confirmou a operação sobre "${absoluto}"; pode ter ocorrido movimentação. Confira a origem e a Lixeira do Windows. Não foi feita restauração automática. (Detalhe: ${detalheErroWindows(erro)})`,
     }
     return fracasso(`O Windows não aceitou mandar "${absoluto}" para a Lixeira — nada sumiu. (Detalhe: ${detalheErroWindows(erro)})`)
@@ -207,7 +213,7 @@ async function moverWindows(absoluto: string, ehPasta: boolean, opcoes: OpcoesLi
   if (opcoes.validar && await opcoes.validar().catch(() => false)) {
     return fracasso(`O Windows terminou sem mover "${absoluto}": a versão aprovada continua na origem — nada sumiu.`)
   }
-  return { ok: true, efeitoIniciado: true }
+  return { ok: true, efeitoIniciado: true, destino }
 }
 
 /**
@@ -232,7 +238,7 @@ export async function moverParaLixeira(absoluto: string, opcoes: OpcoesLixeira =
   if (plataforma === 'win32') {
     const conflito = await validarAntesDeMover(opcoes)
     if (conflito) return conflito
-    return moverWindows(absoluto, info.isDirectory(), opcoes)
+    return moverWindows(absoluto, info.isDirectory(), identidadeDe(info), opcoes)
   }
   if (plataforma === 'linux') {
     return moverXdg(absoluto, opcoes.pastaTrash ?? resolverPastaTrashLinux(), identidadeDe(info), opcoes)

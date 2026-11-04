@@ -28,6 +28,37 @@ function vizinhoRoteado(roteiro: RespostaIteracao[]) {
 
 const EXECUTORES = criarExecutoresFalsos()
 
+describe('Missão 2 — terminalização e recuperação sem repetir DELETE', () => {
+  it.each([400,401,403,404,422])('HTTP %s terminal não oferece continuação automática do mesmo payload', async status => {
+    const eventos: EventoAgir[]=[]
+    const fim=await rodarAgir({historico:[{papel:'usuario',conteudo:'tarefa'}],executores:EXECUTORES,emitir:e=>eventos.push(e),vizinho:async()=>{throw Object.assign(new Error('recusado'),{code:status===401||status===403?'chave':'http',httpStatus:status})}})
+    expect(fim.status).toBe('erro')
+    expect(fim.mensagensParaRetomar).toBeUndefined()
+    expect(eventos.at(-1)).not.toHaveProperty('retomavel')
+  })
+  it('rede cai depois de DELETE concluído: retomada inclui resultado e não repete a tool', async () => {
+    const excluir=vi.fn(async()=>({ok:true,resumo:'movido para a lixeira'}))
+    let chamada=0
+    const fim=await rodarAgir({historico:[{papel:'usuario',conteudo:'exclua'}],executores:{...EXECUTORES,excluir},emitir:()=>undefined,pedirAprovacao:async()=>true,vizinho:async()=>{
+      if (++chamada===1) return {texto:'',pedidos:[{id:'delete-unico',ferramenta:'excluir',argumentos:{caminho:'arquivo'}}]}
+      throw Object.assign(new Error('DNS'),{code:'endereco'})
+    }})
+    expect(excluir).toHaveBeenCalledOnce()
+    expect(fim.mensagensParaRetomar?.at(-1)).toMatchObject({papel:'ferramenta',pedidoId:'delete-unico',conteudo:'movido para a lixeira'})
+    await rodarAgir({historico:fim.mensagensParaRetomar!,executores:{...EXECUTORES,excluir},emitir:()=>undefined,vizinho:async()=>({texto:'resultado preservado',pedidos:[]})})
+    expect(excluir).toHaveBeenCalledOnce()
+  })
+  it('exceção de executor mutável informa efeito incerto, encerra e não chama modelo novamente', async () => {
+    const vizinho=vi.fn(async()=>({texto:'',pedidos:[{id:'incerto',ferramenta:'excluir' as const,argumentos:{caminho:'arquivo'}}]}))
+    const eventos:EventoAgir[]=[]
+    const fim=await rodarAgir({historico:[],executores:{...EXECUTORES,excluir:async()=>{throw new Error('falhou após iniciar')}},emitir:e=>eventos.push(e),vizinho,pedirAprovacao:async()=>true})
+    expect(fim).toMatchObject({status:'erro',codigoErro:'resposta'})
+    expect(vizinho).toHaveBeenCalledOnce()
+    expect(eventos).toContainEqual(expect.objectContaining({type:'tool_result',ok:false,efeitoIniciado:true}))
+    expect(eventos.at(-1)).toMatchObject({type:'error',code:'resposta'})
+  })
+})
+
 describe('O loop do agente (rodarAgir)', () => {
   it('resposta em texto puro: 1 iteração, chunk + done, sem tocar ferramenta', async () => {
     const { vizinho, chamadas } = vizinhoRoteado([{ texto: 'Olá, dono!', pedidos: [], modelo: 'modelo-teste' }])

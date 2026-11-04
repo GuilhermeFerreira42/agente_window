@@ -2,7 +2,7 @@
 // Casa Agir — contrato de ferramentas de arquivo e, na FATIA 13, execução one-shot.
 // O modo efetivo é registrado no servidor; Perguntar/Planejar são somente leitura.
 // Agir permite criar/escrever sem confirmação repetitiva; operações destrutivas
-// continuam exigindo cartão individual. O workspace ancora caminhos relativos.
+// seguem consentimento específico, cartão ou dois opt-ins de D138. O workspace ancora caminhos relativos.
 // Q4 (D93) = canal NATIVO: cada protocolo tem seu extrator de pedidos.
 // ============================================================================
 /**
@@ -95,7 +95,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 /**
  * Eventos do fio da casa Agir. O loop emite; a rota repassa por SSE na C3.
  * `approval` é o pedido de sim/não ao dono (o cartão da C3) — já nasce no
- * contrato porque o loop precisa saber onde parar e esperar. `previa` (FATIA 12) carrega o que o servidor viu no disco (prévia do arquivo ou contagem da pasta) para o cartão reforçado do `excluir`. `teto` (FATIA
+ * contrato porque o loop precisa saber onde parar e esperar. `previa` (FATIA 12) carrega o que o servidor viu no disco (prévia do arquivo ou confirmação resumida da pasta) para o cartão reforçado do `excluir`. `teto` (FATIA
  * 11) é a pausa honesta ao bater o limite: NÃO é erro — o dono continua
  * (mesmo fluxo, orçamento cheio) ou para por aqui. `iteracao` (pós-11) anuncia
  * cada ida ao modelo para a tela mostrar o progresso ("iteração 2 de 25").
@@ -142,6 +142,8 @@ export type VizinhoProvedor = (
 
 /** Resultado de executar uma ferramenta. */
 export interface ResultadoFerramenta {
+  /** Exceção inesperada: parar sem repetir ferramenta com efeitos incertos. */
+  erroTerminal?: boolean
   ok: boolean
   /** Resumo curto para a TELA (o que aconteceu, em palavras de gente). */
   resumo: string

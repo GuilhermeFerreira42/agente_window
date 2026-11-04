@@ -1,3 +1,5 @@
+// @vitest-environment node
+// Transporte HTTP real do backend: usa fetch nativo, sem substituições do jsdom.
 // ============================================================================
 // Provas do VIZINHO REAL (conquista 2): um provedor HTTP falso (node:http)
 // fala os 4 idiomas — e o vizinho tem que anunciar as ferramentas no corpo,
@@ -51,6 +53,23 @@ const HISTORICO: MensagemAgir[] = [
   { papel: 'assistente', conteudo: '', pedidos: [{ id: 'p1', ferramenta: 'criar', argumentos: { caminho: 'ola.txt', conteudo: 'oi' } }] },
   { papel: 'ferramenta', conteudo: 'Arquivo "ola.txt" criado (escrita atômica).', pedidoId: 'p1', ferramenta: 'criar' },
 ]
+
+describe('Missão 2 — erros reais de transporte e resposta', () => {
+  it.each([400,401,403,429,502])('HTTP %s preserva categoria/status sem retentativa automática', async status => {
+    let chamadas=0
+    const servidor=await servidorFalso((_req,res)=>{chamadas++;res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:status===400?'maximum context length exceeded: too many tokens':'fixture failure'}}))})
+    try {
+      const vizinho=criarVizinhoReal(alvoDe('openai-chat',servidor.baseUrl))
+      await expect(vizinho(HISTORICO)).rejects.toMatchObject({code:status===401||status===403?'chave':'http',httpStatus:status})
+      expect(chamadas).toBe(1)
+    } finally {await servidor.fechar()}
+  })
+  it('resposta vazia do provedor é erro terminal, sem sucesso inventado', async()=>{
+    const servidor=await servidorFalso((_req,res)=>{res.writeHead(200,{'Content-Type':'application/json'});res.end('{"choices":[]}')})
+    try {await expect(criarVizinhoReal(alvoDe('openai-chat',servidor.baseUrl))(HISTORICO)).rejects.toMatchObject({code:'resposta'})}
+    finally {await servidor.fechar()}
+  })
+})
 
 describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
   it('monta o tool_call que chega aos pedaços + texto ao vivo + corpo com anúncio', async () => {

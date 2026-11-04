@@ -1,5 +1,7 @@
 # 04 - ARQUITETURA E REGRAS DURAS
 
+> **Vigência DELETE — 2026-11-04, D138:** a missão Codex nº 2 substitui os trechos históricos deste documento que restringem excluir ao workspace ou obrigam sempre cartão/contagem. Externos exigem autorização específica da instrução humana atual ou cartão; automático exige dois opt-ins e escopo da tarefa validado no backend. Raiz/ancestrais do workspace, links/redirecionamentos e caminhos ambíguos continuam protegidos. Confirmação resumida é distinta da assinatura técnica de metadados da árvore. A política é exclusivamente Lixeira; `executar` continua shell sem sandbox e não está integralmente coberto por essa política. Detalhe normativo em `05` D138, SPEC/resultados em `09`. Terminal humano e gate DP-03/DP-06 intocados.
+
 > Da IA. Lido antes de tocar em código. Resume `03_ARQUITETURA_EXECUTAVEL`, `04_CONTRATOS_TECNICOS`, `13_ADRS`, `18_PROTOCOLO_ANTI_REGRESSAO` e `28_INVENTARIO_OBSOLETOS` (originais íntegros em `docs/arquivo_morto/`). Em caso de dúvida sobre o terminal, **abrir o 18 original** antes de agir.
 
 ## 1. Regras duras (violação = rollback imediato)

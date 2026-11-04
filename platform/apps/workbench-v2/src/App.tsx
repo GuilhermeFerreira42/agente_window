@@ -25,7 +25,7 @@ import { CustomizationsView } from './components/CustomizationsView'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, registrarInstrucaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -564,6 +564,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Nível de permissões é separado dos quatro modos e não é restaurado como
   // Permitir tudo após recarregar o app: cada nova vida de UI volta a Manual.
   const [permissionByChat, setPermissionByChat] = useState<Record<string, NivelPermissaoAgir>>({})
+  const [automaticDeletesByChat, setAutomaticDeletesByChat] = useState<Record<string, boolean>>({})
   const [modeByChat, setModeByChat] = useState<Record<string, ModoAgir>>(() => {
     try {
       const saved: unknown = JSON.parse(localStorage.getItem('agente-window:mode-by-chat:v1') ?? '{}')
@@ -1844,7 +1845,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onError: (code, mensagemErro, detalhe) => {
         if (code === 'fluxo' && aoFluxoMorto) {
           aoFluxoMorto()
-          return
+          // Expirar o cartão também precisa encerrar o estado de trabalho.
         }
         agirAtivas.current.delete(runKey)
         // Erro TRANSITÓRIO com retomada guardada: a bolha mostra o erro E o
@@ -1899,12 +1900,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     historico: MensagemSimples[],
     aoConcluir?: () => void,
     modelSelection: SelecaoModelo = { tipo: 'auto' },
+    instrucaoHumana?: string,
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
     const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
-    const permissao = permissionByChat[runKey] ?? 'manual'
+    const sessaoPermissao = sessions.find(session => session.id === sessionId)
+    const permissionKey = `${runKey}:${sessaoPermissao?.worktreePath ?? sessaoPermissao?.workspacePath ?? ''}`
+    const permissao = permissionByChat[permissionKey] ?? 'manual'
     const entrada = {
+      instructionToken: undefined as string | undefined,
       mensagens: historico,
       modelSelection,
       // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
@@ -1933,6 +1938,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(async () => {
       if (canceladaAntesDoInicio) return
       await selecionarPermissaoAgir(sessionId, chatId, permissao)
+      if (canceladaAntesDoInicio) return
+      if (instrucaoHumana !== undefined) entrada.instructionToken = await registrarInstrucaoAgir(sessionId, chatId, entrada.fluxo, instrucaoHumana, controladorModo.signal)
       if (canceladaAntesDoInicio) return
       real = enviarAgir(entrada, ouvintes)
     }).catch((erro: unknown) => {
@@ -2096,7 +2103,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
     // servidor, a resposta chega em pedaços e as ferramentas viram cartões
     // com aprovação do dono (SPEC PARTE 2D).
-    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection)
+    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim())
   }
 
   const handleStop = async () => {
@@ -2314,13 +2321,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const renderChatFor = (session: Session) => {
     const sessionChatId = resolveActiveChatId(session, activeChatBySession)
     const sessionChatKey = `${session.id}:${sessionChatId}`
+    const permissionKey = `${sessionChatKey}:${session.worktreePath ?? session.workspacePath}`
     return (
       <ChatPanel
         session={session}
         activeChatId={sessionChatId}
         model={modelByChat[sessionChatKey] ?? selectedModel}
         mode={modeByChat[sessionChatKey] ?? selectedMode}
-        permission={permissionByChat[sessionChatKey] ?? 'manual'}
+        permission={permissionByChat[permissionKey] ?? 'manual'}
+        automaticDeletes={automaticDeletesByChat[permissionKey] === true && permissionByChat[permissionKey] === 'allow-all'}
+        onChangeAutomaticDeletes={async (permitir) => {
+          await selecionarPermissaoAgir(session.id, sessionChatId, permissionByChat[permissionKey] ?? 'manual', permitir)
+          setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: permitir }))
+        }}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
         onChangeModel={(nextModel) => setModelByChat((current) => ({ ...current, [sessionChatKey]: nextModel }))}
         onChangeMode={(nextMode) => {
@@ -2328,7 +2341,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         }}
         onChangePermission={async (nextPermission) => {
           await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
-          setPermissionByChat((current) => ({ ...current, [sessionChatKey]: nextPermission }))
+          setPermissionByChat((current) => ({ ...current, [permissionKey]: nextPermission }))
+          if (nextPermission === 'manual') setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: false }))
         }}
         onSend={(text, attachments, modelSelection) => handleSend(text, attachments, undefined, modelSelection)}
         onStop={handleStop}

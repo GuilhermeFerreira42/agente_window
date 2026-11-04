@@ -123,7 +123,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         typeof codigoSuspeito === 'string' && codigoSuspeito !== '' ? (codigoSuspeito as CategoriaErroAgir) : 'http'
       // Erro TRANSITÓRIO (rede/provedor instável): o diálogo acumulado vai
       // junto como retomada — a tela oferece "continuar de onde parou".
-      const retomavel = codigo === 'tempo' || codigo === 'endereco' || codigo === 'http'
+      const statusHttp = (erro as { httpStatus?: number })?.httpStatus
+      const retomavel = codigo === 'tempo' || codigo === 'endereco' || (codigo === 'http' && (statusHttp === undefined || statusHttp === 429 || statusHttp >= 500))
       emitir({
         type: 'error',
         code: codigo,
@@ -196,11 +197,15 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       }
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
       let pedidoExecucao = pedido
-      const executarPedido = () => executores[pedido.ferramenta](pedidoExecucao, {
+      const executarPedido = async (): Promise<ResultadoFerramenta> => {
+        try { return await executores[pedido.ferramenta](pedidoExecucao, {
         sinal,
         aoProgresso: (text: string) => emitir({ type: 'tool_progress', id: pedidoExecucao.id, text }),
         aguardarContinuacao: () => opcoes.aguardarContinuacao?.(pedido) ?? Promise.resolve(false),
-      })
+        }) } catch {
+          return { ok: false, erroTerminal: true, efeitoIniciado: ehMexida(pedido.ferramenta), resumo: 'A ferramenta falhou inesperadamente. Confira a origem e os resultados antes de tentar novamente; os efeitos não puderam ser confirmados.' }
+        }
+      }
       let resultado: ResultadoFerramenta = liberado
         ? await executarPedido()
         : { ok: false, resumo: textoNegacao }
@@ -235,6 +240,10 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         pedidoId: pedido.id,
         ferramenta: pedido.ferramenta,
       })
+      if (resultado.erroTerminal) {
+        emitir({ type: 'error', code: 'resposta', message: resultado.resumo })
+        return { status: 'erro', textoFinal: '', iteracoes: iteracao, codigoErro: 'resposta' }
+      }
       // Preserva o resultado já concluído; não inicia outra chamada/tool após terminalização.
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao }
     }

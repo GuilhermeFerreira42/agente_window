@@ -3,7 +3,7 @@
 // para a lixeira XDG (temporária nos testes, via $XDG_DATA_HOME); território,
 // nomes inválidos e a própria pasta raiz = recusa honesta; falha = nada some.
 // ============================================================================
-import { lstat, mkdtemp, mkdir, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, open, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -48,23 +48,23 @@ describe('excluir — executor real', () => {
     expect(await readFile(path.join(xdgTemp, 'Trash', 'files', 'alvo.txt'), 'utf8')).toBe('conteúdo do alvo')
   })
 
-  it('pasta com arquivos vai inteira e o resumo conta os itens', async () => {
+  it('pasta com arquivos vai inteira com resumo sem contagem obrigatória', async () => {
     const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
     await mkdir(path.join(raiz, 'caixa', 'sub'), { recursive: true })
     await writeFile(path.join(raiz, 'caixa', 'um.txt'), '1', 'utf8')
     await writeFile(path.join(raiz, 'caixa', 'sub', 'dois.txt'), '2', 'utf8')
     const resultado = await excluirComPrevia(executores, 'caixa')
     expect(resultado.ok).toBe(true)
-    expect(resultado.resumo).toContain('3 itens')
+    expect(resultado.resumo).toContain('e seu conteúdo')
     await expect(stat(path.join(raiz, 'caixa'))).rejects.toThrow()
     expect(await readFile(path.join(xdgTemp, 'Trash', 'files', 'caixa', 'sub', 'dois.txt'), 'utf8')).toBe('2')
   })
 
-  it('../fora = recusa de território, mesmo aprovado (RF12-4)', async () => {
+  it('externo inexistente continua recusado sem inventar motivo de território', async () => {
     const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
     const resultado = await excluirComPrevia(executores, '../fora.txt')
     expect(resultado.ok).toBe(false)
-    expect(resultado.resumo).toContain('Fora da pasta de trabalho')
+    expect(resultado.resumo).toContain('não existe')
   })
 
   it('a própria pasta de trabalho nunca é alvo (RNF12-3)', async () => {
@@ -99,20 +99,20 @@ describe('excluir — executor real', () => {
 })
 
 describe('excluir — prévia do cartão reforçado (descreverAlvoExcluir)', () => {
-  it('arquivo mostra o começo do conteúdo; pasta mostra contagem + tamanho', async () => {
+  it('arquivo mostra começo limitado; pasta identifica alvo e todo conteúdo', async () => {
     await writeFile(path.join(raiz, 'carta.txt'), 'primeira linha\nsegunda linha', 'utf8')
     const previaArquivo = await descreverAlvoExcluir(raiz, 'carta.txt')
     expect(previaArquivo).toContain('primeira linha')
     await mkdir(path.join(raiz, 'pacote'), { recursive: true })
     await writeFile(path.join(raiz, 'pacote', 'a.txt'), '12345', 'utf8')
     const previaPasta = await descreverAlvoExcluir(raiz, 'pacote')
-    expect(previaPasta).toContain('1 item')
-    expect(previaPasta).toContain('5 B')
+    expect(previaPasta).toContain(path.join(raiz, 'pacote'))
+    expect(previaPasta).toContain('TODO o seu conteúdo')
   })
 
   it('problema vira frase honesta (aprovar não apaga nada)', async () => {
     expect(await descreverAlvoExcluir(raiz, '')).toContain('não apaga nada')
-    expect(await descreverAlvoExcluir(raiz, '../fora.txt')).toContain('Fora da pasta')
+    expect(await descreverAlvoExcluir(raiz, '../fora.txt')).toContain('não existe')
     expect(await descreverAlvoExcluir(raiz, 'sumido.txt')).toContain('não existe')
   })
 })
@@ -140,8 +140,8 @@ describe('excluir — correções DEBT-24 (contenção e corrida)', () => {
     await symlink(fora, path.join(raiz, 'ponteiro'))
     const resultado = await excluirComPrevia(executores, 'ponteiro/segredo.txt')
     expect(resultado.ok).toBe(false)
-    expect(resultado.resumo).toContain('Fora da pasta de trabalho')
-    expect(resultado.resumo).toContain('Nada sumiu')
+    expect(resultado.resumo).toContain('é um link')
+    expect(resultado.resumo).toContain('nada sumiu')
     // O essencial: o arquivo externo NÃO foi para a lixeira.
     expect(await readFile(path.join(fora, 'segredo.txt'), 'utf8')).toBe('FORA-DO-WORKSPACE')
     await expect(stat(path.join(xdgTemp, 'Trash', 'files', 'segredo.txt'))).rejects.toThrow()
@@ -163,14 +163,15 @@ describe('excluir — correções DEBT-24 (contenção e corrida)', () => {
     executores.fechar()
   })
 
-  it('C1: caminho absoluto fora da pasta de trabalho é recusado (mais estrito que as irmãs sob D121)', async () => {
+  it('missão 2: externo só move com prévia server-side e mantém conteúdo recuperável', async () => {
     const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
     const fora = path.join(base, 'absoluto-fora.txt')
     await writeFile(fora, 'intacto', 'utf8')
-    const resultado = await excluirComPrevia(executores, fora)
-    expect(resultado.ok).toBe(false)
-    expect(resultado.resumo).toContain('Fora da pasta de trabalho')
+    expect((await executores.excluir(pedidoExcluir(fora))).ok).toBe(false)
     expect(await readFile(fora, 'utf8')).toBe('intacto')
+    const resultado = await excluirComPrevia(executores, fora)
+    expect(resultado.ok).toBe(true)
+    expect(await readFile(path.join(xdgTemp, 'Trash', 'files', 'absoluto-fora.txt'), 'utf8')).toBe('intacto')
     executores.fechar()
   })
 
@@ -199,7 +200,7 @@ describe('excluir — correções DEBT-24 (contenção e corrida)', () => {
     expect(previaLink).toContain('aprovar não apaga nada')
     // Alvo REAL fora da pasta de trabalho → motivo de território.
     expect(await descreverAlvoExcluir(raiz, path.join(base, 'fora-da-pasta', 'segredo.txt'))).toContain(
-      'Fora da pasta',
+      path.join(base, 'fora-da-pasta', 'segredo.txt'),
     )
     const alvoReal = path.join(raiz, 'previa-real.txt')
     await writeFile(alvoReal, 'conteúdo visível', 'utf8')
@@ -212,6 +213,49 @@ describe('excluir — correções DEBT-24 (contenção e corrida)', () => {
 
 
 describe('DELETE — vínculo server-side entre prévia e execução', () => {
+  it('pasta acima de 20.000 entradas: prévia curta, árvore inteira e conteúdo preservado', async () => {
+    const pasta = path.join(raiz, 'mais-de-vinte-mil')
+    await mkdir(pasta)
+    for (let inicio = 0; inicio < 20_005; inicio += 100) {
+      await Promise.all(Array.from({ length: Math.min(100, 20_005 - inicio) }, (_, i) => writeFile(path.join(pasta, `${inicio+i}.txt`), String(inicio+i))))
+    }
+    const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
+    const pedido = pedidoExcluir(pasta)
+    const previa = await executores.prepararExclusao(pedido)
+    expect(previa).toContain('TODO o seu conteúdo')
+    expect(previa.length).toBeLessThan(1000)
+    expect(await executores.excluir(pedido)).toMatchObject({ok:true})
+    expect(await readFile(path.join(xdgTemp, 'Trash', 'files', 'mais-de-vinte-mil', '20004.txt'), 'utf8')).toBe('20004')
+    await expect(stat(pasta)).rejects.toThrow()
+    executores.fechar()
+  }, 180_000)
+
+  it('profundidade maior que 128 e arquivo esparso 2 GiB em pasta não exigem leitura de todo conteúdo', async () => {
+    const pasta = path.join(raiz, 'profunda')
+    const fundo = path.join(pasta, ...Array.from({ length: 130 }, () => 'd'))
+    await mkdir(fundo, { recursive: true })
+    const arquivo = await open(path.join(fundo, 'grande.bin'), 'wx')
+    try { await arquivo.truncate(2 * 1024 ** 3) } finally { await arquivo.close() }
+    const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
+    const pedido = pedidoExcluir(pasta)
+    expect(await executores.prepararExclusao(pedido)).toContain('TODO o seu conteúdo')
+    expect(await executores.excluir(pedido)).toMatchObject({ok:true})
+    const movido = path.join(xdgTemp, 'Trash', 'files', 'profunda', path.relative(pasta, fundo), 'grande.bin')
+    expect((await stat(movido)).size).toBe(2 * 1024 ** 3)
+    executores.fechar()
+  }, 60_000)
+
+  it('observação cancelada falha antes da aprovação e preserva o alvo', async () => {
+    const nome = 'cancelar-observacao.txt'
+    await writeFile(path.join(raiz, nome), 'intacto')
+    const executores = criarExecutoresReais(raiz, { plataforma: 'linux' })
+    const sinal = new AbortController(); sinal.abort()
+    const pedido = pedidoExcluir(nome)
+    await expect(executores.prepararExclusao(pedido, sinal.signal)).rejects.toThrow('cancelada')
+    expect((await executores.excluir(pedido)).ok).toBe(false)
+    expect(await readFile(path.join(raiz, nome), 'utf8')).toBe('intacto')
+    executores.fechar()
+  })
   it.each(['linux', 'win32'] as const)('substituição entre aprovação e execução em %s exige nova confirmação', async (plataforma) => {
     const executores = criarExecutoresReais(raiz, { plataforma, executar: async () => { throw new Error('não deveria chamar PowerShell') } })
     const nome = 'troca-' + plataforma + '.txt'

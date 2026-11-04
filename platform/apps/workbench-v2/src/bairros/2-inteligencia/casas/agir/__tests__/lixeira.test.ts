@@ -4,11 +4,13 @@
 // nada some; Windows via comando puro + execução injetável (sem Windows).
 // ============================================================================
 import { readFileSync, statSync } from 'node:fs'
-import { lstat, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as disco from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import {
   comandoLixeiraWindows,
   contarConteudo,
@@ -40,7 +42,7 @@ describe('lixeira — XDG no Linux', () => {
     const origem = path.join(base, 'alvo.txt')
     await writeFile(origem, 'conteúdo secreto', 'utf8')
     const resultado = await moverParaLixeira(origem, { plataforma: 'linux', pastaTrash: trash })
-    expect(resultado.ok).toBe(true)
+    expect(resultado).toMatchObject({ok:true})
     await expect(stat(origem)).rejects.toThrow() // sumiu da origem
     const destino = path.join(trash, 'files', 'alvo.txt')
     expect(resultado.destino).toBe(destino)
@@ -102,33 +104,46 @@ describe('lixeira — XDG no Linux', () => {
 })
 
 describe('lixeira — Windows (comando puro + execução injetável)', () => {
-  it('manda arquivo para a Lixeira real (SendToRecycleBin), com apóstrofo escapado', async () => {
+  it.skipIf(process.platform !== 'win32')('PowerShell 5.1 compila o adaptador e o sink recusa exclusão sem flag de reciclagem, sem tocar arquivos', async () => {
+    const {args}=comandoLixeiraWindows('C:\\unused-test.txt',false)
+    const script=args.at(-1)!.split('; $destino=')[0]+"; $sink=New-Object AgentWindowTrash.RecycleOnlySink; @{result=$sink.PreDeleteItem(0,$null);refused=$sink.Refused}|ConvertTo-Json -Compress"
+    const {stdout}=await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-STA','-Command',script],{windowsHide:true,timeout:15000})
+    const result=JSON.parse(stdout) as {result:number;refused:boolean}
+    expect(result.refused).toBe(true)
+    expect(result.result).toBeLessThan(0)
+  },20000)
+  it('despacha API Shell somente reciclagem e confere destino e identidade (injeção, não integração Windows)', async () => {
     const chamadas: Array<{ comando: string; args: string[] }> = []
     const origem = path.join(base, "o'neil.txt") // real, com apóstrofo (o stat vem antes do despacho)
     await writeFile(origem, 'x', 'utf8')
+    const sintetico = path.join(base, 'windows-sintetico')
+    const destinoSimulado = 'C:\\$Recycle.Bin\\S-1-test\\$Rteste.txt'
     const resultado = await moverParaLixeira(origem, {
       plataforma: 'win32',
+      operacoes: { lstat: ((_, opcoes) => disco.lstat(sintetico, opcoes)) as typeof disco.lstat },
       executar: async (comando, args) => {
         chamadas.push({ comando, args })
-        return { stdout: '', stderr: '' }
+        await rename(origem, sintetico)
+        return { stdout: JSON.stringify({ destino: destinoSimulado }), stderr: '' }
       },
     })
     expect(resultado.ok).toBe(true)
     expect(chamadas).toHaveLength(1)
     expect(chamadas[0].comando).toBe('powershell.exe')
     // C4: só switches OFICIAIS do powershell.exe 5.1 (`-NonFatal` não existe).
-    expect(chamadas[0].args.slice(0, 3)).toEqual(['-NoProfile', '-NonInteractive', '-Command'])
+    expect(chamadas[0].args.slice(0, 4)).toEqual(['-NoProfile', '-NonInteractive', '-STA', '-Command'])
     expect(chamadas[0].args.join(' ')).not.toContain('NonFatal')
     const script = chamadas[0].args.join(' ')
-    expect(script).toContain('DeleteFile')
-    expect(script).toContain('SendToRecycleBin')
+    expect(script).toContain('FOFX_RECYCLEONDELETE')
+    expect(script).toContain('PreDeleteItem')
+    expect(script).toContain('PostDeleteItem')
     expect(script).toContain("o''neil.txt") // apóstrofo dobrado
     expect(script).not.toContain('Remove-Item') // nunca apaga direto
   })
 
-  it('pasta usa DeleteDirectory; falha do PowerShell = nada sumiu', async () => {
+  it('pasta usa a mesma API Shell; falha com versão intacta = nada sumiu', async () => {
     const pasta = comandoLixeiraWindows('C:\\trab\\pasta', true)
-    expect(pasta.args.join(' ')).toContain('DeleteDirectory')
+    expect(pasta.args.join(' ')).toContain('[AgentWindowTrash.Recycle]::Move')
     const origem = path.join(base, 'pasta-win')
     await mkdir(origem, { recursive: true })
     const falha = Object.assign(new Error('exit 1'), { stderr: 'DeleteDirectory falhou: caminho longo demais' })

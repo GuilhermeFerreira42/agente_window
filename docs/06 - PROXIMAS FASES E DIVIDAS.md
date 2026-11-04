@@ -1,5 +1,17 @@
 # 06 - PROXIMAS FASES E DIVIDAS — Roadmap & Matriz de Dívidas
 
+> **Atualização de aceite do dono — 2026-11-04:** MICRO-FATIA DELETE **homologada com ressalvas**, limitada aos dois cenários manuais declarados em `08` (exclusão com novas permissões e fora da pasta da conversa). O dono autorizou seguir agora para a regressão integral da Arena/Debian, sem repetir toda a lista Windows. **DEBT-24: aceite funcional limitado registrado, validação geral pendente; não baixada integralmente.** Os outros casos não receberam aceite humano por inferência. Resultados gerais e decisão do dono ainda são necessários para o avanço de implementação; DP-03/DP-06 seguem obrigatórios antes da Fatia 14. Substitui a pendência de “aguardar primeiro aceite manual” nas notas anteriores, sem apagar seus históricos.
+
+> **Vigência 2026-11-04 — missão Codex nº 2 / D138:** DEBT-24 permanece **aberta**, em conclusão técnica para homologação do dono. SPEC 2F e linhas históricas DEBT-23/DEBT-24 abaixo mantêm rastreabilidade, mas suas regras “sempre cartão”, “fora recusado” e “contagem obrigatória” foram substituídas prospectivamente por D138: instrução humana específica ou cartão, externos autorizados, opção automática própria junto de Permitir tudo e confirmação resumida. Nunca permanente, identidade/reconfirmação/cancelamento e relato de efeitos permanecem obrigatórios. SPEC executiva e evidências em `09`; status em `03`; roteiro atualizado em `08`. Não interpretar as antigas descrições de stub/inatividade como estado atual.
+
+> **Sequência preservada:** MICRO-FATIA DELETE → Fatia 14 → Fatia 15 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 → Fatia 16 → Fatia 17 → Fatia 18 → Fatia 19 → Fatia 20. DP-03 e DP-06 continuam pré-requisitos da 14; nenhuma dessas fatias foi iniciada nesta missão.
+
+### Pendência vigente antes do encerramento DELETE — regressão integral Arena/Debian (ordem do dono, 2026-11-04)
+
+Após a etapa de homologação no Windows, o dono encaminhará à Arena a validação do **condomínio inteiro com Node 26.13.0 / npm 11.20.0**, não apenas os testes de excluir. Justificativa: troca transversal de runtime (D137) e aumento efetivo do perímetro DELETE (D138). Responsável pelos testes técnicos no Debian: **Arena**; responsável pela homologação/aceite final: **dono**. Estado: **PENDENTE**. Escopo, isolamento, falhas de referência e critérios de relatório vivem no `09`, seção **“Passagem obrigatória para a Arena — regressão integral no Debian após Windows”**; não duplicar placares aqui.
+
+Não encerrar DEBT-24 nem autorizar avanço com base apenas no parecer Windows “pronta com ressalvas”. A Arena deve entregar resultados verificáveis e classificar falhas/regressões/bloqueios para decisão do dono. A Fatia 13 conserva seu histórico de homologação; isso não a reabre nem elimina a necessidade de testar comandos/terminal na regressão geral. DP-03 e DP-06 permanecem pré-requisitos adicionais antes da codificação da 14. Nenhuma fatia posterior foi iniciada por esse encaminhamento.
+
 > **Documento Canônico de Planejamento e Débito Técnico (Padrão Spec-Driven / Stream Coding).**
 > - **Regra de ouro:** Todo débito técnico e todo o roadmap do projeto vivem estritamente aqui (não criar arquivos separados como `TECHNICAL_DEBT.md` ou `ROADMAP.md`).
 > - **Princípio de bloqueio:** Nenhuma fatia nova é iniciada enquanto existirem dívidas bloqueantes da fatia anterior. **Flexibilizado conscientemente pela D63/D64** para os itens de *refinamento* (foram para a FATIA 17 (pós-D95; era 13), fora do caminho crítico do MVP).

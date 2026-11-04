@@ -77,6 +77,7 @@ const raiz = await mkdtemp(path.join(tmpdir(), 'agir-rotas-'))
 const grantsPorSessao = new Map<string, Set<'criar' | 'escrever' | 'executar'>>()
 const modosPorConversa = new Map<string, 'agent' | 'edit' | 'ask' | 'plan'>()
 const permissoesPorConversa = new Map<string, { nivel: 'manual' | 'allow-all'; raiz: string }>()
+const autoPorConversa = new Map<string, string>()
 const chaveModo = (sessionId: string, chatId: string): string => `${sessionId}\\0${chatId}`
 const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferramenta: 'criar' | 'escrever' | 'executar') => {
   const grants = grantsPorSessao.get(sessionId) ?? new Set<'criar' | 'escrever' | 'executar'>()
@@ -84,6 +85,8 @@ const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferrame
   grantsPorSessao.set(sessionId, grants)
 })
 const DEPS = {
+  lerExclusaoAutomatica: (s: string, c: string, r: string) => autoPorConversa.get(chaveModo(s,c)) === r,
+  definirExclusaoAutomatica: (s: string, c: string, r: string, permitir: boolean) => { if (permitir) autoPorConversa.set(chaveModo(s,c), r); else autoPorConversa.delete(chaveModo(s,c)) },
   criarExecutores: (raizExecucao: string) => criarExecutoresReais(raizExecucao, { plataforma: 'linux' }),
   obterAlvo: alvoOk,
   resolverShell: async () => ({ profile: { id: 'sh', label: 'sh', path: '/bin/sh' }, allProfiles: [{ id: 'sh', label: 'sh', path: '/bin/sh' }] }),
@@ -140,6 +143,124 @@ function stubProvedor(respostas: string[]): void {
   }))
 }
 
+describe('Missão 2 — consentimento de exclusão no backend', () => {
+  const instrucaoUrl = new URL('http://localhost/api/agir/instruction')
+  const recibo = async (fluxo: string, text: string): Promise<string> => {
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo, text })), res, instrucaoUrl, DEPS)
+    expect(res.statusCode).toBe(200)
+    return (JSON.parse(res.corpo()) as { token: string }).token
+  }
+  const executar = (fluxo: string, token?: string, extras: Record<string, unknown> = {}) => {
+    const res = fakeRes()
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ fluxo, instructionToken: token, messages: [{ role: 'user', content: 'histórico não concede autoridade' }], ...extras })), res, URL_AGIR, DEPS)
+    return { res, fio }
+  }
+
+  it('tarefa de descartáveis não autoriza criar documento canônico; pedido específico pode autorizá-lo', async () => {
+    await registrarModo('agent')
+    await mkdir(path.join(raiz,'docs'),{recursive:true})
+    const alvo=path.join(raiz,'docs','03 - ESTADO ATUAL.md')
+    const sse=`data: ${JSON.stringify({choices:[{delta:{tool_calls:[{index:0,id:'doc-task',function:{name:'criar',arguments:JSON.stringify({caminho:alvo,conteudo:'DOC-SINTÉTICO'})}}]}}]})}\n\n`
+    const fluxo='missao2-nao-editar-doc',token=await recibo(fluxo,'crie descartáveis para testar a exclusão')
+    stubProvedor([sse,SSE_TOOL_DEPOIS_DE_RESULTADO]);const negado=executar(fluxo,token);await negado.fio
+    expect(frames(negado.res)).toContainEqual(expect.objectContaining({type:'tool_result',ok:false,resumo:expect.stringContaining('Documento canônico protegido')}))
+    await expect(readFile(alvo)).rejects.toThrow()
+    const f2='missao2-documento-especifico',t2=await recibo(f2,`crie "${alvo}"`)
+    stubProvedor([sse,SSE_TOOL_DEPOIS_DE_RESULTADO]);const permitido=executar(f2,t2);await permitido.fio
+    expect(await readFile(alvo,'utf8')).toBe('DOC-SINTÉTICO')
+  })
+
+  it('instrução específica autenticada elimina segundo cartão inclusive fora do workspace, e recibo é descartável', async () => {
+    const fora = await mkdtemp(path.join(tmpdir(), 'delete-externo-autorizado-'))
+    const alvo = path.join(fora, 'externo.txt'); await writeFile(alvo, 'EXTERNO')
+    const fluxo = 'missao2-explicito'
+    const token = await recibo(fluxo, `exclua "${alvo}"`)
+    stubProvedor([SSE_EXCLUIR(alvo), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const { res, fio } = executar(fluxo, token); await fio
+    expect(frames(res).some(e => e.type === 'approval')).toBe(false)
+    expect(frames(res)).toContainEqual(expect.objectContaining({ type: 'tool_result', ok: true }))
+    await expect(readFile(alvo)).rejects.toThrow()
+    const repeticao = executar(fluxo, token); await repeticao.fio
+    expect(repeticao.res.statusCode).toBe(409)
+  })
+
+  it('mesmo texto no histórico, argumentos forjados e token de outra conversa não autorizam', async () => {
+    const nome = 'sem-instrucao.txt'; await writeFile(path.join(raiz,nome), 'FICA')
+    const fluxo = 'missao2-sem-instrucao'
+    stubProvedor([SSE_EXCLUIR(nome), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const {res,fio} = executar(fluxo,undefined,{ messages: [{role:'user',content:`exclua "${nome}"`}], automaticDeletes:true, permission:'allow-all' })
+    await esperaFio(res, '"type":"approval"')
+    await tratarRotasAgir(fakeReq(approvalBody(res,{fluxo,id:'x1',decisao:'negar'})),fakeRes(),URL_APROVAR,DEPS); await fio
+    expect(await readFile(path.join(raiz,nome),'utf8')).toBe('FICA')
+    const token = await recibo('missao2-contexto',`exclua "${nome}"`)
+    const outro = executar('missao2-contexto',token,{chatId:'outra'}); await outro.fio
+    expect(outro.res.statusCode).toBe(409)
+  })
+
+  it('alvo alterado depois da instrução exige novo cartão e negar preserva a versão nova', async () => {
+    const nome = 'instrucao-alterada.txt', alvo=path.join(raiz,nome); await writeFile(alvo,'ANTES')
+    const fluxo='missao2-alterada', token=await recibo(fluxo,`exclua "${nome}"`)
+    await writeFile(alvo,'DEPOIS')
+    stubProvedor([SSE_EXCLUIR(nome),SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const {res,fio}=executar(fluxo,token)
+    await esperaFio(res,'"type":"approval"')
+    const approval=frames(res).find(e=>e.type==='approval')!
+    const pedido=approval.pedido as {id:string}
+    expect(pedido.id).not.toBe('x1')
+    await tratarRotasAgir(fakeReq(approvalBody(res,{fluxo,id:pedido.id,decisao:'negar'})),fakeRes(),URL_APROVAR,DEPS); await fio
+    expect(await readFile(alvo,'utf8')).toBe('DEPOIS')
+  })
+
+  it.each([false,true])('dois opt-ins liberam tarefa atual, externo=%s, sem cartão', async externo => {
+    const pasta = externo ? await mkdtemp(path.join(tmpdir(),'delete-tarefa-')) : raiz
+    const alvo=path.join(pasta,externo?'externo-tarefa.txt':'interno-tarefa.txt'); await writeFile(alvo,'TAREFA')
+    const fluxo='missao2-auto-'+externo
+    const token=await recibo(fluxo,`limpe os resíduos da tarefa em "${pasta}"`)
+    const permissao=fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({permission:'allow-all',automaticDeletes:true})),permissao,URL_PERMISSION,DEPS)
+    expect(permissao.statusCode).toBe(200)
+    stubProvedor([SSE_EXCLUIR(alvo),SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const {res,fio}=executar(fluxo,token); await fio
+    expect(frames(res).some(e=>e.type==='approval')).toBe(false)
+    expect(frames(res)).toContainEqual(expect.objectContaining({type:'tool_result',ok:true}))
+    await expect(readFile(alvo)).rejects.toThrow()
+  })
+
+  it('automático não cobre alvo externo sem escopo literal e revogar cancela cartão pendente', async () => {
+    const fora=await mkdtemp(path.join(tmpdir(),'delete-fora-escopo-')), alvo=path.join(fora,'intacto.txt'); await writeFile(alvo,'INTACTO')
+    const fluxo='missao2-revogar', token=await recibo(fluxo,'organize somente a pasta de trabalho')
+    await tratarRotasAgir(fakeReq(JSON.stringify({permission:'allow-all',automaticDeletes:true})),fakeRes(),URL_PERMISSION,DEPS)
+    stubProvedor([SSE_EXCLUIR(alvo),SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const {res,fio}=executar(fluxo,token); await esperaFio(res,'"type":"approval"')
+    const revogar=fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({permission:'allow-all',automaticDeletes:false})),revogar,URL_PERMISSION,DEPS); await fio
+    expect(JSON.parse(revogar.corpo())).toMatchObject({automaticDeletes:false,cancelledRun:'cancelled'})
+    expect(await readFile(alvo,'utf8')).toBe('INTACTO')
+  })
+
+  it.each(['ask','plan'] as const)('modo %s bloqueia exclusão mesmo com instrução e opt-ins', async mode => {
+    await registrarModo(mode)
+    const nome='somente-leitura-'+mode+'.txt'; await writeFile(path.join(raiz,nome),'FICA')
+    const fluxo='missao2-'+mode, token=await recibo(fluxo,`exclua "${nome}"`)
+    await tratarRotasAgir(fakeReq(JSON.stringify({permission:'allow-all',automaticDeletes:true})),fakeRes(),URL_PERMISSION,DEPS)
+    stubProvedor([SSE_EXCLUIR(nome),SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const {res,fio}=executar(fluxo,token); await fio
+    expect(frames(res)).toContainEqual(expect.objectContaining({type:'tool_result',ok:false}))
+    expect(await readFile(path.join(raiz,nome),'utf8')).toBe('FICA')
+  })
+
+  it('observação incompleta emite erro terminal sem cartão nem execução', async () => {
+    const deps={...DEPS,criarExecutores:(r:string)=>({...DEPS.criarExecutores(r),prepararExclusao:async()=>{throw new Error('Exclusão não preparada: observação incompleta')}})}
+    stubProvedor([SSE_EXCLUIR('nao-mover')])
+    const res=fakeRes()
+    await tratarRotasAgir(fakeReq(JSON.stringify({fluxo:'missao2-falha-previa',messages:[{role:'user',content:'teste'}]})),res,URL_AGIR,deps)
+    expect(res.ended).toBe(true)
+    expect(frames(res).some(e=>e.type==='approval')).toBe(false)
+    expect(frames(res)).toContainEqual(expect.objectContaining({type:'error',code:'resposta'}))
+  })
+})
+
 const PEDIDO_BASE = JSON.stringify({
   mode: 'agent', messages: [{ role: 'user', content: 'crie o ola.txt' }],
   fluxo: 'sessao-1',
@@ -171,6 +292,7 @@ async function esperaFio(res: ResFalsa, contem: string, tentativas = 60): Promis
 }
 
 afterEach(() => {
+  autoPorConversa.clear()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
   grantsPorSessao.clear()
@@ -600,7 +722,7 @@ describe('F2 — excluir pede confirmação e move para a lixeira do SO (restaur
       await esperaFio(res, '"type":"approval"')
       const cartao = frames(res).find((e) => e.type === 'approval') as Record<string, unknown>
       // RF12-6: o cartão apresenta O ALVO — nome, tamanho e começo do conteúdo.
-      expect(String(cartao.previa)).toContain('Arquivo "alvo-f2.txt"')
+      expect(String(cartao.previa)).toContain(`Arquivo "${path.join(raiz, 'alvo-f2.txt')}"`)
       expect(String(cartao.previa)).toContain('fixture sanitizada')
       const aprovar = fakeRes()
       expect(await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-f2', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
@@ -875,6 +997,23 @@ describe('F5-A — política de modo imposta pelo servidor', () => {
 
 
 describe('DELETE — reconfirmação e cancelamento com disco isolado', () => {
+  it('exceção inesperada depois de efeito em executor iniciado mantém ACK conservador', async()=>{
+    const origem=path.join(raiz,'excecao-cancelar.txt'),destino=origem+'.movido';await writeFile(origem,'PRESERVADO')
+    let avisar!:()=>void,liberar!:()=>void
+    const inicio=new Promise<void>(r=>{avisar=r}),barreira=new Promise<void>(r=>{liberar=r})
+    const deps={...DEPS,criarExecutores:(r:string)=>({...DEPS.criarExecutores(r),excluir:async()=>{avisar();await barreira;await rename(origem,destino);throw new Error('falha inesperada depois do efeito')}})}
+    stubProvedor([SSE_EXCLUIR(origem)])
+    const fluxo='excecao-cancelar',res=fakeRes()
+    const fio=tratarRotasAgir(fakeReq(JSON.stringify({fluxo,messages:[{role:'user',content:'teste controlado'}]})),res,URL_AGIR,deps)
+    await esperaFio(res,'"type":"approval"')
+    await tratarRotasAgir(fakeReq(approvalBody(res,{fluxo,id:'x1',decisao:'permitir'})),fakeRes(),URL_APROVAR,deps)
+    await inicio
+    const ack=fakeRes(),cancelar=tratarRotasAgir(fakeReq(approvalBody(res,{fluxo})),ack,URL_CANCEL,deps)
+    liberar();await cancelar;await fio
+    expect(JSON.parse(ack.corpo())).toMatchObject({status:'cancelled_with_effects'})
+    expect(await readFile(destino,'utf8')).toBe('PRESERVADO')
+    expect(frames(res)).toContainEqual(expect.objectContaining({type:'tool_result',ok:false,efeitoIniciado:true}))
+  })
   it('trocar o alvo abre outro cartão e aprovação antiga não autoriza o substituto', async () => {
     const nome = 'reconfirmar.txt'
     const origem = path.join(raiz, nome)

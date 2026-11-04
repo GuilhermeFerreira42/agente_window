@@ -16,6 +16,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Node 26 possui Web Storage próprio. Nos workers, preservar o Storage do
+    // navegador jsdom, sem exigir um arquivo de localStorage no processo Node.
+    poolOptions: {
+      forks: { execArgv: ['--no-experimental-webstorage'] },
+      threads: { execArgv: ['--no-experimental-webstorage'] },
+    },
     setupFiles: './src/__tests__/setup.ts',
     testTimeout: 20000,
     hookTimeout: 20000,

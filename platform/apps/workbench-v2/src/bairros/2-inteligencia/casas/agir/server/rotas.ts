@@ -10,7 +10,7 @@
 // que valida a pasta informada pela tela e devolve a raiz real (o navegador
 // nunca define território por conta própria).
 // Regra atual F5-A/F2-F4: Agir/Edit autorizam criar/escrever sem cartão
-// repetitivo; exclusão, por ser destrutiva, segue manual e individual. O modo
+// repetitivo; exclusão segue a autorização específica/cartão/opt-ins de D138. O modo
 // efetivo é registrado separadamente no servidor; o payload do run não manda.
 // FATIA 11: o TETO vem da casa Config — a prefeitura injeta `lerTeto` (a casa
 // Agir NUNCA importa outra casa abaixo do barrel — LEGO). Ao bater o teto, a
@@ -18,6 +18,7 @@
 // cheio (RF11-3); pedido novo no mesmo fluxo descarta a retomada.
 // ============================================================================
 import { randomUUID } from 'node:crypto'
+import * as nodePath from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
 import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
@@ -26,8 +27,9 @@ import { criarExecutoresReais, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
 import { comandoExigeAprovacaoIndividual, criarExecutorComando, type ResolverShellComando } from './executorComando'
 import { criarVizinhoReal } from './vizinho'
+import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } from './autorizacaoExclusao'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait']
+const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -55,6 +57,8 @@ export interface DependenciasAgir {
   definirModo: (sessionId: string, chatId: string, modo: ModoAgir) => void
   lerPermissao?: (sessionId: string, chatId: string, raiz: string) => NivelPermissaoAgir
   definirPermissao?: (sessionId: string, chatId: string, raiz: string, nivel: NivelPermissaoAgir) => void
+  lerExclusaoAutomatica?: (sessionId: string, chatId: string, raiz: string) => boolean
+  definirExclusaoAutomatica?: (sessionId: string, chatId: string, raiz: string, permitir: boolean) => void
   /** Fábrica injetável para testar a barreira de commit de ferramentas mutáveis. */
   criarExecutores?: (raiz: string) => ExecutoresDisco
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
@@ -72,7 +76,19 @@ interface ContextoFluxo {
   modo: ModoAgir
   modoSelecionadoNoServidor: boolean
   permissao: NivelPermissaoAgir
+  escopoExclusao?: string[]
+  exclusoesTentadas?: Set<string>
+  instrucaoAtual?: string
 }
+
+interface InstrucaoHumana {
+  sessionId: string; chatId: string; fluxo: string; raiz: string; criada: number
+  executores: ExecutoresDisco; pedido?: PedidoFerramenta; escopo: string[]
+  texto: string
+}
+// Recibos opacos de uma ação humana na fronteira local existente. Nunca são
+// extraídos de messages nem enviados ao provedor. Expiram e são consumidos uma vez.
+const instrucoes = new Map<string, InstrucaoHumana>()
 type EstadoExecucao = 'running' | 'awaiting-approval' | 'cancel-requested' | 'cancelled' | 'completed' | 'paused'
 interface ExecucaoAgir extends ContextoFluxo {
   runId: string
@@ -261,6 +277,7 @@ interface FioAgir {
   permissoes: string[]
   alvo: AlvoConversa
   teto: number
+  instrucao?: InstrucaoHumana
 }
 
 /**
@@ -287,7 +304,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor, permissao: fio.execucao.permissao })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
-  const executoresDisco = (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
+  const executoresDisco = fio.instrucao?.executores ?? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
   const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
@@ -296,6 +313,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       const operacao = executorComandoBase(pedido, contexto).then((resultado) => {
         if (resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
         return resultado
+      }, (erro: unknown) => {
+        fio.execucao.mutacoesConfirmadas += 1 // exceção não comprova ausência de efeito
+        throw erro
       })
       fio.execucao.efeitoMutavelEmAndamento = operacao
       try { return await operacao } finally {
@@ -309,11 +329,17 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       if (abort.signal.aborted || fio.execucao.estado !== 'running') {
         return { ok: false, resumo: ferramenta === 'excluir' ? 'Cancelada antes de iniciar a exclusão; nada foi movido.' : 'Cancelada antes de iniciar a alteração; o arquivo não foi publicado.' }
       }
+      if (ferramenta === 'excluir' && autorizacoesAutomaticas.has(pedido) && !automaticaAtiva()) {
+        return { ok: false, resumo: 'Exclusões automáticas revogadas antes da execução; nada foi movido.' }
+      }
       // Registra a operação antes de ceder o event loop. O cancel endpoint
       // aguarda esta Promise e só então confirma se houve publicação.
       const operacao = Promise.resolve().then(() => executar(pedido, contexto)).then((resultado) => {
         if (resultado.ok || resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
         return resultado
+      }, (erro: unknown) => {
+        fio.execucao.mutacoesConfirmadas += 1 // possível efeito: nunca confirmar cancelamento limpo
+        throw erro
       })
       fio.execucao.efeitoMutavelEmAndamento = operacao
       try {
@@ -326,6 +352,11 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const modeloEfetivo = fio.alvo.providerId && fio.alvo.modelId
     ? `${fio.alvo.providerId} / ${fio.alvo.modelId}`
     : fio.alvo.modelo
+  const autorizacoesAutomaticas = new WeakSet<PedidoFerramenta>()
+  const automaticaAtiva = (): boolean => lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all' && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
+  let instrucaoConsumida = false
+  const reconfirmacoes = fio.execucao.exclusoesTentadas ?? new Set<string>()
+  fio.execucao.exclusoesTentadas = reconfirmacoes
   try {
     resultado = await rodarAgir({
       vizinho: criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo),
@@ -346,7 +377,30 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
         const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
-        // Excluir sempre exige aprovação individual, inclusive com Permitir tudo.
+        // Reconflito nunca reutiliza opt-in/instrução: exige cartão atualizado.
+        if (pedido.ferramenta === 'excluir') {
+          if (!instrucaoConsumida && fio.instrucao?.pedido) {
+            const original = fio.instrucao.pedido
+            if (alvoDentroDoEscopo(fio.raiz, pedido.argumentos.caminho, [String(original.argumentos.caminho)]) &&
+                alvoDentroDoEscopo(fio.raiz, original.argumentos.caminho, [nodePath.resolve(fio.raiz, String(pedido.argumentos.caminho))])) {
+              instrucaoConsumida = true
+              if (executoresDisco.transferirPrevia?.(original, pedido)) {
+                reconfirmacoes.add(nodePath.resolve(fio.raiz, String(pedido.argumentos.caminho)).toLocaleLowerCase())
+                escreverEvento(res, { type: 'tool_progress', id: pedido.id, text: 'Autorização específica da instrução humana atual; alvo e versão serão revalidados.' })
+                return true
+              }
+            }
+          }
+          const caminho = nodePath.resolve(fio.raiz, String(pedido.argumentos.caminho)).toLocaleLowerCase()
+          if (!reconfirmacoes.has(caminho) && automaticaAtiva() && alvoDentroDoEscopo(fio.raiz, pedido.argumentos.caminho, fio.execucao.escopoExclusao ?? [])) {
+            await executoresDisco.prepararExclusao(pedido, abort.signal)
+            reconfirmacoes.add(caminho)
+            if (!automaticaAtiva() || abort.signal.aborted) return false
+            autorizacoesAutomaticas.add(pedido)
+            escreverEvento(res, { type: 'tool_progress', id: pedido.id, text: 'Exclusão automática autorizada para esta tarefa; somente Lixeira do sistema.' })
+            return true
+          }
+        }
         if (nivelPermissao === 'allow-all' && pedido.ferramenta !== 'excluir') return true
         // D121: Agent/Edit já dispensam prompts repetitivos de criar/escrever;
         // isto não altera o contrato histórico dessas operações.
@@ -361,7 +415,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
         fio.execucao.estado = 'awaiting-approval'
         const previa = pedido.ferramenta === 'excluir'
-          ? await executoresDisco.prepararExclusao(pedido)
+          ? await executoresDisco.prepararExclusao(pedido, abort.signal)
           : pedido.ferramenta === 'executar'
             ? `Diretório inicial: ${fio.raiz}\\nShell: detectado pelo aplicativo\\nComando: ${String(pedido.argumentos.comando ?? '').slice(0, 400)}`
             : undefined
@@ -389,6 +443,15 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
         }
+        if ((pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever') && typeof pedido.argumentos.caminho === 'string') {
+          const caminho = nodePath.resolve(fio.raiz, pedido.argumentos.caminho)
+          if (/[\\/]docs[\\/]0[1-9] - [^\\/]+\.md$/iu.test(caminho)) {
+            const texto = fio.execucao.instrucaoAtual ?? ''
+            const nome = nodePath.basename(caminho)
+            const autoriza = /^(?:por favor[, ]+)?(?:edite|atualize|corrija|escreva|crie|altere|update|edit|write|create)\s/iu.test(texto.trim()) && (texto.includes(caminho) || texto.includes(`"${nome}"`) || texto.includes(`\`${nome}\``))
+            if (!autoriza) return 'Documento canônico protegido: esta tarefa não contém pedido humano específico para editar este documento. Permissão de criar descartáveis ou excluir arquivos não autoriza essa alteração.'
+          }
+        }
         return null
       },
       aguardarContinuacao: async (pedido) => {
@@ -404,9 +467,10 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       sinal: abort.signal,
     })
-  } catch {
+  } catch (erro) {
     if (!abort.signal.aborted) {
-      escreverEvento(res, { type: 'error', code: 'resposta', message: 'Erro inesperado do servidor ao agir.' })
+      resultado = { status: 'erro', textoFinal: '', iteracoes: 0, codigoErro: 'resposta' }
+      escreverEvento(res, { type: 'error', code: 'resposta', message: erro instanceof Error && erro.message.startsWith('Exclusão não preparada:') ? erro.message : 'Erro inesperado do servidor ao agir. Confira os resultados já concluídos antes de tentar novamente.' })
     }
   } finally {
     executoresDisco.fechar()
@@ -533,6 +597,41 @@ async function tratarCancelar(req: IncomingMessage, res: ServerResponse, deps: D
   return true
 }
 
+/** Ação exclusiva do envio humano na UI, protegida pela fronteira local/Origin.
+ * O run recebe somente o recibo opaco; messages nunca concede autorização. */
+async function tratarInstrucaoHumana(req: IncomingMessage, res: ServerResponse, deps: DependenciasAgir): Promise<boolean> {
+  let corpo: Record<string, unknown>
+  try { corpo = await lerCorpo(req) } catch {
+    sendErro(res, 400, 'configuracao', 'Instrução inválida.'); return true
+  }
+  const { sessionId, chatId, fluxo, text } = corpo
+  if (typeof sessionId !== 'string' || typeof chatId !== 'string' || typeof fluxo !== 'string' || !fluxo || typeof text !== 'string' || text.length > 100_000) {
+    sendErro(res, 400, 'configuracao', 'Instrução sem identidade ou texto válido.'); return true
+  }
+  const contexto = deps.resolverContexto(sessionId, chatId)
+  if (!contexto.ok) { sendErro(res, 409, 'fluxo', contexto.message); return true }
+  for (const [id, instrucao] of instrucoes) {
+    if (Date.now() - instrucao.criada > 300_000 || (instrucao.sessionId === sessionId && instrucao.chatId === chatId) || instrucoes.size >= 20) {
+      instrucao.executores.fechar(); instrucoes.delete(id)
+    }
+  }
+  const executores = (deps.criarExecutores ?? criarExecutoresReais)(contexto.raiz)
+  const alvo = alvoExplicitoExclusao(text)
+  let pedido: PedidoFerramenta | undefined
+  let aviso: string | undefined
+  if (alvo && !['ask', 'plan'].includes(deps.lerModo(sessionId, chatId) ?? 'agent')) {
+    pedido = { id: randomUUID(), ferramenta: 'excluir', argumentos: { caminho: nodePath.resolve(contexto.raiz, alvo) } }
+    try { await executores.prepararExclusao(pedido) } catch (erro) {
+      aviso = erro instanceof Error ? erro.message : 'Não foi possível preparar exclusão; será necessária confirmação.'
+      pedido = undefined
+    }
+  }
+  const token = randomUUID()
+  instrucoes.set(token, { sessionId, chatId, fluxo, raiz: contexto.raiz, criada: Date.now(), executores, pedido, escopo: escopoExclusaoAutomatica(contexto.raiz, text), texto: text })
+  sendJson(res, 200, { token, ...(aviso ? { aviso } : {}) })
+  return true
+}
+
 /** POST /api/agir — abre o fio do loop do agente. */
 async function tratarAgir(
   req: IncomingMessage,
@@ -583,7 +682,14 @@ async function tratarAgir(
     return true
   }
   retomarPorFluxo.delete(fluxo)
-  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva }
+  const token = typeof corpo.instructionToken === 'string' ? corpo.instructionToken : ''
+  const instrucao = instrucoes.get(token)
+  if (token && (!instrucao || instrucao.fluxo !== fluxo || instrucao.sessionId !== sessionId || instrucao.chatId !== chatId || instrucao.raiz !== contexto.raiz || Date.now() - instrucao.criada > 300_000)) {
+    sendErro(res, 409, 'fluxo', 'A instrução humana expirou ou pertence a outro contexto; envie novamente ou use confirmação individual.')
+    return true
+  }
+  instrucoes.delete(token)
+  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   const resultado = await executarFioAgir(res, {
     execucao,
@@ -595,6 +701,7 @@ async function tratarAgir(
     permissoes: contexto.permissoes,
     alvo,
     teto,
+    instrucao,
   }, deps)
   guardarRetomada(fluxo, resultado, contextoFluxo, alvo)
   return true
@@ -720,9 +827,15 @@ async function tratarSelecionarPermissao(req: IncomingMessage, res: ServerRespon
     return true
   }
   const anterior = lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz)
+  const autoAnterior = deps.lerExclusaoAutomatica?.(sessionId, chatId, contexto.raiz) === true
+  if (corpo.automaticDeletes !== undefined && (typeof corpo.automaticDeletes !== 'boolean' || !deps.definirExclusaoAutomatica || (corpo.automaticDeletes && nivel !== 'allow-all'))) {
+    sendErro(res, 400, 'configuracao', 'Exclusões automáticas exigem opção booleana explícita e Permitir tudo ativo.')
+    return true
+  }
   deps.definirPermissao(sessionId, chatId, contexto.raiz, nivel as NivelPermissaoAgir)
+  if (typeof corpo.automaticDeletes === 'boolean') deps.definirExclusaoAutomatica?.(sessionId, chatId, contexto.raiz, corpo.automaticDeletes)
   let cancelamento: 'none' | 'cancelled' | 'cancelled_with_effects' = 'none'
-  if (anterior === 'allow-all' && nivel === 'manual') {
+  if ((anterior === 'allow-all' && nivel === 'manual') || (autoAnterior && corpo.automaticDeletes === false)) {
     const ativas = [...execucaoPorFluxo.values()].filter((execucao) => execucao.sessionId === sessionId && execucao.chatId === chatId)
     for (const execucao of ativas) {
       if (!solicitarCancelamento(execucao, 'requested')) continue
@@ -731,7 +844,7 @@ async function tratarSelecionarPermissao(req: IncomingMessage, res: ServerRespon
       else if (cancelamento === 'none') cancelamento = 'cancelled'
     }
   }
-  sendJson(res, 200, { ok: true, permission: nivel, cancelledRun: cancelamento })
+  sendJson(res, 200, { ok: true, permission: nivel, automaticDeletes: deps.lerExclusaoAutomatica?.(sessionId, chatId, contexto.raiz) === true, cancelledRun: cancelamento })
   return true
 }
 
@@ -782,6 +895,7 @@ export async function tratarRotasAgir(
 ): Promise<boolean> {
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
+  if (url.pathname === '/api/agir/instruction') return tratarInstrucaoHumana(req, res, deps)
   if (url.pathname === '/api/agir/mode') return tratarSelecionarModo(req, res, deps)
   if (url.pathname === '/api/agir/permission') return tratarSelecionarPermissao(req, res, deps)
   if (url.pathname === '/api/agir/command-wait') return tratarRespostaAguardarComando(req, res, deps)

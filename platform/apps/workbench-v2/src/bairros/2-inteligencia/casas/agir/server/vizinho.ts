@@ -161,6 +161,9 @@ function erroPorStatus(status: number, corpoErro = '', chave: string | null = nu
   const complemento = detalhe ? ` Detalhe do serviço: ${detalhe}` : ''
   if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida ou sem autorização (erro ${status}). Confira a chave em Provedores.${complemento}`, status)
   if (status === 400) {
+    if (/context.{0,35}(?:length|window|limit)|too many tokens|token.{0,30}(?:limit|exceed)|exceed.{0,30}(?:context|token)/i.test(detalhe)) {
+      return new ErroVizinho('http', `O contexto enviado ultrapassou o limite do modelo (erro 400). Reduza o histórico ou comece outra conversa. Nada será repetido automaticamente.${complemento}`, status)
+    }
     return new ErroVizinho(
       'http',
       `O serviço recusou o pedido com ferramentas (erro 400). Confira modelo, endpoint e protocolo; a rejeição não bloqueia novas tentativas.${complemento}`,
@@ -521,6 +524,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         }
       }
 
+      if (comedor.acumulo.texto === '' && comedor.acumulo.pedidos.length === 0) throw new ErroVizinho('resposta', 'O serviço terminou sem texto ou ferramenta válidos. Nenhuma operação foi inferida dessa resposta.')
       return {
         texto: comedor.acumulo.texto,
         pedidos: comedor.acumulo.pedidos,

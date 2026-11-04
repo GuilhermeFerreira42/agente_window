@@ -1,5 +1,25 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-11-04 — homologação humana com ressalvas e commit da consolidação DELETE autorizado
+
+- O dono declarou sucesso manual em exclusão com as novas permissões e em exclusão fora da pasta da conversa e determinou registrar a MICRO-FATIA DELETE como **homologada com ressalvas nesses cenários**. Não declarou ter cumprido os outros itens do roteiro, nem especificou todas as combinações/tipos de alvo. Registro de alcance em `08`.
+- Autorizou seguir para regressão integral pela Arena no Debian; não repetir agora toda a lista manual como condição para essa passagem. Validação geral e DEBT-24 continuam pendentes nos seus alcances; nenhuma Fatia 14 iniciada ou pré-requisito DP-03/DP-06 dispensado.
+- Autorizou commit desta consolidação, superando a proibição da carta inicial nesse perímetro. Mensagem de rastreabilidade: **`feat: finalize recoverable delete and record scoped Windows acceptance`**. Integra código/testes DELETE e registros canônicos pertinentes, incluindo correções anteriores necessárias já presentes na árvore; pesquisas e temporários alheios permanecem fora. Sem push.
+
+## 2026-11-04 — encaminhamento do dono: regressão integral na Arena/Debian após Windows
+
+- O dono confirmou que, após concluir sua etapa Windows, pedirá à Arena a validação de todo o sistema no Debian, considerando a troca de Node já registrada em D137 e a ampliação do escopo DELETE. Não basta repetir os testes focais da ferramenta.
+- Estado/pendência em `03`/`06`; matriz de validação, falhas a reavaliar, isolamento e formato de evidência em `09`; gate do aceite humano em `08`. Este registro é somente documental: nenhum código alterado, nenhum teste Linux executado, nenhum commit/push.
+- Aguardam-se resultados técnicos e aceite do dono; DEBT-24 aberta. Fatia 13 e sequência D133 preservadas; sem autorização automática para Fatia 14 e sem dispensar DP-03/DP-06.
+
+## 2026-11-04 — missão Codex nº 2: conclusão técnica DELETE / D138
+
+- Ordem expressa do dono autorizou investigar, implementar, corrigir e testar todo este escopo, sem commit/push e sem homologação oficial. Preservadas as alterações anteriores e os nove canônicos. Base local: `77dd348` (registro documental do runtime); nenhum commit desta missão.
+- Removida a dependência de contagem/leitura integral da árvore para a apresentação. Assinatura técnica iterativa por metadados, identidade e reconfirmação preservadas, com prazo/cancelamento e falha de preparo antes do cartão. Instrução específica e opção automática reusam a fronteira local e as permissões existentes; externos autorizados, escopo literal conservador, revogação e modos read-only. Contrato formal em `05` D138.
+- Adaptador Windows usa IFileOperation com reciclagem, sink e destino/identidade conferidos. Erros de contexto/HTTP/ferramenta são explícitos; continuação preserva resultados e não reexecuta uma tool já concluída. Exceção com efeito desconhecido não produz ACK de cancelamento limpo. Proteção focal de canônicos impede criar/escrever por task de descartáveis sem pedido específico; shell continua sem sandbox.
+- Windows real e Chrome isolado exercitados; a régua histórica XDG foi atualizada, mas não executada no Windows. Harness de teste usa Storage do jsdom em Node 26; transporte HTTP de Agir usa ambiente Node real. Arquivos, resultados, falhas anteriores e cenários não comprovados estão em `09`; roteiro manual em `08`. DEBT-24 e o aceite final ficam com o dono; nenhuma fatia posterior iniciada.
+- Fechamento: reproduzido e corrigido o estado de trabalho preso após retomada expirada; fluxo focal final 4/4. Parecer **pronta com ressalvas**, sem homologação oficial. Placar ampliado, diferença de harness/home no baseline e limites permanecem em `09`; não tratar redução de falhas como correções integrais de DELETE. Aguardar validação do dono.
+
 ## 2026-11-03 — padronização do runtime e inicialização reproduzível (D137)
 
 - Autorização do dono: versão estável mais nova, preparação completa, checagens e documentação; o próprio dono fará seu ZIP. Posteriormente restringiu o fechamento ao trabalho de runtime e deixou os testes gerais para a Arena. Também autorizou commit para rastreabilidade.

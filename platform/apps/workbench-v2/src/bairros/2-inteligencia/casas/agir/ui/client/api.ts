@@ -44,11 +44,11 @@ export async function selecionarModoAgir(sessionId: string, chatId: string, mode
   throw new Error(mensagem)
 }
 
-export async function selecionarPermissaoAgir(sessionId: string, chatId: string, permission: NivelPermissaoAgir): Promise<void> {
+export async function selecionarPermissaoAgir(sessionId: string, chatId: string, permission: NivelPermissaoAgir, automaticDeletes?: boolean): Promise<void> {
   const resposta = await fetch('/api/agir/permission', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId, chatId, permission }),
+    body: JSON.stringify({ sessionId, chatId, permission, ...(automaticDeletes !== undefined ? { automaticDeletes } : {}) }),
   })
   if (resposta.ok) return
   let mensagem = 'Não foi possível registrar o nível de permissão no servidor.'
@@ -57,12 +57,20 @@ export async function selecionarPermissaoAgir(sessionId: string, chatId: string,
 }
 
 export interface EntradaAgir {
+  instructionToken?: string
   mensagens: MensagemSimples[]
   modelSelection?: { tipo: 'auto' } | { tipo: 'explicita'; providerId: string; modelId: string }
   fluxo: string
   sessionId: string
   chatId: string
   mode: ModoAgir
+}
+
+export async function registrarInstrucaoAgir(sessionId: string, chatId: string, fluxo: string, text: string, signal?: AbortSignal): Promise<string> {
+  const resposta = await fetch('/api/agir/instruction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, chatId, fluxo, text }), signal })
+  const corpo = await resposta.json() as { token?: string; message?: string }
+  if (!resposta.ok || !corpo.token) throw new Error(corpo.message ?? 'Não foi possível registrar sua instrução; nenhuma execução foi iniciada.')
+  return corpo.token
 }
 
 export interface IdentidadeExecucaoAgir {
@@ -138,7 +146,7 @@ async function bombearFio(
     }
     if (!encerrou) consumir(framer.fechar())
     if (!encerrou && !paradaSolicitada()) {
-      ouvintes.onError('resposta', 'A conexão terminou antes de o servidor confirmar o fim. Envie a mensagem de novo.')
+      ouvintes.onError('resposta', 'A conexão terminou antes da confirmação final. Confira os cartões e o disco antes de tentar novamente; operações podem já ter ocorrido.')
     }
   } catch (erro) {
     if ((erro as { name?: string })?.name === 'AbortError' || paradaSolicitada()) return
@@ -228,6 +236,7 @@ function abrirFio(url: string, corpo: unknown, escopo: EscopoRun, ouvintes: Ouvi
 
 export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): ControleAgir {
   return abrirFio('/api/agir', {
+    instructionToken: entrada.instructionToken,
     messages: entrada.mensagens,
     modelSelection: entrada.modelSelection ?? { tipo: 'auto' },
     fluxo: entrada.fluxo,

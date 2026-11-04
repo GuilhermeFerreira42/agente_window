@@ -31,7 +31,7 @@ function conferirIsolamento(): void {
     if (existsSync(caminho) && realpathSync(caminho) !== caminho) throw new Error('A árvore de teste contém redirecionamento no workspace ou na lixeira.')
   }
 }
-const LIXEIRA_TESTE = ['alvo.txt', 'caixa', 'preservado.txt', 'alvo-sessao.txt', 's12.txt', 'ola.txt']
+const LIXEIRA_TESTE = ['alvo.txt', 'caixa', 'preservado.txt', 'alvo-sessao.txt', 's12.txt', 'ola.txt', 'fora12.txt']
 const marcador = () => `EXCLUIR-E2E-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
 interface ConfigProvedor {
@@ -143,7 +143,7 @@ test.describe('FATIA 12 — Excluir (lixeira + cartão reforçado)', () => {
 
     await enviar(page, 'EXCLUIR_PASTA caixa')
     const cartaoPasta = page.locator('.chat-tool-card', { hasText: 'caixa' }) // bolha nova: busca global
-    await expect(cartaoPasta).toContainText('3 itens', { timeout: 8000 }) // contagem antes (RF12-6)
+    await expect(cartaoPasta).toContainText('TODO o seu conteúdo', { timeout: 8000 }) // D138: confirmação resumida
     await page.getByRole('button', { name: 'Permitir esta mexida' }).click()
     await expect(cartaoPasta).toContainText('Feito', { timeout: 8000 })
     expect(existsSync(`${PASTA}/caixa`), 'pasta some inteira').toBe(false)
@@ -184,15 +184,17 @@ test.describe('FATIA 12 — Excluir (lixeira + cartão reforçado)', () => {
     await shot(page, 'f12_T3_sessao_nao_cobre')
   })
 
-  test('T4: ../fora = recusa honesta mesmo aprovando; nada nasce fora (RF12-4)', async ({ page }) => {
+  test('T4: externo descartável mediante cartão vai inteiro à lixeira isolada (D138)', async ({ page }) => {
     await prepararSessaoComPasta(page, marcador())
+    conferirIsolamento()
+    writeFileSync(join(ROOT,'fora12.txt'),'EXTERNO-DESCARTÁVEL')
     await enviar(page, 'EXCLUIR_FORA')
     const cartao = cartoes(page).first()
     await expect(cartao).toContainText('Excluir (lixeira)', { timeout: 8000 })
     await page.getByRole('button', { name: 'Permitir esta mexida' }).click()
-    await expect(cartao).toContainText('Não executou', { timeout: 8000 })
-    await expect(cartao).toContainText('Fora da pasta')
-    expect(existsSync(join(ROOT, 'fora12.txt')), 'nada fora da pasta').toBe(false)
+    await expect(cartao).toContainText('Feito', { timeout: 8000 })
+    expect(existsSync(join(ROOT, 'fora12.txt')), 'externo saiu da origem').toBe(false)
+    expect(readFileSync(join(TRASH,'files','fora12.txt'),'utf8')).toBe('EXTERNO-DESCARTÁVEL')
     await shot(page, 'f12_T4_fora_recusado')
   })
 

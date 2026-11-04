@@ -20,6 +20,7 @@ beforeEach(() => {
   // A rota de cancelamento é separada do endpoint SSE e confirma o ACK F3.
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url === '/api/agir/instruction') return Promise.resolve(new Response(JSON.stringify({token:'human-fixture'}),{status:200,headers:{'Content-Type':'application/json'}}))
     if (url === '/api/agir/mode' || url === '/api/agir/permission') {
       return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
@@ -42,9 +43,11 @@ beforeEach(() => {
 })
 
 /** Fio SSE de teste no MESMO formato do servidor (frames `data:` + JSON). */
-function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 'aberto' = 'done', atrasoMs = 40): void {
+function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 'aberto' | 'teto' = 'done', atrasoMs = 40): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input)
+    if (url === '/api/agir/continuar') return new Response(JSON.stringify({code:'fluxo',message:'A pausa expirou no servidor.'}),{status:409,headers:{'Content-Type':'application/json'}})
+    if (url === '/api/agir/instruction') return new Response(JSON.stringify({token:'human-fixture'}),{status:200,headers:{'Content-Type':'application/json'}})
     if (url === '/api/agir/mode' || url === '/api/agir/permission') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url === '/fs/workspace') return new Response(null, { status: 404 })
     if (url === '/api/sessions') return new Response(null, { status: 204 })
@@ -56,6 +59,7 @@ function responderChatComSSE(textos: string[], fecharCom: 'done' | 'sem-done' | 
     const codificar = new TextEncoder()
     const pedacos = textos.map((texto) => codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: texto })}\n\n`))
     if (fecharCom === 'done') pedacos.push(codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`))
+    if (fecharCom === 'teto') pedacos.push(codificar.encode(`data: ${JSON.stringify({type:'teto',iteracoes:1,teto:1})}\n\n`))
     const fio = new ReadableStream<Uint8Array>({
       start(controller) {
         controladorFio = controller
@@ -95,6 +99,15 @@ async function enviarMensagem(texto: string): Promise<void> {
 }
 
 describe('FATIA 09 — conversa REAL no App (SPEC §3)', () => {
+  it('retomada expirada encerra Trabalhando, marca o cartão e permite novo envio',async()=>{
+    responderChatComSSE(['Pausa após efeito registrado.'],'teto',20)
+    await enviarMensagem('tarefa controlada')
+    await waitFor(()=>expect(screen.queryByRole('button',{name:'Continuar'}),document.body.textContent??'').not.toBeNull(),{timeout:4000})
+    await userEvent.setup().click(screen.getByRole('button',{name:'Continuar'}))
+    await waitFor(()=>expect(screen.queryByRole('button',{name:'Parar execução'})).not.toBeInTheDocument(),{timeout:2000})
+    expect(screen.getByText('A pausa expirou no servidor.')).toBeInTheDocument()
+    expect(screen.queryByText('Trabalhando')).not.toBeInTheDocument()
+  })
   it('§3.2/§3.9: a bolha cresce em pedaços e o rodapé rotula o modelo efetivo', async () => {
     responderChatComSSE(['Parcial um. ', 'Parcial dois.'], 'done', 80)
     await enviarMensagem('pergunta em pedaços')
@@ -120,7 +133,8 @@ describe('FATIA 09 — conversa REAL no App (SPEC §3)', () => {
     await enviarMensagem('resposta incompleta')
 
     await waitFor(() => {
-      expect(screen.getByText(/terminou antes de o servidor confirmar/)).toBeInTheDocument()
+      expect(screen.getByText(/terminou antes da confirmação final/)).toBeInTheDocument()
+      expect(screen.getByText(/operações podem já ter ocorrido/)).toBeInTheDocument()
     }, { timeout: 3000 })
     expect(screen.queryByText(/Estou trabalhando em/)).not.toBeInTheDocument()
     expect(screen.queryByText('Trabalhando')).not.toBeInTheDocument()

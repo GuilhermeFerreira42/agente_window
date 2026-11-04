@@ -24,6 +24,7 @@ export function definirModoAgir(sessionId: string, chatId: string, modo: ModoAgi
 interface SelecaoPermissao {
   nivel: NivelPermissaoAgir
   raiz: string
+  exclusaoAutomatica?: boolean
 }
 
 // Permitir tudo não é persistido entre reinícios do servidor e é vinculado à
@@ -37,11 +38,23 @@ export function lerPermissaoAgir(sessionId: string, chatId: string, raiz: string
 
 export function definirPermissaoAgir(sessionId: string, chatId: string, raiz: string, nivel: NivelPermissaoAgir): void {
   const id = chave(sessionId, chatId)
+  const anterior = permissaoPorConversa.get(id)
   permissaoPorConversa.delete(id)
-  permissaoPorConversa.set(id, { nivel, raiz })
+  permissaoPorConversa.set(id, { nivel, raiz, exclusaoAutomatica: nivel === 'allow-all' && anterior?.raiz === raiz && anterior.exclusaoAutomatica === true })
   while (permissaoPorConversa.size > MAX_CONVERSAS) {
     const maisAntiga = permissaoPorConversa.keys().next()
     if (maisAntiga.done) break
     permissaoPorConversa.delete(maisAntiga.value)
   }
+}
+
+export function lerExclusaoAutomaticaAgir(sessionId: string, chatId: string, raiz: string): boolean {
+  const selecao = permissaoPorConversa.get(chave(sessionId, chatId))
+  return selecao?.raiz === raiz && selecao.nivel === 'allow-all' && selecao.exclusaoAutomatica === true
+}
+
+export function definirExclusaoAutomaticaAgir(sessionId: string, chatId: string, raiz: string, permitir: boolean): void {
+  const selecao = permissaoPorConversa.get(chave(sessionId, chatId))
+  if (!selecao || selecao.raiz !== raiz || (permitir && selecao.nivel !== 'allow-all')) throw new Error('Ative Permitir tudo antes das exclusões automáticas.')
+  selecao.exclusaoAutomatica = permitir
 }

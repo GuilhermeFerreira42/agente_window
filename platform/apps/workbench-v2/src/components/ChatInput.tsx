@@ -27,6 +27,8 @@ interface ChatInputProps {
   model: string
   mode: string
   permission?: NivelPermissaoAgir
+  automaticDeletes?: boolean
+  onChangeAutomaticDeletes?: (permitir: boolean) => Promise<void>
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
   onChangePermission?: (permission: NivelPermissaoAgir) => Promise<void>
@@ -111,6 +113,8 @@ export function ChatInput({
   model,
   mode,
   permission = 'manual',
+  automaticDeletes = false,
+  onChangeAutomaticDeletes = async () => undefined,
   onChangeModel,
   onChangeMode,
   onChangePermission = async () => undefined,
@@ -752,6 +756,16 @@ export function ChatInput({
                   <span>Permitir tudo</span>
                   <span className="popover-option-description">Sem confirmações individuais; limitado à conta do SO. Perguntar/Planejar continuam somente leitura.</span>
                   {permission === 'allow-all' && <Check size={12} aria-hidden="true" />}
+                </button>
+                <button className="popover-option permission-risk-option" role="menuitemcheckbox" aria-checked={automaticDeletes} type="button" disabled={permissionBusy || (permission !== 'allow-all' && !automaticDeletes)} onClick={() => {
+                  if (!automaticDeletes && !window.confirm('Permitir exclusões automáticas nesta conversa e pasta? A IA poderá enviar alvos da tarefa à Lixeira sem cartão individual, inclusive caminhos externos mencionados na sua instrução atual. Não autoriza exclusão permanente. Você pode desativar esta opção a qualquer momento.')) return
+                  setPermissionBusy(true)
+                  setPermissionError(undefined)
+                  void onChangeAutomaticDeletes(!automaticDeletes).catch((erro: unknown) => setPermissionError(erro instanceof Error ? erro.message : 'Não foi possível alterar a opção.')).finally(() => setPermissionBusy(false))
+                }}>
+                  <span>Permitir exclusões automáticas</span>
+                  <span className="popover-option-description">Com Permitir tudo, usa a Lixeira nos caminhos indicados na tarefa. Se o escopo não estiver claro, pede confirmação. Desligado por padrão.</span>
+                  {automaticDeletes && <Check size={12} aria-hidden="true" />}
                 </button>
                 {permissionError && <div role="alert" className="permission-error">{permissionError}</div>}
               </div>

@@ -37,6 +37,8 @@ interface ChatPanelProps {
   model: string
   mode: string
   permission?: NivelPermissaoAgir
+  automaticDeletes?: boolean
+  onChangeAutomaticDeletes?: (permitir: boolean) => Promise<void>
   onSelectChat: (chatId: string) => void
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
@@ -304,6 +306,8 @@ export function ChatPanel({
   model,
   mode,
   permission = 'manual',
+  automaticDeletes = false,
+  onChangeAutomaticDeletes,
   onSelectChat,
   onChangeModel,
   onChangeMode,
@@ -412,6 +416,8 @@ export function ChatPanel({
             model={model}
             mode={mode}
             permission={permission}
+            automaticDeletes={automaticDeletes}
+            onChangeAutomaticDeletes={onChangeAutomaticDeletes}
             onChangeModel={onChangeModel}
             onChangeMode={onChangeMode}
             onChangePermission={onChangePermission}

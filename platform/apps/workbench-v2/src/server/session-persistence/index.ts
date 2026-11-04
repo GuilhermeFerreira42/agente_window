@@ -12,7 +12,7 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
-import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
+import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, definirExclusaoAutomaticaAgir, lerExclusaoAutomaticaAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
 import { resolveShell } from '../../../../../services/pty-server/src/shellDetector'
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
 import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
@@ -247,6 +247,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       definirModo: definirModoAgir,
       lerPermissao: lerPermissaoAgir,
       definirPermissao: definirPermissaoAgir,
+      lerExclusaoAutomatica: lerExclusaoAutomaticaAgir,
+      definirExclusaoAutomatica: definirExclusaoAutomaticaAgir,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
     })) return true
   }

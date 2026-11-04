@@ -56,6 +56,30 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
 }
 
 describe('ChatInput', () => {
+  it('exclusões automáticas exigem ação explícita adicional, consentimento próprio e são reversíveis', async () => {
+    const user=userEvent.setup(), alterar=vi.fn(async()=>undefined)
+    const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)
+    const view=renderInput({permission:'allow-all',onChangeAutomaticDeletes:alterar})
+    await user.click(screen.getByRole('button',{name:'Permitir tudo ativo'}))
+    const opcao=screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/})
+    expect(opcao).toHaveAttribute('aria-checked','false')
+    await user.click(opcao)
+    expect(alterar).not.toHaveBeenCalled()
+    confirm.mockReturnValue(true)
+    await user.click(opcao)
+    await waitFor(()=>expect(alterar).toHaveBeenCalledWith(true))
+    view.rerender(<ChatInput {...view.props} automaticDeletes={true} />)
+    await user.click(screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/}))
+    await waitFor(()=>expect(alterar).toHaveBeenCalledWith(false))
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+  })
+
+  it('automação desativada em Manual não pode ser ativada pelo menu', async () => {
+    const user=userEvent.setup(); renderInput()
+    await user.click(screen.getByRole('button',{name:'Permissões manuais'}))
+    expect(screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/})).toBeDisabled()
+  })
   it('exige confirmação explícita para Permitir tudo e deixa Manual sem confirmação', async () => {
     const user = userEvent.setup()
     const onChangePermission = vi.fn(async () => undefined)

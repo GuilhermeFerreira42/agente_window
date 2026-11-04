@@ -28,6 +28,7 @@ beforeEach(() => {
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url === '/api/agir/instruction') return Promise.resolve(new Response(JSON.stringify({token:'human-fixture'}),{status:200,headers:{'Content-Type':'application/json'}}))
     if (url === '/api/providers') return Promise.resolve(new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
       { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat' },
       { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat' },
@@ -59,6 +60,7 @@ function responderChatComSSE(
 ): void {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url === '/api/agir/instruction') return new Response(JSON.stringify({token:'human-fixture'}),{status:200,headers:{'Content-Type':'application/json'}})
     if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [
       { providerId: 'openai', modelId: 'gpt-5-mini', label: 'OpenAI — GPT-5 mini', protocol: 'openai-chat' },
       { providerId: 'openai', modelId: 'gpt-5', label: 'OpenAI — GPT-5', protocol: 'openai-chat' },

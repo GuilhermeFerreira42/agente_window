@@ -4,10 +4,11 @@
 // escrever exige leitura prévia + fingerprint e substituição atômica.
 import { createHash, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
+import type { BigIntStats } from 'node:fs'
 import * as nodePath from 'node:path'
 import type { ArgumentosFerramenta, ExecutorFerramenta, FerramentaId, ResultadoFerramenta, PedidoFerramenta } from '../contract'
 import { catalogoFerramentas } from './ferramentas'
-import { contarConteudo, formatarTamanho, moverParaLixeira, type OpcoesLixeira } from './lixeira'
+import { moverParaLixeira, type OpcoesLixeira } from './lixeira'
 import { verificarTerritorio } from './territorio'
 
 export const LIMITE_BUSCA = 200
@@ -36,6 +37,13 @@ function prepararPorta(raiz: string, caminho: unknown): Porta {
   return veredito.liberado
     ? { ok: true, caminho: veredito.caminho }
     : { ok: false, resumo: veredito.motivo }
+}
+
+function prepararPortaExclusao(raiz: string, caminho: unknown): Porta {
+  if (typeof caminho === 'string' && (/[\0*?<>|]/u.test(caminho) || (process.platform === 'win32' && /^(?:[A-Za-z]:[^\\/]|\\\\)/u.test(caminho)))) {
+    return { ok: false, resumo: 'Caminho de exclusão ambíguo ou especial — informe um caminho local inequívoco.' }
+  }
+  return prepararPorta(raiz, caminho)
 }
 
 function ehErroCodigo(erro: unknown, codigo: string): boolean {
@@ -96,14 +104,13 @@ function separadorNormalizado(): string {
 }
 
 /** Motivo tipado — evita checar prefixo de string para decidir a mensagem. */
-type MotivoExclusao = 'fora' | 'raiz' | 'inexistente' | 'link' | 'sem_pasta'
+type MotivoExclusao = 'raiz' | 'inexistente' | 'link' | 'sem_pasta'
 
 type AlvoExclusao =
   | { ok: true; real: string; ehPasta: boolean }
   | { ok: false; motivo: MotivoExclusao }
 
 const FRASE_MOTIVO: Record<MotivoExclusao, string> = {
-  fora: 'Fora da pasta de trabalho — a exclusão não sai dela',
   raiz: 'A pasta de trabalho inteira não pode ser excluída — escolha o que vai para a lixeira dentro dela',
   inexistente: 'não existe no disco',
   link: 'é um link (não um arquivo/pasta real) — recusado',
@@ -114,30 +121,16 @@ function estaDentro(raizNorm: string, alvoNorm: string): boolean {
   return alvoNorm.startsWith(`${raizNorm}${separadorNormalizado()}`)
 }
 
-/**
- * DEBT-24 / D128 — contenção do `excluir` na pasta de trabalho.
- *
- * D121 permite caminho absoluto/externo para ler/listar/buscar/criar/escrever
- * (o workspace é base de resolução, não sandbox). **Exclusão é destrutiva e foi
- * homologada por D97 com "território = pasta ativa"**: a contenção aqui é
- * mantida DE PROPÓSITO, mais estrita que a das cinco ferramentas irmãs, e é a
- * proteção que o dono pediu para preservar.
- *
- * ORDEM das checagens (cada uma com motivo próprio, na ordem homologada):
- *   1. território LEXICAL e "raiz nunca é alvo" — ANTES de olhar o disco, para
- *      que `../fora` devolva "fora da pasta" e não "não existe" (o motivo certo
- *      importa: é o que o modelo e o dono leem);
- *   2. `lstat` no caminho pedido — link simbólico/junction é RECUSADO. Tem que
- *      vir ANTES do `realpath`, que resolveria o link e esconderia a troca;
- *   3. território FÍSICO via `realpath` — resolve links de componentes pai e
- *      fecha o escape por symlink de pasta (achado comprovado da auditoria F2);
- *   4. re-conferência com `lstat` no caminho real, no momento da ação.
- */
+/** D138: externos podem receber autorização específica/cartão. Mantém raiz e
+ * ancestrais protegidos e recusa links/junctions, inclusive em componentes pai.
+ * A autorização fica na prévia privada de uso único, nunca em argumentos. */
 async function resolverAlvoExclusao(raiz: string, caminhoResolvido: string): Promise<AlvoExclusao> {
   const raizLexical = normalizaCaminho(nodePath.resolve(raiz))
   const alvoLexical = normalizaCaminho(caminhoResolvido)
   if (alvoLexical === raizLexical) return { ok: false, motivo: 'raiz' }
-  if (!estaDentro(raizLexical, alvoLexical)) return { ok: false, motivo: 'fora' }
+  // A missão nº 2 permite externos autorizados. Raiz e ancestrais do workspace
+  // continuam protegidos; caminho por link/junction não autoriza outro alvo.
+  if (estaDentro(alvoLexical, raizLexical) || nodePath.dirname(caminhoResolvido) === caminhoResolvido) return { ok: false, motivo: 'raiz' }
 
   let cru
   try {
@@ -162,7 +155,8 @@ async function resolverAlvoExclusao(raiz: string, caminhoResolvido: string): Pro
   const raizNorm = normalizaCaminho(raizReal)
   const realNorm = normalizaCaminho(real)
   if (realNorm === raizNorm) return { ok: false, motivo: 'raiz' }
-  if (!estaDentro(raizNorm, realNorm)) return { ok: false, motivo: 'fora' }
+  if (estaDentro(realNorm, raizNorm)) return { ok: false, motivo: 'raiz' }
+  if (realNorm !== alvoLexical) return { ok: false, motivo: 'link' }
 
   let info
   try {
@@ -174,15 +168,8 @@ async function resolverAlvoExclusao(raiz: string, caminhoResolvido: string): Pro
   return { ok: true, real, ehPasta: info.isDirectory() }
 }
 
-/** Prévia do alvo do `excluir` para o cartão reforçado (FATIA 12, RF12-6):
- * arquivo → começo do conteúdo; pasta → contagem + tamanho; problema →
- * frase honesta dizendo que aprovar não apaga nada. A rota chama antes de
- * emitir o `approval` (só o servidor enxerga o disco).
- *
- * RESTAURADA por DEBT-24/D128: a versão fail-closed dizia "exclusão não está
- * disponível" porque o executor estava bloqueado. Com o executor restaurado,
- * a prévia volta a mostrar o alvo real — que é o que o cartão promete.
- */
+/** D138: apresentação curta e caminho absoluto. Não enumera nem conta pasta;
+ * a assinatura técnica e o consentimento são responsabilidades separadas. */
 export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Promise<string> {
   if (typeof entrada !== 'string' || entrada.trim() === '') {
     return 'O caminho veio vazio — aprovar não apaga nada.'
@@ -190,7 +177,7 @@ export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Prom
   const nome = entrada.trim()
   const veredito = verificarTerritorio(raiz, nome)
   if (!veredito.liberado) {
-    return 'Fora da pasta de trabalho — aprovar não apaga nada.'
+    return `${veredito.motivo} Aprovar não apaga nada.`
   }
   const alvo = await resolverAlvoExclusao(nodePath.resolve(raiz), veredito.caminho)
   if (!alvo.ok) {
@@ -199,8 +186,6 @@ export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Prom
         return `"${nome}" não existe — nada vai sumir.`
       case 'link':
         return `"${nome}" é um link, não um arquivo/pasta real — aprovar não apaga nada.`
-      case 'fora':
-        return 'Fora da pasta de trabalho — aprovar não apaga nada.'
       case 'raiz':
         return `${FRASE_MOTIVO.raiz}.`
       case 'sem_pasta':
@@ -209,39 +194,53 @@ export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Prom
   }
   if (!alvo.ehPasta) {
     try {
-      const conteudo = await fs.readFile(alvo.real, 'utf8')
-      return `Arquivo "${nome}" (${conteudo.length} caracteres):\n${conteudo.slice(0, 400)}`
+      const arquivo = await fs.open(alvo.real, 'r')
+      try {
+        const buffer = Buffer.alloc(400)
+        const { bytesRead } = await arquivo.read(buffer, 0, buffer.length, 0)
+        return `Arquivo "${alvo.real}" → Lixeira do sistema. Para restaurar, use a Lixeira.\n${buffer.subarray(0, bytesRead).toString('utf8')}`
+      } finally { await arquivo.close() }
     } catch {
       return `Arquivo "${nome}" (não deu para pré-visualizar).`
     }
   }
-  const contagem = await contarConteudo(alvo.real)
-  const itemOuItens = contagem.itens === 1 ? 'item' : 'itens'
-  const parcial = contagem.cortada ? ' (contagem parcial — pasta muito grande)' : ''
-  return `Pasta "${nome}": ${contagem.itens} ${itemOuItens} (${formatarTamanho(contagem.bytes)}).${parcial}`
+  return `Pasta "${alvo.real}": a pasta e TODO o seu conteúdo serão enviados à Lixeira do sistema. Para restaurar, use a Lixeira; não há desfazer direto no app.`
 }
 
 export type FerramentasDeDisco = Exclude<FerramentaId, 'executar'>
 export type ExecutoresDisco = Record<FerramentasDeDisco, ExecutorFerramenta> & {
   fechar: () => void
-  prepararExclusao: (pedido: PedidoFerramenta) => Promise<string>
+  prepararExclusao: (pedido: PedidoFerramenta, sinal?: AbortSignal) => Promise<string>
+  /** Transferência exclusivamente server-side de uma instrução humana já observada. */
+  transferirPrevia?: (origem: PedidoFerramenta, destino: PedidoFerramenta) => boolean
 }
 
-/** Versão observada da árvore, sem seguir links internos. Falha fechada se
- * não for possível observar tudo. Metadados + conteúdo detectam também edição
- * de arquivo dentro de uma pasta cujo próprio mtime não mudou. */
-async function versaoExclusao(caminho: string): Promise<string> {
+/** D138: metadados/nomes/links da árvore, sem seguir links nem ler o conteúdo
+ * dos arquivos filhos. Arquivo individual mantém hash em streaming. Prazo
+ * explícito e cancelamento; não é snapshot atômico nem CAS contra processo hostil. */
+async function versaoExclusao(caminho: string, sinal?: AbortSignal): Promise<string> {
   const hash = createHash('sha256')
-  let itens = 0
-  const visitar = async (atual: string, profundidade: number): Promise<void> => {
-    if (++itens > 20_000 || profundidade > 128) throw new Error('Limite de observação da exclusão')
+  const prazo = Date.now() + 120_000
+  const conferir = (): void => {
+    if (sinal?.aborted) throw new Error('Observação cancelada')
+    if (Date.now() > prazo) throw new Error('A observação ultrapassou 120 segundos')
+  }
+  const metadata = (s: BigIntStats): string => [s.dev, s.ino, s.mode, s.size, s.mtimeNs, s.ctimeNs, s.nlink].join(':')
+  const pendentes: Array<{ atual: string; depois?: string }> = [{ atual: caminho }]
+  while (pendentes.length) {
+    conferir()
+    const { atual, depois } = pendentes.pop()!
     const antes = await fs.lstat(atual, { bigint: true })
-    const metadata = (s: typeof antes): string => [s.dev, s.ino, s.mode, s.size, s.mtimeNs, s.ctimeNs, s.nlink].join(':')
+    if (depois !== undefined) {
+      if (metadata(antes) !== depois) throw new Error('Pasta mudou durante a observação')
+      continue
+    }
     hash.update(JSON.stringify([nodePath.relative(caminho, atual), metadata(antes)]))
     if (antes.isSymbolicLink()) hash.update(await fs.readlink(atual))
     else if (antes.isDirectory()) {
-      for (const nome of (await fs.readdir(atual)).sort()) await visitar(nodePath.join(atual, nome), profundidade + 1)
-    } else if (antes.isFile()) {
+      pendentes.push({ atual, depois: metadata(antes) })
+      for (const nome of (await fs.readdir(atual)).sort().reverse()) pendentes.push({ atual: nodePath.join(atual, nome) })
+    } else if (antes.isFile() && atual === caminho) {
       const arquivo = await fs.open(atual, 'r')
       try {
         const esperado = metadata(antes)
@@ -249,6 +248,7 @@ async function versaoExclusao(caminho: string): Promise<string> {
         const conteudo = createHash('sha256')
         let bytes = 0n
         for await (const bloco of arquivo.createReadStream({ autoClose: false })) {
+          conferir()
           conteudo.update(bloco)
           bytes += BigInt(bloco.length)
         }
@@ -259,10 +259,9 @@ async function versaoExclusao(caminho: string): Promise<string> {
       } finally {
         await arquivo.close()
       }
-    } else throw new Error('Tipo de arquivo não suportado')
+    } else if (!antes.isFile()) throw new Error('Tipo de arquivo não suportado')
     if (metadata(antes) !== metadata(await fs.lstat(atual, { bigint: true }))) throw new Error('Alvo mudou durante a observação')
   }
-  await visitar(caminho, 0)
   return hash.digest('hex')
 }
 
@@ -272,21 +271,21 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
   const versoesLidas = new Map<string, VersaoArquivo>()
   // Apenas servidor: nunca aceitamos identidade ou aprovação vinda do modelo.
   let previas = new WeakMap<PedidoFerramenta, { real: string; versao: string }>()
-  const prepararExclusao = async (pedido: PedidoFerramenta): Promise<string> => {
+  const prepararExclusao = async (pedido: PedidoFerramenta, sinal?: AbortSignal): Promise<string> => {
     previas.delete(pedido)
-    const porta = prepararPorta(raizResolvida, pedido.argumentos.caminho)
+    const porta = prepararPortaExclusao(raizResolvida, pedido.argumentos.caminho)
     if (!porta.ok) return porta.resumo
     const alvo = await resolverAlvoExclusao(raizResolvida, porta.caminho)
     if (!alvo.ok) return descreverAlvoExcluir(raizResolvida, pedido.argumentos.caminho)
     try {
-      const antes = await versaoExclusao(alvo.real)
+      const antes = await versaoExclusao(alvo.real, sinal)
       const previa = await descreverAlvoExcluir(raizResolvida, pedido.argumentos.caminho)
       const depois = await resolverAlvoExclusao(raizResolvida, porta.caminho)
-      if (!depois.ok || depois.real !== alvo.real || antes !== await versaoExclusao(depois.real)) throw new Error('Alvo mudou')
+      if (!depois.ok || depois.real !== alvo.real || sinal?.aborted) throw new Error('Alvo mudou')
       previas.set(pedido, { real: alvo.real, versao: antes })
       return previa
-    } catch {
-      return 'Não foi possível observar uma versão estável e completa do alvo — nada será movido. Solicite uma nova prévia.'
+    } catch (erro) {
+      throw new Error(`Exclusão não preparada: ${erro instanceof Error ? erro.message : 'falha de acesso'}. Nada foi movido.`)
     }
   }
 
@@ -463,32 +462,15 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
     }
   }
 
-  /**
-   * RESTAURADO por DEBT-24/D128 (2026-10-31) — contrato homologado em D97
-   * (SPEC 2F): arquivo E pasta para a LIXEIRA do sistema, nunca permanente,
-   * sempre com cartão, sessão nunca cobre, território = pasta ativa.
-   *
-   * O que estava aqui era um stub de falha fixa que nem chamava
-   * `moverParaLixeira` — resíduo "temporário" do episódio fail-closed F2,
-   * cuja condição de religamento (helper de handles) foi aposentada por D121.
-   *
-   * Proteções vivas nesta restauração:
-   *   · contenção na pasta de trabalho via realpath (mais estrita que as cinco
-   *     irmãs, que sob D121 aceitam caminho externo);
-   *   · a raiz da pasta de trabalho nunca é alvo;
-   *   · link simbólico/junction é recusado, nunca seguido;
-   *   · serialização por destino (mesma fila que criar/escrever) — duas
-   *     exclusões concorrentes do mesmo caminho não correm juntas;
-   *   · versão lida em cache é descartada após mover;
-   *   · falha antes de mover mantém a origem; efeito parcial informa destino.
-   * Exclusão PERMANENTE continua fora (DEBT-23 separada; SPEC 2F §6 "nunca
-   * permanente" segue valendo até ordem expressa do dono).
-   */
+  /** Lixeira exclusiva, prévia privada descartável e revalidação antes de mover.
+   * D138 substitui os limites antigos de território/cartão obrigatório. A rota
+   * verifica instrução específica, opt-ins ou cartão; este executor nunca aceita
+   * consentimento nos argumentos do modelo. Sem fallback permanente. */
   const excluir: ExecutorFerramenta = async (pedido, contexto) => {
     const motivo = faltando('excluir', pedido.argumentos)
     if (motivo) return falha(motivo)
     const entrada = String(pedido.argumentos.caminho)
-    const porta = prepararPorta(raizResolvida, pedido.argumentos.caminho)
+    const porta = prepararPortaExclusao(raizResolvida, pedido.argumentos.caminho)
     if (!porta.ok) return falha(porta.resumo)
     return serializar(porta.caminho, async () => {
       const alvo = await resolverAlvoExclusao(raizResolvida, porta.caminho)
@@ -500,8 +482,6 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
             return falha(
               `"${entrada}" é um link, não um arquivo/pasta real — recusado: nada sumiu. Peça a exclusão do alvo do link.`,
             )
-          case 'fora':
-            return falha(`${FRASE_MOTIVO.fora}. Nada sumiu.`)
           case 'raiz':
             return falha(`${FRASE_MOTIVO.raiz}.`)
           case 'sem_pasta':
@@ -513,9 +493,8 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
       if (!aprovada) return falha('Não há prévia estável vinculada a esta exclusão. Solicite uma nova confirmação — nada sumiu.')
       const validarAprovada = async (): Promise<boolean> => {
         const atual = await resolverAlvoExclusao(raizResolvida, porta.caminho)
-        return atual.ok && atual.real === aprovada.real && aprovada.versao === await versaoExclusao(atual.real)
+        return atual.ok && atual.real === aprovada.real && aprovada.versao === await versaoExclusao(atual.real, contexto?.sinal)
       }
-      const contagem = alvo.ehPasta ? await contarConteudo(alvo.real) : null
       // Revalida dentro da lixeira, após a reserva XDG e imediatamente antes
       // do despacho Windows/rename. D121: ainda não é CAS de syscall por handle.
       const resultado = await moverParaLixeira(alvo.real, { ...opcoesLixeira, validar: validarAprovada, sinal: contexto?.sinal })
@@ -531,20 +510,27 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
       // O item saiu do disco: qualquer versão em cache deste caminho é mentira.
       versoesLidas.delete(alvo.real)
       versoesLidas.delete(porta.caminho)
-      if (!alvo.ehPasta || !contagem) {
+      if (!alvo.ehPasta) {
         return {
           ok: true,
-          resumo: `Arquivo "${entrada}" movido para a lixeira (para restaurar, abra a lixeira do sistema).`,
+          resumo: `Arquivo "${alvo.real}" movido para a lixeira (para restaurar, abra a lixeira do sistema).`,
         }
       }
-      const itemOuItens = contagem.itens === 1 ? 'item' : 'itens'
-      const parcial = contagem.cortada ? ', contagem parcial' : ''
       return {
         ok: true,
-        resumo: `Pasta "${entrada}" (${contagem.itens} ${itemOuItens}${parcial}) movida para a lixeira (para restaurar, abra a lixeira do sistema).`,
+        resumo: `Pasta "${alvo.real}" e seu conteúdo movidos para a lixeira (para restaurar, abra a lixeira do sistema).`,
       }
     })
   }
 
-  return { ler, listar, buscar, criar, escrever, excluir, prepararExclusao, fechar: () => { versoesLidas.clear(); previas = new WeakMap() } }
+  return { ler, listar, buscar, criar, escrever, excluir, prepararExclusao,
+    transferirPrevia: (origem, destino) => {
+      const previa = previas.get(origem)
+      previas.delete(origem)
+      const porta = prepararPorta(raizResolvida, destino.argumentos.caminho)
+      if (!previa || !porta.ok || normalizaCaminho(porta.caminho) !== normalizaCaminho(previa.real)) return false
+      previas.set(destino, previa)
+      return true
+    },
+    fechar: () => { versoesLidas.clear(); previas = new WeakMap() } }
 }

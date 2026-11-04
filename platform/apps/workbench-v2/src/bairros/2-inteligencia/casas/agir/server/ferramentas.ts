@@ -43,25 +43,25 @@ export const catalogoFerramentas: DescritorFerramenta[] = [
   {
     id: 'criar',
     titulo: 'Criar arquivo',
-    descricao: 'Cria um arquivo local novo com o conteúdo dado; nunca substitui destino existente.',
+    descricao: 'Cria um arquivo local novo com o conteúdo dado; nunca substitui destino existente. Somente no escopo pedido pelo usuário; criar descartáveis não autoriza editar documentação oficial. Confira o resultado antes de prosseguir.',
     obrigatorios: ['caminho', 'conteudo'],
   },
   {
     id: 'escrever',
     titulo: 'Escrever arquivo',
-    descricao: 'Atualiza arquivo local existente após leitura na execução atual; se detectar mudança concorrente, não grava.',
+    descricao: 'Atualiza arquivo local existente após leitura na execução atual; se detectar mudança concorrente, não grava. Não altere documentação oficial sem pedido específico do usuário. Falha não é sucesso.',
     obrigatorios: ['caminho', 'conteudo'],
   },
   {
     id: 'excluir',
     titulo: 'Excluir (lixeira)',
-    descricao: 'Move um arquivo ou pasta da pasta de trabalho para a LIXEIRA do sistema (nunca apaga permanente; restaurar é pela lixeira). Sempre pede permissão ao dono, uma a uma.',
+    descricao: 'Move arquivo ou pasta e seu conteúdo para a LIXEIRA do sistema; nunca apaga permanente. Caminhos absolutos externos são aceitos mediante autorização verificada pelo servidor. A instrução humana específica ou os dois opt-ins podem dispensar cartão; ambiguidade ou mudança do alvo exige confirmação. Não invente causas para falhas nem declare homologação; informe o resultado real. Restaurar é pela Lixeira.',
     obrigatorios: ['caminho'],
   },
   {
     id: 'executar',
     titulo: 'Executar comando',
-    descricao: 'Executa um comando no shell padrão do aplicativo, em processo próprio, com diretório inicial igual à pasta de trabalho ativa. O comando pode acessar recursos conforme os privilégios da conta do sistema operacional.',
+    descricao: 'Executa comando no shell padrão, em processo próprio, com cwd inicial da pasta ativa e privilégios da conta do SO; não é sandbox. Inspecione código de saída/stdout/stderr e confirme os efeitos antes de continuar; falha não comprova criação ou cópia. Para excluir arquivos use excluir (Lixeira), nunca substitua por comando de exclusão permanente. Uma tarefa de teste não autoriza editar documentos oficiais.',
     obrigatorios: ['comando'],
   },
 ]
