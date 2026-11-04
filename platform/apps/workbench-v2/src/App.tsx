@@ -1773,14 +1773,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onCommandWaiting: (id) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? { ...carta, status: 'aguardando_continuacao' } : carta))
       },
-      onToolResult: (id, ferramenta, ok, resumo) => {
+      onToolResult: (id, ferramenta, ok, resumo, efeitoIniciado) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? {
           ...carta,
           status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
           resumo,
         } : carta))
         // O agente escreveu/apagou no disco: o Explorer mostra sem precisar resselecionar.
-        if (ok && (ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir')) {
+        if ((ok || efeitoIniciado) && (ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir')) {
           const modulo = explorerModuleRef.current
           if (modulo) void modulo.explorer.refresh().catch(() => undefined)
         }

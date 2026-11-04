@@ -4,9 +4,10 @@
 // Parar antes e no meio · o comportamento dos executores falsos.
 // ============================================================================
 import { describe, expect, it, vi } from 'vitest'
-import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, RespostaIteracao, VizinhoProvedor } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, MensagemAgir, OpcoesVizinho, PedidoFerramenta, RespostaIteracao, VizinhoProvedor } from '../contract'
 import { TETO_PADRAO, rodarAgir } from '../server/agir'
 import { criarExecutoresFalsos, ehMexida } from '../server/ferramentas'
+import { enviarAgir } from '../ui/client/api'
 
 /** Vizinho falso que segue um roteiro (uma resposta por chamada, na ordem) —
  * e cumpre o contrato do fio: texto sai AO VIVO pelo `aoTexto`. */
@@ -393,5 +394,72 @@ describe('Executores falsos da C1 (prova do esqueleto, sem disco)', () => {
     expect(ehMexida('buscar')).toBe(false)
     expect(ehMexida('criar')).toBe(true)
     expect(ehMexida('escrever')).toBe(true)
+  })
+})
+
+
+describe('DELETE — reconfirmação do alvo alterado', () => {
+  it('exige novo aceite com ID distinto antes de executar o alvo atualizado', async () => {
+    const pedido = { id: 'delete-original', ferramenta: 'excluir' as const, argumentos: { caminho: 'temporario.txt' } }
+    const { vizinho } = vizinhoRoteado([
+      { texto: '', pedidos: [pedido] },
+      { texto: 'Concluído.', pedidos: [] },
+    ])
+    const excluir = vi.fn()
+      .mockResolvedValueOnce({ ok: false, requerNovaAprovacao: true, resumo: 'O alvo mudou; confirme novamente.' })
+      .mockResolvedValueOnce({ ok: true, resumo: 'Movido para a lixeira.' })
+    const aprovar = vi.fn(async (pedidoAprovacao: PedidoFerramenta) => pedidoAprovacao.ferramenta === 'excluir')
+    const eventos: EventoAgir[] = []
+
+    const fim = await rodarAgir({
+      vizinho, historico: [], executores: { ...EXECUTORES, excluir },
+      emitir: (evento) => eventos.push(evento), pedirAprovacao: aprovar,
+    })
+
+    expect(fim.status).toBe('respondeu')
+    expect(aprovar).toHaveBeenCalledTimes(2)
+    expect(excluir).toHaveBeenCalledTimes(2)
+    const novoPedido = aprovar.mock.calls[1][0]
+    expect(novoPedido.id).not.toBe(pedido.id)
+    expect(excluir.mock.calls[1][0]).toEqual(novoPedido)
+    expect(eventos.find((evento) => evento.type === 'tool_result' && evento.ok)).toMatchObject({ id: novoPedido.id })
+  })
+})
+
+describe('DELETE — resultado parcial no diálogo do modelo', () => {
+  it('não rotula movimentação parcial como NÃO EXECUTADO', async () => {
+    const { vizinho, chamadas } = vizinhoRoteado([
+      { texto: '', pedidos: [{ id: 'delete-parcial', ferramenta: 'excluir', argumentos: { caminho: 'temporario.txt' } }] },
+      { texto: 'Confira o destino informado.', pedidos: [] },
+    ])
+    const eventos: EventoAgir[] = []
+    await rodarAgir({ vizinho, historico: [], emitir: (e) => eventos.push(e), pedirAprovacao: async () => true,
+      executores: { ...EXECUTORES, excluir: async () => ({ ok: false, efeitoIniciado: true, resumo: 'Conteúdo preservado em destino temporário informado.' }) },
+    })
+    expect(eventos.find((e) => e.type === 'tool_result')).toMatchObject({ ok: false, efeitoIniciado: true })
+    const resultado = chamadas[1][chamadas[1].length - 1].conteudo
+    expect(resultado).toContain('EFEITO PARCIAL:')
+    expect(resultado).not.toContain('NÃO EXECUTADO:')
+  })
+})
+
+
+describe('DELETE — efeito parcial atravessa o cliente SSE', () => {
+  it('repassa efeitoIniciado ao callback usado pelo Explorer mesmo com ok=false', async () => {
+    const resultado = vi.fn()
+    let concluir!: () => void
+    let falhar!: (erro: Error) => void
+    const fim = new Promise<void>((resolve, reject) => { concluir = resolve; falhar = reject })
+    const evento = { type: 'tool_result', id: 'parcial', ferramenta: 'excluir', ok: false, resumo: 'Item em destino preservado.', efeitoIniciado: true }
+    const sse = 'data: ' + JSON.stringify(evento) + '\n\ndata: ' + JSON.stringify({ type: 'done' }) + '\n\n'
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'isolado', 'X-Agir-Generation': '1' } })))
+    try {
+      enviarAgir({ mensagens: [], fluxo: 'delete-parcial', sessionId: 'teste', chatId: 'teste', mode: 'agent' }, {
+        onChunk: () => undefined, onTool: () => undefined, onApproval: () => undefined, onTeto: () => undefined,
+        onToolResult: resultado, onDone: concluir, onError: (_code, message) => falhar(new Error(message)),
+      })
+      await fim
+      expect(resultado).toHaveBeenCalledWith('parcial', 'excluir', false, 'Item em destino preservado.', true)
+    } finally { vi.unstubAllGlobals() }
   })
 })

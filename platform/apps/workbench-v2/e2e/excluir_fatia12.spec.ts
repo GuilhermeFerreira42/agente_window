@@ -3,21 +3,34 @@
 // Condições de execução (fora do repo, como as fatias 08–11):
 //   · Vite 5174 com AGENTE_WINDOW_PROVIDERS_PATH em fixture;
 //   · stub 4610 (uploads/stub_agir.cjs) com os cenários EXCLUIR_* (FATIA 12);
-//   · território REAL: /tmp/excluir-e2e-ws (recriado por teste);
-//   · lixeira REAL do Linux (~/.local/share/Trash) — a restauração é
-//     conferível de verdade; cada teste limpa o que mandou para lá.
+//   · AGENTE_DELETE_E2E_ROOT = árvore temporária exclusiva com marcador;
+//   · workspace e lixeira XDG ficam dentro dela (nunca a lixeira pessoal);
+//   · servidor separado com o mesmo XDG_DATA_HOME e persistência isolada.
 //
 // REGRA DA CASA: todo teste tem pelo menos um `expect` (e2eAssertionContract).
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join, resolve, sep } from 'node:path'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { resetApp, shot } from './helpers'
 
 const STUB = 'http://127.0.0.1:4610/v1'
 const CHAVE_BOA = 'nvapi-TESTE-agir-0001'
 const MODELO = 'stub-agir-1'
-const PASTA = '/tmp/excluir-e2e-ws'
-const TRASH = `${homedir()}/.local/share/Trash`
+// O harness deve criar esta árvore descartável e iniciar o servidor com
+// XDG_DATA_HOME=ROOT/xdg e perfil de persistência/provedores também isolado.
+const ROOT = process.env.AGENTE_DELETE_E2E_ROOT ? resolve(process.env.AGENTE_DELETE_E2E_ROOT) : ''
+const PASTA = join(ROOT, 'workspace')
+const TRASH = join(ROOT, 'xdg', 'Trash')
+function conferirIsolamento(): void {
+  if (process.platform !== 'linux') throw new Error('Este E2E verifica XDG/Linux; Windows exige seu cenário próprio de Lixeira real.')
+  if (!ROOT || !ROOT.startsWith(resolve(tmpdir()) + sep) || !basename(ROOT).startsWith('agent-window-delete-e2e-')) throw new Error('Forneça uma árvore temporária exclusiva em AGENTE_DELETE_E2E_ROOT.')
+  if (realpathSync(ROOT) !== ROOT || readFileSync(join(ROOT, 'ISOLATED_DELETE_E2E'), 'utf8').trim() !== ROOT) throw new Error('Raiz de teste sem marcador válido ou com redirecionamento.')
+  if (process.env.XDG_DATA_HOME !== join(ROOT, 'xdg')) throw new Error('O teste e o servidor isolado devem usar ROOT/xdg como XDG_DATA_HOME.')
+  for (const caminho of [join(ROOT, 'xdg'), PASTA, TRASH, join(TRASH, 'files'), join(TRASH, 'info')]) {
+    if (existsSync(caminho) && realpathSync(caminho) !== caminho) throw new Error('A árvore de teste contém redirecionamento no workspace ou na lixeira.')
+  }
+}
 const LIXEIRA_TESTE = ['alvo.txt', 'caixa', 'preservado.txt', 'alvo-sessao.txt', 's12.txt', 'ola.txt']
 const marcador = () => `EXCLUIR-E2E-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
@@ -51,11 +64,12 @@ async function varrerMinhasSessoes(request: APIRequestContext): Promise<void> {
   }
 }
 
-/** Limpa da lixeira real o que ESTA bateria mandou (evita colisão nome.2). */
+/** Limpa somente itens da lixeira XDG pertencente à árvore descartável. */
 function limparLixeira(): void {
+  conferirIsolamento()
   for (const nome of LIXEIRA_TESTE) {
-    rmSync(`${TRASH}/files/${nome}`, { recursive: true, force: true })
-    rmSync(`${TRASH}/info/${nome}.trashinfo`, { force: true })
+    rmSync(join(TRASH, 'files', nome), { recursive: true, force: true })
+    rmSync(join(TRASH, 'info', nome + '.trashinfo'), { force: true })
   }
 }
 
@@ -85,6 +99,7 @@ async function prepararSessaoComPasta(page: Page, marca: string): Promise<void> 
 }
 
 test.beforeEach(async ({ request }) => {
+  conferirIsolamento()
   rmSync(PASTA, { recursive: true, force: true })
   mkdirSync(PASTA, { recursive: true })
   mkdirSync(`${PASTA}/caixa/sub`, { recursive: true })
@@ -99,6 +114,8 @@ test.beforeEach(async ({ request }) => {
 })
 
 test.afterAll(() => {
+  if (!ROOT) return
+  conferirIsolamento()
   rmSync(PASTA, { recursive: true, force: true })
   limparLixeira()
 })
@@ -175,7 +192,7 @@ test.describe('FATIA 12 — Excluir (lixeira + cartão reforçado)', () => {
     await page.getByRole('button', { name: 'Permitir esta mexida' }).click()
     await expect(cartao).toContainText('Não executou', { timeout: 8000 })
     await expect(cartao).toContainText('Fora da pasta')
-    expect(existsSync('/tmp/fora12.txt'), 'nada fora da pasta').toBe(false)
+    expect(existsSync(join(ROOT, 'fora12.txt')), 'nada fora da pasta').toBe(false)
     await shot(page, 'f12_T4_fora_recusado')
   })
 

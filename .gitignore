@@ -18,6 +18,7 @@ target/
 .svelte-kit/
 .parcel-cache/
 .cache/
+.runtime/
 .local/
 .mypy_cache/
 .pytest_cache/

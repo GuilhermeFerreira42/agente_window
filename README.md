@@ -1,5 +1,7 @@
 # agente_window — o "Agent Window"
 
+> **Ambiente de execução:** use `iniciar.cmd` no Windows ou `sh iniciar.sh` no Linux/macOS, a partir desta pasta. O inicializador prepara o Node/npm definidos em `platform/runtime.json`, confere a integridade do download oficial e instala as dependências pelo lockfile. Não depende da versão global de Node nem de runtimes internos de ferramentas de IA. A primeira preparação exige internet. O estado corrente da entrega e os limites de validação estão em `docs/03`; resultados operacionais em `docs/09`. Blocos datados abaixo preservam o histórico e não substituem esses registros.
+
 Aplicativo web que reproduz a **"Agents Window" do VS Code 1.135** — 90 % de fidelidade (a régua é o VS Code real / code-server na **8080**) e 10 % de decisões próprias: chassi com terminal integrado e tela de Provedores inspirada no **Cline** (`docs/02`). Construído em **React + Vite**, com backend de PTY e sistema de arquivos próprios, num monorepo npm (`platform/`).
 
 > **Recebeu este projeto agora?** Leia **`docs/01 - COMECE AQUI.md`** — é a porta de entrada da documentação. **IAs:** leiam `AGENTS.md` antes de qualquer tarefa.
@@ -23,11 +25,13 @@ agente_window/
 
 ## Como rodar (Windows / Linux)
 ```bash
-cd platform
-npm install --include=dev    # obrigatório ser aqui (raiz dos workspaces)
-npm run dev                  # sobe o workbench — http://127.0.0.1:5174
+# Windows: duplo clique em iniciar.cmd, ou execute na raiz:
+iniciar.cmd
+
+# Linux/macOS, na raiz:
+sh iniciar.sh
 ```
-A porta **5174** atende tudo integrado: aplicativo + `/fs` + `/pty` (arquitetura *Single Port*). Scripts alternativos (`dev:full`, `dev:pty`) e a explicação de cada um: `platform/README.md`.
+A porta **5174** atende tudo integrado: aplicativo + `/fs` + `/pty` (arquitetura *Single Port*). `iniciar.cmd install` prepara as dependências e `iniciar.cmd check` verifica ambiente e módulos nativos sem abrir o aplicativo; os mesmos argumentos valem para `sh iniciar.sh`. Scripts alternativos e preparação manual com a versão exata: `platform/README.md` e `docs/09`.
 
 ## Testes
 ```bash

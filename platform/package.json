@@ -15,9 +15,33 @@
     "dev:frontend": "npm run dev --workspace=agents-window-replica-v2",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspace=agents-window-replica-v2",
-    "test:all": "npm run test --workspace=agents-window-replica-v2 && npm run test --workspace=@agente-window/pty-server"
+    "test:all": "npm run test --workspace=agents-window-replica-v2 && npm run test --workspace=@agente-window/pty-server",
+    "predev": "node scripts/check-runtime.mjs",
+    "predev:full": "node scripts/check-runtime.mjs",
+    "predev:pty": "node scripts/check-runtime.mjs",
+    "predev:v2": "node scripts/check-runtime.mjs",
+    "predev:frontend": "node scripts/check-runtime.mjs",
+    "prebuild": "node scripts/check-runtime.mjs",
+    "pretest": "node scripts/check-runtime.mjs",
+    "pretest:all": "node scripts/check-runtime.mjs",
+    "preinstall": "node scripts/check-runtime.mjs",
+    "runtime:check": "node scripts/project.mjs check",
+    "test:runtime": "node --test scripts/runtime.test.mjs",
+    "preruntime:check": "node scripts/check-runtime.mjs",
+    "pretest:runtime": "node scripts/check-runtime.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": "26.13.0",
+    "npm": "11.20.0"
+  },
+  "packageManager": "npm@11.20.0",
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.28.2": true,
+    "node-pty@1.1.0": true
   }
 }

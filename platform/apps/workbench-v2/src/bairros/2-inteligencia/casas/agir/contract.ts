@@ -105,7 +105,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'tool'; pedido: PedidoFerramenta }
-  | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string }
+  | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean }
   | { type: 'approval'; pedido: PedidoFerramenta; previa?: string; allowSession?: boolean }
   | { type: 'tool_progress'; id: string; text: string }
   | { type: 'command_waiting'; id: string }
@@ -149,6 +149,8 @@ export interface ResultadoFerramenta {
   conteudo?: string
   /** Metadado interno da rota para ACK de cancelamento com efeitos possíveis. */
   efeitoIniciado?: boolean
+  /** Conflito observado antes de mover: repetir o cartão, nunca autoautorizar. */
+  requerNovaAprovacao?: boolean
 }
 
 /** Sinais e canais opcionais de execução; ferramentas antigas os ignoram. */

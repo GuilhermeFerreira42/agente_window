@@ -1,5 +1,7 @@
 # 02 - VISAO GERAL — Agente Window
 
+**Ambiente reproduzível (2026-11-03):** Node/npm são fixados em `platform/runtime.json` e verificados antes dos comandos oficiais. Entrada para instalar/ligar: `iniciar.cmd` no Windows, `sh iniciar.sh` no Linux/macOS. A configuração acompanha os fontes; binários e dependências são preparados por máquina. Estado e validação corrente: `03` e `09`.
+
 > Leitura: 2.º arquivo (depois do `01`). Curto de propósito: o que é o projeto, com que é feito e onde está cada coisa. Detalhe técnico no `04`; estado no `03`.
 
 ## 1. O que é — Identidade do Produto (90 % / 10 %)

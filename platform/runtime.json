@@ -1,0 +1,7 @@
+{
+  "nodeVersion": "26.13.0",
+  "npmVersion": "11.20.0",
+  "releaseChannel": "lts",
+  "platforms": ["win32", "linux", "darwin"],
+  "architectures": ["x64", "arm64"]
+}

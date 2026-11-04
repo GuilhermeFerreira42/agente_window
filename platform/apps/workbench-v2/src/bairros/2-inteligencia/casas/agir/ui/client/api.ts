@@ -21,7 +21,7 @@ export interface DetalheErroAgir {
 export interface OuvintesAgir {
   onChunk: (texto: string) => void
   onTool: (pedido: PedidoFerramenta) => void
-  onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string) => void
+  onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string, efeitoIniciado?: boolean) => void
   onApproval: (pedido: PedidoFerramenta, previa?: string, allowSession?: boolean) => void
   onToolProgress?: (id: string, text: string) => void
   onCommandWaiting?: (id: string) => void
@@ -105,7 +105,7 @@ async function bombearFio(
         if (paradaSolicitada() && evento.type !== 'tool_result') return false
         if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
         else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
-        else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo)
+        else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo, evento.efeitoIniciado)
         else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido, evento.previa, evento.allowSession)
         else if (evento.type === 'tool_progress') ouvintes.onToolProgress?.(evento.id, evento.text)
         else if (evento.type === 'command_waiting') ouvintes.onCommandWaiting?.(evento.id)

@@ -22,7 +22,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
 import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
-import { criarExecutoresReais, descreverAlvoExcluir, type ExecutoresDisco } from './discos'
+import { criarExecutoresReais, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
 import { comandoExigeAprovacaoIndividual, criarExecutorComando, type ResolverShellComando } from './executorComando'
 import { criarVizinhoReal } from './vizinho'
@@ -303,16 +303,16 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       }
     },
   }
-  for (const ferramenta of ['criar', 'escrever'] as const) {
+  for (const ferramenta of ['criar', 'escrever', 'excluir'] as const) {
     const executar = executoresDisco[ferramenta]
-    executores[ferramenta] = async (pedido) => {
+    executores[ferramenta] = async (pedido, contexto) => {
       if (abort.signal.aborted || fio.execucao.estado !== 'running') {
-        return { ok: false, resumo: 'Cancelada antes de iniciar a alteração; o arquivo não foi publicado.' }
+        return { ok: false, resumo: ferramenta === 'excluir' ? 'Cancelada antes de iniciar a exclusão; nada foi movido.' : 'Cancelada antes de iniciar a alteração; o arquivo não foi publicado.' }
       }
       // Registra a operação antes de ceder o event loop. O cancel endpoint
       // aguarda esta Promise e só então confirma se houve publicação.
-      const operacao = Promise.resolve().then(() => executar(pedido)).then((resultado) => {
-        if (resultado.ok) fio.execucao.mutacoesConfirmadas += 1
+      const operacao = Promise.resolve().then(() => executar(pedido, contexto)).then((resultado) => {
+        if (resultado.ok || resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
         return resultado
       })
       fio.execucao.efeitoMutavelEmAndamento = operacao
@@ -346,8 +346,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       pedirAprovacao: async (pedido) => {
         const concedidas = permissoesPorFluxo.get(fluxo)
         const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
-        // Permitir tudo retira os prompts individuais, mas não habilita a ferramenta
-        // excluir, cujo executor continua bloqueado/não implementado neste checkout.
+        // Excluir sempre exige aprovação individual, inclusive com Permitir tudo.
         if (nivelPermissao === 'allow-all' && pedido.ferramenta !== 'excluir') return true
         // D121: Agent/Edit já dispensam prompts repetitivos de criar/escrever;
         // isto não altera o contrato histórico dessas operações.
@@ -362,7 +361,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
         fio.execucao.estado = 'awaiting-approval'
         const previa = pedido.ferramenta === 'excluir'
-          ? await descreverAlvoExcluir(fio.raiz, pedido.argumentos.caminho)
+          ? await executoresDisco.prepararExclusao(pedido)
           : pedido.ferramenta === 'executar'
             ? `Diretório inicial: ${fio.raiz}\\nShell: detectado pelo aplicativo\\nComando: ${String(pedido.argumentos.comando ?? '').slice(0, 400)}`
             : undefined

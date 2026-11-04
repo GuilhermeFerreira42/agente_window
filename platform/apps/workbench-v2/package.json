@@ -14,7 +14,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "build:fs-server": "tsc -p server/tsconfig.server.json && node -e \"require('node:fs').writeFileSync('dist-fs-server/package.json', JSON.stringify({type:'commonjs'})+\\\"\\\\n\\\")\""
+    "build:fs-server": "tsc -p server/tsconfig.server.json && node -e \"require('node:fs').writeFileSync('dist-fs-server/package.json', JSON.stringify({type:'commonjs'})+\\\"\\\\n\\\")\"",
+    "predev": "node ../../scripts/check-runtime.mjs",
+    "prebuild": "node ../../scripts/check-runtime.mjs",
+    "prebuild:fs-boundary": "node ../../scripts/check-runtime.mjs",
+    "pretypecheck": "node ../../scripts/check-runtime.mjs",
+    "prelint": "node ../../scripts/check-runtime.mjs",
+    "pretest": "node ../../scripts/check-runtime.mjs",
+    "pretest:watch": "node ../../scripts/check-runtime.mjs",
+    "pretest:coverage": "node ../../scripts/check-runtime.mjs",
+    "prebuild:fs-server": "node ../../scripts/check-runtime.mjs",
+    "preinstall": "node ../../scripts/check-runtime.mjs",
+    "prepreview": "node ../../scripts/check-runtime.mjs",
+    "prepreview:vite": "node ../../scripts/check-runtime.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -57,5 +69,10 @@
     "typescript-eslint": "^8.68.0",
     "vite": "^5.4.14",
     "vitest": "^2.1.9"
-  }
+  },
+  "engines": {
+    "node": "26.13.0",
+    "npm": "11.20.0"
+  },
+  "packageManager": "npm@11.20.0"
 }

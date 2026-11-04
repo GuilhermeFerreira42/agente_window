@@ -76,6 +76,7 @@ agente_window/
 - Homologação de fase = **validação manual do usuário no Windows**, nunca só o teste verde da IA.
 
 ## B. Workspace e servidores
+0. **Ambiente fixado (2026-11-03):** a versão de execução é definida em `platform/runtime.json`. Para preparar/ligar a partir dos fontes, use `iniciar.cmd` (Windows) ou `sh iniciar.sh` (Linux/macOS), na raiz. Os inicializadores usam distribuição oficial verificada e instalação pelo lockfile, sem depender do Node global ou do runtime de uma IA. Comandos npm manuais exigem as versões exatas e têm gates automáticos. Leia `09` para requisitos e evidências por plataforma; nunca transportar `node_modules` ou credenciais de outra máquina como se fossem fontes portáteis.
 1. O workspace é a fonte de verdade. Reinspecione antes de afirmar que algo falta.
 2. **Nunca** resetar sessão, apagar arquivos do usuário, restaurar `legacy/` (foi removida de propósito) ou fazer ação irreversível sem ordem explícita.
 3. Um `.txt` que é tarball renomeado **não** se lê como texto (ver cabeçalho de `restore-code-server.sh`).

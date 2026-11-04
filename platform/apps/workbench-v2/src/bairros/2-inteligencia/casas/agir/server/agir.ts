@@ -195,25 +195,43 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         return { status: 'erro', textoFinal: '', iteracoes: iteracao, codigoErro: 'fluxo' }
       }
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
-      const resultado: ResultadoFerramenta = liberado
-        ? await executores[pedido.ferramenta](pedido, {
-            sinal,
-            aoProgresso: (text) => emitir({ type: 'tool_progress', id: pedido.id, text }),
-            aguardarContinuacao: () => opcoes.aguardarContinuacao?.(pedido) ?? Promise.resolve(false),
-          })
+      let pedidoExecucao = pedido
+      const executarPedido = () => executores[pedido.ferramenta](pedidoExecucao, {
+        sinal,
+        aoProgresso: (text: string) => emitir({ type: 'tool_progress', id: pedidoExecucao.id, text }),
+        aguardarContinuacao: () => opcoes.aguardarContinuacao?.(pedido) ?? Promise.resolve(false),
+      })
+      let resultado: ResultadoFerramenta = liberado
+        ? await executarPedido()
         : { ok: false, resumo: textoNegacao }
+
+      while (pedido.ferramenta === 'excluir' && resultado.requerNovaAprovacao) {
+        if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao }
+        emitir({ type: 'tool_result', id: pedidoExecucao.id, ferramenta: pedido.ferramenta, ok: false, resumo: resultado.resumo })
+        // ID novo impede que um duplo clique no cartão antigo autorize o novo alvo.
+        pedidoExecucao = { ...pedido, id: `${pedido.id}-reconfirmacao-${globalThis.crypto.randomUUID()}` }
+        emitir({ type: 'tool', pedido: pedidoExecucao })
+        liberado = await pedirAprovacao?.(pedidoExecucao) ?? false
+        if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao }
+        if (opcoes.validarContexto && !opcoes.validarContexto(pedido)) {
+          resultado = { ok: false, resumo: 'A sessão ou pasta mudou; exclusão não executada.' }
+          break
+        }
+        resultado = liberado ? await executarPedido() : { ok: false, resumo: textoNegacao }
+      }
 
       emitir({
         type: 'tool_result',
-        id: pedido.id,
+        id: pedidoExecucao.id,
         ferramenta: pedido.ferramenta,
         ok: resultado.ok,
         resumo: resultado.resumo,
+        ...(resultado.efeitoIniciado ? { efeitoIniciado: true } : {}),
       })
 
       mensagens.push({
         papel: 'ferramenta',
-        conteudo: resultado.ok ? (resultado.conteudo ?? resultado.resumo) : `NÃO EXECUTADO: ${resultado.resumo}`,
+        conteudo: resultado.ok ? (resultado.conteudo ?? resultado.resumo) : `${resultado.efeitoIniciado ? 'EFEITO PARCIAL' : 'NÃO EXECUTADO'}: ${resultado.resumo}`,
         pedidoId: pedido.id,
         ferramenta: pedido.ferramenta,
       })

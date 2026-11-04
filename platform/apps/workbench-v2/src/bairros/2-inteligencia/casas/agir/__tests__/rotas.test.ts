@@ -4,7 +4,7 @@
 // tool_result → done), a NEGAÇÃO do dono e o "Permitir na Sessão" valendo
 // na segunda mexida — além do aprovar para fluxo morto.
 // ============================================================================
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
@@ -84,6 +84,7 @@ const concederPermissaoSessao = vi.fn((sessionId: string, _raiz: string, ferrame
   grantsPorSessao.set(sessionId, grants)
 })
 const DEPS = {
+  criarExecutores: (raizExecucao: string) => criarExecutoresReais(raizExecucao, { plataforma: 'linux' }),
   obterAlvo: alvoOk,
   resolverShell: async () => ({ profile: { id: 'sh', label: 'sh', path: '/bin/sh' }, allProfiles: [{ id: 'sh', label: 'sh', path: '/bin/sh' }] }),
   resolverContexto: (sessionId: string, chatId: string) => sessionId && chatId
@@ -577,8 +578,16 @@ describe('Fatia 13 — permission level e comando one-shot', () => {
 const SSE_EXCLUIR = (arquivo: string, id = 'x1'): string =>
   `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name: 'excluir', arguments: JSON.stringify({ caminho: arquivo }) } }] } }] })}\n\n`
 
-describe('F2 — excluir pede confirmação mas permanece fail-closed até lixeira segura', () => {
-  it('approval informa bloqueio; permitir não lê nem move o alvo', async () => {
+describe('F2 — excluir pede confirmação e move para a lixeira do SO (restaurado: DEBT-24/D128)', () => {
+  // REGISTRO: este teste abençoava a REGRESSÃO. Ele afirmava `previa` com
+  // "exclusão não está disponível" e `tool_result` com "Exclusão bloqueada"
+  // porque `discos.ts` tinha um executor stub e `lixeira.ts` tinha o corpo
+  // removido (`f850fc5`). Isso contradizia o E2E `excluir_fatia12.spec.ts`,
+  // que sempre afirmou exclusão REAL, e feria D79 (teste não pode passar a
+  // abençoar comportamento quebrado). Com a capacidade restaurada pela
+  // MICRO-FATIA DELETE, as asserções voltam ao comportamento homologado em
+  // D97 — a contradição se resolve pela restauração, não por máscara.
+  it('previa mostra o alvo real; permitir move para a lixeira; a origem some e o conteúdo fica restaurável', async () => {
     const xdg = await mkdtemp(path.join(tmpdir(), 'agir-f2-xdg-'))
     const anterior = process.env.XDG_DATA_HOME
     process.env.XDG_DATA_HOME = xdg
@@ -590,16 +599,50 @@ describe('F2 — excluir pede confirmação mas permanece fail-closed até lixei
       const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
       await esperaFio(res, '"type":"approval"')
       const cartao = frames(res).find((e) => e.type === 'approval') as Record<string, unknown>
-      expect(String(cartao.previa)).toContain('exclusão não está disponível')
-      expect(String(cartao.previa)).toContain('nenhum item foi lido, movido ou removido')
+      // RF12-6: o cartão apresenta O ALVO — nome, tamanho e começo do conteúdo.
+      expect(String(cartao.previa)).toContain('Arquivo "alvo-f2.txt"')
+      expect(String(cartao.previa)).toContain('fixture sanitizada')
       const aprovar = fakeRes()
       expect(await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-f2', id: 'x1', decisao: 'permitir' })), aprovar, URL_APROVAR, DEPS)).toBe(true)
       expect(aprovar.statusCode).toBe(200)
       await fio
       const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
+      expect(resultado).toMatchObject({ ok: true })
+      expect(String(resultado.resumo)).toContain('movido para a lixeira')
+      expect(String(resultado.resumo)).toContain('lixeira do sistema')
+      // Some da origem (o resultado é comunicado ao agente E aconteceu de fato).
+      await expect(readFile(path.join(raiz, 'alvo-f2.txt'), 'utf8')).rejects.toThrow()
+      // RNF12-1: foi para a LIXEIRA, inteiro, com bilhete de restauração.
+      expect(await readFile(path.join(xdg, 'Trash', 'files', 'alvo-f2.txt'), 'utf8')).toBe('fixture sanitizada')
+      const bilhete = await readFile(path.join(xdg, 'Trash', 'info', 'alvo-f2.txt.trashinfo'), 'utf8')
+      expect(bilhete).toContain('[Trash Info]')
+      expect(bilhete).toMatch(/DeletionDate=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+    } finally {
+      if (anterior === undefined) delete process.env.XDG_DATA_HOME
+      else process.env.XDG_DATA_HOME = anterior
+      await rm(xdg, { recursive: true, force: true })
+    }
+  })
+
+  it('recusa do dono: nada é lido, movido ou removido (RF12-3)', async () => {
+    const xdg = await mkdtemp(path.join(tmpdir(), 'agir-f2-negar-'))
+    const anterior = process.env.XDG_DATA_HOME
+    process.env.XDG_DATA_HOME = xdg
+    try {
+      await writeFile(path.join(raiz, 'alvo-f2-negado.txt'), 'fiquei', 'utf8')
+      stubProvedor([SSE_EXCLUIR('alvo-f2-negado.txt', 'x1n'), SSE_TOOL_DEPOIS_DE_RESULTADO])
+      const res = fakeRes()
+      const pedido = JSON.stringify({ mode: 'agent', messages: [{ role: 'user', content: 'apague o alvo-f2-negado.txt' }], fluxo: 'fluxo-f2-negar', workspace: 'raiz-real' })
+      const fio = tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, DEPS)
+      await esperaFio(res, '"type":"approval"')
+      await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'fluxo-f2-negar', id: 'x1n', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
+      await fio
+      const resultado = frames(res).find((e) => e.type === 'tool_result') as Record<string, unknown>
       expect(resultado).toMatchObject({ ok: false })
-      expect(String(resultado.resumo)).toContain('Exclusão bloqueada')
-      expect(await readFile(path.join(raiz, 'alvo-f2.txt'), 'utf8')).toBe('fixture sanitizada')
+      expect(String(resultado.resumo)).toContain('dono negou')
+      expect(String(resultado.resumo)).toContain('nada sumiu')
+      expect(await readFile(path.join(raiz, 'alvo-f2-negado.txt'), 'utf8')).toBe('fiquei')
+      await expect(readFile(path.join(xdg, 'Trash', 'files', 'alvo-f2-negado.txt'), 'utf8')).rejects.toThrow()
     } finally {
       if (anterior === undefined) delete process.env.XDG_DATA_HOME
       else process.env.XDG_DATA_HOME = anterior
@@ -827,5 +870,88 @@ describe('F5-A — política de modo imposta pelo servidor', () => {
     expect(eventos.some((evento) => evento.type === 'approval')).toBe(false)
     expect(eventos.filter((evento) => evento.type === 'tool_result' && evento.ok === true)).toHaveLength(2)
     await expect(readFile(path.join(raiz, 'f5-edit.txt'), 'utf8')).resolves.toBe('depois')
+  })
+})
+
+
+describe('DELETE — reconfirmação e cancelamento com disco isolado', () => {
+  it('trocar o alvo abre outro cartão e aprovação antiga não autoriza o substituto', async () => {
+    const nome = 'reconfirmar.txt'
+    const origem = path.join(raiz, nome)
+    const trash = path.join(raiz, 'trash-reconfirmar')
+    const deps = { ...DEPS, criarExecutores: (r: string) => criarExecutoresReais(r, { plataforma: 'linux', pastaTrash: trash }) }
+    await writeFile(origem, 'VERSAO-A')
+    stubProvedor([SSE_EXCLUIR(nome), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fluxo = 'delete-reconfirmar'
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ messages: [{ role: 'user', content: 'excluir' }], fluxo })), res, URL_AGIR, deps)
+    await esperaFio(res, '"type":"approval"')
+    expect(res.corpo()).toContain('VERSAO-A')
+    await rename(origem, origem + '.original')
+    await writeFile(origem, 'VERSAO-B')
+    const antigo = approvalBody(res, { fluxo, id: 'x1', decisao: 'permitir' })
+    await tratarRotasAgir(fakeReq(antigo), fakeRes(), URL_APROVAR, deps)
+    // Esperar o segundo approval, não só o anúncio do novo cartão.
+    for (let n = 0; n < 100 && frames(res).filter((e) => e.type === 'approval').length < 2; n++) await new Promise((resolve) => setTimeout(resolve, 10))
+    const cartoes = frames(res).filter((e) => e.type === 'approval')
+    expect(cartoes).toHaveLength(2)
+    const novoPedido = cartoes[1].pedido as { id: string }
+    expect(novoPedido.id).not.toBe('x1')
+    expect(String(cartoes[1].previa)).toContain('VERSAO-B')
+    expect(await readFile(origem, 'utf8')).toBe('VERSAO-B')
+    const duplicado = fakeRes()
+    await tratarRotasAgir(fakeReq(antigo), duplicado, URL_APROVAR, deps)
+    expect(duplicado.statusCode).toBe(409)
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo, id: novoPedido.id, decisao: 'permitir' })), fakeRes(), URL_APROVAR, deps)
+    await fio
+    expect(await readFile(path.join(trash, 'files', nome), 'utf8')).toBe('VERSAO-B')
+    expect(await readFile(origem + '.original', 'utf8')).toBe('VERSAO-A')
+    expect(frames(res).filter((e) => e.type === 'tool_result').at(-1)).toMatchObject({ id: novoPedido.id, ok: true })
+  })
+
+  it.each(['movido', 'recusado', 'parcial'] as const)('Parar aguarda excluir em andamento e distingue %s', async (desfecho) => {
+    const nome = 'cancel-delete-' + desfecho + '.txt'
+    const origem = path.join(raiz, nome)
+    const trash = path.join(raiz, 'trash-cancel-' + desfecho)
+    await writeFile(origem, 'CONTEUDO')
+    let avisar!: () => void
+    let liberar!: () => void
+    const inicio = new Promise<void>((resolve) => { avisar = resolve })
+    const barreira = new Promise<void>((resolve) => { liberar = resolve })
+    const deps = { ...DEPS, criarExecutores: (r: string) => criarExecutoresReais(r, {
+      plataforma: 'linux', pastaTrash: trash,
+      operacoes: {
+        rename: async (a, b) => {
+          avisar()
+          await barreira
+          if (desfecho === 'recusado') throw Object.assign(new Error('sem permissão'), { code: 'EPERM' })
+          await rename(a, b)
+        },
+        ...(desfecho === 'parcial' ? { lstat: async () => { throw new Error('falha de conferência') } } : {}),
+      },
+    }) }
+    stubProvedor([SSE_EXCLUIR(nome), SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    const fluxo = 'cancel-delete-' + desfecho
+    const fio = tratarRotasAgir(fakeReq(JSON.stringify({ messages: [{ role: 'user', content: 'excluir' }], fluxo })), res, URL_AGIR, deps)
+    await esperaFio(res, '"type":"approval"')
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo, id: 'x1', decisao: 'permitir' })), fakeRes(), URL_APROVAR, deps)
+    await inicio
+    const cancelRes = fakeRes()
+    const cancel = tratarRotasAgir(fakeReq(approvalBody(res, { fluxo })), cancelRes, URL_CANCEL, deps)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(cancelRes.ended).toBe(false)
+    liberar()
+    await cancel
+    await fio
+    expect(JSON.parse(cancelRes.corpo()).status).toBe(desfecho === 'recusado' ? 'cancelled' : 'cancelled_with_effects')
+    const resultado = frames(res).find((e) => e.type === 'tool_result')
+    expect(resultado).toMatchObject({ ok: desfecho === 'movido' })
+    if (desfecho === 'recusado') expect(await readFile(origem, 'utf8')).toBe('CONTEUDO')
+    else {
+      expect(await readFile(path.join(trash, 'files', nome), 'utf8')).toBe('CONTEUDO')
+      await expect(readFile(origem)).rejects.toThrow()
+      if (desfecho === 'parcial') expect(resultado).toMatchObject({ efeitoIniciado: true })
+    }
   })
 })
