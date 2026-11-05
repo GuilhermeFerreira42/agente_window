@@ -511,3 +511,180 @@ externa, e não foi feito.
   blocos Dark+ e Light+. Os ofensores voltaram aos 3 `quickInput` originais. O
   teste **continua reprovado** — é a pendência antiga, delimitada, não maquiada.
 - **PEND-03 (TerminalPanel, 9 falhas):** intocada. Relevante para a Fatia 16.
+
+---
+
+## D144 — 2026-11-05 — GATE TÉCNICO da FATIA 15 (SPEC 2I): três colisões com regras duras e como cada uma será tratada
+
+Gate aberto **antes de qualquer código**, na disciplina da D129/D140: contrato,
+migração, testes e rollback decididos primeiro. A SPEC 2I está FECHADA (Q&A 100%
+em 20/10) e não é reavaliada aqui — o que esta entrada faz é registrar que a
+execução dela **colide com três regras duras** do `04 §1`, cuja violação é
+"rollback imediato", e decidir cada colisão com alternativa rejeitada.
+
+### Colisão 1 — Regra dura 2 × entregável (a)
+
+**Regra 2 (`04:12`):** `src/modules/explorer-search/{core,server}/**` intocáveis;
+`index.ts`/`contract.ts` do módulo **só aditivos**; `ui/**` **só montagem**; o
+módulo nunca importa do shell.
+
+**O que a SPEC pede:** fundir `EditorTab` × `AttachTab`. Mas existem **três**
+definições concorrentes, e a mais profunda está em área congelada:
+- `src/types.ts:146` — `EditorTab` do App, `EditorTabType` com 7 valores
+- `modules/explorer-search/contract.ts:124` — `AttachTab`, 4 kinds
+- `modules/explorer-search/core/editor/editorService.ts:17` — `EditorTab extends
+  AttachTab`, **dentro de `core/**`, que é intocável**
+
+**DECISÃO:** o modelo fundido **NÃO** nasce dentro de `core/**`. Ele nasce no
+shell (Bairro 1), como tipo único de aba, e o `AttachTab` do módulo permanece como
+representação interna, **adaptado na fronteira**. `contract.ts` do módulo só
+recebe acréscimo se for indispensável, nunca remoção.
+
+**Por quê:** a Regra 8 (LEGO) diz que "módulos prontos são reposicionados, nunca
+reescritos" — e é exatamente isso que a fusão por adaptador faz. Reposicionar é
+permitido; reescrever `core/editor/editorService.ts` (21 testes próprios, MRU,
+preview/pinned, abas fixas Changes/Diff) não é.
+
+**Alternativa rejeitada:** pedir exceção para reescrever `core/**`. Custo: perder
+21+6 testes do serviço de editor e a semântica de MRU/preview já validada, para
+ganhar nada que o adaptador não entregue. Risco de rollback imediato pela Regra 2.
+
+### Colisão 2 — Regra dura 3 × RNF15-2
+
+**Regra 3 (`04:13`):** `App.tsx` só wiring **aditivo**.
+**RNF15-2 da SPEC:** `App.tsx` **DIMINUI** (meta: gestão de abas sai dele).
+
+Diminuir não é aditivo: as duas se contradizem textualmente.
+
+**DECISÃO:** prevalece a SPEC. A Regra 3 já está parcialmente superada pelos
+fatos — ela própria diz "`EditorArea.tsx` segue só com Browser/Customizations", e
+Customizations saiu do `EditorArea` para a casa Personalizações na Fatia 14. O
+espírito da regra é "o síndico não acumula regra de negócio", e RNF15-2 serve a
+esse mesmo espírito com mais força: tirar a gestão de abas do síndico é esvaziá-lo,
+não engordá-lo.
+
+**Salvaguardas obrigatórias, sem as quais a exceção não vale:**
+1. A gestão de abas sai para um **dono novo** (casa ou módulo de shell), não é
+   apenas apagada.
+2. Regressão integral antes e depois, com o placar registrado.
+3. Reversão segura: a remoção acontece por commit próprio e revertível, separado
+   do commit que cria o dono novo.
+
+**Alternativa rejeitada:** manter a gestão em `App.tsx` e só fundir os tipos.
+Custo: RNF15-2 não seria cumprido e o síndico continuaria dono de uma máquina de
+estado que a SPEC quer fora dele.
+
+### Colisão 3 — Regra dura 9 × PEND-02 e PEND-03
+
+**Regra 9 (`04:19`):** "proibido iniciar nova fatia com dívida técnica aberta".
+Há dívida aberta: PEND-02 (3 contratos visuais) e PEND-03 (9 testes do
+TerminalPanel).
+
+**DECISÃO:** a Fatia 15 **pode** começar. A D140, posterior e aprovada pelo dono,
+governa: "falha nova bloqueante ⇒ corrigir antes; **pré-existente delimitada ⇒
+dívida registrada sem fingir verde**". PEND-02 e PEND-03 estão delimitadas,
+diagnosticadas e registradas; não são bloqueantes novas. Interpretação contrária
+tornaria o projeto inexequível, porque a Regra 9 proibiria qualquer fatia futura
+enquanto houver uma pendência histórica.
+
+**Limite desta decisão:** se a Fatia 15 **agravar** PEND-02 ou PEND-03, isso é
+falha nova e bloqueia — exatamente o que aconteceu na Fatia 14 com os quatro
+tokens `inputValidation`, corrigidos no mesmo ato (ver PEND-05 na D143).
+
+### A tensão central: aposentar a Regra 10 × RF15-2
+
+**Regra 10** ("Preservação de Sessões em Background via `display: contents/none`",
+`04:255`) existe para que esconder **nunca** desmonte — é o mecanismo que garante
+que estado não se perde. O entregável (d) manda aposentá-la. O RF15-2 exige
+"abas irmãs alternam **sem perder estado**".
+
+Aparentemente contraditório. **Resolução:** o estado deixa de ser preservado por
+*montagem permanente* e passa a ser preservado por *modelo*. A aba carrega o que
+importa (uri, dirty, conteúdo em edição, preview/pinned, posição) e a persistência
+(RF15-4, F5 restaura) é a prova disso. Desmontar uma aba cuja estado está no
+modelo não perde nada.
+
+**Isto é o item mais arriscado da fatia** e por isso tem trava própria: um teste
+que alterna entre duas abas irmãs, edita, alterna de volta e confere que a edição
+sobreviveu — sem F5 e com F5.
+
+### Referência pendurada: `docs/18` não existe
+
+Seis pontos do código e três dos canônicos citam "Regra 10 do `docs/18`"
+(`contract.ts:141`, `attachLayout.ts:6`, `editorService.ts:12`,
+`CodeEditorPane.tsx:4`, `App.tsx:2639`, `01:118`, `04:15`, `05` D17). **Não há
+`docs/18`** — os canônicos são `01`–`09`. A autoridade real é `04:255`.
+
+**Decisão:** não caçar nem recriar o `18`. Ao aposentar a Regra 10 na Fatia 15, as
+citações são removidas junto com o código que as sustenta, e as que sobrarem em
+comentário histórico passam a apontar para `04`. Registrar aqui é o suficiente;
+criar um décimo canônico está proibido.
+
+### Inventário REAL de testes (corrige o número da SPEC)
+
+A SPEC fala em "31 testes de unidade + 11 specs E2E". Esse número vem da
+avaliação §8.7/D90, pré-D95, e está **desatualizado**. Inventário medido hoje,
+por arquivos que **referenciam** as peças (limite superior, não previsão de quebra):
+
+| Arquivo | Testes |
+|---|---|
+| `__tests__/App.test.tsx` | 49 (13 skip) |
+| `modules/explorer-search/__tests__/editorService.test.ts` | 21 |
+| `__tests__/sessionState.test.ts` | 10 |
+| `__tests__/sidePane.test.ts` | 9 |
+| `__tests__/sessionsManagement.test.ts` | 9 |
+| `modules/explorer-search/__tests__/editorTabs.test.tsx` | 7 |
+| `__tests__/layoutController.test.ts` | 6 |
+| `__tests__/dockedAuxiliaryController.test.ts` | 6 |
+| `modules/explorer-search/__tests__/editorServiceDiff.test.ts` | 6 |
+| `__tests__/coverageIntegration.test.tsx` | 5 |
+| `__tests__/editorTabs.test.ts` | 4 |
+| `__tests__/iconLabels.test.ts` | 4 (2 skip) |
+| `modules/explorer-search/__tests__/attachMaximize.test.ts` | 2 |
+| **Total** | **138** |
+
+E2E: existem **44 specs** em `platform/apps/workbench-v2/e2e/` com
+`playwright.config.ts`. Os binários de navegador **não estão instalados**, então
+nenhuma roda aqui — o próprio `06:266` já registra que "o E2E completo segue
+inútil no sandbox" e que a régua tem de ser **por spec**.
+
+**Consequência para o aceite 4:** "31+11 testes repontados/quarentenados com
+registro" será cumprido sobre o inventário REAL, não sobre o número antigo. E o
+E2E ficará como **NÃO VERIFICADO**, nunca como verde.
+
+### Migração em ondas (padrão D74 — testes antes do código)
+
+**Onda 0 — repontar testes, sem tocar em código de produção.** Identificar, entre
+os 138, os que testam a coluna que vai deixar de existir; repontar os que continuam
+válidos e marcar em quarentena **com registro** os obsoletos (D79: nunca apagar em
+silêncio). Sai com a suíte verde e um mapa escrito do que cada teste passou a
+provar.
+
+**Onda 1 — modelo único de aba + dono novo.** O tipo fundido no shell, a máquina
+de estados 4→2, e a gestão de abas saindo do síndico. `App.tsx` diminui aqui.
+
+**Onda 2 — editor capaz no centro.** A aba `file` passa a renderizar o
+`CodeEditorPane` (salvar, dirty, preview/pinned, breadcrumbs, outline) no lugar do
+Monaco simples de `EditorArea.tsx:651`, reaproveitando `writeFileAtomic` (§2D) —
+sem reescrever o módulo, só reposicionando (Regra 8).
+
+**Onda 3 — roteamento e aposentadoria.** Explorer, busca e SCM deixam de chamar
+`attach.open` e abrem aba no modelo único; `AuxiliaryBar`/`AttachArea`/`attach.css`
+e `pendingAttachOpen` saem. O caso "arquivo aberto + Provedores" deixa de existir
+**por construção**, com teste que prova (R15-3).
+
+Cada onda fecha com typecheck zero, testes da onda verdes e regressão integral
+comparada ao placar anterior.
+
+### Rollback
+
+Cada onda é um commit próprio e revertível. A ordem de reversão é a inversa da
+migração. A Onda 0 é a mais segura de reverter (só testes) e a mais importante de
+ter feito antes: sem ela, uma quebra na Onda 1 não se distingue de uma quebra
+pré-existente. Ponto de retorno conhecido: **HEAD `e9cdd10`**, suíte 1304 | 12 | 23.
+
+### O que D144 NÃO faz
+
+Não reabre a SPEC 2I. Não antecipa as fatias 16–20 nem M1–M8. Não altera a
+sequência da D133. Não cria décimo canônico. Não toca no terminal humano (Regra 1).
+**Não homologa nada** — aceite humano continua sendo do dono.
