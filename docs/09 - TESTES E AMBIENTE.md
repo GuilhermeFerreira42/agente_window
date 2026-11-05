@@ -1497,3 +1497,119 @@ Removido `platform/apps/workbench-v2/vite.config.ts.timestamp-1793761336948-b2d8
 ### Parecer técnico
 
 A MICRO-FATIA DELETE está **tecnicamente validada no Debian**: instalação limpa pelo lockfile, runtime D137 confirmado, typecheck zerado nos dois pacotes, testes de runtime 3/3, PTY 5/5, casa `agir` 204 testes sem falha, K3/EXDEV executado e aprovado, credenciais isoladas e prova D81 aprovada. **Nenhuma regressão atribuível à DELETE e nenhum defeito de produto no seu escopo.** Conclusão técnica do executor **não equivale a homologação independente**; o aceite é do dono.
+
+## 3.30 — FATIA 15, Onda 0: inventário real de testes e correção do número publicado na D144 (2026-11-05)
+
+**Correção de um número meu.** A D144 registrou o inventário da Fatia 15 como
+**138 testes** em 13 arquivos. O número medido é **153**. A contagem anterior
+somava linhas que casavam com `^\s*it(` / `^\s*test(` e perdia ocorrências com
+recuo diferente. É erro de medição, não reavaliação. A D144 não foi reescrita —
+registro anterior não se reescreve; corrige-se aqui, datado.
+
+**Baseline exata dos 13 arquivos em HEAD `8816f67`** (evidência:
+`arena-operacional/evidencias/40-onda0-baseline-13-arquivos.log`):
+
+| | |
+|---|---|
+| Testes | **153** |
+| Aprovados | 136 |
+| Reprovados | **1** — `iconLabels.test.ts:80`, **PEND-02 pré-existente** |
+| Ignorados | 16 — **todos herdados**, nenhum criado por esta execução |
+| Arquivos | 12 aprovados, 1 reprovado |
+| Duração | 73,44 s (`App.test.tsx` sozinho, 64 s) |
+
+O inventário da SPEC 2I ("31 testes de unidade + 11 specs E2E") vem da avaliação
+§8.7/D90, pré-D95, e está desatualizado nos dois lados: hoje são 153 unitários nos
+arquivos que referenciam as peças e **44 specs E2E** em
+`platform/apps/workbench-v2/e2e/`, nenhuma executável aqui por ausência dos
+binários de navegador.
+
+**Onde está o mapa completo:** `arena-operacional/onda0-mapa-de-testes-fatia15.md`.
+Vive fora do repositório de propósito — é artefato de trabalho que muda a cada
+onda, e o repositório não deve carregar logs extensos. Aqui fica só o que é
+canônico: o número corrigido, a baseline e as decisões.
+
+**Saldo da classificação (104 dos 153 classificados; os 49 ativos do `App.test.tsx`
+ficam para a Onda 1, porque classificar sem o endereço novo para apontar seria
+chute):**
+
+| Destino | Testes |
+|---|---|
+| Sobrevive sem mudança | 51 |
+| Repontar (mesma propriedade, endereço novo) | 11 |
+| Quarentena — morre (o comportamento deixa de existir) | 10 |
+| Quarentena — hiberna (volta em outra onda) | 2 |
+| Não afetado (falso positivo do inventário) | 13 |
+| Já reprovado antes da fatia (PEND-02) | 1 |
+| Já ignorado antes da fatia (herdado) | 16 |
+| `App.test.tsx` ativos por classificar | 49 |
+| **Total** | **153** |
+
+**Leitura:** o que morre está concentrado em três arquivos (`sidePane`,
+`layoutController`, `dockedAuxiliaryController`), que são justamente os que testam
+a coluna que a SPEC aposenta. A maior parte sobrevive. Isso é evidência de que a
+fusão é **reposicionamento**, não demolição — o que a Regra 8 exige e o que a
+decisão 1 da D144 prometeu.
+
+**Quatro travas que têm de atravessar as quatro ondas sem nenhuma linha alterada:**
+`editorService.test.ts` (21), `editorServiceDiff.test.ts` (6),
+`editorTabs.test.tsx` (7) e `sessionState.test.ts` (10). São 44 testes. Se eles
+continuarem verdes sem mudança, está provado que `core/**` não foi tocado (Regra
+dura 2) e que a noção de dono por sessão foi preservada.
+
+**Achado:** dos 13 testes ignorados do `App.test.tsx`, **7 são do anexo** — foram
+postos de lado antes desta execução, e a Fatia 15 é a fatia que lhes dá destino.
+Cinco hibernam e devem ser reativados nas ondas 1 e 3 (Search, Branch Changes e
+Diff viram abas centrais); três morrem com a coluna (barra auxiliar, aba Detalhes
+em single-pane, Toggle Details); os demais repontam. Nada disso é apagar em
+silêncio: a política é quarentena **com registro**, no mesmo commit que remove o
+código protegido, nunca antes.
+
+**Política de quarentena que passa a valer na Fatia 15 (D79 aplicado):**
+1. nenhum teste é ignorado antes da hora — pular teste enquanto o código protegido
+   existe é retirar a rede durante a refactoração, o que é afrouxar asserção;
+2. quarentena só no mesmo commit que remove o código que o teste protegia;
+3. toda quarentena leva comentário `// QUARENTENA D79 — <o que deixou de existir>
+   — <onda> — <data>` e uma linha no mapa;
+4. quarentena diz se o teste **morre** ou **hiberna**;
+5. teste repontado prova a **mesma propriedade** em endereço novo; se a propriedade
+   mudar, é teste novo e o antigo entra em quarentena com registro.
+
+**Três decisões que a Onda 0 forçou, com alternativa rejeitada (a SPEC 2I está
+fechada mas não responde a estas):**
+
+- **Duas políticas de sucessão de aba convivem no app.** O modelo do App ativa a
+  **vizinha da direita** ao fechar a aba ativa (`domain/editorTabs.ts`); o modelo do
+  anexo ativa a **mais recentemente usada**, "como o VS Code"
+  (`core/editor/editorService.ts`). **Decisão: o modelo fundido adota MRU** — é o
+  comportamento do VS Code, já está implementado e testado no módulo que a Regra 8
+  manda reposicionar, e é o serviço que sobrevive à fusão. **Consequência honesta:**
+  dois testes de `editorTabs.test.ts` vão reprovar **de propósito** na Onda 1; é
+  mudança de contrato deliberada, não regressão, e devem ser repontados no mesmo
+  commit citando a D144. *Rejeitado:* manter a vizinha da direita — divergiria do VS
+  Code num comportamento sentido toda hora e manteria duas implementações depois de
+  uma fatia cujo objetivo é ter uma só.
+- **R-033 fica sem objeto** (exigia que o mobile nunca apresente a aux bar).
+  **Decisão: em single-pane a barra única aparece**, porque o que R-033 queria
+  evitar — duas barras disputando tela estreita — fica impossível **por
+  construção**, que é o mesmo argumento do entregável (e) para o caso "arquivo
+  aberto + Provedores". *Rejeitado:* esconder a barra no mobile — o mobile perderia
+  Editor, Busca e SCM, que são o que a Onda 3 ruteia para ela.
+- **O atalho Alt+Cmd+L (Toggle Details) perde o objeto.** **Decisão: remover, não
+  remapear.** Remapear inventaria comportamento que nenhuma SPEC pede, e criar
+  comportamento novo não especificado é criar dívida. *Rejeitado:* remapear para
+  alternar a Side Bar — colide com atalho existente e não está na SPEC. Se o dono
+  quiser atalho para a barra única, é item novo.
+
+**Decisão provisória sobre o dono novo da gestão de abas:** o **shell**
+(`src/shell/`), não uma casa do Bairro 2. Gestão de abas é layout de Workbench sem
+IA, e a regra de ouro do condomínio diz que o **Bairro 1 funciona sem IA**; criar
+casa no Bairro 2 para isso faria o layout depender de inteligência, invertendo a
+dependência. *Rejeitado:* casa nova no Bairro 2.
+
+**O que a Onda 0 deliberadamente NÃO fez:** não tocou em código de produção; não
+criou nenhum `it.skip`; não repontou nada (repontar exige endereço novo); não mexeu
+em `iconLabels.test.ts:80`, que está reprovado por PEND-02 — corrigir ali no meio
+de uma refactoração de layout misturaria duas causas e arriscaria maquiar. Fica
+registrado que ele **já estava reprovado antes**, para que ninguém atribua a falha
+à Fatia 15.
