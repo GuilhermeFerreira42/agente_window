@@ -331,14 +331,14 @@ Resultados técnicos efetivamente executados ficam em `09`; roteiro em `08`; est
 ```ts
 /** Instrução de produto (DP-06/E-1): o que o PRODUTO manda o modelo fazer —
  * distinto do que o usuário disse. Nunca entra no transcript como fala. */
-export interface InstrucaoAgir {
+export interface InstrucaoDeProduto {
   origem: 'skill'          // origem, para auditoria e anúncio honesto
   id: string               // identificador estável do item de customização
   nome: string             // nome invocado (/nome)
   corpo: string            // conteúdo do SKILL.md após o frontmatter
 }
-// OpcoesAgir  += instrucoes?: readonly InstrucaoAgir[]
-// OpcoesVizinho += instrucoes?: readonly InstrucaoAgir[]
+// OpcoesAgir    += instrucoesDeProduto?: readonly InstrucaoDeProduto[]
+// OpcoesVizinho += instrucoesDeProduto?: readonly InstrucaoDeProduto[]
 ```
 Cada protocolo traduz a instrução para o **próprio mecanismo nativo** em `dialogo.ts` (OpenAI/Ollama: mensagem `system` à frente; Anthropic: parâmetro `system` de topo; Gemini: `systemInstruction`). Ponto de aplicação verificado: `agir.ts:113`, `vizinho(mensagens, { aoTexto, sinal })`.
 

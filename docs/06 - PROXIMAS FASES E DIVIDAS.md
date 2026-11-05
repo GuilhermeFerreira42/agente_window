@@ -1421,7 +1421,7 @@ A opção A resolve a divergência de ciclo de vida sem tocar nas sessões PTY h
 | **DP-06** | Responsável pela montagem do contexto | **servidor compõe, prefeitura é o endereço, três fatos com três donos** | nenhum segundo montador de contexto; `montarHistorico` permanece com reporte na etapa 1 |
 
 **Contrato aditivo** (na forma da regra *"`contract.ts` apenas aditivo"*):
-`InstrucaoAgir { origem:'skill'; id; nome; corpo }` · `OpcoesAgir.instrucoes?` · `OpcoesVizinho.instrucoes?`. Ponto de aplicação: **`agir.ts:113`**. Tradução por protocolo em `dialogo.ts`, cada um pelo **próprio mecanismo nativo**.
+`InstrucaoDeProduto { origem:'skill'; id; nome; corpo }` · `OpcoesAgir.instrucoesDeProduto?` · `OpcoesVizinho.instrucoesDeProduto?`. Ponto de aplicação: **`agir.ts:113`**. Tradução por protocolo em `dialogo.ts`, cada um pelo **próprio mecanismo nativo**.
 
 **Migração:** etapa 1 (Fatia 14) → etapa 2 (M2: servidor prefere o transcript e reporta) → etapa 3 (M3: servidor é o dono) → etapa 4 (remoção de `montarHistorico` do browser). Cada etapa é aditiva e reversível isoladamente.
 

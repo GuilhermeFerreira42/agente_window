@@ -184,7 +184,7 @@ function erroPorStatus(status: number, corpoErro = '', chave: string | null = nu
  */
 function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[], opcoes?: OpcoesVizinho): { url: string; corpo: Record<string, unknown> } {
   const { url, corpo } = corpoDePedidoBruto(alvo, mensagens, opcoes?.ferramentasPermitidas)
-  return { url, corpo: aplicarInstrucoes(alvo.protocolo, corpo, opcoes?.instrucoes ?? []) }
+  return { url, corpo: aplicarInstrucoes(alvo.protocolo, corpo, opcoes?.instrucoesDeProduto ?? []) }
 }
 
 function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permitidas?: readonly string[]): { url: string; corpo: Record<string, unknown> } {

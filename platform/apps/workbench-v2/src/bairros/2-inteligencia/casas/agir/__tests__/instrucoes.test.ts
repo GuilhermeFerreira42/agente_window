@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import type {
   ExecutorFerramenta,
   FerramentaId,
-  InstrucaoAgir,
+  InstrucaoDeProduto,
   OpcoesVizinho,
   ProtocoloAgir,
   VizinhoProvedor,
@@ -21,8 +21,8 @@ import { aplicarInstrucoes, textoDeInstrucoes, traduzirHistorico } from '../serv
 
 const PROTOCOLOS: ProtocoloAgir[] = ['openai-chat', 'anthropic', 'gemini', 'ollama']
 
-const UMA: InstrucaoAgir = { origem: 'skill', id: 'usuario:commit', nome: 'commit', corpo: 'Siga o estilo de commit do repositório.' }
-const DUAS: InstrucaoAgir[] = [UMA, { origem: 'skill', id: 'usuario:revisar', nome: 'revisar', corpo: 'Aponte riscos de segurança.' }]
+const UMA: InstrucaoDeProduto = { origem: 'skill', id: 'usuario:commit', nome: 'commit', corpo: 'Siga o estilo de commit do repositório.' }
+const DUAS: InstrucaoDeProduto[] = [UMA, { origem: 'skill', id: 'usuario:revisar', nome: 'revisar', corpo: 'Aponte riscos de segurança.' }]
 
 /** Extrai de um corpo de pedido todo texto que chegou ao modelo, seja qual for o formato. */
 function textosDoCorpo(corpo: Record<string, unknown>): string[] {
@@ -168,7 +168,7 @@ describe('rodarAgir — o loop apenas REPASSA o que o servidor compôs', () => {
     })
     expect(resultado.status).toBe('respondeu')
     expect(vistos).toHaveLength(1)
-    expect(vistos[0]?.instrucoes).toBeUndefined()
+    expect(vistos[0]?.instrucoesDeProduto).toBeUndefined()
     expect(vistos[0]?.ferramentasPermitidas).toBeUndefined()
     expect(typeof vistos[0]?.aoTexto).toBe('function')
   })
@@ -182,10 +182,10 @@ describe('rodarAgir — o loop apenas REPASSA o que o servidor compôs', () => {
       historico,
       executores,
       emitir: () => undefined,
-      instrucoes: DUAS,
+      instrucoesDeProduto: DUAS,
       ferramentasPermitidas: ['ler', 'listar'],
     })
-    expect(vistos[0]?.instrucoes).toEqual(DUAS)
+    expect(vistos[0]?.instrucoesDeProduto).toEqual(DUAS)
     expect(vistos[0]?.ferramentasPermitidas).toEqual(['ler', 'listar'])
     // A garantia histórica de agir.ts:91 continua valendo com o campo novo.
     expect(JSON.stringify(historico)).toBe(antes)
@@ -208,7 +208,7 @@ describe('rodarAgir — o loop apenas REPASSA o que o servidor compôs', () => {
       historico: [{ papel: 'usuario', conteudo: 'oi' }],
       executores,
       emitir: () => undefined,
-      instrucoes: [UMA],
+      instrucoesDeProduto: [UMA],
     })
     expect(historicosVistos).toHaveLength(2)
     for (const mensagens of historicosVistos) {

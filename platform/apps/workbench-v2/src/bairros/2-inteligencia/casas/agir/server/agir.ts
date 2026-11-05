@@ -16,7 +16,7 @@ import type {
   EventoAgir,
   ExecutorFerramenta,
   FerramentaId,
-  InstrucaoAgir,
+  InstrucaoDeProduto,
   MensagemAgir,
   PedidoFerramenta,
   RespostaIteracao,
@@ -41,7 +41,7 @@ export interface OpcoesAgir {
    * opcional: ausente = nenhuma instrução, comportamento idêntico ao anterior.
    * O loop apenas REPASSA — ele não decide instrução nenhuma.
    */
-  instrucoes?: readonly InstrucaoAgir[]
+  instrucoesDeProduto?: readonly InstrucaoDeProduto[]
   /**
    * Ferramentas que o anúncio ao modelo pode incluir (RF14-4). `undefined` =
    * catálogo inteiro, que é o comportamento histórico.
@@ -127,7 +127,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         sinal,
         // D141: repassa o que o servidor compôs. Continua valendo que o
         // `historico` de entrada NUNCA é alterado — instrução não é mensagem.
-        instrucoes: opcoes.instrucoes,
+        instrucoesDeProduto: opcoes.instrucoesDeProduto,
         ferramentasPermitidas: opcoes.ferramentasPermitidas,
       })
     } catch (erro) {

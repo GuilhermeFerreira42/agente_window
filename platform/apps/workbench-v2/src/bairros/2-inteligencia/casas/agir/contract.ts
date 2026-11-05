@@ -128,12 +128,20 @@ export interface RespostaIteracao {
  * fazer, distinto do que o usuário disse. Viaja em campo próprio, FORA do array
  * de mensagens — nunca como `papel:'usuario'`, e nunca entra no transcript.
  *
+ * O nome NÃO é `InstrucaoAgir` de propósito: esta casa já tem `InstrucaoHumana`
+ * (`server/rotas.ts`), que é o conceito oposto em segurança — recibos opacos de
+ * uma ação humana que "nunca são extraídos de messages nem enviados ao
+ * provedor". Esta aqui É enviada ao provedor. Dois tipos de nome quase igual e
+ * regra de segurança oposta é acidente anunciado; o campo também se chama
+ * `instrucoesDeProduto`, e não `instrucoes`, porque `rotas.ts` já tem um
+ * `const instrucoes` que guarda os recibos humanos.
+ *
  * `MensagemAgir.papel` não ganha `'system'` de propósito: isso obrigaria os
  * quatro protocolos a traduzir um papel novo e poluiria o registro fiel da
  * conversa. Cada protocolo recebe a instrução pelo próprio mecanismo nativo
  * (ver `server/dialogo.ts` → `aplicarInstrucoes`).
  */
-export interface InstrucaoAgir {
+export interface InstrucaoDeProduto {
   /** De onde veio — para auditoria e para um anúncio honesto ao modelo. */
   origem: 'skill'
   /** Identificador estável do item (`<escopo>:<nome>` na casa Personalizações). */
@@ -158,7 +166,7 @@ export interface OpcoesVizinho {
   aoTexto?: (pedaco: string) => void
   sinal?: AbortSignal
   /** Instruções de produto compostas pelo SERVIDOR (DP-06). */
-  instrucoes?: readonly InstrucaoAgir[]
+  instrucoesDeProduto?: readonly InstrucaoDeProduto[]
   /**
    * Ferramentas que o anúncio ao modelo pode incluir (RF14-4). `undefined` =
    * catálogo inteiro, que é o comportamento histórico.

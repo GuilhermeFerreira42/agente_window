@@ -9,7 +9,7 @@
 // Sem tradução fiel, o modelo "esquece" o que pediu na iteração anterior — e o
 // loop vira cabra-cega (ou repete, ou inventa). É a segunda metade do anúncio.
 // ============================================================================
-import type { InstrucaoAgir, MensagemAgir, ProtocoloAgir } from '../contract'
+import type { InstrucaoDeProduto, MensagemAgir, ProtocoloAgir } from '../contract'
 
 export function traduzirHistorico(protocolo: ProtocoloAgir, mensagens: MensagemAgir[]): unknown[] {
   return mensagens.map((mensagem): unknown => {
@@ -87,7 +87,7 @@ export function traduzirHistorico(protocolo: ProtocoloAgir, mensagens: MensagemA
  * O texto único da instrução, igual para os quatro protocolos. Diz de onde veio
  * e por quê — o modelo não deve achar que o produto falou como se fosse o dono.
  */
-export function textoDeInstrucoes(instrucoes: readonly InstrucaoAgir[]): string {
+export function textoDeInstrucoes(instrucoes: readonly InstrucaoDeProduto[]): string {
   const ativas = instrucoes.filter((instrucao) => instrucao.corpo.trim().length > 0)
   if (ativas.length === 0) return ''
   const cabecalho = ativas.length === 1
@@ -109,7 +109,7 @@ export function textoDeInstrucoes(instrucoes: readonly InstrucaoAgir[]): string 
 export function aplicarInstrucoes(
   protocolo: ProtocoloAgir,
   corpo: Record<string, unknown>,
-  instrucoes: readonly InstrucaoAgir[],
+  instrucoes: readonly InstrucaoDeProduto[],
 ): Record<string, unknown> {
   const texto = textoDeInstrucoes(instrucoes)
   if (!texto) return corpo
