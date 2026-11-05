@@ -770,3 +770,86 @@ salva no centro (Onda 2).
 **Próxima:** Onda 2 — `CodeEditorPane` no centro da aba `file`, reaproveitando
 `writeFileAtomic`. Trava: `editorService` (21) + `editorServiceDiff` (6) +
 `editorTabs.test.tsx` (7) verdes sem nenhuma linha alterada.
+
+## D146 — 2026-11-05 — FATIA 15, contrato da fusão: o mapa superfície a superfície e o que morre em cada colisão
+
+**Por que esta decisão existe.** A D144 decidiu ONDE o modelo fundido nasce (no shell) e
+a Onda 1 o construiu (`shell/abas.ts`, commit `b26544c`). Mas o entregável (a) da SPEC 2I
+não é só o tipo: é **resolver a duplicação `search`/`diff`/`changes`** que `docs/06` aponta
+no item 1 do escopo técnico. Sem decidir superfície por superfície, qualquer adaptador que
+eu escrevesse estaria inventando semântica — e inventar semântica não especificada é criar
+dívida (regra dura 9). Contrato antes do código, como exige o desbloqueio D129.
+
+**Fato que reordena o trabalho, descoberto nesta investigação.** `components/AuxiliaryBar.tsx`
+não tem mais conteúdo nenhum além do slot do editor anexo: a maquete da coluna "Detalhes" foi
+removida na 5.3 e os botões "Barra auxiliar" na 5.8-c1, e o próprio comentário do arquivo diz
+*"a barra é só a casca do Editor Anexo… Sem anexo não há nada a renderizar"*. **A coluna É o
+editor.** Consequência: montar o editor capaz no centro e aposentar a coluna são o mesmo
+movimento visto de dois lados, e não há conteúdo de coluna a preservar além do que o módulo
+já tem. Isso encurta a Onda 3 e reforça que a fusão é reposicionamento (Regra 8), não demolição.
+
+**Segundo fato decisivo.** `App.tsx:141-142` registra que `diffFilesBySession` *"nasce e
+permanece vazio"*. A aba `diff` do App, título "Branch Changes", renderiza `DiffView` com
+lista vazia: é uma **casca oca** cujo único efeito real hoje é `setAuxiliaryTab('changes')` e
+`setEditorHidden(false)` — ou seja, servir de pretexto para revelar a coluna. O SCM de verdade
+está no módulo (`ChangesPane`, montado na Side Bar pela 5.3 e como aba fixa `ATTACH_CHANGES_URI`
+no anexo). Numa fatia cujo princípio é tornar real o que é mock, a casca não tem como vencer.
+
+### 1. Mapa superfície a superfície
+
+| Superfície | No App (`types.ts` EditorTabType) | No módulo (`AttachTabKind`) | Decisão |
+|---|---|---|---|
+| arquivo / código | `file` — 4 chamadores: handle real do File System Access (`App.tsx:497`), divisão demo (`1129`), novo arquivo demo (`2429`), resultado de busca (`2443`) | `code` — clique na árvore vai SÓ para o módulo (`attach.open`, `pinned:true`, `App.tsx:1170`) | **UMA superfície.** Tipo `file`, dono = sessão, `uri` vinda do módulo. O corpo passa a ser o `CodeEditorPane` (salvar, dirty, preview/pinned, breadcrumbs, outline). Os três caminhos demo sem recurso de disco mantêm o estado honesto que já existe ("Conteúdo indisponível — nunca mock silencioso") |
+| busca | `search` — **não é mais criado** (`App.tsx:1190`: "a aba Search do editor central não é mais criada"); o `EditorArea` ainda renderiza `searchSlot` ou o `SearchView` mock | `search` | **UMA superfície.** Tipo `search`, dono = sessão. O corpo é o Search Panel real do módulo, que já tem mount próprio (`mountSearch`) |
+| SCM / mudanças do branch | `diff`, título "Branch Changes" — **casca oca**, `diffFiles` permanentemente vazio | `changes` — aba fixa `ATTACH_CHANGES_URI`, `ChangesPane` real | **A do módulo vence e a casca do App morre.** O nome do TIPO continua `diff`, para não quebrar ícone, CSS, `MANAGED_TAB_TYPES`/`DOCKED_TAB_TYPES` e os testes que o citam; o que muda é o CORPO, que passa a ser o real |
+| diff de um arquivo | **não existe** | `diff` — aba fixa `ATTACH_DIFF_URI`, read-only, 1 por sessão, payload trocado a cada open (original/modified já resolvidos) | **Só o módulo tem.** Exige membro NOVO na união `EditorTabType`: `'diff-arquivo'`. É aditivo: não há validador de tipo em runtime (verificado) e `tabIcon` tem default |
+| browser | `browser` — criado em `App.tsx:1045`, pareado com `BrowserViewState` | não tem | Só do App. RF15-3 o quer como aba central, e já é |
+| provedores | `providers` — global, sem dono de sessão | não tem | Só do App. É o caso que a SPEC quer irmão de "arquivo" |
+| configurações | `config` — global | não tem | Só do App |
+| personalizações | `customizations` — R-092: é CUSTOM VIEW full-surface, não aba | não tem | Fora do escopo desta fatia. A Fatia 14 já moveu Personalizações para a lateral esquerda |
+
+### 2. Esquema de id da fronteira
+
+As abas do módulo são keyed por **uri e por sessão**; as do App vivem num array único com
+`sessionId` opcional. Para projetar uma na outra sem colisão:
+
+`idDaAbaDoModulo(sessionId, uri) = sessionId + '::' + uri`
+
+Estável (a mesma uri na mesma sessão dá o mesmo id, então reabrir não duplica), único (a mesma
+uri aberta em duas sessões não colide — sem isso "abas de S1 não vazam para S2" quebraria) e
+reversível (separa no primeiro `::`). As abas nativas do App conservam seus ids atuais
+(`file-<ts>-<seq>`), porque nada as obriga a mudar.
+
+*Rejeitado:* usar a uri pura como id — colide entre sessões. *Rejeitado:* gerar id novo a cada
+projeção — quebraria a identidade da aba a cada render e destruiria MRU, dirty e foco.
+
+### 3. O que isto autoriza e o que continua proibido
+
+Autoriza: membro novo em `EditorTabType`; `mountCodeEditor` aditivo em `contract.ts`/`index.ts`;
+componente de montagem novo em `ui/**` que compõe o `CodeEditorPane` existente.
+
+Continua proibido: tocar em `core/**` e `server/**` do módulo; reescrever `AttachArea` ou
+`CodeEditorPane`; criar décimo canônico; ignorar teste antes de remover o código que ele protege.
+
+**Duplicação temporal aceita e delimitada.** O corpo central precisa da mesma fiação de salvar
+que o `AttachArea` tem (`doSave`, `saveError`, diálogo de dirty). Extrair isso agora para um
+hook compartilhado mexeria num componente coberto por testes para produzir um ganho que
+desaparece na Onda 3, quando o `AttachArea` é apagado. **Decisão: compor de novo no componente
+novo e deixar os dois coexistirem por uma onda.** É duplicação com prazo de validade e data
+para morrer, registrada aqui para não ser confundida com descuido. *Rejeitado:* extrair hook
+compartilhado — risco sobre 7 testes verdes para benefício de uma onda.
+
+### 4. Ordem e rollback
+
+A fusão passa a ter três passos dentro da Onda 2, nesta ordem, um commit cada: **(2a)** o
+adaptador puro que projeta as abas do módulo na coleção fundida, com testes — nada de UI, nada
+de risco; **(2b)** o `mountCodeEditor` aditivo no módulo mais o componente de montagem do corpo;
+**(2c)** o centro passando a renderizar o corpo capaz para a aba ativa, e a coluna deixando de
+montar o anexo. A Onda 3 herda só o roteamento restante e a aposentadoria dos arquivos mortos.
+
+**Rollback:** cada passo é um commit e reverte sozinho. O ponto de retorno conhecido continua
+`e9cdd10` (suíte 1304 | 12 | 23); o ponto de retorno desta fatia é `5bf3e1c` (180 testes,
+163 aprovados, única falha a PEND-02 pré-existente).
+
+**Trava que não se move:** `editorService` 21 + `editorServiceDiff` 6 + `editorTabs.test.tsx` 7
+verdes sem nenhuma linha alterada em todos os três passos.
