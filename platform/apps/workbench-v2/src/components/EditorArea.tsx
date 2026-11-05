@@ -27,7 +27,7 @@ import {
 import Editor, { DiffEditor } from '@monaco-editor/react'
 import type { BrowserViewState, BrowserViewport, DiffFile, EditorTab, SearchResult } from '../types'
 import { getEditorTabsVisibleForSession } from '../domain/browserOwnership'
-import { resolveVisibleEditorTabId } from '../domain/editorTabs'
+import { resolverAbaVisivel } from '../shell/abas'
 import { getDiffResolution } from '../domain/sessionState'
 import { isTabCloseable, type SidePaneState } from '../domain/sidePane'
 import { formatSearchSummary, splitSearchHighlight } from '../domain/search'
@@ -450,7 +450,7 @@ export function EditorArea({
 }: EditorAreaProps) {
   const monacoTheme = theme === 'light' ? 'vs' : 'vs-dark'
   const visibleTabs = useMemo(() => getEditorTabsVisibleForSession(tabs, activeSessionId), [tabs, activeSessionId])
-  const resolvedActiveTabId = resolveVisibleEditorTabId(visibleTabs, activeTabId)
+  const resolvedActiveTabId = resolverAbaVisivel(visibleTabs, activeTabId)
   const activeTab = visibleTabs.find((tab) => tab.id === resolvedActiveTabId)
   const activeBrowser = activeTab?.browserId ? browserViews.find((view) => view.id === activeTab.browserId && view.sessionId === activeSessionId) : undefined
   const [addTabMenuOpen, setAddTabMenuOpen] = useState(false)

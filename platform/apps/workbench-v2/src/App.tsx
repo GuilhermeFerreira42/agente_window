@@ -60,7 +60,9 @@ import {
   removeBrowserResourcesForSession,
 } from './domain/browserOwnership'
 import { filterSearchResults } from './domain/search'
-import { resolveNextEditorTabId, resolveVisibleEditorTabId } from './domain/editorTabs'
+// FATIA 15 Onda 1 (D144 §3.4): a gestão de abas tem DONO NOVO no shell. O App
+// deixa de decidir política de sucessão — ele orquestra e delega.
+import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel } from './shell/abas'
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveDetailPanelVisible, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
@@ -651,6 +653,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Search/file tabs that remain visible across sessions.
   const activeTabBySession = useRef<Record<string, string>>(initialEditorTabs[0] ? { [BOOT_SESSION_ID]: initialEditorTabs[0].id } : {})
   const activeGlobalTabId = useRef<string | undefined>()
+  // FATIA 15 Onda 1 (D144 §3.1): ordem de uso das abas, mais recente primeiro. É o
+  // que decide a sucessão ao fechar — MRU, como o VS Code, no lugar da vizinha da
+  // direita. Vive em ref porque é ordem de uso, não estado renderizável.
+  const mruRef = useRef<readonly string[]>([])
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
   // tela cheia que esconde as laterais, mantemos o shell montado e usamos uma
@@ -696,7 +702,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const visibleEditorTabs = useMemo(() => hasSessions ? getEditorTabsVisibleForSession(editorTabs, activeSession.id) : [], [hasSessions, editorTabs, activeSession.id])
   // Tipo da aba ativa — usado para "gate" da ação Toggle Details (só faz sentido
   // em abas com painel de detalhes acoplado: Changes/Files, nunca Browser/Search).
-  const activeVisibleTabId = resolveVisibleEditorTabId(visibleEditorTabs, activeTabId)
+  const activeVisibleTabId = resolverAbaVisivel(visibleEditorTabs, activeTabId)
   const activeTabType = visibleEditorTabs.find((tab) => tab.id === activeVisibleTabId)?.type
   // FATIA 07 (DEBT-09, 15/10): abas GLOBAIS (sem dono de sessão — ex.: Provedores)
   // também abrem o editor central na landing. Abas com dono continuam invisíveis
@@ -844,6 +850,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }
     setActiveTabId(tab.id)
     setMobilePane('editor')
+    mruRef.current = registrarUso(mruRef.current, tab.id)
     if (tab.sessionId) {
       activeTabBySession.current[tab.sessionId] = tab.id
     } else {
@@ -1353,15 +1360,23 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // já é escondido em EditorArea; este guard cobre atalhos/DnD/menu de contexto.
     if (!isTabCloseable(closing, sidePaneState)) return
 
-    const visibleBeforeClose = getEditorTabsVisibleForSession(editorTabs, activeSession.id)
-    const nextIdBeforeCleanup = resolveNextEditorTabId(visibleBeforeClose, id, activeTabId)
+    // FATIA 15 Onda 1 (D144 §3.1): a sucessão vem do dono novo, não do App. MRU
+    // primeiro; vizinha da posição só na falta de histórico (espelha
+    // editorService.close). `colecaoParaEscopo` filtra o MRU — que é global — para
+    // as candidatas do escopo, senão uma aba de outra sessão ganharia o foco e
+    // "abas de S1 não vazam para S2" quebraria. O App continua DONO da remoção
+    // porque ela cascateia os recursos de Browser; do dono novo ele só pede a
+    // sucessora.
+    const sucessoraAoFechar = (candidatas: readonly EditorTab[], ativa: string | undefined) =>
+      fecharAba(colecaoParaEscopo(candidatas, mruRef.current), id, ativa).sucessoraId
+
+    const nextIdBeforeCleanup = sucessoraAoFechar(getEditorTabsVisibleForSession(editorTabs, activeSession.id), activeTabId)
     const nextResources = removeBrowserResourceForTab({ browserViews, editorTabs }, id)
     setBrowserViews(nextResources.browserViews)
     setEditorTabs(nextResources.editorTabs)
 
     if (closing.sessionId && activeTabBySession.current[closing.sessionId] === id) {
-      const ownerTabsBeforeClose = editorTabs.filter((tab) => tab.sessionId === closing.sessionId)
-      const replacement = resolveNextEditorTabId(ownerTabsBeforeClose, id, id)
+      const replacement = sucessoraAoFechar(editorTabs.filter((tab) => tab.sessionId === closing.sessionId), id)
       if (replacement) activeTabBySession.current[closing.sessionId] = replacement
       else delete activeTabBySession.current[closing.sessionId]
     }
@@ -1369,7 +1384,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
     const visibleAfterClose = getEditorTabsVisibleForSession(nextResources.editorTabs, activeSession.id)
     const requestedNextId = activeTabId === id ? nextIdBeforeCleanup : activeTabId
-    activateEditorTab(nextResources.editorTabs.find((tab) => tab.id === resolveVisibleEditorTabId(visibleAfterClose, requestedNextId)))
+    activateEditorTab(nextResources.editorTabs.find((tab) => tab.id === resolverAbaVisivel(visibleAfterClose, requestedNextId)))
   }
 
   const navigateBrowser = (id: string, url: string) => setBrowserViews((current) => current.map((view) => view.id === id ? navigateBrowserState(view, url) : view))
@@ -1514,7 +1529,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setEditorTabs(nextResources.editorTabs)
       delete activeTabBySession.current[id]
       if (activeSessionId === id) {
-        setActiveTabId(resolveVisibleEditorTabId(getEditorTabsVisibleForSession(nextResources.editorTabs, id), activeTabId))
+        setActiveTabId(resolverAbaVisivel(getEditorTabsVisibleForSession(nextResources.editorTabs, id), activeTabId))
         setTerminalVisible(false)
       }
       notify('Sessão arquivada e browsers descartados')

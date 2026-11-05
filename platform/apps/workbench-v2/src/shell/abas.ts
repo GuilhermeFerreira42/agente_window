@@ -69,10 +69,32 @@ export interface ColecaoDeAbas {
 
 export const COLECAO_VAZIA: ColecaoDeAbas = { abas: [], mru: [] }
 
+/**
+ * Ordem de uso: `id` vai para a frente, sem acumular duplicata. Espelha a linha
+ * do `editorService.setActive` (`mru = [uri, ...mru.filter(u => u !== uri)]`).
+ * Existe separada de `registrarAbaAtiva` porque quem guarda o MRU fora da
+ * coleção (o App, num ref) precisa atualizar só a ordem, sem forjar coleção.
+ */
+export function registrarUso(mru: readonly string[], id: string | undefined): readonly string[] {
+  if (!id) return mru
+  return [id, ...mru.filter((cada) => cada !== id)]
+}
+
 /** Espelha `editorService.setActive`: a aba ativada vai para a frente do MRU. */
 export function registrarAbaAtiva(colecao: ColecaoDeAbas, id: string | undefined): ColecaoDeAbas {
   if (!id) return colecao
-  return { abas: colecao.abas, mru: [id, ...colecao.mru.filter((cada) => cada !== id)] }
+  return { abas: colecao.abas, mru: registrarUso(colecao.mru, id) }
+}
+
+/**
+ * Monta a coleção de um ESCOPO (as abas visíveis de uma sessão, ou as abas de um
+ * dono) a partir de um MRU que é global ao App. Filtrar o MRU para as candidatas
+ * é o que impede uma aba de outra sessão — invisível no escopo — de ganhar o foco
+ * só por ter sido usada recentemente. Sem o filtro, a sucessão MRU vazaria entre
+ * sessões e quebraria "um grupo por sessão".
+ */
+export function colecaoParaEscopo(abas: readonly Aba[], mru: readonly string[]): ColecaoDeAbas {
+  return { abas, mru: mru.filter((id) => abas.some((aba) => aba.id === id)) }
 }
 
 /**

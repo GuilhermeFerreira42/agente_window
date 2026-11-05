@@ -9,11 +9,13 @@ import {
   abrirAba,
   barraDeAbasVisivel,
   chatCentralizado,
+  colecaoParaEscopo,
   conteudoDoEditorVisivel,
   fecharAba,
   marcarEdicao,
   promoverAba,
   registrarAbaAtiva,
+  registrarUso,
   resolverAbaVisivel,
   resolverEstadoDoPainel,
   resolverSucessora,
@@ -69,6 +71,49 @@ describe('modelo único: sucessão ao fechar (D144 §3.1 — MRU vence a vizinha
     expect(resolverSucessora({ ...apos, mruAposFecho: ['c', 'a'] })).toBe('c')
     expect(resolverSucessora({ ...apos, mruAposFecho: [] })).toBe('c')
     expect(resolverSucessora({ abasAposFecho: [], mruAposFecho: [], indiceDaFechada: 0 })).toBeUndefined()
+  })
+
+  it('registrarUso manda o id para a frente sem duplicar e aceita vazio', () => {
+    expect(registrarUso(['a', 'b', 'c'], 'c')).toEqual(['c', 'a', 'b'])
+    expect(registrarUso(['a', 'b'], 'novo')).toEqual(['novo', 'a', 'b'])
+    expect(registrarUso(['a'], undefined)).toEqual(['a'])
+    expect(registrarUso([], undefined)).toEqual([])
+  })
+})
+
+describe('modelo único: o MRU não vaza entre escopos (um grupo por sessão)', () => {
+  // O App guarda UM MRU global; a sucessão é calculada por escopo. Se o filtro
+  // sumir, uma aba invisível no escopo pode ganhar o foco — e é exatamente isso
+  // que "abas de S1 não vazam para S2" proíbe.
+  const s1 = aba('s1-a', { sessionId: 's1' })
+  const s1b = aba('s1-b', { sessionId: 's1' })
+  const s2 = aba('s2-a', { sessionId: 's2' })
+  const global = aba('g')
+
+  it('filtra o MRU para as abas do escopo', () => {
+    const escopo = colecaoParaEscopo([s1, s1b, global], ['s2-a', 's1-b', 'g', 's1-a'])
+    expect(escopo.mru).toEqual(['s1-b', 'g', 's1-a'])
+    expect(escopo.abas).toHaveLength(3)
+  })
+
+  it('a sucessão ignora a mais recente quando ela é de outra sessão', () => {
+    // s2-a foi a última usada no app inteiro, mas não pertence ao escopo de s1:
+    // fechar s1-a ativa s1-b, não s2-a.
+    const mruGlobal = ['s2-a', 's1-a', 's1-b']
+    const escopo = colecaoParaEscopo([s1, s1b], mruGlobal)
+    expect(fecharAba(escopo, 's1-a', 's1-a').sucessoraId).toBe('s1-b')
+  })
+
+  it('sem candidatas no MRU, cai na vizinha da posição do escopo', () => {
+    const escopo = colecaoParaEscopo([s1, s1b, aba('s1-c', { sessionId: 's1' })], ['s2-a'])
+    expect(escopo.mru).toEqual([])
+    expect(fecharAba(escopo, 's1-b', 's1-b').sucessoraId).toBe('s1-c')
+  })
+
+  it('aba global entra em qualquer escopo e pode herdar o foco', () => {
+    const escopo = colecaoParaEscopo([global, s2], ['g', 's2-a'])
+    expect(escopo.mru).toEqual(['g', 's2-a'])
+    expect(fecharAba(escopo, 'g', 'g').sucessoraId).toBe('s2-a')
   })
 })
 
