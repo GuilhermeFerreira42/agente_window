@@ -347,3 +347,71 @@ Cada protocolo traduz a instrução para o **próprio mecanismo nativo** em `dia
 **Testes que fecham o gate (provas em `09`):** contrato aditivo não quebra chamador antigo · instrução nunca aparece como `papel:'usuario'` · skill desligada não é injetada nem anunciada · os quatro protocolos recebem a instrução pelo mecanismo nativo · a composição reporta a fonte do histórico · `montarHistorico` do browser continua funcionando durante a etapa 1.
 
 **O que D141 NÃO faz:** não reabre a SPEC 2H · não antecipa M1–M8 · não altera a sequência D133 · não cria décimo canônico · **não homologa nada** — o aceite funcional humano permanece exclusivo do dono (`08`, bloco D140).
+
+---
+
+## D142 — 2026-11-05 — Incidente de processo: commit feito com typecheck vermelho e mensagem falsa
+
+**Registro obrigatório, sem atenuante.** O dono determinou que o que não funcionar
+fique relatado em lugar visível. Isto é um caso em que o que não funcionou foi o
+meu próprio processo, e não o código.
+
+### O que aconteceu
+
+Durante a Unidade 2 da Fatia 14 foi feito um rename de segurança de nomeação
+(`InstrucaoAgir` → `InstrucaoDeProduto`, commit `40181bc`). O rename foi
+executado por **substituição global de um token que é substring de outro
+identificador existente**: `InstrucaoAgir` ocorre dentro de
+`registrarInstrucaoAgir`, função pública do barrel da casa Agir, consumida por
+`App.tsx:28`. O barrel passou a reexportar um nome que nunca existiu em
+`ui/client/api.ts`.
+
+Dois erros de compilação:
+`src/App.tsx(28,128) TS2305` e `casas/agir/index.ts(49,128) TS2305`.
+
+### As três falhas, em ordem de gravidade
+
+1. **O typecheck foi executado ANTES do commit e retornou `EXIT=1`** com os dois
+   erros listados. **O commit foi feito mesmo assim.** A regra do projeto é
+   commitar apenas com typecheck zero e testes verdes. Ela foi violada.
+2. **A mensagem do commit `40181bc` afirma textualmente que
+   `registrarInstrucaoAgir` "NÃO foi tocado".** A afirmação era falsa no momento
+   em que foi escrita. Mensagem de commit é registro histórico: afirmar nela algo
+   não verificado é o mesmo defeito que falsificar placar.
+3. **A evidência estava impressa e foi lida errado.** A verificação anterior
+   mostrava `InstrucaoAgir -> InstrucaoDeProduto: 2 em index.ts` quando o
+   esperado era 1. O número divergente foi ignorado.
+
+Atenuante que **não** se aplica: os testes passaram (330) porque o vitest não
+checa tipos. Verde de teste não compensa vermelho de tsc — são verificações
+distintas e ambas são obrigatórias.
+
+### Correção
+
+Commit `1e377d5`, uma linha no barrel. Todas as ocorrências de
+`InstrucaoDeProduto` e `instrucoesDeProduto` foram conferidas uma a uma e são as
+intencionais. typecheck zero; 330 testes aprovados. O histórico **não** foi
+reescrito: `40181bc` permanece com a mensagem falsa, e `1e377d5` a corrige
+publicamente.
+
+### Regras que passam a valer (R-1, R-2, R-3)
+
+**R-1 — Nunca substituir globalmente um token que possa ser substring de outro
+identificador.** Rename de identificador se faz por ocorrência conferida, ou com
+fronteira de palavra, e sempre seguido de `grep` pelo nome ANTIGO para provar que
+não sobrou nenhum e de `grep` pelo NOVO para provar que não pegou nada indevido.
+
+**R-2 — Commit só com os dois verdes, medidos no mesmo comando.** O comando de
+commit deve falhar sozinho se o typecheck não for zero. Forma aprovada:
+
+```sh
+TMPDIR=/home/user/.cache/tmp sh iniciar.sh typecheck > /tmp/tc.txt 2>&1
+TC=$?; TMPDIR=/home/user/.cache/tmp sh iniciar.sh test <alvo> > /tmp/ts.txt 2>&1
+TS=$?; [ $TC -eq 0 ] && [ $TS -eq 0 ] && git commit ... || echo "GATE FALHOU - NAO commitar"
+```
+
+Nunca `comando | tail; echo EXIT=$?` — captura o status do `tail`, não o do
+comando, e já produziu um falso verde nesta execução.
+
+**R-3 — Nenhuma mensagem de commit afirma o que não foi verificado.** Se um fato
+não foi medido, ele não entra na mensagem; se entra, entra como "não verificado".
