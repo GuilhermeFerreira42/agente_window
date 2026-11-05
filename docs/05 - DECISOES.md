@@ -970,3 +970,120 @@ provado o Monaco de verdade gravando no disco — isso exige o servidor de pé, 
 morto nesta cópia. E2E/Playwright não roda (binários ausentes). O corpo central ainda não é
 alcançável pela interface: isso é o passo 2c.
 
+## D148 — 2026-11-05 — FATIA 15, contrato da ligação no centro (passo 2c): fundir no derivado, não no estado
+
+**Por que esta decisão existe.** O passo 2b construiu o corpo capaz de salvar e o deixou
+propositadamente inalcançável pela interface. Ligá-lo é o passo 2c, e é o passo que mexe no
+`App.tsx` — 2739 linhas, 62 testes verdes, síndico do condomínio. D129 exige contrato antes do
+código, e aqui o contrato não é opcional: há duas maneiras de fundir as abas e uma delas produz
+bugs de sincronização que os testes atuais não pegam.
+
+### 1. A fusão acontece no DERIVADO, nunca no estado
+
+O App guarda as abas em **um** array (`editorTabs`, `App.tsx:532`) com `sessionId` opcional, mais
+`activeTabId` (533) e o ref `activeTabBySession` (654). A lista que a faixa mostra já é derivada:
+`visibleEditorTabs` (702) filtra por sessão e `resolverAbaVisivel` (705) decide a ativa.
+
+**Decisão:** as abas projetadas do módulo **não entram em `editorTabs`**. Elas são calculadas na
+mesma derivação — `visibleEditorTabs` passa a devolver `fundirAbas(nativasVisíveis, projetadas)` —
+e o estado do App continua dono só das abas nativas. Uma fonte de verdade para cada lado, e a
+fusão é uma função pura já provada no passo 2a (`shell/ponteAnexo.ts`, 27 provas).
+
+*Rejeitado:* gravar as abas projetadas dentro de `editorTabs`. Custaria: (a) duas fontes de
+verdade para a mesma aba, com o risco de o estado e o módulo divergirem a cada evento; (b) a
+migração manual de id quando uma aba nativa é substituída pela de fronteira — a D146 já avisou que
+substituir **troca o id** e que o App guarda `activeTabId` e `activeTabBySession` por id; no
+derivado isso se resolve sozinho, porque a lista fundida é recalculada e o `resolverAbaVisivel`
+escolhe de novo; (c) limpeza das abas projetadas em cada `dispose`/troca de sessão, que hoje não
+existe para nada.
+
+Consequência aceita: **operações que mutam `editorTabs` por id simplesmente não encontram os ids de
+fronteira** (`sessionId::uri`), e isso é o comportamento certo — reorderar, duplicar ou editar uma
+aba do módulo pelo estado do App seria escrever numa fonte que não é a dona. As duas operações que
+precisam atravessar a fronteira são tratadas explicitamente no item 3.
+
+### 2. O centro recebe o corpo como SLOT, do mesmo jeito que Search e Personalizações
+
+Regra 3 limita o `EditorArea.tsx` a Browser/Customizations. Mas o padrão que já existe lá resolve
+isso sem violação: `searchSlot`, `customizationsSurface`, `providersSurface` e `configSurface` são
+**props** (`EditorArea.tsx:82`, ramos em 611-616). O EditorArea renderiza o slot que receber; quem
+sabe do módulo é o App.
+
+**Decisão:** o App cria `CenterCodeEditorSlot` espelhando `AttachModuleSlot` (`App.tsx:227-234` —
+ref + `useEffect` chamando `mountCodeEditor` + `unmountCodeEditor` no cleanup) e o passa como prop
+`codeEditorSlot`. O EditorArea ganha **um ramo novo e três guardas**: o ramo renderiza o slot para
+`type === 'file'` quando o slot existe, e os três ramos atuais de `file` (image preview à parte) —
+`readError`, `content == null` e o `<Editor>` sem salvamento (655-661) — passam a exigir
+`!codeEditorSlot`.
+
+*Rejeitado:* o EditorArea importar o módulo ou conhecer `mountCodeEditor` — violação direta da
+Regra 3 e acoplamento do bairro 1 ao módulo. *Rejeitado:* trocar o `<Editor>` atual pelo corpo sem
+slot, isto é, ligar os dois no mesmo ramo — impediria a falha visível do item 4.
+
+**Os três caminhos demo sem disco continuam honestos.** `split`, `new-file` e `search` criam abas
+**nativas** com `content == null` e sem `isRealFile`; para elas o App não fornece slot, então elas
+seguem caindo no estado `file-content-unavailable`. Só a aba de fronteira — que tem uri e veio do
+módulo, que é quem lê o disco — recebe o corpo capaz. Nenhum mock silencioso entra por aqui.
+
+### 3. `activateTab` aditivo no contrato, e fechar atravessa `requestCloseTab`
+
+Clicar numa aba de fronteira tem de dizer ao módulo que aquela uri é a ativa, porque é o
+`EditorService` dele que decide o que o `CodeEditorPane` mostra.
+
+**Decisão:** `IEditorAttachApi` ganha `activateTab?(input: { sessionId; uri })`, aditivo e opcional
+como os outros, mapeando direto para `EditorService.activate` (`editorService.ts:121`), que já
+existe. Fechar aba de fronteira chama `attach.requestCloseTab` (criado no 2b) e **nunca**
+`setEditorTabs`: quem pode salvar ou descartar é o módulo.
+
+*Rejeitado:* reaproveitar `attach.open` para ativar — para a superfície `diff` o `open` exige o
+payload `AttachDiffPayload`, que o App não tem (quem o construiu foi o módulo, no clique da Source
+Control View). *Rejeitado:* guardar o `kind` dentro da aba projetada para poder reabrir — o
+`activate` resolve sem isso, e carregar o kind na projeção seria estado duplicado de um dado que o
+módulo já tem.
+
+### 4. Se `mountCodeEditor` não existir, o centro falha VISÍVEL
+
+Os campos novos do contrato são opcionais de propósito (2b): um módulo anterior continua
+satisfazendo a interface. O preço é que `module.mountCodeEditor?.(...)` pode não fazer nada.
+
+**Decisão:** se o App precisar do corpo capaz e o módulo não o oferecer, o centro mostra um estado
+de erro explícito — na família do `file-content-unavailable` e do `file-read-error` que já existem
+— dizendo que a capacidade de salvar não está disponível. *Rejeitado:* cair em silêncio no `<Editor>`
+atual, que não salva: é exatamente a mentira que a RF15-1 existe para acabar, e o dono já pediu que
+o que não funciona apareça.
+
+### 5. Ordem: ligar em um commit, desligar a coluna em outro
+
+A D146 escreveu o 2c como "o centro renderiza o corpo capaz **e** a coluna deixa de montar o
+anexo". A D144, porém, estabeleceu como salvaguarda obrigatória da exceção à Regra 3: "a remoção
+acontece por **commit próprio e revertível**, separado do commit que cria o dono novo".
+
+**Decisão:** prevalece a salvaguarda, e o 2c vira dois commits. **2c-i** liga: projeção na
+derivação, slot no centro, `activateTab`, `requestCloseTab`, falha visível — com a coluna ainda
+montando o anexo, então nada que funciona hoje deixa de funcionar; as duas superfícies mostram as
+mesmas abas, que é a duplicação temporal que a D146 §3 aceitou e datou para morrer. **2c-ii**
+desliga: o App deixa de renderizar `AttachModuleSlot` e o roteamento essencial (clique na árvore,
+`App.tsx:1167-1171`) passa a aterrar no centro. Se o 2c-i revelar um problema, ele reverte sozinho
+e a coluna continua inteira.
+
+### 6. Escopo do 2c: a superfície `file`. O resto é Onda 3
+
+O 2c liga o corpo capaz para a superfície `file` (kind `code`), que é onde mora o critério-mãe
+RF15-1. As abas `search`, `changes` e `diff-arquivo` **já aparecem na faixa fundida** como abas
+irmãs (é o que a projeção do 2a faz, e atende parte da RF15-2 e da RF15-3), mas o corpo delas
+continua o atual até a Onda 3, que herdou "o roteamento restante": o `search` já cai no Search
+Panel real porque o App fornece `searchSlot`; o `changes` ainda cai na casca oca `DiffView` com
+`diffFiles` vazio, e trocá-la pelo `ChangesPane` real (que o `mountScm` já sabe montar) é trabalho
+da Onda 3 junto com a aposentadoria da coluna e a máquina 4 → 2.
+
+**Trava que não se move:** `App.test.tsx` 62 aprovados | 13 pulados antes e depois, e as 44 travas
+(`editorService` 21, `editorServiceDiff` 6, `editorTabs.test.tsx` 7, `sessionState` 10) sem linha
+alterada. Se o 2c-i mudar o placar do `App.test.tsx`, é regressão e não avança.
+
+**RNF15-2 vai piorar antes de melhorar, e isso está dito de antemão.** O 2c-i acrescenta linhas ao
+`App.tsx` (o slot, a projeção, os dois ramos de fronteira). O requisito é que o `App.tsx` **diminua**
+abaixo de 2724 — hoje está em 2739. A queda só vem na Onda 3, quando saem `AttachModuleSlot`,
+`auxiliaryTab`, `editorHidden`, `sidePaneInputs`/`sidePaneState`, `chatCentered`,
+`detailPanelVisible`, `layoutController`, `isTabCloseable`, `enterDetailOnly` e `showEditorRestore`.
+Registrar o aumento no 2c-i sem esconder é o que permite cobrar a queda na Onda 3.
+
