@@ -1450,3 +1450,52 @@ Ordem sugerida, cada item com gate de teste antes do próximo:
 5. **Gate de aceitação:** todos os comportamentos listados acima verificados em testes unitários/integração e
    **homologação humana** onde houver dependência de navegador real/Monaco real/Windows (item 3).
 6. **Onda 3:** reduzir `App.tsx` (RNF15-2), tratar dívidas (`.then` sem `.catch`, `outlineTracker`).
+
+### Mapeamento da superfície antiga — 2026-11-05 (noite, executado sem código)
+
+O que a superfície antiga é: `<AuxiliaryBar>` (App.tsx L2746, condicional a `layoutController.managesAuxiliaryBar`), o `attachExpanded`, o estado `auxiliaryTab`, `editorHidden`, `chatCentered`, `detailPanelVisible`, `sidePaneState`, `dockedAuxiliaryController`, `layoutController`.
+
+**Consumidores/dependências/estados/comportamentos identificados:**
+
+- **Renderização:** `renderDesktopAuxiliaryBar` (L781) decide mostrar/ocultar a `AuxiliaryBar`; a barra é montada enquanto o anexo tiver abas (L308) independente da coluna Detalhes; `!customViewActive && layoutController.managesAuxiliaryBar` (L2746).
+- **Onde Configurações/Provedores/navegador nascem:** `openConfig`/`openProviders` (L1245-1249) criam aba nativa do editor; `openBrowser` (L1237) cria aba `browser`; o Activity Bar / titlebar (L2595-2603) aciona `onOpenBrowser` / `onAccountAction` (`open-providers` / `open-config`).
+- **Abastidos pela antiga:** abas `browser`, `providers`, `config`, `search`, `changes` (L1109 cria `browser`), aba `diff` nativa, `dockedAuxiliaryController` (L630, R-040), `enterDetailOnly`/`showEditorRestore` (L1325-1369), `editorHidden` (L644, L765-768), `chatCentered` (L772, L2735), `detailPanelVisible` (L776, L782).
+- **O que a decisão do dono altera:** essas abas devem **passar a renderizar no contêiner central** (o EditorArea com a faixa fundida), **não** na `AuxiliaryBar`. O `<Editor>` antigo (inalcançável, D150 §4) sai; os ramos por content-type (`browser`, `providers`, `config`, `search`, `changes`, `diff`) entram no contêiner. O layout (painel anexo, expansível) e o estado preservado permanecem; a área de chat não é substituída.
+- **O que vai vir** (plano item 2+): migrar conteúdos para abas do contêiner central; reaproveitar componentes; só então desligar `AuxiliaryBar`/`attachExpanded`/`auxiliaryTab`.
+
+### D152 — Onda 2c-ii, passo A: a superfície do módulo passa a poder ser o centro — 2026-11-05 (noite)
+
+**Contexto.** O plano da D151 §4 prevê desligar a coluna antiga (item 2) antes de removê-la (item 3). Antes de tocar no
+shell, foi preciso resolver um **bloqueador lido no código**, não suposto: o módulo decidia a sessão de destino por
+`attachSessionId`, que **só existe quando `mountAttach` roda** — isto é, quando a coluna monta.
+
+**O bloqueador.** Dois pontos dependiam exclusivamente da coluna:
+
+- `openInAttachSession()` (`modules/explorer-search/index.ts`): sem `attachSessionId`, a abertura era arquivada em
+  `pendingAttachOpen` e **só** executada dentro de `mountAttach`. Desligar a coluna sem tratar isso faria **toda
+  abertura de arquivo da árvore, do search e do SCM pendurar para sempre** — uma regressão total de RF15-1.
+- `activeCodeUri()` (base do `ExplorerActiveFileApi.getActiveUri`/`onActiveChanged`): com `attachSessionId` nulo,
+  devolvia `null` sempre → Outline, Timeline e o rastreio de arquivo ativo morreriam junto com a coluna.
+
+**Decisão (D152).** Introduzir **uma** derivação da superfície ativa, `sessionIdDaSuperficie() = attachSessionId ??
+centerSessionId`, e usá-la nos dois pontos; e fazer `mountCodeEditor` executar a abertura pendente quando o centro monta.
+
+**Por que é inerte hoje.** Enquanto a coluna existir, `attachSessionId` não é nulo e o `??` **nunca** alcança o centro: os
+caminhos seguem idênticos aos do 2c-i. A mudança só passa a ter efeito quando a coluna for desligada — que é exatamente
+o alvo. É aditiva e reversível (`git revert`), sem tocar em `core/**`, `contract.ts` ou `index.ts` do módulo
+(regra dura 2 preservada: as mudanças são no *factory*, não no contrato).
+
+**Alternativas descartadas.**
+- *Montar a coluna oculta só para manter `attachSessionId`*: manteria a duplicação que a decisão do dono manda eliminar, e
+  o custo é um segundo `CodeEditorPane` vivo com dois modelos Monaco concorrentes para a mesma URI — o problema que a
+  Onda 2b (D146 §2) já teve de resolver com `painelQueTem`.
+- *Fazer o shell passar a sessão em cada chamada*: o shell não alcança o `EditorService` (Regra 2) e ampliaria a
+  superfície pública do contrato congelado.
+
+**Evidência.** `arena-operacional/evidencias/48-2c-ii-a-habilitador-superficie.txt`. Gate no mesmo comando: **typecheck
+EXIT 0** + **inventário 258 = 241✓|1✗|16skip em 19 arquivos** — idêntico ao baseline de `986c585`. As 12 falhas da suíte
+integral (TerminalPanel 9, iconLabels 1, themeTokens 1, visualStates 1) foram **medidas com `git stash`** e são
+pré-existentes: 12 falhas / 12 passados / 2 skips, contra 12 falhas / 12 passados / 2 skips sem a minha mudança.
+
+**O que este passo NÃO faz.** Não desliga a coluna, não remove nada, não muda comportamento observável. É o degrau que
+torna o desligamento seguro.

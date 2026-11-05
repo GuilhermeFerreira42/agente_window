@@ -227,9 +227,17 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     // atendente órfão).
     onCloseRequester: (r) => { if (r) centerCloseRequesters.set(sessionId, r); else centerCloseRequesters.delete(sessionId); },
   });
+  // FATIA 15 Onda 2c-ii (D151 §2): a superfície de abas do módulo pode ser a COLUNA
+  // (2c-i, sobreposição) ou só o CENTRO (2c-ii, alvo). Enquanto as duas existirem,
+  // `attachSessionId` vem primeiro para não mudar nada do que já funcionava; quando a
+  // coluna for desligada, sobra a sessão do centro e o comportamento é o mesmo de antes.
+  // Sem isto, desligar a coluna deixaria TODA abertura de arquivo pendente para sempre,
+  // porque `openInAttachSession` nunca acharia sessão montada.
+  const sessionIdDaSuperficie = (): string | null => attachSessionId ?? centerSessionId;
   const activeCodeUri = (): WorkspaceUri | null => {
-    if (!attachSessionId) return null;
-    const t = editorService.getActive(attachSessionId);
+    const sid = sessionIdDaSuperficie();
+    if (!sid) return null;
+    const t = editorService.getActive(sid);
     return t && t.kind === 'code' ? t.uri : null;
   };
   const activeFileApi: ExplorerActiveFileApi = {
@@ -266,7 +274,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // executada assim que o anexo montar (zero aba fantasma / sumiço pós-F5).
   let pendingAttachOpen: ((sessionId: string) => void) | null = null;
   const openInAttachSession = (fn: (sessionId: string) => void): void => {
-    if (attachSessionId) fn(attachSessionId);
+    const sid = sessionIdDaSuperficie();
+    if (sid) fn(sid);
     else pendingAttachOpen = fn;
   };
   const onOpenMatch = (m: SearchMatch) => {
@@ -450,6 +459,10 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       centerSessionId = opts.sessionId;
       centerRoot = createRoot(container);
       centerRoot.render(createElement(CenterCodeEditor, centerProps(opts.sessionId)));
+      // 2c-ii: com a coluna desligada o centro é a ÚNICA superfície — a abertura que
+      // ficou pendente (feita antes de qualquer host montar, ex.: F5 ou boot) tem de
+      // sair aqui, senão nunca sairia.
+      if (pendingAttachOpen) { const fn = pendingAttachOpen; pendingAttachOpen = null; fn(opts.sessionId); }
     },
 
     unmountCodeEditor,
