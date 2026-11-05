@@ -1626,3 +1626,43 @@ byte no disco.
 escrever o teste novo: o `outlineCandidates.test.ts` tinha 10 erros TS2345 (dublê de editor não atribuível a
 `IStandaloneCodeEditor`). Foi pego no typecheck seguinte, corrigido com um cast nomeado num único ponto, e o commit do C2
 passou a exigir os dois verdes **juntos**. Registro porque a R-2 vale também quando o arquivo novo é teste.
+
+### D156 — Onda 2c-ii, passo C3: a casca da coluna saiu do shell — 2026-11-05 (noite)
+
+**Removido do `App.tsx`** (com o C2 verde, como a D155 planejou):
+
+- `import { AuxiliaryBar }` e o componente `AttachModuleSlot` — sem coluna não há onde montá-lo;
+- `detailPanelVisible` e `renderDesktopAuxiliaryBar` — o gate morto: `auxiliaryVisible` é **fixo em `false`** desde a D2.72,
+  então `shouldRenderAuxiliaryBar` devolvia `false` sempre. A coluna renderizava por outra condição, não por ele;
+- o import de `resolveDetailPanelVisible` no App (**a função continua em `domain/sidePane.ts`** e continua provada por
+  `sidePane.test.ts` — remover a função seria apagar contrato de domínio por motivo cosmético).
+
+**O que NÃO foi removido, e por quê — a parte que importa.**
+
+`mountAttach`/`unmountAttach`/`AttachArea` **ficam**. Três razões, todas verificáveis:
+
+1. são **API pública do contrato congelado** (`contract.ts:225-226`, aditiva desde a 4.7) — removê-las quebraria o contrato
+   que a regra dura 2 protege, e não é o que a decisão do dono pediu (a decisão fala de superfície de interface, não de
+   apagar API do módulo);
+2. `centerSaveRouting.test.tsx` as usa como **caminho de rota de save** — é o teste que prova que dois painéis montados não
+   se atrapalham ao salvar. Apagá-las exigiria reescrever esse teste, e "nenhum teste ignorado antes de remover o código que
+   protege" é trava;
+3. elas são a **rede de segurança do rollback**: se a homologação humana revelar um defeito no centro, religar a coluna é
+   uma linha no App, porque a maquinaria do anexo continua inteira e testada.
+
+**Dívida registrada, não escondida.** `mountAttach` está **sem consumidor no produto** — só testes. Fica como dívida de
+limpeza da Onda 3, com uma condição: só sai quando o contrato puder ser revisto **e** o teste de rota de save tiver um
+caminho equivalente no centro. Registrada aqui para que ninguém a descubra por acidente depois.
+
+**CSS.** As regras `.top-right-section > .auxiliary-bar…` continuam no `app.css` e agora não casam com nada. Saem na Onda 3
+junto com a varredura de borda residual — apagá-las agora misturaria remoção de componente com faxina de estilo no mesmo
+commit, e `layoutDensity.test.ts` policia essas regras (ele segue verde, o que confirma que nada quebrou, mas mexer nele no
+mesmo passo confundiria a causa de qualquer falha).
+
+**Ganho medido em `App.tsx`.** 2828 → **2822 linhas** (`wc -l`). É pouco de propósito: o RNF15-2 pede redução grande, e ela
+vem na Onda 3, quando saírem `attachExpanded`, o `editor-maximized` da coluna, `auxiliaryTab` e o estado de layout legado —
+todos ainda **lidos** por caminhos vivos (persistência de layout, `DockedAuxiliaryBarController`). Cortar isso agora seria
+mexer em persistência no mesmo commit em que se desliga a interface.
+
+**Gate.** typecheck **EXIT 0** + **283 = 266✓|1✗|16skip em 23 arquivos**, a mesma contagem do C2 — a remoção não custou
+cobertura nem comportamento. Falha única = PEND-02, pré-existente.

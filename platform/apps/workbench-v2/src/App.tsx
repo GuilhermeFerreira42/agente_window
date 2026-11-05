@@ -67,7 +67,7 @@ import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Ab
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
-import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveDetailPanelVisible, resolveSidePaneState } from './domain/sidePane'
+import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
 import { isFileSystemAccessSupported, pickDirectory as pickDirectoryReal, readDirectoryEntries, readFileContent, saveRootHandle, loadRootHandle, clearRootHandle, type FileSystemEntry } from './domain/fileSystem'
 import { captureSessionLayout, forgetSessionLayout, restoreSessionLayout, type SessionLayoutMap } from './domain/sessionLayout'
@@ -88,7 +88,6 @@ import {
 } from './domain/mobileNavigationStack'
 import { createLayoutController, layoutPlatformFor } from './domain/layoutController'
 import { commitDraft, createManagementState, discardDraft, openDraft, selectProviderForNewSession } from './domain/sessionsManagement'
-import { AuxiliaryBar } from './components/AuxiliaryBar'
 import { ChatPanel } from './components/ChatPanel'
 import { EditorArea } from './components/EditorArea'
 import { MobileDiffView } from './components/MobileDiffView'
@@ -237,15 +236,6 @@ function CenterCodeEditorSlot({ module, sessionId }: { module: IExplorerSearchMo
   }, [module, sessionId])
   useEffect(() => () => module.unmountCodeEditor?.(), [module])
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="center-code-editor-slot" />
-}
-
-function AttachModuleSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (hostRef.current) module.mountAttach(hostRef.current, { sessionId })
-  }, [module, sessionId])
-  useEffect(() => () => module.unmountAttach(), [module])
-  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="attach-module-slot" />
 }
 
 interface AppProps {
@@ -778,13 +768,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (E7/R-044) O detalhe é transiente sob uma aba Browser enquanto o editor está
   // visível — some ao ativar Browser e retorna ao voltar p/ Changes/Files. Se o
   // editor for oculto com Browser ativo, o painel mostra o fallback Changes/Files.
-  const detailPanelVisible = resolveDetailPanelVisible({ auxVisible: auxiliaryVisible, activeTabType, editorContentVisible })
   // (E4/R-033) Controller de layout por plataforma: desktop gerencia a aux bar;
   // mobile/single-pane a omite por completo (não escondida via CSS). O gate de
   // render da coluna de detalhes consulta o controller, não `isSinglePane` cru.
   const layoutController = useMemo(() => createLayoutController(layoutPlatformFor(isSinglePane)), [isSinglePane])
-  const renderDesktopAuxiliaryBar = layoutController.managesAuxiliaryBar
-    && layoutController.shouldRenderAuxiliaryBar({ auxiliaryVisible: detailPanelVisible, multipleSessionsVisible: false })
   // R-030 — espelha o estado de layout RENDERIZADO da sessão ativa para o ref
   // que a captura (no autorun) lê ao sair da sessão. Atualizado a cada render:
   // enquanto a sessão não troca, este é o estado "ao vivo"; no instante da troca
