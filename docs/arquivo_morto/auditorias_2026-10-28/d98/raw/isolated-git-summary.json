@@ -1,0 +1,32 @@
+{
+  "kind": "summary-of-isolated-measurements",
+  "branch": "docs/capacidades-d102-alinhamento",
+  "head": "59dfc32c99417136c9817984c81456803f296e58",
+  "fixtureRoot": "/tmp/d98-fixtures",
+  "warmSamples": 7,
+  "statistics": "p50; per-step measurements are not interchangeable",
+  "units": "milliseconds",
+  "results": {
+    "5000": {
+      "gitHostStatusP50": 20.116,
+      "buildGroupsP50": 3.059,
+      "parsePorcelainV2P50": 0.290,
+      "gitCliStatusP50": 6.169,
+      "gitStatusHttpP50": 36.376,
+      "gitStatusJsonBytes": 650045
+    },
+    "10000": {
+      "gitHostStatusP50": 33.308,
+      "buildGroupsP50": 5.319,
+      "parsePorcelainV2P50": 0.611,
+      "gitCliStatusP50": 9.999,
+      "gitStatusHttpP50": 53.514,
+      "gitStatusJsonBytes": 1310045
+    }
+  },
+  "limitations": [
+    "Isolated API, CLI, parsing and grouping cover different work and are not direct alternatives.",
+    "Warm runs only; no confidence intervals; JIT/GC outliers were observed.",
+    "Underlying temporary Vitest measurement file was removed after the investigation; this preserves the reported medians, not the individual seven samples."
+  ]
+}

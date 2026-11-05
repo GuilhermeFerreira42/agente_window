@@ -1,0 +1,437 @@
+/* E3 / Etapa 0+2 — chrome visual dedicado do terminal (sem tocar a lógica PTY) */
+
+:root {
+  --terminal-tab-height: 22px;
+}
+
+/* Show close button on tab item hover */
+.terminal-tab-item:hover .terminal-tab-close-btn {
+  opacity: 1 !important;
+}
+
+.terminal-panel {
+  height: var(--terminal-height);
+  min-height: 120px;
+  flex: 0 0 var(--terminal-height);
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-top: var(--vscode-strokeThickness) solid var(--vscode-panel-border);
+  border-radius: 0;
+  background: var(--vscode-panel-background);
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+.terminal-panel.is-maximized {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  height: auto;
+  min-height: 0;
+  border-top: 0;
+}
+
+.terminal-panel.is-maximized .terminal-container {
+  padding: var(--vscode-spacing-size100);
+}
+
+.terminal-panel.is-maximized .terminal-header {
+  min-height: 36px;
+}
+
+.terminal-header {
+  min-height: 30px;
+  padding: 0 8px 0 10px;
+  background: var(--vscode-panel-background);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: var(--vscode-strokeThickness) solid var(--vscode-panel-border);
+}
+
+.terminal-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.terminal-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--terminal-tab-height);
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid transparent;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label1);
+  cursor: pointer;
+}
+
+.terminal-tab:hover {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.terminal-tab.is-active {
+  color: var(--vscode-foreground);
+  border-top-color: var(--vscode-terminal-tab-activeBorder, var(--vscode-focusBorder));
+  background: var(--vscode-terminal-tab-activeBackground, transparent);
+}
+
+.terminal-tab-badge {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--vscode-list-warningForeground);
+  color: var(--vscode-panel-background);
+  font-size: 10px;
+  text-align: center;
+}
+
+.terminal-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.terminal-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small);
+  background: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  cursor: pointer;
+}
+
+.terminal-action:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.terminal-action[aria-pressed='true'] {
+  background: var(--vscode-actionBar-toggledBackground);
+}
+
+.terminal-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.terminal-shell-picker {
+  position: relative;
+}
+
+.terminal-shell-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  padding: 0 6px;
+}
+
+.terminal-shell-name {
+  font-size: var(--vscode-fontSize-label2);
+}
+
+.terminal-shell-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--vscode-menu-border);
+  border-radius: var(--vscode-cornerRadius-medium, 6px);
+  background: var(--vscode-menu-background);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--vscode-widget-shadow) 24%, transparent);
+}
+
+.terminal-shell-option {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small, 4px);
+  background: transparent;
+  color: var(--vscode-menu-foreground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.terminal-shell-option-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-shell-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+
+.terminal-shell-option:hover,
+.terminal-shell-option.is-active {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.terminal-shell-option.is-active .terminal-shell-option-check {
+  opacity: 1;
+}
+
+.terminal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-terminal-background);
+}
+
+.terminal-instance-strip {
+  min-height: var(--terminal-tab-height);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 var(--vscode-spacing-size80);
+  border-bottom: var(--vscode-strokeThickness) solid var(--vscode-panel-border);
+  background: var(--vscode-terminal-background);
+}
+
+.terminal-instance-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.terminal-instance-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.terminal-instance-tab-shell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.terminal-instance-tab {
+  display: inline-flex;
+  align-items: center;
+  max-width: 180px;
+  min-height: var(--terminal-tab-height);
+  padding: 0 8px;
+  border: 0;
+  border-top: 1px solid transparent;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.terminal-instance-tab:hover,
+.terminal-instance-tab-shell:hover .terminal-instance-tab {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.terminal-instance-tab.is-active {
+  color: var(--vscode-foreground);
+  border-top-color: var(--vscode-terminal-tab-activeBorder, var(--vscode-focusBorder));
+  background: var(--vscode-terminal-tab-activeBackground, transparent);
+}
+
+.terminal-instance-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--vscode-fontSize-label2);
+}
+
+.terminal-instance-tab-close {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.terminal-instance-tab-close:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.terminal-panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.terminal-main-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.terminal-panes.is-split {
+  gap: 1px;
+  background: var(--vscode-panel-border);
+}
+
+.terminal-panes.is-split .terminal-container {
+  border-right: 1px solid var(--vscode-panel-border);
+}
+
+.terminal-container {
+  min-height: 0;
+  flex: 1;
+  padding: var(--vscode-spacing-size100);
+  overflow: hidden;
+  background: var(--vscode-terminal-background);
+}
+
+.terminal-container.is-status-error {
+  box-shadow: inset 0 0 0 1px var(--vscode-errorForeground);
+}
+
+.terminal-container.is-status-closed {
+  box-shadow: inset 0 0 0 1px var(--vscode-panel-border);
+}
+
+.terminal-container.is-hidden {
+  display: none;
+}
+
+.terminal-container-split {
+  border-right: 0 !important;
+}
+
+.terminal-group {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.terminal-group-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.terminal-group-pane-main,
+.terminal-group-pane-split {
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-sash {
+  display: block;
+  flex: 0 0 4px;
+  width: 4px;
+  min-width: 4px;
+  align-self: stretch;
+  cursor: col-resize;
+  background: var(--vscode-terminal-tab-activeBorder, var(--vscode-panel-border));
+  opacity: 0.35;
+  touch-action: none;
+}
+
+.split-sash:hover {
+  opacity: 0.8;
+}
+
+.terminal-output-view,
+.terminal-problems-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 10px;
+  background: var(--vscode-panel-background);
+}
+
+.terminal-output-lines {
+  margin: 0;
+  color: var(--vscode-foreground);
+  font-family: var(--monaco-monospace-font);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.terminal-problems-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.terminal-problem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--vscode-fontSize-label1);
+  color: var(--vscode-foreground);
+}
+
+.terminal-problem-severity.is-warning {
+  color: var(--vscode-list-warningForeground);
+}
+
+.terminal-problem-severity.is-info {
+  color: var(--vscode-charts-blue);
+}
+
+.terminal-problem-location {
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label2);
+}
+
+.terminal-problems-empty {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label1);
+}
+
+.single-pane .terminal-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(60vh, 420px);
+  z-index: 20;
+  border-top: 0;
+  border-radius: var(--vscode-cornerRadius-large) var(--vscode-cornerRadius-large) 0 0;
+}
+
+.single-pane .terminal-panel.is-maximized {
+  inset: 0;
+  height: auto;
+  border-radius: 0;
+}
+
+.custom-view-active .terminal-panel {
+  display: none;
+}

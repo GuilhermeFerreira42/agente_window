@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/agente-window/schema/v1/providers.json",
+  "activeProvider": "openai",
+  "providers": {
+    "openai": {
+      "name": "OpenAI Official",
+      "baseURL": "https://api.openai.com/v1",
+      "apiKey": "sk-proj-PLACEHOLDER_KEY",
+      "model": "gpt-4o",
+      "contextWindow": 128000,
+      "maxTokens": 4096,
+      "temperature": 0.2,
+      "headers": {}
+    },
+    "google": {
+      "name": "Google AI Studio (Gemini)",
+      "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "apiKey": "AIzaSy-PLACEHOLDER_KEY",
+      "model": "gemini-2.0-flash",
+      "contextWindow": 1000000,
+      "maxTokens": 8192,
+      "temperature": 0.2,
+      "headers": {}
+    },
+    "nvidia": {
+      "name": "NVIDIA NIM",
+      "baseURL": "https://integrate.api.nvidia.com/v1",
+      "apiKey": "nvapi-PLACEHOLDER_KEY",
+      "model": "meta/llama-3.1-70b-instruct",
+      "contextWindow": 128000,
+      "maxTokens": 4096,
+      "temperature": 0.2,
+      "headers": {}
+    },
+    "helicone": {
+      "name": "Helicone AI Gateway (OpenAI Proxy)",
+      "baseURL": "https://ai-gateway.helicone.ai/v1",
+      "apiKey": "sk-proj-OPENAI_KEY_PLACEHOLDER",
+      "model": "gpt-4o",
+      "contextWindow": 128000,
+      "maxTokens": 4096,
+      "temperature": 0.2,
+      "headers": {
+        "Helicone-Auth": "Bearer sk-helicone-PLACEHOLDER_TOKEN"
+      }
+    },
+    "ollama": {
+      "name": "Ollama Local",
+      "baseURL": "http://localhost:11434/v1",
+      "apiKey": "ollama-local",
+      "model": "llama3.2",
+      "contextWindow": 32768,
+      "maxTokens": 4096,
+      "temperature": 0.2,
+      "headers": {}
+    },
+    "opencode-zen": {
+      "name": "OpenCode Zen Proxy",
+      "baseURL": "https://opencode.ai/zen/v1",
+      "apiKey": "zen-PLACEHOLDER_KEY",
+      "model": "claude-3-5-sonnet",
+      "contextWindow": 200000,
+      "maxTokens": 8192,
+      "temperature": 0.2,
+      "headers": {}
+    }
+  }
+}

@@ -1,0 +1,782 @@
+[
+  {
+    "variant": "baseline",
+    "rep": 1,
+    "status": "completed",
+    "ms": 5077.3696,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 2,
+    "renderMs": 746.1000001430511,
+    "maxTask": 932,
+    "maxTimer": 1465.9000000357628,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 6.899999976158142,
+        "max": 2.300000011920929
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 5.5,
+        "max": 2.899999976158142
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 6,
+        "max": 3.100000023841858
+      },
+      "derive": {
+        "count": 3,
+        "sum": 6.300000011920929,
+        "max": 3.199999988079071
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 78.70000004768372,
+        "max": 43.5
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 17.00000035762787,
+        "max": 8.699999988079071
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 30.099999964237213,
+        "max": 30.099999964237213
+      }
+    }
+  },
+  {
+    "variant": "baseline",
+    "rep": 2,
+    "status": "completed",
+    "ms": 5104.184500000001,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 2,
+    "renderMs": 716.9999996423721,
+    "maxTask": 1015,
+    "maxTimer": 1469,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 7,
+        "max": 2.400000035762787
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 5.5,
+        "max": 2.899999976158142
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 12.299999952316284,
+        "max": 9.599999964237213
+      },
+      "derive": {
+        "count": 3,
+        "sum": 12.600000023841858,
+        "max": 9.699999988079071
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 85.10000002384186,
+        "max": 46.19999998807907
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 10.20000010728836,
+        "max": 1.0999999642372131
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 30.600000023841858,
+        "max": 30.600000023841858
+      }
+    }
+  },
+  {
+    "variant": "baseline",
+    "rep": 3,
+    "status": "completed",
+    "ms": 5008.2959999999985,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 2,
+    "renderMs": 691.600000679493,
+    "maxTask": 934,
+    "maxTimer": 1476.4000000357628,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 7.300000011920929,
+        "max": 2.400000035762787
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 5.599999964237213,
+        "max": 2.899999976158142
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 11.100000023841858,
+        "max": 8.300000011920929
+      },
+      "derive": {
+        "count": 3,
+        "sum": 11.599999964237213,
+        "max": 8.5
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 70.20000004768372,
+        "max": 38.10000002384186
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 8.900000154972076,
+        "max": 1.100000023841858
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 35,
+        "max": 35
+      }
+    }
+  },
+  {
+    "variant": "coalesce",
+    "rep": 1,
+    "status": "completed",
+    "ms": 4676.757699999999,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 1,
+    "renderMs": 504.3000003695488,
+    "maxTask": 1180,
+    "maxTimer": 1182.8999999761581,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 4.899999976158142,
+        "max": 2.400000035762787
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 3,
+        "max": 3
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 3.300000011920929,
+        "max": 3.300000011920929
+      },
+      "derive": {
+        "count": 2,
+        "sum": 3.400000035762787,
+        "max": 3.300000011920929
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 34.89999997615814,
+        "max": 34.89999997615814
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 10.20000022649765,
+        "max": 0.8999999761581421
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 29.80000001192093,
+        "max": 29.80000001192093
+      }
+    }
+  },
+  {
+    "variant": "coalesce",
+    "rep": 2,
+    "status": "completed",
+    "ms": 4616.210300000001,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 1,
+    "renderMs": 434.8999993801117,
+    "maxTask": 1133,
+    "maxTimer": 1127.5999999642372,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 5,
+        "max": 2.699999988079071
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 3.199999988079071,
+        "max": 3.199999988079071
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 8.499999940395355,
+        "max": 8.399999976158142
+      },
+      "derive": {
+        "count": 2,
+        "sum": 8.599999964237213,
+        "max": 8.5
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 32,
+        "max": 31.899999976158142
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 9.300000190734863,
+        "max": 1.0999999642372131
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 31.400000035762787,
+        "max": 31.400000035762787
+      }
+    }
+  },
+  {
+    "variant": "coalesce",
+    "rep": 3,
+    "status": "completed",
+    "ms": 4704.727300000002,
+    "logical": 5002,
+    "domRows": 5002,
+    "dom": 55621,
+    "renderCount": 1,
+    "renderMs": 439.4999997615814,
+    "maxTask": 1143,
+    "maxTimer": 1149.4000000357628,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 5.300000011920929,
+        "max": 2.699999988079071
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 3.199999988079071,
+        "max": 3.199999988079071
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 10.900000035762787,
+        "max": 10.800000011920929
+      },
+      "derive": {
+        "count": 2,
+        "sum": 11.199999988079071,
+        "max": 11
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 33.69999998807907,
+        "max": 33.69999998807907
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 10.49999988079071,
+        "max": 1
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 35.89999997615814,
+        "max": 35.89999997615814
+      }
+    }
+  },
+  {
+    "variant": "cap",
+    "rep": 1,
+    "status": "completed",
+    "ms": 4164.151999999999,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 2,
+    "renderMs": 96.30000001192093,
+    "maxTask": 940,
+    "maxTimer": 1084,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 6.699999988079071,
+        "max": 2.5
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 10.800000011920929,
+        "max": 8.300000011920929
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 11.500000059604645,
+        "max": 8.600000023841858
+      },
+      "derive": {
+        "count": 3,
+        "sum": 11.800000011920929,
+        "max": 8.699999988079071
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 77.00000005960464,
+        "max": 44.200000047683716
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 10.900000035762787,
+        "max": 1
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 31.19999998807907,
+        "max": 31.19999998807907
+      }
+    }
+  },
+  {
+    "variant": "cap",
+    "rep": 2,
+    "status": "completed",
+    "ms": 4165.833999999999,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 2,
+    "renderMs": 97.60000002384186,
+    "maxTask": 909,
+    "maxTimer": 1032.8999999761581,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 6.599999964237213,
+        "max": 2.399999976158142
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 5.199999988079071,
+        "max": 3
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 5.900000035762787,
+        "max": 3.400000035762787
+      },
+      "derive": {
+        "count": 3,
+        "sum": 6,
+        "max": 3.5
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 83.59999996423721,
+        "max": 46
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 9.800000131130219,
+        "max": 1.100000023841858
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 37.09999996423721,
+        "max": 37.09999996423721
+      }
+    }
+  },
+  {
+    "variant": "cap",
+    "rep": 3,
+    "status": "completed",
+    "ms": 4453.0556,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 2,
+    "renderMs": 89.59999996423721,
+    "maxTask": 1142,
+    "maxTimer": 1258.8999999761581,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 6,
+        "sum": 6.799999952316284,
+        "max": 2.5
+      },
+      "visibleRows": {
+        "count": 3,
+        "sum": 5,
+        "max": 2.5
+      },
+      "deriveOnly": {
+        "count": 3,
+        "sum": 5.5,
+        "max": 2.699999988079071
+      },
+      "derive": {
+        "count": 3,
+        "sum": 5.699999988079071,
+        "max": 2.899999976158142
+      },
+      "jsxRows": {
+        "count": 3,
+        "sum": 76.40000003576279,
+        "max": 44.10000002384186
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 9.699999511241913,
+        "max": 1.0999999642372131
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 40.40000003576279,
+        "max": 40.40000003576279
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap",
+    "rep": 1,
+    "status": "completed",
+    "ms": 4178.0799,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 46.40000003576279,
+    "maxTask": 932,
+    "maxTimer": 1098.5999999642372,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 5,
+        "max": 2.5
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 3.199999988079071,
+        "max": 3.199999988079071
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 8.599999964237213,
+        "max": 8.599999964237213
+      },
+      "derive": {
+        "count": 2,
+        "sum": 8.899999976158142,
+        "max": 8.800000011920929
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 32.19999998807907,
+        "max": 32.19999998807907
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 8.499999463558197,
+        "max": 1
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 31.30000001192093,
+        "max": 31.30000001192093
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap",
+    "rep": 2,
+    "status": "completed",
+    "ms": 4141.978000000001,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 47.40000009536743,
+    "maxTask": 900,
+    "maxTimer": 1033.4000000357628,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 5.200000047683716,
+        "max": 2.700000047683716
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 8.700000047683716,
+        "max": 8.700000047683716
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 9.200000047683716,
+        "max": 9.200000047683716
+      },
+      "derive": {
+        "count": 2,
+        "sum": 9.300000011920929,
+        "max": 9.200000047683716
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 33.19999998807907,
+        "max": 33.09999996423721
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 10.299999833106995,
+        "max": 1
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 32.299999952316284,
+        "max": 32.299999952316284
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap",
+    "rep": 3,
+    "status": "completed",
+    "ms": 4168.4715,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 45.80000001192093,
+    "maxTask": 917,
+    "maxTimer": 1012.5,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 4.899999976158142,
+        "max": 2.5
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 2.899999976158142,
+        "max": 2.899999976158142
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 8,
+        "max": 8
+      },
+      "derive": {
+        "count": 2,
+        "sum": 8.199999988079071,
+        "max": 8.099999964237213
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 32.799999952316284,
+        "max": 32.69999998807907
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 8.499999701976776,
+        "max": 1.199999988079071
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 30.799999952316284,
+        "max": 30.799999952316284
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap16",
+    "rep": 1,
+    "status": "completed",
+    "ms": 3702.2820999999994,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 46.199999928474426,
+    "maxTask": 52,
+    "maxTimer": 53.69999998807907,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 4.400000035762787,
+        "max": 2.300000011920929
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 2.600000023841858,
+        "max": 2.600000023841858
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 3,
+        "max": 3
+      },
+      "derive": {
+        "count": 2,
+        "sum": 3.099999964237213,
+        "max": 3
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 38.800000071525574,
+        "max": 38.700000047683716
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 31.49999964237213,
+        "max": 1.300000011920929
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 24.19999998807907,
+        "max": 24.19999998807907
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap16",
+    "rep": 2,
+    "status": "completed",
+    "ms": 3648.478800000001,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 45.30000001192093,
+    "maxTask": 53,
+    "maxTimer": 85,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 5,
+        "max": 2.699999988079071
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 3.4999999403953552,
+        "max": 3.399999976158142
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 3.699999988079071,
+        "max": 3.600000023841858
+      },
+      "derive": {
+        "count": 2,
+        "sum": 3.799999952316284,
+        "max": 3.699999988079071
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 37.000000059604645,
+        "max": 36.90000003576279
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 28.900000154972076,
+        "max": 1.100000023841858
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 32.799999952316284,
+        "max": 32.799999952316284
+      }
+    }
+  },
+  {
+    "variant": "coalesce-cap16",
+    "rep": 3,
+    "status": "completed",
+    "ms": 3584.3901000000005,
+    "logical": 5002,
+    "domRows": 40,
+    "dom": 1039,
+    "renderCount": 1,
+    "renderMs": 42.80000001192093,
+    "maxTask": 0,
+    "maxTimer": 56.10000002384186,
+    "stats": 5000,
+    "errors": 0,
+    "groups": {
+      "childrenOf": {
+        "count": 4,
+        "sum": 4.200000047683716,
+        "max": 2.100000023841858
+      },
+      "visibleRows": {
+        "count": 2,
+        "sum": 2.5,
+        "max": 2.399999976158142
+      },
+      "deriveOnly": {
+        "count": 2,
+        "sum": 2.800000011920929,
+        "max": 2.699999988079071
+      },
+      "derive": {
+        "count": 2,
+        "sum": 2.900000035762787,
+        "max": 2.699999988079071
+      },
+      "jsxRows": {
+        "count": 2,
+        "sum": 35.30000001192093,
+        "max": 35.30000001192093
+      },
+      "bodyParse": {
+        "count": 5001,
+        "sum": 31.900000512599945,
+        "max": 1.0999999642372131
+      },
+      "buildChildren": {
+        "count": 1,
+        "sum": 33.60000002384186,
+        "max": 33.60000002384186
+      }
+    }
+  }
+]

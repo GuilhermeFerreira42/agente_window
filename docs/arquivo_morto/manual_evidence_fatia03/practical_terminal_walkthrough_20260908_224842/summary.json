@@ -1,0 +1,42 @@
+{
+  "baseUrl": "http://localhost:5173",
+  "wsUrls": [
+    "ws://localhost:5173/?token=VZ7ryZ5MNIWv",
+    "ws://localhost:5173/?token=VZ7ryZ5MNIWv",
+    "ws://localhost:5173/pty",
+    "ws://localhost:5173/pty",
+    "ws://localhost:5173/pty",
+    "ws://localhost:5173/pty"
+  ],
+  "pageErrors": [],
+  "steps": [
+    "abrindo aplicação e limpando estado",
+    "abrindo terminal principal",
+    "digitando no terminal principal e verificando echo",
+    "executando clear no terminal principal",
+    "maximizando e restaurando o terminal",
+    "abrindo split terminal e digitando em ambos",
+    "executando clear no terminal dividido",
+    "testando botão Limpar terminal e digitando de novo",
+    "fechando split",
+    "fechando e reabrindo o painel para confirmar persistência"
+  ],
+  "promptVisibleOnOpen": true,
+  "promptSampleOnOpen": "user@e2b:~$",
+  "mainPidBefore": "2344",
+  "mainPidAfterToggle": "2344",
+  "samePidAfterToggle": true,
+  "mainMarkerSeen": true,
+  "mainClearRemovedMarker": true,
+  "mainPromptAfterClear": true,
+  "maximizeOk": true,
+  "restoreOk": true,
+  "splitOpened": true,
+  "splitPromptVisible": true,
+  "mainMarkerInMainOnly": true,
+  "splitMarkerInSplitOnly": true,
+  "splitClearRemovedMarker": true,
+  "splitPromptAfterClear": true,
+  "closeSplitOk": true,
+  "buttonClearKeptTerminalUsable": true
+}

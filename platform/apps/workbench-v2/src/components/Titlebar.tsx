@@ -1,0 +1,139 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  Bot,
+  CircleAlert,
+  CircleUserRound,
+  GitCompareArrows,
+  Globe2,
+  Moon,
+  PanelLeft,
+  Plus,
+  Search,
+  Sun,
+  TerminalSquare,
+} from 'lucide-react'
+import type { Session } from '../types'
+import { WorkspaceSwitcher } from './TopBar/WorkspaceSwitcher'
+
+interface TitlebarProps {
+  activeSession: Session
+  unreadCount: number
+  sidebarVisible: boolean
+  terminalVisible: boolean
+  approved: boolean
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
+  onToggleSidebar: () => void
+  onToggleTerminal: () => void
+  onOpenSearch: () => void
+  onOpenBrowser: () => void
+  onOpenDiff: () => void
+  onNewSession: () => void
+  onShowSessions: () => void
+  workspacePath: string
+  workspaceChangePending?: boolean
+  onChangeWorkspace: (path: string) => Promise<void>
+  onBrowseWorkspace: () => void
+  onAccountAction: (action: string) => void
+}
+
+export function Titlebar({
+  activeSession,
+  unreadCount,
+  sidebarVisible,
+  terminalVisible,
+  approved,
+  theme,
+  onToggleTheme,
+  onToggleSidebar,
+  onToggleTerminal,
+  onOpenSearch,
+  onOpenBrowser,
+  onOpenDiff,
+  onNewSession,
+  onShowSessions,
+  workspacePath,
+  workspaceChangePending,
+  onChangeWorkspace,
+  onBrowseWorkspace,
+  onAccountAction,
+}: TitlebarProps) {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const closeOnOutside = (event: PointerEvent) => {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) setAccountMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutside)
+    return () => document.removeEventListener('pointerdown', closeOnOutside)
+  }, [accountMenuOpen])
+
+  const runAccountAction = (action: string) => {
+    setAccountMenuOpen(false)
+    onAccountAction(action)
+  }
+
+  return (
+    <header className="titlebar" aria-label="Barra de título da Janela de Agentes">
+      <div className="titlebar-inner">
+        <div className="titlebar-left">
+          <button className={`titlebar-button sidebar-toggle${sidebarVisible ? ' is-active' : ''}`} type="button" aria-label="Alternar lista de sessões" title="Lista de sessões" onClick={onToggleSidebar}>
+            <PanelLeft size={15} />
+            {unreadCount > 0 && <span className="unread-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+          </button>
+          <div className="brand" aria-label="Agent Sessions">
+            <span className="brand-mark" aria-hidden="true"><Bot size={12} /></span>
+            <span className="brand-label">Agent Sessions</span>
+          </div>
+        </div>
+
+        <div className="titlebar-center">
+          {approved ? <div className="command-center is-approved"><span className="command-center-approved-label">Ação aprovada</span></div> : <WorkspaceSwitcher currentPath={workspacePath} pending={workspaceChangePending} onConfirm={onChangeWorkspace} onBrowse={onBrowseWorkspace}/>} 
+          <button className="workspace-switcher-sessions" type="button" aria-label="Mostrar sessões" title={activeSession.title} onClick={onShowSessions}>{activeSession.status === 'needs-input' ? <CircleAlert size={12}/> : <Bot size={12}/>}</button>
+        </div>
+
+        <div className="titlebar-right">
+          <button className="titlebar-button is-secondary" type="button" aria-label="Nova sessão" title="Nova sessão" onClick={onNewSession}>
+            <Plus size={15} />
+          </button>
+          <button className="titlebar-button is-secondary" type="button" aria-label="Abrir navegador no editor" title="Abrir navegador no editor" onClick={onOpenBrowser}>
+            <Globe2 size={15} />
+          </button>
+          <button className="titlebar-button is-secondary" type="button" aria-label="Abrir busca no editor" title="Abrir busca no editor" onClick={onOpenSearch}>
+            <Search size={15} />
+          </button>
+          <button className="titlebar-button is-secondary" type="button" aria-label="Abrir alterações no editor" title="Abrir multi-diff" onClick={onOpenDiff}>
+            <GitCompareArrows size={15} />
+          </button>
+          <button className={`titlebar-button is-secondary${terminalVisible ? ' is-active' : ''}`} type="button" aria-label="Alternar terminal" title="Terminal" onClick={onToggleTerminal}>
+            <TerminalSquare size={15} />
+          </button>
+          <button className="titlebar-button" type="button" aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={onToggleTheme}>
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <div className="account-menu-anchor" ref={accountRef}>
+            <button className={`titlebar-button${accountMenuOpen ? ' is-active' : ''}`} type="button" aria-label="Conta" title="Conta" aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((current) => !current)}>
+              <CircleUserRound size={15} />
+            </button>
+            {accountMenuOpen && (
+              <div className="account-menu" role="menu" aria-label="Menu da conta">
+                <div className="account-menu-header">
+                  <span className="account-menu-name">Agente Dev</span>
+                  <span className="account-menu-email">dev@agents.local</span>
+                </div>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('Perfil aberto')}>Perfil</button>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('open-providers')}>Provedores</button>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('open-config')}>Configurações</button>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('Configurações da conta abertas')}>Configurações da conta</button>
+                <button type="button" role="menuitem" onClick={() => runAccountAction('Sessão encerrada')}>Sair</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
+

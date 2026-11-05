@@ -1,0 +1,428 @@
+{
+  "search": {
+    "view": {
+      "rect": {
+        "x": 48,
+        "y": 35,
+        "w": 300,
+        "h": 843
+      },
+      "height": "843px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(97, 97, 97)",
+      "background-color": "rgb(243, 243, 243)",
+      "border": "0px none rgb(97, 97, 97)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgba(38, 119, 203, 0.18) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "query_container": {
+      "rect": {
+        "x": 50,
+        "y": 76,
+        "w": 286,
+        "h": 58
+      },
+      "height": "58px",
+      "width": "286px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(97, 97, 97)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(97, 97, 97)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(97, 97, 97) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "inputbox": {
+      "rect": {
+        "x": 68,
+        "y": 76,
+        "w": 268,
+        "h": 26
+      },
+      "height": "26px",
+      "width": "268px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(97, 97, 97)",
+      "background-color": "rgb(255, 255, 255)",
+      "border": "1px solid rgba(0, 0, 0, 0)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(0, 144, 241) solid 1px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "input": {
+      "rect": {
+        "x": 69,
+        "y": 77,
+        "w": 200,
+        "h": 24
+      },
+      "height": "24px",
+      "width": "200px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(97, 97, 97)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(97, 97, 97)",
+      "border-radius": "0px",
+      "padding": "3px 0px 3px 6px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(97, 97, 97) none 0px",
+      "box-shadow": "none",
+      "cursor": "text",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "input_placeholder": "Search",
+    "toggles": [
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-case-sensitive",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-whole-word",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-regex",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "find-filter-button monaco-custom-toggle",
+        "w": 0,
+        "h": 0
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-preserve-case",
+        "w": 20,
+        "h": 20
+      }
+    ],
+    "replace_toggle": {
+      "rect": {
+        "x": 50,
+        "y": 76,
+        "w": 16,
+        "h": 58
+      },
+      "height": "58px",
+      "width": "16px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(97, 97, 97)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(97, 97, 97)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(97, 97, 97) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "actions": [
+      "Refresh",
+      "Clear Search Results",
+      "Open New Search Editor",
+      "View as Tree",
+      "Collapse All"
+    ],
+    "details_toggle": {
+      "rect": {
+        "x": 313,
+        "y": 134,
+        "w": 25,
+        "h": 16
+      },
+      "height": "16px",
+      "width": "25px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "messages": {
+      "rect": {
+        "x": 48,
+        "y": 148,
+        "w": 300,
+        "h": 0
+      },
+      "height": "0px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgba(204, 204, 204, 0.65)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgba(204, 204, 204, 0.65)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "-5px 0px 0px",
+      "opacity": "1",
+      "outline": "rgba(204, 204, 204, 0.65) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "inputbox_focus": {
+      "rect": {
+        "x": 68,
+        "y": 76,
+        "w": 268,
+        "h": 26
+      },
+      "height": "26px",
+      "width": "268px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(49, 49, 49)",
+      "border": "1px solid rgb(60, 60, 60)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(0, 120, 212) solid 1px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "results": {
+      "message": "504 results in 55 files - Open in editor",
+      "file_row": {
+        "rect": {
+          "x": 48,
+          "y": 174,
+          "w": 300,
+          "h": 22
+        },
+        "height": "22px",
+        "width": "300px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "22px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "match_row": {
+        "rect": {
+          "x": 86,
+          "y": 196,
+          "w": 262,
+          "h": 22
+        },
+        "height": "22px",
+        "width": "262px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "22px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "highlight": {
+        "rect": {
+          "x": 101,
+          "y": 199,
+          "w": 35,
+          "h": 15
+        },
+        "height": "auto",
+        "width": "auto",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "22px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(234, 92, 0, 0.33)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "badge": {
+        "rect": {
+          "x": 318,
+          "y": 177,
+          "w": 18,
+          "h": 18
+        },
+        "height": "18px",
+        "width": "18px",
+        "font-size": "11px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "11px",
+        "color": "rgb(248, 248, 248)",
+        "background-color": "rgb(97, 97, 97)",
+        "border": "0px none rgb(248, 248, 248)",
+        "border-radius": "11px",
+        "padding": "3px 5px",
+        "margin": "0px 12px 0px 0px",
+        "opacity": "1",
+        "outline": "rgb(248, 248, 248) none 0px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "rows": [
+        {
+          "label": "1 matches in file .gitignore of folder ., Search result",
+          "level": "1",
+          "h": 22
+        },
+        {
+          "label": "'# FATIA-04 (4.3): build do adapter FS p/ preview (compilado de server/fs)' at column 3 found FATIA",
+          "level": "2",
+          "h": 22
+        },
+        {
+          "label": "11 matches in file 00_COMO_LER_ESTA_DOCUMENTACAO.md of folder docs, Search result",
+          "level": "1",
+          "h": 22
+        },
+        {
+          "label": "'16. [`14_PRIMEIRA_FATIA_RECOMENDADA.md`](14_PRIMEIRA_FATIA_RECOMENDADA.md)' at column 19 found FATIA",
+          "level": "2",
+          "h": 22
+        },
+        {
+          "label": "'16. [`14_PRIMEIRA_FATIA_RECOMENDADA.md`](14_PRIMEIRA_FATIA_RECOMENDADA.md)' at column 54 found FATIA",
+          "level": "2",
+          "h": 22
+        },
+        {
+          "label": "'4. Nenhuma fatia é considerada pronta sem passar por `07_MATRIZ_DE_VALIDACAO.md` e `08_CRITERIOS_DE_HOMOLOGACAO.md`.' at column 12 found fatia",
+          "level": "2",
+          "h": 22
+        }
+      ]
+    },
+    "row_hover_actions": [],
+    "replace_input": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "height": "auto",
+      "width": "100%",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(49, 49, 49)",
+      "border": "1px solid rgb(60, 60, 60)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "details_inputs": [
+      {
+        "label": "files to include",
+        "placeholder": "e.g. *.ts, src/**/include"
+      },
+      {
+        "label": "files to exclude",
+        "placeholder": ""
+      }
+    ]
+  }
+}

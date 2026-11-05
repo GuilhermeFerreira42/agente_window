@@ -1,0 +1,108 @@
+{
+ "stateOnLoad": {
+  "activityBar": {
+   "x": 1232,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  },
+  "sideBar": {
+   "x": 932,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "auxiliaryBar": {
+   "x": 0,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "editor": {
+   "x": 300,
+   "y": 35,
+   "w": 632,
+   "h": 743
+  }
+ },
+ "right": {
+  "activityBar": {
+   "x": 1232,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  },
+  "sideBar": {
+   "x": 932,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "auxiliaryBar": {
+   "x": 0,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "editor": {
+   "x": 300,
+   "y": 35,
+   "w": 632,
+   "h": 743
+  },
+  "abClasses": "part activitybar right bordered",
+  "sbClasses": "part sidebar right pane-composite-part",
+  "abBorderBefore": {
+   "border-left-width": "1px",
+   "border-left-color": "rgb(240, 241, 242)",
+   "border-right-width": "0px"
+  },
+  "sbBorder": {
+   "border-left-width": "1px",
+   "border-left-color": "rgb(240, 241, 242)",
+   "border-right-width": "0px"
+  },
+  "indicator": {
+   "border-left-width": "2px",
+   "border-right-width": "0px",
+   "border-right-color": "rgb(32, 32, 32)",
+   "left": "46px",
+   "right": "0px"
+  },
+  "sash": {
+   "x": 930,
+   "w": 4,
+   "sbLeft": 932,
+   "offsetFromSbLeft": -2
+  },
+  "badge": {
+   "top": "24px",
+   "right": "8px",
+   "left": "24px"
+  },
+  "title": {
+   "labelPaddingLeft": 8,
+   "actionsRightGap": 8
+  }
+ },
+ "restored": {
+  "activityBar": {
+   "x": 1232,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  },
+  "sideBar": {
+   "x": 932,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "auxiliaryBar": {
+   "x": 0,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  }
+ }
+}

@@ -1,0 +1,193 @@
+export type SessionStatus = 'untitled' | 'working' | 'needs-input' | 'completed' | 'error'
+export type SessionSection = 'pinned' | 'today' | 'yesterday' | 'lastWeek' | 'older' | 'archived'
+export type ChatStatus = SessionStatus
+export type MessageRole = 'user' | 'assistant'
+export type ChatVote = 'up' | 'down'
+export type ChatCopyKind = 'message' | 'code'
+export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'customizations' | 'providers' | 'config'
+export type BrowserViewport = 'desktop' | 'tablet' | 'mobile'
+export type BrowserStatus = 'loading' | 'ready' | 'error'
+
+/** Cartão de ferramenta do agente (FATIA 10) preso a uma resposta do chat. */
+export interface FerramentaNoChat {
+  id: string
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar'
+  /** Caminho (ou padrão de busca) mostrado no cartão. */
+  alvo: string
+  /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */
+  previa?: string
+  status: 'aguardando' | 'aguardando_continuacao' | 'executando' | 'ok' | 'negado' | 'erro' | 'expirado'
+  /** O servidor indica se o grant de sessão é aceito por esta ferramenta/chamada. */
+  allowSession?: boolean
+  /** Saída recente limitada, enviada como progresso durante comando longo. */
+  progresso?: string
+  /** Resumo honesto do resultado (texto do servidor). */
+  resumo?: string
+  /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */
+  ordem?: number
+}
+
+export interface ChatMessage {
+  id: string
+  role: MessageRole
+  content: string
+  time: string
+  model?: string
+  mode?: string
+  attachments?: Attachment[]
+  running?: boolean
+  cancelled?: boolean
+  /** Bolha de ERRO honesto (FATIA 09) — fica fora do histórico enviado ao modelo. */
+  erro?: boolean
+  vote?: ChatVote
+  reported?: boolean
+  /** Cartões de ferramenta do agente (FATIA 10) — presos a esta resposta. */
+  ferramentas?: FerramentaNoChat[]
+  /** Cartões "continuar?" do teto (FATIA 11) — presos a esta resposta. */
+  continuar?: ContinuarNoChat[]
+  /** Progresso do agente (pós-11): a iteração atual e o teto — "iteração 2 de 25". */
+  iteracaoAtual?: number
+  tetoAtual?: number
+  /** Quando a corrida começou (pós-11) — o contador "há Xs" do dono. */
+  inicioEm?: number
+}
+
+export interface ContinuarNoChat {
+  id: string
+  status: 'aguardando' | 'continuado' | 'parado' | 'expirado'
+  /** Iterações usadas quando pausou (= o teto da época). */
+  iteracoes: number
+  /** Orçamento cheio que o Continuar concede. */
+  teto: number
+  /** Ordem de chegada (pós-11) — a tela mostra os cartões em ordem cronológica. */
+  ordem?: number
+  /** Título próprio (pós-11) — o cartão de "continuar após erro" não é teto. */
+  titulo?: string
+  /** Texto próprio (pós-11) — ausente = o texto padrão do teto. */
+  motivo?: string
+}
+
+export interface ComposerDraft {
+  text: string
+  attachments: Attachment[]
+}
+
+export interface ComposerHistoryEntry {
+  text: string
+  attachments: Attachment[]
+  model: string
+  mode: string
+}
+
+export interface NestedChat {
+  id: string
+  title: string
+  status: ChatStatus
+  unread?: boolean
+  approval?: string
+  messages: ChatMessage[]
+}
+
+export interface Session {
+  id: string
+  title: string
+  workspace: string
+  workspacePath: string
+  /** Stable filesystem-safe project key used by SQLite and JSONL storage. */
+  slug?: string
+  /** Optional isolated directory; null/absent means direct workspace mode. */
+  worktreePath?: string | null
+  section: SessionSection
+  status: SessionStatus
+  updated: string
+  diffAdded: number
+  diffRemoved: number
+  branch: string | null
+  pinned?: boolean
+  unread?: boolean
+  archived?: boolean
+  ciFailure?: boolean
+  approval?: string
+  chats: NestedChat[]
+  mainChatId: string
+  /** Provider-neutral kind flags (SESSIONS_LIST.md §Placement precedence). */
+  isQuickChat?: boolean
+  /** Automation runs are excluded from the primary Sessions list. */
+  automation?: boolean
+  /** Custom-group membership id, when the user assigned one. */
+  customGroup?: string
+  /** Provider identity, for composite filtering. Defaults to 'local'. */
+  provider?: string
+  /**
+   * Draft não-commitado (SESSIONS.md §Drafts / §New session): uma nova sessão
+   * é um rascunho até o primeiro envio; ao enviar entra no catálogo commitado.
+   * Abandonar um draft o descarta.
+   */
+  isDraft?: boolean
+  /** Monotonic creation/update sort keys (list-owned, not provider timestamps). */
+  createdSeq?: number
+  updatedSeq?: number
+  /** Monotonic write token used to reject late/stale session snapshots. */
+  persistenceRevision?: number
+}
+
+export interface BrowserViewState {
+  id: string
+  sessionId: string
+  title: string
+  url: string
+  history: string[]
+  historyIndex: number
+  status: BrowserStatus
+  viewport: BrowserViewport
+  reloadToken: number
+}
+
+export interface EditorTab {
+  id: string
+  type: EditorTabType
+  title: string
+  sessionId?: string
+  path?: string
+  browserId?: string
+  content?: string
+  isRealFile?: boolean
+  /** (BLOCO 4.4-fix BUG-P1) binário aberto do Explorer — renderiza Image Preview
+   *  de verdade (data URL), nunca via Monaco. Aditivo ao contrato do tab. */
+  imagePreview?: { dataBase64: string; mime: string }
+  /** (4.4-fix, validação manual) Falha de leitura do disco/da handle — exibida
+   *  como error editor EXPLÍCITO na aba (padrão VS Code `createEditorOpenError`),
+   *  nunca conteúdo sintético/mock silencioso. */
+  readError?: string
+}
+
+export type DiffResolution = 'accepted' | 'reverted'
+
+export interface DiffFile {
+  id: string
+  path: string
+  status: 'modified' | 'added' | 'deleted' | 'renamed'
+  added: number
+  removed: number
+  original: string
+  modified: string
+  viewed?: boolean
+  /** Compatibility flag retained for the existing mock contract. */
+  accepted?: boolean
+  /** Explicit in-memory outcome of an accept/revert action. */
+  resolution?: DiffResolution
+}
+
+export interface SearchResult {
+  path: string
+  line: number
+  content: string
+  match: string
+}
+
+export interface Attachment {
+  id: string
+  name: string
+  kind: 'workspace' | 'local'
+}
+

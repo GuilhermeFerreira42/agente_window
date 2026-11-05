@@ -1,0 +1,144 @@
+{
+ "topOffsetFirstItem": {
+  "abY": 35,
+  "firstItemY": 70,
+  "delta": 35,
+  "menubarInActivityBar": true,
+  "menubarH": 35,
+  "contentChildren": [
+   "menubar compact overflow-menu-only h=35",
+   "composite-bar h=240",
+   " h=96"
+  ]
+ },
+ "right": {
+  "workbenchCls": "",
+  "activityBar": {
+   "x": 0,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  },
+  "sideBar": {
+   "x": 48,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "editor": {
+   "x": 348,
+   "y": 35,
+   "w": 632,
+   "h": 743
+  },
+  "panel": {
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0
+  },
+  "abClasses": "part activitybar left bordered",
+  "sbClasses": "part sidebar left pane-composite-part",
+  "abBorder": {
+   "border-left-width": "0px",
+   "border-left-color": "rgb(240, 241, 242)",
+   "border-right-width": "1px"
+  },
+  "sbBorder": {
+   "border-left-width": "0px",
+   "border-left-color": "rgb(32, 32, 32)",
+   "border-right-width": "1px"
+  },
+  "indicator": {
+   "border-left-width": "2px",
+   "border-right-width": "0px",
+   "border-right-color": "rgb(32, 32, 32)",
+   "left": "0px",
+   "right": "46px"
+  },
+  "sash": {
+   "x": 346,
+   "w": 4,
+   "sbLeft": 48,
+   "offsetFromSbLeft": 298,
+   "cls": "monaco-sash vertical primary-sidebar-sash"
+  },
+  "badge": {
+   "top": "24px",
+   "right": "8px",
+   "left": "24px"
+  },
+  "titleActionsSide": {
+   "titleX": 48,
+   "labelX": 56,
+   "labelPaddingLeft": 8,
+   "actionsRightGap": 8
+  }
+ },
+ "rightPanel": {
+  "panel": {
+   "x": 300,
+   "y": 511.328125,
+   "w": 632,
+   "h": 266.65625
+  },
+  "editor": {
+   "x": 300,
+   "y": 35,
+   "w": 632,
+   "h": 476.328125
+  },
+  "sideBar": {
+   "x": 932,
+   "y": 35,
+   "w": 300,
+   "h": 743
+  },
+  "activityBar": {
+   "x": 1232,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  }
+ },
+ "rightClosed": {
+  "sideBar": {
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0
+  },
+  "activityBar": {
+   "x": 1232,
+   "y": 35,
+   "w": 48,
+   "h": 743
+  },
+  "editor": {
+   "x": 300,
+   "y": 35,
+   "w": 932,
+   "h": 476.328125
+  },
+  "panel": {
+   "x": 300,
+   "y": 511.328125,
+   "w": 932,
+   "h": 266.65625
+  }
+ },
+ "restored": {
+  "sideBar": {
+   "x": 932,
+   "y": 61,
+   "w": 300,
+   "h": 717
+  },
+  "activityBar": {
+   "x": 1232,
+   "y": 61,
+   "w": 48,
+   "h": 717
+  }
+ }
+}

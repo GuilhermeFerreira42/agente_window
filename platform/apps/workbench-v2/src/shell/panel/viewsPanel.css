@@ -1,0 +1,72 @@
+/* FATIA-05 5.5 — Views Panel (new `.part.panel` above the terminal). Tokens only (D20). No transitions (RF-11).
+ * Height not measured — validate on Windows homologation. */
+.part.panel.views-panel {
+  flex: 0 0 var(--views-panel-height, 240px);
+  height: var(--views-panel-height, 240px);
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-top: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-panel-background);
+  color: var(--vscode-foreground);
+  position: relative;
+  overflow: hidden;
+}
+.part.panel.views-panel.drop-target { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-dropBackground, var(--vscode-panel-background)); }
+
+/* switcher: 35 px, tabs uppercase 11 px como o Panel do VS Code (title actions omitidas) */
+.part.panel.views-panel > .panel-switcher {
+  flex: 0 0 35px;
+  height: 35px;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  gap: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.part.panel.views-panel .panel-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: grab;
+  user-select: none;
+  color: var(--vscode-panelTitle-inactiveForeground, var(--vscode-foreground));
+  outline: none;
+}
+.part.panel.views-panel .panel-tab:active { cursor: grabbing; }
+.part.panel.views-panel .panel-tab:hover,
+.part.panel.views-panel .panel-tab.checked { color: var(--vscode-panelTitle-activeForeground, var(--vscode-foreground)); }
+.part.panel.views-panel .panel-tab.checked::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 1px;
+  background: var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder));
+}
+.part.panel.views-panel .panel-tab.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--vscode-focusBorder);
+}
+.part.panel.views-panel .panel-tab:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+
+.part.panel.views-panel > .content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.part.panel.views-panel .views-panel-pane { flex: 1 1 auto; min-height: 0; flex-direction: column; overflow: hidden; }
+/* as views reaproveitam o CSS da Side Bar (.side-bar-view) — o pane do Panel só precisa preencher */
+.part.panel.views-panel .views-panel-pane > .side-bar-view { flex: 1 1 auto; min-height: 0; }
+
+/* empty panel only exists on screen while a view drag is in flight: slim strip with a hint */
+.part.panel.views-panel.empty { flex-basis: 35px; height: 35px; }
+.part.panel.views-panel.empty > .panel-switcher { border-bottom: 0; }
+.part.panel.views-panel .panel-drop-hint { display: flex; align-items: center; font-size: 11px; text-transform: uppercase; color: var(--vscode-descriptionForeground); padding: 0 10px; pointer-events: none; }

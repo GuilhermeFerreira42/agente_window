@@ -1,0 +1,409 @@
+{
+  "scenario": "SCM 1000",
+  "fixture": "/tmp/d98-fixtures/scm-1000",
+  "startedAt": "2026-10-28T15:44:12.732Z",
+  "requests": [
+    {
+      "path": "/fs/root",
+      "method": "GET",
+      "at": 6018.420635
+    },
+    {
+      "path": "/fs/root",
+      "method": "GET",
+      "at": 6018.6042
+    },
+    {
+      "path": "/fs/stat",
+      "method": "POST",
+      "at": 6075.693109
+    },
+    {
+      "path": "/fs/list",
+      "method": "GET",
+      "at": 6094.726483
+    },
+    {
+      "path": "/fs/stat",
+      "method": "POST",
+      "at": 6117.474335
+    },
+    {
+      "path": "/git/status",
+      "method": "POST",
+      "at": 6168.678738
+    },
+    {
+      "path": "/fs/workspace",
+      "method": "POST",
+      "at": 6632.159626
+    },
+    {
+      "path": "/fs/workspace",
+      "method": "POST",
+      "at": 6660.899944
+    },
+    {
+      "path": "/fs/root",
+      "method": "GET",
+      "at": 6700.076983
+    },
+    {
+      "path": "/fs/stat",
+      "method": "POST",
+      "at": 6706.292109
+    },
+    {
+      "path": "/fs/list",
+      "method": "GET",
+      "at": 6709.859362
+    },
+    {
+      "path": "/fs/stat",
+      "method": "POST",
+      "at": 6711.67209
+    },
+    {
+      "path": "/git/status",
+      "method": "POST",
+      "at": 6730.242836
+    },
+    {
+      "path": "/git/status",
+      "method": "POST",
+      "at": 7651.30626
+    }
+  ],
+  "responses": [
+    {
+      "path": "/fs/root",
+      "status": 200,
+      "at": 6057.008037
+    },
+    {
+      "path": "/fs/root",
+      "status": 200,
+      "at": 6059.991755
+    },
+    {
+      "path": "/fs/stat",
+      "status": 200,
+      "at": 6093.58162
+    },
+    {
+      "path": "/fs/list",
+      "status": 200,
+      "at": 6107.556283
+    },
+    {
+      "path": "/fs/stat",
+      "status": 200,
+      "at": 6119.31689
+    },
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 6253.983533,
+      "bytes": 130045,
+      "entries": 1000
+    },
+    {
+      "path": "/fs/workspace",
+      "status": 200,
+      "at": 6648.573905
+    },
+    {
+      "path": "/fs/workspace",
+      "status": 200,
+      "at": 6700.023528
+    },
+    {
+      "path": "/fs/root",
+      "status": 200,
+      "at": 6700.243983
+    },
+    {
+      "path": "/fs/stat",
+      "status": 200,
+      "at": 6708.063385
+    },
+    {
+      "path": "/fs/list",
+      "status": 200,
+      "at": 6710.905469
+    },
+    {
+      "path": "/fs/stat",
+      "status": 200,
+      "at": 6713.146466
+    },
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 6760.321862,
+      "bytes": 130045,
+      "entries": 1000
+    },
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 7655.735392,
+      "bytes": 130045,
+      "entries": 1000
+    }
+  ],
+  "consoleErrors": [
+    "Warning: Attempted to synchronously unmount a root while React was already rendering. React cannot finish unmounting the root until the current render has completed, which may lead to a race condition.%s \n    at App (http://127.0.0.1:5175/src/App.tsx:229:27)\n    at TerminalSessionProvider (http://127.0.0.1:5175/src/providers/TerminalSessionProvider.tsx:53:43)"
+  ],
+  "pageErrors": [],
+  "statusResponses": [
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 6253.983533,
+      "bytes": 130045,
+      "entries": 1000
+    },
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 6760.321862,
+      "bytes": 130045,
+      "entries": 1000
+    },
+    {
+      "path": "/git/status",
+      "status": 200,
+      "at": 7655.735392,
+      "bytes": 130045,
+      "entries": 1000
+    }
+  ],
+  "selectWorkspaceMs": 481.88,
+  "scmViewReadyMs": 648.25,
+  "afterMount": {
+    "resourceRows": 1000,
+    "totalRows": 1002,
+    "domNodes": 20558,
+    "commits": 52,
+    "longTasks": [
+      {
+        "startTime": 5164.5,
+        "duration": 166
+      },
+      {
+        "startTime": 5336.299999999814,
+        "duration": 84
+      },
+      {
+        "startTime": 5580.700000000186,
+        "duration": 69
+      },
+      {
+        "startTime": 5661.799999999814,
+        "duration": 309
+      },
+      {
+        "startTime": 6166.5,
+        "duration": 235
+      }
+    ],
+    "viewport": 726
+  },
+  "refreshHttpMs": 411.5,
+  "refreshResponseStatus": 200,
+  "refreshToPaintMs": 459.9,
+  "scrollInputToFrameMs": 60.52,
+  "final": {
+    "resourceRows": 1000,
+    "totalRows": 1002,
+    "domNodes": 20558,
+    "commits": [
+      5403.600000000559,
+      5420.5,
+      5458.100000000559,
+      5492.200000000186,
+      5498.4000000003725,
+      5531.9000000003725,
+      5538.9000000003725,
+      5545.799999999814,
+      5546.9000000003725,
+      5550,
+      5550.700000000186,
+      5550.9000000003725,
+      5555.700000000186,
+      5556.600000000559,
+      5570.200000000186,
+      5570.9000000003725,
+      5574.200000000186,
+      5574.4000000003725,
+      5574.4000000003725,
+      5574.5,
+      5574.600000000559,
+      5575.600000000559,
+      5579.799999999814,
+      5580.700000000186,
+      5653.4000000003725,
+      5658.600000000559,
+      5971.100000000559,
+      5987.299999999814,
+      5994.100000000559,
+      6014.600000000559,
+      6039.700000000186,
+      6061.9000000003725,
+      6063.700000000186,
+      6069.799999999814,
+      6086.9000000003725,
+      6091.9000000003725,
+      6093.100000000559,
+      6123.299999999814,
+      6125.100000000559,
+      6127.299999999814,
+      6127.799999999814,
+      6128.5,
+      6128.700000000186,
+      6129.9000000003725,
+      6130.100000000559,
+      6130.299999999814,
+      6132.299999999814,
+      6136.799999999814,
+      6137.5,
+      6161.100000000559,
+      6402.100000000559,
+      6629.600000000559,
+      7019.600000000559,
+      7139.9000000003725
+    ],
+    "longTasks": [
+      {
+        "startTime": 5164.5,
+        "duration": 166
+      },
+      {
+        "startTime": 5336.299999999814,
+        "duration": 84
+      },
+      {
+        "startTime": 5580.700000000186,
+        "duration": 69
+      },
+      {
+        "startTime": 5661.799999999814,
+        "duration": 309
+      },
+      {
+        "startTime": 6166.5,
+        "duration": 235
+      },
+      {
+        "startTime": 6790.9000000003725,
+        "duration": 229
+      },
+      {
+        "startTime": 7034.200000000186,
+        "duration": 105
+      }
+    ],
+    "performance": []
+  },
+  "cdpMetrics": {
+    "JSEventListeners": 4295,
+    "Nodes": 24991,
+    "LayoutDuration": 0.118056,
+    "RecalcStyleDuration": 0.120405,
+    "ScriptDuration": 1.297866,
+    "TaskDuration": 2.209739,
+    "JSHeapUsedSize": 45631932,
+    "JSHeapTotalSize": 50286592
+  },
+  "durationFromNavMs": 7349.83,
+  "crashed": true,
+  "trace": {
+    "events": 48403,
+    "bytes": 9018561,
+    "gzBytes": 708115,
+    "names": [
+      "thread_name",
+      "process_name",
+      "process_uptime_seconds",
+      "RunTask",
+      "Commit",
+      "EventDispatch",
+      "UpdateLayoutTree",
+      "InvalidateLayout",
+      "Layout",
+      "SetLayerTreeId",
+      "PrePaint",
+      "DOMStats",
+      "Paint",
+      "Layerize",
+      "BeginCommitCompositorFrame",
+      "TracingStartedInBrowser",
+      "navigationStart",
+      "fetchStart",
+      "ResourceWillSendRequest",
+      "domLoading",
+      "responseEnd",
+      "MetaCharsetCheck",
+      "ParseHTML",
+      "ScheduleStyleRecalculation",
+      "UpdateCounters",
+      "domInteractive",
+      "domContentLoadedEventStart",
+      "domContentLoadedEventEnd",
+      "domComplete",
+      "FrameCommittedInBrowser",
+      "FrameStartedLoading",
+      "unloadEventStart",
+      "unloadEventEnd",
+      "ResourceSendRequest",
+      "ResourceReceiveResponse",
+      "commitNavigationEnd",
+      "CommitLoad",
+      "ResourceReceivedData",
+      "HTMLDocumentParser::MaybeFetchQueuedPreloads",
+      "V8.StackGuard",
+      "V8.HandleInterrupts",
+      "V8.InvokeApiInterruptCallbacks",
+      "v8.compileModule",
+      "ParseMetaViewport",
+      "ResourceFinish",
+      "BackgroundProcessor::MaybeStartProcessingResponse",
+      "BackgroundJSStreamManager::TryStartStreamingTask",
+      "BackgroundJSStreamManager::RunScriptStreamingTask",
+      "v8.parseOnBackground",
+      "v8.parseOnBackgroundParsing",
+      "BackgroundJSStreamManager::OnFinishStreaming",
+      "v8.parseOnBackgroundWaiting",
+      "v8.evaluateModule",
+      "WebSocketCreate",
+      "RunMicrotasks",
+      "WebSocketSendHandshakeRequest",
+      "WebSocketReceiveHandshakeResponse",
+      "FunctionCall",
+      "WebSocketReceive",
+      "TimerInstall",
+      "BackgroundJSStreamManager::OnDataPipeReadable",
+      "V8.GC_HEAP_EXTERNAL_PROLOGUE",
+      "MinorGC",
+      "V8.GC_HEAP_PROLOGUE",
+      "V8.GC_TIME_TO_SAFEPOINT",
+      "V8.GC_SCAVENGER",
+      "V8.GC_HEAP_PROLOGUE_SAFEPOINT",
+      "V8.GC_SCAVENGER_SCAVENGE",
+      "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_IDENTIFY",
+      "ComputeWeaknessProcessor start",
+      "V8.GC_SCAVENGER_TRACED_HANDLES_COMPUTE_WEAKNESS_PARALLEL",
+      "V8.GC_SCAVENGER_SCAVENGE_COLLECT_OLD_TO_NEW_PAGES",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE",
+      "Parallel scavenge started",
+      "V8.GC_SCAVENGER_SCAVENGE_ROOTS",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL",
+      "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_PROCESS",
+      "ClearWeaknessProcessor start",
+      "V8.GC_SCAVENGER_TRACED_HANDLES_RESET_PARALLEL",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE"
+    ]
+  },
+  "finishedAt": "2026-10-28T15:44:21.403Z"
+}

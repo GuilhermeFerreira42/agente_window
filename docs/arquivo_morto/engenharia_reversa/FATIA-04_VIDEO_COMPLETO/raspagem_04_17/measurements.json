@@ -1,0 +1,2141 @@
+{
+  "workbench": {
+    "activitybar": {
+      "rect": {
+        "x": 0,
+        "y": 35,
+        "w": 48,
+        "h": 843
+      },
+      "height": "843px",
+      "width": "48px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(43, 43, 43)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "sidebar": {
+      "rect": {
+        "x": 48,
+        "y": 35,
+        "w": 300,
+        "h": 843
+      },
+      "height": "843px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgba(83, 89, 93, 0.5) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "editor": {
+      "rect": {
+        "x": 348,
+        "y": 35,
+        "w": 1052,
+        "h": 843
+      },
+      "height": "843px",
+      "width": "1052px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "statusbar": {
+      "rect": {
+        "x": 0,
+        "y": 878,
+        "w": 1400,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "1400px",
+      "font-size": "12px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "titlebar": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1400,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "1400px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "rgba(0, 0, 0, 0.08) 0px 0px 6px 0px",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "sash_sidebar": {
+      "rect": {
+        "x": 46,
+        "y": 35,
+        "w": 4,
+        "h": 843
+      },
+      "height": "843px",
+      "width": "4px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "sash_size_var": "4px",
+    "sash_hover_size": "4px"
+  },
+  "explorer": {
+    "composite_title": {
+      "rect": {
+        "x": 48,
+        "y": 35,
+        "w": 299,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "299px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px 8px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "composite_title_h2": {
+      "rect": {
+        "x": 68,
+        "y": 35,
+        "w": 58,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "57.75px",
+      "font-size": "11px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "35px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "uppercase"
+    },
+    "pane_header": {
+      "rect": {
+        "x": 48,
+        "y": 70,
+        "w": 300,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "300px",
+      "font-size": "11px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "700",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "pane_header_generic": {
+      "rect": {
+        "x": 48,
+        "y": 70,
+        "w": 300,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "300px",
+      "font-size": "11px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "700",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "pane_header_title": {
+      "rect": {
+        "x": 68,
+        "y": 70,
+        "w": 111,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "110.828px",
+      "font-size": "11px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "700",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "uppercase"
+    },
+    "pane_header_twistie": {
+      "rect": {
+        "x": 50,
+        "y": 74,
+        "w": 16,
+        "h": 16
+      },
+      "height": "16px",
+      "width": "16px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px 2px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "folders_view": {
+      "rect": {
+        "x": 48,
+        "y": 92,
+        "w": 300,
+        "h": 742
+      },
+      "height": "742px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "header_actions": [
+      {
+        "title": "New File...",
+        "classes": "action-label codicon codicon-new-file",
+        "w": 20,
+        "h": 20,
+        "fontSize": "16px",
+        "color": "rgb(204, 204, 204)",
+        "padding": "2px",
+        "borderRadius": "6px"
+      },
+      {
+        "title": "New Folder...",
+        "classes": "action-label codicon codicon-new-folder",
+        "w": 20,
+        "h": 20,
+        "fontSize": "16px",
+        "color": "rgb(204, 204, 204)",
+        "padding": "2px",
+        "borderRadius": "6px"
+      },
+      {
+        "title": "Refresh Explorer",
+        "classes": "action-label codicon codicon-refresh",
+        "w": 20,
+        "h": 20,
+        "fontSize": "16px",
+        "color": "rgb(204, 204, 204)",
+        "padding": "2px",
+        "borderRadius": "6px"
+      },
+      {
+        "title": "Collapse Folders in Explorer",
+        "classes": "action-label codicon codicon-collapse-all",
+        "w": 20,
+        "h": 20,
+        "fontSize": "16px",
+        "color": "rgb(204, 204, 204)",
+        "padding": "2px",
+        "borderRadius": "6px"
+      }
+    ],
+    "header_actions_container": {
+      "rect": {
+        "x": 244,
+        "y": 71,
+        "w": 96,
+        "h": 20
+      },
+      "height": "20px",
+      "width": "96px",
+      "font-size": "11px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "700",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px 8px 0px 65.1719px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    }
+  },
+  "tree": {
+    "list": {
+      "rect": {
+        "x": 48,
+        "y": 92,
+        "w": 300,
+        "h": 742
+      },
+      "height": "742px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "rows_container": {
+      "rect": {
+        "x": 48,
+        "y": 92,
+        "w": 300,
+        "h": 110
+      },
+      "height": "110px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "row": {
+      "rect": {
+        "x": 48,
+        "y": 92,
+        "w": 300,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "twistie": {
+      "rect": {
+        "x": 51,
+        "y": 92,
+        "w": 30,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "16px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px 6px 0px 8px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "indent": {
+      "rect": {
+        "x": 64,
+        "y": 92,
+        "w": 0,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "0px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "contents": {
+      "rect": {
+        "x": 78,
+        "y": 92,
+        "w": 270,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "270px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "label": {
+      "rect": {
+        "x": 78,
+        "y": 92,
+        "w": 270,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "270px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "label_name": {
+      "rect": {
+        "x": 78,
+        "y": 95,
+        "w": 30,
+        "h": 15
+      },
+      "height": "auto",
+      "width": "auto",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "indent_var": "",
+    "indent_guides": "",
+    "rows_sample": [
+      {
+        "level": "1",
+        "label": "docs",
+        "classes": "monaco-list-row focused selected",
+        "top": "0px",
+        "height": "22px",
+        "indentWidth": 0,
+        "twistieLeft": 51,
+        "contentsLeft": 78,
+        "iconClasses": "monaco-icon-label folder-icon agente_window-name-dir-icon docs-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "comparacao-terminal",
+        "classes": "monaco-list-row",
+        "top": "22px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 86,
+        "iconClasses": "monaco-icon-label folder-icon docs-name-dir-icon comparacao-terminal-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "engenharia_reversa",
+        "classes": "monaco-list-row",
+        "top": "44px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 86,
+        "iconClasses": "monaco-icon-label folder-icon docs-name-dir-icon engenharia_reversa-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "historico_homologacao",
+        "classes": "monaco-list-row",
+        "top": "66px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 86,
+        "iconClasses": "monaco-icon-label folder-icon docs-name-dir-icon historico_homologacao-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "historico_migracao_temporaria",
+        "classes": "monaco-list-row",
+        "top": "88px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 86,
+        "iconClasses": "monaco-icon-label folder-icon docs-name-dir-icon historico_migracao_temporaria-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "referencias_visuais",
+        "classes": "monaco-list-row",
+        "top": "110px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 86,
+        "iconClasses": "monaco-icon-label folder-icon docs-name-dir-icon referencias_visuais-name-folder-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "00_COMO_LER_ESTA_DOCUMENTACAO.md",
+        "classes": "monaco-list-row",
+        "top": "132px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 00_como_ler_esta_documentacao.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "01_FONTE_DA_VERDADE.md",
+        "classes": "monaco-list-row",
+        "top": "154px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 01_fonte_da_verdade.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "02_ESCOPO_V1_E_NAO_ESCOPO.md",
+        "classes": "monaco-list-row",
+        "top": "176px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 02_escopo_v1_e_nao_escopo.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "03_ARQUITETURA_EXECUTAVEL.md",
+        "classes": "monaco-list-row",
+        "top": "198px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 03_arquitetura_executavel.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "03A_FLUXOS_ARQUITETURAIS_E_EXEMPLOS.md",
+        "classes": "monaco-list-row",
+        "top": "220px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 03a_fluxos_arquiteturais_e_exemplos.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      },
+      {
+        "level": "2",
+        "label": "04_CONTRATOS_TECNICOS.md",
+        "classes": "monaco-list-row",
+        "top": "242px",
+        "height": "22px",
+        "indentWidth": 8,
+        "twistieLeft": 51,
+        "contentsLeft": 64,
+        "iconClasses": "monaco-icon-label file-icon docs-name-dir-icon 04_contratos_tecnicos.md-name-file-icon name-file-icon md-ext-file-icon ext-file-icon markdown-lang-file-icon explorer-item"
+      }
+    ],
+    "row_hover": {
+      "bg": "rgb(42, 45, 46)",
+      "color": "rgb(204, 204, 204)",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "cursor": "pointer"
+    },
+    "row_selected_focused": {
+      "classes": "monaco-list-row focused selected",
+      "bg": "rgb(4, 57, 94)",
+      "color": "rgb(255, 255, 255)",
+      "outline": "rgb(0, 120, 212) solid 1px",
+      "outlineOffset": "-1px",
+      "listFocused": true
+    },
+    "row_selected_inactive": {
+      "classes": "monaco-list-row focused selected",
+      "bg": "rgb(55, 55, 61)",
+      "color": "rgb(204, 204, 204)",
+      "outline": "rgb(204, 204, 204) none 0px"
+    },
+    "indent_guide": {
+      "rect": {
+        "x": 64,
+        "y": 114,
+        "w": 8,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "8px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "22px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "0",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "inline_input": {
+      "inputbox": {
+        "rect": {
+          "x": 86,
+          "y": 196,
+          "w": 262,
+          "h": 22
+        },
+        "height": "22px",
+        "width": "262px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "normal",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgb(49, 49, 49)",
+        "border": "1px solid rgb(60, 60, 60)",
+        "border-radius": "4px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(0, 120, 212) solid 1px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "input": {
+        "rect": {
+          "x": 87,
+          "y": 197,
+          "w": 260,
+          "h": 20
+        },
+        "height": "20px",
+        "width": "260px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "normal",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "text",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      }
+    },
+    "inline_input_error": {
+      "msg": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "height": "auto",
+        "width": "100%",
+        "font-size": "12px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "17px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgb(53, 42, 5)",
+        "border": "1px solid rgb(184, 149, 0)",
+        "border-radius": "0px",
+        "padding": "4.8px",
+        "margin": "-1px 0px 0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "auto",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "box": {
+        "rect": {
+          "x": 86,
+          "y": 196,
+          "w": 262,
+          "h": 22
+        },
+        "height": "22px",
+        "width": "262px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "normal",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgb(49, 49, 49)",
+        "border": "1px solid rgb(60, 60, 60)",
+        "border-radius": "4px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(0, 120, 212) solid 1px",
+        "box-shadow": "none",
+        "cursor": "pointer",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      }
+    },
+    "dnd_over": {
+      "rowDropTarget": null,
+      "listDropTarget": null
+    }
+  },
+  "context_menu": {
+    "container": {
+      "rect": {
+        "x": 198,
+        "y": 149,
+        "w": 348,
+        "h": 436
+      },
+      "height": "436px",
+      "width": "348.281px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "8px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "rgba(0, 0, 0, 0.14) 0px 0px 12px 0px",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "menu": {
+      "rect": {
+        "x": 198,
+        "y": 149,
+        "w": 348,
+        "h": 436
+      },
+      "height": "434px",
+      "width": "346.281px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "1px solid rgb(69, 69, 69)",
+      "border-radius": "8px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "item": {
+      "rect": {
+        "x": 199,
+        "y": 154,
+        "w": 346,
+        "h": 24
+      },
+      "height": "24px",
+      "width": "346.281px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "label": {
+      "rect": {
+        "x": 203,
+        "y": 160,
+        "w": 338,
+        "h": 13
+      },
+      "height": "13px",
+      "width": "338.281px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "13px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "6px",
+      "padding": "0px 26px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "keybinding": {
+      "rect": {
+        "x": 373,
+        "y": 267,
+        "w": 168,
+        "h": 13
+      },
+      "height": "13px",
+      "width": "116.234px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "13px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "6px",
+      "padding": "0px 26px",
+      "margin": "0px",
+      "opacity": "0.7",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "separator": {
+      "rect": {
+        "x": 199,
+        "y": 255,
+        "w": 346,
+        "h": 1
+      },
+      "height": "0px",
+      "width": "346.281px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "13px",
+      "color": "rgba(204, 204, 204, 0.5)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "5px 0px",
+      "opacity": "1",
+      "outline": "rgba(204, 204, 204, 0.5) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "items": [
+      {
+        "label": "New File...",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "New Folder...",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Open in Images Preview",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Open in Integrated Terminal",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Find in Folder...",
+        "key": "Shift+Alt+F",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Add Folder to Chat",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Cut",
+        "key": "Ctrl+X",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Copy",
+        "key": "Ctrl+C",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Paste",
+        "key": "Ctrl+V",
+        "separator": false,
+        "disabled": true
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Download...",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Upload...",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Copy Path",
+        "key": "Ctrl+Alt+C",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Copy Relative Path",
+        "key": "Ctrl+Shift+Alt+C",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "",
+        "separator": true,
+        "disabled": true
+      },
+      {
+        "label": "Rename...",
+        "key": "F2",
+        "separator": false,
+        "disabled": false
+      },
+      {
+        "label": "Delete Permanently",
+        "key": "Del",
+        "separator": false,
+        "disabled": false
+      }
+    ],
+    "items_folder": [
+      {
+        "label": "New File...",
+        "separator": false
+      },
+      {
+        "label": "New Folder...",
+        "separator": false
+      },
+      {
+        "label": "Open in Images Preview",
+        "separator": false
+      },
+      {
+        "label": "Open in Integrated Terminal",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Find in Folder...",
+        "key": "Shift+Alt+F",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Add Folder to Chat",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Cut",
+        "key": "Ctrl+X",
+        "separator": false
+      },
+      {
+        "label": "Copy",
+        "key": "Ctrl+C",
+        "separator": false
+      },
+      {
+        "label": "Paste",
+        "key": "Ctrl+V",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Download...",
+        "separator": false
+      },
+      {
+        "label": "Upload...",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Copy Path",
+        "key": "Ctrl+Alt+C",
+        "separator": false
+      },
+      {
+        "label": "Copy Relative Path",
+        "key": "Ctrl+Shift+Alt+C",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Rename...",
+        "key": "F2",
+        "separator": false
+      },
+      {
+        "label": "Delete Permanently",
+        "key": "Del",
+        "separator": false
+      }
+    ],
+    "items_empty_area": [
+      {
+        "label": "Open Preview",
+        "separator": false
+      },
+      {
+        "label": "Open to the Side",
+        "key": "Ctrl+Enter",
+        "separator": false
+      },
+      {
+        "label": "Open With...",
+        "separator": false
+      },
+      {
+        "label": "Open in Integrated Terminal",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Select for Compare",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Find File References",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Open Timeline",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Add File to Chat",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Cut",
+        "key": "Ctrl+X",
+        "separator": false
+      },
+      {
+        "label": "Copy",
+        "key": "Ctrl+C",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Download...",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Copy Path",
+        "key": "Ctrl+Alt+C",
+        "separator": false
+      },
+      {
+        "label": "Copy Relative Path",
+        "key": "Ctrl+Shift+Alt+C",
+        "separator": false
+      },
+      {
+        "label": "",
+        "separator": true
+      },
+      {
+        "label": "Rename...",
+        "key": "F2",
+        "separator": false
+      },
+      {
+        "label": "Delete Permanently",
+        "key": "Del",
+        "separator": false
+      }
+    ]
+  },
+  "editor": {
+    "title_container": {
+      "rect": {
+        "x": 348,
+        "y": 35,
+        "w": 1052,
+        "h": 57
+      },
+      "height": "57px",
+      "width": "1052px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(24, 24, 24)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tabs_container": {
+      "rect": {
+        "x": 348,
+        "y": 35,
+        "w": 936,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "936px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab": {
+      "rect": {
+        "x": 348,
+        "y": 35,
+        "w": 143,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "142.641px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(255, 255, 255)",
+      "background-color": "rgb(31, 31, 31)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px 0px 0px 10px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(255, 255, 255) none 0px",
+      "box-shadow": "rgba(0, 0, 0, 0.02) 0px 8px 12px 0px inset",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab_label": {
+      "rect": {
+        "x": 358,
+        "y": 35,
+        "w": 104,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "103.641px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "35px",
+      "color": "rgb(255, 255, 255)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(255, 255, 255)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(255, 255, 255) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab_label_a": {
+      "rect": {
+        "x": 380,
+        "y": 45,
+        "w": 81,
+        "h": 15
+      },
+      "height": "auto",
+      "width": "auto",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "35px",
+      "color": "rgb(255, 255, 255)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(255, 255, 255)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(255, 255, 255) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab_close": {
+      "rect": {
+        "x": 466,
+        "y": 43,
+        "w": 20,
+        "h": 20
+      },
+      "height": "16px",
+      "width": "16px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(255, 255, 255)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(255, 255, 255)",
+      "border-radius": "6px",
+      "padding": "2px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(255, 255, 255) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab_active": {
+      "rect": {
+        "x": 348,
+        "y": 35,
+        "w": 143,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "142.641px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(255, 255, 255)",
+      "background-color": "rgb(31, 31, 31)",
+      "border": "",
+      "border-radius": "0px",
+      "padding": "0px 0px 0px 10px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(255, 255, 255) none 0px",
+      "box-shadow": "rgba(0, 0, 0, 0.02) 0px 8px 12px 0px inset",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "tab_preview_fontstyle": "italic",
+    "tab_classes": [
+      "tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top"
+    ],
+    "editor_actions": {
+      "rect": {
+        "x": 1284,
+        "y": 35,
+        "w": 116,
+        "h": 35
+      },
+      "height": "35px",
+      "width": "104px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px 8px 0px 4px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "editor_actions_items": [
+      {
+        "title": "Open Preview to the Side (Ctrl+K V)\n[Alt] Open Preview",
+        "cls": "action-label codicon codicon-open-preview",
+        "w": 22,
+        "h": 22
+      },
+      {
+        "title": "Open as Preview",
+        "cls": "action-label codicon codicon-preview",
+        "w": 22,
+        "h": 22
+      },
+      {
+        "title": "Split Editor Right (Ctrl+\\)\n[Alt] Split Editor Down",
+        "cls": "action-label codicon codicon-split-horizontal",
+        "w": 22,
+        "h": 22
+      },
+      {
+        "title": "More Actions...",
+        "cls": "action-label codicon codicon-toolbar-more",
+        "w": 22,
+        "h": 22
+      }
+    ],
+    "breadcrumbs": {
+      "rect": {
+        "x": 348,
+        "y": 70,
+        "w": 1052,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "1052px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "breadcrumb_item": {
+      "rect": {
+        "x": 348,
+        "y": 70,
+        "w": 127,
+        "h": 22
+      },
+      "height": "22px",
+      "width": "118.641px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgba(204, 204, 204, 0.8)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgba(204, 204, 204, 0.8)",
+      "border-radius": "0px",
+      "padding": "0px 8px 0px 0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgba(204, 204, 204, 0.8) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "breadcrumb_items": [
+      {
+        "text": "README.md",
+        "cls": "file monaco-breadcrumb-item",
+        "w": 126.640625
+      }
+    ],
+    "breadcrumb_sep": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "height": "auto",
+      "width": "auto",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgba(204, 204, 204, 0.8)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgba(204, 204, 204, 0.8)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgba(204, 204, 204, 0.8) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "editor_container": {
+      "rect": {
+        "x": 348,
+        "y": 92,
+        "w": 1052,
+        "h": 786
+      },
+      "height": "786px",
+      "width": "1052px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(31, 31, 31)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "monaco_editor_font": {
+      "font": "\"Droid Sans Mono\", monospace",
+      "size": "14px",
+      "lh": "19px"
+    },
+    "group_border_var": "",
+    "tab_hover": {
+      "bg": "rgb(31, 31, 31)",
+      "closeVisible": "1 / vis visible / w 20"
+    },
+    "tab_after_dblclick_fontstyle": "normal",
+    "tabs_multi": [
+      {
+        "label": "README.md",
+        "cls": "tab tab-actions-right sizing-fit has-icon tab-border-bottom",
+        "italic": "normal",
+        "w": 142,
+        "h": 35,
+        "borderTop": "0px none rgb(157, 157, 157)",
+        "borderBottom": "0px none rgb(157, 157, 157)",
+        "bg": "rgb(24, 24, 24)",
+        "color": "rgb(157, 157, 157)"
+      },
+      {
+        "label": "-atualiza_git_1.0.bat",
+        "cls": "tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top",
+        "italic": "italic",
+        "w": 194,
+        "h": 35,
+        "borderTop": "0px none rgb(255, 255, 255)",
+        "borderBottom": "0px none rgb(255, 255, 255)",
+        "bg": "rgb(31, 31, 31)",
+        "color": "rgb(255, 255, 255)"
+      }
+    ],
+    "tab_dirty": {
+      "cls": "tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top",
+      "closeIconCls": "action-label codicon codicon-close-small"
+    },
+    "split": {
+      "groups": [
+        {
+          "x": 348,
+          "w": 526,
+          "active": false
+        },
+        {
+          "x": 874,
+          "w": 526,
+          "active": true
+        }
+      ],
+      "sash": {
+        "rect": {
+          "x": 872,
+          "y": 35,
+          "w": 4,
+          "h": 843
+        },
+        "height": "843px",
+        "width": "4px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "18.2px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "ew-resize",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      }
+    },
+    "drop_overlay": null,
+    "drop_overlay_dom": [
+      {
+        "cls": "margin-view-overlays",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 70,
+        "h": 6125
+      },
+      {
+        "cls": "view-overlays",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 595,
+        "h": 0
+      },
+      {
+        "cls": "overlayWidgets",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 526,
+        "h": 0
+      },
+      {
+        "cls": "editor-group-overlay-indicator overlay-move-transition",
+        "bg": "rgba(83, 89, 93, 0.5)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 526,
+        "h": 808
+      },
+      {
+        "cls": "editor-group-overlay-drop-into-prompt",
+        "bg": "rgb(32, 32, 32)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 221,
+        "h": 31
+      },
+      {
+        "cls": "margin-view-overlays focused",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 70,
+        "h": 6125
+      },
+      {
+        "cls": "view-overlays focused",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 595,
+        "h": 0
+      },
+      {
+        "cls": "overlayWidgets",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 526,
+        "h": 0
+      },
+      {
+        "cls": "drop-block-overlay",
+        "bg": "rgba(0, 0, 0, 0)",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "w": 1052,
+        "h": 843
+      }
+    ],
+    "empty": {
+      "watermark": {
+        "rect": {
+          "x": 738,
+          "y": 35,
+          "w": 272,
+          "h": 843
+        },
+        "height": "843px",
+        "width": "272px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "18.2px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px 390px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "auto",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "letterpress": {
+        "rect": {
+          "x": 746,
+          "y": 272,
+          "w": 256,
+          "h": 256
+        },
+        "height": "256px",
+        "width": "256px",
+        "font-size": "13px",
+        "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+        "font-weight": "400",
+        "line-height": "18.2px",
+        "color": "rgb(204, 204, 204)",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(204, 204, 204)",
+        "border-radius": "0px",
+        "padding": "0px",
+        "margin": "0px",
+        "opacity": "1",
+        "outline": "rgb(204, 204, 204) none 0px",
+        "box-shadow": "none",
+        "cursor": "auto",
+        "letter-spacing": "normal",
+        "text-transform": "none"
+      },
+      "shortcuts": [
+        "Open Chat",
+        "Ctrl+Alt+I",
+        "Show All Commands",
+        "Ctrl+Shift+P",
+        "Find in Files",
+        "Ctrl+Shift+F"
+      ]
+    }
+  },
+  "open_editors": {
+    "header": null,
+    "row": null,
+    "rows": []
+  },
+  "search": {
+    "view": {
+      "rect": {
+        "x": 48,
+        "y": 70,
+        "w": 300,
+        "h": 808
+      },
+      "height": "808px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "query_container": {
+      "rect": {
+        "x": 50,
+        "y": 76,
+        "w": 286,
+        "h": 26
+      },
+      "height": "26px",
+      "width": "286px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "inputbox": {
+      "rect": {
+        "x": 68,
+        "y": 76,
+        "w": 268,
+        "h": 26
+      },
+      "height": "26px",
+      "width": "268px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgb(49, 49, 49)",
+      "border": "1px solid rgb(60, 60, 60)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(0, 120, 212) solid 1px",
+      "box-shadow": "none",
+      "cursor": "auto",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "input": null,
+    "toggles": [
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-case-sensitive",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-whole-word",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-regex",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "title": "",
+        "cls": "find-filter-button monaco-custom-toggle",
+        "w": 0,
+        "h": 0
+      },
+      {
+        "title": "",
+        "cls": "monaco-custom-toggle codicon codicon-preserve-case",
+        "w": 0,
+        "h": 0
+      }
+    ],
+    "replace_toggle": {
+      "rect": {
+        "x": 50,
+        "y": 76,
+        "w": 16,
+        "h": 26
+      },
+      "height": "26px",
+      "width": "16px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "4px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "actions": [],
+    "details_toggle": {
+      "rect": {
+        "x": 313,
+        "y": 102,
+        "w": 25,
+        "h": 16
+      },
+      "height": "16px",
+      "width": "25px",
+      "font-size": "16px",
+      "font-family": "codicon",
+      "font-weight": "400",
+      "line-height": "16px",
+      "color": "rgb(204, 204, 204)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgb(204, 204, 204)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "0px",
+      "opacity": "1",
+      "outline": "rgb(204, 204, 204) none 0px",
+      "box-shadow": "none",
+      "cursor": "pointer",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    },
+    "messages": {
+      "rect": {
+        "x": 48,
+        "y": 116,
+        "w": 300,
+        "h": 0
+      },
+      "height": "0px",
+      "width": "300px",
+      "font-size": "13px",
+      "font-family": "system-ui, Ubuntu, \"Droid Sans\", sans-serif",
+      "font-weight": "400",
+      "line-height": "18.2px",
+      "color": "rgba(204, 204, 204, 0.65)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border": "0px none rgba(204, 204, 204, 0.65)",
+      "border-radius": "0px",
+      "padding": "0px",
+      "margin": "-5px 0px 0px",
+      "opacity": "1",
+      "outline": "rgba(204, 204, 204, 0.65) none 0px",
+      "box-shadow": "none",
+      "cursor": "default",
+      "letter-spacing": "normal",
+      "text-transform": "none"
+    }
+  }
+}

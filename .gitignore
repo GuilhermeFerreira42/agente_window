@@ -1,0 +1,79 @@
+# Dependency directories and package-manager caches
+node_modules/
+jspm_dependencies/
+.pnpm-store/
+.npm/
+.yarn/cache/
+
+# Build outputs and framework/compiler caches
+dist/
+build/
+out/
+target/
+.vite/
+.turbo/
+.next/
+.nuxt/
+.output/
+.svelte-kit/
+.parcel-cache/
+.cache/
+.runtime/
+.local/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local-only state, credentials and temporary test evidence
+.netrc
+.credentials/
+.secrets/
+playwright/.auth/
+.playwright-cli/
+playwright/.cache/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Environment variables and local secrets (keep checked-in examples explicit)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Claude Code
+.claude/
+code-server/
+# FATIA-04 (4.3): build do adapter FS p/ preview (compilado de server/fs)
+dist-fs-server/
+
+# FATIA 08 (D81): a chave de API mora FORA do repo (~/.agente_window/providers.json).
+# Regra aqui como segunda tranca — se algum caminho relativo surgir, nunca vai para o Git.
+.agente_window/
+providers.json
+providers.json.bak-*

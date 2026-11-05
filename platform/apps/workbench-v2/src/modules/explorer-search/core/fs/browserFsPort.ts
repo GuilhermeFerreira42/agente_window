@@ -1,0 +1,199 @@
+// ============================================================================
+// modules/explorer-search/core/fs/browserFsPort.ts — FileSystemPort HTTP.
+// Adapter browser (04_10 §2.1 mapeamento, 04_15 §4.3): fala com o Single Port
+// (/fs/*) via fetch; binário com maxBytes; erros carregam `code` do servidor.
+// Sem imports externos (core puro — FT-07): usa globals web (fetch).
+// ============================================================================
+import type { FileSystemPortLike, WorkspaceUri, SearchQuery } from '../../contract';
+import type { SearchTransportResult } from '../search/searchService';
+import type { ExplorerFsWatchClient } from '../watchClient';
+
+export interface BrowserFsPortOptions {
+  /** Base URL do Single Port (default: mesma origem do app). */
+  baseUrl?: string;
+  /** Cliente de watch (injetável para testes e no wiring 4.4). */
+  watchClient: ExplorerFsWatchClient;
+}
+
+/** Erro de I/O espelhado do servidor (`code` preserva a semântica). */
+export class BrowserFsError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'BrowserFsError';
+  }
+}
+
+type BrowserFsStat = Awaited<ReturnType<FileSystemPortLike['stat']>>;
+type PendingStat = { uri: WorkspaceUri; resolve(stat: BrowserFsStat): void; reject(error: unknown): void };
+type StatBatchResult =
+  | { ok: true; stat: BrowserFsStat }
+  | { ok: false; code: string; message: string; status: number };
+const STAT_BATCH_SIZE = 64;
+
+export class BrowserFsPort implements FileSystemPortLike {
+  private readonly base: string;
+  private readonly watchClient: ExplorerFsWatchClient;
+  private readonly pendingStats: PendingStat[] = [];
+  private statFlushScheduled = false;
+
+  constructor(options: BrowserFsPortOptions) {
+    this.base = options.baseUrl ?? '';
+    this.watchClient = options.watchClient;
+  }
+
+  private async json<T>(path: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(`${this.base}${path}`, init);
+    if (!res.ok) {
+      let code = 'io';
+      let message = res.statusText;
+      try {
+        const data = (await res.json()) as { code?: string; message?: string };
+        code = data.code ?? code;
+        message = data.message ?? message;
+      } catch {
+        /* corpo não-JSON — segue com status */
+      }
+      throw new BrowserFsError(code, message, res.status);
+    }
+    // Corpo vazio é VÁLIDO fora de GET (201/204 do server: createFile/mkdir/write).
+    // Ler como texto e só parsear quando não-vazio — /fs/upload 201 TEM corpo
+    // ({uri}) e os GETs sempre têm JSON. (BUG 4.4-E2E: res.json() em corpo vazio
+    // quebrava o commit inline após o create ter SUCESSO no disco.)
+    const text = await res.text();
+    return (text.length > 0 ? JSON.parse(text) : undefined) as T;
+  }
+
+  /** Descoberta da raiz configurada no servidor (Q9: boot sem picker).
+   *  Conveniência do ADAPTER — não faz parte da FileSystemPortLike congelada. */
+  async discoverRoot(): Promise<WorkspaceUri> {
+    const data = await this.json<{ root: WorkspaceUri }>('/fs/root');
+    return data.root;
+  }
+
+  /** 4.6 c2 — transporte de busca (POST /fs/search, c1). Conveniência do
+   *  ADAPTER (não faz parte da FileSystemPortLike congelada); o SearchService
+   *  detecta por duck-typing (`hasSearchTransport`). `signal` aborta o fetch
+   *  → o servidor cancela o walker ("última busca vence"). */
+  async searchText(input: { root: WorkspaceUri; query: SearchQuery; maxResults?: number; maxFiles?: number; signal?: AbortSignal }): Promise<SearchTransportResult> {
+    return this.json<SearchTransportResult>('/fs/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: input.root, query: input.query, maxResults: input.maxResults, maxFiles: input.maxFiles }),
+      signal: input.signal,
+    });
+  }
+
+  private post<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    return this.json<T>(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // ---- a porta congelada ----
+  list(input: { uri: WorkspaceUri }) {
+    return this.json<{ entries: Array<{ uri: WorkspaceUri; name: string; kind: 'file' | 'directory' }> }>(
+      `/fs/list?uri=${encodeURIComponent(input.uri)}`,
+    ).then((r) => r.entries);
+  }
+
+  stat(input: { uri: WorkspaceUri }): Promise<BrowserFsStat> {
+    return new Promise<BrowserFsStat>((resolve, reject) => {
+      this.pendingStats.push({ uri: input.uri, resolve, reject });
+      if (this.statFlushScheduled) return;
+      this.statFlushScheduled = true;
+      queueMicrotask(() => this.flushStatBatch());
+    });
+  }
+
+  private flushStatBatch(): void {
+    this.statFlushScheduled = false;
+    const batch = this.pendingStats.splice(0, STAT_BATCH_SIZE);
+    if (batch.length === 0) return;
+    const request: Promise<StatBatchResult[]> = batch.length === 1
+      ? this.post<BrowserFsStat>('/fs/stat', { uri: batch[0].uri }).then((stat) => [{ ok: true, stat }])
+      : this.post<{ results: StatBatchResult[] }>('/fs/statBatch', { uris: batch.map((item) => item.uri) })
+        .then((response) => {
+          if (!Array.isArray(response.results) || response.results.length !== batch.length) {
+            throw new BrowserFsError('io', 'Resposta inválida do lote de stat', 500);
+          }
+          return response.results;
+        });
+
+    void request.then(
+      (results) => {
+        results.forEach((result, index) => {
+          const pending = batch[index];
+          if (result.ok) pending.resolve(result.stat);
+          else pending.reject(new BrowserFsError(result.code, result.message, result.status));
+        });
+      },
+      (error: unknown) => { for (const pending of batch) pending.reject(error); },
+    ).finally(() => {
+      if (this.pendingStats.length > 0 && !this.statFlushScheduled) {
+        this.statFlushScheduled = true;
+        queueMicrotask(() => this.flushStatBatch());
+      }
+    });
+  }
+
+  readFile(input: { uri: WorkspaceUri }) {
+    return this.json<{ content: string; encoding: 'utf-8' }>(
+      `/fs/read?uri=${encodeURIComponent(input.uri)}`,
+    );
+  }
+
+  readFileBinary(input: { uri: WorkspaceUri; maxBytes?: number }) {
+    const max = input.maxBytes != null ? `&maxBytes=${input.maxBytes}` : '';
+    return this.json<{ dataBase64: string; mime: string }>(
+      `/fs/read?binary=1${max}&uri=${encodeURIComponent(input.uri)}`,
+    );
+  }
+
+  writeFile(input: { uri: WorkspaceUri; content: string; atomic: true }): Promise<void> {
+    return this.post('/fs/write', { uri: input.uri, content: input.content });
+  }
+
+  createFile(input: { uri: WorkspaceUri; content?: string }): Promise<void> {
+    return this.post('/fs/createFile', { uri: input.uri, content: input.content });
+  }
+
+  createFolder(input: { uri: WorkspaceUri }): Promise<void> {
+    return this.post('/fs/mkdir', { uri: input.uri });
+  }
+
+  copy(input: { from: WorkspaceUri; to: WorkspaceUri }): Promise<void> {
+    return this.post('/fs/copy', { from: input.from, to: input.to });
+  }
+
+  move(input: { from: WorkspaceUri; to: WorkspaceUri }): Promise<void> {
+    return this.post('/fs/rename', { from: input.from, to: input.to });
+  }
+
+  remove(input: { uri: WorkspaceUri; recursive?: boolean }): Promise<void> {
+    return this.post('/fs/delete', { uri: input.uri, recursive: input.recursive === true });
+  }
+
+  watch(input: { uri: WorkspaceUri }): Promise<{ watcherId: string }> {
+    // watchClient é ciclo de vida do próprio porto (criado no wiring, 4.4).
+    return Promise.resolve({ watcherId: this.watchClient.watch(input.uri) });
+  }
+
+  onEvent(
+    cb: (e: {
+      type: 'fs.changed';
+      changes: Array<{ uri: WorkspaceUri; kind: 'added' | 'removed' | 'changed' }>;
+    }) => void,
+  ): () => void {
+    return this.watchClient.onEvent(cb);
+  }
+
+  dispose(): void {
+    void this;
+  }
+}

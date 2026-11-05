@@ -1,0 +1,23 @@
+{
+  "baseUrl": "http://localhost:5173",
+  "wsUrls": [
+    "ws://localhost:5173/pty",
+    "ws://localhost:5173/pty",
+    "ws://localhost:5173/pty"
+  ],
+  "pageErrors": [],
+  "promptDetected": true,
+  "promptSample": "user@e2b:~$ echo PID_PROOF_1788902643059PID_PROOF_1788902643059user@e2b:~$  ",
+  "pidBeforeToggle": "21550",
+  "pidAfterToggle": "21550",
+  "samePidAfterToggle": true,
+  "markerPersisted": true,
+  "splitVisible": true,
+  "splitMarkerSeen": true,
+  "shellOptions": 2,
+  "shellPathBefore": "/bin/bash",
+  "shellPathAfter": "/bin/sh",
+  "shellSwitchAttempted": true,
+  "shellButtonLabelAfter": "sh",
+  "errorStateShown": true
+}

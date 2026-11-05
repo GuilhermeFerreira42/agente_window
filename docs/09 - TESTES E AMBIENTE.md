@@ -1,0 +1,1398 @@
+# 09 - TESTES E AMBIENTE (da IA)
+
+> **VIGÊNCIA D140 — execução técnica delegada (04/11/2026):** Arena nova que receba apenas `agente_window/` deve ler `01`, `03`, `05` D140 e reconciliar `git status`, HEAD, fontes e gates. É permitido corrigir PEND-01 (perfil efêmero fora do repositório e de `.cache`) e diagnosticar PEND-03 sem enfraquecer testes. Fechar DP-03/DP-06/E-1..E-5 com SPEC, testes e decisão registrada **antes** de codificar 14; seguir D133 de modo autônomo e verificável. O relato da regressão DELETE abaixo é histórico, não deve ser reexecutado como tarefa inicial. Criar diário, `status.json` e dashboard HTML **fora do repositório**, derivando o estado dos nove canônicos e do Git, e atualizar após cada marco; não prometer live update sem processo ativo. Quando for entregue só esta pasta, esses artefatos externos não estarão incluídos: recriá-los, não exigir a conversa antiga. Não alterar dados reais nem publicar sem autorização.
+
+
+> **Vigência após aceite humano — 2026-11-04:** o dono homologou **com ressalvas somente** exclusão com as novas permissões e de alvo externo à pasta da conversa, nos limites registrados em `08`, e autorizou a passagem à Arena/Debian e o commit relacionado. Os pareceres “aguardar aceite” abaixo são anteriores a esse relato; seus placares e limites técnicos permanecem válidos. **A regressão integral continua PENDENTE, sem aprovação geral e sem baixa integral de DEBT-24.** Nenhum outro cenário manual foi homologado por inferência. Usar a seção de passagem à Arena para continuar o trabalho.
+
+## 2026-11-04 — SPEC da missão Codex nº 2: conclusão técnica DELETE
+
+Autorização: carta do dono desta data; substitui para esta missão os limites históricos de confirmação obrigatória/território de D97/D134, preservando lixeira exclusiva, identidade, modos read-only, cancelamento e relatos de efeitos. Sem commit/push, sem homologação oficial ou encerramento de DEBT-24, sem Fatias 14/15/M. Base local: commit `77dd348`, com alterações anteriores não commitadas preservadas.
+
+Objetivo: pasta grande com confirmação resumida; autorização específica da instrução humana atual conferida no backend; opção adicional de exclusão automática desligada por padrão e revogável; erros terminais encerram o estado de trabalho sem repetir efeitos.
+
+Perímetro: casa Agir (disco, permissões, rotas, loop, cliente e testes); wiring de sessão e UI ChatInput/ChatPanel/App; canônicos 03/04/05/06/07/08/09 somente onde necessário. Não alterar terminal humano, motor Explorer, persistência estrutural, provedores ou composição de contexto DP-03/DP-06.
+
+Desenho: prévia curta com caminho absoluto e aviso de todo conteúdo/restauro pelo SO. Diretório recebe assinatura determinística de metadados/nomes/links sem ler o conteúdo dos arquivos filhos; arquivo individual mantém hash em streaming. Remover teto arbitrário de entradas/profundidade, usar travessia iterativa cancelável e prazo explícito, recusar observação incompleta antes de pedir aprovação. Revalidar antes de mover e exigir cartão novo em conflito; não prometer snapshot atômico nem eliminar TOCTOU D121.
+
+Autoridade: reutilizar fronteira local Host/Origin e registro de permissões por sessão/conversa/raiz. Instrução direta vem de ação própria do envio humano, separada do histórico entregue pelo modelo; gramática conservadora de pedido integral + caminho único, com confirmação para linguagem ambígua. Consentimento específico é descartável e vinculado à versão do alvo. Automação só com os dois opt-ins ativos e escopo literal da instrução atual, nunca derivado de tools/arquivos: caminhos absolutos entre aspas ou alvo do pedido direto, com relativos ancorados no workspace. Não autorizar automaticamente todo o workspace. Sem escopo inequívoco, pedir cartão. Configuração volátil segue o nível de permissões existente, sem migração de banco. Mudanças/revogação invalidam runs pendentes. Não há isolamento contra cliente/processo hostil da mesma conta (D113/D121).
+
+Aceite/testes: reproduzir teto >20.000 antes da correção; metadados de subpastas/arquivo alterados exigem novo aceite; identidade/copiar/reutilizar prévia recusados; aprovação/recusa/cancelamento; externos/links/raiz; opt-in/revogação/read-only; erros HTTP/rede/timeout/ferramenta e continuação sem reexecutar efeitos. TypeScript e lint focal; suíte Agir antes/depois, regressão proporcional e Windows real só em árvore descartável própria. Resultados serão registrados abaixo após execução. Não usar a cópia node_modules fornecida nem dados pessoais para testes.
+
+### Diagnóstico, solução e evidências verificáveis desta missão
+
+**Pasta relatada:** `C:\Users\Usuario\Desktop\agente_window\node_modules` não estava presente nesta investigação (`Test-Path` falso); não foi usada nem excluída. Não se pode comprovar retroativamente a causa exata naquela árvore. Foi reproduzido o mecanismo de falha em uma cópia imutável anterior do código, usando pasta sintética com **20.005 arquivos**: `prepararExclusao` percorre/hasheia conteúdo, ultrapassa o teto de entradas, devolve “Não foi possível observar uma versão estável e completa…”, não grava a WeakMap e a execução subsequente não tem prévia vinculada. Isso distingue falha de preparo de autorização, falha de provedor e falha da Lixeira; “tamanho da pasta” sozinho era explicação insuficiente. A contagem para UI e as observações repetidas também adicionavam I/O desnecessário.
+
+**Código atual:** `agir/server/discos.ts`, `versaoExclusao`/`prepararExclusao`, usa travessia iterativa, ordem determinística, metadados/nomes/links dos descendentes, sem ler o conteúdo de cada filho nem impor tetos de 20.000/128. Arquivo individual conserva hash em streaming; prévia lê no máximo 400 bytes. Observação tem cancelamento e prazo de 120 segundos; falha incompleta lança erro terminal antes do cartão. Revalidação imediatamente antes de mover continua obrigatória. A assinatura é proporcional, não instantânea: continua O(n) em entradas e não fornece snapshot/CAS universal. Edição comum de descendente é detectada por metadados; adulteração hostil que restaure metadados e corridas entre syscalls não são cobertas (D121).
+
+**Consentimento:** `server/autorizacaoExclusao.ts`, `server/modos.ts`, `server/rotas.ts` e o cliente reusam autoridade/sessão/grants do produto. `POST /api/agir/instruction` é chamado somente pelo envio humano, separado de `messages`; recibo opaco, contexto, validade, versão e uso único são conferidos no servidor. Histórico/argumentos não concedem permissão. `transferirPrevia` é interno ao servidor; troca de alvo exige outra aprovação com ID novo. A opção automática usa o registro volátil existente, não banco novo; desligada por padrão, requer Permitir tudo e escopo literal da instrução atual. Sem escopo literal, mesmo dentro do workspace, pede cartão. A fronteira D113 confia no cliente/processos da mesma conta; não foi criada autenticação remota nem defesa contra shell local hostil. Permissões de UI são agora indexadas também pela pasta para não levar opt-in silencioso a outro workspace.
+
+**Windows:** substituído o adaptador VisualBasic de exclusão genérica por um adaptador fino IFileOperation em `server/lixeiraWindows.ts`, carregado via PowerShell 5.1. Flags de reciclagem/early failure, sink que recusa PreDelete sem intenção de reciclagem, destino de PostDelete e identidade conferidos em `lixeira.ts`; saída vazia/exit 0 sem prova de destino não constitui sucesso. Não há fallback permanente. A compilação e a recusa do sink sem flag foram testadas sem tocar arquivo; cenários reais descritos abaixo. Isso não comprova todos os volumes/políticas/capacidades da Lixeira.
+
+**Erros e confiabilidade:** loop conserva tool_result antes de eventual retomada manual, não repete automaticamente a ferramenta concluída. HTTP 400 de contexto orienta reduzir histórico/nova conversa e não oferece retomar o mesmo payload; 401/403/404/422 são terminais. 429/5xx/rede/tempo podem oferecer retomada manual pertinente; nenhum retry/fallback automático foi adicionado. Resposta upstream vazia vira erro, exceção de ferramenta interrompe o loop e reconhece efeito incerto; cancelamento concorrente com exceção também informa possíveis efeitos. Falha de prévia termina SSE/estado, sem approval sem vínculo. `executar` continua retornando stdout/stderr/exit; o catálogo orienta verificar efeitos e não inventar causas/sucesso. Isso não garante veracidade de toda narrativa da LLM. Criar/escrever nos nove nomes canônicos são bloqueados sem pedido específico da instrução humana atual. **Shell arbitrário não é sandbox:** pode apagar permanentemente e editar documentos conforme privilégios da conta; não há proteção universal por regex ou pela política de excluir. Controle abrangente exigiria decisão arquitetural futura, sem reabrir Fatia 13 aqui. Contexto/compactação/memória estrutural continuam em M1–M3.
+
+**Referências primárias consultadas, sem copiar serviços inteiros:** [VS Code fileActions.ts](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/files/browser/fileActions.ts), funções `deleteFiles`/`getMoveToTrashMessage`: confirmação dos alvos selecionados e aplicação recursiva pelo serviço de arquivos, sem listagem obrigatória de descendentes no diálogo. Seu caminho de exclusão permanente não foi adotado. Reaproveitados no produto: loop, fila por destino, WeakMap de versão, cartões, cancelamento, modos, registro de permissões e callback de refresh do Explorer. Contratos da API Shell: [SetOperationFlags](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-setoperationflags), [PreDeleteItem](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperationprogresssink-predeleteitem) e [TRANSFER_SOURCE_FLAGS](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/ne-shobjidl_core-_transfer_source_flags). Consulta a `main` é referência técnica posterior, não substitui a régua visual 1.135.
+
+### Windows real e navegador isolado
+
+**Runtime:** Node 26.13.0 / npm 11.20.0 do projeto; PowerShell **5.1.22621.6133** (versão efetiva também consta no JSON nativo). Nenhuma credencial/provedor real foi usado. Nenhum dado/conversa pessoal foi apagado, nenhum commit/push, nenhuma limpeza da Lixeira.
+
+- Árvore nativa exclusiva: `C:\Users\Usuario\AppData\Local\Temp\agent-window-mission2-native-kiTUiB`. Alvos absolutos foram conferidos sob essa raiz antes de mover/restaurar. Arquivo pequeno, arquivo **64 MiB** e pasta de **20.005 arquivos**: ausência na origem, presença na Lixeira real, conteúdo/tamanho/quantidade e restauração seletiva pelo verbo Shell `undelete` verificados. Não confundir restauração programática real com homologação manual da UI do Windows. Os três alvos principais foram restaurados; probes descartáveis anteriores podem permanecer na Lixeira, sem tocar outros itens.
+- Na mesma pasta grande, a cópia anterior recusou preparo após cerca de **24,8 s**; a versão corrigida preparou a confirmação resumida em cerca de **6,6 s**, moveu e restaurou 20.005 itens. Medidas pontuais desta máquina, não benchmark de paridade nem SLA. Evidência: `platform/.cache/delete-mission2-native.json` e `evidence.json` na árvore nativa.
+- Chrome real/headless, servidor separado em loopback **5177**, stub HTTP local e perfil descartável `platform/.cache/test-runs/mission2-browser-NucHub`: **4/4 cenários** — recusar sem efeito; instrução direta sem segundo cartão + Explorer antes/depois sem F5; dois opt-ins pela UI + exclusão automática na tarefa delimitada; HTTP 400 de contexto encerrando o trabalho, sem botão Parar e com novo envio habilitável. **Zero pageerrors**. Evidência: `platform/.cache/delete-mission2-browser.json`; perfil contém screenshot e log. Servidor/stub desta prova foram encerrados. O produto pessoal na 5174 não foi usado para testes destrutivos.
+
+### Harness, comandos e perímetro de arquivos
+
+Entrada oficial de testes: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/scripts/project.ps1 test ... --maxWorkers=1 --minWorkers=1`. Launcher cria perfil em `.cache/test-runs` e redireciona home/temporários/provedores/configuração. TypeScript: mesma entrada com `typecheck`. Lint: ESLint do lockfile, executado com Node fixado.
+
+`vitest.config.ts` passa `--no-experimental-webstorage` aos workers: Node 26 expõe Web Storage próprio sem arquivo configurado, e o harness antigo podia substituir o Storage do jsdom por `undefined`. O flag preserva o Storage de navegador do jsdom; não altera o produto no Chrome. `vizinho.test.ts` declara ambiente Node para exercitar HTTP/fetch nativos do backend, sem o fetch do jsdom. **Não é skip nem stub que mascara rede:** os 17 casos usam servidor local real ou porta morta, incluindo 400/401/403/429/502, vazio, timeout e protocolos. Os mocks de App/streaming foram atualizados para o novo recibo; a mensagem de SSE truncado agora alerta para possíveis efeitos, em vez de sugerir repetição cega.
+
+**Arquivos desta missão (caminhos relativos à raiz; o diff completo também contém trabalho anterior):**
+
+- Em `platform/apps/workbench-v2/src/bairros/2-inteligencia/casas/agir/`: `server/discos.ts`, `server/lixeira.ts`, **novo** `server/lixeiraWindows.ts`, **novo** `server/autorizacaoExclusao.ts`, `server/modos.ts`, `server/rotas.ts`, `server/agir.ts`, `server/vizinho.ts`, `server/ferramentas.ts`, `contract.ts`, `index.ts`, `ui/client/api.ts`; testes `excluir.test.ts`, `lixeira.test.ts`, `rotas.test.ts`, `agir.test.ts`, `vizinho.test.ts` e **novo** `autorizacaoExclusao.test.ts` sob `__tests__/`.
+- No mesmo app: `src/App.tsx` (wiring/estado), `src/components/ChatInput.tsx`, `src/components/ChatPanel.tsx`, `src/server/session-persistence/index.ts` (somente injeção das permissões existentes), `src/__tests__/ChatInput.test.tsx`, `src/__tests__/chatStreamingFatia09.test.tsx`, `src/__tests__/App.test.tsx`, `e2e/excluir_fatia12.spec.ts`, `vitest.config.ts`.
+- Canônicos: `docs/03`, `04`, `05`, `06`, `07`, `08`, `09`. Nenhum décimo documento ativo. Terminal humano, PTY, motor Explorer, identidade de projetos, banco/JSONL e versões de bibliotecas não foram alterados nesta missão.
+
+### Limites e critérios de entrega
+
+Não executados: E2E legado `excluir_fatia12.spec.ts` (exige Linux/XDG e stub específico, indisponíveis neste Windows; somente inspeção/atualização do contrato), Linux nativo/EXDEV real entre volumes, macOS, todos os provedores reais, volumes externos/rede, Lixeira lotada/indisponível e cancelamento nativo demorado. Erros de permissão/EXDEV/registro e corrida de cancelamento foram exercitados por injeção/barreiras; não declarar essas simulações como provas de SO. O teste XDG em NTFS teve recusas transitórias em uma rodada de diretórios; repetição focal e rodada ampliada devem ser consideradas separadamente da Lixeira nativa. Não esvaziar nem alterar ACL/política da Lixeira pessoal para ampliar cobertura.
+
+Riscos aceitos: janela entre última observação e operação por caminho, árvore sem snapshot atômico, prazo finito de observação, escopo literal conservador e confiança local D113. Nenhuma promessa de impedir toda ação de LLM/shell hostil. Próximo aceite é o roteiro atualizado de `08`, pelo dono. **DEBT-24 aberta; sem homologação oficial e sem autorização para Fatia 14.**
+
+### Placares consolidados e parecer técnico — missão nº 2
+
+| Verificação realmente executada | Resultado |
+|---|---|
+| Agir na cópia histórica imutável, Node 26, harness antigo | **135 passaram / 23 falharam / 5 ignorados** |
+| Agir extraída da rodada ampliada corrigida | **186 passaram / 13 falharam / 5 ignorados**; falhas remanescentes já presentes por arquivo/nome na cópia histórica |
+| Backend de consentimento/reconfirmação/cancelamento + parser de autoridade, filtro focal final | **28 passaram / 0 falharam**; 41 casos fora do filtro, não contabilizados como aprovados |
+| Transporte HTTP de Agir em ambiente Node real | **17/17**; inclui protocolos, 400/401/403/429/502, vazio, endereço e relógios de timeout |
+| ChatInput, incluindo opção automática e reversão | **28/28** na rodada ampliada |
+| Fluxo de chat/erro/truncamento/cancelamento/retomada expirada após correção final | **4/4** |
+| TypeScript do app e configuração, pelo inicializador fixado | **exit 0** após a correção final |
+| TypeScript isolado de `e2e/excluir_fatia12.spec.ts` e seus imports, sem emissão | **exit 0**; não equivale a executar o E2E |
+| ESLint em 27 arquivos deste perímetro | **26 arquivos sem erro/aviso**; `App.tsx`: **20 erros / 1 aviso**, mensagens/regra idênticas ao baseline histórico, verificados com lintText usando o mesmo caminho/configuração |
+| Rodada ampliada atual, excluído apenas `src/__tests__/App.test.tsx` | **129 arquivos; 1.037 passaram / 54 falharam / 8 ignorados** |
+| Mesmo recorte na cópia histórica, perfis separados e Node fixado | **128 arquivos; 922 passaram / 126 falharam / 8 ignorados** |
+| Triagem da única falha adicional por arquivo/nome | **1/1 passou** com home sintético fora do checkout; demais 18 casos desse arquivo ficaram fora do filtro |
+| Windows real / Chrome isolado | Três alvos nativos movidos/conferidos/restaurados; Chrome **4/4**, sem pageerrors, conforme seção acima |
+
+**Retomada expirada — defeito comprovado e corrigido no fechamento:** ao receber `fluxo` com callback de expiração, `App.tsx/onError` marcava o cartão e retornava antes de limpar `agirAtivas`, `running` e o estado da conversa. O teste `retomada expirada encerra Trabalhando…` reproduziu o botão **Parar execução** permanecendo depois da resposta 409 (`delete-mission2-expired-before2.json`: 0/1). Removido esse retorno antecipado: cartão expira e o caminho comum termina o trabalho/mostra o erro. A bateria focal posterior passou **4/4** (`delete-mission2-streaming-expired-fixed.json`). A rodada ampliada não foi repetida depois desse ajuste focal de uma linha; TypeScript/lint foram repetidos e passaram nos limites da tabela.
+
+**Comparação responsável:** as **13 falhas atuais de Agir** são nove casos de comandos `/bin/sh`/POSIX da Fatia 13, três de fronteira que comparam separadores POSIX e uma de território POSIX no Windows. Fontes do executor/terminal humano não foram alteradas. A escolha do ambiente Node para HTTP removeu as dez falhas de transporte do harness jsdom sem trocar por mocks ou skips; as 17 provas de rede real local passaram. As versões de bibliotecas permaneceram fixas.
+
+Na rodada ampliada, **53 das 54 falhas atuais têm o mesmo arquivo relativo e nome de teste no baseline histórico**. Incluem terminal humano, tokens/ícones/estado visual, worktree, testes de filesystem/Git/search e fronteiras com pressupostos de plataforma. **A única adicional** é `providersRepo.test.ts`, regra D81 de que o caminho de credenciais fica fora do repositório: o launcher põe o **home sintético de teste dentro de `.cache` do checkout ativo**; o teste remove o override de providers e, corretamente, identifica esse caminho sintético como interno. Na cópia histórica o mesmo home fica fora daquele checkout, por isso a comparação não é simétrica. **Não é evidência de credencial real movida para o repo:** implementação/teste de Provedores não foram alterados nesta missão; um reteste com home temporário próprio fora do checkout passou 1/1. Não foi trocado o storage de produção nem enfraquecida a regra D81. A limitação de isolamento do launcher fica registrada para sua próxima manutenção, sem converter a fixture em garantia sobre o perfil real.
+
+O baseline é uma **fotografia histórica preservada da padronização anterior**, não um contrafactual perfeito da árvore no primeiro instante da missão. Há diferenças de harness e trabalho anterior não commitado. **Não atribuir a redução de 126 para 54 falhas integralmente ao DELETE.** Uma primeira tentativa de baseline carregou fontes durante edições e foi descartada; uma rodada ampliada intermediária também antecedeu os ajustes do harness. Só os recortes e condições identificados acima sustentam a conclusão. A primeira execução ampla da cópia histórica excedeu 300 segundos; a repetição com limite de 600 segundos concluiu. A suíte integral **não está verde** e não foi declarada aprovada; `App.test.tsx` inteiro ficou excluído do recorte pelo problema anterior de recursão do mock de fetch, sem reparo dessa suíte nesta missão. O App real foi exercitado em Chrome e os fluxos pertinentes em testes focais.
+
+**Evidências locais ignoradas pelo Git:** em `platform/.cache/`, prefixo `delete-mission2-`: `historical-baseline.json`, `general-final.json`, `historical-general.json`, `comparison.json`, `consent-final.json`, `provider-final.json`, `provider-triage.json`, `lint-final.json`, `streaming-expired-fixed.json`, `native.json`, `browser.json`. Os JSONs contêm casos/diagnósticos verificáveis; perfis e temporários foram mantidos para inspeção, sem limpeza de dados pessoais. Esses artefatos não acompanham um ZIP de fontes que exclua caches; este registro canônico preserva resultados, limites e métodos.
+
+**Parecer: PRONTA COM RESSALVAS para homologação manual delimitada no Windows 11.** Não foi identificado bloqueante remanescente nos cenários DELETE efetivamente verificados. Ressalvas não bloqueantes para iniciar esse roteiro: falhas de regressão/plataforma acima, suíte integral não aprovada, Linux/volumes/políticas/cancelamento nativo longo não comprovados, escopo literal conservador e TOCTOU D121. Não é autorização para uso irrestrito, encerramento de DEBT-24, avanço de fatia ou homologação oficial. Aguardar aceite do dono conforme `08`.
+
+## Passagem obrigatória para a Arena — regressão integral no Debian após Windows
+
+**Origem e estado — ordem do dono em 2026-11-04:** a troca para **Node 26.13.0 / npm 11.20.0** já está registrada em D137; esta seção liga essa mudança à validação que ainda falta. O dono concedeu o aceite Windows limitado e com ressalvas registrado em `08` e autorizou encaminhar os fontes à Arena, cujo ambiente informado é Debian. **PENDENTE: esta seção não relata execução ou aprovação geral no Debian.** A micro-fatia passou a abranger permissões, loop, interface e harness; a validação não pode ficar restrita à ferramenta excluir. Responsável técnico: Arena; homologação/aceite: dono. Não iniciar Fatia 14 nem encerrar DEBT-24 por inferência a partir deste registro.
+
+### Ambiente e método a preservar
+
+1. Ler `01 → 02 → 03` e os contratos D137/D138 antes de testar. Conferir os **fontes reais entregues**, inclusive mudanças não commitadas: HEAD sozinho não identifica a entrega. Preservar uma fotografia imutável para comparação antes de qualquer eventual correção; não resetar/restaurar ao HEAD e perder alterações do pacote.
+2. Preparar a distribuição Linux e dependências **do zero pelo lockfile**, com as versões exatas de `platform/runtime.json`, iguais em todos os workspaces. Não transportar nem reutilizar `node_modules`/binários de `.runtime` do Windows. Registrar Debian, arquitetura, Node/npm efetivos e dependências nativas/pré-requisitos disponíveis. Não usar outra versão do Node silenciosamente quando faltar biblioteca do SO; registrar o bloqueio.
+3. Usar perfis, bancos, conversas, configuração de provedores e temporários **sintéticos**, sem credenciais pessoais e sem tráfego para provedores reais por acidente. O launcher é ponto de partida, mas o home sintético interno a `.cache` precisa ser considerado na prova D81: quando o teste remover o override de providers, ele ainda deve resolver um **home descartável fora do checkout**, nunca o home pessoal. Comparações entre árvores precisam das mesmas condições relativas de isolamento.
+4. Executar a suíte integral existente antes de selecionar filtros. **Não herdar automaticamente a exclusão de `App.test.tsx` usada no Windows**: investigar se o mock também recursa no Debian. Se bloquear, preservar log e motivo; depois usar recorte complementar explícito, sem apresentar esse recorte como suíte completa. Preservar quarentenas/skips históricos documentados; nenhum skip/afrouxamento de assert para fabricar aprovação.
+5. Comparar por **arquivo relativo + nome do teste**, com ambiente/runtime/harness equivalentes. Uma falha Windows por `/bin/sh`, separador ou quebra de linha pode desaparecer no Debian; isso precisa de execução, não suposição. Uma falha existente também pode ser defeito real: classificar e registrar sem chamar todas de “apenas ambiente”. Não atribuir a redução de falhas inteira ao DELETE, nem comparar totais de recortes diferentes como se fossem equivalentes.
+
+### Matriz mínima da validação do condomínio
+
+| Área | O que a Arena precisa executar/verificar | Evidência exigida |
+|---|---|---|
+| Instalação/runtime | Instalação Linux limpa; coerência das versões de todos os workspaces; testes de runtime; rejeição de ambiente incompatível; carregamento nativo SQLite e PTY | Comandos, versões efetivas, saídas e códigos de término |
+| Workbench inteiro | Vitest integral sem filtro inicial: UI, sessões, persistência, workspace, Explorer/Search/SCM, configurações, provedores, Conversa e Agir | Placar por arquivo/teste, ignorados, falhas e limites; nenhum verde presumido |
+| Pacote PTY | Testes e typecheck próprios do workspace `@agente-window/pty-server`, além de smoke do terminal integrado com comando seguro e sessão sintética | Saída do pacote e resultado real do smoke; preservar terminal humano congelado |
+| TypeScript/lint/build | Typecheck do app e demais pacotes, lint pertinente e build de workspaces quando viável; comparar diagnósticos anteriores | Logs; falha por recurso/compilador distinguida de regressão; não omitir erro |
+| Persistência | Conversas sintéticas salvar/reabrir, revisão/conflito, troca de workspace e isolamento de histórico/configurações | Conteúdo conferido e ausência de escrita em perfil real |
+| Modos/permissões | Perguntar/Planejar read-only; Agente/Editar; Manual/Permitir tudo; opção automática própria, default off, revogação, troca de conversa/pasta e reinício | Backend + UI; payload/histórico/documentos não ampliam consentimento |
+| DELETE no Linux real | Arquivo pequeno/grande, milhares de entradas, profundidade, assinatura/prévia, alteração durante espera, recusa, reconfirmação, links, externos, instrução específica e escopo automático | Origem/destino/conteúdo observados em árvore descartável; nunca permanente |
+| Lixeira XDG | Bilhete, reserva concorrente, nomes iguais, erros de registro/permissão e restauração seletiva; EXDEV real se houver dois volumes adequados | Outro volume deve recusar sem copiar/apagar; sem volumes, marcar não executado. Não usar Lixeira pessoal |
+| Erros e cancelamento | Contexto excedido, autenticação, limite de pedidos, indisponibilidade, DNS/rede, timeout, resposta inválida, SSE truncado, retomada expirada; cancelar antes/durante efeito | UI sai de Trabalhando; efeitos concluídos/incertos preservados; não repetir DELETE automaticamente |
+| Browser/E2E integrado | Preparar servidor/stub/perfil/árvore isolados e executar os E2E pertinentes de chat, arquivos, permissões, comandos e regressão existente; incluir `excluir_fatia12.spec.ts` quando satisfeitas suas guardas | Resultados reais e bloqueios separados. Reavaliar assertivas legadas diante de D121/D138, sem alterar contrato vigente para fazer passar |
+| Credenciais e fronteiras | Testes de Provedores/D81, separação de casas, Host/Origin local e redirecionamentos | Mesmo isolamento nos dois lados da comparação; nunca usar chaves reais em logs |
+
+**Atenção à abrangência dos comandos:** `sh iniciar.sh test` executa os testes do **Workbench**, não substitui os testes do pacote PTY nem os de runtime. O script raiz `test:all` usa `&&`: se Workbench falhar, o PTY pode nem executar; a Arena deve executar e registrar cada pacote separadamente mesmo nesse caso. Todos os comandos manuais precisam usar o mesmo Node/npm preparado e perfil sintético; não cair no runtime global da Arena sem conferir versões. Testes não autorizam alterar fontes congelados do terminal/Explorer ou fazer correções fora de escopo para obter verde.
+
+Ponto de partida na raiz dos fontes (não é registro de execução):
+
+```sh
+sh iniciar.sh install
+sh iniciar.sh check
+sh iniciar.sh typecheck
+sh iniciar.sh test --maxWorkers=1 --minWorkers=1
+```
+
+Além disso, executar os testes existentes `platform/scripts/runtime.test.mjs` e o script de teste/typecheck do pacote PTY com o runtime fixado, em isolamento equivalente. Build via ação oficial `build` quando os recursos permitirem. Para E2E, seguir as guardas específicas e o mapa deste documento: **nunca rodar specs destrutivas de fixture contra o projeto real**. Registrar requisito ausente, limite de memória, ausência de browser/stub/volume ou incompatibilidade de biblioteca como bloqueio, sem contornar proteção de produção.
+
+### Falhas Windows que devem ser reavaliadas no Debian
+
+- **Agir: 13 falhas remanescentes** — nove de comandos/shell POSIX da Fatia 13, três de fronteira com separadores e uma de território POSIX. Rodar, conferir resultado e distinguir incompatibilidade do teste de falha real do executor. O funcionamento de comandos no Debian não homologa automaticamente PowerShell no Windows.
+- **Bateria ampliada: 54 falhas** — 53 têm o mesmo arquivo/nome no baseline histórico; incluem terminal humano, ícones/tokens/estado visual, worktree, filesystem/Git/search e fronteiras das casas. A adicional de Provedores foi triada como efeito do home sintético dentro do checkout e passou 1/1 fora dele. A triagem e os números históricos estão na seção anterior; a Arena deve produzir seu próprio placar Linux.
+- **`App.test.tsx` e lint:** suíte App inteira não comprovada nesta missão Windows; os quatro fluxos pertinentes passaram separadamente. Lint de App contém 20 erros/1 aviso idênticos à referência histórica, sem novos diagnósticos no perímetro alterado. Registrar o que persistir no Debian e não esconder essas exclusões/dívidas.
+- **Harness Node 26:** preservar o ajuste de Web Storage do jsdom e o ambiente Node explícito dos testes de transporte. Validar que essas escolhas funcionam no Debian; não removê-las para reutilizar números antigos. Os testes de runtime, instalação, banco e terminal anteriores não demonstram regressão integral do sistema.
+
+### Entrega necessária antes da decisão de avanço
+
+A Arena deve registrar nos canônicos pertinentes: árvore/versão de código realmente testada; runtime/SO/recursos; comandos e recortes; aprovações/falhas/ignorados/bloqueios; comparação por caso; classificação de cada problema como preexistente, regressão comprovada, diferença de ambiente ou inconclusivo, com impacto bloqueante/não bloqueante. **Testes automatizados fornecem evidência dos cenários cobertos, não garantia absoluta de que nada quebrou.** Stubs, Linux e Windows têm alcances distintos.
+
+Depois dos resultados técnicos e manuais, **o dono decide** o aceite/encerramento DELETE e a autorização de avanço. Falhas bloqueantes exigem solução ou decisão explícita; o teste técnico não encerra DEBT-24 sozinho. A Fatia 13 conserva sua homologação histórica. **DP-03 e DP-06 continuam obrigatórios antes da codificação da Fatia 14**, além da sequência D133. Nenhuma Fatia 14/15/M foi iniciada ou autorizada automaticamente por esta passagem.
+
+## 2026-11-03 — padronização do ambiente de execução (D137)
+
+
+**SPEC e autorização:** o dono autorizou fixar uma versão estável atual de Node/npm, preparar o ambiente, verificar a inicialização e alinhar os canônicos. Depois delimitou o encerramento às alterações de runtime; **a validação automática do condomínio inteiro ficou para a Arena**. Não gerar ZIP, não alterar lógica funcional do terminal nem dados de conversas, não homologar DELETE.
+
+**Configuração adotada:** `platform/runtime.json` fixa Node **26.13.0 LTS** / npm **11.20.0**. Os três manifests de workspace, packageManager, engines, lockfile, `.nvmrc` e `.node-version` concordam. A política npm recusa engines incompatíveis e scripts de dependências não aprovados. `allowScripts` autoriza somente better-sqlite3@12.11.1, node-pty@1.1.0 e esbuild@0.21.5/@0.28.2, já presentes no lockfile. A troca de runtime não alterou versões de bibliotecas.
+
+**Operação:** na raiz, `iniciar.cmd` (Windows) ou `sh iniciar.sh` (Linux/macOS). O inicializador baixa a distribuição oficial e confere SHA-256, usa runtime local em `platform/.runtime`, prepara dependências com `npm ci --include=dev` e verifica SQLite/PTY antes de iniciar o Vite Single Port 5174. Não depende de runtime interno do Codex e não modifica o Node global. Ações: `install`, `check`, `typecheck`, `test`, `build`. O preparo inicial exige internet. Se runtime/arquitetura/lockfile mudar, as dependências são preparadas novamente. Falhas são apresentadas no terminal; não há fallback silencioso para Node antigo.
+
+**Isolamento de testes:** a ação `test` cria perfil próprio em `platform/.cache/test-runs`, aponta configurações e temporários para ele, redireciona `os.homedir()` somente no processo Node dos testes e remove variáveis usuais de credenciais de API do ambiente filho. Não muda o perfil real do usuário. Os resíduos sintéticos ficam para diagnóstico. Isso não fornece automaticamente servidor/stub de E2E nem autoriza rodar specs destrutivas contra o produto real. Comandos manuais fora do inicializador devem preparar isolamento equivalente conforme as seções históricas deste documento.
+
+### Executado nesta tarefa — Windows x64
+
+| Verificação | Resultado |
+|---|---|
+| Distribuição Node oficial e checksum | Conferidos; Node 26.13.0 e npm 11.20.0 |
+| Instalação limpa de avaliação | 613 pacotes; os scripts nativos inicialmente bloqueados pelo npm novo foram aprovados de forma explícita e reconstruídos com sucesso |
+| Instalação pelo inicializador no projeto real, já com política explícita | Concluída, 613 pacotes, exit 0; preinstall conferiu a versão; check confirmou SQLite e PTY |
+| Testes de coerência/rejeição de runtime | **3/3**, via Node test runner |
+| Sintaxe dos scripts JS, parser PowerShell e `bash -n` do inicializador shell | Passaram |
+| Node 22.12.0 no verificador | Recusado com orientação para usar o inicializador |
+| SQLite descartável | Gravação, fechamento, reabertura e leitura do mesmo conteúdo passaram |
+| PTY nativo | PowerShell seguro retornou marcador e código 0 |
+| Vite + Chrome na cópia isolada com Node 26 | HTTP atendido, raiz React montada, nenhum erro JavaScript na abertura |
+| PTY integrado por WebSocket no mesmo Vite isolado | Abertura e execução de marcador seguro passaram; somente a sessão sintética do teste foi encerrada |
+
+Os testes integrados usaram uma cópia externa e perfil sintético, sem exclusão de arquivos reais ou envio de mensagem ao modelo. A conferência de abertura também foi executada no projeto após a troca. Os resultados focais anteriores da correção DELETE em Node 24 são registros de outra rodada e **não podem ser apresentados como executados em Node 26**.
+
+### Pendências explícitas para a Arena
+
+1. Confirmar o runtime pelo inicializador `check`; executar os testes automáticos existentes do condomínio inteiro em perfil descartável, incluindo a aplicação e o serviço PTY, typecheck, lint e build pertinentes. Não escrever uma bateria paralela para substituir a existente.
+2. Comparar falhas com os baselines registrados, distinguindo limitações Windows/POSIX e problemas de mocks de regressões reais. A suíte geral **não foi rodada nesta tarefa**; não declarar zero regressão nem todos os testes verdes pela instalação ter funcionado.
+3. Preparar servidores/stubs isolados para os E2E possíveis, respeitando 5174/5175 e a árvore temporária exigida pela spec DELETE. Cenários sem dependências devem ser registrados como não executados, sem apontar testes destrutivos para o repositório ou dados reais.
+4. Validar fluxos completos de conversas, provedores reais quando autorizados e disponíveis, atualização visual do Explorer, restauro pela Lixeira e demais cenários ainda pendentes da microfatia. O dono realiza o aceite manual; DEBT-24 permanece aberta.
+5. Linux/macOS e ARM64 têm caminho de preparação nos scripts, mas **não foram homologados nesta tarefa**. Linux/macOS requerem curl, tar/XZ e sha256sum ou shasum; a distribuição Linux desta linha de Node requer libatomic. Se não houver binário nativo compatível de dependência, o ambiente pode exigir compilador/SDK/Python; não omitir esse bloqueio nem instalar ferramentas de sistema sem avaliar o ambiente.
+
+**Fontes oficiais consultadas:** [Node 26.13.0 LTS](https://nodejs.org/en/blog/release/v26.13.0) e [política de scripts npm](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts/). O npm da versão adotada bloqueia scripts de dependências não aprovados, por isso uma instalação que apenas termina sem erro não basta para comprovar módulos nativos carregados.
+
+**Entrega por fontes:** preservar configuração, inicializadores, scripts, manifests, lockfile e nove canônicos. Excluir do ZIP manual `node_modules`, `.runtime`, `.cache`, credenciais e conversas pessoais. O dono fará o ZIP; nenhum arquivo ZIP do projeto foi gerado por esta tarefa. Rastreabilidade de commit em 03 e 07. Alterações anteriores da árvore não foram incorporadas automaticamente ao commit de padronização; preservar e revisar seu diff separadamente.
+
+## 2026-11-03 — SPEC focal: tela cinza na abertura por import Node no navegador
+
+- Objetivo: restaurar a abertura da interface em `127.0.0.1:5174`, preservando a reconfirmação DELETE.
+- Causa identificada: o barrel público de Agir exporta `server/agir.ts`, que precisa continuar compatível com o navegador; o import novo de `randomUUID` de `node:crypto` interrompe sua avaliação no Vite.
+- Escopo: substituir essa dependência no loop pela API Web Crypto disponível no navegador e no Node usado pelo projeto; teste focal de reconfirmação, typecheck, lint e abertura real em Chrome. Sem alterar os executores de disco, PTY, permissões ou dados de sessões.
+- Aceite: interface montada e nenhum erro JavaScript na abertura; a reconfirmação ainda gera um ID novo, exige novo aceite e executa com o novo ID. Resultados registrados após a validação.
+
+**Resultado:** corrigido o loop para `globalThis.crypto.randomUUID()`. `npx vitest run src/bairros/2-inteligencia/casas/agir/__tests__/agir.test.ts --maxWorkers=1 --minWorkers=1` passou com **21/21**, incluindo reconfirmação com novo ID e segundo aceite. `npm run typecheck` e ESLint de `server/agir.ts` + `__tests__/agir.test.ts` passaram. Chrome real/headless, perfil descartável, navegação sem interação mutável em `http://127.0.0.1:5174/`: antes HTTP 200, erro de externalização `node:crypto.randomUUID`, 0 filhos em `#root` e 0 botões; depois HTTP 200, 0 erros JavaScript, 1 filho em `#root` e 46 botões. O Vite existente deixou de escutar durante a investigação; foi iniciado novamente em loopback na 5174 para reproduzir e validar. Não foram enviadas mensagens ao modelo nem executados testes destrutivos/E2E de fixture. Esta rodada comprova a abertura e o loop focal, não rehomologa DELETE. HEAD local `fe218b8`, sem novo commit.
+
+> **Leia a §1 antes de rodar qualquer spec.** Specs de fixture (`12*`, `13*`, `14*` menos `14b_git_smoke`) **só na 5175**; na 5174 elas apagam arquivos reais do repo. Um Vite por vez (RAM). Reseed antes de cada spec de fixture.
+
+
+**Reorganizado:** 2026-10-03 (antigo `26`) · **Atualizado:** 2026-10-30 · **Data original:** 2026-09-29 · **Escopo:** `platform/apps/workbench-v2/` (Playwright + Vitest). **Estado corrente:** o dono declarou o Gate D98 concluído/homologado no Windows; evidência técnica e limites históricos em `§3.8.5`. A Fatia 13 usa a opção A da SPEC 2G/D126: executor one-shot separado do PTY humano, com shell detectado e workspace ativo validado; homologação manual relatada pelo dono, limitada aos cenários registrados em `08`. A investigação e validação focal do fix de descoberta Ollama/Cloud estão em `§3.23`; o dono confirmou a homologação manual do fix, separada dos testes Linux executados pelo agente. Não atribuir testes Windows ao agente nem inferir cobertura exaustiva além do aceite declarado. O Git local não tem remote configurado; o estado oficial do GitHub não foi verificado e não houve push. `.gitignore` cobre dependencies, outputs, caches, env/segredos e artefatos de teste.
+
+**Snapshots abaixo de 3.12–3.16:** resultados e roteiros anteriores a D121 permanecem para histórico. Onde exigem confinamento físico ao workspace, bloquear todas as operações ou provam CAS universal, não são os critérios correntes F2/F4. Use a seção 3.17 D121 ao fim. As seções 3.18–3.21 também são snapshots datados anteriores à decisão D126 e à homologação manual limitada da Fatia 13; não prevalecem sobre o estado corrente acima e §3.22.
+**Por que este documento existe:** duas IAs independentes gastaram turnos inteiros redescobrindo as mesmas regras de ambiente, e uma delas **apagou 206 arquivos reais** por rodar a suíte errada contra o servidor errado. Tudo o que está aqui foi vivido, não suposto. Fontes: sessão de trabalho do agente Arena (FATIA-04/05) e a auditoria externa `docs/arquivo_morto/engenharia_reversa/FATIA-05_LAYOUT/05_02_auditoria_externa_suite_e2e_e_raspagem.md`.
+
+---
+
+## 1. Os dois mundos (LEIA ANTES DE RODAR QUALQUER SPEC)
+
+| Mundo | Servidor | O que ele expõe | Quem roda nele |
+|---|---|---|---|
+| **5174 — repo real** | `npm run dev` (em `platform/apps/workbench-v2`; liga em `127.0.0.1`, porta 5174; `baseURL` padrão do `playwright.config.ts`) | O próprio `/home/user/agente_window` via plugins fs/git | Specs de **shell/terminal** e `sessao_14b_git_smoke` |
+| **5175 — fixture descartável** | `FS_TEST_ROOT=/tmp/explorer-fs-fixture npx vite --port 5175 --strictPort` (sem `--host`; bind loopback do config) | A pasta `/tmp/explorer-fs-fixture/e2e-fixture-root/` (semeada pelo teste) | Specs de **módulo** (12, 13, 14, 14b_*, 14c, 14d, 15) com `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5175` |
+
+### ⚠️ Regra de ouro
+**Specs de fixture (12*, 13*, 14*, 14b_backend, 14b_changes, 14c, 14d) fazem rename/delete/discard/git-init na árvore que o servidor expõe. Rodá-las contra a 5174 destrói arquivos do repositório real.** Foi assim que `legacy/` (206 arquivos) foi apagado em 2026-09-29 (restaurado via `git checkout`). Nunca omita o `PLAYWRIGHT_BASE_URL` para elas.
+
+Só `sessao_14b_git_smoke` opera de propósito no repo real (cria e apaga `e2e-smoke-<pid>.txt`), e `sessao_11_terminal_interactive_v2` precisa do repo real por causa do PTY.
+
+---
+
+## 2. Inventário completo — 33 arquivos / 195 testes (atualizado 2026-10-17: + `fatia08_modo_abertura` com 4 e + `conversa_fatia09` com 5)
+
+### 2.1 Anti-regressão OBRIGATÓRIA em todo commit da FATIA-05 (`docs/arquivo_morto/24_PLANO_FATIA-05_CHASSIS_RIGHT.md §9`) — 12 suítes / 115 testes
+| Spec | Testes | Mundo | Observação |
+|---|---|---|---|
+| `sessao_11_terminal_pty_real` | 6 | 5174 ou 5175 (não usa fs) | terminal homologado — **intocável** |
+| `sessao_11_terminal_interactive_v2` | 3 | **5174** | idem |
+| `sessao_12_explorer` | 30 | 5175 | **muta a árvore** (renomeia/apaga/cria) → reseed depois; T9 (X do Open Editors no hover) é flaky, re-rodar |
+| `sessao_12_explorer_fs_backend` | 10 | 5175 | exige `seed.txt` intacto → reseed antes |
+| `sessao_13_search` | 14 | 5175 | "across M files" ocasionalmente flaky |
+| `sessao_13_search_backend` | 6 | 5175 | |
+| `sessao_14_editor_anexo` | 16 | 5175 | T10 depende da seed; T13 flaky (`ECONNRESET` visto 1×); 16/16 desde o c2 (RF-09) · **5.7 (`9a11319`, autorizado 2026-10-01): T1/T2/T3/T14/T15/T16 reescritas para as regras novas** — teto 50 % (era 75 %), piso do chat 420, "Detalhes" colapsa na 1.ª aba e é exclusiva com o editor na faixa fina (`collapseDetails()` no preâmbulo); larguras-alvo 330/280 (cabem em 1400 px) |
+| `sessao_15_editor_maximize` | 3 | 5175 | **5.7 T30–T32** (`9a11319`): clique real em `seed.txt` (pasta `e2e-fixture-root` começa fechada → helper expande) → editor fino sem F5, Detalhes 0 px, chat ≥ 420 e ≥ 50 % da faixa `.top-right-section`; ⤢ → chat/Side Bar escondidos, anexo ≥ faixa − 12, `editorMaximized` em `workbench.layoutState.v1`, F5 + reabrir mantém; restaurar devolve largura ±2; Browser ativo não bloqueia (mede o **centro** `.main-surface`, pois o Browser divide o PanelGroup com o chat). Só lê a fixture. **Entra na bateria obrigatória (16 suítes)** |
+| `sessao_14b_git_changes` | 11 (**9 + 2 skip** desde 5.3) | 5175 | `afterAll` apaga `.git` da fixture → reseed depois · 5.3: SCM lida na Side Bar; T1/T5 `test.skip` (lógica da aba do anexo, D2.60) |
+| `sessao_14b_git_backend` | 7 | 5175 | |
+| `sessao_14b_git_smoke` | 1 | **5174** | repo real, autolimpa |
+| `sessao_14c_diff_minimal` | 6 (**2 + 4 skip** desde 5.3) | 5175 | faz git-init da raiz da fixture; reseed antes · 5.3: T1/T3/T5/T6 `test.skip` (lógica da aba Changes do anexo, D2.60); T2/T4 verdes |
+| `sessao_14d_commit_input` | 5 | 5175 | |
+
+### 2.2 Spec da FATIA-05 em construção
+| `sessao_15_outline_timeline` | 4 | 5175 | **5.6 T26–T29** (`7d05c7d`): Outline de `outline.ts` (4 símbolos, `aria-level`, codicon, clique → `active-line-number` 6), `.txt` → frase padrão, Timeline de `gitot/hist.txt` (2 commits, clique → diff `hist.txt (sha7)` v1→v2), sem histórico/sem repo → frase padrão. `beforeAll` cria `.git` na raiz da fixture (só `gitot/` commitado) + `outline.ts`; `afterAll` apaga → reseed depois. Diff inline: linhas removidas ficam em `.view-lines.line-delete` dentro do `.editor.modified` — filtrar com `:not(.line-delete)`. **Entra na bateria obrigatória (15 suítes)** |
+| `sessao_15_drag_drop_views` | 6 | 5175 | **5.5 T20–T25** (T25 = ícones da Activity Bar arrastáveis, `4e10381`) (DnD Side Bar ↔ Views Panel via `dispatchEvent` + `DataTransfer` sintético — §4.2; T24 abre o terminal só para provar que ele não aceita drop) — **5/5** desde `1f1ed79`; **entra na bateria obrigatória (14 suítes)** |
+| `sessao_15_activity_bar` | 21 | 5175 | **T16–T20 (5.4: menu de contexto Move Activity Bar, Left/Right reposicionam, F5 mantém, views/badge com `left`, Top/Bottom desabilitados D2.64; cria fixture git própria `gitab`)** — **21/21** desde `7bd528b` · **5.7: T4b agora exige chat ESCONDIDO no maximizado** (D6); **T8/T9 ganharam espera de painel+foco antes de digitar** — na bateria cheia o texto caía no chat 3× (nunca isolado); 21/21 ×2 depois · T8 flaky 1× antes (busca) · **T10–T15 (5.3: SCM na Side Bar, diff no anexo, coexistência RF-06, badge git.count(), maquete ausente do DOM, Initialize Repository + Open Source Control)** — **16/16** desde `2bd6cc3` · T1 (c1) · T2/T3/T4/T4b-RF-09 (c2) · T5 (c3) · **T6–T9 (5.2: lupa ativa view, Ctrl+Shift+F abre Side Bar no Search, RF-06 resultado abre no anexo sem fechar o Search, foco/estado preservado)** — **10/10** desde `22a1523`; **faz parte da bateria obrigatória (14 suítes)** |
+
+### 2.3 Specs do shell que passam mas NÃO estão na bateria obrigatória — 8 arquivos / 43 testes
+`sessao_01_sessions_core` 5 · `sessao_02_sessions_list` 5 · `sessao_03_layout` 5 · `sessao_04_layout_controller` 5 · `sessao_05_single_pane` 6 · `sessao_06_mobile` 5 · `sessao_07_browser_editor` 5 · `sessao_09_bugs_criticos` 5 · `validacao3_sessao03_layout_controller_real` 4 (T4 já foi visto falhando em sessão anterior) · `gate0_validation` 1 · `debug_terminal_toggle` 1. Mundo 5174. Auditoria externa: **verdes** em `ba571dd`. Vale rodar ao fechar cada sub-fase (5.x), não a cada commit.
+
+### 2.4 Os 13 testes MORTOS (5 arquivos + partes de 2) — pré-existentes, commit `75c6686` (2026-09-17)
+| Spec | Falha | Por quê está morto |
+|---|---|---|
+| `sessao_08_filesystem` | 3 de 5 (T2, T3, T4) | espera a árvore demo "Workspace Files" e botões "Escolher pasta real do disco / Trocar pasta" — substituídos pelo módulo Explorer real na FATIA-04 |
+| `sessao_10_custom_view_grid` | 3 de 6 (T3, T4, T5) | timeouts de click em F5/persistência da custom view |
+| `sessao_11b_visual` | 1/1 | espera 2 abas em tablist "Terminais abertos" (rótulo pré-consolidação) |
+| `sessao_11c_clear_active` | 1/1 | espera marcador `MAIN_CLEAR_*` no xterm ativo |
+| `sessao_11d_split_sash` | 1/1 | espera `role=separator` "Redimensionar split do terminal" |
+| `sessao_11e_theme_states` | 2/2 | espera `[data-pty-session-id$=":0"]` |
+| `sessao_11f_context_menu` | 2/2 | ações do menu de contexto do terminal |
+
+Todos testam rótulos/atributos do terminal **anteriores** à homologação `COMITE_HOMOLOGACAO_TERMINAL_V2` (`75c6686`). Mesma família das **9 falhas do Vitest** em `src/components/terminal/__tests__/TerminalPanel.test.tsx` (espera `role="region"` "Terminal"; `VSCodeTerminal.tsx` renderiza `aria-label="Painel Inferior"`).
+**Destino decidido (2026-10-14, D74 — faxina em 2 ondas):** **onda 1** — os 13 E2E mortos são marcados como `skip` na **FATIA 07** (registro preservado; **não apagar**); **onda 2** — as **9 falhas do Vitest** (`TerminalPanel.test.tsx`, P4) são consertadas na **FATIA 16 — Terminal 2.0** (pós-D95), junto do transplante. Até as fatias correspondentes abrirem: **não gastar tokens investigando-os**; contam como "pré-existentes" e ficam fora do critério de verde.
+
+**Onda 1 ✅ EXECUTADA (2026-10-15, FATIA 07, commit `9985b9e`):** os 13 viraram `test.skip` com 2 linhas de comentário acima de cada um (apontando este §2.4 e a FATIA 16, pós-D95). Skips da suíte: **6 → 19**. O contrato anti-trapaça (`src/__tests__/e2eAssertionContract.test.ts`) passou a aceitar `test.skip` como declaração de teste — e **endureceu**: spec com 100 % dos testes em quarentena precisa citar `docs/09` (senão reprova) — quarentena nunca silenciosa (**D79**). Confirmação Playwright: `sessao_08`+`sessao_10` = 3✓/6 skip/2✗ e `sessao_11*`+`sessao_05` = 13✓/7 skip/2✗ (as ✗ são as pré-existentes da §2.6).
+
+### 2.5 Números esperados hoje
+- **Baseline global histórico no HEAD `f2ff5a3`:** `npx vitest run` → **722 passed / 9 failed / 16 skipped**. As 9 falhas eram preexistentes em `TerminalPanel.test.tsx`; os 16 skips são os débitos D2.60. Mudança nesses 9/16 exige investigação; o número de pass pode crescer com testes novos. Os gates focados atuais do HEAD `a65a246` estão no cabeçalho e na §7.
+- **Baseline 2026-10-15 (HEAD `9985b9e`, pós-FATIA 07 parcial):** `npx vitest run` → **730 passed / 12 failed / 16 skipped (758)** · typecheck **0**. As 12 falhas são todas pré-existentes (provadas com `git stash` no início da FATIA 07): **9** em `TerminalPanel.test.tsx` (P4 — onda 2 da D74 na FATIA 16 (pós-D95)) + **1** `iconLabels.test.ts` + **1** `themeTokens.test.ts` + **1** `visualStates.test.ts`. Os 16 skips são os débitos D2.60. O `pass` subiu 722 → 730 (4 testes novos da FATIA 07 + 1 do contrato + 3 de outra origem); nenhum teste novo falhando.
+- **Falhas E2E pré-existentes FORA da lista §2.4 (triagem 2026-10-15) → §2.6:** 7 testes que falham **igual** no HEAD e em `e02e486` (A/B) mas **não** estão no §2.4 — portanto **não** foram marcados (marcá-los seria estender a onda 1, decisão do dono pendente).
+- **Bateria §9 (14 suítes):** 5175 → 15 (16) · 13_search (14) · 13_search_backend (6) · 14 (16) · 14c (2 + 4 skip) · 14d (5) · 14b_git_changes (9 + 2 skip) · 14b_git_backend (7) · 12_explorer_fs_backend (10) · 11_terminal_pty_real (6) · 12_explorer (30); 5174 → 11_terminal_interactive_v2 (3) · 14b_git_smoke (1). **Verde duas vezes** na 5.2 e na 5.3 (pré e pós-commit).
+- **Typecheck:** `npm run typecheck` (tsc -b --force) → **0 erros**. Não use `npx tsc` (sem node_modules instala pacote errado).
+- **E2E completo** (auditoria externa em `ba571dd`, sem spec 15): 166/180 = 167 não-mortos verdes + 13 mortos + 1 flaky (12_explorer T9).
+
+### 2.5.1 Baseline FATIA 08 (HEAD `fde5f0f`, 2026-10-15)
+- `npx vitest run` → **765 passed / 12 failed / 16 skipped (793)** · typecheck **0**. As 12 falhas são **exatamente as mesmas** da linha anterior (9 `TerminalPanel` + `iconLabels` + `themeTokens` + `visualStates`). O `pass` subiu 730 → 765: **+37** dos testes da casa nova (registro 6, repositório 13, sonda 13, fronteira LEGO 5) **−2** do `src/server/providers.test.ts`, removido junto com o código legado.
+- **E2E da fatia:** `provedores_fatia08.spec.ts` **6/6** (ver §13) · `conversa_fatia09.spec.ts` **5/5** (FATIA 09 — streaming+Markdown+rodapé · Parar · F5+isolamento · erros honestos+varredura de chave · troca de provedor; roda contra o mesmo stub 4599 com o fio padrão de **600 ms/pedaço** e o cenário **LENTO** de 700 ms ativado pela palavra `LENTO` no pedido; caso (d) timeout 60 s é unit da C2, nota no spec).
+
+### 2.5.2 Baseline 2026-10-17 (HEAD `f7b9035`) — pós A1 + D88 e homologação da FATIA 08
+- `npx vitest run` → **767 passed / 12 failed / 16 skipped (795)** · typecheck **0**.
+- As **12 falhas são exatamente as mesmas** de sempre: **9** `TerminalPanel.test.tsx` + `iconLabels` + `themeTokens` + `visualStates`. **Prova de que são pré-existentes:** A/B com `git stash` em 17/10 — **12 antes e 12 depois**, nos mesmos 4 arquivos.
+- O `pass` subiu **765 → 767**: **+2** testes novos de persistência (D88) — `centerEditorMaximized` nasce em anexo e é lembrado no reload; layout antigo (sem a coluna) migra para anexo.
+- **Trava nova (a que faltava no DEBT-04):** `e2e/fatia08_modo_abertura.spec.ts` — **4/4** (`T1` geometria da landing com aba aberta · `T2` editor maximizado → Provedores maximizado · `T3` reload preserva o último modo · `T4` padrão de fábrica = anexo).
+- **Regras aprendidas nesta rodada (não repetir o erro):**
+  1. O **contrato anti-trapaça** (`e2eAssertionContract.test.ts`) exige `test(` com **2 espaços** no início da linha; spec fora da convenção reprova a suíte.
+  2. A **fixture de provedores** precisa estar em **v2** (`{"versao":2,"ativo":null,"provedores":{}}`); em v1 a tela mostra "Formato não reconhecido".
+  3. A primeira execução de uma spec nova costuma falhar **por Vite frio** (compilação na primeira visita) — re-rodar antes de investigar.
+  4. Specs que usam o stub de provedor exigem o **stub na 4599 no ar**; sem ele, T2/T4/T5 da bateria 08 falham por conexão recusada (não é regressão).
+
+### 2.6 Falhas pré-existentes FORA do §2.4 — triagem 2026-10-15 (decisão do dono pendente)
+Encontradas ao rodar a suíte com o seed de sessões correto (ver §3.6). **Não** estão na lista canônica do §2.4, então **não** foram marcadas como `skip` (seria estender a onda 1, D74). Cada uma foi conferida no **A/B `e02e486`** (falha idêntica nos dois estados → pré-existente, não regressão da FATIA 07):
+
+| Spec | Teste | Sintoma (15/10) |
+|---|---|---|
+| `sessao_01_sessions_core` | T2 — "Nova sessão cria exatamente uma" | o clique em "Nova sessão" **abre a landing** e a linha nasce só no envio; o teste espera a linha na hora (expectativa anterior à landing atual) |
+| `sessao_01_sessions_core` | T3 — "ativa persiste após F5" | com 5 sessões no banco, o ativo volta para outra sessão após o F5 (passa com 3 – sensível à composição do seed/timing de persistência) |
+| `sessao_08_filesystem` | T1 — "detecção da File System Access API" | espera uma aba **"Files"** que não existe desde o Explorer da FATIA-04 (mesma família do T2–T4 do §2.4) |
+| `sessao_09_bugs_criticos` | T5 — "arrastáveis + fixar/arquivar (R-085)" | timeout de 30 s no caminho do menu de contexto |
+| `sessao_10_custom_view_grid` | T1 — "AI Customizations cobre Aux" | a `.auxiliary-bar` fica **hidden** após "Abrir alterações"; o teste espera visível |
+| `sessao_05_single_pane` | T2 — "aba Browser esconde o detail panel" | a `.auxiliary-bar` **continua montada** (count 1, esperado 0) |
+| `sessao_05_single_pane` | T6 — "resize só na Sessions Part" | o chat não absorve o delta de 240 px (absorveu menos de 200) |
+
+**Leitura:** T1 do `sessao_08` parece da mesma família morta do §2.4 (aba "Files" pré-FATIA-04); T1 do `sessao_10` e T2 do `sessao_05` discutem a **visibilidade da Aux** — podem ser a **mesma causa raiz** (uma real, a investigar). T2/T3 do `sessao_01` e T5 do `sessao_09` parecem **expectativa desatualizada/timing**. Nada disso é da FATIA 07; decidir quando abrir a fatia que tocar cada área (**FATIA 16/17 (pós-D95)**) — ou marcar como `skip` com registro, se o dono autorizar a extensão da onda 1.
+
+#### Investigação dos 2 suspeitos da Aux (2026-10-15, ordem do dono — "opção C"): **veredito = expectativa morta, não bug**
+Método: leitura do código + sonda `validacao_fatia07/sonda_05_aux_bar.cjs` (Playwright, observação pura) + decisões homologadas. **Fatos medidos ao vivo** (0 pageerrors):
+| Passo | `.auxiliary-bar` | Abas do editor |
+|---|---|---|
+| boot | no DOM, `display:flex`, **largura 0 px** | nenhuma |
+| "Abrir alterações no editor" | igual (largura 0) | abre **aba** `diff` "Branch Changes" (selecionada) |
+| "Abrir navegador no editor" | **continua montada** | abre **aba** `browser` "Browser" (selecionada) |
+
+**Por que os testes estão velhos:** a coluna "Detalhes" da `AuxiliaryBar` foi **removida de vez** (5.8-c1, 2026-10-02 — D2.50), a homologação 5.7 fixou "**fechar aba nunca desmonta a AuxiliaryBar**; **sem 'Detalhes' com 0 arquivos"** e o campo `auxiliaryVisible` é hoje **constante `false`** no shell (D2.72 — limpeza reservada à FATIA 18 (era 14 pré-D95), "só limpeza"). Hoje a `.auxiliary-bar` é **a casca do Editor Anexo**: sempre montada quando o módulo existe (Regra 10: `display`), recolhida com largura 0. E "Abrir alterações" abre **aba** no editor por decisão (E10/R-083: "a Changes pill revela explicitamente o editor"). Os dois specs são de **17/09** (`75c6686`) — **anteriores** à remoção.
+→ **`sessao_10 T1`** espera a coluna antiga **visível** ao abrir alterações; **`sessao_05 T2`** espera a coluna antiga **desmontada** ao abrir o navegador. Ambos contradizem decisões já homologadas.
+
+**Aplicado (15/10, D80 — decisão do dono, opção "só os 2"):** `sessao_10 T1` e `sessao_05 T2` estão em **quarentena `test.skip`** com nota (registro preservado; "expectativa morta, sem conserto previsto"). Os **5 restantes continuam vermelhos** e registrados nesta §2.6 — dois deles podem ser problema real (`sessao_09 T5` arrastar/fixar e `sessao_01 T3` sessão ativa após F5) e por isso **não** foram silenciados. Skips da suíte E2E: **19 → 21**.
+
+---
+
+## 3. Receita do ambiente (por turno — o sandbox é recriado a cada mensagem do usuário)
+
+O que **some** entre mensagens: `node_modules`, browsers do Playwright, runtime do code-server (`/home/user/.cache`), `/tmp` (fixture), todos os processos. O que **fica**: arquivos em `/home/user` fora das pastas de cache.
+
+### 3.1 Instalar
+```bash
+cd /home/user/agente_window/platform && npm install            # ~1–2 min
+cd apps/workbench-v2 && npx playwright install chromium         # + sudo npx playwright install-deps chromium se faltar lib
+sudo sysctl -w fs.inotify.max_user_watches=1048576 fs.inotify.max_user_instances=1024
+```
+### 3.2 Servidores — sempre via `start_process` (nunca em bash de fundo), bind compatível com o escopo
+- Fixture: `FS_TEST_ROOT=/tmp/explorer-fs-fixture npx vite --port 5175 --strictPort` (sem `--host`; `vite.config.ts` mantém `127.0.0.1`).
+- Repo: `npm run dev` (em `platform/apps/workbench-v2`, `127.0.0.1:5174`). Não sobrescrever Host/bind com flags externas.
+- **Estado de segurança atualizado (F1, 2026-10-26):** Vite/preview usam loopback e boundary local valida Host/Origin; grants/contexto de sessão/workspace são server-side. Na fixture isolada, GET same-origin 200; PUT cross-origin 403; POST sem Origin 403; Host inválido 403; upgrade WebSocket PTY com Origin hostil rejeitado. Nenhum processo LAN/code-server foi iniciado. O registro D105 abaixo descreve a inspeção estática anterior à alteração, não o estado atual.
+- `/home/user/restore-code-server.sh` continua usando `--bind-addr 0.0.0.0:8080 --auth none` quando executado; code-server é ambiente de medição separado, não proteção das APIs do produto, e não deve ser iniciado/alterado sem escopo explícito. O PTY server usa `PTY_HOST || 127.0.0.1` como padrão no código; serviço standalone não foi alterado nem testado nesta F1. Acesso local e autorização por operação são requisitos separados (D103/D105).
+- **Aquecer** com uma carga manual antes da bateria (cold-start Vite+Monaco > 30 s de timeout do 1º teste).
+### 3.3 Reseed da fixture (antes de CADA spec de fixture)
+Não apague a raiz `/tmp/explorer-fs-fixture` — o watcher do Vite 5175 morre e a 1ª requisição falha. Apague **só o conteúdo** e re-semeie. Função pronta: `reseed()` em `platform/apps/workbench-v2/run-antiregressao.sh` (`bash -c 'source <(sed -n "/^reseed()/,/^}/p" run-antiregressao.sh); reseed'`).
+### 3.4 Ordem da bateria §9 que cabe na RAM (~1,9 GB, sem swap)
+1. code-server 8080 **desligado**.
+2. Subir 5174 → rodar `sessao_11_terminal_interactive_v2`, `sessao_14b_git_smoke` (`--workers=1`) → **derrubar 5174**.
+3. Subir 5175 → para cada spec: reseed → `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5175 npx playwright test e2e/<spec> --workers=1 --reporter=line`.
+4. `npm run typecheck`; `npx vitest run`.
+5. Religar o 8080 no fim (`/home/user/restore-code-server.sh` com `TMPDIR=/home/user/.cache/tmp`, ~2–3 min).
+`run-antiregressao.sh` faz o passo 3 em série; os itens do passo 2 ele espera já no ar — **não deixe os dois Vite juntos durante 14/14c** (§4.1).
+### 3.5 Comandos que valem
+- Um spec: `npx playwright test e2e/sessao_14c_diff_minimal --workers=1 --reporter=line` (o `-g` vazio roda a suíte inteira; o glob `sessao_12_explorer` também casa `_fs_backend`).
+- Sempre `timeout ≤ 700` no wrapper e saída para arquivo de log quando a suíte for longa (o pipe morre com o wrapper e perde o resumo).
+- Órfãos após interrupção: `pgrep -f "playwright test|workerProcessEntry|chrome-headless-shell"` e matar por PID (**nunca** `pkill -f` com padrão que case o próprio shell).
+- Print de tela sem travar: `node shot.tmp.mjs <url> <png>` (utilitário local, não versionado) ou Playwright com `clip` e esperando `.agent-sessions-workbench` — `networkidle` nunca fica idle com o Vite.
+
+### 3.6 Seed de sessões para os specs de 5174 (descoberto em 2026-10-15) — senão, falha em massa
+`resetApp` (`helpers.ts:58`) espera `.session-row`: **sem ≥1 sessão no banco, toda spec falha** (foi a causa das "18 falhas" da triagem da FATIA 07). Receita que ficou verde:
+1. **5 sessões** (o `sessao_01 T1` exige **≥5** linhas), **todas na mesma pasta** e essa pasta **dentro da raiz do 5174** (`repoRoot = /home/user/agente_window` — `vite.config.ts`; na prática usei `platform/apps/workbench-v2`).
+2. **Por que a mesma pasta:** a raiz ativa do `explorer-search` é a pasta da **sessão ativa**; pasta de outra sessão fora dela → `GET /fs/list` responde **403** e specs que conferem o console (`sessao_01 T5`, `sessao_11_terminal_pty_real T1`) falham por tabela. Com o seed em `/tmp` isso acontecia — **não** é bug do produto.
+3. **Persistência atrasada:** depois do Enter na landing, esperar **~2,5–3 s** antes de fechar o navegador, senão o `PUT /api/sessions` **não sai** e o banco fica vazio. Com sessões já existentes, abrir a landing exige clicar em **"Nova sessão"** (`landingVisible = newSessionLanding || !hasSessions`).
+4. **Banco:** `~/.agente_window/agente_window.db` (tabela `sessions`); conferir com `GET /api/sessions`; limpar com `DELETE /api/sessions/<id>?force=true`. **Cuidado:** `sessao_09 T3` apaga uma sessão no meio da rodada — re-semear entre lotes.
+
+### 3.7 Régua pós-MVP — 08→09→10→11→12 em série (receita 20/10, +12 em 21/10 C2)
+- **Browsers:** `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright/browsers` (já vem com chromium) — `npx playwright install` FALHA (lock sem permissão) e não é preciso.
+- **Stubs (fora do repo, `start_process`):** `node /home/user/uploads/stub_provider.cjs` (4599 — 08/09) + `node /home/user/uploads/stub_agir.cjs` (4610 **v3+12** — 10/11/12; v3 tem `TETO_INFINITO`, a 12 somou os cenários `EXCLUIR_*`).
+- **Vite:** `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json AGENTE_WINDOW_SETTINGS_PATH=/tmp/f11-e2e-settings.json npm run dev` (local-only em `127.0.0.1:5174`; a 08 **amarra** o caminho `/tmp/prov-fixture/providers.json` — outro caminho = 6 fails no beforeEach; `mkdir -p /tmp/prov-fixture` antes).
+- **Ordem canônica OBRIGATÓRIA** (uma spec por comando — múltiplos posicionais o Playwright ignora): `provedores_fatia08` → `conversa_fatia09` → `agir_fatia10` → `teto_fatia11` → `excluir_fatia12`. Esperado: **6/6 + 5/5 + 5/5 + 2/2 + 5/5 = 23/23**.
+
+  > 🔴 **NOTA DE CORREÇÃO — D128/DEBT-24 (2026-10-31). O placar "23/23" desta linha NÃO descreve o código atual.** A spec `excluir_fatia12` afirma exclusão **real** (`expect(existsSync(\`${PASTA}/alvo.txt\`)).toBe(false)` + leitura de volta em `~/.local/share/Trash/files/` + `.trashinfo` com o caminho de origem), mas o executor hoje retorna falha fixa (`discos.ts:271` · `lixeira.ts:17-21`). **A spec não pode passar** — **dedução de leitura de código, NÃO observada em execução** (nenhum teste foi executado nesta missão; a spec é destrutiva por construção e o dono proibiu executar exclusões). **A spec permanece ATIVA, sem `skip`, sem `fixme` e sem marca de quarentena** (verificado), enquanto `__tests__/excluir.test.ts` foi reescrito para afirmar o comportamento oposto (`describe('excluir — fora do escopo desta missão e fail-closed')`) — **dois artefatos contraditórios sobre o mesmo comportamento, sem registro da contradição**, contra o espírito de **D79** (*"quarentena de teste nunca é silenciosa… precisa citar o registro"*). **Este mesmo arquivo já contém a informação correta em §3.x/L470 e L502** (*"exclusão não implementada"*; *"Lixeira/exclusão e prévia não acessam o disco e falham fechado"*) — **prevalecem essas**, não o placar desta linha. **A régua esperada passa a ser 18/18** (`6/6 + 5/5 + 5/5 + 2/2`) **até** que DEBT-24 seja resolvida e a spec volte a passar, **ou** que ela seja quarentenada **com registro** aqui. ⏳ Destino pendente de aprovação do dono. Ver `investigacao_memoria_fatias_m/15_TASK06_DIAGNOSTICO_FATIA13_EXCLUIR_E_ALINHAMENTO.md` §3.4.
+  > 🟢 **RESOLUÇÃO — D132/D136 (2026-10-31, Task 07). O dono aprovou a R1 e a contradição foi resolvida pela RESTAURAÇÃO, não por quarentena nem por máscara.** `lixeira.ts` recuperou o corpo (base `90fe21d`, a versão homologada por D97) e `discos.ts` voltou a chamar `moverParaLixeira`. **Os três artefatos voltaram a concordar:** o E2E `excluir_fatia12` (que **sempre afirmou exclusão real e estava certo**) · `excluir.test.ts` e `lixeira.test.ts` (**restaurados das versões homologadas + provas das correções K1/K2/K3**; 3→13 e 3→19 testes) · e o bloco F2 de `rotas.test.ts`, que **abençoava a regressão** (`previa` = *"exclusão não está disponível"*, `tool_result` = *"Exclusão bloqueada"*) e **passou a afirmar o comportamento real**, com a nota explicativa preservada dentro do próprio teste (40→41 testes). **A régua volta a ser 23/23 no papel — mas o E2E continua NÃO EXECUTADO neste ambiente** (falta `uploads/stub_agir.cjs`, sem browsers do Playwright, `/tmp` × `$HOME` em dispositivos diferentes). **O que foi executado de verdade:** suíte `agir` **137 passaram / 4 skipped / 0 falharam**, `tsc` exit 0, `eslint` nos cinco arquivos exit 0, e a **suíte completa antes × depois com os mesmos 14 testes falhando nas duas rodadas** (nenhum em `agir`). Placar em §3.25. **Nada foi quarentenado e nenhum `skip` novo foi criado.**
+- **Por que a ordem importa (DEBT-21):** as specs dividem o armazém persistente (`.db` + memória do Vite + `*.jsonl`, sem fixture): sobras `AGIR-E2E-*`/`TETO-E2E-*`/`EXCLUIR-E2E-*` com pasta apagada quebram a 09 (clica a 1.ª linha → 409 workspace), e a T4 da 09 semeia bolhas "Chave inválida (erro 401)" que quebram a T4 da 08 (assert página-inteira). Higiene: DELETE nas sobras via `/api/sessions/<id>?force=true` antes da 09; neutralizar o texto nas `.jsonl` se a 08-T4 reclamar (Vite parado). **NUNCA zerar o banco** (`resetApp` exige ≥1 `.session-row` — banco zerado = falha em massa) e **NUNCA semear via `PUT /api/sessions`** (corpo mínimo quebra o boot da UI) — seed só pela UI (§3.6).
+
+### 3.8 D98/PERF — investigação técnica e evidência inicial (2026-10-28; gate aberto)
+
+**Autorização e limites.** Em 2026-10-28 o dono autorizou explicitamente a investigação sem o antigo pré-gate de validação documental. Isso liberou investigação técnica: SCM + Explorer juntos, traces/instrumentação do app real, fixtures descartáveis e protótipo temporário. Em 2026-10-29, após homologar manualmente os objetivos principais de desempenho/funcionamento D98, o dono autorizou seis correções funcionais estreitas pós-homologação. Essa ordem não reabre otimizações, não autoriza Fatia 13/iniciativas M, push nem enfraquecimento de F1–F5-B; a aprovação de desempenho não equivale ao encerramento do Gate. As correções e evidências estão em §3.8.5. A hipótese histórica de que “Git é rápido e a UI é gargalo” não é tratada como fato sem separar as etapas.
+
+**Baseline e ambiente.** Branch `docs/capacidades-d102-alinhamento`, HEAD de código da rodada `59dfc32c99417136c9817984c81456803f296e58`; Linux x86_64/kernel 6.1.158, Node 20.20.2, Git 2.47.3, Vite 5.4.21, Playwright 1.63.0, Chromium Playwright revision 1243. RAM visível 1.982 MiB, sem swap; em uma tentativa Explorer 5k havia ~190 MiB disponíveis. Aplicação de teste somente em loopback **5175**, com `FS_TEST_ROOT=file:///tmp/d98-fixtures/...`; 5174 não foi usado. Fixtures criadas em `/tmp/d98-fixtures` (repos Git sintéticos, arquivos untracked; raízes e conteúdos descritos no pacote de evidências). HOME isolado em `/tmp/d98-home`. Nenhum projeto/dado real do usuário foi tocado. Code-server permaneceu parado. Após medições, servidor, Chromium e harnesses temporários foram encerrados/removidos.
+
+**Protocolo e repetições.** SCM e Explorer foram exercitados no app via Playwright/CDP com trace real; cada sessão de UI é uma execução medida, portanto não há distribuição/repetições independentes para esses números. O isolamento de `GitHost`, `buildGroups`, parser, CLI e HTTP usou 7 amostras warm e p50; houve outliers compatíveis com JIT/GC. O harness `ChangesList` executou uma vez por combinação de volume/modo; o lado “real” importa o componente `ChangesList` atual, recebe o JSON real de `/git/status` e usa `buildGroups`; o protótipo cria uma janela visível temporária com o mesmo payload/API/fixture, mas não tem paridade completa de markup, interações/acessibilidade ou shell. Não é prova de ganho final do produto. Os traces/JSON sem alteração estão em `docs/arquivo_morto/auditorias_2026-10-28/d98/raw/`; fixtures podem ser recriadas pelo `generate-fixtures.mjs` no mesmo diretório.
+
+**SCM/Git — etapas isoladas.** Medianas p50 em 7 amostras warm, por volume:
+
+| Etapa medida | 5k | 10k | Observação |
+|---|---:|---:|---|
+| `GitHost.status` | 20,116 ms | 33,308 ms | Serviço local e fixture do cenário; não equivale ao tempo de UI. |
+| `buildGroups` | 3,059 ms | 5,319 ms | Derivação dos grupos SCM em memória. |
+| `parsePorcelainV2` | 0,290 ms | 0,611 ms | Parser isolado; outliers não entram na mediana. |
+| Git CLI `status` | 6,169 ms | 9,999 ms | Etapa/processo diferente da API. |
+| `POST /git/status` HTTP | 36,376 ms | 53,514 ms | Payload JSON de 650.045 B / 1.310.045 B; não comparar diretamente com CLI. |
+
+**SCM — app e componente.** Na sessão do app real com 1k recursos: 1.000 entries, 1.002 linhas, 20.558 nós DOM. Seleção do workspace: 482 ms; view SCM pronta: 648 ms. Refresh: HTTP 412 ms, até paint 460 ms; scroll até dois `requestAnimationFrame`: 61 ms. Foram vistas três respostas `/git/status` de 130.045 B/1.000 entradas, com durações aproximadas 85, 30 e 4 ms. O trace tem 48.403 eventos (9.018.561 B descomprimidos; 708.115 B gzip). Foram observados 7 long tasks de 69–309 ms; o trace completo cobre boot, troca de workspace, seleção SCM e refresh, portanto esses tempos **não** são atribuídos todos ao SCM. Houve 52 commits React até a leitura após montagem e 54 ao fim; a instrumentação registra timestamps/contagem, não duração individual de commit. O indicador `crashed: true` sem timestamp não permite determinar se ocorreu durante a sessão ou no encerramento. Uma tentativa do app completo em 5k chegou ao badge `Source Control (5000)`, mas a view resultou em `Target crashed`; não houve trace/dump que prove OOM ou causa.
+
+No harness isolado do `ChangesList` atual, 1k montou 1.002 linhas/20.052 nós de documento; React Profiler `actualDuration` 182 ms e long tasks de 192 e 106 ms. Em 5k montou 5.002 linhas/100.052 nós; `actualDuration` 998 ms, long tasks de 1.037 e 793 ms, JS heap CDP ~50,3 MB. O protótipo temporário, com 1k/5k/10k no mesmo payload por volume, manteve 26 linhas visíveis e ~370 nós no DOM, `actualDuration` inicial de 12,7 / 12,6 / 12,8 ms; ao rolar em 1k/5k, renderizou 26 linhas, ~382 nós e atualizações de 8,5 / 6,5 ms. Em 10k o JSON tinha 10.000 entries/1.310.045 B; no modo virtualizado não houve erro de console nem long task observada. Este A/B é evidência forte de que a lista atual cria custo de montagem proporcional à quantidade de linhas **no componente isolado**; as cifras do protótipo não garantem equivalência visual/funcional ou desempenho ponta a ponta. Os tempos de API foram uma amostra por página (p.ex. 14/15,3 ms em 1k e 39,2/79,8 ms em 5k); não são comparação estatística.
+
+**Explorer — app real 1k.** Expandir `children-1000` levou 10.423,51 ms. Durante a expansão: 2 chamadas `/fs/list` iniciadas/concluídas e 1.004 `/fs/stat` iniciadas, com 891 respostas observadas; na sessão, 1.008 stats iniciadas, 895 respostas e 113 erros `ERR_INSUFFICIENT_RESOURCES`. A UI mostrou 1.003 linhas e 11.562 nós DOM, mas a presença das linhas **não** comprova que todos os metadados foram obtidos. Foram observadas 7 long tasks durante a expansão, máximo 368 ms; scroll até dois frames 66,87 ms; JS heap reportado ~33,95 MB. Trace: 88.374 eventos (16.140.833 B descomprimidos; 1.218.837 B gzip).
+
+A tentativa Explorer 5k expirou após 60 s esperando `.agent-sessions-workbench` durante o boot; o `body` estava vazio, ocorreu uma falha `ERR_INSUFFICIENT_RESOURCES` e não houve `/fs/list` nem `/fs/stat`. O processo começou com memória disponível baixa (~190 MiB). Não chegou à expansão, não é uma medição 5k do Explorer e não prova que o produto falhe nessa escala; causa entre limite do sandbox, Chromium ou boot do app permanece indeterminada.
+
+**Código observado e interpretação causal provisória.** `src/modules/explorer-search/core/treeState.ts`, em `TreeState.ensureResolved`, lista filhos e chama `fs.stat` para cada entrada em um `Promise.all` sem limite; `browserFsPort.ts` encaminha cada `stat` por HTTP. Isso explica estruturalmente a amplificação N-por-filho e é coerente com os 1.004 pedidos e 113 erros reais observados. Confiança **alta** de que esse padrão gera fan-out e contribuiu para erros/latência; **média** de que seja a causa predominante dos 10,4 s, pois transporte, serviço filesystem e render ocorrem na mesma janela e não foram isolados por intervenção controlada. `ChangesList.tsx` mapeia todos os recursos em DOM; `ExplorerView.tsx` achata/mapa todas as linhas visíveis. O A/B isolado sustenta com confiança **alta no componente SCM** que o render eager escala com N; confiança **média** de que ele explique sozinho o crash do app completo em 5k. Não há evidência suficiente para atribuir a causa do crash SCM 5k nem para afirmar que Git, React, DOM ou filesystem isoladamente expliquem todo o travamento. Nenhuma métrica confiável de CPU do processo/sandbox foi capturada; JS heap não equivale à memória residente total.
+
+**Critérios para uma SPEC quantitativa futura.** Antes de propor limiares, repetir em ambiente com folga de memória, ao menos 3 execuções independentes por volume e ordem A/B controlada para SCM e Explorer (1k/5k/10k quando suportado), preservando failures; separar API/Git, `list`, `stat`, filas/concorrência, transformação, commit/render e paint. Capturar CPU e RSS do processo por método confiável, heap, long tasks, linhas/nós DOM, p50/p95, erros, tempo até utilizável e responsividade durante scroll/refresh. Validar funcionalidade, seleção, teclado, ações, ordenação, cancelamento e estado de erro do protótipo antes de qualquer escolha de arquitetura. Só então derivar em SPEC metas explícitas de tempo/erros/recursos com justificativa e testes de regressão; aguardar aprovação do dono antes de produção. Esta rodada não define metas, não aprova arquitetura e não fecha D98.
+
+**Não fazer:** não usar 5174/projetos reais; não alterar produção; não iniciar Fatia 13 ou iniciativas M; não misturar pendências F1–F5-B com D98; não declarar a tentativa Explorer 5k como resultado; não transformar protótipo, benchmark sintético ou hipótese em causa provada/homologação. Parar para revisão independente após entregar a síntese.
+
+### 3.8.1 D98 — validação independente Windows (2026-10-28; sem otimização de produção)
+
+**A. Baseline/ambiente.** Branch `docs/capacidades-d102-alinhamento`, HEAD `fd913db3d442511ae40a1d94ea2a2dfaaab88f4e` confirmado; código de produção idêntico ao baseline anterior `59dfc32`. Havia uma edição local preexistente no último parágrafo do reteste Windows F1–F5-B; foi preservada separadamente. Windows 11 Pro 23H2/build 22631.6199, i5-10400 (6 cores/12 threads), RAM visível 16.602.528 KiB (~15,83 GiB); livre no snapshot durante o piloto 1.520.528 KiB (~1,45 GiB), sem medição contínua do mínimo. SSD SATA Kingston SA400S37240G, C: NTFS, ~9,94 GB livres no início. Node 24.16.0, npm 11.13.0, Git 2.44.0.windows.1, Edge headless 156.0.4314.50, viewport 1400×900. Máquina compartilhada com outros processos; não foi obtido ambiente Windows ocioso nem desativado antivírus/indexação. Não há evidência que atribua um resultado específico ao antivírus. Nenhuma configuração global alterada.
+
+**B. Critérios consultados.** D98/D99 e autorização de 28/10 em `05`; micro-fatia PERF em `06`; protocolo `09 §3.8` e D101 §3.10; homologação humana em `08`. Investigar SCM+Explorer juntos, conferir hipótese com trace e protótipo em fixture, separar backend/render/recursos, derivar SPEC quantitativa e aguardar aprovação. Não existe SLA numérico aprovado. Terminal, App, Explorer core/server e demais fontes de produção permaneceram intactos. Fatia 13, iniciativas M e F1–F5-B não foram abertos nem corrigidos.
+
+**Pacote/reprodução:** `arquivo_morto/auditorias_2026-10-28/d98/windows/README.md`, scripts, `results-summary.json`, `environment.json`, `manifest.json` e `raw/` (JSON/logs comprimidos sem reserialização; traces CDP gzip originais). Dados temporários e fixtures fora do repo: `C:\Users\Usuario\.codex\visualizations\2026\10\27\01a17f37-97c4-74a2-87bb-d6fbbbe5b243\d98-windows-20261028`. Nenhum arquivo pessoal, provedor ou credencial real acessado. Um Vite por vez, somente 127.0.0.1:5175, HOME/USERPROFILE/arquivos de configuração isolados. `start_process` não está disponível nesta sessão; subprocessos Node controlados, com timeouts de operação, encerrados ao final.
+
+**Método.** Fixtures SCM com 1k/5k/10k arquivos untracked e um sentinel tracked; Explorer com duas pastas de 1k/5k arquivos. Um piloto manteve os 6k untracked, como o gerador Linux; para o A/B principal os arquivos do Explorer foram commitados somente no repo fictício, separando o custo da lista SCM oculta. Essa diferença impede comparar diretamente o tempo Windows com os 10,4 s Linux. O Windows não recebeu o protótipo Linux (não versionado); foi criado outro, reutilizando o markup e callbacks atuais das linhas SCM, sem biblioteca nova.
+
+Instrumentação e experiências são transformações de módulos em memória por plugin Vite externo, não edições nas fontes. Explorer: mesmo wrapper de medida nos dois braços; original sem limite versus fila de 16 operações `stat` completas (inclui leitura/parse do JSON). SCM: Profiler externo e janela temporária de 32 recursos, usando as mesmas linhas/ações. Foram feitas quatro execuções por braço/volume no app: r1 com trace, r2–r4 sem trace; alternância A/B no Explorer. Tabelas usam **três amostras independentes sem trace**; p95 é o quantil empírico superior dessas três, na prática o máximo observado, não estimativa robusta de SLA. Backend: uma amostra de aquecimento e sete warm por volume. Componente isolado: três amostras por braço/volume, ordem A/B alternada. Cache de disco/Vite não foi esvaziado; não chamar de cold boot. SCM real e experimental foram rodados em blocos separados, possível efeito de ordem/cache.
+
+Medições: requisições até corpo concluído, filas/concorrência, erros, long tasks via PerformanceObserver, atraso de timer de 50 ms como proxy de responsividade, DOM, JS heap e métricas CDP de CPU/TaskDuration. CPU CDP não equivale a percentual global do Windows; JS heap não é RSS nem memória total. RSS/peak resident e mínimo contínuo de RAM **não foram medidos**. A medida de scroll é deslocamento até dois RAF, não uma sessão longa de scroll com frame time distribuído. As falhas e amostras com trace ficaram preservadas.
+
+**C. Explorer, aplicativo real — conclusão de linhas e metadados.** A conclusão exige N operações terminadas e sem erros, não apenas linhas no DOM. Cada expansão gerou uma listagem e exatamente N stats; todos terminaram com sucesso nos dois braços Windows.
+
+| Volume | Braço | Total p50 / p95 | Pico HTTP stat | Falhas de stat/transporte | DOM do documento |
+|---|---|---:|---:|---:|---:|
+| 1k | original | 1.098 / 1.129 ms | 1.000 | 0 | ~11,6k |
+| 1k | limite 16 | 1.107 / 1.419 ms | 16 | 0 | ~11,6k |
+| 5k | original | 5.018 / 5.029 ms | 5.000 | 0 | 55.668 |
+| 5k | limite 16 | 5.128 / 5.153 ms | 16 | 0 | 55.668 |
+
+Em 5k, a janela entre primeiro stat e último stat terminado teve mediana **3.289 ms original / 3.565 ms limitada**; do último stat ao snapshot após paint, ~**1.637 / 1.424 ms**. São janelas observadas com transporte/parse/render sobrepostos, não uma decomposição aditiva de CPU ou percentual causal puro. Limitar não acelerou o total: ~+0,8% em 1k e +2,2% em 5k, variação sem demonstração estatística de regressão. A contenção do pico, de 5.000 para 16, é comprovada. Não houve erros em Windows para comprovar melhora da taxa de erros.
+
+A soma mediana das long tasks 5k caiu aproximadamente de 2,45 s para 1,40 s, mas o máximo ainda foi **949 ms original / 871 ms limitada**. Timer de 50 ms atrasou até **1.600 / 1.445 ms**. A interface responde depois, porém não permanece continuamente fluida durante a expansão. Scroll após a conclusão: mediana ~29/30 ms; heap ~82,0/80,6 MiB. TaskDuration CDP durante a operação: mediana ~3,74/4,27 s, sem alegar CPU global. Portanto há custo substancial no cliente além da simultaneidade de requests.
+
+A amostra 5k original **com trace** levou 14.800 ms, versus 5.202 ms limitada; o trace registra ~309k/~312k eventos. Esse contraste não foi usado como ganho de 3×: as três amostras sem trace não o repetem. Há interação provável com a captura/pressão de eventos ou outro estado transitório; a causa exata do outlier não foi provada. Nenhuma medição falhou no boot/expansão 5k desta rodada Windows.
+
+**Interação Explorer/SCM:** no piloto Explorer 1k com 6k untracked, houve 6.000 linhas SCM presentes antes de selecionar SCM e ~131.626 nós DOM; expansão ~1.298 ms. No A/B com Git limpo, SCM tinha zero recursos e DOM Explorer 1k ~11,6k. O `ChangesList` pode estar montado oculto, contribuindo para memória/boot mesmo com Explorer ativo. A confirmação não permite atribuir exatamente quantos ms do piloto pertencem à lista oculta; não subtrair execuções distintas como prova causal.
+
+**D/E/F. SCM, aplicativo real e componente isolado.** No app, o serviço já carregara os recursos e a lista oculta antes da ativação de SCM. A coluna “ativar” mede clique da Activity Bar até linhas/estado e dois RAF: **não é boot total nem tempo desde escolha da pasta**. O Profiler confirma o primeiro render com N recursos mesmo antes de abrir SCM. A experiência virtualizada foi aplicada somente pelo plugin de diagnóstico; não entrou no produto.
+
+| Volume | App original: ativar p50 | App janela: ativar p50 | DOM original → janela | Heap JS original → janela |
+|---|---:|---:|---:|---:|
+| 1k | 247 ms | 81 ms | 20.673 → 1.411 | ~38,0 → 24,7 MiB |
+| 5k | 1.014 ms | 84 ms | 100.720 → 1.411 | ~69,2 → 25,9 MiB |
+| 10k | 1.774 ms | 82 ms | 200.767 → 1.411 | ~129,9 → 27,3 MiB |
+
+Todos os 12 cenários por braço do app completaram (r1 com trace + r2–r4 sem trace), sem crash/erro de API registrado. Maior long task observada até a leitura pós-abertura: 177/818/1.680 ms no original (1k/5k/10k), contra 152/148/148 ms no experimental; esses máximos incluem boot/contexto e não são exclusivamente SCM. Primeiro render Profiler com N recursos: ~164/685/1.349 ms original, ~7/11/7 ms janela. Os dados do refresh mostram duas atualizações de lista (loading e resultado); os tempos e commits individuais estão nos JSON. `refreshObservedMs` inclui uma espera fixa de 800 ms do harness: **não é benchmark exato de refresh até utilizável**. Scroll após carga: medianas original 22/50/85 ms, janela ~35 ms. Em 1k o scroll sintético virtual foi mais lento; não esconder esse resultado.
+
+No componente isolado, montagem síncrona e atualização controlada até dois RAF:
+
+| Volume | Montagem p50 atual → janela | DOM atual → janela | Atualização p50 atual → janela |
+|---|---:|---:|---:|
+| 1k | 173 → 21 ms | 20.048 → 692 | 163 → 39 ms |
+| 5k | 729 → 20 ms | 100.048 → 692 | 767 → 42 ms |
+| 10k | 1.464 → 19 ms | 200.048 → 692 | 1.736 → 35 ms |
+
+A evidência de ganho não ficou restrita ao componente: também apareceu ao ativar SCM no app real. Ainda assim, o markup do protótipo envolve viewport/spacers e reduz grupos; ganho não prova equivalência funcional. Os ~370 nós do protótipo Linux e os 692 desta janela Windows são experimentos diferentes, não regressão do mesmo protótipo.
+
+**Git/API isolados, p50 de sete amostras warm (mesma fixture Windows por volume):**
+
+| Volume | Git CLI | GitHost.status | HTTP /git/status | buildGroups | Parser | Bytes JSON |
+|---|---:|---:|---:|---:|---:|---:|
+| 1k | 43,2 ms | 82,5 ms | 86,2 ms | 0,23 ms | 0,08 ms | 230.045 |
+| 5k | 49,1 ms | 99,6 ms | 142,1 ms | 0,85 ms | 0,29 ms | 1.150.045 |
+| 10k | 58,2 ms | 132,1 ms | 203,8 ms | 2,05 ms | 0,86 ms | 2.310.045 |
+
+GitHost executa também rev-parse/validação e transformação; HTTP adiciona serialização/transporte. São camadas distintas, não valores intercambiáveis. As APIs Windows foram mais lentas que as medianas Linux publicadas; versões, máquina, payload e caminhos diferem. A longa raiz temporária Windows aumenta URIs/JSON; não atribuir todo o delta ao SO/Git. Parser/buildGroups não são o gargalo dominante observado nesses volumes; ~204 ms de API em 10k ainda importa e não deve ser chamado “zero”.
+
+**Funcionalidade e estabilidade:** no componente atual, **10/10** verificações dirigidas passaram. Na janela experimental, **7/10** passaram: clique/Enter mantém callback de abrir; Tab alcança ação; stage/unstage reais via HTTP 204 funcionam; refresh mantém os 1.000 recursos; bytes são preservados; árvore continua exposta semanticamente. **Três reprovações do protótipo:** badge mostra apenas o subconjunto visível; foco se perde quando a linha sai da janela; não alcançou corretamente o último arquivo após stage/unstage/refresh. Preservar callbacks/role não demonstra acessibilidade completa: leitor de tela, posições totais, seleção/foco fora da janela, navegação cruzando fronteira e grupos/actions globais ainda exigem aceite. Não aprovar o protótipo para produção.
+
+No aplicativo original, **9/9** verificações de estabilidade passaram: criação observada automaticamente pelo Explorer, criação/modificação vistas no Git, remoção observada pelo Explorer, SCM atualizado enquanto Explorer estava ativo, stage/unstage reais, retorno a Git limpo e bytes originais restaurados. Somente fixtures foram modificadas; conferência final dos 22.000 arquivos gerados e três sentinels encontrou os bytes esperados, sem staged residual e com Explorer Git limpo (`fixture-integrity.json.gz`). Não houve perda de dados observada. Não houve suíte global nova: nenhuma fonte/dependência de produção mudou; o reteste F1–F5-B anterior não foi reaberto.
+
+**Falhas de medição preservadas:** piloto isolado não executou React por faltar preâmbulo do Vite no HTML servido pelo harness; reparado com `transformIndexHtml`. Piloto SCM mediu ativação, mas refresh falhou por seletor de ação oculta; repetido com hover/seletor visível. Primeira verificação funcional esperava HTTP 200 para stage; o contrato é 204, e a ação havia funcionado; restaurado o index da fixture e repetido com assert de sucesso 2xx. São falhas do harness, não defeitos/crashes do produto. Logs/JSON desses primeiros ensaios permanecem no pacote. Erros de sintaxe em geradores auxiliares foram corrigidos antes das execuções válidas.
+
+**G. Diagnóstico e comparação Linux/Windows (dez perguntas):**
+
+1. **Comprovado:** o `Promise.all` por filho gera N stats concorrentes; os picos 1k/5k foram observados. Não é hipótese abstrata.
+2. **Parcela causal:** metadata/HTTP/parse ocupam ~3,3 s na expansão 5k, e há ~1,6 s posteriores até snapshot/paint; não são parcelas puras/somáveis de CPU. Não se pode imputar todos os 10,4 s Linux ao fan-out.
+3. **Limite de concorrência:** reduz comprovadamente o pico e parte do bloqueio acumulado; não melhorou tempo total nem demonstrou redução de erros neste Windows, onde não ocorreram erros.
+4. **SCM eager:** gargalo relevante comprovado no componente e no app real, inclusive montado oculto. Crescimento ~20 nós por recurso e tarefas >1 s em 10k.
+5. **Virtualização:** benefício mensurável confirmado também no fluxo real de ativação, sem alegar ganho no boot total.
+6. **Paridade:** tecnicamente viável preservar handlers e ações, mas o protótipo atual reprovou foco, fim do scroll e totais. Equivalência completa não demonstrada.
+7. **Erros/crashes:** Windows não reproduziu crashes/ERR_INSUFFICIENT_RESOURCES. Traces Linux e a tentativa 5k anterior continuam válidos como evidência limitada; baixa memória, pressão de requests/DOM e profiling são explicações prováveis, não OOM provado nem causa única fechada.
+8. **Outras causas:** lista SCM oculta, duas renders no refresh, DOM/layout do Explorer, custo Windows de processos Git/API, tamanho de URIs/payload, cache/pressão externa e overhead do trace. Não medir somente Git CLI.
+9. **Suficiência para SPEC:** sim para uma SPEC mínima de render SCM e contenção de concorrência, com ressalvas e metas candidatas; não para prometer que somente limitar stats eliminará a lentidão do Explorer. Janela/produção do Explorer exige confirmação funcional/causal adicional antes de fechar essa parte da solução.
+10. **Gate:** permanece aberto até SPEC quantitativa revisada/aprovada, implementação especificamente autorizada, regressão funcional/acessível e evidências de estabilidade, incluindo aceite humano. A investigação não homologa D98.
+
+**H. Proposta mínima, não implementada:** janela visível no SCM existente, preservando identidade URI+grupo e callbacks; contagens/ações derivadas dos grupos completos, foco/seleção independentes do DOM, viewport/scroll corretos após refresh. Fila limitada/cancelável para stats do Explorer dentro das portas existentes, sem alterar o contrato congelado ou introduzir helper/serviço/worker; “16” é candidato ensaiado, não constante aprovada. Não criar framework genérico de listas nem adicionar biblioteca por inferência. Investigar em experimento próprio o custo de render/layout das linhas Explorer antes de prometer virtualizá-lo ou definir sua solução definitiva.
+
+**I. Critérios candidatos para futura SPEC — NÃO aprovados:** zero perda de dados, zero erro silencioso de stat, completude N/N explícita; fila com limite mensurável, descarte/cancelamento em troca de workspace/colapso; manter ordenação/readonly/mtime, seleção, foco, Enter/Tab/Delete, ações de grupo completas, rollback/erros existentes e último recurso acessível após refresh. Candidatos SCM até 10k no ambiente definido: ativação p95 ≤200 ms, montagem isolada ≤50 ms, atualização controlada ≤75 ms, documento ≤2.500 nós e heap JS pós-carga ≤40 MiB — margens sobre os resultados do protótipo, não metas retroativamente aceitas nem portáveis sem baseline local. Comparar também scroll pequeno (não piorar 1k sem justificativa), long tasks por fase, refresh real até paint e foco/ARIA com tecnologia assistiva. Explorer: orçamento provisório de não regressão ≤10% do p95 local em execução sem trace (o outlier 1k limitado não satisfaz esse candidato); pico limitado e fila encerrada ao cancelar; orçamento de responsividade não pode aceitar os bloqueios atuais de ~1,4–1,6 s. O alvo final de render Explorer deve vir de experimento adicional, não de número inventado. Repetir com mais amostras/cache controlado e fixtures representativas antes de adotar percentis como SLA.
+
+**J/K. Fechamento:** somente canônicos 03/06/07/09 e artefatos diagnósticos em arquivo morto foram alterados. Produção, lockfile e dependências intactos, nove canônicos preservados; sem push. A edição preexistente no 09 não faz parte do commit da investigação. Pronto para **elaborar/revisar uma SPEC mínima com as lacunas acima explícitas**; não pronto para aprovar o protótipo, implementar automaticamente ou declarar o Gate concluído. Servidores/Edge de teste encerrados. Parar e aguardar avaliação do dono.
+
+### 3.8.2 D98 — SPECs candidatas e profiling final do Explorer (2026-10-28)
+
+**Escopo/estado:** continuação autorizada após `70eba74`; branch `docs/capacidades-d102-alinhamento`, fontes de produção continuam em `59dfc32`. Nenhuma otimização implementada. As duas SPECs propostas ficam no `06`, sob a micro-fatia PERF, com baseline, perímetro, contratos, metas candidatas e plano de testes. São **candidatas para revisão**, não aprovadas. D98 permanece aberto, sem Fatia 13, iniciativas M ou nova frente F1–F5-B. A edição local preexistente no final do 09 continua preservada fora do commit.
+
+**Método sem reiniciar a auditoria:** reutilizadas as fixtures `d98-windows-20261028/fixtures` da rodada anterior, com Explorer Git limpo e SCM fictício. Mesma máquina/versões de `§3.8.1`; snapshot adicional em `continuacao/environment.json`, sem monitoramento contínuo de pressão externa/antivírus. Um Vite por vez em 127.0.0.1:5175, HOME/USERPROFILE/configuração fictícios, Edge headless 1400 × 900. Sem credenciais/chamadas reais, dependências novas ou alterações globais. `start_process` indisponível: subprocessos controlados e encerrados ao final. Artefatos e instruções: `arquivo_morto/auditorias_2026-10-28/d98/windows/continuacao/`.
+
+Só foram acrescentadas medições das etapas ainda não separadas e intervenções específicas: timers em `ensureResolved`/construção de filhos, ordenação/flatten da árvore, corpo/parse HTTP e geração de JSX; React Profiler em ExplorerView; eventos/ticks; CPU sampling CDP de 1 ms e trace do renderer em execuções separadas. Instrumentação via plugin externo, transformando código em memória; nenhuma fonte escrita. Três amostras sem trace por alternativa, warm Vite/cache explícito. Alternativas foram rodadas em blocos, não intercaladas; variação de máquina/cache e instrumentação limitam inferência estatística. p95 dos três pontos é o máximo empírico, não um SLA robusto. Traces/profiles não entram nas medianas.
+
+**Controle antes de modificar o comportamento experimental:** expansão de 5k terminou em mediana **5077 ms** (5008/5077/5104), comparável aos 5018 ms anteriores (~+1,2%, não regressão confirmada). Todos 5000 stats completaram e não houve erro de transporte. UI tinha 5002 linhas e 55621 nós no documento; SCM tinha zero recursos nessa fixture limpa, portanto o bloqueio não depende de SCM carregado oculto.
+
+**O que o profiling separou:**
+
+- Construir 5000 ExplorerItems após os stats: mediana 30,6 ms (amostras 30,1/30,6/35). Ordenação/childrenOf total ~7 ms; flatten/visibleRows ~5,5 ms. São spans aninhados: **não somá-los** como parcelas independentes.
+- Parse instrumentado dos 5001 corpos (list+stats): total mediano 10,2 ms, com resolução de timer limitada; a função HTTP também tem custo de await/scheduling não incluído nesse parse puro. CPU sampling atribuiu ~124 ms à função`json` inteira no ensaio com profiler; não confundir esse valor com parseJSON ou tempo de rede.
+- JSX das linhas: ~70–85 ms no controle. O Profiler observou **dois commits com 5002 linhas por expansão**, mediana de 717 ms somados de`actualDuration`, além do pequeno commit de foco com 2 linhas antes da expansão. Eventos de negócio `nodeExpanded` e `selectionChanged` ocorreram praticamente juntos; o tick adicional na continuação de`openRow` também participa do repaint. Não foi demonstrada complexidade quadrática no modelo/sorter; não propor cache/worker por inferência.
+- Trace do controle: long tasks de aproximadamente 1079 ms no começo da rajada e 1032/610 ms perto dos commits/layout; `RunMicrotasks` teve bloco máximo 1079 ms. CPU sampling encontrou ~949 ms de self samples no builtin`fetch`, coerente com iniciação de milhares de operações em seguida. Não é tempo do servidor nem prova de que toda latência venha do fetch.
+- Mesmo trace: `UpdateLayoutTree` somou 336 ms (máximo 334,5), `Layout`154 ms e`PrePaint`122 ms; Paint ~26 ms. Timings inclusivos/nativos e Profiler se sobrepõem: não somar ou atribuir porcentagem exata do total a cada um. Frames classificados como`(program)` e parte de GC/IPC permanecem sem atribuição fina. A intervenção sobre o volume DOM, abaixo, sustenta causalidade independentemente dessa limitação.
+
+**Experimentos controlados no aplicativo real,5k:** o modelo e todos os 5000 metadados são preservados. “Corte 40” cria o JSX completo e só depois deixa 40 linhas entrarem em React/DOM; é intervenção causal deliberadamente incompleta, **não virtualização funcional**, e não pode ser aceita como árvore pronta.
+
+| Alternativa | Tempo p 50 / máximo | Commits pesados | Profiler soma p 50 | Maior long task | Maior atraso de timer 50 ms |
+|---|---:|---:|---:|---:|---:|
+| Controle original instrumentado |5077/5104 ms|2|717 ms|1015 ms|1476 ms|
+| Só coalescer repaint por frame |4677/4705 ms|1|439 ms|1180 ms|1183 ms|
+| Só corte diagnóstico 40 |4166/4453 ms|2|96 ms|1142 ms|1259 ms|
+| Coalescer+corte 40, stats ilimitados |4168/4178 ms|1|46 ms|932 ms|1099 ms|
+| Coalescer+corte 40+fila 16 |3648/3702 ms|1|45 ms|53 ms|85 ms|
+
+O último braço reduz o total observado em~28% e elimina os bloqueios longos nas três amostras, comDOM 1039 nós e 5000 stats concluídos/zero erros. Não extrapolar para uma janela funcional, outros volumes ou produção. Só coalescer reduz um render repetido, mas mantém a rajada de fetch; só reduzir DOM mantém o primeiro bloqueio; só limitar stats, como já medido na rodada anterior, deixa o custo final da lista integral. Os ensaios tornam a **combinação local** uma proposta fundamentada, em vez de “virtualizar porque ficou mais rápido”. Nenhuma alternativa foi transformada em código de produção.
+
+No profile separado do braço combinado, houve uma long task reportada de 54 ms e tempo total 3882 ms. Trace registrou`UpdateLayoutTree`~4,8 ms,`Layout`~2,4 ms e`PrePaint`~3,3 ms. Eventos de trace podem ter durações maiores que o PerformanceObserver e agregam escopos diferentes: não usar apenas o menor indicador nem tratar captura de profiler como benchmark sem overhead. Os traces/CPU profiles brutos preservam a análise independente.
+
+**Relação com SCM oculto e trabalho desnecessário:** está comprovada em§3.8.1 a montagem de 6000 recursos SCM quando Explorer está ativo; o wiring monta uma vez e oculta por CSS, e o pane continua assinando o serviço. Isso agrava boot/memória em repos sujos, mas não explica sozinho a expansão medida aqui, em repo limpo. O estado Git/badge deve continuar atualizando; a SPEC propõe suspender somente o renderer oculto, com visibilidade explícita do layout e snapshot mais recente ao reabrir, preservando o estado do pane/serviço. Explorer também não deve desenhar recursos se sua view não estiver visível. Não propor desligar watch ou Git para esconder custo.
+
+**Três defeitos SCM investigados, não apenas repetidos:**
+
+1. **Badge:** `ChangesList` calcula o total dos grupos recebidos; o protótipo passa grupos fatiados, então o badge do provider reflete 32 em vez de 1000 (não é o badge da Activity Bar). Modelo completo e janela precisam ser separados; ações de grupo/totais não podem usar a fatia.
+2. **Foco:** unmount da linha focada elimina o elemento ativo; o probe confirmou `focusAfter=null` no protótipo. Chaves estáveis e modelo de foco por URI+grupo+ação, com linha focada preservada na montagem e revelação do destino antes de mover foco, são a solução proposta. Não considerar somente callback de abrir como seleção/foco completos.
+3. **Fim do scroll:** no protótipo isolado após stage/unstage/refresh, scrollbar externo tinha altura 21736, viewport 440 e scroll máximo 21296. A janela calculada ficava`[964,996)`; os arquivos 996–999 não eram montados. Havia outro scroll interno com 748 px de conteúdo em 440 px;308 px ficavam fora da geometria externa. No app real, rolar o owner interno chegou só ao arquivo 00031; o original chegou ao 00999. O novo probe verificou URI esperada **e** interseção com viewport e todos os clips após revelação, confirmando o último item do app original visível. O teste anterior que consultava apenas o último nó DOM não era suficiente. A SPEC exige uma sequência lógica que inclua cabeçalhos, um scroll owner e cálculo de faixa pelo viewport real, sem altura fixa 32/spacers compensatórios.
+
+**Decisão técnica proposta e alternativas:** não mexer em parser, sorter, backend, contratos de FS/Git ou arquitetura: seus custos medidos não justificam essa intervenção. SCM: janela completa com identidade/contagens/foco/âncora e suspensão de renderer oculto. Explorer: fila por instância para conter a iniciação dos fetches, um repaint por frame sem remover eventos de negócio e range calculado antes do JSX. Preservar árvore completa, metadata e funcionalidades; não copiar o corte 40. Protocolos e limites de arquivos constam das duas SPECs em 06. Não criar abstração genérica, batch endpoint, worker, serviço, biblioteca ou truncamento arbitrário em 10k.
+
+**Critérios objetivos, testes e tolerâncias:** ver SPECs candidatas em 06. SCM herda baselines comprovados 1k/5k/10k e corrige os três casos vermelhos; critérios incluem p95 empírico de ativação≤200 ms e regras de foco/ações/totais/scroll, renderer oculto sem recursos montados e preservação de estado. Explorer propõe 5k≤4500 ms e≤90%do controle pareado;1k≤1500 ms e≤120%do controle; long task e atraso do timer≤150 ms, N/N metadados, pico≤16 e janela acessível. São limites candidatos com margens explícitas, **não resultados aprovados**. O 1k do novo desenho, DnD/inline edit/ARIA, cancelamento da fila e paridade completa continuam para implementação futura autorizada; não declarar que um corte diagnóstico os validou. Exigir baselines pareados, warm-up e sete amostras sem trace, metodologia de paint real no refresh, e não alterar metas para favorecer o teste.
+
+**Confiança e pendências:** alta para fan-out/iniciação de fetch, render integral/repetido e geometria defeituosa do protótipo; alta para os ganhos do experimento limitado nessas fixtures, não para equivalência funcional; média para detalhes da distribuição nativa/GC e extrapolação a produção. A causa dos crashes Linux segue inconclusiva, sem nova ocorrência aqui. Não foram medidas pressão contínua de RAM/RSS, navegador não headless, produção sem instrumentação ou todas as escalas de Explorer. Isso não impede revisar uma SPEC mínima com gates explícitos, mas impede aprovar/homologar por inferência.
+
+**Integridade/falhas de diagnóstico:** fixtures reutilizadas, sem criação de projeto real ou alteração de conteúdo pessoal; Git stage/unstage só nos arquivos fictícios. Estado final das fixtures e hashes estão no pacote. Os ensaios iniciais tiveram erro do instrumento (`__jsxStart`/marcador lógico) e uma tentativa de coalescing não aplicada; logs/JSON preservados como inválidos para comparação. O braço foi repetido com a instrumentação de tick comprovada (três notificações → um commit pesado). Não houve nova regressão de produção nem reexecução da suíte global, já que nenhuma fonte mudou.
+
+**Entrega histórica da auditoria (antes da autorização explícita de implementação):** as SPECs então propostas aguardavam revisão; nenhuma produção tinha sido alterada naquela rodada. Este estado documental foi substituído em 2026-10-28 pela autorização específica registrada em `06` e pelos resultados de implementação abaixo. A autorização não homologa o Gate.
+
+### 3.8.3 D98-SCM — implementação Etapa A, teste e medição Linux (2026-10-28)
+
+**Escopo/estado:** implementada a Etapa A/SCM autorizada em 28/10, antes de iniciar Explorer. O modelo Git permanece completo; somente a janela DOM é limitada. Código/testes e os pontos de integração estão listados em `06` e no relatório reproduzível `arquivo_morto/auditorias_2026-10-28/d98/linux/SCM-implementation-2026-10-28.md`. Não houve mudança em GitHost/GitService, contratos, dependências ou outro perímetro. Branch de trabalho `d98/performance-implementation`; sem push. A etapa **não** homologa D98 nem substitui validação independente Windows/Codex e revisão humana.
+
+**Método/ambiente:** Debian 13 x64, Linux 6.1.158+, Node 20.20.2, Playwright 1.63.0, Chrome for Testing 153.0.8010.12, 2 vCPUs Xeon 2,60 GHz, viewport 1400×900. Vite real em loopback com fixtures Git descartáveis fora do repositório, 1k/5k/10k recursos untracked; nenhuma pasta do usuário foi usada. Para ativação, uma abertura warm carregou o modelo e foi excluída; depois sete alternâncias Explorer→SCM por volume, medindo clique até contagem/modelo coerentes e dois RAF. Não inclui boot, escolha do workspace ou carregamento inicial de Git. p95 de sete = máximo empírico, não estimativa populacional. SO/browser/CPU/paths/caches não equivalem ao baseline Windows; comparação direta não é válida.
+
+**Ativação final pós-implementação e correção de foco** (sete amostras por volume; os dados preliminares anteriores a esta correção ficam substituídos por esta tabela):
+
+| N | Sete amostras (ms) | p50 | p95 empírico (máximo) | Alvo inicial |
+|---:|---|---:|---:|---:|
+| 1.000 | 103,8; 110,4; 135,9; 120,1; 184,1; 114,9; 116,0 | 116,0 | 184,1 | ≤200 |
+| 5.000 | 75,7; 129,7; 90,3; 67,8; 135,4; 83,9; 52,1 | 83,9 | 135,4 | ≤200 |
+| 10.000 | 104,1; 80,9; 113,4; 182,2; 100,3; 125,3; 151,6 | 113,4 | 182,2 | ≤200 |
+
+O máximo empírico ficou abaixo do limite inicial nos três volumes; 1k e 10k ficaram a 15,9 ms e 17,8 ms do limite, respectivamente. Medida warm do renderer, não boot total; p95 de sete pontos é apenas o máximo observado, não SLA populacional. A comparação histórica é contextual: Windows original p50 247/1014/1774 ms em `§3.8.1`, ambiente não pareado.
+
+**Antes/depois e completude:** baseline diagnóstico tinha 1.000 recursos montados/1.002 linhas e 20.558 nós de documento em 1k; implementação manteve contagens lógicas de 1k/5k/10k enquanto montava normalmente ~32–40 linhas de recurso (pico 42 com foco pinado, sempre <100 no browser). No app 10k, um snapshot de viewport 1400×900 contou 1.227 nós totais no documento. São medições em ambientes/execuções diferentes, não comparação pareada. Badges e `data-total` permaneceram integrais; `aria-setsize`/`posinset` refletem os grupos completos; a ação global envia o grupo completo. `End` alcançou o último recurso e sua geometria ficou dentro do viewport, apesar de ele não estar inicialmente montado.
+
+**Testes após a correção final de foco:** Vitest dirigido (7 arquivos: viewport/helper, `ChangesList`, `changesConfirm`, `gitService`, `frontier`, `attachDialog` e contrato E2E) **45/45 passou**, incluindo foco lógico ao ocultar/desmontar e reabrir; Typecheck e ESLint dirigido passaram. E2E Playwright real `e2e/d98_scm.spec.ts`: **1/1 passou separadamente em 1k, 5k e 10k**, cobrindo Tab, End/visibilidade geométrica, stage/unstage reais, preservação de bytes, refresh (+1/removido) e ocultar/reabrir com zero linhas e foco restaurado. Durações: 1k 13,5 s; 10k 7,9 s; 5k, no reteste após aquecimento do Vite, 8,5 s. A primeira execução final 5k levou 1m51s; não se repetiu, mas a causa não foi isolada por fase. A duração de E2E não é o benchmark de ativação.
+
+`npm test -- --reporter=dot`, repetido após a correção: **972 pass, 12 falhas, 27 skipped** (123 arquivos; 283,46 s). As mesmas 12 falhas ficaram em quatro arquivos fora do perímetro D98 (`TerminalPanel.test.tsx` 9, `iconLabels.test.ts` 1, `themeTokens.test.ts` 1, `visualStates.test.ts` 1). Não foi feita execução comparável em HEAD antes da alteração; baseline/causalidade não estão provados e a suíte segue não verde. `npm run build` passou typecheck/etapa `build:fs-boundary`, mas Vite foi terminado pelo SO com código 137 durante transformação em duas tentativas; build de produção não concluído. O gate permanece aberto, sem ocultar falhas, limitações ou atribuição causal sem evidência.
+
+**Limites não medidos nesta execução:** montagem/update isolados contra 50/75 ms, heap JS, long tasks da interação SCM isolada, commits do renderer oculto, atualização do badge com view oculta, zoom/viewport estreito e validação assistiva por leitor de tela. Testes ARIA e browser verificam estrutura/navegação, mas não equivalem a aceite humano. Os resultados detalhados e comandos de reprodução estão no relatório Linux citado acima. Explorer não foi incluído neste marco.
+
+**Estado do Gate:** Etapa A passou os testes funcionais/unidade/E2E executados e o alvo inicial de ativação; depois dela a Etapa B/Explorer foi executada em commit distinto `29b1399`, com evidência e pendências em `§3.8.4`. D98 permanece **não homologada**. Commit local de qualquer etapa não equivale a Gate. Validação independente Windows/Codex e revisão final continuam necessárias; sem push.
+
+### 3.8.4 D98-Explorer — implementação, testes e limites Linux (2026-10-29)
+
+**Estado/escopo:** Etapa B foi implementada somente depois da conclusão/commit da Etapa A/SCM (`4f277db`) e está em commit local separado `29b1399` no branch `d98/performance-implementation`. Evidência detalhada, comandos e instruções de repetição em Windows/Codex: `arquivo_morto/auditorias_2026-10-28/d98/linux/Explorer-implementation-2026-10-29.md`. Nenhum push, alteração genérica de `FileSystemPortLike`, modificação de F1–F4, Fatia 13 ou iniciativas M. D98 continua **não homologada**.
+
+**Implementação:** `TreeState` mantém fila compartilhada de stats e gerações; resultados antigos não são aplicados; `BrowserFsPort.stat()` mantém a interface existente, coalesce chamadas individuais internamente, usa `/fs/stat` para um URI e `/fs/statBatch` para 2–64, com Promise/rejeição por URI; servidor reutiliza `FsHost.stat` e suas validações. A fila de transporte envia um lote por vez. A view mantém árvore/metadados/seleção/foco/ordem/ARIA completos, calcula a faixa lógica antes de criar rows, preserva âncora/foco em refresh e coalesce a pintura por frame. Testes cobrem limite, erros por URI, geração obsoleta, navegação End, virtualização e repaint sem truncar o modelo.
+
+**Ambiente/método:** Debian 13, Linux 6.1.158+, x86-64, 2 vCPUs Xeon 2,60 GHz, 2,03 GB RAM; Node 20.20.2, npm 10.8.2, Playwright 1.63.0, Chrome for Testing 153.0.8010.12, viewport 1400×900. Vite real + Chromium headless e fixtures descartáveis marcadas fora do repo; sem trace durante coleta. `e2e/d98_explorer.spec.ts`: 3 repetições em 0/1 e sete em 1k/5k. A expansão é medida após o clique até contagem/altura lógica completa; depois da altura/aria completa, o harness aguarda dois `requestAnimationFrame` antes de parar as métricas. Boot não incluso. Os sete pontos não foram pareados com controle nem alternados A/B; não houve warm-up formal excluído. Máximo de 7 é somente máximo empírico, não p95 populacional.
+
+| Arquivos | Expansão (amostras ms) | Mediana / máximo ms | Timer máximo observado | Long-task entries | Stats / batches | Rows inicialmente montadas |
+|---:|---|---:|---:|---:|---:|---:|
+| 0 (3) | 96,0; 98,3; 113,0 | 98,3 / 113,0 | 10,4 ms | nenhuma | 0 / 0 | 1 |
+| 1 (3) | 108,2; 103,0; 101,6 | 103,0 / 108,2 | 11,3 ms | nenhuma | 1 / 0 | 2 |
+| 1.000 (7) | 214,4; 227,6; 188,7; 248,0; 266,0; 241,2; 239,3 | 239,3 / 266,0 | 32,5 ms | nenhuma | 1.000 / 16 | 39 |
+| 5.000 (7) | 997,5; 923,5; 965,6; 475,4; 537,4; 487,4; 930,3 | 923,5 / 997,5 | 94,4 ms | 59 ms (1/7) | 5.000 / 79 | 39 |
+
+Cada expansão respeitou os limites absolutos propostos de ≤1.500 ms/1k e ≤4.500 ms/5k; timer máximo 94,4 ms e a maior long-task observada foi 59 ms, ambos abaixo de 150 ms. `0` no campo long-task significa nenhum registro recebido por `PerformanceObserver('longtask')`, não duração literal zero. O E2E verificou até 60 rows DOM montadas, `aria-setsize` lógico, `End` até o último item e geometria visível. `statRequests` conta URIs pedidas; metadata completa, partial errors e rejeição isolada por URI são verificados também no Vitest/integration.
+
+**Divergência do limite original, explicitamente pendente de revisão:** a SPEC original descrevia fila de até 16 operações completas e critério “pico ≤16 por instância”. A implementação usa lote de até 64 URIs e apenas um request HTTP batch em voo por porta; o servidor resolve os até 64 stats via `Promise.all`. Assim, request concurrency é 1, mas a concorrência de operações `stat` pode atingir 64. Os 16/79 lotes medidos não provam conformidade com limite 16 se este se refere a operações individuais. Não foi feita comparação 16-vs-64 e o limite candidato não foi alterado: o desvio, o racional e a pendência constam no relatório para revisão do Codex/dono.
+
+**Refresh e regressão funcional:** cenário E2E de 5k passou 7/7 com duas mudanças consecutivas removendo a URI âncora/focada, preservando vizinho e offset em pixels; terceira atualização restaurou a fixture, seguida de `End` ao último recurso. E2E seletivo `sessao_12_explorer.spec.ts`: 6/6 — lazy expand/collapse, create, F2 rename, collapse-all/refresh externo, paste e teclado/foco/scroll. Um sétimo cenário de upload/drag-drop falhou: `/fs/mkdir` recebeu 403 `forbidden_path` para `file:///`/`file:///tmp` e `/fs/upload` recebeu 403 `local_only`; o upload usa `application/octet-stream`, enquanto a fronteira local existente exige JSON em mutações sensíveis. Não mudar a fronteira nem contornar F1–F4 foi intencional. Upload/DnD no browser continua bloqueador funcional, sem atribuição causal ao código D98.
+
+**Testes de código e regressão:** `npm run typecheck` passou; ESLint dirigido passou; Vitest final 8 arquivos/80 testes passou, incluindo `e2eAssertionContract.test.ts` 6/6. Último Vitest global: 119 arquivos passados, 4 falhos e 2 skipped; 989 pass, 12 falhas, 27 skipped. Falhas: `TerminalPanel.test.tsx` (9), `iconLabels.test.ts`, `themeTokens.test.ts`, `visualStates.test.ts` (1 cada); são as mesmas quatro áreas da rodada anterior, mas não houve HEAD integral pareado que prove causalidade. Build de produção não foi aprovado: `build:fs-boundary` desativou o helper nativo por rename concorrente de diretório-pai; TypeScript passou, Vite terminou em OOM no heap padrão e ficou sem progresso por 15 minutos com heap 1280 MB até ser encerrado.
+
+**Pendências antes de considerar o Gate:** controle A/B pareado e cumprimento/ajuste deliberado da concorrência 16; upload/DnD browser sem afrouxar a fronteira F1–F4; regressão combinada SCM+Explorer sob 0/6k alterações Git e view oculta; build concluído; revisão independente real em Windows pelo Codex (incluindo ACL/reparse/Edge, sem extrapolar Linux); aceite humano. Não houve teste Explorer 10k, leitor de tela, viewport 170 px ou homologação. Repetição Windows passo a passo está no relatório citado.
+
+### 3.8.5 D98 — correções localizadas pós-homologação manual de desempenho (2026-10-29)
+
+**Estado e limite (histórico da etapa; fechamento posterior):** o dono confirmou manualmente no Windows o desempenho do Explorer e os seis comportamentos REG-01–REG-06, incluindo o seletor nativo. Em atualização posterior nesta conversa, declarou expressamente ter concluído e homologado o Gate D98; o registro de fechamento pelo dono está em `08`. A autorização original limitava-se a estas correções e não reabria otimizações. Código/testes nesta cópia: `8ec2dda` e `8793b9e`; docs D98 `0413148`. Não há resultado separado de Codex independente registrado. Os hashes `c4fe0f2` e `69c9fe5` citados em notas anteriores não constam no banco de objetos nem nos reflogs deste checkout; não foi localizado o ZIP de origem, então a causa da divergência não pode ser afirmada.
+
+**Diagnóstico confirmado e origem histórica.**
+
+| ID | Causa demonstrada | Origem/contrato histórico | Resultado |
+|---|---|---|---|
+| REG-01 | A UI enviava DELETE sem `Content-Type: application/json` e sem corpo. A fronteira local recusava antes da rota com 403 `local_only`; com JSON a exclusão legítima respondeu 200 e a linha desapareceu. Origin `attacker.invalid` com JSON continua 403. | `removePersistedSession` em `sessionsClient.ts` foi introduzida em `1f12a93` sem corpo; não houve relaxamento do middleware. | Corrigido no cliente com JSON `{}`; teste cobre UI e origem não autorizada. |
+| REG-02 | A exclusão de pasta funcionou em fluxo real de Explorer quando testada com pasta fictícia e conteúdo aninhado. Não foi confirmado defeito de produção. | A cobertura anterior não tinha o cenário de regressão com fixture descartável; nenhuma causa de backend/permissão provada. | Sem mudança de produção; E2E passou e verificou remoção no disco. |
+| REG-03 | O botão chegava ao cliente, mas POST `/api/workspaces/pick` sem JSON era bloqueado em 403 antes do handler nativo. Após correção, Linux chega à rota e retorna 500 honesto “Native workspace picker is only available on Windows”; `App` captura o erro e notifica. O E2E verifica a fronteira/resposta, não o texto da notificação. | `pickSessionWorkspace` também veio de `1f12a93` sem body/Content-Type; a fronteira local permaneceu estrita. | Cliente e tratamento de erro corrigidos. O dono confirmou manualmente no Windows que o seletor funciona; não há log/vídeo incluído nesta cópia nem resultado separado de Codex independente. |
+| REG-04 | A pasta selecionada na landing só comandava o Explorer quando `sessions.length===0`; em landing com sessões antigas, a árvore continuava ligada à sessão ativa, apesar do estado da seleção mudar. | Condição introduzida em `62cf055` para a landing sem sessões. | `App.tsx` distingue workspace pendente da landing do workspace persistido da sessão ativa; a troca aparece na árvore sem chat/F5. |
+| REG-05 | Trocar workspace alterava a `key` de `TerminalPanel`, desmontando os terminais e religando o WebSocket; antes da correção as conexões PTY observadas subiam de 2 para 4. | `62cf055` colocou session+workspace na key para implementar a decisão histórica de shell novo em pasta nova. Isso destruía os shells existentes quando a pasta mudava. | Key agora é estável por sessão; conexão WebSocket não depende do path. Troca mantém shells e cria PTY separado no novo contexto para operações futuras. O E2E confirma WS sem reconexão e duas tabs após a troca. |
+| REG-06 | Ao não haver sessão, o Explorer seguia a pasta escolhida, mas o primeiro PTY ainda recebia o workspace sintético/default do painel; a atualização acidental observada após “Oi” não era contrato aceitável. | Mesmo fluxo de seleção da landing de `62cf055`; o `workspace` do painel seguia apenas `activeSession`, sem contexto pendente. | Contexto pendente alimenta Explorer e criação do primeiro PTY imediatamente; nenhum chat foi enviado/simulado. |
+
+**Cobertura antes da correção.** O baseline dirigido era 6 arquivos/70 testes de serviços/funções de baixo nível. Não exercitava a sequência real de clique → request com headers reais → middleware → UI, a seleção da landing com uma sessão antiga presente, nem o lifecycle do WebSocket/PTY durante a troca. Os mocks unitários não podiam detectar essas lacunas. O novo E2E faz setup/cleanup de uma sessão fixa e raízes fictícias; REG-02 apaga somente a fixture `/tmp/explorer-fs-fixture/d98-delete-fixture`.
+
+**Correções/arquivos.** `src/services/sessions/sessionsClient.ts` agora envia JSON em picker e DELETE; `sessionsClient.test.ts` trava contrato/URL/headers/body. `App.tsx` direciona Explorer ao contexto pendente da landing, trata erro do picker, não chama `/api/pty/cwd` ao trocar pasta e mantém a key de terminal por sessão. `VSCodeTerminal.tsx` mantém workspace vivo em ref, WebSocket por sessão e abre novo PTY no workspace novo sem desmontar os anteriores. `e2e/regressions_d98.spec.ts` contém os seis cenários (REG-04/06 separados em landing com sessões antigas e sem sessões). Nenhuma política de exclusão, autorização, limite de filesystem, interface IA/chat ou contratos de persistência foi ampliada.
+
+**Validação executada (Linux).** `npm run typecheck` passou. Vitest focal final: **11 arquivos/93 testes passaram** (inclui segurança/local boundary, operações de arquivos, troca/persistência de workspace, sessões/client, terminal e três testes de `fatia07_destravar`). E2E `regressions_d98.spec.ts`: **6/6 passou**; cobre exclusão legítima e origem alheia 403, exclusão de fixture fictícia, seletor boundary, Explorer na landing com e sem sessões, e preservação de WS/PTY ao trocar workspace. D98-SCM virtualizado em fixture isolada de 1k: **1/1 passou**; D98-Explorer em fixture isolada de 1k: **1/1 passou**. Typecheck e `git diff --check` passaram. ESLint dirigido final reporta **39 erros/3 avisos** em bases antigas; a comparação com HEAD `3f5c33c` reproduziu as mesmas contagens por arquivo/regra. Os dois novos testes (`sessionsClient.test.ts`, `regressions_d98.spec.ts`) não têm achados. O build oficial foi tentado: `tsc` passou; o helper de boundary nativo foi desabilitado por detecção de rename concorrente fora do boundary; Vite iniciou e encerrou por heap OOM (~917 MiB). Portanto build **não passou/concluiu**. Estas checagens preservam evidência específica de D98, mas não equivalem à validação manual Windows do dono nem fecham o Gate.
+
+**Regressão geral, baseline e limites.** Vitest geral final: **324 suítes — 316 passaram, 8 falharam; 1.030 testes — 991 passaram, 12 falharam, 27 ignorados**. As falhas são 9 em `TerminalPanel.test.tsx` e 1 em cada `iconLabels.test.ts`, `themeTokens.test.ts`, `visualStates.test.ts`. Em worktree temporária do baseline `3f5c33c`, foram repetidos os arquivos de falha: as mesmas 12 assertions falharam; `TerminalPanel` 9/9, e cada um dos outros três testes 1/1. Logo, as 12 falhas gerais restantes são reproduzidas no baseline e não foram atribuídas a esta mudança. A `fatia07_destravar.test.tsx` tinha uma assertion adicional que passava no baseline exigindo remontagem ao trocar pasta; isso contradizia o contrato aprovado de preservar painel/shells existentes. A assertion/nome/comentário foram alinhados para exigir o mesmo nó e workspace atualizado; o arquivo agora passa 3/3, e o PTY real é coberto pelo E2E REG-05. Esta correção de expectativa é explícita, não uma supressão de falha.
+
+ESLint dirigido: **39 erros/3 avisos** em `App.tsx`, `VSCodeTerminal.tsx` e um achado histórico em `fatia07_destravar.test.tsx`; o mesmo total e distribuição por arquivo foi reproduzido no baseline `3f5c33c`. Nada foi “corrigido” por supressão; testes novos sem achados. A tentativa de build não concluiu por OOM descrito acima. Uma bateria auxiliar antiga (41 E2Es com 11 falhas, 7 skips e 12 casos não executados) usou servidor/fixtures incompatíveis para specs `12*`/`14*` e não é baseline válido; os resultados T4/smoke Git não foram considerados aprovados nem resolvidos e ficam fora do placar D98. O vídeo/gravação referido em notas anteriores não estava no workspace/attachments desta cópia; a validação manual do dono é registrada como declaração, sem artefato anexado. A instalação `npm ci --ignore-scripts` reportou 10 advisories (4 moderate, 2 high, 4 critical); não foram auditados/corrigidos nesta etapa, nem executado `npm audit fix`.
+
+**Windows e encerramento.** O dono declarou expressamente que concluiu e homologou o Gate D98 no ambiente Windows, inclusive as correções; o Gate está fechado por decisão do dono. A confirmação não foi observada/gravada pela execução Linux e nenhum relatório separado de Codex independente consta nesta cópia. As limitações técnicas Linux (picker responde “Windows only” no servidor; build Vite OOM; falhas gerais reproduzidas no baseline) permanecem arquivadas para rastreabilidade, mas não substituem nem revogam o aceite do dono. A Fatia 13 foi aberta após o fechamento de D98; a divergência arquitetural da SPEC 2G foi posteriormente resolvida por D126 (opção A), com status técnico atualizado em `§3.22`.
+
+### 3.9 Responsabilidade e segurança dos testes com provedores reais (D91, opção C; reafirmado D99)
+- Arena executa testes técnicos automatizados: unitários, integração, E2E, regressão e benchmarks.
+- Um provedor real só pode ser validado com ambiente legítimo, acesso seguro e autorização. Nunca solicitar, registrar ou expor chaves/credenciais em conversa, código, documentos ou logs.
+- Se o ambiente/acesso/autorização não estiver disponível, registrar o teste real como **bloqueado/não executado**; não substituir por um stub e chamá-lo de teste real.
+- Testes automatizados e validação de integração não substituem a **homologação funcional do dono** (`08`).
+
+**D102 — método triplo, aprovado apenas como governança documental (26/10/2026):** para cada CAP, verificar (a) **código** com arquivos/commits e fronteiras observadas, (b) **especificações/documentação pública** versionadas, separando promessa de implementação, e (c) **testes/métricas reproduzíveis** sob condições equivalentes. Não registrar superioridade/equivalência sem (c) pertinente; quando comparação real não for viável, marcar não testado, inconclusivo ou não comparável. Evitar importar código de referências com licença/proveniência inadequadas. Esta metodologia, por si só, não autorizava executar D98, alterar produção ou criar SPEC definitiva; a investigação D98 recebeu autorização explícita posterior em 2026-10-28, registrada em §3.8. Mudança permanente continua sujeita à SPEC quantitativa e aprovação.
+
+### 3.10 Metodologia comparativa reproduzível — D101 (2026-10-24)
+
+Esta metodologia permite avaliar uma capacidade do Agente Window contra referências relevantes, inclusive os cinco cenários de `02 §1.4`, sem presumir paridade, inventar metas ou ampliar o roadmap. Uma alegação comparativa é válida apenas para o cenário, versão/configuração e condições realmente testados.
+
+**Antes de executar (na SPEC e no plano de teste):**
+1. Delimitar cenário/critério CAP de D100, tarefa e comportamento observável; escolher referência, produto/versão/commit e funcionalidades disponíveis. Distinguir objetivo do produto de capacidades já entregues.
+2. Fixar protocolo, script/checklist, fixtures e dados iniciais, ambiente (SO, hardware, runtime), versões e configurações de ambos os sistemas. Registrar todos os desvios e variáveis que não puderem ser equiparadas.
+3. Fixar antes de ver os resultados critérios de correção, segurança, estabilidade, completude, experiência e desempenho relevantes, incluindo como avaliar equivalência e tratamento de variação. **Não definir ou ajustar limiares depois para favorecer um resultado.** Metas quantitativas serão justificadas em SPEC após medições; este documento não estabelece números-alvo.
+4. Repetições, condições de cache/aquecimento, tamanho da fixture, timeout e método de coleta são definidos pela SPEC para o cenário; registrar cada rodada, falha, descarte e motivo. Um timeout ou execução incompleta não prova uma duração exata nem uma causa.
+
+**Controle do modelo/provedor versus overhead do produto:** quando a tarefa depender de IA, manter modelo/provedor, versão, parâmetros, prompt/contexto e condições de serviço tão equivalentes quanto possível. Registrar separadamente tempos/uso reportados pelo serviço, custos das fronteiras internas e tempo observado ponta a ponta. Comparar o Agente Window com a referência usando o mesmo modelo/provedor quando disponível; se não for possível, a comparação de qualidade ou velocidade do modelo é **não comparável** e deve ser relatada em trilha separada, sem atribuir essa diferença ao overhead do Agente Window. Para operações locais/UI, usar fixture e configuração equivalentes e instrumentar separadamente filesystem/Git, transporte, processamento e renderização quando a pergunta exigir localizar overhead. Não tratar números de backend isolados como experiência completa do usuário.
+
+**Evidência a preservar no relatório:** passos exatos para repetir; commits/tags dos produtos; script/testes e hash da fixture; ambiente e configurações sem segredos; dados brutos e logs sanitizados; critérios definidos antes; resultados de cada rodada; exceções, limitações e relação com o cenário. Nunca registrar chaves, credenciais, prompts/conteúdo sensível sem necessidade e autorização. Distinguir medições deste checkout de resultados históricos relatados e não reproduzidos. Testes-fonte de terceiros demonstram que há um caso de teste, não que nosso sistema passou nele.
+
+**Estados possíveis por critério/cenário:**
+- **Superior** — satisfaz os critérios pré-definidos e apresenta resultado melhor nas dimensões comparáveis, sustentado pelas evidências e método registrados.
+- **Equivalente** — satisfaz os critérios e a tolerância de equivalência definida previamente; não significa identidade absoluta.
+- **Inferior** — comparável sob as condições acordadas e falha os critérios ou obtém resultado pior, demonstrado pelas evidências.
+- **Inconclusivo** — evidência insuficiente, variável não controlada relevante, resultados instáveis, timeout sem medida válida ou critério não resolvido.
+- **Não testado** — não foi executada avaliação pertinente; plano, hipótese ou presença de testes não muda este estado.
+- **Não comparável** — referência, tarefa, ambiente ou variável essencial não pôde ser alinhada; os dados podem ser informativos, mas não sustentam uma classificação ordinal.
+
+O estado é atribuído a cada critério e cenário, não ao produto inteiro por extrapolação. Só se pode agregar cenários usando regra de agregação aprovada previamente em SPEC. Ausência de resultado “inferior” não comprova equivalência. Resultados negativos não são omitidos e não se convertem em correção sem mudança implementada e reavaliada.
+
+**Escopo e estado:** D98 mantém gate e protocolo próprios em §3.8; esta metodologia geral não autoriza alteração permanente nem declara paridade/superioridade. A investigação técnica autorizada em 2026-10-28 e suas limitações estão registradas em §3.8; nenhuma homologação humana, avaliação comparativa de paridade ou alegação de superioridade foi feita.
+
+---
+
+### 3.11 Protocolo de evidência CAP → SPEC → teste → aceite (auditoria 2026-10-25)
+
+O `06` contém a **única matriz de vínculo CAP-01–CAP-20** e seus destinos confirmados ou candidatos; `02` define as capacidades e cenários, `08` define a avaliação humana. Este item descreve **como produzir evidências futuras**, não executa testes nem cria SPEC.
+
+Para cada CAP e cenário que entrar em uma SPEC aprovada, registrar um caso de prova com: **ID CAP/cenário**; fatia/iniciativa **aprovada**; SPEC/versão/contratos; código/commit/ambiente; fixture e integridade; provedor/modelo real ou stub **explicitamente diferenciado**; pré-condições; ações, chamadas de ferramentas e resultados; métricas/limiares fixados **antes** das rodadas; repetição, erros e cancelamento; regressões afetadas; artefatos; parecer técnico e aceite humano pendente ou efetuado.
+
+**Cobertura mínima a planejar:** cenário 1 = escala e correção do mapa arquitetural; cenário 2 = plano, filesystem, comandos, Git e testes; cenário 3 = reinício/rehidratação sem duplicar side effects; cenário 4 = instalação/remoção e permissão de integração; cenário 5 = ciclo multi-sessão com decisões/documentação/execução. A associação de CAPs a cenários permanece **proposta** no `06`, não é critério técnico aprovado.
+
+**Gates:** sem SPEC/decisão, classificar como **não planejado para execução**; sem teste, **não testado**; evidência parcial não equivale a conformidade da CAP inteira. Metodologia comparativa D101 continua em §3.10; não confundir com homologação humana. Testes históricos não são repetidos por este adendo.
+
+**D98 — nota histórica de 25/10:** o relatório preliminar antigo contém inspeção estática e medições sintéticas; naquele momento não havia trace CDP end-to-end nem medição do componente real. É insumo histórico, não baseline homologada. A autorização e evidência técnica posteriores de 28/10 estão atualizadas em §3.8; mudança de produção segue dependente de SPEC quantitativa e aprovação explícita.
+
+### 3.12 Plano preliminar de verificação D103–D112 (registro histórico; não é SPEC)
+
+Este roteiro documenta o estado e as propostas de D103–D112, anteriores a D119/D121. F1 e testes de fronteira continuam pertinentes; as linhas F2/F4 abaixo que exigem conter toda operação no workspace ou resistência a processo da mesma conta são **históricas e substituídas por D121**. Este roteiro não autoriza iniciar D98, alterar serviços ou executar capacidades fora do escopo aprovado; aprovação não é homologação.
+
+| Tema | Verificação futura mínima | Limite/estado desta rodada |
+|---|---|---|
+| **Acesso local / F1** | Verificar Vite, preview, proxy, WebSocket/PTY e code-server em computador local e origem externa; demonstrar que a rede não alcança app/API indevidamente. Separar isso da autorização de cada tool. | Boundary local + contexto/grants server-side implementados; typecheck, 43 testes focados, App 46 pass/13 skip e cinco checks HTTP/WebSocket da fixture passaram; override de bind externo recusado. Sem Windows, rede externa real, preview `server.mjs`, code-server/PTY standalone ou homologação. O script code-server segue separado e intocado. |
+| **Autoridade / F1** | Solicitações com workspace, sessão e permissões adulterados devem ser rejeitadas pelo servidor e vinculadas ao projeto autorizado. | Evidência automatizada parcial da F1 em 3.14; critérios completos e homologação não verificados. |
+| **Caminhos / F2** | Matriz POSIX/Windows para `..`, absoluto, symlink/junction/reparse, troca concorrente; read/list/search/create/write/delete/preview sem acesso externo. | Linux x64: `fsSeguro.test.ts` (symlink, hardlink, traversal, worker concorrente durante read/create/write), `discos.test.ts` (search ignora links), lixeira/excluir fail-closed; 22/22 em 4 suítes. Windows/macOS e junction/reparse não testados; exclusão não implementada; F2 incompleta. **🟢 ATUALIZADO — D136 (2026-10-31, Task 07): a exclusão voltou a ser implementada e testada. `lixeira.test.ts` 3→19 testes e `excluir.test.ts` 3→13, agora cobrindo movimentação real para a lixeira XDG (arquivo e pasta, com bilhete `.trashinfo`), colisão de nome, recusa da aprovação, e as contenções `../fora`, absoluto externo, raiz inteira, **symlink de alvo** e **symlink de componente pai apontando para fora** (via `realpath`), mais duas exclusões concorrentes do mesmo caminho. F2 **avança mas continua incompleta**: junction/reparse do Windows, macOS e troca concorrente de pasta-pai seguem não testados. Placar completo em §3.25. |
+| **Colisão / atomicidade / F4** | `criar` em destino existente, mutação entre leitura e escrita, rename/write falhando, interrupção e concorrência; comparar bytes antes/depois. | Sem teste executado; usar fixture, nunca arquivos reais do usuário. |
+| **Parada / aprovação / F3** | Parar antes/durante/depois de cartão pendente; resposta atrasada, duplicada e concorrente; provar ausência de side effect após invalidação. | Estático, não reproduzido; sem teste executado. |
+| **Modos/modelo / F5** | Em cada modo, tentar tool read/write; manipular payload cliente; comparar seleção UI, alvo validado e provedor ativo. | D108 futuro; sem mudança de comportamento. |
+| **Contexto/anexo / F6** | Comparar indicador com `usage` do provedor; testar provedor sem usage, arquivo pequeno/grande e anexo apenas por nome. | Estático; sem chamada real. |
+| **Retomada / F7** | Reiniciar em estados diversos; verificar efeitos, autorização, concorrência e idempotência antes de continuação. | M7 planejada; sem restart test. |
+| **Busca/segredos / F8** | Árvore ampla, sem correspondência, arquivo grande, limites/cancelamento, redação de logs e rota de revelação em ambiente autorizado sem registrar valor de chave. | JSON de provedor observado sem criptografia e com `0600`; proteção integral da rota não auditada; sem credencial real. |
+
+**Medição e relatório:** separar implementação observada, teste-fonte, teste executado, relato histórico e homologação humana. Para D101/D112, registrar versões, configurações, limites, provedor/modelo, rodadas, dados sanitizados e não comparabilidade. Código/documentação isolados não demonstram paridade; não declarar superioridade sem teste comparável.
+
+**Atualização D122 (2026-10-29):** para F5-B, esta seção e seus resultados antigos que exigem `verified`/canary são histórico. A regressão corrente deve afirmar: target sem avaliação inicia e recebe tools normais; resposta em texto sem tool call conclui; erro real da API aparece com detalhe sanitizado; uma única chamada/seleção é mantida, sem fallback; tentativa futura não fica bloqueada por uma rejeição anterior. O serviço/UI/rota canary foram removidos. Nenhum teste deve usar credencial real ou provedor real.
+
+### 3.13 Plano de testes F1–F8 (SPECs F1–F4, F5-A e F5-B aprovadas por D119; critérios em `06`)
+
+Os critérios vigentes F1–F4, F5-A e F5-B estão em `06`, com D121 prevalecendo para F2/F4 e D120 para `declared`. D119 autoriza apenas as seis frentes aprovadas, com commits rastreáveis; aprovação não substitui homologação. Usar HOME e fixtures descartáveis, sem provedor/credenciais reais. Testes E2E mutáveis usam fixture isolada, nunca 5174/repo-backed.
+
+A bateria deve separar: (1) F1 — autoridade local, Host/Origin, sessão/workspace/grants server-side; (2) F2 — leitura dentro e fora, `..`/absoluto e acesso a outro projeto sob permissões normais do SO; (3) F3 — cancelamento/ACK/aprovação/continuação concorrente; (4) F4 — criar exclusivo, colisão, escrita após leitura, conflito, falha e hardlinks; (5) F5-A/B — Perguntar/Planejar sem mutação, Agir/Editar autorizados sem confirmações repetitivas, payload não eleva grants, modelo só habilitado por evidência `verified` válida, `declared` opcional; (6) F6–F8 fora do escopo. Não declarar Windows testado sem execução real. F1 tem evidência parcial em 3.14; F3–F5-B preservam registros anteriores e necessitam regressão atualizada; a seção 3.17 registra a execução D121. F2/F4 não alegam sandbox física nem CAS universal. D98 não estava autorizada por D119 à época deste plano; autorização independente posterior consta em §3.8. Fatia 13 permanece não iniciada.
+
+### 3.14 F1 — verificações desta missão (2026-10-26; sem homologação)
+
+- **Typecheck:** `npm run typecheck` passou após conectar `validarContexto` à rota e ao loop Agir.
+- **Testes focados:** `npm test -- src/server/localBoundary.test.ts src/server/session-persistence/database.test.ts src/server/session-persistence/agirContext.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/agir.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/rotas.test.ts` — 5 arquivos, **43/43**; `src/__tests__/App.test.tsx` adicionalmente: **46 passaram, 13 skipped**.
+- **Integração Vite em `127.0.0.1:5175`, com HOME, workspace e JSON de provedores descartáveis em `/tmp`:** GET same-origin `/api/providers` → 200; PUT cross-origin → 403; POST sem Origin → 403; Host não autorizado → 403; tentativa de upgrade WebSocket PTY com Origin hostil → rejeitada. Fixture de provedores permaneceu byte-a-byte intacta; servidor parado sem erro no shutdown. Teste adicional: iniciar Vite com `--host 0.0.0.0` falha fechado na resolução de config (exit 1, sem listener). Nenhum shell/PTY autorizado foi iniciado.
+- **Build:** `npm run build` não passou: o processo Node atingiu o limite de heap durante transformação do Vite (`FATAL ERROR: Reached heap limit Allocation failed`). TypeScript havia concluído antes; build não aprovado.
+- **Não executados/inconclusivos:** Windows e primitivas específicas do SO; E2E em browser do fluxo de criação de sessão; rede externa real; preview `server.mjs` em runtime (artefatos de build ausentes após OOM); code-server e PTY standalone; handshake WebSocket autorizado; provedores/credenciais reais; revisão humana/homologação. Não inferir aprovação destes critérios a partir dos checks locais.
+
+### 3.15 F2 — helper nativo Linux (snapshot histórico pré-D121; sem homologação)
+
+> D121 dispensou a abordagem nativa e o critério de contenção física ao workspace. O helper permanece sem uso e sem build; os resultados abaixo só documentam a investigação anterior, não são instruções de estado atual.
+
+- **Construção:** `cd platform/apps/workbench-v2 && npm run build:fs-boundary` — passou em Linux x64, Node 20.20.2, kernel 6.1.158. Exige toolchain C++/Python no build. Helper está no mesmo processo; não inicia servidor/porta/processo.
+- **Typecheck:** `npm run typecheck` passou após integrar `fsSeguro.ts`, executor e fechamento explícito do descritor raiz por fluxo.
+- **Testes focados:** `npx vitest run src/bairros/2-inteligencia/casas/agir/__tests__/fsSeguro.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/discos.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/lixeira.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/excluir.test.ts src/bairros/2-inteligencia/casas/agir/__tests__/rotas.test.ts` — **5 arquivos, 38/38** (22 dedicados a FS/lixeira/excluir). Testa leitura/listagem/criação exclusiva/escrita; traversal, caminho absoluto, symlink/hardlink; busca não segue symlink; worker concorrente alterna diretório e symlink enquanto o processo tenta read/create/write; sentinelas externas ficaram intactas. Lixeira/exclusão e prévia não acessam o disco e falham fechado.
+- **Fora da evidência:** build Vite completo não rerodado (OOM prévio); suíte unitária completa e E2E não rodadas após F2; Windows/macOS, junction/reparse points, troca concorrente em hardware Windows e homologação humana não executados. Não declarar F2 concluída.
+- **Suíte global:** `npx vitest run` → 934 passou / 13 falharam / 22 skip. Falhas: `App.test.tsx` (assert de regeneração), `TerminalPanel.test.tsx` (9; corresponde ao conjunto já registrado em baseline histórico), `iconLabels.test.ts`, `themeTokens.test.ts`, `visualStates.test.ts` (3). Não foi rerodado um baseline integral antes desta missão; não atribuir causalidade à F2. Os cinco arquivos focados F2 passaram.
+- **Uso:** compilação do addon é requisito das operações Linux; `npm run build` e `npm run preview` chamam o build nativo. Sem o `.node`, kernel compatível ou syscall permitida, F2 retorna indisponível e nunca usa caminhos Node como fallback.
+
+### 3.16 Continuidade D119 — snapshot pré-D121 (2026-10-27; histórico)
+
+> Os registros F1/F3/F5-B continuam evidência histórica útil. As conclusões F2/F4 de bloqueio total e o requisito de contenção/CAS adversarial foram substituídos por D121.
+
+#### F1
+- Commit `b2c49b4` endurece rotas locais sensíveis: sem Origin, leituras `/api`, `/fs`, `/git`, `/pty` exigem `Sec-Fetch-Site: same-origin`; mutações exigem Origin exato e JSON (`application/json`), e Fetch Metadata incompatível quando presente é rejeitado.
+- `npx vitest run src/server/localBoundary.test.ts --reporter=dot`: **6/6**; `npm run typecheck -- --pretty false` e `git diff --check`: passaram. Sem novo E2E de browser, preview ou revisão visual/operacional; F1 permanece parcial, sem homologação.
+
+#### F2
+- Com addon Linux compilado: `fsSeguro.test.ts` + `discos.test.ts`, **18/18**. Isso não cobre o novo achado adversarial: um harness Node isolado executou `SandboxRoot.createExclusive` enquanto um Worker renomeava `workspace/slot` para `outside/slot` e de volta; foi observada publicação transitória de `probe-0` em `outside/slot` (`ok:1000`, `fail:2`). Depois de parar o Worker, a pasta foi movida de volta antes da contagem e o fixture foi limpo; o contador externo final zero não elimina a observação durante a corrida.
+- Segundo harness isolado, `readFile('slot/secret')` retornou `OUTSIDE-SECRET` quando o diretório externo `outside/slot` foi movido momentaneamente para `workspace/slot` e retirado durante a leitura. Isso comprova que a resolução `openat2` e o descritor fixado não garantem subárvore física imutável após resolução.
+- Mitigação fail-closed commit `787b987`: `fsSeguro.ts` deixou de carregar/expor o addon e `abrirRaizDiscoSegura` sempre retorna null; `build-boundary.cjs` agora não compila/empacota o helper. Todas as ferramentas Agir de disco (ler/listar/buscar/criar/escrever) recusam, sem fallback path-based. `discos.test.ts` valida a recusa de todas as cinco operações; `fsSeguro.test.ts` valida que a API não é exposta. Regressão `fsSeguro`+`discos`+`rotas`+`agir`: 45 passaram, 17 skipped; typecheck passou. Quatro testes do helper nativo e 13 testes de operações de disco foram skipped porque o wrapper está intencionalmente desativado e não contam como evidência positiva. A primitiva C++ não está corrigida. Windows permanece não testado; exclusão continua fail-closed.
+
+#### F3 / contexto de sessão
+- `rotas.test.ts` inicialmente falhou porque esperava `ok:false` sem considerar o addon nativo disponível. Commit `3d8695d` tornou o teste condicional ao addon e rotas+Agir passaram 43/43. Após o gate F2 `787b987`, o helper deixou de ser exposto e a asserção atual exige `tool_result ok:false` com motivo F2, arquivo inexistente e aprovação duplicada 409; `rotas.test.ts` + `agir.test.ts` continuam 43/43. A alteração de teste não muda a lógica de claim/cancelamento.
+- `agirContext.test.ts` + `database.test.ts`: **6/6** ao executar com `AGENTE_WINDOW_TEST_HOME` e `HOME` em diretório temporário isolado, removido após os testes.
+
+#### Regressão/UI
+- Regressão de 12 arquivos e seleção F1/F3/F5-A/B: **175 passou, 17 skipped, 1 falhou**. Única falha: `App.test.tsx` → “conecta regenerar e feedback ao estado persistido da mensagem”, status esperado “Resposta regenerada”, recebido “Regenerando resposta”. Reexecução isolada desse teste: **1/1 passou**. Sem comparação integral nova com baseline nesta continuidade; causa inconclusiva, não atribuir como regressão nem como ambiente comprovado.
+- Warnings `fetch('/fs/workspace')` relativo inválido e respostas 404 são dos mocks/jsdom e não impediram os demais casos, mas permanecem ruído de teste. Suite E2E de navegador e suíte global completa não foram rodadas.
+
+#### F5-B: contrato DeepSeek e dependências
+- A documentação oficial DeepSeek descreve tool calls em OpenAI Chat Completions e diz que no thinking mode o `reasoning_content` precisa ser enviado em todas as chamadas subsequentes que carregam `tools`; sua ausência pode produzir HTTP 400. O endpoint oferece `thinking.type=disabled`, mas o adaptador Agir não preserva `reasoning_content` nem desabilita thinking. O modelo pode declarar suporte a tools e ainda assim o par/configuração não ser compatível com Agir. Estado permanece `unknown`/bloqueado; nenhuma chamada upstream, chave ou segredo foi usado. Referências: https://api-docs.deepseek.com/guides/tool_calls/ · https://api-docs.deepseek.com/guides/thinking_mode/ · https://api-docs.deepseek.com/api/create-chat-completion/.
+- `npm audit`: **9 vulnerabilidades** no grafo total (3 critical, 2 high, 4 moderate); `npm audit --omit=dev`: **0**. `npm ls`: Vite 5.4.21, Vitest 2.1.9, `@vitest/coverage-v8` 2.1.9, tinypool 1.1.1. Correções propostas pelo audit envolvem majors; nenhum upgrade/`npm audit fix` foi executado.
+
+### 3.17 F1–F5-B pós-D121 — testes em Linux (2026-10-27; sem homologação)
+
+**Escopo operacional:** paths relativos partem do workspace; caminhos absolutos/externos pedidos são resolvidos sem sandbox própria e dependem das permissões usuais do SO. Operações de disco usam Node.js; helper nativo permanece desativado. `criar` não substitui destino, `escrever` exige leitura prévia e compara hash/fingerprint; hard links múltiplos são recusados na escrita; exclusão segue bloqueada. `agent/edit` server-side permite criar/escrever sem cartões repetitivos; `ask/plan` não mutam. Modo vindo no payload do run é ignorado, grants continuam sob autoridade do servidor.
+
+**Evidência de regressão** (HOME/DB temporários, sem variáveis comuns de credenciais reais):
+
+- F1–F5-B direcionada em HOME isolado: **22 arquivos; 223 testes passaram, 17 ignorados** (inclui 4 skips históricos do helper nativo, ainda desativado). `App.test.tsx`: 60 totais, **47 passaram/13 ignorados** após mock de `/api/agir/mode`.
+- Teste F3 streaming/parada: os três cenários `chatStreamingFatia09.test.tsx` inicialmente falharam porque o mock não respondia à nova rota de registro de modo. Mock foi corrigido sem alterar comportamento F3 e a suíte passou **3/3**; `App.test.tsx` igualmente passou. Os 404/warnings de Explorer e `api/sessions` foram respondidos por fixtures, sem side effects reais.
+- Após ajustes adicionais em disco: TypeScript passou; `discos.test.ts`, `territorio.test.ts`, `rotas.test.ts`, `frontier.test.ts`: **4 arquivos, 49/49**.
+- Testes `discos`: cobrem paths externos/relativos, fixtures temporárias, criação exclusiva e colisão, edição após leitura, conflito externo observado e recusa sem alterar os bytes concorrentes, links simbólicos e recusa de hard links múltiplos. `territorio`: resolve relativo/absoluto e destino/link estático. `rotas`: autoridade de modo server-side, payload não pode escolher permissões, Ask/Plan sem side effects e Agent/Edit sem confirmação repetida. Não houve provedor real.
+- F1: `localBoundary.test.ts` cobre `/api/agir/mode` como mutação same-origin; cross-origin e sem Origin são recusados. F3: fixtures/cancelamento e regras de approval passam na regressão; `chatStreamingFatia09` 3/3 e novo teste App de Parar durante registro de modo pendente 1/1 confirmam abort do preflight e ausência de `/api/agir`; sem E2E de browser.
+
+**Regressão ampla e build:** `npx vitest run` em Linux com HOME/DB isolados, sem credenciais API comuns: **121 arquivos, 117 passaram/4 falharam; 962 testes passaram/12 falharam/20 skip**. As 12 falhas ficaram em `TerminalPanel.test.tsx` (9), `iconLabels.test.ts` (1), `themeTokens.test.ts` (1) e `visualStates.test.ts` (1); erros observados são fixture/contrato de terminal e contratos visuais/tokens, sem atribuição às mudanças F1–F5-B. O build inicialmente não encontrou `pty.node` porque `npm ci --ignore-scripts`; `npm rebuild node-pty` corrigiu isso. `npm run build` então passou o helper no-op e `tsc -b`, mas Vite foi encerrado por OOM, heap ~943 MB.
+
+**Ainda pendente:** `git diff --check`; revisão final de diff; prova operacional manual Linux adicional, separada dos testes Vitest; homologação Windows real (ACL, reparse/junction, hard links, create-exclusive, rename em arquivo aberto e permissões) e aceite humano. Não declarar Windows testado sem execução real. Risco de processo malicioso da mesma conta trocar paths durante a operação é aceito e documentado, não mitigado. Limites de rename/ACL/metadados/durabilidade podem variar por FS. Nenhum commit/push desta rodada até o registro final; D98/Fatia 13 permanecem fora do escopo.
+
+## 4. Becos sem saída (não tente de novo)
+
+### 4.1 Memória
+- **Dois Vite (5174+5175) + suíte com Monaco (14, 14c) → "Page crashed" / timeout em `page.reload`.** Parece regressão, é OOM. Rode com um Vite só.
+- `--workers=2` → thrashing (46 s → 7 min por teste) e Chromium órfão.
+- code-server (~900 MB com 2 extension hosts) não cabe junto com a bateria. Abrir pasta no 8080 via Playwright dispara extension hosts e trava.
+- **Proibido** buildar VS Code/code-server da fonte (`docs/arquivo_morto/16-INICIAR-POR-AQUI-IA-EXECUTORA.md`). Runtime pronto em `.cache` via script de restore; `/tmp` (tmpfs 1 GB) enche → `TMPDIR=/home/user/.cache/tmp`.
+
+### 4.2 Playwright
+- `addInitScript` roda também no `page.reload` — limpar `localStorage` só com flag em `sessionStorage` quando o teste precisa reler persistência.
+- `mouse.move` com coordenadas fracionárias → ±1 px no delta. Arredondar e tolerar ±1.
+- Transição CSS de largura quebra asserts de `boundingBox` — os componentes novos **não** têm transição (o VS Code real também não anima a Side Bar).
+- `:has(> …)` não funcionou nos seletores do projeto.
+- Activity Bar expõe `role="tab"`; `getByRole('tab', {name})` colide com abas do editor → escopar.
+- Monaco DiffEditor: < 900 px vira inline; há 2 `.view-lines`.
+- Para provar DnD com **mouse real** (diagnóstico, não para a bateria): `chromium.launch({ headless: false })` sob `xvfb-run`, `Input.setInterceptDrags {enabled:false}` numa `CDPSession` e `Input.dispatchMouseEvent` pressed/moved/released — o próprio Chromium inicia o drag; foto da tela com `import -window root`. Usado na 5.5 (prints c5.5/05–09).
+- HTML5 DnD nativo **não dispara** com `page.mouse` em Chromium headless → disparar `dragstart`/`dragenter`/`dragover`/`drop`/`dragend` via `dispatchEvent(new DragEvent(..., { dataTransfer: new DataTransfer() }))` dentro de `page.evaluate` (helper `dnd()` em `sessao_15_drag_drop_views`). `dragover` só enxerga `dataTransfer.types`, nunca o payload.
+- `WS /fs/watch` é flaky; `13_search` "across M files", `12_explorer` T9, `14` T13 são flaky conhecidos — re-rodar 1× antes de declarar regressão.
+
+### 4.3 Vite / código
+- esbuild do Vite pode morrer (`The service is no longer running: write EPIPE`) após cópias de arquivo/HMR em rajada com pouca RAM — a página mostra overlay vermelho e todo teste dá timeout no `waitForSelector`. **Reiniciar o Vite** (stop/start), não é bug do código.
+- Plugins fs/git carregam no boot do Vite: mudança em `server/**` exige reiniciar o Vite.
+- `git stash`/`pop` grande com Vite no ar pode matar o esbuild.
+- `/fs/stat` é POST `{uri}`; nunca filtrar `fs.changed added`.
+- `module.mount/unmount` em callback-ref: adiar `reactRoot.unmount()` com `setTimeout`.
+- `npx tsc` sem `node_modules` instala outro pacote — usar `npm run typecheck`.
+
+### 4.4 Processo
+- Interrupção do usuário no meio de `playwright test` deixa processos comendo RAM — limpar antes de retomar.
+- Testes longos precisam **caber num turno**; ao trocar de mensagem tudo recomeça (§3).
+
+---
+
+## 5. Ferramentas existentes (onde estão, para que servem)
+| Arquivo | Uso | Versionado? |
+|---|---|---|
+| `platform/apps/workbench-v2/run-antiregressao.sh` | bateria §9 em série com reseed | sim (c1) |
+| `platform/apps/workbench-v2/shot.tmp.mjs` | print de uma URL sem travar com Monaco | **não** (temporário; ver `docs/04 - ARQUITETURA E REGRAS DURAS.md §4`) |
+| `/home/user/restore-code-server.sh` | restaurar runtime do code-server em `.cache` e subir 8080 | fora do repo (cópia em `uploads/restore-code-server.sh.txt`) |
+| `e2e_05_00/e2e_canonical_5175.sh`, `kill_orphans.sh` | driver de bateria e limpeza, do agente externo | **não estão neste clone** — só citados em `05_02`; recriar se necessário a partir de §3 |
+| `platform/apps/workbench-v2/probe-terminal.mjs`, `validacao-real-workspace.mjs` | sondas antigas (FATIA-03/04) | sim; não usadas na FATIA-05 |
+
+---
+
+## 6. Validação técnica atual da FATIA 06.4a
+
+A homologação humana está no `08`. Esta seção registra somente o que a IA deve conferir antes de entregar o gate Windows.
+
+### 6.1 Ambiente
+- Vite na porta **5174 real**.
+- `npm run typecheck` com 0 erros.
+- Specs de fixture nunca apontam para 5174.
+
+### 6.2 Checklist técnico da 06.4a
+1. Pasta sem Git é aceita com `useWorktree=false`, `worktree_path=NULL`, branch ausente e PWD direto.
+2. Pasta Git também usa o diretório original no fluxo padrão; não cria branch/worktree.
+3. Trocar sessão chama `POST /fs/workspace { path }` e atualiza Explorer/Search/SCM para a raiz ativa.
+4. F5 restaura sessões e workspace ativo sem duplicação.
+5. Recentes ficam em `~/.agente_window/recent-workspaces.json`, máximo 10 e sem duplicatas.
+6. Excluir sessão sem worktree remove apenas persistência; nunca remove a pasta real.
+7. `useWorktree=true` em pasta sem Git falha com `worktree_requires_git`, sem fallback silencioso.
+
+### 6.3 Último resultado medido
+- Typecheck: 0.
+- Alvo da 06.4a: 71 pass / 13 skip.
+- Suíte completa: **722 pass / 9 falhas preexistentes / 16 skip**.
+- Playwright terminal: 3/3.
+- Homologação no Windows real: **concluída com ressalvas em 2026-10-10**; itens 1/3/4/5 comprovados em vídeo e 2/6/7 aceitos pelo usuário com base na validação local. 06.4b liberada.
+
+## 7. Gate local consolidado da FATIA 06 (2026-10-11)
+- Typecheck: 0 erros.
+- `SessionLanding.test.tsx`: 11/11.
+- `App.test.tsx`: 46 pass / 13 skip.
+- `providers.test.ts`: 2/2; garante escrita sem `apiKey`, env status e validação de URL.
+- `workspaces.test.ts`: 7/7; inclui Git/não-Git, `realpath`, recentes, listagem de diretórios e plataforma do picker.
+- Servidor Debian 5174: GET/PUT `/api/providers`, arquivo real e contratos de workspace passaram.
+- Uma primeira tentativa de Playwright foi bloqueada por `libnspr4.so`; após instalar as dependências no ambiente efêmero, a execução real passou conforme §§8–9 abaixo.
+- `git diff --check`: sem erro de conteúdo. Documentos canônicos: 9.
+
+## 8. Revalidação final 06.4c/Fatia 06 (2026-10-11)
+- Typecheck: 0.
+- SessionLanding: 11/11, incluindo autocomplete `/` e seleção que preenche `/home/`.
+- Workspace server: 7/7, incluindo listagem exclusiva de diretórios reais.
+- Providers: 2/2.
+- App: 46 pass / 13 skip.
+- Playwright Chromium real no Debian, 1400×900: `/` listou raiz; seleção navegou até `/home/user/`; criação da sessão passou; comando `pwd` no xterm retornou `/home/user`; Conta > Provedores abriu 3 cards; zero `pageerror`. Evidência local não versionada: `/home/user/fatia06-linux-playwright.png`.
+
+
+## 9. Gate Workspace Switcher
+- Typecheck 0; WorkspaceSwitcher 3/3; SessionLanding 11/11; workspace/providers 9/9.
+- Playwright Debian 1400×900: raiz listou home/mnt/tmp; `/mnt/` mostrou pasta vazia; `/tmp` sincronizou `/fs/root=file:///tmp`, `document.title=/tmp` e `pwd=/tmp`; zero page errors.
+
+## 10. Bateria e Gates de Teste — FATIA 07: Destravar (ex-"6.1", renumerada por D64)
+Para a entrega da **FATIA 07 — Destravar** (SPEC na Parte 2 do `06`), os seguintes testes automatizados devem ser adicionados/validados antes da homologação humana:
+1. **Teste de Sincronização Atômica (`App.test.tsx`):**
+   - Disparo de seleção de pasta deve chamar imediatamente o recarregamento do Explorer e a notificação de `cd` ao PTY, sem necessidade de despacho de mensagem no chat.
+2. **Teste de Abertura de Provedores na Landing (`SessionLanding.test.tsx` / `App.test.tsx`):**
+   - Disparo da ação de abrir Provedores a partir do estado inicial (zero sessões / landing vazia) deve montar a tela no editor moderno com sucesso.
+3. **Teste de Purga do Visualizador Legado:**
+   - Teste estático/unitário confirmando que nenhum componente de `components/legacy/` é instanciado na árvore React.
+4. *(movido)* **Teste de Limpeza de Buffer do Terminal (`clear`):** saiu desta fatia — agora integra a **FATIA 16 — Terminal 2.0** (pós-D95) (DEBT-01, por D64).
+5. **Higiene — onda 1 (D74):** marcar como `skip` os 13 E2E mortos (§2.4), preservando o registro (**não apagar**).
+6. **Pré-requisito em cascata:** a **FATIA 08 não inicia** sem typecheck 0 e aprovação deste gate.
+
+## 11. Análise de vídeos do usuário (método validado em 2026-10-12)
+O usuário grava a tela e envia o arquivo; a análise tem de cruzar **áudio** e **imagem** antes de concluir qualquer coisa. Pipeline validado em um MP4 de 4min02s (1904×1076, H.264, AAC).
+
+1. **Nunca ler como texto:** o arquivo pode chegar como `.mp4.txt`. Renomear, confirmar com `file` (deve dizer ISO Media/MP4) e medir com `ffprobe` (duração, streams, resolução). Ler bytes de MP4 como texto não ajuda.
+2. **Instalação (por turno — não persiste entre mensagens):** `sudo apt-get install -y ffmpeg` + `python3 -m pip install faster-whisper` (~25 s no apt+pip; `sudo -n` funciona e o Hugging Face é acessível do sandbox).
+3. **Áudio:** `ffmpeg -i video.mp4 -vn -ar 16000 -ac 1 -c:a pcm_s16le audio.wav`.
+4. **Transcrição:** faster-whisper **small**, `device='cpu'`, `compute_type='int8'`, `cpu_threads=2`, `language='pt'`, `beam_size=5`, `vad_filter=True`, `word_timestamps=True`. ~84 s para 4 min de áudio. Conferir idioma detectado, probabilidade e se os segmentos cobrem a duração.
+   - **PyAV quebra** em `transcribe('audio.wav')` com `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. Não abandonar: carregar o WAV como array NumPy (`wave` + `astype(np.float32)/32768.0`) e passar o array.
+5. **Frames:** periódicos (`fps=1/15,scale=1280:-2`), de cena (`select='gt(scene,0.18)'`) e **dirigidos por timestamp** (`-ss T -frames:v 1`) nos pontos que a fala marca. Folhas de contato com `drawtext` (`%{pts\:hms}`) + `tile` dão panorama rápido; **atenção**: em clipes extraídos com `-ss`, o rótulo `pts` reinicia em zero — somar o offset do corte.
+6. **Timestamps exatos sem perder tempo:** extrair `fps=1` do vídeo inteiro (242 JPEGs) e casar cada frame periódico por comparação de pixels (MSE) — MSE=0 identifica o segundo exato. Não estimar por aproximação em trecho que vá para doc.
+7. **Cruzar fala × tela** antes de concluir; vídeo do usuário **prevalece** sobre o 8080 do sandbox. **Cuidado com o risco de ler o app errado:** os vídeos alternam **VS Code original × clone** — confirmar qual app está na tela (o clone aparece em `localhost:5174` na barra de endereço do navegador; o original tem barra de status roxa e menus PT-BR).
+8. **Onde trabalhar:** artefatos (áudio, transcrição, frames) em `/home/user/video_analysis/` — **nunca** dentro do repositório; nunca commitar mídia ou transcrição. Relatório pode ser salvo lá como arquivo auxiliar da sessão. *(Limpeza de 14/10: as pastas de 12–13/10 foram apagadas para liberar espaço; o conteúdo está preservado em `/home/user/uploads/registro_alinhamento/2026-10-12_13_analises_de_video_arquivadas.md` e o script com o fallback NumPy ficou em `ferramentas_analise/transcrever_whisper_numpy.py` — pasta removida na limpeza de 21/10.)*
+9. **Escopo:** análise **não autoriza implementação**. O vídeo revela requisitos; implementar só com ordem explícita. Achados viram linha em `docs/06` (dívida) e/ou `docs/07` (histórico).
+
+## 12. Habilidade de podcast (skills_podcast 4.0.1 — Greenforged Edition)
+Pacote de produção de podcast (orquestrador → escritor → atomizador/validador → produtor de áudio) extraído em `uploads/skills_podcast 4.0.1 (Greenforged Edition)/` — **fora do repositório; não versionar** (regra do `§11 item 8`). Entrada: `inicializador.txt` → `README.md` + `orquestrador/BOOT_ORQUESTRADOR.md` + `orquestrador/SKILL_ORQUESTRADOR.md`.
+
+- **Uso neste projeto:** transformar o estado da obra em conversa em linguagem simples para o usuário (contextualizar antes de decidir). Corpus = repo + conversas + análise do vídeo.
+- **Adaptação validada em 2026-10-12** (Episódio 01): gênero novo **`GENERO_ESTADO_DA_OBRA`** (8 segmentos, adaptado do Detalhado); roteiro, JSON e estado em `/home/user/podcast/` (fora do repo). Áudio opcional (o usuário dispensou nesta rodada; JSON pronto para gerar depois).
+- **Regras da casa mantidas:** balanceamento ≤ 20% entre speakers (trava dura), disfluências ≥ 1 a cada 3 falas, Speaker B elabora (não só pergunta), termo técnico sempre traduzido, fecho com gancho.
+- **Validação adaptada:** o MARCH cego multiagente exige agentes separados; quando não for possível, validar **em agente único** cruzando cada afirmação com os arquivos do repositório (resultado em `_resultado_validacao.json`; exigir 0 não-encontradas para aprovar).
+- **Cuidado:** a fatia só aceita roteiro com acentuação PT-BR correta (primeira passada saiu sem acento e foi corrigida — não repetir).
+
+## 13. Bateria e prova — FATIA 08: Conectar (Provedores) (2026-10-15)
+> Baseline no HEAD `fde5f0f`: typecheck **0** · unit **765✓ / 12✗ (pré-existentes) / 16 skip** (§2.5.1) · E2E da fatia **6/6**.
+
+**Unit da casa** (`src/bairros/2-inteligencia/casas/provedores/__tests__/`, **37/37**):
+| Arquivo | Testes | Cobre |
+|---|---|---|
+| `registro.test.ts` | 6 | 8 descritores, ids únicos, protocolos com adaptador, endereços padrão, o genérico |
+| `providersRepo.test.ts` | 13 | máscara, precedência **arquivo > ambiente** (D84), migração v1→v2 com `.bak`, `validarEntrada`, gravação 0600, revelar chave, id desconhecido |
+| `probe.test.ts` | 13 | `fetch` mockado: ok · 401 · endereço · tempo (timeout 10 s) · http · resposta · catálogo e ping de conversa |
+| `frontier.test.ts` | 5 | fronteira LEGO: fora da casa só o barrel (exceção estreita do plugin), deps permitidas, `contract.ts` sem `any`, `as unknown as` confinado, dono único das regras |
+
+**E2E** (`e2e/provedores_fatia08.spec.ts` — **6/6**, ~32 s) contra **stub local** (`uploads/stub_provider.cjs`, porta 4599; falha 401 com chave errada e 405 no caminho `/sem-catalogo`) e servidor iniciado com `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` — o arquivo real do dono **nunca** é tocado (o `beforeEach` confere `storage:'fixture'` e o caminho).
+| Teste | Prova |
+|---|---|
+| T1 | Conta ▸ Provedores: 8 itens + endereços padrão por provedor (NVIDIA = `integrate.api.nvidia.com/v1`) |
+| T2 | Genérico: conexão de verdade (200 + 5 modelos), buscar modelos, escolher, salvar, **F5** e tudo no lugar |
+| T3 | Máscara no campo + **olhinho** (D83): revela a chave inteira sob clique e volta a ocultar |
+| T4 | **Falhas honestas:** 401 ("Chave inválida") e endereço inalcançável ("Não deu para alcançar") |
+| T5 | Serviço que não lista modelos (405): aviso honesto + **modelo digitado à mão valendo** |
+| T6 | **Provedor ativo:** chip verde, persiste após F5 |
+
+**Contrato anti-trapaça:** a spec nova nasceu com asserções e na convenção exigida — `e2eAssertionContract.test.ts` **verde** (na 1.ª tentativa ele reprovou por indentação; corrigido e virou lição para specs futuras).
+**Evidências:** `/home/user/validacao_fatia08/` (prints `f08_T*.png` + `e2e_saida.txt`) — pasta **externa** ao repositório.
+**Limitação registrada (honesta):** a prova automatizada usa **serviço simulado**; a validação com **provedor real** é o roteiro do dono (`08` PARTE C). A migração do v1 real só será exercitada no primeiro uso do dono (o sandbox não tem o arquivo dele). **Nota D99:** este registro descreve a prova da FATIA 08 e a homologação funcional feitas à época; a responsabilidade vigente por testes técnicos com provedores reais está em `§3.9`.
+
+### 13.2 Validação do dono com serviço REAL (15/10, via vídeo analisado em 16/10)
+Duas IAs independentes (transcrição Whisper + frames + IA com visão de vídeo) convergiram sobre a gravação do dono:
+| Prova | Valor exato |
+|---|---|
+| Ollama local (`http://localhost:11434`) | **"Conexão aprovada. O serviço respondeu em 209 ms e mostrou 5 modelos."** |
+| Genérico → LiteLLM (`http://0.0.0.0:4000`, `meu-pool`) | **"…respondeu em 158 ms e mostrou 4 modelos."** |
+| Chave | mascarada o vídeo inteiro; nunca revelada |
+| Erros | **nenhum** (nenhuma faixa vermelha, nenhuma tela cinza) |
+Divergências resolvidas por recorte ampliado: os números dos ajustes são `99999999999999`/`10000000000000000` (a IA de vídeo leu "999/1000") e o rodapé do chat **tem** "Claude Sonnet 4" (a IA de vídeo disse que não). Registro completo: `uploads/midia_fatia08/ANALISE_VIDEO_15-10.md` (fora do repo; mídia apagada a pedido do dono em 16/10).
+
+### 13.1 A/B da suíte E2E completa (2026-10-15) — **zero regressão da FATIA 08** (com ressalva honesta)
+Ao rodar a suíte E2E **completa** neste sandbox, o resultado é ruidoso: **88 failed / 21 skipped / 87 passed (33,4 min)** — muito pior que a auditoria histórica (166/180 em `ba571dd`), e **não** é da FATIA 08.
+
+**Método (D"/A-B contra estado anterior"):** as **21 specs que falharam** foram rodadas também no estado **anterior** (`e182960`, worktree `/tmp/ab_pre`, mesmo seed, mesmo servidor, 5174) → **88 failed / 10 skipped / 49 passed (31,3 min)**.
+
+**Comparação por ID de teste:** 88 falhas nos dois estados; divergem apenas **2 para cada lado** — e **trocando de teste dentro do mesmo arquivo**, o que caracteriza **instabilidade**, não regressão:
+| Spec | Estado NOVO (`fde5f0f`) | Estado ANTIGO (`e182960`) |
+|---|---|---|
+| `sessao_14d_commit_input` | falha `:90` (T3) na rodada completa; `:58` (T1) na rodada isolada | falha `:58` (T1) |
+| `sessao_15_activity_bar` | falha `:265` (T5) | falha `:71` (T1) |
+
+**Prova direta com spec isolado:** `sessao_15_editor_maximize` (10 testes) = **9✗/1✓ nos DOIS estados** (rodado isolado, servidor limpo e seed de 5 sessões em cada) — falha idêntica, pré-existente.
+
+**Leitura honesta:** a suíte E2E completa **não é régua neste sandbox** (40 falhas por *timeout* de 30 s em áreas congeladas que a fatia não toca: explorer, search, git, editor, activity bar). A régua usada continua sendo: (a) as baterias focadas já registradas (§2.4/§2.5/§2.6) e (b) o A/B por spec. **Nenhuma falha exclusiva da FATIA 08**; a bateria da fatia é **6/6** (§13).
+
+### 13.3 Buraco de teste identificado (16/10) — nenhuma trava dizia ONDE a superfície abre
+A sonda `sonda_01_debt09.cjs` (FATIA 07) e a bateria da FATIA 08 verificavam que a tela **abre** (aba, `.providers-view` visível, zero erro de console) — **nenhuma** verificava **onde/como** ela abre (superfície, estado do painel, maximizado × divisão). Foi por esse buraco que o **DEBT-04** (reaberto pelo dono em 16/10) passou. **Trava proposta** (entra junto do fix da opção A, `06 §8.3`): teste E2E de contrato — "Conta ▸ Provedores abre com o editor **maximizado** (`.desktop-surface-group.editor-maximized`, sem `.chat-pane`)"; e, no unit, contrato do estado de layout por tipo de aba.
+
+### 13.4 FATIA 10 — bateria da fatia e estado da suíte (19/10)
+- Unit: **872✓ / 12✗ (pré-existentes e intocáveis: `TerminalPanel`×9, `iconLabels`, `themeTokens`, `visualStates`) / 16 skip**. O flaky "regenerar" do `App.test` segue intermitente sob carga (provado pré-existente via stash no C1; hoje: 3/3 no estado limpo, 4/4 isolado com as mudanças da fatia, e o arquivo inteiro 46✓ logo depois de falhar — corrida a corrida).
+- E2E régua (por fatia, conforme §13.1): **fatias 08 + 09 + 10 = 15/15**, contra os stubs 4599/4610 e território REAL em `/tmp`. A `agir_fatia10` (5/5) prova: cartão aparece e **nada é escrito antes do Permitir**, o disco recebe o conteúdo exato, negar não escreve, "Permitir na Sessão" vale no fluxo e sobrevive ao F5, e ferramenta nenhuma sai da pasta.
+- Suíte E2E **completa**: segue não-régua neste sandbox — travou >25 min nas specs antigas de terminal/PTY (ver §13.1: 88✘ ambientais já auditados). A bateria da fatia é a régua.
+
+## Pós-11: travas de regressão por correção (C1–C7, 21/10 — FATIA 11 homologada, D96)
+Cada coisa tratada no pós-11 e ONDE mora a proteção que impede regressão. "Prova viva" = conferência com o app rodando (prints fora do repo, pasta `prova-pos11/`).
+| Correção | O que a trava garante | Trava (arquivo real) |
+|---|---|---|
+| C1 (`7bc2231`) ocioso 300s | fio lento-mas-vivo NÃO sofre timeout | `casas/agir/__tests__/vizinho.test.ts` — "fio saudável e LENTO: o ocioso NÃO dispara" |
+| C1 absoluto 1800s | fio pingando para sempre morre no total | `vizinho.test.ts` — "rede absoluta: pingando PARA SEMPRE morre no total" |
+| C1 retomada transitória | erro 500 guarda retomada; Continuar retoma de onde parou | `agir.test.ts` ("erro TRANSITÓRIO… retomável") + `rotas.test.ts` ("erro transitório (500) guarda retomada") |
+| C1 erro definitivo | erro de chave NÃO oferece retomada | `agir.test.ts` — "erro DEFINITIVO (chave): sem retomada" |
+| C2 (`7c42fa3`) progresso/cartões | SEM teste dedicado — guardado pela suíte App (49 testes) + régua E2E + provas vivas B/C | `src/__tests__/App.test.tsx` + régua 18/18 |
+| C3 (`224c58c`) textos honestos | ferramentas dizem que NADA foi gravado; recusas honestas | `casas/agir/__tests__/discos.test.ts` 10/10 |
+| C4 (`5ec8c48`) Explorer pós-escrita | agente escreve → Explorer mostra sem resselecionar | E2E `agir_fatia10` 5/5 + `teto_fatia11` 2/2 (7/7) + prova viva A (evento `refreshed` sem unit dedicado) |
+| F11 teto/Continuar | teto pausa com cartão; Continuar dá +2 no mesmo fluxo; Parar morre limpo | `e2e/teto_fatia11.spec.ts` T1 + `agir/rotas.test.ts` (evento `teto`, 409 sem pausa) |
+| F11 Config | salva teto+rolagem e sobrevive ao F5 | `teto_fatia11` T2 + `casas/config/__tests__/ConfigView.test.tsx` |
+| F11 auto-scroll | só-no-fim; desligado nunca desce | `src/__tests__/ChatPanel.test.tsx` ("só-no-fim…", "desligado na config…") |
+| C6 (`4c8df87`) iterações/Continuar | Continuar funciona; rename validado por tsc + suíte verde (sem trava textual) | `teto_fatia11` T1 + unit base idêntico |
+| C7 (`4321393`) diff re-clicado | A→A→B: diff visível + zero erros fatais | `e2e/diff_sem_travar.spec.ts` 3/3 |
+| Régua geral | 08+09+10+11 sem regressão + specs honestas | 18/18 na ordem canônica + `e2eAssertionContract.test.ts` (anti-trapaça) |
+
+## FATIA 12: travas de regressão (21/10 — homologada D97)
+Onde mora a proteção de cada comportamento da fatia (servidor em `casas/agir/server/` + `e2e/excluir_fatia12.spec.ts`).
+| Comportamento | O que a trava garante | Trava (arquivo real) |
+|---|---|---|
+| `excluir` no catálogo | ferramenta existe, anunciada nos 4 canais, `ehMexida` | `anuncio.test.ts` (6 ferramentas) + `ferramentas.ts` |
+| Lixeira por SO | Windows = Lixeira real (PowerShell, switches oficiais); Linux = XDG com bilhete; resto = erro honesto | `lixeira.test.ts` 12 testes + E2E T1 (lixeira real Linux) |
+| C4 switch + detalhe | sem switch inventado; recusa traz o stderr/stdout do Windows; teto 3 min | `lixeira.ts` (`detalheErroWindows`) + casa 92/92 |
+| RF12-3 sessão nunca cobre | `sessao` p/ excluir = 400; cartão sempre pergunta | `rotas.test.ts` + E2E T3 |
+| Território = pasta ativa | fora (`../`, irmã, outro disco) = recusa honesta, nada some | `territorio.test.ts` 15/15 + E2E T4 |
+| C5 canônico no Windows | dentro com caixa diferente/prefixo UNC/barra inicial NÃO dá "fora" | `territorio.test.ts` (5 testes win32) |
+| Cartão reforçado | sem-desfazer + prévia/contagem do servidor, sem botão de sessão | `CartaoFerramenta` + E2E T1/T5 |
+| Negar | "nada sumiu"; arquivo continua na pasta e fora da lixeira | negação no loop + E2E T2 |
+| Régua geral | 08+09+10+11+12 sem regressão | 23/23 na ordem canônica + `e2eAssertionContract.test.ts` |
+
+## Reteste independente Windows — 2026-10-28 (F1–F5-B; sem homologação)
+
+**Baseline:** branch `docs/capacidades-d102-alinhamento`, HEAD `24d10542a980d2c84a6dee67b85be92db001a7aa`, árvore inicialmente limpa. Confirmados `253d8e1` (F3/F5-A) e `24d1054` (ACL). Os nove canônicos não receberam a auditoria Windows anterior neste checkout; seus resultados foram recuperados das evidências externas, sem inventar um registro anterior inexistente no 09. Este registro substitui como evidência atual o relatório auxiliar de 27/10, preservado em `arquivo_morto/auditoria-windows-correcoes-2026-10-27.md`. Voltaram a existir somente nove arquivos ativos na raiz de docs.
+
+**Ambiente:** Windows x64 23H2, build 22631.6199, volume C: NTFS; Node 24.16.0, npm 11.13.0, Edge headless real via Playwright. Dependências instaladas com `npm ci --ignore-scripts`, seguido de rebuild de better-sqlite3 e node-pty. HOME e USERPROFILE isolados, provedores OpenAI-compatible fictícios em loopback, provas canary simuladas `verified`. Nenhuma credencial ou chamada real. Servidores temporários controlados por subprocesso com timeout e encerramento: `start_process` não está disponível nesta sessão Windows. D98/Fatia 13 não fizeram parte daquele reteste Windows.
+
+**Evidência externa, fora do Git:** `C:\Users\Usuario\.codex\visualizations\2026\10\27\01a17f37-97c4-74a2-87bb-d6fbbbe5b243\retest-20261028`. Subpastas: raiz = baseline Arena; `clean` = diagnóstico de ambiente, sem alteração de produto; `fixed` = correção ACL e testes; `final` = integração com barreira de provedor corrigida. Auditoria anterior preservada na pasta irmã `audit-windows`. Scripts, JSON, logs e screenshots permanecem fora do repositório.
+
+### Achado novo, reprodução e correção estreita da ACL
+
+**Reprovado no baseline Arena:** salvar provedor fictício via HTTP devolveu 400; nenhuma prova `verified` podia ser estabelecida. A primeira aplicação da DACL funcionava; a segunda aplicação de `Set-Acl` no arquivo já privado falhava com `SeSecurityPrivilege`. A verificação pós-rename então removia o arquivo principal. Reproduzido fora do aplicativo, com três aplicações sucessivas: primeira passa, seguintes falham (`clean/acl-reapply.log`). Não era uma falha de F3 nem de catálogo: os testes dependentes ficaram impedidos pela gravação de credenciais.
+
+Havia também contaminação de `PSModulePath` do PowerShell 7 herdada pelo Windows PowerShell 5.1 lançado via Node: `Microsoft.PowerShell.Security` falhava ao carregar com membros de TypeData duplicados. A normalização do ambiente resolveu somente esse impedimento, e expôs a falha real de reaplicação da ACL. Logs originais preservados; nenhum teste foi ignorado para ocultá-los.
+
+**Correção autorizada dentro do contrato D81:** aplicar o mesmo objeto de segurança por `[System.IO.File]::SetAccessControl`, preservando proprietário, DACL privada e verificação final; remover somente `PSModulePath` do ambiente do subprocesso para ele resolver os próprios módulos. Não há helper nativo nem nova arquitetura. Teste Windows reforçado com leitura repetida do mesmo arquivo já protegido; seu inspetor independente também resolve módulos nativos. Variante direta passou três aplicações sucessivas antes da alteração de produção.
+
+**Aprovado após correção:** `fixed/acl-ntfs.json`: três cenários, com snapshots reais das DACLs. Arquivo preexistente herdado corrigido; principal, temporários e backups com herança desativada e exatamente uma ACE Allow/FullControl não herdada para o SID atual. O observador interceptou `writeFile` para inspecionar temporários/backups antes dos bytes fictícios. Falha EIO injetada no rename preservou os bytes originais e removeu temporários. Teste Windows do repositório executado, não ignorado.
+
+**Limites:** inspeção de DACL não simula login de outro usuário/administrador; não promete isolamento contra administrador. Falha arbitrária na verificação após rename continua fail-closed e pode deixar somente o backup anterior, sem restauração automática do principal; esse ramo não recebeu nova injeção específica. Reaplicar/verificar ACLs de todos os backups em cada leitura custa subprocessos e cresce com o histórico: timeouts observados e registrados abaixo, sem cache ou relaxamento das permissões.
+
+### F3 — resultado integrado da corrida original
+
+**Aprovado:** `fixed/cancel-before-commit-2.json`, 14/14. Mesmo preload externo da auditoria anterior suspende `fs.link` imediatamente antes da publicação. Arquivo ausente na barreira; pedido de cancelamento permanece sem ACK durante 600 ms; liberação publica os bytes completos; somente então resposta `cancelled_with_effects`. SSE bruto em `fixed/cancel-before-commit-events-2.txt`. A antiga confirmação prematura não foi reproduzida após a correção F3.
+
+**Aprovado no Edge:** cancelamento durante publicação mantém o arquivo e exibe a mensagem de que alterações já concluídas foram mantidas; screenshot `fixed/f3-ui-effects.png`. Cancelar resposta atrasada antes de iniciar a mutação impediu criação. Os 29 testes de rotas Agir passaram, incluindo aprovação pendente invalidada, aprovação tardia, consumo único e continuations concorrentes. Os testes de arquivo incluem duas criações concorrentes com um vencedor e escritores que detectam versão obsoleta. Não se alega rollback nem proteção contra corrida maliciosa da mesma conta, conforme D121.
+
+### F5-A — modos e política
+
+**Aprovado no Edge:** Perguntar sobrevive à recarga; Agente, Editar, Perguntar e Planejar sobrevivem a recargas individuais; Planejar sobrevive ao fechamento/reabertura do navegador com perfil persistente. Duas conversas com modos distintos mantêm suas escolhas ao alternar e recarregar. JSON malformado, array e modo desconhecido em localStorage são descartados; o modo desconhecido não é enviado como concessão. Registros e screenshots na integração. Não foi reiniciado o executável desktop Codex: o ciclo de vida testado foi o aplicativo web em Edge.
+
+**Política server-side aprovada:** Perguntar/Planejar recusam mutações, inclusive payload forjado com modo Agente, grants e workspace externo; sessão inexistente é recusada. Valores conhecidos são preferências locais, não grants. Restauração não altera as validações do backend; modo conhecido é registrado explicitamente antes de executar.
+
+### Regressão, comparabilidade e limites
+
+- Baseline Arena sem correções locais: focada 84 pass/14 fail/13 skip; global 897 pass/75 fail/26 skip. Falhas ACL explicam a maior parte da diferença nova; logs/JSON preservados na raiz da evidência.
+- Após correção, runner original sob carga: focada 96 pass/2 fail/13 skip; global 915 pass/57 fail/26 skip. Falhas novas são timeouts de 20 s, não relaxados no código nem nos testes versionados.
+- Runner diagnóstico externo: mesmo conteúdo dos testes, `vizinho.test.ts` em Node (fetch nativo não aceita AbortSignal de jsdom), teto 60 s e quatro workers. Focada **98 pass/0 fail/13 skip**: App 49/13, rotas Agir 29/0, providersRepo 17/0 (inclui ACL Windows), rotas Provedores 3/0.
+- A primeira global ajustada ficou 933 pass/39 fail/26 skip porque o harness omitiu `AGENTE_WINDOW_TEST_HOME`, fazendo seis testes de contexto/banco se autoignorarem. O flag foi corrigido e a execução completa repetida; placar final registrado abaixo. Nenhum resultado omitido ou tratado como aprovação.
+- Testes adicionais reais de arquivos: **21/21**, incluindo paths externos Unicode, links/junctions, conflitos, criação exclusiva, erro de rename, compartilhamento Windows e exclusão bloqueada. F2/F4 mantêm D121.
+- Typecheck passou após a correção; lint dirigido dos dois arquivos alterados passou. Lint global: **103 erros/19 avisos**, dívida distribuída anterior; sem alegar lint global verde. Build Vite e typecheck passaram no Windows, inclusive após a correção; avisos de chunks grandes permanecem. O wrapper executou `tsc -b --force` e `vite build` separadamente; não reativou helper nativo.
+- Comparação anterior: 923/51/20 original e 934/40/20 ajustada; 21/21 arquivos e 23/1 integração. A alteração de runner/timeout e o flag de isolamento são explícitos; não comparar 933/39/26 como se fosse a mesma cobertura. A falha antiga do assert POSIX 0600 desapareceu da suíte Windows, substituída por inspeção real de DACL.
+
+**39 falhas residuais da global ajustada:** 12 históricas em TerminalPanel (9), iconLabels (1), themeTokens (1), visualStates (1); 27 de portabilidade/expectativas Windows: gitHost (10, `mkdir` como executável Unix), worktrees (1, CRLF), fsHost (2, URI), searchEngine (2, URI), fronteiras de quatro casas (11, separadores), territorio (1, descrição POSIX versus path nativo). Nenhum desses arquivos foi alterado. A classificação deriva das mensagens individuais e da comparação com a auditoria anterior, não de uma suposta suíte global verde.
+
+**Prioridades:** P1 no baseline = gravação ACL bloqueada, corrigida localmente; P2 = custo crescente de subprocessos ACL e timeouts, dívida Windows/runner, lint e falhas globais; P2 = recuperação operacional após falha arbitrária pós-publicação ainda depende de backup. F3 original e persistência Perguntar corrigidas nos cenários reproduzidos. Provedores reais e homologação humana não executados. Não há homologação automática nem autorização implícita para D98/Fatia 13.
+
+### Fechamento dos placares e parecer
+
+Global ajustada final, com `AGENTE_WINDOW_TEST_HOME` habilitado: **939 pass/39 fail/20 skip, 998 testes em 121 arquivos (108 arquivos pass/13 fail)**. Comparação por nome de teste com o JSON da auditoria anterior: **zero falhas novas**; removida somente a falha `providersRepo: salva em 0600 e relê`. Ganho de cinco aprovados em relação a 934/40/20 é consistente com quatro testes adicionados e a antiga falha corrigida. Os seis testes de contexto/grants SQLite executaram e passaram. O runner original e os timeouts continuam reprovados e não foram sobrescritos por esse resultado diagnóstico.
+
+| Frente | Situação no escopo testado |
+|---|---|
+| F1 | Sessão/contexto/grants no servidor, Host/Origin e payload forjado passaram; seis testes de persistência/contexto executados. |
+| F2 | Leitura externa e interna, links estáticos e paths Windows passaram nos testes adicionais, respeitando D121. |
+| F3 | Corrida original passou em HTTP e UI; cancelamento pré-mutação, pós-conclusão e aprovação pendente/tardia passaram; concorrência coberta por rotas e disco. |
+| F4 | Criação exclusiva, leitura prévia, conflito observável e falhas de publicação passaram; não se alega CAS universal. |
+| F5-A | Quatro modos, recarga, perfil reaberto, conversas distintas, armazenamento inválido e política server-side passaram. |
+| F5-B | Catálogo inicial, seleção explícita de par, Auto, prova verified e bloqueio sem fallback passaram; atualização tardia de catálogo na UI é discriminada no resultado E2E final abaixo. |
+
+**Parecer:** a evidência resolve os defeitos reproduzidos de F3/Perguntar e valida DACL real após a correção adicional. Não permite declarar homologação global: persistem 39 falhas, lint global reprovado, timeouts, limites de recuperação e homologação humana pendente. É possível o dono avaliar depois uma autorização específica de investigação D98 com essas ressalvas; o reteste não fecha o Gate nem o inicia. Nenhuma implementação da Fatia 13.
+
+**E2E final e repetição dirigida (sem somar cenários sobrepostos):**
+
+- `fixed/integration-v3.json`: 26 pass/2 fail. Um fail era o harness de F5-B que supunha início de fetch após uma espera fixa de 1 s; foi substituído por barreira real no provedor fictício. O outro foi atualização de catálogo na UI além do teto de 10 s. F3 UI com efeito foi executado e passou nesta execução.
+- `final/integration-v3.json`: **27 pass/3 fail** em fixture de longa duração. A barreira corrigida de F5-B, cancelamento após publicação e aprovação pendente/tardia passaram. Três falhas ao fim: UI não voltou a Enviar em 15 s; o teste F3 UI seguinte ficou impedido pelo estado anterior; catálogo novo não apareceu em 10 s. Não se considera a falha em cascata uma nova reprodução da corrida F3. Todos os logs originais foram mantidos.
+- `e2e-repeat/integration-v3.json`: **6/6**, fixture nova, repetindo setup simulado, navegador, parada e atualização do catálogo com os mesmos limites originais, sem remover assertions. Portanto parada/catalogo não falham de forma determinística em fixture curta. Uma leitura HTTP do catálogo na fixture longa mediu 5.295 ms (`final/catalog-timing.json`), compatível com o custo da reaplicação de ACLs, mas insuficiente para atribuir toda intermitência exclusivamente a essa causa. F5-B fica aprovado nos contratos funcionais exercitados, com ressalva P2 de latência/intermitência E2E. A estabilidade da execução longa ainda impede homologação ampla.
+
+**Mudanças desta missão:** somente o repositório de Provedores e seu teste Windows, mais consolidação nos canônicos 03/06/07/09 e arquivamento do relatório auxiliar. Nenhuma alteração em F3, App, terminal, Explorer core/server ou EditorArea. Um único grupo funcional de correção ACL e evidências; sem push. Ao entregar, encerrar servidores/Edge de teste e aguardar avaliação do dono. Relatório e código daquele reteste não iniciaram D98/Fatia 13.
+
+
+### 3.18 Correção F5-B D122 — regressão sem pre-gate (2026-10-29; sem homologação)
+
+**Escopo:** remover o gate `verified` e o fluxo canary; chamada de modelo habilitado enviada com o anúncio de ferramentas normal; resposta textual sem tool call aceita; erro real HTTP com detalhe legível e redação de credenciais; sem fallback/troca de modelo ou bloqueio persistente; compatibilidade de leitura de arquivo v4 antigo. Nenhum endereço/porta alterado. Preservados Auto/par explícito, seletor, permissões e modos. Não se tocou na arquitetura da Fatia 13.
+
+**Validações no Linux/fixtures locais:**
+- `npm run typecheck`: passou (`tsc -b --force`).
+- ESLint dirigido a fontes e testes alterados: passou, sem erros/avisos.
+- `git diff --check`: passou.
+- Testes focados de Agir, vizinho/protocolos, loop, repositório/rotas Provedores, UI, resolução do alvo e seletores: **119 passaram, 1 skip**. A execução global também passou todos esses contratos e as verificações de regressão relacionadas.
+- `npm test -- --reporter=dot`: **126 arquivos, 120 passaram, 4 falharam, 2 ignorados; 1001 testes passaram, 12 falharam, 27 ignorados**. As 12 falhas ficaram nos mesmos quatro arquivos já conhecidos (`TerminalPanel.test.tsx`: 9; `iconLabels.test.ts`: 1; `themeTokens.test.ts`: 1; `visualStates.test.ts`: 1), não alterados nesta correção. Não atribuir essas falhas automaticamente a D122.
+- Build completo não repetido porque a validação prévia desta base já terminava o bundle Vite por limite de memória; o typecheck atual passou. `npm ci --ignore-scripts` instalou dependências do lockfile sem editar manifesto/lock.
+
+Após a última alteração de apresentação no seletor, os testes direcionados de catálogo no `ChatInput` e envio da preferência exata no `App` passaram (**2/2**); typecheck e lint focal também passaram. Código funcional no commit local `9f5cde4` (base `40fdac6`).
+
+**Limites:** somente stubs e arquivos temporários; nenhuma chamada/credencial de provedor real, teste Windows, E2E de browser ou homologação humana. D122 muda a decisão do produto, não o aceite. F1–F5-B continuam sem declaração de homologação; Fatia 13 não foi homologada nem reaberta arquiteturalmente. Git local `main`, sem remote/push.
+
+### 3.19 D123 — carregamento resiliente do painel Provedores (2026-10-29; sem homologação)
+
+**Escopo:** abrir o formulário com defaults locais antes de completar a leitura do arquivo persistido; hidratar o v4 sem chamar modelos, descoberta, conexão, validação de tools ou serviço de provedor; timeout de 10 s com abort, apresentação do erro e retry; bloquear ações que possam gravar ou consultar enquanto não houver estado hidratado. O endpoint continua sendo o GET same-origin `/api/providers`. A chave só aparece como máscara; sem alteração de arquivo durante GET.
+
+**Investigação de D122:** `git show 9f5cde4^..9f5cde4` e a comparação do fluxo mostraram que D122 removeu o canary, mas não alterou o caminho do GET/ACL que pode atrasar a hidratação. Logo, não há evidência de que a remoção do canary tenha introduzido a regressão de loading. Uma medição já documentada em fixture longa marcou 5.295 ms para uma leitura HTTP de catálogo, consistente com a hipótese de custo ACL, mas sem isolar causalidade nem explicar todo o loader indefinido. A máquina Windows do dono não foi reproduzida nesta sessão.
+
+**Correção de percurso Windows:** antes, a proteção de cada arquivo principal, backup `.bak-*` e temporário `.tmp-*` podia lançar uma execução PowerShell separada e sequencial em cada GET. Mantida a listagem/checagem anti-symlink e a validação ACL; o conjunto agora é passado numa única execução em lote. ACL já correta é verificada sem ser reescrita. Não foi descartada segurança de backups; o teste Windows existente segue marcado para executar em Windows.
+
+**Validações Linux/fixtures:**
+- UI: estado pendente mostra defaults locais sem iniciar `buscarModelos`, `testar` ou `revelarChave`; carregamento normal hidrata URL/modelo salvos; erro apresenta alerta e retry mantendo formulário; timeout termina o loading e nova tentativa recupera.
+- Repositório: v4 preserva ativo, segredo, modelo habilitado, habilitação e parâmetros; canary legado continua ignorado.
+- Rota GET: retorna configuração v4 local mascarando segredo e sem chamar `fetch` externo.
+- Vitest dirigido: **3 arquivos passaram; 23 testes passaram, 1 skip** (ACL Windows). Typecheck `tsc -b --force` passou; ESLint focal passou.
+
+**Limites:** sem Windows nesta sessão, sem teste de tempo no equipamento do dono, sem chamada/credencial real, sem E2E browser ou homologação. Não mudar host/porta do provedor; não fazer push; não declarar homologação da Fatia 13. Build completo não foi necessário/repetido. Código/testes em `6c42b24`; documentação em commit local separado (`main`); árvore limpa, sem remote/push.
+
+### 3.20 D124 — ACL Windows existente com owner diferente (2026-10-29; sem homologação)
+
+**Causa no código:** D123 passou a tratar a propriedade do arquivo como parte da validade da DACL. Uma configuração legada podia ter a DACL realmente privada — herança desabilitada, uma única ACE explícita Allow/FullControl para o SID atual, não herdada — e ainda ter outro owner. A validação classificava esse arquivo válido como inválido e tentava `SetOwner($sid)`; em conta padrão, essa alteração pode ser negada. O `catch` antigo transformava tudo na mesma frase “não foi possível confirmar a ACL”, então erro de inspeção/propriedade parecia prova de exposição. Não há diferença de ACL feita por D122; a regra de owner adicional foi introduzida na otimização ACL de D123.
+
+**Correção:** owner deixou de ser critério para reconhecer a DACL privada. A rotina ainda exige DACL protegida e ACE única, Allow, FullControl ao SID da conta atual, não herdada; se não satisfaz, tenta reparar e validar como antes. Falhas agora informam a etapa: preparação, inspeção (explicitamente sem afirmar que a DACL estava aberta), reparo ou verificação pós-reparo; timeout também é diferenciado. Nenhum segredo é retornado no diagnóstico.
+
+**Cobertura:** adicionado teste de integração Windows com arquivo temporário e chave fictícia, DACL restrita ao SID atual e owner atribuído a `BUILTIN\Administrators`; exige leitura, bytes da configuração e owner preservados. Se o runner Windows não tiver privilégio para atribuir owner à fixture, o cenário é marcado skip; não toca em arquivo real do usuário. A suíte existente também cobre ACL herdada em arquivo preexistente e backups.
+
+**Validação desta sessão (Linux):** 3 arquivos focados; **23 testes passaram e 2 foram ignorados por dependerem de Windows**. Typecheck e ESLint focal passaram. Não há PowerShell/Windows no runner, portanto o teste ACL real está preparado, mas não foi executado aqui; a DACL da instalação do dono não foi inspecionada nesta sessão.
+
+**Limites e preservação:** nenhuma credencial real lida/escrita; não alterar endereço/porta; canary permanece removido e modelos habilitados continuam sem gate `verified`; nenhuma mudança de modos/permissões de produto, nem homologação da Fatia 13. Código/testes no commit local `80425d0`, documentação local separada; sem push.
+
+### 3.21 D125 — armazenamento de provedores com permissões normais do SO (2026-10-29; snapshot imediatamente após D125)
+
+**Contrato aprovado:** nenhuma condição de DACL/ACL privada para abrir configurações existentes; nenhum PowerShell, `Get-Acl`/`SetAccessControl`, `SetOwner` ou normalização automática no carregamento/salvamento. A conta Windows acessa conforme permissões normais do diretório/arquivo no SO. Config existente em leitura não tem owner, DACL ou bytes modificados. Nova publicação permanece exclusiva/atômica; modo 0600 POSIX preservado, modo ignorado pelo Windows conforme comportamento normal da plataforma. O caminho de configuração segue fora do repositório.
+
+**Implementação:** removidos `protegerCredenciaisExistentes`, a verificação por arquivo e o pós-processamento que removia o destino final se a verificação ACL falhasse. `lerArquivo` vai direto à leitura de filesystem; erro de leitura/corrupção segue retornado ao middleware como status de erro, e UI mostra erro recuperável com timeout/retry (D123). Nenhum conteúdo de chave é incluído em GET normal/logs/mensagem de falha; máscara e rota reveal continuam distintas. Rotas, validações Host/Origin e contratos de acesso externo não foram alterados.
+
+**Testes:** o teste Windows que exigia DACL privada/owner atual foi substituído por teste de fixture v4 com chave fictícia: leitura sem regravar, PUT local sem ACL customizada, chave/modelo preservados e backup criado usando a conta do SO. Adicionado caso JSON corrompido que exige mensagem de erro real sem eco do texto que contém chave fictícia. UI mantém testes de loading/erro/timeout. Vitest focado em Linux: **24 passaram, 1 teste Windows ignorado**; typecheck e ESLint focal passaram.
+
+**Limites do snapshot D125:** o runner daquela sessão era Linux sem Windows/PowerShell; teste Windows preparado, mas não executado. Não se acessou arquivo real, não se mudou ACL ou permissão existente, não houve chamada a provedor real. D122 removia qualquer exigência de `verified`/canary; endpoints/portas, seleção Auto/explícita, modos e permissões preservados. Naquele ponto, a Fatia 13 ainda não tinha aceite registrado; esse estado foi atualizado depois por D126 e pela declaração manual limitada em `08`/`§3.22`. Código/testes D125 no commit local `bf79a3f`, documentação em commit local separado; sem push.
+
+### 3.22 Fatia 13 — evidência automatizada desta missão documental (2026-10-29)
+
+**Escopo da rodada:** consolidação dos nove documentos canônicos somente. Nenhum código de produção, teste-fonte, manifesto ou lockfile foi alterado. A declaração de homologação manual Windows pertence ao dono e está registrada separadamente em `08`; os resultados abaixo foram executados pelo agente no runner Linux e não a substituem.
+
+**Ambiente:** dependências restauradas com `npm ci --ignore-scripts` em `platform/apps` (613 pacotes) e `npm rebuild better-sqlite3`. O npm reportou 10 advisories no grafo instalado; não foi executado `npm audit fix`. O diretório `node_modules` é efêmero/ignorado; os manifests e lockfiles não foram alterados.
+
+**Testes focados Agir/execução/permissões/UI:** Vitest em 11 arquivos existentes: `agir.test.ts`, `executorComando.test.ts`, `rotas.test.ts`, `vizinho.test.ts`, `extracao.test.ts`, `frontier.test.ts`, `discos.test.ts`, `territorio.test.ts`, `excluir.test.ts`, `session-persistence/database.test.ts` e `ChatInput.test.tsx`. Primeira execução: **132 passaram e 2 foram ignorados**; os dois skips eram os testes de banco/grants condicionados a `AGENTE_WINDOW_TEST_HOME`. Reexecução isolada de `database.test.ts` com diretório temporário fornecido em `AGENTE_WINDOW_TEST_HOME`: **2/2 passaram**. Assim, a evidência de grants não fica classificada como não testada; o placar da primeira execução não deve ser somado como se fosse uma única rodada.
+
+**Verificações estáticas:** `npm run typecheck` passou. ESLint focal passou nos 13 arquivos de implementação/UI/testes relacionados a Agir, executor, rotas, shell/session persistence e cartões. As fontes verificadas foram existentes, não modificadas nesta missão.
+
+**Não executados nesta missão:** suíte Vitest global, E2E Playwright/browser, build de produção, testes Windows/PowerShell, chamadas a provedores reais ou novos ensaios manuais no aplicativo. A limitação histórica do build Linux por OOM permanece documentada nos registros anteriores; não foi reaberta nem reavaliada aqui. Falhas globais históricas continuam sendo as registradas nas seções datadas anteriores e não foram atribuídas à Fatia 13 sem evidência de regressão. O aceite manual de Windows é somente o relato do dono em `08` e cobre apenas os cenários listados ali.
+
+**Limites técnicos reafirmados:** os testes em Linux validam apenas os casos cobertos pelos testes-fonte existentes. Não comprovam todos os shells/comandos, todos os cenários de risco, o comportamento de todos os provedores, confinamento ao workspace ou isolamento contra outras contas da máquina. O executor shell herda os privilégios do SO. `excluir` segue fail-closed e distinta de `executar`; nenhuma permissão de shell a desbloqueia. Sem push.
+
+### 3.23 — descoberta de modelos Ollama Cloud (2026-10-30; correção local e homologação manual declarada pelo dono)
+
+**Reprodução enviada pelo dono (Windows):** `(Invoke-RestMethod 'http://localhost:11434/api/tags').models | Select-Object -ExpandProperty name` retornou `hermes3:3b`, `digitsflow/bonsai-8b:latest`, `qwen3-coder:480b-cloud` e `deepseek-v4-pro:cloud`; nenhum Gemma4. Depois, `POST http://localhost:11434/api/show` reconheceu tanto `gemma4:31b-cloud` quanto `gemma4:cloud`. A tela nativa do Ollama no vídeo mostrava e executava Gemma4 Cloud. Isso distingue o caso do stale state React: o servidor local não incluía esse item em `/api/tags`, embora reconhecesse o alias por `/api/show`.
+
+**Causa e correção:** o fluxo anterior descobria apenas modelos registrados no servidor configurado (`GET {baseUrl}/api/tags`). A lista Cloud pública é separada. Para Ollama, `Buscar modelos` agora consulta o endpoint local e também `GET https://ollama.com/api/tags`, sem alterar a URL base configurada para inferência (`http://localhost:11434` no caso testado). A consulta pública não envia a chave do provedor. O catálogo público entrega nomes como `gemma4:31b`; o fluxo os converte para aliases locais, com sufixo `-cloud` quando há tag e `:cloud` quando não há tag — assim `gemma4:31b` fica `gemma4:31b-cloud`, reconhecido no `/api/show` do dono. Aliases da mesma família já fornecidos localmente não são duplicados. A lista Cloud é complementar: se falhar, os modelos locais continuam visíveis com aviso de resultado parcial. Configuração salva, modelos habilitados e seleção/default permanecem intactos; a descoberta não habilita o novo modelo automaticamente.
+
+**Verificação e testes:** a leitura real do catálogo público nesta sessão retornou 23 nomes e incluiu `gemma4:31b`. Testes automatizados cobrem reconsulta local por clique, adição/remoção/resultado vazio, complemento Cloud, alias Gemma4, deduplicação e indisponibilidade do catálogo Cloud. Suíte Vitest focada em `provedores`: **6 arquivos, 54 passaram, 1 ignorado**; ESLint focal e `npm run typecheck` passaram. `npm ci --ignore-scripts` reportou 10 advisories no grafo instalado; não foi executado `npm audit fix` e manifests/lockfiles não foram alterados.
+
+**Limites e homologação:** sem Ollama local ou Windows neste runner. O dono informou que já homologou manualmente o fix no aplicativo. Os passos e cenários específicos não foram detalhados nesta atualização; registrar como aceite declarado, sem inferir cobertura além dele. A homologação do dono é distinta dos testes automatizados Linux e não foi executada independentemente pelo agente. Sem credencial real, sem mudança do endereço de inferência, sem alteração de permissões/modos ou do contrato de canary, sem suite global/E2E e sem push. Commits funcionais locais: `71c8de7` (refresh do estado React) e `ecdab7c` (catálogo Cloud). Documentação atualizada em commit local separado.
+
+## 3.24 — Task 01: correção H01/H02/H03 e revalidação Windows (2026-10-30)
+
+**Versão:** árvore de trabalho sobre HEAD `0dfe3c245a0589fe1ac9ae106e10ea9834714f67` (`fix: document Ollama Cloud model discovery fix`). Sem commit/push. Substitui os resultados negativos H01/H02/H03 da auditoria de 30/10 somente nos caminhos corrigidos e retestados; não apaga o relatório histórico nem declara homologação oficial.
+
+**Ambiente:** Windows 11 Pro 10.0.22631, NTFS, Node 24.16.0/libuv 1.52.1; Vitest 2.1.9, Vite 5.4.21, Edge 156.0.4314.50 headless. USERPROFILE/HOME/AGENTE_WINDOW_TEST_HOME isolados antes de Node; conversas/projetos/perfis sintéticos, sem provider/credenciais reais. Build e navegador em cópia externa; dependências existentes reutilizadas sem instalação. Logs, harnesses, PNGs e complemento: `C:\Users\Usuario\Documents\ChatGPT\correcao_task01_20261030\`.
+
+| Verificação | Resultado |
+|---|---|
+| Regressões antes da correção de produção | index/transcripts: 6 passaram e 3 falharam (H01 perda de mensagens, regravação indevida do transcript na troca, H02 EPERM). Cliente: 3 passaram e 2 falharam, comprovando reenvio após 409 e resposta obsoleta não distinguida. |
+| Focada após correção | index/transcripts/cliente: 14/14 na primeira rodada; depois adicionado teste de coordenação read/delete, incluído na regressão abaixo. |
+| Regressão ampliada de persistência/sessões/layout/landing/streaming/UI | 19 arquivos: **127 passaram, 1 falhou, 0 ignorados**. Única falha é worktrees.test.ts, inalterado: comparação LF/CRLF já reprovada na auditoria anterior. Não é nova regressão funcional demonstrada. |
+| Regressão App.test.tsx | **49 passaram, 13 ignorados**, sem falhas; warnings existentes de mocks do Explorer. |
+| UI de conflito/recuperação | **6/6**: alerta, bloqueio de debounce/pagehide, backup/restauração após reload, cópia preservando versão remota/IDs, falha de recuperação, edição durante recuperação e quota de armazenamento (alguns casos exercitam mais de um comportamento). |
+| Harnesses anteriores de HTTP/falhas | **10/10**. A expectativa de H01 aceita 409 explícito caso a troca avance primeiro e exige preservar exatamente todo PUT confirmado; o antigo teste falhava por perda após 200. |
+| Harness anterior de cliente | **3/3**; atualização de contrato: próximo envio sobre uma sessão em conflito permanece bloqueado até recuperação explícita, em vez de usar currentRevision+1 cegamente; 2xx vazio e overflow mantidos. |
+| Sonda nativa independente (não usa writer do app) | 160 renames ao mesmo destino em paralelo: 91 EPERM; mesmo destino serial: 160/160; destinos distintos paralelos: 160/160. Diagnóstico da disputa Windows, não falha do writer corrigido. |
+| Writer corrigido Windows | **320 gravações/20 rodadas de 16**, sem falhas/mistura/.tmp; último snapshot admitido preservado. Leitura e exclusão coordenadas também testadas. |
+| Reinício de processos reais | 32/32 PUTs 200; revisão 31 depois de 32 recusada; novo processo recuperou revisão 32, título, IDs, conteúdo e ordem. |
+| Edge real, aplicativo Vite, perfil exclusivo | Envio de mensagens, alternância/isolamento, F5 e fechamento/reabertura passaram. `UNSAVED_AFTER_409` passou a ter aviso; reload manteve mensagem/aviso sem alterar a revisão remota. Cópia recuperou conteúdo local mantendo SERVER_NEWER_SNAPSHOT no original; ambas persistiram após reiniciar o browser. |
+| TypeScript | `tsc -b apps/workbench-v2 --force`: exit 0 na árvore final. |
+| ESLint focado | 11 fontes/testes de persistência/tipos: zero erros/avisos. App.tsx possui **20 erros/1 aviso preexistentes**, idênticos ao HEAD, sem mensagem nova; comparação JSON preservada. Não declarar lint de App integralmente verde. |
+| Build | npm run build: **exit 0**, Vite em 28,44 s; warnings existentes de eval no terminal, CSS `-: T` e tamanho de chunk. |
+| git diff --check | Exit 0. |
+
+**Contratos corrigidos:** a fila de sessão coordena catálogo/revisão + transcript; a fila do transcript coordena IO do destino por caminho no mesmo processo. Não há fila global entre sessões nem lock multiprocesso. A troca de workspace lê e atualiza apenas metadados atuais, sem republicar mensagens. PUT obsoleto é recusado explicitamente quando a revisão interna avança primeiro. O cliente não considera 409 sucesso nem usa a revisão remota como licença para substituir seu conteúdo; resposta local antiga só é descartada como obsoleta quando um envio local posterior já foi confirmado.
+
+**Recuperação:** aviso persistente por conversa, conteúdo local preservado e backup best-effort em localStorage, botão `Save a separate copy`; a versão remota não é substituída pela rejeitada. Edição feita durante o salvamento de recuperação continua marcada e preservada. Backup sem quota/permissão produz aviso para manter a janela aberta. Não é merge automático nem memória M1–M8.
+
+**Limites:** ensaio do Edge foi headless e sem LLM real (erros honestos de provider ausente também persistidos). Criação inicial das conversas foi pela API da própria página. Não executados: app empacotado, perda de energia/disco, kill no meio do commit, concorrência multiprocesso no mesmo armazenamento, payload extremo de keepalive, suíte global e lint integral. Persistem a janela JSONL/SQLite, a entrega best-effort de pagehide e os limites do backup do navegador. Sem mudanças nos módulos congelados/terminal. A falha preexistente do teste de worktree e o lint anterior de App continuam explicitamente fora da alegação de aprovação. Não houve tentativa de limpar materiais antigos bloqueados por política; evidências e cópias descartáveis externas foram mantidas.
+
+## 3.25 — Task 07: MICRO-FATIA DELETE — placares, prova de não-regressão e limites (2026-10-31)
+
+**Ambiente:** Linux x64 · Node **v20.20.2** · npm **10.8.2** · Vitest **2.1.9** · dependências instaladas com `npm ci --no-audit --no-fund` em `platform/apps/workbench-v2` (**590 pacotes**, exit 0) · **sem Windows, sem browsers do Playwright, sem `uploads/stub_agir.cjs`**. Todos os testes usam **apenas arquivos e pastas temporários** criados por `mkdtemp` para esse fim — **nenhum arquivo real foi lido, movido ou apagado**. `XDG_DATA_HOME` é apontado para temporário **dentro da mesma pasta base** do workspace de teste, garantindo **mesmo dispositivo** (sem EXDEV) nos casos de movimentação.
+
+### Placares executados de verdade
+
+| Verificação | Comando | Resultado |
+|---|---|---|
+| Suíte `agir` (11 arquivos) | `npx vitest run src/bairros/2-inteligencia/casas/agir` | ✅ **137 passaram · 4 skipped · 0 falharam** (141 testes) |
+| Typecheck | `npx tsc -b --force` | ✅ **exit 0** |
+| Lint dos 5 arquivos alterados | `npx eslint <os cinco>` | ✅ **exit 0**, zero problemas |
+| Suíte completa — **DEPOIS** | `npx vitest run` | **5 arquivos falharam · 122 passaram · 2 skipped (129)** / **14 testes falharam · 1055 passaram · 27 skipped (1096)** |
+| Suíte completa — **ANTES** (baseline) | `npx vitest run` com os 5 arquivos revertidos ao HEAD | **5 arquivos falharam · 122 passaram · 2 skipped (129)** / **14 testes falharam · 1028 passaram · 27 skipped (1069)** |
+
+**Prova de não-regressão (o ponto mais importante desta rodada):** a suíte completa foi executada **duas vezes** — uma com os cinco arquivos revertidos ao estado anterior (`git checkout --`, com as versões novas guardadas em `/home/user/.cache` e restauradas depois) e outra com a restauração aplicada. **As 14 falhas são exatamente as mesmas nas duas rodadas**, nos mesmos cinco arquivos: `TerminalPanel.test.tsx` · `iconLabels.test.ts` · `themeTokens.test.ts` · `visualStates.test.ts` · `session-persistence/index.test.ts` (esta por `AGENTE_WINDOW_TEST_HOME` indefinido). **Nenhuma está em `bairros/2-inteligencia/casas/agir/`.** O total de testes subiu **1069 → 1096 (+27)** e **todos os 27 novos passaram**. Logo: **a restauração não quebrou nada e acrescentou 27 provas.**
+
+**Delta por arquivo da suíte `agir`:** `excluir.test.ts` **3 → 13** · `lixeira.test.ts` **3 → 19** · `rotas.test.ts` **40 → 41** · os outros oito inalterados (`agir` 18 · `discos` 10 · `vizinho` 11 · `executorComando` 6 · `extracao` 7 · `territorio` 6 · `frontier` 5 · `fsSeguro` 5 com 4 skipped). Total da pasta: **114 → 141**.
+
+### O que os 27 testes novos provam
+
+- **Movimentação real (restaurada das versões homologadas):** arquivo some da origem e aparece **inteiro** em `Trash/files/` · pasta com subpastas vai inteira · **bilhete `.trashinfo`** com `Path=` (encodeURI) e `DeletionDate=` no formato XDG · **colisão de nome** gera `nome.2`/`nome.3` · **falha ao gravar o bilhete desfaz o `rename`** e devolve erro honesto · **contagem e tamanho** (`contarConteudo`/`formatarTamanho`, teto `LIMITE_CONTAGEM=20000` e aviso de contagem parcial) · Windows por **comando puro com execução injetável** (`comandoLixeiraWindows`, `detalheErroWindows` — lição **C4**: `-NonFatal` não existe no PowerShell 5.1, usa-se `-NonInteractive`).
+- **K1 — link recusado, nunca seguido:** `moverParaLixeira` sobre um symlink devolve `ok:false` com *"é um link"* e *"nada sumiu"*; **o alvo apontado continua intacto**, o link continua lá e **nada chega à lixeira**. Trava de regressão por leitura de fonte: o código usa `lstat`, não `stat` cego.
+- **K2 — identidade `dev:ino`:** trava de regressão por leitura de fonte (`identidadeDe`, *"mudou durante a operação"*) + caso positivo provando que a movimentação normal **preserva o `ino`** e devolve o destino.
+- **K3 — fallback destrutivo removido:** trava de regressão por leitura de fonte (`force: true` e `cp(` **não existem mais** em `lixeira.ts`) + caso real de **lixeira em outro dispositivo** devolvendo recusa honesta com a **origem intacta** (rodou porque neste sandbox `tmpdir()` é tmpfs e `homedir()` fica em outro dispositivo; a condição é detectada em tempo de execução e **registrada no próprio teste**, não é `skip` silencioso — D79).
+- **Contenção no executor (D134):** `../fora` devolve *"Fora da pasta de trabalho"* e **não** *"não existe"* (o motivo certo importa: é o que o modelo e o dono leem) · caminho **absoluto externo** recusado · **symlink de componente pai apontando para fora** recusado via `realpath`, com o arquivo externo intacto · **symlink como alvo** recusado · **duas exclusões concorrentes do mesmo caminho** produzem **exatamente um sucesso** e a perdedora diz *"não existe"* — nenhuma inventa resultado · **prévia real** do cartão mostra nome, tamanho e começo do conteúdo para arquivo, contagem para pasta, e frases honestas para link/fora/inexistente.
+- **Rota ponta a ponta (`rotas.test.ts`):** o cartão `approval` traz a **prévia com o alvo real** · aprovar devolve `tool_result` **`ok:true`** com *"movido para a lixeira"* · a origem some · o conteúdo fica na lixeira **com bilhete** · **negar** devolve `ok:false` com *"dono negou"* e *"nada sumiu"*, origem intacta e **lixeira vazia**. Os dois testes **RF12-3** que já existiam continuam válidos e passando: *"Permitir na Sessão"* para `excluir` → **400** honesto, e `permissoes:['excluir']` no pedido **não auto-libera**.
+
+### ❌ NÃO executado — e não declarado como executado
+
+1. **E2E `e2e/excluir_fatia12.spec.ts` — NÃO EXECUTADO.** Três bloqueios **independentes** do ambiente: **(a)** falta `uploads/stub_agir.cjs` no repositório, e a spec espera esse stub na porta **4610**; **(b)** **não há browsers do Playwright** instalados (`/opt/playwright` ausente; `npx playwright install` não funciona neste sandbox); **(c)** o fixture usa `/tmp/excluir-e2e-ws` com lixeira real em `~/.local/share/Trash/`, e `/tmp` (**dev 29**) × `$HOME` (**dev 65024**) são **filesystems diferentes** ⇒ **EXDEV**, que a correção K3 transforma em recusa honesta. **A spec não foi alterada, não recebeu `skip`, não recebeu `fixme` e não foi quarentenada.** Ela **já afirmava exclusão real** — estava certa, e a contradição se resolveu pela restauração do código. **A régua 23/23 volta a ser o esperado no papel, mas permanece NÃO observada em execução.**
+2. **Lixeira real do Windows — NÃO TESTADA.** Não há Windows neste ambiente. O caminho PowerShell (`Microsoft.VisualBasic.FileIO.FileSystem::DeleteFile/DeleteDirectory` com `SendToRecycleBin`) foi provado **apenas por comando puro com execução injetável**, o que valida a **montagem do comando e o tratamento do erro**, não o efeito real no SO. **Roteiro objetivo de homologação manual (Partes A e B, 11 passos) em `08`.**
+3. **4 erros de ESLint pré-existentes NÃO corrigidos.** `agir/server/fsSeguro.ts:24` (`_raiz` definido e nunca usado) e `agir/__tests__/fsSeguro.test.ts:127/130/144` (três blocos `catch {}` vazios). **Verificado que já existem no HEAD oficial `cea60d5`** com `git show cea60d5:<caminho>` — **não foram introduzidos por esta missão** e estão em arquivos **fora do escopo autorizado** (carta §8: *"não modificar áreas não relacionadas"*). Registro: `npm run lint` global **não passa** por causa deles, antes e depois.
+4. **14 falhas da suíte completa são pré-existentes deste ambiente Linux** (prova acima: idênticas antes e depois). **Não foram investigadas nem corrigidas** — fora do escopo. Entre elas, `session-persistence/index.test.ts` falha por **`AGENTE_WINDOW_TEST_HOME` indefinido**, o que sugere dependência de variável de ambiente que este sandbox não fornece; `09 §3.24` já registra limites semelhantes de ambiente.
+
+### Limites técnicos reafirmados
+
+Os testes Linux validam **apenas** os casos cobertos. **Não comprovam:** comportamento na Lixeira real do Windows · junction/reparse points · macOS · troca concorrente da pasta-pai durante a operação · pastas acima do teto de contagem em disco real · integração com o Explorer no app rodando (a atualização do Explorer é provada por testes de UI já existentes, não por esta rodada). **K2 não tem teste negativo:** forçar uma divergência de identidade `dev:ino` entre a validação e o `rename` exigiria uma corrida real, que não é reproduzível de forma determinística — o que existe é a **trava de regressão por leitura de fonte** mais o caso positivo. **Nenhum commit e nenhum push foram feitos. CRUD completo continua NÃO homologado.**
+
+
+## 3.26 — Correções da MICRO-FATIA DELETE após auditoria independente (2026-11-03)
+
+**Autorização e escopo:** missão do dono “CORREÇÃO DOS DEFEITOS DA MICRO-FATIA DELETE”. Implementar somente vínculo prévia/autorização/execução, cancelamento, falhas XDG, reserva concorrente, testes relacionados e roteiro descartável, mantendo SPEC 2F, D97, D121 e D132–D136. Sem commit/push, exclusão permanente, novo loop/sistema de permissões, alteração de memória/MCP/identidade de projetos, reabertura da Fatia 13 ou início da 14. **Implementação para nova auditoria independente, não homologada; DEBT-24 permanece aberta.**
+
+### Contrato e implementação da correção
+
+1. **Prévia vinculada:** `discos.ts/prepararExclusao` observa uma versão antes/depois da prévia e guarda apenas no servidor, em WeakMap por pedido, caminho real + hash. Versão inclui dev/ino, tipo/modo, tamanho, mtime/ctime em nanossegundos, hard links e conteúdo dos arquivos. Diretórios são observados recursivamente em ordem estável; links internos têm seu próprio nome/alvo observado, sem seguir seu conteúdo. Falha, tipo especial, mais de 20.000 entradas (incluindo raiz) ou profundidade acima de 128 não geram autorização válida. Antes de mover, o caminho e essa versão são comparados novamente, inclusive no Windows. A prévia é de uso único e não pode ser fornecida pelo modelo/cliente.
+2. **Reconfirmação:** conflito sem efeito retorna `requerNovaAprovacao`. O loop existente encerra o cartão antigo com recusa e abre outro com UUID novo e prévia atualizada. Negar/Parar continuam impedindo a ação; resposta duplicada do cartão anterior não autoriza o novo alvo. O diálogo do provedor mantém o ID original do tool call.
+3. **Cancelamento:** `rotas.ts` inclui excluir no acompanhamento existente de Promise mutável e efeitos. O ACK espera a operação. Resultado sem efeito → `cancelled`; efeito realizado ou não descartado → `cancelled_with_effects`. Criar/escrever/executar preservam suas políticas.
+4. **Reserva XDG e falha de registro:** cada nome exige criar seu `.trashinfo` com `open('wx')`. Arquivo, diretório, link pendente ou registro previamente existente provocam outro nome. Nenhuma fila global foi adicionada. O bilhete é escrito, sincronizado e fechado **antes** de mover. Portanto a falha de gravação/sync não pode mais ocorrer depois da movimentação: a origem permanece intacta e não é necessário rollback. Foi removido o rollback cego; nenhuma tentativa de restaurar pode sobrescrever um novo ocupante da origem. Em falha posterior de conferência, conteúdo e bilhete permanecem no destino informado, com `ok:false` e `efeitoIniciado:true`.
+5. **Resultado coerente:** o efeito parcial/possível atravessa SSE e cliente; o cartão conserva o erro e a explicação, o Explorer atualiza também quando `ok:false` com efeito, e o modelo recebe o resumo como efeito parcial, sem o prefixo “NÃO EXECUTADO”. Erro/timeout do PowerShell só afirma origem intacta se a versão aprovada ainda for observável; caso contrário informa possível efeito e exige conferir origem/Lixeira. Exit 0 sem movimento não vira sucesso quando a versão aprovada continua na origem.
+6. **Testes por plataforma:** testes comuns do executor/rota usam o backend XDG real com destino temporário explícito, sem fingir que Windows usa XDG por padrão. Despacho Windows e erros são exercitados por injeção; integração Windows real foi executada separadamente com descartáveis. Os testes POSIX de executar não foram alterados para esconder suas falhas no Windows.
+
+### Ambiente, isolamento e evidências
+
+Windows, Node 24.16.0, PowerShell **5.1.22621.6133**. Árvore exclusiva: `C:\Users\Usuario\AppData\Local\Temp\agent-window-delete-fix-71a4360039474367840112353398af97`. TMP/TEMP apontados para ela; operações destrutivas reais foram restritas a temporários criados dentro dela. Nenhuma limpeza da Lixeira pessoal. Itens descartáveis enviados à Lixeira do Windows foram preservados nela.
+
+- **Prova negativa do código anterior:** bundle preservado da auditoria anterior, executado somente na árvore descartável, com barreiras antes dos renames. Duas origens A/B com mesmo nome: **ambas retornaram ok:true para o mesmo destino, mas apenas B permaneceu**. Evidência externa `old-collision-proof.json`.
+- **Prova positiva Windows real:** executor corrigido com prévia vinculada para arquivo e diretório. Ambos ausentes na origem e encontrados via Shell.Application na Lixeira, com conteúdos `WINDOWS-FILE` e `WINDOWS-DIRECTORY`. Evidência externa `windows-real-proof.json`. Isso não comprova todos os volumes, restauro pela UI ou cancelamento de uma operação nativa longa.
+- Logs e provas permanecem nessa árvore externa, sem artefato adicional no projeto: `before-agir.log`, `after-agir.log`, `focused-final.log`, `routes-focused-final.log`, `general-head-without-app.log`, `general-final-without-app.log`, `lint-app-comparison.json`.
+
+### Testes executados e comparação
+
+| Verificação | Resultado observado |
+|---|---|
+| Baseline da árvore de trabalho antes destas correções, suíte Agir | **108 passaram / 28 falharam / 5 ignorados (141)** |
+| Suíte Agir corrigida | **134 passaram / 23 falharam / 5 ignorados (162)** |
+| Focalizados lixeira/excluir/loop-cliente + contrato de assertions E2E | **72 passaram / 1 ignorado (73)** |
+| Rotas, filtro DELETE/F2 | **8 passaram**, 37 casos fora do filtro; não confundir esses 37 com cenários aprovados |
+| TypeScript app e node, sem emissão/incremental | **exit 0** em ambos |
+| TypeScript do E2E alterado e seus imports, sem emissão | **exit 0** |
+| ESLint dos arquivos alterados em Agir e do E2E | **exit 0** |
+| ESLint App.tsx | **20 erros / 1 aviso preexistentes**, diagnósticos idênticos ao HEAD, verificados por stdin com mesmo nome/configuração; não corrigidos por estarem fora do escopo |
+
+As **23 falhas Agir remanescentes têm os mesmos nomes no baseline**: executar/rotas dependentes de /bin/sh (9), fronteiras com comparação de separador POSIX no Windows (3), território POSIX (1), vizinho/provedores (10). **As cinco removidas são expectativas XDG indevidas no Windows**, agora exercitadas com backend e destino temporários explícitos. Os **21 casos adicionais** cobrem substituição Linux/Windows, edição no mesmo arquivo e em subpasta, aprovação ausente/copiada/reutilizada, cancelamento, reserva concorrente com barreira, colisões de registro/arquivo/link, falhas de escrita/sync, EXDEV/EPERM/ENOENT injetados, pós-movimentação, modelo, SSE e resultado Windows. Não há falha nova de Agir por nome nesta comparação.
+
+**Suíte geral:** tentada com perfis descartáveis separados por processo (USERPROFILE, APPDATA, LOCALAPPDATA, TMP/TEMP, XDG_DATA_HOME e AGENTE_WINDOW_TEST_HOME), sem apontar banco/conversas para o perfil real. A execução integral foi interrompida: `App.test.tsx` entra em recursão no mock de fetch em ambas as árvores. Foi executada bateria ampliada com esse único arquivo excluído, em 128 arquivos, comparada ao HEAD histórico exportado na auditoria anterior (não confundir esse baseline com o working tree da primeira linha da tabela). O resultado final e a comparação estão no complemento abaixo. Não declarar a suíte integral aprovada.
+
+### Limitações e operação posterior
+
+- **Janela residual D121:** não há CAS de nomes por handle nem proteção contra processo hostil da mesma conta. Permanece intervalo entre a última observação e rename/despacho PowerShell (incluindo inicialização do PowerShell). A observação de uma árvore não é snapshot atômico. A reserva XDG protege operações concorrentes do app e clientes que respeitam o protocolo de reserva; não impede um processo externo de escrever diretamente em files/ entre lstat e rename. Não chamar isso de sandbox.
+- **Não executados:** Linux nativo, EXDEV real entre dispositivos, restauro Windows por UI, Explorer visual no navegador e cancelamento de movimentação nativa Windows demorada. EXDEV/erros/cancelamento foram comprovados por injeção e barreiras controladas, não por esses cenários de SO.
+- **E2E não executado:** sem servidor/stub isolados preparados. Foi corrigido para exigir `AGENTE_DELETE_E2E_ROOT` dentro do temporário, prefixo `agent-window-delete-e2e-`, marcador `ISOLATED_DELETE_E2E` contendo o caminho absoluto da raiz e XDG_DATA_HOME=ROOT/xdg. Workspace e lixeira ficam dentro da árvore; redirecionamentos de diretórios são recusados antes da limpeza. O harness deve iniciar servidor dedicado com o mesmo XDG_DATA_HOME e persistência/provedores isolados. O E2E é específico XDG/Linux e falha com explicação em outras plataformas; ele não é substituto da prova Windows. Sua sintaxe/tipos/lint e contrato de assertions foram verificados, seu fluxo de browser não.
+- Um processo interrompido antes de mover pode deixar bilhete órfão: a origem não é apagada e futuras operações escolhem outro nome. Não foi implementada limpeza geral nem recuperação automática da Lixeira.
+
+**Parada:** aguardar autorização do dono para nova auditoria independente. Nenhuma declaração de homologação, encerramento de DEBT-24 ou autorização de Fatia 14.
+
+
+**Complemento da bateria ampliada (estado final do código, 2026-11-03):** excluído somente `src/__tests__/App.test.tsx`, **128 arquivos**, **989 aprovações / 58 falhas / 8 ignorados (1055 testes)**, exit 1. HEAD histórico exportado, mesmo recorte e perfis separados: **941 aprovações / 59 falhas / 7 ignorados (1007 testes)**, exit 1. Por nome de teste, **nenhuma falha nova**; as 58 atuais aparecem no baseline. A única falha ausente no atual é `visualStates.test.ts — keeps the disabled state consistent (opacity + cursor)`; seu fonte não foi alterado nesta missão, portanto não é apresentada como correção de DELETE. Entre as falhas comuns há pressupostos POSIX e testes de fronteira com separadores Windows. A tentativa integral permanece **inconclusiva/interrompida**, sem placar final de App. Comparação externa em `failure-comparison.json`.
+
+
+**Perímetro efetivamente editado nesta correção:** em `platform/apps/workbench-v2/src/bairros/2-inteligencia/casas/agir/`: `server/discos.ts`, `server/lixeira.ts`, `server/rotas.ts`, `server/agir.ts`, `contract.ts`, `ui/client/api.ts`, `__tests__/excluir.test.ts`, `__tests__/lixeira.test.ts`, `__tests__/rotas.test.ts` e `__tests__/agir.test.ts`. Fora dessa casa: `src/App.tsx` (somente parâmetro do callback e condição de refresh), `e2e/excluir_fatia12.spec.ts` e canônicos `docs/03`, `06`, `07`, `08`, `09`. Os demais arquivos que já apareciam modificados/não rastreados no início foram preservados; não atribuir todo o git diff a esta correção.
+
+## 3.27 — Validação final da MICRO-FATIA DELETE (2026-11-03)
+
+A assinatura que vincula a aprovação mantém caminho, metadados, conteúdo e estrutura da árvore. A leitura para SHA-256 agora usa blocos em vez de carregar o arquivo inteiro. A identidade e os metadados do descritor aberto são conferidos antes e depois da leitura, com verificação da quantidade de bytes e nova conferência do caminho. A observação da pasta continua em ordem determinística, com listas de nomes por diretório visitado e os tetos anteriores de 20.000 entradas e profundidade 128. O conteúdo é processado um arquivo por vez.
+
+O dono aceitou a janela residual entre a última validação e o rename ou despacho ao PowerShell, no modelo por caminho de D121. A SPEC 2F e D97 mantêm aprovação individual, território da pasta ativa, movimentação recuperável e relato honesto dos efeitos. Continua possível que uma alteração concorrente após a última checagem afete a movimentação. A troca durante a espera exige reconfirmação, e divergência detectada após mover é comunicada como efeito parcial com o destino quando conhecido. A conferência por caminho não oferece atomicidade contra TOCTOU.
+
+Validação em cópias temporárias com Node 24.16.0. No Ubuntu via WSL, o executor moveu para XDG um arquivo esparso de 2 GiB e uma pasta contendo outro arquivo esparso de 2 GiB. Foram conferidos ausência na origem, tamanho e conteúdo no fim de cada arquivo movido. No Windows, a suíte Agir obteve 134 aprovações, 23 falhas e 5 ignorados, com o mesmo conjunto de falhas por nome da auditoria anterior. No recorte dos quatro arquivos excluir, lixeira, rotas e agir, foram 106 aprovações, cinco falhas preexistentes de comandos da Fatia 13 e um ignorado. TypeScript da aplicação e ESLint de discos.ts terminaram com código 0.
+
+Homologação manual pendente conforme o roteiro de 08. A validação final não incluiu E2E em navegador nem Lixeira real do Windows. DEBT-24 segue aberta.
+
+## 3.28 — Regressão integral no Debian pela Arena: MICRO-FATIA DELETE validada (2026-11-04)
+
+**Autorização e escopo:** execução da seção "Passagem obrigatória para a Arena — regressão integral no Debian após Windows", sob o Plano de Execução Autônoma de 2026-11-04. Registro técnico dos resultados efetivamente executados. **Nenhum fonte do produto foi alterado nesta tarefa.** Diário operacional do executor em `/home/user/EXECUCAO_AUTONOMA.md` (fora do repositório); logs integrais em `/home/user/evidencias/`.
+
+### Árvore, runtime e recursos realmente testados
+
+| Item | Valor |
+|---|---|
+| Árvore | `c94563aef22abf83e1a0642e9689890f96378ea0` + `investigacao_memoria_fatias_m/00_INDICE.md` não commitado |
+| Branch / remote | `main` / nenhum |
+| SO | Debian GNU/Linux 13 (trixie), kernel 6.1.158+, x86_64 |
+| Runtime efetivo | Node **v26.13.0**, npm **11.20.0** — preparados pelo `iniciar.sh`, distribuição conferida por SHA-256. **D137 confirmado válido no repositório atualizado** |
+| Recursos | 2 núcleos · 1982 MB RAM · **swap 0** · 20 GB livres · `/tmp` tmpfs 992 MB |
+| Toolchain nativa | python3 3.13.16 · make 4.4.1 · gcc/g++ 14.2.0 |
+
+Preparo **do zero pelo lockfile**, sem transportar `node_modules` nem binários de `.runtime` do Windows.
+
+**Fotografia imutável preservada ANTES de qualquer correção:** SHA-256 dos **1020** arquivos rastreados, dos 30 fontes `.ts` da casa `agir`, cópia física dos 8 untracked e do `00_INDICE.md`, e tag git `baseline-arena-2026-11-04`. **Nenhum `reset`/`checkout --`/`clean` executado em momento algum.**
+
+**Estado real da árvore no recebimento — verificado, não presumido.** `git status` listava 8 ` M` + 8 `??`. Comparação byte a byte sem filtros (`git cat-file blob HEAD:<f>` versus arquivo em disco) provou que **7 dos 8 são idênticos ao HEAD**: os quatro fontes da DELETE (`agir/contract.ts`, `server/discos.ts`, `server/lixeira.ts`, `server/rotas.ts`) e este `docs/09` não têm diferença de conteúdo; `iniciar.cmd` e `platform/scripts/project.ps1` diferem apenas por CRLF, exigido por `.gitattributes eol=crlf`. **A única alteração real não commitada é `investigacao_memoria_fatias_m/00_INDICE.md`** (4427 B → 46963 B, +356 linhas). A MICRO-FATIA DELETE já está integralmente commitada em `c94563a`.
+
+> **Regra de perímetro decorrente (vale para toda execução futura neste SO):** o `git status` reporta `iniciar.cmd` e `project.ps1` como modificados de forma permanente em checkout Linux, porque `.gitattributes` impõe `eol=crlf` e o atalho de stat nunca se satisfaz. **A autoridade de perímetro é `git diff --name-only HEAD`** (compara conteúdo aplicando filtros), **não** `git status`. Usar `git status` para policiar áreas congeladas produz falso positivo.
+
+### Adaptações de ambiente necessárias — registradas, não silenciosas
+
+1. **Runtime fora do snapshot.** `iniciar.sh:10` fixa `runtime_root="$platform_root/.runtime"` sem override por variável, baixa o tarball para dentro dele (linha 17) e o extrai lá (linha 22) sem removê-lo: **258 MB** medidos. `.runtime/` consta do `.gitignore` (linha 21), mas o padrão tem barra final e portanto **não casa com symlink**. Solução: symlink `platform/.runtime` → `/home/user/.cache/aw-runtime`, mais `platform/.runtime` em `.git/info/exclude` (ignore local, nunca commitado). **Fundamento canônico: §B6 de `01`** ("clones grandes e runtimes ficam em `/home/user/.cache`") — não é contorno de regra, é a regra aplicada. `iniciar.sh` roda intocado. Custo: `.cache` não persiste entre reinícios do workspace, o Node 26 é re-baixado a cada sessão.
+2. **`TMPDIR` fora da tmpfs.** `/tmp` é tmpfs de 992 MB compartilhada com a RAM; com swap zero, `node-gyp` e `vite` escrevendo ali competiriam com a própria compilação. `TMPDIR=/home/user/.cache/tmp` em toda operação pesada.
+3. **Compilação nativa com `JOBS=1`**, para não estourar a RAM com dois jobs C++ simultâneos.
+4. **`oom_score_adj=900` no processo de build**, tornando-o vítima preferencial do OOM killer. **Funcionou:** na segunda tentativa o build foi morto e o code-server na 8080 sobreviveu.
+
+### Comandos executados e recortes — resultados reais
+
+| Comando | Resultado |
+|---|---|
+| `sh iniciar.sh install` | **EXIT 0** — Node 26.13.0 baixado (32,5 MB), SHA-256 conferido, `npm ci --include=dev` → **614 pacotes em 21 s** |
+| `sh iniciar.sh check` | **EXIT 0** — `Node 26.13.0, npm 11.20.0, SQLite e PTY carregados` |
+| `sh iniciar.sh typecheck` | **EXIT 0** — `tsc -b --force`, **zero diagnósticos** |
+| `npm run test:runtime` (platform) | **EXIT 0** — **3 aprovados / 0 falhas** |
+| `sh iniciar.sh test --maxWorkers=1 --minWorkers=1` | **EXIT 1** — **1121 aprovados / 18 falhas / 23 ignorados (1162)** · 122 arquivos aprovados, 8 reprovados (130) · 202 s |
+| `npm run typecheck --workspace=@agente-window/pty-server` | **EXIT 0** — `tsc --noEmit` limpo |
+| `npm run test --workspace=@agente-window/pty-server` | **EXIT 0** — **5 aprovados / 0 falhas** |
+| `npm run lint --workspace=agents-window-replica-v2` | **EXIT 1** — **99 erros / 19 avisos / 38 arquivos** (baseline Linux) |
+| `sh iniciar.sh build` | **EXIT 137 (SIGKILL/OOM)** — ver "Não executado" |
+
+**O pacote PTY e os testes de runtime foram executados separadamente, nunca via `test:all`**, porque `test:all` usa `&&` e o Workbench falhando impediria o PTY de rodar. Da mesma forma, **`sh iniciar.sh test` não é a suíte completa**: `project.mjs` restringe a ação `test` a `--workspace=agents-window-replica-v2`, excluindo o pacote PTY e `scripts/runtime.test.mjs`.
+
+**`App.test.tsx` — a exclusão herdada do Windows NÃO se justifica no Debian.** Conforme ordenado, a suíte rodou **sem filtro inicial** e o arquivo foi coletado (`vitest.config.ts:28` inclui `src/**/*.{test,spec}.{ts,tsx}`; o `exclude` da linha 39 é apenas de cobertura). Resultado: **`✓ src/__tests__/App.test.tsx (62 tests | 13 skipped) 73080ms`**. O mock **não recusou** no Debian. Isto responde 13 dos 23 ignorados.
+
+### Matriz mínima do condomínio — situação por área
+
+| Área | Situação |
+|---|---|
+| 1. Instalação/runtime | ✅ atendida |
+| 2. Workbench inteiro, sem filtro | ✅ executada — 18 falhas, todas classificadas abaixo |
+| 3. Pacote PTY | ✅ atendida — PTY real spawnando processo OS e bridge single-port com reconexão |
+| 4. TypeScript/lint/build | ⚠ **parcial** — typecheck 0 nos dois pacotes ✅ · lint baseline registrado ✅ · **`vite build` inviável por RAM** |
+| 5. Persistência | ✅ atendida — `session-persistence/index` 6, `worktrees` 9, `transcripts` 4, `workspaces` 7, `database` 2, `chatAlvo` 4, `agirContext` 4, `layoutPersistence` 10, `SessionPersistenceNotice` 6 |
+| 6. Modos/permissões | ✅ atendida — `autorizacaoExclusao` 13/13 e `frontier` 5/5 nas quatro casas |
+| 7. DELETE no Linux real | ✅ atendida — `excluir` 21, `discos` 10, `territorio` 6, `vizinho` 17, `rotas` 56 |
+| 8. Lixeira XDG | ✅ atendida — `lixeira` 30 testes, **incluindo o K3/EXDEV, cuja lacuna de cobertura foi fechada nesta execução** |
+| 9. Erros e cancelamento | ✅ atendida — `executorComando` 6/6 (cancelamento, timeout, árvore de processos, padrões destrutivos) · `vizinho` erros honestos (400/401/403/429/502, porta morta, fio mudo, timeout ocioso, resposta vazia) · `chatStreamingFatia09` 4 · `streaming` 9 |
+| 10. Browser/E2E integrado | ❌ **NÃO VERIFICADO** — ver abaixo |
+| 11. Credenciais e fronteiras | ✅ atendida — prova D81 aprovada; zero variável de credencial no ambiente |
+
+**Casa `agir` (código da DELETE), harness oficial: 14 arquivos · 204 testes · 198 aprovados · 6 ignorados · ZERO falhas.**
+
+### Classificação caso a caso das 18 falhas
+
+**GRUPO I — 6 falhas · DIFERENÇA DE AMBIENTE causada pelo harness de testes · produto correto · NÃO bloqueante para o produto, BLOQUEANTE para a confiabilidade da suíte oficial**
+
+`casas/config/__tests__/repo.test.ts:70` · `casas/provedores/__tests__/providersRepo.test.ts:283` · `explorer-search/__tests__/fsWatcher.test.ts:39,76,94` · `explorer-search/__tests__/fsIntegration.test.ts:238`.
+
+**Causa raiz única, comprovada por experimento.** `platform/scripts/project.mjs` cria o perfil descartável em `platform/.cache/test-runs/run-XXXX` e o exporta como `TMP`/`TEMP`/`TMPDIR`/`AGENTE_WINDOW_TEST_HOME`. Esse caminho produz dois efeitos simultâneos:
+
+1. está **dentro do checkout**, o que viola o invariante que o teste D81 afirma (`real.startsWith(raizDoRepo)` deve ser falso);
+2. contém o segmento **`.cache`**, que casa com o filtro `NOISE` de `server/fs/watcher.ts:43` — `/(^|[/\\])(\.git|node_modules|…|\.cache|dist|out|target|coverage)([/\\]|$)/` — aplicado em `handleEvent` (`watcher.ts:206`), de modo que **todo evento de FS é descartado na emissão**.
+
+`platform/scripts/test-profile.cjs:7` ainda **lança erro** se o perfil não estiver dentro de `platform/.cache/test-runs`, o que impede contornar o problema por variável de ambiente sem abandonar o harness oficial.
+
+Quatro sondas com arquivo de diagnóstico temporário (criado, executado e **removido**; o perímetro foi conferido depois):
+
+| Sonda | TMPDIR contendo `.cache` | TMPDIR limpo |
+|---|---|---|
+| P1 `fs.watch` cru, não recursivo | 2 eventos | 2 eventos |
+| P2 `ExplorerFsWatcher` default (lazy-per-dir) | **0 lotes** | **1 lote `added`** |
+| P3 `ExplorerFsWatcher` `recursive:true` | **0 lotes** | **1 lote `added`** |
+| P4 lazy-per-dir + `ensureWatch` na raiz | **0 lotes** | **1 lote `added`** |
+
+Reexecutados com perfil fora de `.cache`: os quatro arquivos **passam — 40 aprovados / 1 ignorado**. A prova D81 isolada, com home descartável fora do checkout: **25 aprovados / 1 ignorado**.
+
+Inotify funciona plenamente neste container (`max_user_watches=15612`, `max_user_instances=128`, FS ext4 real, sem overlayfs). **`ExplorerFsWatcher` é correto nos três modos; não há defeito de produto.** `start()` observa a raiz sempre (`watcher.ts:78`, "raiz SEMPRE observada"). O defeito é do harness. **Pendência registrada; não corrigida unilateralmente** por alterar o launcher oficial da D137 e o local de home/credenciais descartáveis (modelo de segurança).
+
+**GRUPO II — 9 falhas · PREEXISTENTES · área congelada · não bloqueante para a DELETE**
+
+`src/__tests__/TerminalPanel.test.tsx`, todas `TestingLibraryElementError` (roles `region`, `button`, `tab`, `menu`, `group` não encontrados) mais uma assertiva de spy não chamado. Causa: **xterm.js exige `HTMLCanvasElement.prototype.getContext`, que o jsdom não implementa sem o pacote nativo `canvas`** — o painel não renderiza e todas as consultas por role falham em cascata. `components/terminal/**` é área congelada (§2 de `04`). Presente no baseline histórico do Windows ("terminal humano"). **Não corrigido nesta fase**: exigiria dependência nativa nova (muda o lockfile da D137) ou stub em `src/__tests__/setup.ts` (altera o ambiente dos 1162 testes).
+
+**GRUPO III — 3 falhas · PREEXISTENTES · contratos visuais que derivaram da fonte · não bloqueante**
+
+`iconLabels.test.ts` (fonte lida como texto deveria conter `title="Mostrar sessões"`) · `themeTokens.test.ts` (3 tokens em desacordo) · `visualStates.test.ts` (CSS casa com `/outline:\s*1px solid var\(--vscode-fo…/`). Presentes no baseline histórico do Windows ("ícones/tokens/estado visual"). Exigem arbitrar qual lado é autoritativo, contrato ou fonte; corrigir o teste configuraria afrouxamento de assertiva, vedado.
+
+**TOTAL: 6 + 9 + 3 = 18. ZERO regressões atribuíveis à MICRO-FATIA DELETE. ZERO defeito de produto no escopo da DELETE.**
+
+### Comparação com o Windows — sem atribuir a redução ao DELETE
+
+O placar Windows da missão Codex nº 2 foi **1037 aprovados / 54 falhas / 8 ignorados** em recorte **sem** `App.test.tsx`. O placar Debian é **1121 / 18 / 23** em recorte **maior** (com `App.test.tsx`). **Os recortes são diferentes e os totais não são comparáveis diretamente**; a redução não é atribuída à DELETE.
+
+Comparação válida, **por arquivo relativo e nome do teste**:
+
+- **Casa `agir`:** Windows **186 aprovados / 13 falhas / 5 ignorados** → Debian **198 aprovados / 0 falhas / 6 ignorados**. As 13 falhas do Windows (9 de comandos/shell POSIX da Fatia 13, 3 de fronteira com separadores, 1 de território POSIX) **não se reproduzem no Debian**, confirmado por execução e não por suposição. Classificação: **diferença de ambiente POSIX × Windows**. ⚠ **Funcionar no Debian NÃO homologa PowerShell nem `IFileOperation` no Windows.**
+- **`App.test.tsx`:** não comprovado no Windows (suíte inteira excluída) → **aprovado no Debian, 62 testes**. A exclusão histórica não se justifica neste SO.
+- **Famílias de falha remanescentes coincidem** com as do baseline histórico: terminal humano, ícones/tokens/estado visual, filesystem. Nenhuma família nova apareceu.
+
+### Lacuna de cobertura fechada — K3 / EXDEV no Linux
+
+`lixeira.test.ts:284`, *"K3: lixeira em outro dispositivo = recusa honesta e origem INTACTA"*, usa `it.skipIf(!doisDispositivos)`, onde `doisDispositivos = statSync(tmpdir()).dev !== statSync(homedir()).dev`. No harness oficial **TMPDIR e homedir caem no mesmo dispositivo (dev 65024)**, portanto **o teste não rodava** — skip silencioso de cobertura de uma trava de segurança.
+
+Execução variante com home sintético em ext4 (dev 65024) e `TMPDIR` em tmpfs (dev 29): **204 testes · 196 aprovados · 5 ignorados** ⇒ **K3 executou e foi aprovado**.
+
+Nessa mesma execução surgiram **3 falhas em `rotas.test.ts`** — **explicadas, e não são defeito**. Ao separar os dispositivos, todo teste que move arquivo da fixture (tmpfs) para a lixeira (ext4) cruza dispositivos, e a **recusa honesta do K3 dispara pela rota real**. Quadro capturado:
+
+```json
+{ "ferramenta": "excluir", "ok": false, "type": "tool_result",
+  "resumo": "A lixeira está em outro disco/partição — não é feito copiar e apagar. Nada sumiu." }
+```
+
+Isto é **evidência positiva de ponta a ponta** de que o fallback destrutivo `cp`+`rm` removido pela correção K3 **não existe mais**: o sistema recusa e nada é apagado. As 3 falhas são artefato do ambiente deliberadamente cross-device, não do produto. **Ambiente correto para a suíte: TMPDIR e homedir no mesmo dispositivo** — exceto quando o objetivo for exercitar K3.
+
+### Os 23 ignorados — inventário completo, sem quarentena nova
+
+`App.test.tsx` 13 (skips internos da própria suíte aprovada) · `agir/fsSeguro.test.ts` 4 (`describe.skipIf(!fsSeguroDisponivel)`, ver F2 abaixo) · `agir/lixeira.test.ts` 2 — (a) `skipIf(platform !== 'win32')`, adaptador PowerShell 5.1 e sink `IFileOperation` da **D138**, **só executável no Windows**; (b) `skipIf(!doisDispositivos)`, o **K3, fechado nesta execução** · `provedoresRepo.test.ts` 1 · `coverageIntegration.test.tsx` 1 · `iconLabels.test.ts` 2.
+
+**Nenhum skip foi criado, nenhum assert foi afrouxado e nenhuma quarentena histórica foi removida.**
+
+**F2 — achado relevante.** `npm run build:fs-boundary` imprime `[F2] Native boundary build disabled: concurrent parent-directory rename is not contained.` O módulo nativo de fronteira de FS está **deliberadamente desativado** por limitação de segurança conhecida (auditoria F1–F8, §85 de `04`). Por isso `fsSeguroDisponivel=false` e 4 testes permanecem em quarentena. **Não é defeito novo; é fail-safe documentado.** O teste ativo afirma exatamente isso: *"mantém indisponível a API de disco até haver garantia contra rename concorrente"* — aprovado.
+
+### NÃO executado — e não declarado como executado
+
+- **`vite build`:** `build:fs-boundary` ✅ e `tsc -b` ✅ (zero erros) e `tsc` do PTY ✅, mas `vite build` morreu na fase `transforming...`. Tentativa 1 com `--max-old-space-size=700` → `FATAL ERROR: JavaScript heap out of memory`, exit **134**. Tentativa 2 com `1024` → **`Killed`, exit 137**. Com ~1037 MB disponíveis e swap zero, `vite` 5.4.21 empacotando Monaco excede o recurso. **Classificação: limite de recurso do ambiente, não regressão de código.** O gate estático de tipos passou nos dois pacotes.
+- **E2E:** 44 specs em `e2e/` e `playwright` instalado, mas **browsers ausentes** (`/opt/playwright` e `~/.cache/ms-playwright` inexistentes). **Não verificado.** Além disso exige subir o Vite em `127.0.0.1:5174` sob ~1 GB de RAM, e `docs/09` proíbe specs destrutivas de fixture contra o projeto real — `excluir_fatia12.spec.ts` exigiria inspeção prévia.
+- **Comportamento no Windows:** PowerShell 5.1, `IFileOperation`, Lixeira real do Windows e o skip `win32` da `lixeira.test.ts` **não são verificáveis neste SO**.
+
+### Limpeza realizada e seu fundamento
+
+Removido `platform/apps/workbench-v2/vite.config.ts.timestamp-1793761336948-b2d8f3cdd7215.mjs`: temporário do Vite **gerado no Windows** (cabeçalho com `file:///C:/Users/Usuario/Desktop/agente_window/platform/node_modules/vite/...`), 1 070 168 B, untracked, não é fonte. §E de `01` proíbe utilitário temporário versionado. **Respondia por 141 dos 259 problemas de lint** (120 dos 240 erros, todos `no-undef`), corrompendo o baseline. Cópia íntegra preservada com SHA-256 `1728c2f6cb3403be…` conferido **antes** da remoção ⇒ remoção totalmente recuperável. Perímetro conferido depois: segue apenas `00_INDICE.md`.
+
+### Baseline Linux de lint (referência para comparações futuras)
+
+**99 erros / 19 avisos / 38 arquivos.** Por regra: `no-undef` 37 · `@typescript-eslint/no-unused-vars` 36 · `react-refresh/only-export-components` 13 · `no-empty` 10 · `@typescript-eslint/no-explicit-any` 7 · `@typescript-eslint/consistent-type-imports` 7 · `react-hooks/exhaustive-deps` 4 · `react-hooks/rules-of-hooks` 1. Por arquivo: `src/App.tsx` 21 · `components/terminal/VSCodeTerminal.tsx` 20 · `probe-terminal.mjs` 12 · `validacao-real-workspace.mjs` 11 · `server.mjs` 10 · `server/local-boundary.mjs` 4. O erro pré-existente conhecido `agir/server/fsSeguro.ts:24 '_raiz' is defined but never used` continua presente e **não foi corrigido**. Como nenhuma linha de fonte foi alterada nesta execução, **todos os 99 erros são pré-existentes por construção**.
+
+### Pendências técnicas abertas por esta regressão
+
+- **PEND-01 (bloqueante para a confiabilidade da suíte, não para o produto):** o perfil de testes mora em `platform/.cache/test-runs`, dentro do checkout e casando com `NOISE`. Gera as 6 falsas falhas do Grupo I **e esconde o K3**. Recomendação: mover a raiz do perfil para fora do repositório e para caminho que não case com `NOISE`, e ajustar `test-profile.cjs:7` para validar "fora do repositório" em vez de "dentro de `platform/.cache/test-runs`". Efeito colateral benéfico: tornaria o harness **conforme** ao invariante D81. **Não implementado** — altera o launcher oficial da D137 e o local de home/credenciais descartáveis.
+- **PEND-02:** arbitrar contrato × fonte nos 3 testes visuais.
+- **PEND-03:** `canvas` no jsdom para as 9 falhas de `TerminalPanel` — relevante para a Fatia 16.
+- **PEND-04:** browsers Playwright ausentes.
+
+### Parecer técnico
+
+A MICRO-FATIA DELETE está **tecnicamente validada no Debian**: instalação limpa pelo lockfile, runtime D137 confirmado, typecheck zerado nos dois pacotes, testes de runtime 3/3, PTY 5/5, casa `agir` 204 testes sem falha, K3/EXDEV executado e aprovado, credenciais isoladas e prova D81 aprovada. **Nenhuma regressão atribuível à DELETE e nenhum defeito de produto no seu escopo.** Conclusão técnica do executor **não equivale a homologação independente**; o aceite é do dono.

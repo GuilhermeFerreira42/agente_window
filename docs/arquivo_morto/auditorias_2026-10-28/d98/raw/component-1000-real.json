@@ -1,0 +1,88 @@
+{
+  "n": 1000,
+  "mode": "real",
+  "url": "http://127.0.0.1:5175/d98-harness.html?n=1000&mode=real",
+  "httpStatus": 200,
+  "initial": {
+    "result": {
+      "mode": "real",
+      "fixtureCount": 1000,
+      "apiMs": 14,
+      "payloadBytes": 130045,
+      "entries": 1000,
+      "groups": [
+        {
+          "id": "workingTree",
+          "items": 1000
+        }
+      ],
+      "rootPath": "/tmp/d98-fixtures/scm-1000",
+      "readyAt": 471.59999999962747,
+      "domNodes": 20052,
+      "renderedRows": 1002
+    },
+    "profile": [
+      {
+        "phase": "mount",
+        "actualDuration": 181.9999999953434,
+        "baseDuration": 71.19999999087304,
+        "startTime": 159.8999999994412,
+        "commitTime": 349.09999999962747
+      }
+    ],
+    "longTasks": [
+      {
+        "duration": 192,
+        "startTime": 159.09999999962747
+      },
+      {
+        "duration": 106,
+        "startTime": 351.09999999962747
+      }
+    ],
+    "errorText": null,
+    "nodeCount": 20052,
+    "rowCount": 1002,
+    "renderedResourceRows": 1000,
+    "bodyTextLength": 24032
+  },
+  "afterScroll": {
+    "nodeCount": 20052,
+    "rowCount": 1002,
+    "renderedResourceRows": 1000,
+    "scrollTop": 0,
+    "scrollHeight": 86174,
+    "profile": [
+      {
+        "phase": "mount",
+        "actualDuration": 181.9999999953434,
+        "baseDuration": 71.19999999087304,
+        "startTime": 159.8999999994412,
+        "commitTime": 349.09999999962747
+      }
+    ],
+    "longTasks": [
+      {
+        "duration": 192,
+        "startTime": 159.09999999962747
+      },
+      {
+        "duration": 106,
+        "startTime": 351.09999999962747
+      }
+    ]
+  },
+  "perf": {
+    "Nodes": 24090,
+    "LayoutCount": 0,
+    "RecalcStyleCount": 0,
+    "LayoutDuration": 0,
+    "RecalcStyleDuration": 0,
+    "ScriptDuration": 0,
+    "TaskDuration": 0.00002,
+    "JSHeapUsedSize": 13971328,
+    "JSHeapTotalSize": 16314368
+  },
+  "errors": [],
+  "fatal": null
+}

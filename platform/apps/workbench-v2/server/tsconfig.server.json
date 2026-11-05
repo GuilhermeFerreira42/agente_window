@@ -1,0 +1,26 @@
+{
+  "//": "Build do adapter FS para o server.mjs (preview). Compila SÓ o server puro (node:*) + contract (tipos apagados) — espelha o padrão do pty-server (dist separada). Gerado em dist-fs-server/ (gitignored).",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "outDir": "../dist-fs-server",
+    "rootDir": "../src/modules/explorer-search",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false,
+    "sourceMap": false,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "../src/modules/explorer-search/contract.ts",
+    "../src/modules/explorer-search/server/fs/**/*.ts"
+  ]
+}
