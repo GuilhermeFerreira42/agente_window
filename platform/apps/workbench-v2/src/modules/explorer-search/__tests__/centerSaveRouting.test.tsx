@@ -81,6 +81,9 @@ type PropsFalsas = {
 vi.mock('../ui/attach/CodeEditorPane', async () => {
   const { createElement, useEffect } = await import('react');
   return {
+    // D152 §2: ver comentário em centerCodeEditor.test.tsx — o DiffPane, importado
+    // pelo CenterCodeEditor, consome ATTACH_MONACO_OPTIONS deste módulo.
+    ATTACH_MONACO_OPTIONS: { fontSize: 13, lineHeight: 18 },
     CodeEditorPane: (props: PropsFalsas) => {
       useEffect(() => { props.onEditorReady?.(h.criarMonacoFalso(), h.criar('centro').api); }, []);
       return createElement('div', { 'data-testid': 'painel-falso-centro', 'data-sessao': props.sessionId });

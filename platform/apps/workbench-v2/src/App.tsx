@@ -740,12 +740,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // `requestCloseTab` de uma aba irmã (D147 §5); o EditorArea oculta com display:none
   // quando a aba ativa é outra, e isso é seguro porque o CodeEditorPane usa
   // automaticLayout. Se o módulo não oferece mountCodeEditor, o centro FALHA VISÍVEL.
-  const haAbasDeArquivoDoModulo = abasProjetadasDoModulo.some((tab) => tab.type === 'file')
+  // D152 §2 (2c-ii): o corpo do centro é dono de DOIS tipos do módulo — `file` (Monaco
+  // com gravação em disco) e `diff-arquivo` (diff read-only do Source Control). O corpo é
+  // o MESMO: é ele que guarda os modelos do Monaco, e desmontá-lo ao trocar de tipo
+  // perderia o estado que RF15-2 manda preservar. Por isso o slot monta quando QUALQUER
+  // um dos dois existir, não só `file`.
+  const haAbasDoCorpoCentral = abasProjetadasDoModulo.some((tab) => tab.type === 'file' || tab.type === 'diff-arquivo')
   const moduloMontaCentro = !!explorerModule && typeof explorerModule.mountCodeEditor === 'function'
-  const codeEditorSlot = haAbasDeArquivoDoModulo && moduloMontaCentro && explorerModule
+  const codeEditorSlot = haAbasDoCorpoCentral && moduloMontaCentro && explorerModule
     ? <CenterCodeEditorSlot module={explorerModule} sessionId={activeSession.id} />
     : undefined
-  const codeEditorUnavailable = haAbasDeArquivoDoModulo && !moduloMontaCentro
+  const codeEditorUnavailable = haAbasDoCorpoCentral && !moduloMontaCentro
     ? 'O módulo Explorer/Busca desta cópia não oferece mountCodeEditor: as abas de arquivo aparecem na faixa, mas ninguém pode gravar em disco a partir do centro. Editar e salvar (RF15-1) não está disponível.'
     : undefined
   // Tipo da aba ativa — usado para "gate" da ação Toggle Details (só faz sentido
@@ -1427,7 +1432,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       // R-081 preservado: a mesma regra de CannotClose que vale para as nativas.
       const projetada = abasProjetadasDoModulo.find((tab) => tab.id === id)
       if (projetada && !isTabCloseable(projetada, sidePaneState)) return
-      if (haAbasDeArquivoDoModulo && moduloMontaCentro) {
+      if (haAbasDoCorpoCentral && moduloMontaCentro) {
         explorerModuleRef.current?.attach.requestCloseTab?.({ sessionId: partes.sessionId, uri })
       } else {
         // D148 §4 / D147 §5: sem corpo montado o pedido não faz nada, e o chamador

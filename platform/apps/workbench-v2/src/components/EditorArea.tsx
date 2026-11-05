@@ -493,8 +493,14 @@ export function EditorArea({
   // shell, não do módulo: a Regra 3 continua intacta. Sem esta distinção, uma aba
   // nativa demo perderia o estado honesto `file-content-unavailable`.
   const abaAtivaEhDoModulo = !!activeTab && ehIdDoModulo(activeTab.id)
-  const corpoCentralEmUso = abaAtivaEhDoModulo && (!!codeEditorSlot || !!codeEditorUnavailable)
-  const corpoCentralVisivel = editorContentVisible && abaAtivaEhDoModulo && activeTab?.type === 'file'
+  // D152 §2 (2c-ii): o corpo do centro serve DOIS tipos de aba do módulo — o arquivo
+  // (`file`, que o Monaco edita) e o diff read-only de um arquivo (`diff-arquivo`). É um
+  // só corpo, montado uma vez, porque é ele que guarda os modelos do Monaco: desmontá-lo
+  // ao trocar de tipo perderia o estado que RF15-2 manda preservar. Fora desses dois tipos
+  // a aba ativa do módulo (search/changes) é do shell, não do módulo.
+  const tipoDoCorpoCentral = activeTab?.type === 'file' || activeTab?.type === 'diff-arquivo'
+  const corpoCentralEmUso = abaAtivaEhDoModulo && tipoDoCorpoCentral && (!!codeEditorSlot || !!codeEditorUnavailable)
+  const corpoCentralVisivel = editorContentVisible && abaAtivaEhDoModulo && tipoDoCorpoCentral
   const activeBrowser = activeTab?.browserId ? browserViews.find((view) => view.id === activeTab.browserId && view.sessionId === activeSessionId) : undefined
   const [addTabMenuOpen, setAddTabMenuOpen] = useState(false)
   const [tabMenu, setTabMenu] = useState<ContextMenuState | null>(null)

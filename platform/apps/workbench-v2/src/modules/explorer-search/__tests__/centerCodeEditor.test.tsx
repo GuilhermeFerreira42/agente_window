@@ -36,6 +36,11 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('../ui/attach/CodeEditorPane', () => ({
+  // D152 §2: o CenterCodeEditor passou a importar o DiffPane, e o DiffPane lê
+  // ATTACH_MONACO_OPTIONS deste módulo (DiffPane.tsx:24). O mock de um módulo
+  // PARCIAL tem de devolver o que os vizinhos consomem, senão o teste morre no
+  // import e deixa de medir o que prometia medir.
+  ATTACH_MONACO_OPTIONS: { fontSize: 13, lineHeight: 18 },
   CodeEditorPane: (props: { onSaveRequest?: (uri: WorkspaceUri) => void; saveError?: string | null; sessionId?: string }) => {
     h.props = props;
     return (

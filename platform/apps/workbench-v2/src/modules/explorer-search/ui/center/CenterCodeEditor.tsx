@@ -31,6 +31,8 @@ import type { EditorService } from '../../core/editor/editorService';
 import type { WorkspaceUri } from '../../contract';
 import { uriBasename } from '../../core/uri';
 import { CodeEditorPane, type CodeEditorPaneProps } from '../attach/CodeEditorPane';
+import { DiffPane } from '../attach/diff/DiffPane';
+import { DiffPaneBoundary } from '../attach/diff/DiffPaneBoundary';
 import { AttachDialog } from '../attach/AttachDialog';
 import { ATTACH_STRINGS } from '../attach/attachStrings';
 import { useEditorVersion } from '../attach/useEditorVersion';
@@ -101,10 +103,26 @@ export function CenterCodeEditor({
   };
 
   const activeTab = editor.getActive(sessionId);
+  // FATIA 15 Onda 2c-ii (D152 §2): a aba ativa do módulo também pode ser um DIFF
+  // (`kind: 'diff'` → tipo `diff-arquivo` no centro). O DiffPane é o MESMO componente
+  // que a coluna usa (Regra 8 LEGO), e o CodeEditorPane continua montado ao lado —
+  // com a aba diff ativa ele fica com `setModel(null)` e host `display:none`, que é
+  // exatamente o que o AttachArea faz hoje. Manter os dois montados é o que preserva
+  // os modelos do Monaco ao alternar arquivo ↔ diff (RF15-2: alternar sem perder estado).
+  const diffPayload = activeTab && activeTab.kind === 'diff' ? (activeTab.diff ?? null) : null;
+  const isDiffActive = !!diffPayload;
 
   return (
     <div className="explorer-viewlet attach-viewlet center-code-editor" data-testid="center-code-editor">
       <div className="editor-container">
+        {isDiffActive && (
+          <DiffPaneBoundary
+            resetKey={`${diffPayload.title}:${diffPayload.original.length}:${diffPayload.modified.length}`}
+            fileName={diffPayload.title}
+          >
+            <DiffPane sessionId={sessionId} payload={diffPayload} />
+          </DiffPaneBoundary>
+        )}
         <CodeEditorPane
           editor={editor}
           sessionId={sessionId}
@@ -113,6 +131,13 @@ export function CenterCodeEditor({
           onSaveRequest={(uri) => { void doSave(uri); }}
           saveError={saveError && saveError.uri === activeTab?.uri ? saveError.message : null}
         />
+        {/* Marca de estado honesto: nenhum diff e nenhum arquivo legivel na aba ativa. */}
+        {!isDiffActive && !activeTab && (
+          <div className="editor-surface-empty" role="status" data-testid="center-empty-state">
+            <strong>Nenhuma aba aberta</strong>
+            <span>Abra um arquivo pelo Explorer, pela busca ou pelo Source Control.</span>
+          </div>
+        )}
       </div>
 
       {dialog?.kind === 'save' && (

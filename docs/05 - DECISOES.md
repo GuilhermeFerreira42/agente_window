@@ -1499,3 +1499,48 @@ pré-existentes: 12 falhas / 12 passados / 2 skips, contra 12 falhas / 12 passad
 
 **O que este passo NÃO faz.** Não desliga a coluna, não remove nada, não muda comportamento observável. É o degrau que
 torna o desligamento seguro.
+
+### D153 — Onda 2c-ii, passo B: o diff do Source Control ganha corpo no contêiner central — 2026-11-05 (noite)
+
+**Problema.** O módulo projeta `kind: 'diff'` como tipo `diff-arquivo` na faixa (ponteAnexo.ts:64), mas o
+`EditorArea` **não tinha ramo nenhum** para esse tipo: nenhuma ocorrência da string no arquivo. O corpo só existia no
+`AttachArea` (coluna), via `DiffPane`. Consequência: desligar a coluna antes de tratar isso deixaria o diff do Source
+Control **sem conteúdo** — aba na faixa, painel vazio. Não é hipótese: é o mesmo defeito que o `file-content-unavailable`
+existe para evitar nos arquivos.
+
+**Decisão (D153).** Dar ao corpo do centro **dois** tipos do módulo, não um:
+
+- `file` → Monaco, já existente (2c-i);
+- `diff-arquivo` → `DiffPane` **reaproveitado** (Regra 8 LEGO), embrulhado no `DiffPaneBoundary` com a mesma `resetKey`
+  que o AttachArea usa — o cinto contra erro do Monaco continua valendo no centro.
+
+**Um corpo, não dois.** O `CodeEditorPane` **permanece montado** ao lado do `DiffPane` quando a aba ativa é um diff. Isso
+não é descuido: o `CodeEditorPane` já trata o caso (`activeUri = null` para `kind: 'diff'` → `setModel(null)` e host
+`display:none`), que é exatamente o que o AttachArea faz hoje. Manter os dois montados é o que **preserva os modelos do
+Monaco ao alternar arquivo ↔ diff** (RF15-2). Desmontar o painel a cada troca de tipo descartaria o que RF15-2 manda
+preservar.
+
+**No shell, um só predicado.** `App.tsx` passou de `haAbasDeArquivoDoModulo` (só `file`) para `haAbasDoCorpoCentral`
+(`file` **ou** `diff-arquivo`); o `EditorArea` ganhou `tipoDoCorpoCentral`, usado tanto por `corpoCentralEmUso` quanto por
+`corpoCentralVisivel`. Um único ponto de verdade por camada — o shell decide *se* monta, o módulo decide *o que* mostra.
+
+**Estado honesto preservado.** Sem aba ativa no corpo, o centro mostra `center-empty-state` em vez de um painel mudo.
+
+**Regressão encontrada no caminho (e o que ela ensina).** Ao importar o `DiffPane` no `CenterCodeEditor`, dois testes
+existentes quebram **no import, antes de rodar**: eles mockam `../ui/attach/CodeEditorPane` com um objeto **parcial** que
+não exporta `ATTACH_MONACO_OPTIONS`, e o `DiffPane.tsx:24` lê exatamente esse valor. Sintoma: `Test Files 3 failed` com
+`(0 test)` — arquivo abortado, nenhum teste executado, contagem total caindo. Corrigido **nos mocks**, não no produto: um
+mock parcial tem de devolver o que os vizinhos consomem. ⛔ **Lição para o próximo import:** o gate tem de incluir os testes
+que mockam o módulo importado, senão a quebra aparece como "0 test" e passa como se fosse só um arquivo vazio.
+
+**Evidência.** Tipo de conteúdo `diff-arquivo` provado por três testes novos em `src/__tests__/centerCorpoDoModulo.test.tsx`
+(com o módulo REAL): (1) abertura chega ao EditorService antes de qualquer host montar; (2) o diff aparece na faixa e o
+`DiffPane` REAL (`attach-diff-pane`) está **dentro** do corpo do centro; (3) alternar arquivo ↔ diff **não desmonta** o
+corpo — prova por identidade de nó, não por testid.
+
+**Gate.** typecheck **EXIT 0** + inventário **261 = 244✓|1✗|16skip em 20 arquivos** (eram 258 em 19; +3 provas). A falha
+única continua sendo a **PEND-02** (iconLabels P7.3), pré-existente.
+
+**Nota de escopo (não é dívida escondida).** A prova (2) precisou de um escopo `corpoDoCentro()` porque `attach-diff-pane`
+aparece **duas vezes** hoje — coluna e centro. Isso é a sobreposição prevista pela D151 §2/§3 e **desaparece no passo C**,
+quando a coluna for desligada. O escopo continua correto depois e passa a ser o único.
