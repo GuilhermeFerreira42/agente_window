@@ -1087,3 +1087,138 @@ abaixo de 2724 — hoje está em 2739. A queda só vem na Onda 3, quando saem `A
 `detailPanelVisible`, `layoutController`, `isTabCloseable`, `enterDetailOnly` e `showEditorRestore`.
 Registrar o aumento no 2c-i sem esconder é o que permite cobrar a queda na Onda 3.
 
+
+
+---
+
+## D149 — 2026-11-05 — INTEGRIDADE GIT CONFIRMADA, TRÊS BACKUPS COM RECUPERAÇÃO PROVADA E RELOCAÇÃO DO RUNTIME: o snapshot voltou a caber sem apagar nada
+
+**Por que esta decisão existe.** O proprietário determinou prioridade imediata à integridade do
+repositório e à segurança das cópias, com uma exigência explícita: *"Não considere um backup seguro
+apenas porque os patches foram gerados. A recuperação precisa ser comprovada."* Uma análise externa
+também apontou possível divergência entre o HEAD registrado no diário (`8afce18`) e um suposto
+`main → 40181bc`. Havia ainda um estouro de snapshot aberto (R15-5) e uma recomendação anterior
+**deste executor** para não mover o runtime. Tudo isso foi investigado, medido e, onde coube,
+revertido com razão registrada.
+
+### 1. A divergência relatada NÃO existe — e isso foi provado, não suposto
+
+O HEAD real é `8afce18c5a2c5fd5b86048cf24ee52717b369784`, igual a `refs/heads/main`, única ref do
+repositório, sem tags, 22 commits, zero merges, árvore de trabalho idêntica ao disco
+(`status --porcelain` 0 entradas, `diff HEAD` 0 linhas, `diff-index HEAD` 0).
+`git fsck --full` não reportou **nenhum** objeto dangling, missing ou broken. São 1388 objetos soltos,
+34,19 MiB, **zero packs** — o repositório nunca foi empacotado.
+
+E `40181bc` **existe como commit e é ancestral direto do HEAD**:
+`git merge-base --is-ancestor 40181bc HEAD` devolve verdadeiro, e o merge-base entre os dois é o
+próprio `40181bc`. Não é objeto órfão nem linhagem paralela. É o commit do incidente registrado em
+D142 (*"refactor: renomear InstrucaoAgir para InstrucaoDeProduto"*), corrigido para frente por
+`1e377d5`. O reflog tem 23 entradas contínuas de `50f9334` (02:31) a `8afce18` (15:08) — 22 commits
+mais um amend (`43abbf8` → `ad3be82`), nenhum merge.
+
+**Conclusão honesta:** quem leu `main → 40181bc` estava diante de estado antigo (reflog ou snapshot
+anterior), não de divergência real. **Nada havia para corrigir no git.** O erro evitado aqui foi o de
+presumir linhagem paralela: a ancestralidade foi testada antes de qualquer afirmação.
+
+### 2. Três backups, os três com recuperação COMPROVADA
+
+A exigência do dono derruba a prática de gerar cópia e declará-la segura. Cada artefato foi
+restaurado de verdade e comparado com o original:
+
+| artefato em `arena-operacional/backup/` | tamanho | prova de recuperação |
+| --- | --- | --- |
+| `agente_window-TODAS-AS-REFS-8afce18.bundle` | 30 027 092 B | clone a partir do bundle: HEAD `8afce18` **igual ao repo real**, tree `af4f968d7f80eadd67388691124af7f3ad57455a` **idêntico byte a byte**, 22 commits do inicial `50f9334` ao `8afce18`, `fsck` 0 corrompidos, diff 0 linhas, 1050 arquivos materializados |
+| `fora-do-repo-2026-11-05.tar.gz` | 2,0 MB | extração em diretório limpo e comparação **sha256 arquivo a arquivo: 99 de 99 idênticos**, 0 diferentes, 0 faltando |
+| `patches-agente_window-50f9334-ate-8afce18.tar.gz` | 147 KB | provado na rodada anterior: base reproduzida por `git archive` (tree `5eb24def` idêntico), `git am` dos 21 patches sem conflito, tree final `af4f968d` **igual ao do HEAD** |
+
+**Isto resolve a dependência que o dono apontou.** Os patches dependem da preservação do commit
+inicial; o bundle **não** — `git bundle verify` responde *"The bundle records a complete history"* e o
+clone reconstruiu os 22 commits desde `50f9334`. O bundle passa a ser o caminho preferencial de
+restauração, e os patches ficam como redundância.
+
+Duas medições que corrigem hábitos errados: `du -sh` informou 58M para um arquivo que `stat -c%s`
+mede em 30 027 092 bytes (28,6 MiB) — **para orçamento de snapshot vale `stat`/`find -printf`, não
+`du -sh`**. E `git fetch <repo-local> <SHA>` falha com *"couldn't find remote ref"*; para provar
+restauração a partir de commit antigo o caminho é `git archive <SHA> | tar -x` num `git init` novo.
+
+### 3. NÃO existe "fora da área de snapshot" que persista — e isso muda a solução
+
+O dono pediu cópia recuperável fora da área sujeita ao limite. Investigado: `.cache` e `.npm` são
+excluídos do snapshot **e apagados a cada reinício**; fora de `/home/user` nada persiste. Portanto
+**não há destino externo durável disponível**, e a única forma de garantir cópia recuperável é
+**reduzir o snapshot para que caiba no limite, guardando os backups dentro dele**.
+
+Aritmética medida: sem o runtime, 66 MB; somando bundle (28,6 MB) e tar (2,0 MB), **~97 MB — cabe**.
+Com o runtime no lugar, 324 + 31 = **355 MB — não cabe**.
+
+### 4. Relocação do runtime — REVERSÃO da recomendação anterior deste executor, com a razão
+
+Em R15-5 este executor registrou a opção "mover `platform/.runtime` para `~/.cache`" como **RISCO
+ALTO** e recomendou ao dono **não** executá-la, sob a premissa de que seria preciso re-baixar 235 MB
+a cada sessão e de que uma falha de rede pararia o projeto. **A recomendação é revertida agora,
+porque a premissa estava errada em três pontos medidos:**
+
+1. O artefato é `.tar.xz`, **~25 MB**, não 235 MB (os 235 MB do registro antigo somavam Node + VS
+   Code para o code-server, que já foi removido por ordem do dono).
+2. **O `iniciar.sh` já faz isso sozinho e com verificação de integridade**: linhas 12–23 detectam
+   runtime ausente ou em versão errada, baixam de `nodejs.org`, baixam `SHASUMS256.txt`, comparam o
+   SHA256 e só então extraem — abortando com *"A integridade do Node nao confere"* se divergir.
+   Não foi preciso inventar mecanismo; o projeto já o tinha.
+3. A rede foi testada antes: `curl -sI` devolveu **HTTP/2 200** e `content-length` para o tarball da
+   versão exata que `platform/runtime.json` exige (26.13.0).
+
+Executado como **MOVE, não delete** (reversível por um `mv` de volta): o diretório foi para
+`/home/user/.cache/runtime-node` e `platform/.runtime` virou symlink. É o mesmo padrão que o projeto
+já usava para o code-server (*"symlinks code-server-main/lib/{vscode,node} -> .cache"*), então não
+introduz convenção nova. `platform/.runtime` **não é versionado** (está em `.git/info/exclude:7`),
+portanto nenhum bundle ou patch o continha antes, e nenhum contém agora. O exclude casa o symlink sem
+barra final, e `git status --porcelain` permaneceu com **0 entradas** — o repositório não foi tocado.
+
+### 5. O passo manual obrigatório, descoberto por teste e não por leitura
+
+Simulado o cenário real de reinício (`.cache` apagado, symlink pendurado), o `iniciar.sh` **falha**:
+
+```
+mkdir: cannot create directory '/home/user/agente_window/platform/.runtime': File exists
+```
+
+porque `mkdir -p` sobre symlink quebrado não cria o destino. A correção é uma linha —
+`mkdir -p /home/user/.cache/runtime-node` — e depois o `iniciar.sh` restaura tudo sozinho.
+Esse passo está automatizado em **`arena-operacional/restaurar-ambiente.sh`**, que também reconfigura
+a identidade do git (o `.git/config` não persiste, e sem isso todo commit aborta com *"Committer
+identity unknown"* — falha que já custou uma prova de restauração nesta obra).
+
+**Prova do script, executada duas vezes:** com o runtime apagado e o symlink pendurado, restaurou
+identidade, destino, Node e typecheck em **16 segundos**; rodado de novo em seguida, foi
+**idempotente** (*"já presente: v26.13.0 — nada a baixar"*). E o runtime re-baixado foi comparado ao
+original guardado: **4745 arquivos nos dois, diferença de 0 caminhos, mesma versão**.
+
+### 6. Resultado medido e gate
+
+| | antes | depois | limite |
+| --- | --- | --- | --- |
+| bytes capturáveis | 324 MB | **112,2 MB** | ~128 MB → folga **+15,8 MB** |
+| arquivos capturáveis | 5 381 | **2 565** | ~10 000 → folga **+7 435** |
+
+Método: `find /home/user` com `-prune` nos 23 nomes que a Arena exclui, somando com `du -cb`.
+Gate após a relocação: `typecheck` **EXIT 0** (*"Node 26.13.0; versão de execução correta"*) e o
+inventário permanente da Fatia 15 **245 = 228 aprovados / 1 reprovado / 16 ignorados (17 arquivos,
+84,96 s)** — **idêntico** ao placar de referência medido antes. Nenhuma evidência histórica, código,
+documentação ou componente essencial foi excluído; `docs/arquivo_morto` permanece intacto.
+
+### 7. Risco residual, declarado em vez de escondido
+
+A relocação troca um risco por outro, e o outro é menor mas não é zero: **se a rede falhar no momento
+do reinício, o projeto fica sem Node até ela voltar** — typecheck e testes não rodam. O que isso
+**não** compromete é a obra: código, docs e histórico estão no repo, e o repo está no bundle cuja
+recuperação foi provada. O bundle fica dentro do snapshot (29 MB), que agora cabe.
+
+Alternativa que daria independência total de rede — manter o tarball oficial do Node (25 MB) dentro
+do snapshot além do bundle — foi **rejeitada por aritmética**: 112,2 + 25 = 137 MB, acima do limite.
+`git gc` para empacotar os 1388 objetos soltos foi **adiado**: ganharia poucos MB sobre uma folga que
+já existe, e a regra desta obra é não operar no `.git` sem necessidade.
+
+**O que continua NÃO verificado, e não deve ser declarado como verificado:** o comportamento real do
+mecanismo de snapshot da Arena diante de symlink (a medição de 112,2 MB é do lado do filesystem, com
+os mesmos filtros de exclusão que a Arena declara); E2E/Playwright (44 specs, binários ausentes);
+pixels reais; `vite build` (OOM); Windows real; e Monaco gravando em disco ponta a ponta.
