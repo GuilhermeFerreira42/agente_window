@@ -1,0 +1,33 @@
+/* ==========================================================================
+   ui/center/center.css — Fatia 15, Onda 2b (D146 §2, passo 2b).
+
+   Corpo da aba central capaz de salvar. Quase nada mora aqui de propósito:
+   as 75 regras que dão estilo ao CodeEditorPane já existem no attach.css,
+   escopadas em `.attach-viewlet`, e a raiz do componente carrega essa classe
+   para herdá-las (Regra 8 LEGO — reposicionar, nunca reescrever). Duplicar
+   aquelas regras para um escopo `.center-*` criaria dois lugares para
+   corrigir cada detalhe visual do mesmo editor.
+
+   O que difere por estar no CENTRO e não num viewlet de 274 px:
+     • ocupa o espaço que o shell lhe der (height 100% do host, min-height 0
+       para o flex filho poder encolher — sem isso o Monaco transborda);
+     • o fundo é o do EDITOR. `.explorer-viewlet` pinta de
+       --vscode-sideBar-background (cinza de barra lateral), que é a cor certa
+       na Side Bar e errada no centro. O seletor composto tem especificidade
+       0,3,0 contra 0,1,0 de `.explorer-viewlet`, então ganha por
+       especificidade e não por ordem de import — que o bundler não garante.
+
+   PEND-05 (D143): os dois tokens usados aqui foram conferidos contra
+   styles/theme.css — --vscode-editor-background (linhas 12 e 270) e
+   --vscode-foreground existem em dark e em light. Nenhuma cor fixa (Regra 4).
+   Sem position:fixed e sem transição de largura (Regras 5).
+   ========================================================================== */
+.explorer-viewlet.attach-viewlet.center-code-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+}

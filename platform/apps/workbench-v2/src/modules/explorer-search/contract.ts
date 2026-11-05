@@ -145,6 +145,13 @@ export interface IEditorAttachApi {
   /** 4.7 c6 (aditivo): maximizar/restaurar dentro da sessão; estado persistido. */
   setMaximized?(input: { sessionId: string; maximized: boolean }): void;
   isMaximized?(input: { sessionId: string }): boolean;
+  /** FATIA-15 Onda 2b (ADITIVO, D146 §2): pede ao editor CENTRAL desta sessão que
+   *  feche a aba — e é o módulo, não o shell, quem abre o diálogo Salvar/Não
+   *  Salvar/Cancelar e executa, porque só o módulo alcança o EditorService e o
+   *  writeFile atômico (Regra 2). Sem corpo central montado o pedido não faz
+   *  nada: o chamador trata isso como falha VISÍVEL, nunca como descarte
+   *  silencioso. */
+  requestCloseTab?(input: { sessionId: string; uri: WorkspaceUri }): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +216,16 @@ export interface IExplorerSearchModule {
    *  árvore). `attach.setVisible` só alterna display:none — nunca desmonta. */
   mountAttach(root: HTMLElement, opts: { sessionId: string }): void;
   unmountAttach(): void;
+  /** FATIA-15 Onda 2b (ADITIVO, D146 §2): renderiza o CORPO da aba central capaz
+   *  de salvar — o mesmo CodeEditorPane do anexo, sem cabeçalho, sem faixa de
+   *  abas, sem sash e sem empty state (no centro isso é do shell). Compartilha o
+   *  MESMO EditorService do anexo: uma fonte de verdade só, o que torna a
+   *  sobreposição das duas superfícies temporária e revertível.
+   *  OPCIONAL de propósito: um módulo anterior continua satisfazendo o contrato,
+   *  e o shell que não o encontrar deve falhar VISÍVEL (Onda 2c), não voltar em
+   *  silêncio ao editor que não salva. */
+  mountCodeEditor?(root: HTMLElement, opts: { sessionId: string }): void;
+  unmountCodeEditor?(): void;
   /** FATIA-05 5.3 (evolução ADITIVA, decisão A 2026-09-30): renderiza a Source Control
    *  View (ChangesPane real da 4.7-b) dentro do slot dado — o shell a coloca na view
    *  `scm` da Side Bar. Clique num recurso abre o diff no anexo. Só DOM dentro de `root`. */

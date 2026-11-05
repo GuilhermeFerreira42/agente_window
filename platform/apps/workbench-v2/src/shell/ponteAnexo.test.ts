@@ -6,7 +6,30 @@ import type { AttachTab, AttachDiffPayload, WorkspaceUri } from '../modules/expl
 // O rótulo de Changes é copiado no adaptador porque changesStrings.ts é interno a
 // ui/** e o barrel não o exporta. Este import é de TESTE, não de produção: existe
 // só para que deriva silenciosa derrube a suíte em vez de chegar na tela do dono.
-import { CHANGES_STRINGS } from '../modules/explorer-search/ui/attach/changes/changesStrings'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+// O rótulo da aba Changes é COPIADO no adaptador de propósito: ponteAnexo.ts é puro
+// e só faz `import type` do barrel, apagado na compilação. Importar o VALOR traria o
+// módulo inteiro (React, Monaco, factory) para dentro do shell em runtime — e para
+// dentro deste teste. Copiar texto visível cria risco de deriva, então a conferência
+// é feita lendo a FONTE com node:fs, do mesmo jeito que frontier.test.ts lê os
+// arquivos que verifica.
+//
+// CORREÇÃO (Onda 2b): este arquivo importava
+// '../modules/explorer-search/ui/attach/changes/changesStrings', o que viola o FT-01
+// ("nada fora do módulo importa abaixo do barrel"). A violação passou despercebida no
+// passo 2a porque o inventário da Fatia 15 não incluía frontier.test.ts — agora inclui.
+const CAMINHO_CHANGES_STRINGS = resolve(
+  process.cwd(),
+  'src/modules/explorer-search/ui/attach/changes/changesStrings.ts',
+)
+function rotuloChangesNoModulo(): string {
+  const fonte = readFileSync(CAMINHO_CHANGES_STRINGS, 'utf-8')
+  const achado = /tabLabel:\s*'([^']+)'/.exec(fonte)
+  if (!achado) throw new Error(`tabLabel não encontrado em ${CAMINHO_CHANGES_STRINGS}`)
+  return achado[1]
+}
 import {
   ROTULO_CHANGES,
   SEPARADOR_ID,
@@ -77,9 +100,9 @@ describe('fronteira: kind do módulo → tipo do App (D146 §1)', () => {
 
 describe('fronteira: rótulos espelham a faixa que o dono já vê (EditorTabs.tsx:50)', () => {
   it('changes usa o rótulo do módulo, e este teste é a trava contra deriva', () => {
-    expect(ROTULO_CHANGES).toBe(CHANGES_STRINGS.tabLabel)
+    expect(ROTULO_CHANGES).toBe(rotuloChangesNoModulo())
     expect(tituloDaAbaDoModulo(doModulo({ uri: 'file:///.explorer-search/changes', kind: 'changes' })))
-      .toBe(CHANGES_STRINGS.tabLabel)
+      .toBe(rotuloChangesNoModulo())
   })
 
   it('diff usa o título do payload, que já vem resolvido, com fallback honesto', () => {
@@ -184,7 +207,7 @@ describe('fronteira: a fusão numa faixa só (entregável (a) da SPEC 2I)', () =
     const fundido = fundirAbas([casca], real)
     expect(fundido).toHaveLength(1)
     expect(fundido[0].uri).toBe('file:///.explorer-search/changes')
-    expect(fundido[0].title).toBe(CHANGES_STRINGS.tabLabel)
+    expect(fundido[0].title).toBe(rotuloChangesNoModulo())
   })
 
   it('a casca NÃO vence quando a ordem é invertida — a regra é pela uri, não pela posição', () => {

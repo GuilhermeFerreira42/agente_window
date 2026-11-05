@@ -26,8 +26,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ExplorerView } from './ui/ExplorerView';
 import { SearchPanel } from './ui/search/SearchPanel';
 import { AttachArea, type AttachAreaProps } from './ui/attach/AttachArea';
+// FATIA-15 Onda 2b (D146 §2) — corpo da aba central capaz de salvar.
+import { CenterCodeEditor, type CenterCodeEditorProps, type CenterCloseRequester } from './ui/center/CenterCodeEditor';
 import { ChangesPane } from './ui/attach/changes/ChangesPane';
-import type { CodeEditorPaneApi } from './ui/attach/CodeEditorPane';
+import type { CodeEditorPaneApi, CodeEditorPaneProps } from './ui/attach/CodeEditorPane';
 import { AttachLayoutStore } from './core/attach/attachLayout';
 import { ATTACH_DIFF_URI, EditorService } from './core/editor/editorService';
 import { GitService } from './core/git/gitService';
@@ -86,6 +88,22 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let searchContainer: HTMLElement | null = null;
   let scmRoot: Root | null = null;
   let scmContainer: HTMLElement | null = null;
+  const unmountCodeEditor = () => {
+    // Espelho de unmountAttach: tira o DOM, zera os holders e o atendente de
+    // fechar aba. O estado do EditorService SOBREVIVE (as abas são do modelo,
+    // não da montagem — é o que permite aposentar a coluna na Onda 3 sem perder
+    // nada; ver D144, tensão Regra 10 × RF15-2).
+    const root = centerRoot;
+    centerRoot = null;
+    centerSessionId = null;
+    centerPaneApi = null;
+    centerCloseRequesters.clear();
+    if (centerContainer) {
+      centerContainer.remove();
+      centerContainer = null;
+    }
+    if (root) setTimeout(() => root.unmount(), 0);
+  };
   const unmountAttach = () => {
     const root = attachRoot;
     attachRoot = null;
@@ -109,19 +127,38 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // dirty e propaga o erro (UI mostra). O fs.changed gerado pela própria
   // escrita é ignorado porque o conteúdo lido é igual ao do modelo.
   const lastSaved = new Map<WorkspaceUri, string>(); // eco da nossa própria escrita (fs.changed)
+  // FATIA-15 Onda 2b (D146 §2) — durante a SOBREPOSIÇÃO TEMPORAL da fusão há
+  // DOIS CodeEditorPane montados: o do anexo (coluna) e o da aba central. Cada
+  // painel só conhece os modelos do Monaco que ELE MESMO criou, então has/
+  // getContent/markSaved/reload de um não servem para a uri do outro. Quem
+  // salva, recarrega ou detecta mudança externa tem de perguntar ao painel que
+  // TEM a uri — não ao primeiro que existir. Com um só painel montado (o caso de
+  // hoje, e o caso final depois que a Onda 3 aposentar a coluna) o resultado é
+  // IDÊNTICO ao de antes: a lista tem um elemento e ele é o do anexo.
+  const painelQueTem = (uri: WorkspaceUri): CodeEditorPaneApi | null =>
+    [attachPaneApi, centerPaneApi].find((p): p is CodeEditorPaneApi => p !== null && p.has(uri)) ?? null;
   const attachSave = async (uri: WorkspaceUri): Promise<void> => {
-    const content = attachPaneApi?.getContent(uri) ?? null;
-    if (content === null) throw new Error(`[explorer-search] attach.save: ${uri} não está aberto no anexo`);
+    const painel = painelQueTem(uri);
+    const content = painel?.getContent(uri) ?? null;
+    // A mensagem conserva o trecho que o FT-04 (frontier.test.ts:198) trava e
+    // acrescenta a segunda superfície, que passou a existir nesta onda.
+    if (content === null) throw new Error(`[explorer-search] attach.save: ${uri} não está aberto no anexo nem na aba central`);
     lastSaved.set(uri, content);
     await deps.fs.writeFile({ uri, content, atomic: true });
-    attachPaneApi?.markSaved(uri);
+    painel?.markSaved(uri);
     for (const sid of editorService.sessionsWith(uri)) editorService.markSaved({ sessionId: sid, uri });
   };
   const attachReload = async (uri: WorkspaceUri): Promise<void> => {
     const read = await deps.fs.readFile({ uri });
-    attachPaneApi?.reload(uri, read.content);
+    painelQueTem(uri)?.reload(uri, read.content);
   };
   const attachApi = attachApiFor(attachLayout, editorService, attachSave);
+  // Onda 2b (D146) — ADITIVO: a faixa de abas do centro é do shell, mas quem
+  // pode salvar ou descartar é o módulo (o shell não alcança o EditorService —
+  // Regra 2). O shell pede; o CenterCodeEditor desta sessão abre o diálogo
+  // Salvar/Não Salvar/Cancelar e executa. Sem corpo central montado o pedido não
+  // faz nada — e o chamador trata isso como falha visível, nunca como descarte.
+  attachApi.requestCloseTab = (input) => { centerCloseRequesters.get(input.sessionId)?.(input); };
   // eventos editor.* saem pelo onEvent do módulo; expandir/recolher move o layout
   // (display:none — nunca desmonta).
   // c6 — maximizar/restaurar sai como evento editor.* (sessão = a que hospeda o anexo).
@@ -153,11 +190,39 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let attachSessionId: string | null = null;
   let attachMonaco: import('monaco-editor').editor.IStandaloneCodeEditor | null = null;
   let attachPaneApi: CodeEditorPaneApi | null = null;
+  // FATIA-15 Onda 2b (D146 §2) — segunda superfície de editor: a aba central.
+  // Mesma forma dos holders do anexo; o EditorService é o MESMO (uma fonte de
+  // verdade), o que muda é só o host React e o painel do Monaco.
+  let centerRoot: Root | null = null;
+  let centerContainer: HTMLElement | null = null;
+  let centerSessionId: string | null = null;
+  let centerPaneApi: CodeEditorPaneApi | null = null;
+  /** Atendentes de `attach.requestCloseTab`, por sessão. O CenterCodeEditor
+   *  registra no mount e retira no unmount. */
+  const centerCloseRequesters = new Map<string, CenterCloseRequester>();
   // 5.6 (A0.6) — Outline lê os símbolos do modelo ativo do Monaco do anexo; Timeline
   // fala com /git/log + /git/show(sha). Tudo aditivo: ExplorerView recebe `activeFile`.
   const outlineTracker = createMonacoOutlineTracker();
   const timelinePort = new BrowserTimelinePort();
   const onEditorReady: AttachAreaProps['onEditorReady'] = (ed, api) => { attachMonaco = ed; attachPaneApi = api; outlineTracker.attach(ed); };
+  // Onda 2b (D146): o painel do centro registra SÓ a api (é ela que salva).
+  // NÃO anexa o outlineTracker de propósito: o Outline (5.6) lê o Monaco do
+  // anexo, e trocar isso agora seria mudança de comportamento não pedida por
+  // este passo. Fica como DÍVIDA DA ONDA 3 — quando a coluna morrer, o Outline
+  // tem de seguir o editor do centro.
+  const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (_ed, api) => { centerPaneApi = api; };
+  const centerProps = (sessionId: string): CenterCodeEditorProps => ({
+    sessionId,
+    editor: editorService,
+    fs: deps.fs,
+    onEditorReady: onCenterEditorReady,
+    onSave: attachSave,
+    onReload: attachReload,
+    // Registra por sessão; o unmount do corpo retira a MESMA chave (o closure
+    // captura o sessionId com que foi criado, então trocar de sessão não deixa
+    // atendente órfão).
+    onCloseRequester: (r) => { if (r) centerCloseRequesters.set(sessionId, r); else centerCloseRequesters.delete(sessionId); },
+  });
   const activeCodeUri = (): WorkspaceUri | null => {
     if (!attachSessionId) return null;
     const t = editorService.getActive(attachSessionId);
@@ -243,15 +308,20 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     // suja → editor.externalChange (a UI pergunta Recarregar / Manter).
     // (rename atômico temp→destino chega como 'added' no fs.watch — conta como mudança)
     for (const change of e.changes) {
-      if (!attachPaneApi?.has(change.uri)) continue;
+      // Onda 2b (D146): resolve o painel que TEM a uri — pode ser o do anexo ou
+      // o da aba central. Resolve DE NOVO dentro da promise: entre a leitura e a
+      // decisão o painel pode ter desmontado, e agir num painel morto é pior do
+      // que não agir.
+      if (!painelQueTem(change.uri)) continue;
       // Lê o disco ANTES de decidir: se for o eco da nossa própria escrita
       // (conteúdo == último salvo) ou igual ao modelo, não é mudança externa.
       void deps.fs.readFile({ uri: change.uri }).then((read) => {
-        if (!attachPaneApi?.has(change.uri)) return;
+        const painel = painelQueTem(change.uri);
+        if (!painel) return;
         if (read.content === lastSaved.get(change.uri)) return;
-        if (read.content === (attachPaneApi.getContent(change.uri) ?? null)) return;
+        if (read.content === (painel.getContent(change.uri) ?? null)) return;
         const states = editorService.notifyExternalChange(change.uri);
-        if (states.length && states.every((s) => !s.dirty)) attachPaneApi.reload(change.uri, read.content);
+        if (states.length && states.every((s) => !s.dirty)) painel.reload(change.uri, read.content);
       }).catch(() => undefined);
     }
     // 4.7-b c2: qualquer mudança no workspace → re-status Git (debounce; só com raiz definida)
@@ -356,6 +426,30 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
 
     unmountAttach,
 
+    mountCodeEditor(root: HTMLElement, opts: { sessionId: string }): void {
+      // Espelho de mountAttach: mesmo host → só re-render (a sessão trocou);
+      // host novo → remonta. Sem o equivalente a `pendingAttachOpen`: abrir
+      // arquivo no centro é decisão do shell, que já sabe a uri — o módulo não
+      // precisa guardar abertura pendente para esta superfície.
+      if (centerRoot && centerContainer && centerContainer.parentElement === root) {
+        if (centerSessionId !== opts.sessionId) {
+          centerSessionId = opts.sessionId;
+          centerRoot.render(createElement(CenterCodeEditor, centerProps(opts.sessionId)));
+        }
+        return;
+      }
+      unmountCodeEditor();
+      const container = root.ownerDocument.createElement('div');
+      container.style.display = 'contents';
+      root.appendChild(container);
+      centerContainer = container;
+      centerSessionId = opts.sessionId;
+      centerRoot = createRoot(container);
+      centerRoot.render(createElement(CenterCodeEditor, centerProps(opts.sessionId)));
+    },
+
+    unmountCodeEditor,
+
     unmount(): void {
       // remove DOM do slot; estado do serviço (expansão/seleção/root) sobrevive.
       if (reactRoot) {
@@ -384,6 +478,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       unmountSearch();
       unmountScm();
       unmountAttach();
+      unmountCodeEditor();
       offEditor();
       offLayoutMax(); offLayoutVis();
       outlineTracker.dispose(); // 5.6
