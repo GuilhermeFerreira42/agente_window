@@ -853,3 +853,120 @@ montar o anexo. A Onda 3 herda só o roteamento restante e a aposentadoria dos a
 
 **Trava que não se move:** `editorService` 21 + `editorServiceDiff` 6 + `editorTabs.test.tsx` 7
 verdes sem nenhuma linha alterada em todos os três passos.
+
+## D147 — 2026-11-05 — FATIA 15, Onda 2b executada: dois painéis de editor, um resolvedor, e o inventário que passou a policiar a fronteira
+
+**Por que esta decisão existe.** A D146 autorizou o passo 2b (componente de montagem do corpo
+central + `mountCodeEditor` aditivo). Executando, apareceram quatro escolhas que não estavam no
+contrato e uma violação que o meu próprio gate deixou passar. Registro as cinco, com o que foi
+rejeitado, porque três delas mudam o que os passos seguintes podem supor. Commit `fff39a4`.
+
+### 1. Dois `CodeEditorPane` montados exigem resolver QUAL painel tem a uri
+
+Durante a sobreposição temporal que a D146 aceitou, o anexo e o corpo central montam cada um o
+seu `CodeEditorPane`. Cada painel só conhece os modelos do Monaco que **ele mesmo** criou: o
+`has`/`getContent`/`markSaved`/`reload` de um não responde pela uri do outro. Havia um holder
+único (`attachPaneApi`, `index.ts:155`) e três consumidores dele — `attachSave`, `attachReload` e
+o watcher de `fs.changed`. Com o centro montado, salvar um arquivo aberto só no centro lançaria
+`não está aberto no anexo`: **a RF15-1 morreria exatamente no caso que a fusão cria**, e morreria
+depois do 2c, quando o centro passasse a ser o caminho principal.
+
+**Decisão:** `painelQueTem(uri)` resolve o painel que tem a uri, e os três consumidores passam a
+perguntar a ele. Com um só painel montado — o caso de hoje e o caso final depois da Onda 3 — o
+resultado é idêntico ao de antes: a lista tem um elemento. O watcher resolve **de novo** dentro da
+promise, porque entre a leitura do disco e a decisão o painel pode ter desmontado, e agir num
+painel morto é pior do que não agir.
+
+*Rejeitado:* compartilhar um painel só entre as duas superfícies — impossível sem reescrever o
+`CodeEditorPane`, que cria os modelos no `useLayoutEffect` do próprio host. *Rejeitado:* manter o
+holder único e tratar o erro no shell — o shell não alcança o `EditorService` (Regra 2), então ele
+não teria como corrigir nada. *Rejeitado:* tornar o `CodeEditorPane` consciente de painel —
+reescrever componente coberto por testes para resolver uma duplicação que morre na Onda 3.
+
+A mensagem de erro conserva o trecho `não está aberto no anexo`, que o **FT-04**
+(`frontier.test.ts:198`) trava, e acrescenta `nem na aba central`. Trocar a mensagem inteira
+quebraria uma trava de fronteira para ganhar precisão de texto; estender mantém os dois.
+
+### 2. O rótulo `Changes` continua COPIADO no adaptador, e a deriva é conferida lendo a fonte
+
+`ponteAnexo.ts` copia `ROTULO_CHANGES = 'Changes'` de `ui/attach/changes/changesStrings.ts:5`. O
+teste do passo 2a importava o original para comparar — e com isso **importava abaixo do barrel**,
+o que o FT-01 proíbe para qualquer arquivo fora do módulo.
+
+**Decisão:** a cópia fica, e é deliberada. `ponteAnexo.ts` é puro: só faz `import type` do barrel,
+apagado na compilação. Importar o **valor** traria `index.ts` inteiro — React, Monaco, a factory, o
+`GitService` — para dentro do shell em runtime, e para dentro do teste. Isso destruiria a
+propriedade que fez o 2a ser um passo sem risco. A conferência de deriva agora lê a fonte com
+`node:fs` e extrai o `tabLabel` por regex, do mesmo jeito que o `frontier.test.ts` lê os arquivos
+que verifica: se alguém trocar o rótulo no módulo, o teste do shell falha.
+
+*Rejeitado:* exportar `CHANGES_STRINGS` pelo barrel — aditivo e permitido pela Regra 2, mas
+acopla o shell ao runtime do módulo por causa de uma string. *Rejeitado:* deixar a cópia sem
+conferência — deriva silenciosa de texto visível ao usuário.
+
+### 3. `frontier.test.ts` entra no inventário da Fatia 15: 14 arquivos viram 17
+
+A violação do item 2 ficou **um commit inteira sem ser detectada** (`eadf4dc` → `ad3be82`), porque
+o gate que eu rodava a cada passo era o inventário de 14 arquivos da Fatia 15, e
+`frontier.test.ts` não estava nele. Eu estava justamente mexendo na fronteira do módulo — o que o
+FT-01/02/03/05/07 policiam — e rodando um gate que não olhava para lá.
+
+**Decisão:** o inventário da Fatia 15 passa a ter **17 arquivos**: os 14 anteriores +
+`frontier.test.ts` (7 provas) + os dois arquivos novos desta onda (`centerCodeEditor.test.tsx`, 20;
+`centerSaveRouting.test.tsx`, 11). Placar medido no commit: **245 testes = 228 aprovados | 1
+reprovado | 16 pulados, 84,51 s**. Aritmética conferida: 207 (2a) + 31 + 7 = 245; aprovados
+190 + 31 + 7 = 228; pulados e reprovados não mudaram. A única reprovação continua sendo
+`iconLabels.test.ts:80`, a PEND-02 pré-existente.
+
+*Rejeitado:* manter os 14 arquivos e rodar o `frontier` "quando lembrar" — foi exatamente assim que
+a violação passou. Regra que vale para as próximas ondas: **o gate de um passo tem de incluir o
+teste que policia o que o passo está mexendo**, e não só os testes do território que ele cita.
+
+### 4. Dívida registrada: o Outline continua lendo o Monaco do anexo
+
+O `outlineTracker` (5.6) é anexado no `onEditorReady` do **anexo** (`index.ts:160`). O corpo
+central registra só a api do painel — a que salva — e não anexa o tracker.
+
+**Decisão:** deixar como está nesta onda e pagar na Onda 3. Com os dois painéis montados, anexar o
+tracker também no centro faria o Outline seguir o último que montou, o que é indeterminado do
+ponto de vista do usuário; e trocar o Outline agora seria mudança de comportamento não pedida pelo
+passo. **Na Onda 3, quando a coluna morrer, o Outline tem de seguir o editor do centro** — fica
+aqui para não virar descuido.
+
+### 5. O corpo central não tem faixa, não tem vazio e não tem sash
+
+`CenterCodeEditor` é dono só de: salvar, mostrar falha de save, dialogar mudança externa e dialogar
+fechar-aba quando **alguém de fora pede**. Faixa de abas, estado vazio, breadcrumbs, sash e
+maximizar ficam no shell — é o que a D146 já dizia, e o teste afirma como contrato: o corpo não
+contém `.title.tabs`, `.tabs-container`, `.monaco-breadcrumbs`, `[role="separator"]` nem
+`.explorer-attach-sash`.
+
+Como a faixa é do shell mas quem pode salvar ou descartar é o módulo (Regra 2), o pedido atravessa
+a fronteira por `attach.requestCloseTab`: **o shell pede, o módulo dialoga e executa**. Sem corpo
+central montado o pedido não faz nada — e o chamador trata isso como falha visível, nunca como
+descarte silencioso. É o mesmo princípio do estado honesto `file-content-unavailable` do
+`EditorArea`: ausência de capacidade aparece, não se finge.
+
+*Rejeitado:* reaproveitar o `AttachArea` com bandeiras para esconder faixa e sash — meteria
+decisões do shell dentro de um componente do módulo coberto por testes, e as bandeiras morreriam na
+Onda 3 junto com o componente. *Rejeitado:* deixar o shell fechar a aba suja direto — ele não tem
+como salvar, então só poderia descartar.
+
+**Estilo.** A raiz do corpo carrega `.attach-viewlet` porque as 75 regras que dão estilo ao
+`CodeEditorPane` são escopadas nela no `attach.css`; sem a classe o editor funcionaria sem estilo
+nenhum. `center.css` tem **uma** regra: o dimensionamento no centro e a correção do fundo, já que
+`.explorer-viewlet` pinta de `--vscode-sideBar-background` (cor de barra lateral). *Rejeitado:*
+duplicar aquelas 75 regras num escopo `.center-*` — dois lugares para corrigir cada detalhe visual
+do mesmo editor. Tokens conferidos contra `styles/theme.css` (PEND-05): os dois usados existem em
+dark e em light, nenhuma cor fixa (Regra 4).
+
+### O que isto NÃO provou
+
+Nos dois arquivos de teste o `CodeEditorPane` é um dublê que só registra a api do painel (e no
+segundo o `AttachArea` também). Está provada a **fiação**: Ctrl+S pede o save, a falha aparece e
+some, o diálogo de conflito abre e recarrega, o pedido de fechar dialoga e descarta só com
+confirmação, o save vai para o painel que tem a uri, o unmount e o dispose limpam. **Não** está
+provado o Monaco de verdade gravando no disco — isso exige o servidor de pé, e o code-server está
+morto nesta cópia. E2E/Playwright não roda (binários ausentes). O corpo central ainda não é
+alcançável pela interface: isso é o passo 2c.
+
