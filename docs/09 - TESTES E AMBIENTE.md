@@ -1,5 +1,8 @@
 # 09 - TESTES E AMBIENTE (da IA)
 
+> **VIGÊNCIA D140 — execução técnica delegada (04/11/2026):** Arena nova que receba apenas `agente_window/` deve ler `01`, `03`, `05` D140 e reconciliar `git status`, HEAD, fontes e gates. É permitido corrigir PEND-01 (perfil efêmero fora do repositório e de `.cache`) e diagnosticar PEND-03 sem enfraquecer testes. Fechar DP-03/DP-06/E-1..E-5 com SPEC, testes e decisão registrada **antes** de codificar 14; seguir D133 de modo autônomo e verificável. O relato da regressão DELETE abaixo é histórico, não deve ser reexecutado como tarefa inicial. Criar diário, `status.json` e dashboard HTML **fora do repositório**, derivando o estado dos nove canônicos e do Git, e atualizar após cada marco; não prometer live update sem processo ativo. Quando for entregue só esta pasta, esses artefatos externos não estarão incluídos: recriá-los, não exigir a conversa antiga. Não alterar dados reais nem publicar sem autorização.
+
+
 > **Vigência após aceite humano — 2026-11-04:** o dono homologou **com ressalvas somente** exclusão com as novas permissões e de alvo externo à pasta da conversa, nos limites registrados em `08`, e autorizou a passagem à Arena/Debian e o commit relacionado. Os pareceres “aguardar aceite” abaixo são anteriores a esse relato; seus placares e limites técnicos permanecem válidos. **A regressão integral continua PENDENTE, sem aprovação geral e sem baixa integral de DEBT-24.** Nenhum outro cenário manual foi homologado por inferência. Usar a seção de passagem à Arena para continuar o trabalho.
 
 ## 2026-11-04 — SPEC da missão Codex nº 2: conclusão técnica DELETE
@@ -1233,3 +1236,163 @@ O dono aceitou a janela residual entre a última validação e o rename ou despa
 Validação em cópias temporárias com Node 24.16.0. No Ubuntu via WSL, o executor moveu para XDG um arquivo esparso de 2 GiB e uma pasta contendo outro arquivo esparso de 2 GiB. Foram conferidos ausência na origem, tamanho e conteúdo no fim de cada arquivo movido. No Windows, a suíte Agir obteve 134 aprovações, 23 falhas e 5 ignorados, com o mesmo conjunto de falhas por nome da auditoria anterior. No recorte dos quatro arquivos excluir, lixeira, rotas e agir, foram 106 aprovações, cinco falhas preexistentes de comandos da Fatia 13 e um ignorado. TypeScript da aplicação e ESLint de discos.ts terminaram com código 0.
 
 Homologação manual pendente conforme o roteiro de 08. A validação final não incluiu E2E em navegador nem Lixeira real do Windows. DEBT-24 segue aberta.
+
+## 3.28 — Regressão integral no Debian pela Arena: MICRO-FATIA DELETE validada (2026-11-04)
+
+**Autorização e escopo:** execução da seção "Passagem obrigatória para a Arena — regressão integral no Debian após Windows", sob o Plano de Execução Autônoma de 2026-11-04. Registro técnico dos resultados efetivamente executados. **Nenhum fonte do produto foi alterado nesta tarefa.** Diário operacional do executor em `/home/user/EXECUCAO_AUTONOMA.md` (fora do repositório); logs integrais em `/home/user/evidencias/`.
+
+### Árvore, runtime e recursos realmente testados
+
+| Item | Valor |
+|---|---|
+| Árvore | `c94563aef22abf83e1a0642e9689890f96378ea0` + `investigacao_memoria_fatias_m/00_INDICE.md` não commitado |
+| Branch / remote | `main` / nenhum |
+| SO | Debian GNU/Linux 13 (trixie), kernel 6.1.158+, x86_64 |
+| Runtime efetivo | Node **v26.13.0**, npm **11.20.0** — preparados pelo `iniciar.sh`, distribuição conferida por SHA-256. **D137 confirmado válido no repositório atualizado** |
+| Recursos | 2 núcleos · 1982 MB RAM · **swap 0** · 20 GB livres · `/tmp` tmpfs 992 MB |
+| Toolchain nativa | python3 3.13.16 · make 4.4.1 · gcc/g++ 14.2.0 |
+
+Preparo **do zero pelo lockfile**, sem transportar `node_modules` nem binários de `.runtime` do Windows.
+
+**Fotografia imutável preservada ANTES de qualquer correção:** SHA-256 dos **1020** arquivos rastreados, dos 30 fontes `.ts` da casa `agir`, cópia física dos 8 untracked e do `00_INDICE.md`, e tag git `baseline-arena-2026-11-04`. **Nenhum `reset`/`checkout --`/`clean` executado em momento algum.**
+
+**Estado real da árvore no recebimento — verificado, não presumido.** `git status` listava 8 ` M` + 8 `??`. Comparação byte a byte sem filtros (`git cat-file blob HEAD:<f>` versus arquivo em disco) provou que **7 dos 8 são idênticos ao HEAD**: os quatro fontes da DELETE (`agir/contract.ts`, `server/discos.ts`, `server/lixeira.ts`, `server/rotas.ts`) e este `docs/09` não têm diferença de conteúdo; `iniciar.cmd` e `platform/scripts/project.ps1` diferem apenas por CRLF, exigido por `.gitattributes eol=crlf`. **A única alteração real não commitada é `investigacao_memoria_fatias_m/00_INDICE.md`** (4427 B → 46963 B, +356 linhas). A MICRO-FATIA DELETE já está integralmente commitada em `c94563a`.
+
+> **Regra de perímetro decorrente (vale para toda execução futura neste SO):** o `git status` reporta `iniciar.cmd` e `project.ps1` como modificados de forma permanente em checkout Linux, porque `.gitattributes` impõe `eol=crlf` e o atalho de stat nunca se satisfaz. **A autoridade de perímetro é `git diff --name-only HEAD`** (compara conteúdo aplicando filtros), **não** `git status`. Usar `git status` para policiar áreas congeladas produz falso positivo.
+
+### Adaptações de ambiente necessárias — registradas, não silenciosas
+
+1. **Runtime fora do snapshot.** `iniciar.sh:10` fixa `runtime_root="$platform_root/.runtime"` sem override por variável, baixa o tarball para dentro dele (linha 17) e o extrai lá (linha 22) sem removê-lo: **258 MB** medidos. `.runtime/` consta do `.gitignore` (linha 21), mas o padrão tem barra final e portanto **não casa com symlink**. Solução: symlink `platform/.runtime` → `/home/user/.cache/aw-runtime`, mais `platform/.runtime` em `.git/info/exclude` (ignore local, nunca commitado). **Fundamento canônico: §B6 de `01`** ("clones grandes e runtimes ficam em `/home/user/.cache`") — não é contorno de regra, é a regra aplicada. `iniciar.sh` roda intocado. Custo: `.cache` não persiste entre reinícios do workspace, o Node 26 é re-baixado a cada sessão.
+2. **`TMPDIR` fora da tmpfs.** `/tmp` é tmpfs de 992 MB compartilhada com a RAM; com swap zero, `node-gyp` e `vite` escrevendo ali competiriam com a própria compilação. `TMPDIR=/home/user/.cache/tmp` em toda operação pesada.
+3. **Compilação nativa com `JOBS=1`**, para não estourar a RAM com dois jobs C++ simultâneos.
+4. **`oom_score_adj=900` no processo de build**, tornando-o vítima preferencial do OOM killer. **Funcionou:** na segunda tentativa o build foi morto e o code-server na 8080 sobreviveu.
+
+### Comandos executados e recortes — resultados reais
+
+| Comando | Resultado |
+|---|---|
+| `sh iniciar.sh install` | **EXIT 0** — Node 26.13.0 baixado (32,5 MB), SHA-256 conferido, `npm ci --include=dev` → **614 pacotes em 21 s** |
+| `sh iniciar.sh check` | **EXIT 0** — `Node 26.13.0, npm 11.20.0, SQLite e PTY carregados` |
+| `sh iniciar.sh typecheck` | **EXIT 0** — `tsc -b --force`, **zero diagnósticos** |
+| `npm run test:runtime` (platform) | **EXIT 0** — **3 aprovados / 0 falhas** |
+| `sh iniciar.sh test --maxWorkers=1 --minWorkers=1` | **EXIT 1** — **1121 aprovados / 18 falhas / 23 ignorados (1162)** · 122 arquivos aprovados, 8 reprovados (130) · 202 s |
+| `npm run typecheck --workspace=@agente-window/pty-server` | **EXIT 0** — `tsc --noEmit` limpo |
+| `npm run test --workspace=@agente-window/pty-server` | **EXIT 0** — **5 aprovados / 0 falhas** |
+| `npm run lint --workspace=agents-window-replica-v2` | **EXIT 1** — **99 erros / 19 avisos / 38 arquivos** (baseline Linux) |
+| `sh iniciar.sh build` | **EXIT 137 (SIGKILL/OOM)** — ver "Não executado" |
+
+**O pacote PTY e os testes de runtime foram executados separadamente, nunca via `test:all`**, porque `test:all` usa `&&` e o Workbench falhando impediria o PTY de rodar. Da mesma forma, **`sh iniciar.sh test` não é a suíte completa**: `project.mjs` restringe a ação `test` a `--workspace=agents-window-replica-v2`, excluindo o pacote PTY e `scripts/runtime.test.mjs`.
+
+**`App.test.tsx` — a exclusão herdada do Windows NÃO se justifica no Debian.** Conforme ordenado, a suíte rodou **sem filtro inicial** e o arquivo foi coletado (`vitest.config.ts:28` inclui `src/**/*.{test,spec}.{ts,tsx}`; o `exclude` da linha 39 é apenas de cobertura). Resultado: **`✓ src/__tests__/App.test.tsx (62 tests | 13 skipped) 73080ms`**. O mock **não recusou** no Debian. Isto responde 13 dos 23 ignorados.
+
+### Matriz mínima do condomínio — situação por área
+
+| Área | Situação |
+|---|---|
+| 1. Instalação/runtime | ✅ atendida |
+| 2. Workbench inteiro, sem filtro | ✅ executada — 18 falhas, todas classificadas abaixo |
+| 3. Pacote PTY | ✅ atendida — PTY real spawnando processo OS e bridge single-port com reconexão |
+| 4. TypeScript/lint/build | ⚠ **parcial** — typecheck 0 nos dois pacotes ✅ · lint baseline registrado ✅ · **`vite build` inviável por RAM** |
+| 5. Persistência | ✅ atendida — `session-persistence/index` 6, `worktrees` 9, `transcripts` 4, `workspaces` 7, `database` 2, `chatAlvo` 4, `agirContext` 4, `layoutPersistence` 10, `SessionPersistenceNotice` 6 |
+| 6. Modos/permissões | ✅ atendida — `autorizacaoExclusao` 13/13 e `frontier` 5/5 nas quatro casas |
+| 7. DELETE no Linux real | ✅ atendida — `excluir` 21, `discos` 10, `territorio` 6, `vizinho` 17, `rotas` 56 |
+| 8. Lixeira XDG | ✅ atendida — `lixeira` 30 testes, **incluindo o K3/EXDEV, cuja lacuna de cobertura foi fechada nesta execução** |
+| 9. Erros e cancelamento | ✅ atendida — `executorComando` 6/6 (cancelamento, timeout, árvore de processos, padrões destrutivos) · `vizinho` erros honestos (400/401/403/429/502, porta morta, fio mudo, timeout ocioso, resposta vazia) · `chatStreamingFatia09` 4 · `streaming` 9 |
+| 10. Browser/E2E integrado | ❌ **NÃO VERIFICADO** — ver abaixo |
+| 11. Credenciais e fronteiras | ✅ atendida — prova D81 aprovada; zero variável de credencial no ambiente |
+
+**Casa `agir` (código da DELETE), harness oficial: 14 arquivos · 204 testes · 198 aprovados · 6 ignorados · ZERO falhas.**
+
+### Classificação caso a caso das 18 falhas
+
+**GRUPO I — 6 falhas · DIFERENÇA DE AMBIENTE causada pelo harness de testes · produto correto · NÃO bloqueante para o produto, BLOQUEANTE para a confiabilidade da suíte oficial**
+
+`casas/config/__tests__/repo.test.ts:70` · `casas/provedores/__tests__/providersRepo.test.ts:283` · `explorer-search/__tests__/fsWatcher.test.ts:39,76,94` · `explorer-search/__tests__/fsIntegration.test.ts:238`.
+
+**Causa raiz única, comprovada por experimento.** `platform/scripts/project.mjs` cria o perfil descartável em `platform/.cache/test-runs/run-XXXX` e o exporta como `TMP`/`TEMP`/`TMPDIR`/`AGENTE_WINDOW_TEST_HOME`. Esse caminho produz dois efeitos simultâneos:
+
+1. está **dentro do checkout**, o que viola o invariante que o teste D81 afirma (`real.startsWith(raizDoRepo)` deve ser falso);
+2. contém o segmento **`.cache`**, que casa com o filtro `NOISE` de `server/fs/watcher.ts:43` — `/(^|[/\\])(\.git|node_modules|…|\.cache|dist|out|target|coverage)([/\\]|$)/` — aplicado em `handleEvent` (`watcher.ts:206`), de modo que **todo evento de FS é descartado na emissão**.
+
+`platform/scripts/test-profile.cjs:7` ainda **lança erro** se o perfil não estiver dentro de `platform/.cache/test-runs`, o que impede contornar o problema por variável de ambiente sem abandonar o harness oficial.
+
+Quatro sondas com arquivo de diagnóstico temporário (criado, executado e **removido**; o perímetro foi conferido depois):
+
+| Sonda | TMPDIR contendo `.cache` | TMPDIR limpo |
+|---|---|---|
+| P1 `fs.watch` cru, não recursivo | 2 eventos | 2 eventos |
+| P2 `ExplorerFsWatcher` default (lazy-per-dir) | **0 lotes** | **1 lote `added`** |
+| P3 `ExplorerFsWatcher` `recursive:true` | **0 lotes** | **1 lote `added`** |
+| P4 lazy-per-dir + `ensureWatch` na raiz | **0 lotes** | **1 lote `added`** |
+
+Reexecutados com perfil fora de `.cache`: os quatro arquivos **passam — 40 aprovados / 1 ignorado**. A prova D81 isolada, com home descartável fora do checkout: **25 aprovados / 1 ignorado**.
+
+Inotify funciona plenamente neste container (`max_user_watches=15612`, `max_user_instances=128`, FS ext4 real, sem overlayfs). **`ExplorerFsWatcher` é correto nos três modos; não há defeito de produto.** `start()` observa a raiz sempre (`watcher.ts:78`, "raiz SEMPRE observada"). O defeito é do harness. **Pendência registrada; não corrigida unilateralmente** por alterar o launcher oficial da D137 e o local de home/credenciais descartáveis (modelo de segurança).
+
+**GRUPO II — 9 falhas · PREEXISTENTES · área congelada · não bloqueante para a DELETE**
+
+`src/__tests__/TerminalPanel.test.tsx`, todas `TestingLibraryElementError` (roles `region`, `button`, `tab`, `menu`, `group` não encontrados) mais uma assertiva de spy não chamado. Causa: **xterm.js exige `HTMLCanvasElement.prototype.getContext`, que o jsdom não implementa sem o pacote nativo `canvas`** — o painel não renderiza e todas as consultas por role falham em cascata. `components/terminal/**` é área congelada (§2 de `04`). Presente no baseline histórico do Windows ("terminal humano"). **Não corrigido nesta fase**: exigiria dependência nativa nova (muda o lockfile da D137) ou stub em `src/__tests__/setup.ts` (altera o ambiente dos 1162 testes).
+
+**GRUPO III — 3 falhas · PREEXISTENTES · contratos visuais que derivaram da fonte · não bloqueante**
+
+`iconLabels.test.ts` (fonte lida como texto deveria conter `title="Mostrar sessões"`) · `themeTokens.test.ts` (3 tokens em desacordo) · `visualStates.test.ts` (CSS casa com `/outline:\s*1px solid var\(--vscode-fo…/`). Presentes no baseline histórico do Windows ("ícones/tokens/estado visual"). Exigem arbitrar qual lado é autoritativo, contrato ou fonte; corrigir o teste configuraria afrouxamento de assertiva, vedado.
+
+**TOTAL: 6 + 9 + 3 = 18. ZERO regressões atribuíveis à MICRO-FATIA DELETE. ZERO defeito de produto no escopo da DELETE.**
+
+### Comparação com o Windows — sem atribuir a redução ao DELETE
+
+O placar Windows da missão Codex nº 2 foi **1037 aprovados / 54 falhas / 8 ignorados** em recorte **sem** `App.test.tsx`. O placar Debian é **1121 / 18 / 23** em recorte **maior** (com `App.test.tsx`). **Os recortes são diferentes e os totais não são comparáveis diretamente**; a redução não é atribuída à DELETE.
+
+Comparação válida, **por arquivo relativo e nome do teste**:
+
+- **Casa `agir`:** Windows **186 aprovados / 13 falhas / 5 ignorados** → Debian **198 aprovados / 0 falhas / 6 ignorados**. As 13 falhas do Windows (9 de comandos/shell POSIX da Fatia 13, 3 de fronteira com separadores, 1 de território POSIX) **não se reproduzem no Debian**, confirmado por execução e não por suposição. Classificação: **diferença de ambiente POSIX × Windows**. ⚠ **Funcionar no Debian NÃO homologa PowerShell nem `IFileOperation` no Windows.**
+- **`App.test.tsx`:** não comprovado no Windows (suíte inteira excluída) → **aprovado no Debian, 62 testes**. A exclusão histórica não se justifica neste SO.
+- **Famílias de falha remanescentes coincidem** com as do baseline histórico: terminal humano, ícones/tokens/estado visual, filesystem. Nenhuma família nova apareceu.
+
+### Lacuna de cobertura fechada — K3 / EXDEV no Linux
+
+`lixeira.test.ts:284`, *"K3: lixeira em outro dispositivo = recusa honesta e origem INTACTA"*, usa `it.skipIf(!doisDispositivos)`, onde `doisDispositivos = statSync(tmpdir()).dev !== statSync(homedir()).dev`. No harness oficial **TMPDIR e homedir caem no mesmo dispositivo (dev 65024)**, portanto **o teste não rodava** — skip silencioso de cobertura de uma trava de segurança.
+
+Execução variante com home sintético em ext4 (dev 65024) e `TMPDIR` em tmpfs (dev 29): **204 testes · 196 aprovados · 5 ignorados** ⇒ **K3 executou e foi aprovado**.
+
+Nessa mesma execução surgiram **3 falhas em `rotas.test.ts`** — **explicadas, e não são defeito**. Ao separar os dispositivos, todo teste que move arquivo da fixture (tmpfs) para a lixeira (ext4) cruza dispositivos, e a **recusa honesta do K3 dispara pela rota real**. Quadro capturado:
+
+```json
+{ "ferramenta": "excluir", "ok": false, "type": "tool_result",
+  "resumo": "A lixeira está em outro disco/partição — não é feito copiar e apagar. Nada sumiu." }
+```
+
+Isto é **evidência positiva de ponta a ponta** de que o fallback destrutivo `cp`+`rm` removido pela correção K3 **não existe mais**: o sistema recusa e nada é apagado. As 3 falhas são artefato do ambiente deliberadamente cross-device, não do produto. **Ambiente correto para a suíte: TMPDIR e homedir no mesmo dispositivo** — exceto quando o objetivo for exercitar K3.
+
+### Os 23 ignorados — inventário completo, sem quarentena nova
+
+`App.test.tsx` 13 (skips internos da própria suíte aprovada) · `agir/fsSeguro.test.ts` 4 (`describe.skipIf(!fsSeguroDisponivel)`, ver F2 abaixo) · `agir/lixeira.test.ts` 2 — (a) `skipIf(platform !== 'win32')`, adaptador PowerShell 5.1 e sink `IFileOperation` da **D138**, **só executável no Windows**; (b) `skipIf(!doisDispositivos)`, o **K3, fechado nesta execução** · `provedoresRepo.test.ts` 1 · `coverageIntegration.test.tsx` 1 · `iconLabels.test.ts` 2.
+
+**Nenhum skip foi criado, nenhum assert foi afrouxado e nenhuma quarentena histórica foi removida.**
+
+**F2 — achado relevante.** `npm run build:fs-boundary` imprime `[F2] Native boundary build disabled: concurrent parent-directory rename is not contained.` O módulo nativo de fronteira de FS está **deliberadamente desativado** por limitação de segurança conhecida (auditoria F1–F8, §85 de `04`). Por isso `fsSeguroDisponivel=false` e 4 testes permanecem em quarentena. **Não é defeito novo; é fail-safe documentado.** O teste ativo afirma exatamente isso: *"mantém indisponível a API de disco até haver garantia contra rename concorrente"* — aprovado.
+
+### NÃO executado — e não declarado como executado
+
+- **`vite build`:** `build:fs-boundary` ✅ e `tsc -b` ✅ (zero erros) e `tsc` do PTY ✅, mas `vite build` morreu na fase `transforming...`. Tentativa 1 com `--max-old-space-size=700` → `FATAL ERROR: JavaScript heap out of memory`, exit **134**. Tentativa 2 com `1024` → **`Killed`, exit 137**. Com ~1037 MB disponíveis e swap zero, `vite` 5.4.21 empacotando Monaco excede o recurso. **Classificação: limite de recurso do ambiente, não regressão de código.** O gate estático de tipos passou nos dois pacotes.
+- **E2E:** 44 specs em `e2e/` e `playwright` instalado, mas **browsers ausentes** (`/opt/playwright` e `~/.cache/ms-playwright` inexistentes). **Não verificado.** Além disso exige subir o Vite em `127.0.0.1:5174` sob ~1 GB de RAM, e `docs/09` proíbe specs destrutivas de fixture contra o projeto real — `excluir_fatia12.spec.ts` exigiria inspeção prévia.
+- **Comportamento no Windows:** PowerShell 5.1, `IFileOperation`, Lixeira real do Windows e o skip `win32` da `lixeira.test.ts` **não são verificáveis neste SO**.
+
+### Limpeza realizada e seu fundamento
+
+Removido `platform/apps/workbench-v2/vite.config.ts.timestamp-1793761336948-b2d8f3cdd7215.mjs`: temporário do Vite **gerado no Windows** (cabeçalho com `file:///C:/Users/Usuario/Desktop/agente_window/platform/node_modules/vite/...`), 1 070 168 B, untracked, não é fonte. §E de `01` proíbe utilitário temporário versionado. **Respondia por 141 dos 259 problemas de lint** (120 dos 240 erros, todos `no-undef`), corrompendo o baseline. Cópia íntegra preservada com SHA-256 `1728c2f6cb3403be…` conferido **antes** da remoção ⇒ remoção totalmente recuperável. Perímetro conferido depois: segue apenas `00_INDICE.md`.
+
+### Baseline Linux de lint (referência para comparações futuras)
+
+**99 erros / 19 avisos / 38 arquivos.** Por regra: `no-undef` 37 · `@typescript-eslint/no-unused-vars` 36 · `react-refresh/only-export-components` 13 · `no-empty` 10 · `@typescript-eslint/no-explicit-any` 7 · `@typescript-eslint/consistent-type-imports` 7 · `react-hooks/exhaustive-deps` 4 · `react-hooks/rules-of-hooks` 1. Por arquivo: `src/App.tsx` 21 · `components/terminal/VSCodeTerminal.tsx` 20 · `probe-terminal.mjs` 12 · `validacao-real-workspace.mjs` 11 · `server.mjs` 10 · `server/local-boundary.mjs` 4. O erro pré-existente conhecido `agir/server/fsSeguro.ts:24 '_raiz' is defined but never used` continua presente e **não foi corrigido**. Como nenhuma linha de fonte foi alterada nesta execução, **todos os 99 erros são pré-existentes por construção**.
+
+### Pendências técnicas abertas por esta regressão
+
+- **PEND-01 (bloqueante para a confiabilidade da suíte, não para o produto):** o perfil de testes mora em `platform/.cache/test-runs`, dentro do checkout e casando com `NOISE`. Gera as 6 falsas falhas do Grupo I **e esconde o K3**. Recomendação: mover a raiz do perfil para fora do repositório e para caminho que não case com `NOISE`, e ajustar `test-profile.cjs:7` para validar "fora do repositório" em vez de "dentro de `platform/.cache/test-runs`". Efeito colateral benéfico: tornaria o harness **conforme** ao invariante D81. **Não implementado** — altera o launcher oficial da D137 e o local de home/credenciais descartáveis.
+- **PEND-02:** arbitrar contrato × fonte nos 3 testes visuais.
+- **PEND-03:** `canvas` no jsdom para as 9 falhas de `TerminalPanel` — relevante para a Fatia 16.
+- **PEND-04:** browsers Playwright ausentes.
+
+### Parecer técnico
+
+A MICRO-FATIA DELETE está **tecnicamente validada no Debian**: instalação limpa pelo lockfile, runtime D137 confirmado, typecheck zerado nos dois pacotes, testes de runtime 3/3, PTY 5/5, casa `agir` 204 testes sem falha, K3/EXDEV executado e aprovado, credenciais isoladas e prova D81 aprovada. **Nenhuma regressão atribuível à DELETE e nenhum defeito de produto no seu escopo.** Conclusão técnica do executor **não equivale a homologação independente**; o aceite é do dono.

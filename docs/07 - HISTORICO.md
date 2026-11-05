@@ -1,5 +1,19 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-11-04 — D140: dono delega autonomia técnica e retomada sem contexto
+
+- O dono aprovou uma nova regra vigente: Arena como executora decide detalhes técnicos, corrige testes/ambiente, fecha DP-03/DP-06/E-1..E-5 com SPEC e provas, e segue D133 até V1.0 nos limites D140. Não há autorização para mudar produto/segurança, executar operações destrutivas em dados reais, fazer push ou declarar homologação final humana.
+- Documentação de governança atualizada nesta **cópia de transferência**, sem alterar código, executar testes nem afirmar que Fatia 14 foi iniciada. Anotações da Arena e dashboard deverão ser criados/atualizados **fora do repositório** na sessão nova; os nove canônicos e Git são a base portátil. Detalhe normativo no `05` D140, estado em `03` e operacional no `09`.
+
+
+## 2026-11-04 — regressão integral no Debian pela Arena e homologação da MICRO-FATIA DELETE (D139)
+
+- A Arena executou a "Passagem obrigatória para a Arena" em Debian 13 com o runtime fixado pela D137 (Node 26.13.0 / npm 11.20.0), preparado do zero pelo lockfile, sem transportar `node_modules` nem binários do Windows. Placar da suíte integral sem filtro: **1121 aprovados / 18 falhas / 23 ignorados**; casa `agir` **204 testes sem falha**; typecheck zerado nos dois pacotes; runtime 3/3; PTY 5/5. Registro técnico completo, com comandos, recortes e classificação caso a caso, em `09` §3.28.
+- **Nenhuma regressão atribuível à MICRO-FATIA DELETE e nenhum defeito de produto no seu escopo.** As 18 falhas decompõem-se em 6 causadas pelo harness de testes, 9 pré-existentes em área congelada (terminal/canvas no jsdom) e 3 pré-existentes de contrato visual. Nenhum skip criado, nenhum assert afrouxado, nenhuma quarentena histórica removida.
+- **O dono homologou a MICRO-FATIA DELETE** com base nesse resultado somado ao aceite manual já registrado no Windows. **DEBT-24 encerrada quanto ao aceite do dono.** A homologação **não** supre o gate da D129: **DP-03, DP-06 e E-1 a E-5 continuam pendentes de aprovação explícita e a Fatia 14 permanece bloqueada**; a sequência D133 não foi reordenada.
+- Registradas as pendências técnicas PEND-01 a PEND-04. **PEND-01 aguarda autorização do dono**: o perfil de testes mora em `platform/.cache/test-runs`, dentro do checkout e casando com o filtro `NOISE` do watcher, o que produz 6 falsas falhas e impedia o teste K3 de rodar. A correção altera o launcher oficial da D137, portanto não foi aplicada unilateralmente.
+- **Nenhum fonte do produto foi alterado nesta tarefa.** A única mudança na árvore foi a remoção de um temporário do Vite gerado no Windows (`vite.config.ts.timestamp-…mjs`, untracked, 1 MB), que respondia por 141 dos 259 problemas de lint; cópia com SHA-256 conferido preservada antes da remoção. Perímetro final: apenas `investigacao_memoria_fatias_m/00_INDICE.md`, nenhuma área congelada tocada.
+
 ## 2026-11-04 — homologação humana com ressalvas e commit da consolidação DELETE autorizado
 
 - O dono declarou sucesso manual em exclusão com as novas permissões e em exclusão fora da pasta da conversa e determinou registrar a MICRO-FATIA DELETE como **homologada com ressalvas nesses cenários**. Não declarou ter cumprido os outros itens do roteiro, nem especificou todas as combinações/tipos de alvo. Registro de alcance em `08`.

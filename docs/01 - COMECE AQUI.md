@@ -1,5 +1,8 @@
 # 01 - COMECE AQUI — Agente Window
 
+> **VIGÊNCIA D140 — mandato de autonomia supervisionada do dono (04/11/2026).** Uma Arena nova, mesmo sem contexto de chat, deve ler `AGENTS.md`, este `01`, `02`, `03` e a decisão `05` D140 **antes de executar qualquer tarefa**. D140 substitui as exigências históricas de consultar o dono para decisões técnicas internas dentro de seu mandato, sem apagar as decisões anteriores. Não confundir a autonomia do **agente que desenvolve este repositório** com permissões concedidas ao **produto Agente Window** para manipular arquivos do usuário: o produto mantém todos os prompts, limites e autorizações de segurança. Estado e pendências no `03`, roteiro de execução no `09`. A Arena deve retomar a partir da Fatia 14 conforme o gate técnico D140 e a sequência D133, não reiniciar a DELETE.
+
+
 > **Este é o arquivo de fonte única.** Toda IA (Arena, Meta, Cursor, Claude Code ou outra) lê este arquivo antes de qualquer tarefa.
 > Ordem de leitura obrigatória: **01 → 02 → 03**. Os outros (04 a 08) abrem só quando a tarefa precisar.
 > Se código e documentação discordarem, **o código manda** — mas reporte a divergência antes de agir.

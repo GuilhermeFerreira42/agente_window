@@ -1,5 +1,8 @@
 # 08 - HOMOLOGACAO (do humano)
 
+> **D140 — divisão de responsabilidades (04/11/2026):** a Arena/Codex executora pode conferir critérios técnicos e **avançar para a fatia seguinte** com evidências e pendências honestas. Isto **não** é homologação funcional humana; somente o dono aceita a V1.0 final e qualquer decisão reservada de produto/segurança. Os roteiros manuais permanecem disponíveis para execução posterior no Windows, e itens não verificados nunca viram “passou”. Detalhe da delegação em `05` D140.
+
+
 > **Para você, não para a IA.** Aqui não entra comando de terminal nem detalhe de teste — isso é o `09`. Parte A = o que cada fatia precisa provar (antigo `07`). Parte B = quando uma entrega está "pronta" (antigo `08`).
 > Regra de sempre: **homologação funcional = você no Windows real (5174), com prints/vídeo**. Teste verde da IA não homologa.
 > **D91/D99:** uma validação real de provedor sem ambiente/acesso/autorização seguros será registrada como bloqueada/não executada; isso não substitui nem transfere sua responsabilidade de homologação funcional. Regras operacionais e de credenciais ficam no `09`.
