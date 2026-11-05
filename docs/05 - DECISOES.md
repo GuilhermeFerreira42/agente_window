@@ -1365,3 +1365,88 @@ vem na Onda 3. Inventário permanente: **17 → 19 arquivos**, placar **245 = 22
 (a única falha continua sendo a PEND-02 pré-existente de `iconLabels`). Trava `App.test.tsx`
 **preservada: 49 aprovados | 13 pulados (62)**. Typecheck EXIT 0. Evidência:
 `arena-operacional/evidencias/46-inventario-19-arquivos-2c-i.txt`.
+
+---
+
+## D151 — 2026-11-05 (noite) — Remoção autorizada dos backups redundantes e a decisão do dono de unificar os visualizadores
+
+### 1. Backups redundantes removidos (item 1 da orientação complementar)
+
+O dono autorizou a exclusão dos backups comprovadamente redundantes de `arena-operacional/backup`, porque já possui uma
+cópia externa do workspace até o commit `bac40be`. Executado com o cuidado pedido:
+
+- **Estado verificado antes de excluir:** HEAD `bac40be08484ffcfa8682e446ede9f75ed68357b`, tree
+  `45043f68be77d17be21657bafa28d338a54f997d`, **0 alterações não commitadas**, `git fsck --full` limpo,
+  `236c3ae` ancestral de `bac40be`. **Nenhum commit ou alteração posterior a `bac40be`** — o workspace estava
+  exatamente no ponto que a cópia externa do dono cobre.
+- **Excluídos (comprovadamente redundantes — cópias do repo):**
+  - `agente_window-TODAS-AS-REFS-bac40be.bundle` (30.056.993 B) — cópia completa do repo via git bundle;
+  - `patches-agente_window-50f9334-ate-bac40be.tar.gz` (182.119 B) — diff do repo.
+  - sha256 registrados **antes** da exclusão (e in `status.json` → `backups.itensRemovidos` e evidência `47`).
+- **Preservados:** `fora-do-repo-2026-11-05-noite.tar.gz` (não é cópia do repo — é a cópia dos arquivos que vivem fora
+  dele: evidências, painel, status) e `code-server-main-fonte-v4.135.0.tar.gz` (fonte do code-server removido).
+  `.git`, código, docs, evidências e registros operacionais: intactos.
+- **Espaço recuperado:** **30,2 MB** (113,5 → 83,2 MB capturaveis; folga de 44,8 MB no limite de 128 MB).
+- **Política nova (do dono):** **git local é o mecanismo principal de versionamento e recuperação entre checkpoints** —
+  commits reversíveis, organizados e documentados. **Não recriar backups redundantes automaticamente**, salvo nova
+  autorização. O dono reconhece que o git local não substitui um backup externo se o workspace inteiro se perder.
+
+*Registrado na evidência `arena-operacional/evidencias/47-remocao-backups-redundantes-bac40be.txt`.*
+
+### 2. Decisão do dono: unificação dos visualizadores — Fatia 15 (item 2)
+
+O dono observou o funcionamento atual e definiu: **manter a superfície do código** (o contêiner de abas que recebe
+o editor Monaco) e **eliminar a superfície antiga** (que recebia Configurações, Provedores, navegador etc.).
+
+**O comportamento esperado, em suas palavras (contopendo, não traduzindo):**
+
+- Abrir um arquivo de código → aba no visualizador principal. Abrir Configurações → nova aba no **mesmo**
+  visualizador. Mesmo para Provedores, navegador e demais conteúdos compatíveis.
+- Todas as abas **compartilham o mesmo contêiner e o mesmo sistema de gerenciamento**; alternar entre elas **sem
+  abrir visualizadores paralelos**.
+- **Não significa** renderizar tudo dentro da instância do Monaco: o Monaco continua responsável pela **edição de
+  código**; o contêiner deve **suportar os diferentes tipos de conteúdo**.
+- O visualizador é a referência: **painel anexo à área de chat, com capacidade de expansão para a região central**;
+  expandir ou recolher **acompanha todas as abas, preservando seus estados**.
+- **Não** transformar a abertura de Configurações ou Provedores em **substituição permanente da área de chat**; **não**
+  criar novos painéis paralelos.
+- A superfície antiga **só é desativada e removida depois que suas funcionalidades estiverem corretamente migradas e
+  validadas**. Identificar todos os consumidores, dependências, estados e comportamentos. **Reaproveitar as
+  implementações existentes**; não recriar Configurações, Provedores ou navegador do zero.
+- Esta orientação **incorpora-se aos critérios de aceitação da Fatia 15** e deve ser confrontada com a documentação
+  vigente, registrando decisões.
+
+### 3. Confronto com a documentação e decisão consequente
+
+- A **SPEC 2I** (`docs/06`) já previa (item d) a **aposentadoria de `AuxiliaryBar`/`AttachArea`/`pendingAttachOpen`**
+  e da máquina 4→2, e o item (b) a **redução das responsabilidades do `App.tsx`** (RNF15-2). A decisão do dono
+  **confirma e acelera** esse roteiro: o 2c-ii que a D148 §5 já havia dividido (desligar a coluna) **ganha o conteúdo
+  exato**: Configurações, Provedores e navegador passam a ser **abas do contêiner central**.
+- **Regra 3** (`EditorArea` só Browser/Customizations, sem conhecer o módulo): mantém-se. O contêiner não precisa
+  conhecer o módulo; recebe abas projetadas (`frontierTabs`) e contente content types.
+- **Divergência registrada:** a decisão do dono **vai além** do que a SPEC 2I imaginava. A SPEC tratava a fusão como
+  **"modelo fundido"** de abas de arquivo; o dono quer **content-type unificado** (Configurações/Provedores/navegador
+  como abas do mesmo contêiner). **Resolve-se assim:** o contêiner passa a ser **container de conteúdo multi-tipo**;
+  a aba de fronteira (`sessionId::uri`) continua; novos tipos de conteúdo entram pela mesma faixa, com ramos de
+  renderização por content-type **dentro do EditorArea**. **Registro:** isso **agrava** o tamanho do `EditorArea`
+  (já 745 linhas, +74 no 2c-i). Se isso vira problema, a redução vem da **exclusão do ramo do `<Editor>` antigo**
+  (inalcançável desde o 2c-i, D150 §4) e do conteúdo do `AuxiliaryBar` herdado — **não** da perda de funcionalidade.
+- **Confronto com a decisão de produto:** a decisão do dono **prevalece** sobre a SPEC 2I sobre onde Configurações e
+  Provedores aparecem. Ficam **guardados** os arquivos que ela cita: `docs/06` e o mockup em
+  `docs/arquivo_morto/pesquisa_bruta/personalizacoes/vscode_agents_mockup_interativo (1).html` (referência visual
+  **parcial**, não implementação completa).
+
+### 4. Plano de execução (Fatia 15, Onda 2c-ii + unificação)
+
+Ordem sugerida, cada item com gate de teste antes do próximo:
+
+1. **Mapeamento (sem código):** identificação dos consumidores, dependências, estados e comportamentos da superfície
+   antiga (`App.tsx`, `AuxiliaryBar`, `sidePane`, `dockedAuxiliaryController`). O que atualmente abre Configurações,
+   Provedores, navegador e como eles se integram ao contêiner de abas central.
+2. **Migração de conteúdos para abas do contêiner central:** Configurações, Provedores e navegador passam a ser
+   abas do mesmo contêiner. Reaproveitamento de componentes existentes (não recriar do zero).
+3. **Fechamento da duplicação visual/funcional:** remoção da superfície antiga **só após migração + validação**.
+4. **Expansão/recolhimento preserva estados:** quando expandir/recolher o painel, as abas abertas acompanham.
+5. **Gate de aceitação:** todos os comportamentos listados acima verificados em testes unitários/integração e
+   **homologação humana** onde houver dependência de navegador real/Monaco real/Windows (item 3).
+6. **Onda 3:** reduzir `App.tsx` (RNF15-2), tratar dívidas (`.then` sem `.catch`, `outlineTracker`).
