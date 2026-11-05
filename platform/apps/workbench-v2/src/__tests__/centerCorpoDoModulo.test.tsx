@@ -202,4 +202,32 @@ describe('Fatia 15 Onda 2c-ii — corpo do centro e superfície (D152)', () => {
     // perder os modelos. Comparação por identidade de nó, não por testid.
     expect(document.querySelector('[data-testid="center-code-editor"]')).toBe(painelAntes)
   })
+  it('4. com a COLUNA desligada (D155), abrir arquivo continua funcionando e a coluna não existe no DOM', async () => {
+    // Esta é a prova central do 2c-ii: antes do D152 §1, `openInAttachSession`
+    // dependia de `attachSessionId`, que só existia com a coluna montada. Sem a
+    // coluna, a abertura ficaria pendente para sempre. Aqui o teste falha se
+    // alguém religar a coluna (exigência da D151 §2: sem painéis paralelos) E
+    // falha se a abertura parar de chegar ao EditorService.
+    render(<App />)
+    const mod = await moduloMontado()
+
+    // Sem painel paralelo: nenhuma barra auxiliar na árvore.
+    expect(document.querySelector('.auxiliary-bar'), 'a coluna antiga voltou a ser renderizada').toBeNull()
+    expect(document.querySelector('[data-testid="attach-module-slot"]'), 'o anexo da coluna voltou a montar').toBeNull()
+
+    for (const sessao of testSessions) {
+      await mod.attach.open({ uri: ARQ_A, kind: 'code', sessionId: sessao.id, pinned: true })
+    }
+
+    // A aba nasce no modelo do módulo (prova de que não ficou pendente)...
+    await waitFor(() => {
+      const algum = testSessions.some((s) => mod.attach.getTabs({ sessionId: s.id }).some((t) => t.uri === ARQ_A))
+      expect(algum, 'a abertura não chegou ao EditorService: ficou pendente esperando a coluna').toBe(true)
+    }, { timeout: 10000 })
+
+    // ...aparece na faixa central...
+    await waitFor(() => expect(faixa().queryByRole('tab', { name: /a\.ts/ })).toBeTruthy(), { timeout: 10000 })
+    // ...e o corpo capaz de salvar está montado no centro.
+    await waitFor(() => expect(document.querySelector('[data-testid="center-code-editor"]')).toBeTruthy(), { timeout: 10000 })
+  })
 })

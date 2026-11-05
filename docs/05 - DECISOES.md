@@ -1583,3 +1583,46 @@ mexe, conforme a lição da D147 §3).
 
 **O que este passo NÃO faz.** Não desliga a coluna. Continua valendo a sobreposição: com as duas superfícies montadas, o
 centro tem a posse (chega depois) e o Outline descreve o editor que o usuário está usando.
+
+### D155 — Onda 2c-ii, passo C2: a coluna foi desligada — 2026-11-05 (noite)
+
+**O que mudou.** O `App` deixou de renderizar `<AuxiliaryBar>` com o `AttachModuleSlot` dentro. O contêiner central passou a ser
+a **única** superfície de abas do módulo. É o "desligar" da D148 §5 (2c-ii DESLIGA: o App deixa de renderizar
+`AttachModuleSlot`), feito **depois** dos dois degraus que o tornaram seguro (D152 §1 superfície, D154 Outline) e depois do
+D153, que deu corpo ao `diff-arquivo` no centro.
+
+**Ordem em que foi feito, e por quê.** Escrevi a mudança e rodei o gate **antes** de apagar qualquer coisa. Se o desligamento
+tivesse efeito colateral, o `git revert` de um único commit bastava; apagar a casca no mesmo passo tornaria o diagnóstico
+mais caro. A remoção da casca (`AuxiliaryBar.tsx`, `AttachModuleSlot`, `renderDesktopAuxiliaryBar`, `detailPanelVisible`,
+regras CSS de `.top-right-section > .auxiliary-bar`) fica para o **C3**, com o C2 verde.
+
+**O que NÃO mudou, e isso é a prova de que a migração funcionou.** Nenhum dos comportamentos do dono dependia de haver *duas*
+superfícies:
+
+- abrir arquivo pela árvore/busca/SCM chegava ao `attach.open` pelo shell (L1231-1235) — o módulo resolve a sessão pela
+  derivação da D152 §1 e o corpo do centro executa;
+- o diff do SCM (`diff-arquivo`) já tinha corpo no centro desde a D153;
+- Configurações, Provedores, navegador, busca e changes **nunca** dependeram da coluna: sempre foram abas nativas do
+  `EditorArea`, que é o contêiner central. O mapeamento da D151 §4 já mostrava isso; o desligamento só confirmou.
+
+**Código morto confirmado (para o C3, não apagado agora).** `auxiliaryVisible` estava **fixo em `false`** desde antes desta
+onda (D2.72), o que torna `renderDesktopAuxiliaryBar` sempre falso — a coluna renderizava por outra condição, não por ele.
+`detailPanelVisible` só alimentava esse gate morto. `attachExpanded` alimenta `auxVisible` (já neutralizado por `false`) e o
+`editor-maximized` do `top-right-section`, cujo efeito de maximizar a coluna também sai no C3 — o maximizar do centro é
+outro (`editorMaximized`, L642, próprio e persistido).
+
+**Evidência.** Gate medido no mesmo comando: typecheck **EXIT 0** + **283 = 266✓|1✗|16skip em 23 arquivos**. A falha única é a
+**PEND-02** (iconLabels P7.3), pré-existente. Entrou `layoutDensity` no gate porque ele policia as regras CSS da barra.
+
+Prova nova em `centerCorpoDoModulo.test.tsx` (4ª): com a coluna desligada, **abrir arquivo continua chegando ao
+EditorService**, a aba aparece na faixa central e o corpo capaz é montado — e o teste **falha se alguém religar a coluna**
+(exige `.auxiliary-bar` e `attach-module-slot` ausentes do DOM).
+
+**O que continua pendente de homologação humana.** Nada aqui muda isso: **Ctrl+S gravando byte em disco, F5 restaurando abas
+e o Monaco real carregando** seguem sem verificação em ambiente real. Os testes provam a fronteira e o roteamento — não o
+byte no disco.
+
+**Dívida criada por mim nesta rodada, e corrigida.** O commit `7cc5af0` entrou com o typecheck medido **antes** de eu
+escrever o teste novo: o `outlineCandidates.test.ts` tinha 10 erros TS2345 (dublê de editor não atribuível a
+`IStandaloneCodeEditor`). Foi pego no typecheck seguinte, corrigido com um cast nomeado num único ponto, e o commit do C2
+passou a exigir os dois verdes **juntos**. Registro porque a R-2 vale também quando o arquivo novo é teste.

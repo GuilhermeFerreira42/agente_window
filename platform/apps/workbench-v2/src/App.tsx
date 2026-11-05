@@ -2745,10 +2745,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               </>
             )}
               </div>
-              {/* 5.7 (D6): com o módulo carregado a barra fica SEMPRE montada (Regra 10 docs/18: o anexo nunca desmonta,
-                  só display:none — senão `attach.open` cai em pendingAttachOpen até o F5). `detailsVisible` governa só a coluna "Detalhes";
-                  a casca vazia (sem Detalhes e anexo recolhido) zera padding/borda via CSS. */}
-              {!customViewActive && layoutController.managesAuxiliaryBar && <AuxiliaryBar session={activeSession} visible={!!explorerModule} attachSlot={explorerModule ? <AttachModuleSlot module={explorerModule} sessionId={activeSession.id} /> : undefined} />}
+              {/* FATIA 15 Onda 2c-ii (D151 §2, D155): a COLUNA foi DESLIGADA. O Editor Anexo
+                  não monta mais aqui — quem hospeda as abas do módulo (arquivo e diff) é o
+                  contêiner central, e a abertura de arquivo chega lá pela derivação
+                  `sessionIdDaSuperficie` (D152 §1). A remoção da casca vem no C3, depois de
+                  esta versão passar pelos gates. */}
+              {null}
             </div>
             {/* FATIA-05 5.5 (docs/25 O14): Views Panel = `.part.panel` NOVO acima do terminal, dentro de .right-section.
                 Recebe views arrastadas da Side Bar; `display: none` sem views. O terminal abaixo não é tocado. */}

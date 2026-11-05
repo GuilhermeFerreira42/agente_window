@@ -16,7 +16,15 @@
 // sob prova é a POLÍTICA DE POSSE, não a API do editor.
 // ============================================================================
 import { describe, expect, it } from 'vitest'
-import { createMonacoOutlineTracker } from '../ui/attach/monacoOutline'
+import { createMonacoOutlineTracker, type MonacoOutlineTracker } from '../ui/attach/monacoOutline'
+
+/**
+ * O editor do tracker é `monaco.editor.IStandaloneCodeEditor`; um dublê não é
+ * estruturalmente atribuível a ele (a interface real tem centenas de membros).
+ * O cast fica AQUI, num único ponto nomeado, em vez de espalhado em cada chamada:
+ * o que este teste prova é a política de posse, não a forma da API do Monaco.
+ */
+type EditorDoTracker = Parameters<MonacoOutlineTracker['attach']>[0]
 
 const descartavel = { dispose: () => undefined }
 
@@ -31,7 +39,7 @@ function editorFalso(modelo: unknown = null) {
     setPosition: () => undefined,
     focus: () => undefined,
   }
-  return { ed, eventos }
+  return { ed: ed as unknown as EditorDoTracker, eventos }
 }
 
 describe('outlineTracker — fila de candidatos (D152 §3)', () => {
