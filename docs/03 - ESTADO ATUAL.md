@@ -1,3 +1,37 @@
+# Estado vigente — 2026-11-05 (noite, Onda 2c-ii concluída)
+
+## ⚑ Um visualizador só: o continente central
+
+A **Onda 2c-ii está tecnicamente concluída**. A coluna antiga (`AuxiliaryBar` + `AttachModuleSlot`) foi **desligada** e sua
+casca **removida do shell**. O contêiner central é agora a única superfície de abas do módulo: arquivo, diff do Source
+Control, Configurações, Provedores, navegador, busca e changes — todos no mesmo lugar, com a faixa de abas fundida.
+
+**HEAD:** `452d165` · **gate:** typecheck EXIT 0 + inventário **283 = 266✓|1✗|16skip em 23 arquivos** (única falha: PEND-02,
+pré-existente) · **painel:** 97 grupos, 0 falhas · **snapshot:** 80,5 MB / 2 683 arquivos.
+
+**Cinco degraus, cada um com gate verde antes do seguinte:** D152 (a superfície do módulo pode ser o centro) → D153 (o
+`diff-arquivo` ganha corpo no centro) → D154 (o Outline segue o editor, não a coluna) → D155 (coluna desligada) → D156
+(casca removida). Plano em `docs/05` D151 §4; decisões D152-D156.
+
+## ⚑ O que continua PENDENTE — e não é detalhe
+
+**Homologação humana**, sob responsabilidade do dono. Nenhum teste em jsdom prova:
+
+- **Ctrl+S gravando byte em disco** com o Monaco real;
+- **F5 restaurando as abas**;
+- **Monaco real carregando** (o dublê prova a fronteira, não o editor);
+- **ambiente Windows**.
+
+Está registrado no `status.json`, no painel e na evidência `49-onda2c-ii-completa.txt`. **Não declarar aprovado o que não
+foi exercitado em ambiente real.**
+
+## ⚑ Próximo: Onda 3
+
+Reduzir `App.tsx` (RNF15-2; hoje 2 822 linhas — a queda grande vem aqui), limpar `attachExpanded`/`auxiliaryTab`/CSS
+`.auxiliary-bar` órfão, e tratar as dívidas: `mountAttach` sem consumidor no produto, `loadMonaco().then()` sem `.catch`,
+`outlineTracker` × diff.
+
+---
 # 03 - ESTADO ATUAL — onde a obra parou
 
 **MANDATO ATUAL — D140 (04/11/2026):** proprietário delegou à Arena/Codex executor decisões técnicas internas necessárias às fatias restantes até V1.0; D129 continua como pré-requisito **técnico a resolver e documentar**, mas não exige mais microaprovações do dono para DP-03, DP-06 e E-1..E-5 dentro dos limites D140. Próxima etapa: reconciliar Git/árvore e decisão D139, ajustar harness PEND-01 e diagnosticar PEND-03 com testes reais, decidir/documentar DP-03/DP-06/E-1..E-5 antes de codificar Fatia 14, seguir D133. Esta atualização é **documental**, não prova de execução, teste ou início de Fatia 14. Checkpoint/dashboard operacionais devem ser recriados e mantidos pela Arena a partir de `03`/`07`/`09` quando receber somente esta pasta; detalhes em `09` D140.
