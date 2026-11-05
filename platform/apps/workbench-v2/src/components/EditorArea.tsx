@@ -27,7 +27,11 @@ import {
 import Editor, { DiffEditor } from '@monaco-editor/react'
 import type { BrowserViewState, BrowserViewport, DiffFile, EditorTab, SearchResult } from '../types'
 import { getEditorTabsVisibleForSession } from '../domain/browserOwnership'
-import { resolverAbaVisivel } from '../shell/abas'
+import { resolverAbaVisivel, type Aba } from '../shell/abas'
+// A fusão vem do shell/ponteAnexo (Onda 2a), que é quem projeta as abas do
+// módulo; `Aba` é o tipo do dono novo (shell/abas). Os dois são do bairro 1 —
+// nenhum import aqui desce abaixo do barrel do módulo (FT-01/FT-02).
+import { ehIdDoModulo, fundirAbas } from '../shell/ponteAnexo'
 import { getDiffResolution } from '../domain/sessionState'
 import { isTabCloseable, type SidePaneState } from '../domain/sidePane'
 import { formatSearchSummary, splitSearchHighlight } from '../domain/search'
@@ -82,6 +86,19 @@ interface EditorAreaProps {
   customizationsSurface: ReactNode
   providersSurface: ReactNode
   configSurface: ReactNode
+  /** FATIA 15 Onda 2c-i (D148 §1): abas do módulo Explorer/Busca JÁ PROJETADAS
+   *  pelo shell (`shell/ponteAnexo.ts`) para esta sessão. Entram na faixa como
+   *  abas irmãs por `fundirAbas` — função pura, no derivado. O EditorArea não
+   *  conhece o módulo: recebe dado pronto, do mesmo jeito que recebe os slots. */
+  frontierTabs?: readonly Aba[]
+  /** D148 §2: o corpo da aba central capaz de EDITAR E SALVAR (RF15-1), montado
+   *  pelo App como slot — o mesmo padrão de `searchSlot`/`customizationsSurface`.
+   *  Ausente = a aba ativa não precisa dele (aba nativa demo, browser, search…). */
+  codeEditorSlot?: ReactNode
+  /** D148 §4: quando a aba ativa PRECISA do corpo capaz e o módulo não oferece
+   *  `mountCodeEditor`, o App manda a mensagem e o centro FALHA VISÍVEL — nunca
+   *  cai em silêncio no `<Editor>` que não salva. */
+  codeEditorUnavailable?: string
   /** (R-087) Tema ativo — controla o tema do Monaco Editor. */
   theme?: 'dark' | 'light'
 }
@@ -424,6 +441,9 @@ export function EditorArea({
   customizationsSurface,
   providersSurface,
   configSurface,
+  frontierTabs,
+  codeEditorSlot,
+  codeEditorUnavailable,
   onNavigateBrowser,
   onBrowserBack,
   onBrowserForward,
@@ -449,9 +469,32 @@ export function EditorArea({
   theme = 'dark',
 }: EditorAreaProps) {
   const monacoTheme = theme === 'light' ? 'vs' : 'vs-dark'
-  const visibleTabs = useMemo(() => getEditorTabsVisibleForSession(tabs, activeSessionId), [tabs, activeSessionId])
+  // FATIA 15 Onda 2c-i (D148 §1): A FUSÃO ACONTECE NO DERIVADO, NUNCA NO ESTADO.
+  // `tabs` continua sendo o estado bruto do App, dono só das abas nativas; as do
+  // módulo chegam projetadas e entram aqui por `fundirAbas` (pura, 27 provas no
+  // passo 2a). Consequência aceita e desejada: operações que mutam o estado por id
+  // não encontram os ids de fronteira (`sessionId::uri`) — reorderar ou editar uma
+  // aba do módulo pelo estado do App seria escrever numa fonte que não é a dona.
+  const visibleTabs = useMemo(
+    () => fundirAbas(getEditorTabsVisibleForSession(tabs, activeSessionId), frontierTabs ?? []),
+    [tabs, activeSessionId, frontierTabs],
+  )
   const resolvedActiveTabId = resolverAbaVisivel(visibleTabs, activeTabId)
   const activeTab = visibleTabs.find((tab) => tab.id === resolvedActiveTabId)
+  // D148 §2/§4: quando o App fornece o corpo capaz — ou declara que ele falta —
+  // os três caminhos de `file` sem disco saem de cena, senão o centro renderizaria
+  // dois corpos para a mesma aba. `imagePreview` fica à parte de propósito, como o
+  // contrato diz: a projeção do módulo não carrega imagePreview, então aba de
+  // fronteira nunca tem preview de imagem e não há sobreposição possível.
+  // O slot pode estar MONTADO sem estar em uso: o App o mantém montado enquanto a
+  // sessão tiver abas de arquivo do módulo, para que `requestCloseTab` de uma aba
+  // irmã tenha atendente (D147 §5). Quem decide se ele está EM USO é a identidade
+  // da aba ativa — e isso o EditorArea resolve sozinho com `ehIdDoModulo`, que é do
+  // shell, não do módulo: a Regra 3 continua intacta. Sem esta distinção, uma aba
+  // nativa demo perderia o estado honesto `file-content-unavailable`.
+  const abaAtivaEhDoModulo = !!activeTab && ehIdDoModulo(activeTab.id)
+  const corpoCentralEmUso = abaAtivaEhDoModulo && (!!codeEditorSlot || !!codeEditorUnavailable)
+  const corpoCentralVisivel = editorContentVisible && abaAtivaEhDoModulo && activeTab?.type === 'file'
   const activeBrowser = activeTab?.browserId ? browserViews.find((view) => view.id === activeTab.browserId && view.sessionId === activeSessionId) : undefined
   const [addTabMenuOpen, setAddTabMenuOpen] = useState(false)
   const [tabMenu, setTabMenu] = useState<ContextMenuState | null>(null)
@@ -614,6 +657,37 @@ export function EditorArea({
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
         {editorContentVisible && activeTab?.type === 'providers' && providersSurface}
         {editorContentVisible && activeTab?.type === 'config' && configSurface}
+        {/* FATIA 15 Onda 2c-i (D148 §2): o corpo capaz de salvar. Fica MONTADO
+            enquanto o slot existir e é apenas OCULTADO quando a aba ativa é outra —
+            display:none, nunca desmontar: é o padrão da casa (attach.setVisible,
+            Regra 10) e aqui é seguro porque o CodeEditorPane usa automaticLayout.
+            Manter montado é o que permite atender requestCloseTab de uma aba irmã
+            que não está ativa; desmontar deixaria o pedido sem atendente. */}
+        {codeEditorSlot && (
+          <div
+            className="center-code-editor-host"
+            data-testid="center-code-editor-host"
+            style={{ display: corpoCentralVisivel ? 'contents' : 'none' }}
+          >
+            {codeEditorSlot}
+          </div>
+        )}
+        {/* D148 §4: sem mountCodeEditor no módulo, o centro FALHA VISÍVEL. Os
+            tokens são os mesmos dos dois estados vizinhos, já conferidos contra
+            theme.css (PEND-05) — nenhuma cor fixa (Regra 4), sem position:fixed e
+            sem transição (Regras 5). */}
+        {editorContentVisible && abaAtivaEhDoModulo && activeTab?.type === 'file' && !codeEditorSlot && codeEditorUnavailable && (
+          <div className="monaco-editor-shell" data-testid="center-code-editor-unavailable">
+            <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-errorForeground)', borderBottom: '1px solid var(--vscode-panel-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚠️ Não é possível editar e salvar aqui — {activeTab.path}</span>
+            </div>
+            <div style={{ height: 'calc(100% - 29px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, background: 'var(--vscode-editor-background)', color: 'var(--vscode-foreground)', padding: 16, textAlign: 'center' }}>
+              <CircleAlert size={28} aria-hidden="true" />
+              <strong>A capacidade de salvar não está disponível</strong>
+              <span style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)', maxWidth: 420 }}>{codeEditorUnavailable}</span>
+            </div>
+          </div>
+        )}
         {editorContentVisible && activeTab?.type === 'file' && activeTab.imagePreview && (
           <ImagePreview
             path={activeTab.path}
@@ -625,7 +699,7 @@ export function EditorArea({
         )}
         {/* (4.4-fix, validação manual) Falha de leitura = ERROR EDITOR explícito
             (espelha createEditorOpenError do VS Code) — nunca conteúdo sintético. */}
-        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && activeTab.readError && (
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !corpoCentralEmUso && activeTab.readError && (
           <div className="monaco-editor-shell" data-testid="file-read-error">
             <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-errorForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>⚠️ Não foi possível ler o arquivo — {activeTab.path}</span>
@@ -640,7 +714,7 @@ export function EditorArea({
         )}
         {/* Sem conteúdo E sem erro: estado honesto — este fluxo abriu a aba sem
             dados (superfícies demo: split/new-file/search). NUNCA mock silencioso. */}
-        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !activeTab.readError && activeTab.content == null && (
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !corpoCentralEmUso && !activeTab.readError && activeTab.content == null && (
           <div className="monaco-editor-shell" data-testid="file-content-unavailable">
             <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-descriptionForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)' }}>
               <span>📄 Conteúdo indisponível — {activeTab.path}</span>
@@ -652,7 +726,7 @@ export function EditorArea({
             </div>
           </div>
         )}
-        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !activeTab.readError && activeTab.content != null && <div className="monaco-editor-shell">
+        {editorContentVisible && activeTab?.type === 'file' && !activeTab.imagePreview && !corpoCentralEmUso && !activeTab.readError && activeTab.content != null && <div className="monaco-editor-shell">
           <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--vscode-descriptionForeground)', borderBottom: '1px solid var(--vscode-panel-border)', background: 'var(--vscode-editor-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>📄 Arquivo real do disco — {activeTab.path}</span>
             <span style={{ fontSize: 10, background: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)', padding: '2px 6px', borderRadius: 4 }}>REAL</span>

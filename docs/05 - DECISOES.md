@@ -1222,3 +1222,146 @@ já existe, e a regra desta obra é não operar no `.git` sem necessidade.
 mecanismo de snapshot da Arena diante de symlink (a medição de 112,2 MB é do lado do filesystem, com
 os mesmos filtros de exclusão que a Arena declara); E2E/Playwright (44 specs, binários ausentes);
 pixels reais; `vite build` (OOM); Windows real; e Monaco gravando em disco ponta a ponta.
+
+
+---
+
+## D150 — 2026-11-05 — FATIA 15, Onda 2c-i EXECUTADA: o corpo capaz de salvar está ligado ao centro, e três achados que mudam o que se pode declarar
+
+**Por que esta decisão existe.** A D148 escreveu o contrato do passo 2c antes de codar, como a D129
+exige. Executar o 2c-i revelou três fatos que o contrato não previa e um deles muda o que se pode
+declarar sobre o critério-mãe RF15-1. Registrar aqui, e não só no commit, é o que permite ao
+proprietário cobrar depois.
+
+### 1. O slot fica MONTADO enquanto houver aba de arquivo do módulo — não só quando uma está ativa
+
+O contrato dizia que o App fornece o slot para a aba de fronteira. Executando, apareceu o preço:
+`requestCloseTab` só tem efeito se houver atendente registrado, e o atendente é o `CenterCodeEditor`
+montado (`centerCloseRequesters`, por sessão). Se o slot fosse fornecido apenas com a aba de
+fronteira ativa, fechar uma aba irmã pelo X da faixa — com outra aba ativa — não teria atendente e o
+pedido morreria em silêncio, que é exatamente o que a D147 §5 proíbe.
+
+**Decisão:** o App fornece `codeEditorSlot` enquanto a sessão tiver **alguma** aba de arquivo do
+módulo (`haAbasDeArquivoDoModulo`), e o EditorArea decide **visibilidade**, não montagem:
+`display: contents` quando a aba ativa é de fronteira, `display: none` quando não é. Ocultar em vez
+de desmontar é o padrão da casa (`attach.setVisible` "NUNCA desmonta", Regra 10), é o que a Regra 5
+prescreve para recolher com box, e aqui é seguro porque o `CodeEditorPane` usa `automaticLayout: true`
+— o Monaco se re-layoutiza sozinho ao voltar.
+
+*Rejeitado:* fornecer o slot só com a aba ativa. Deixaria `requestCloseTab` sem atendente para abas
+irmãs e destruiria o Monaco a cada alternância.
+
+**Como o EditorArea sabe se o corpo está EM USO sem conhecer o módulo:** pela identidade da aba ativa,
+`ehIdDoModulo(activeTab.id)` — função do **shell** (`ponteAnexo.ts`), não do módulo. A Regra 3
+(EditorArea limitado a Browser/Customizations, sem conhecer o módulo) continua intacta: ele recebe um
+ReactNode e um dado, e decide com uma função pura do próprio bairro. Sem essa distinção — que a
+primeira implementação não fazia — uma aba nativa demo perdia o estado honesto
+`file-content-unavailable` só porque o corpo estava montado para outra aba.
+
+### 2. A fusão entra no EditorArea por prop `frontierTabs`, e o reorder é seguro porque usa IDs
+
+A D148 §1 disse que a fusão acontece no derivado do App (`visibleEditorTabs`). Executando, apareceu
+que o EditorArea **também** deriva a própria lista (`getEditorTabsVisibleForSession(tabs,
+activeSessionId)`, linha 452) — a faixa que o usuário vê não vem do derivado do App.
+
+**Decisão:** o App passa as abas já projetadas na prop nova `frontierTabs` e o EditorArea funde na
+sua própria derivação, com a mesma função pura `fundirAbas`. O App continua fundindo em
+`visibleEditorTabs` para as decisões de layout. São **dois cálculos da mesma função pura sobre os
+mesmos inputs**, não duas fontes de verdade: nada é gravado, e o resultado é determinístico.
+
+*Rejeitado:* passar a lista já fundida como `tabs`. Isso mudaria o significado da prop que alimenta
+as operações por id e misturaria responsabilidades.
+
+**Verificação que tornou a fusão segura:** `onReorderTabs(fromId, toId)` opera por **IDs, não por
+índices** (EditorArea:534 → App:1081 `reorderEditorTabs`). Arrastar abas com a lista fundida não
+desloca posição nenhuma; e se um dos ids for de fronteira, o App simplesmente não o encontra em
+`editorTabs`, que é o comportamento que a D148 §1 declarou correto.
+
+### 3. ACHADO: `selectEditorTab` e `closeEditorTab` só procuravam nas abas nativas
+
+Os dois começam com `editorTabs.find(...)`. Com a faixa passando a mostrar abas de fronteira, clicar
+nelas não faria **nada** — o `find` devolve `undefined` e o guard retorna em silêncio. Não é hipótese:
+é o que o código fazia, e nenhum teste pegaria porque nenhum teste clicava numa aba que não existia
+antes.
+
+**Decisão:** os dois ganharam um ramo de fronteira antes do `find`. `selectEditorTab` ativa pela
+projeção; `closeEditorTab` pede `attach.requestCloseTab` e **nunca** chama `setEditorTabs`. O R-081
+(CannotClose em detail-only) foi preservado aplicando `isTabCloseable` à aba projetada antes de pedir.
+
+### 4. ACHADO QUE MUDA O QUE SE PODE DECLARAR: o `<Editor>` que não salva está INALCANÇÁVEL
+
+O motivo histórico da RF15-1 existir era o `<Editor>` do EditorArea com `value={activeTab.content}` e
+nenhum salvamento. Medindo quem o alimenta:
+
+| criador de aba nativa `file` | linha | content | vivo? |
+| --- | --- | --- | --- |
+| `split` (dividir editor) | 1193 | sem content | vivo → cai em `file-content-unavailable` |
+| `new-file` (menu +) | 2515 | sem content | vivo → cai em `file-content-unavailable` |
+| resultado de busca | 2532 | sem content | vivo → cai em `file-content-unavailable` |
+| `handleOpenFileHandle` (File System Access API) | 522 | **com content** | **ÓRFÃO** |
+
+`handleOpenFileHandle` tem **uma única ocorrência no App.tsx inteiro: a própria declaração** — nunca é
+chamado. O mesmo vale para `handleClearDirectory`. O estado que o alimentaria, `fileSystemEntries`,
+também tem uma ocorrência só (o `useState`) e **nunca é renderizado por componente nenhum**, então não
+existe árvore do File System Access na tela onde o usuário pudesse clicar. E `initialEditorTabs = []`,
+portanto nada nasce com content no boot.
+
+**Consequência, dita com precisão:** nenhuma aba nativa chega ao EditorArea com `content != null`.
+O ramo do `<Editor>` que não salva é **código dormente, inalcançável pela interface**. Somado ao fato
+de que o clique na árvore do Explorer visível já passa por `attach.open`
+(`handleExplorerFileOpenedRef`, App:1231-1235 — o Explorer que o usuário vê é o do módulo, hospedado
+em `ExplorerView slot={...}`, App:565), o caminho vivo de abrir arquivo é **um só**, e com o 2c-i ele
+aterra no corpo capaz de salvar.
+
+**Isto não é declaração de RF15-1 concluída.** O que se pode afirmar, e o que se afirma, está na
+seção 6.
+
+### 5. Dívida registrada, não corrigida neste passo
+
+O fluxo órfão do File System Access (`handleOpenFileHandle`, `handleClearDirectory`,
+`fileSystemEntries`, `readFileContent`, `readDirectoryEntries`, `pickDirectoryReal`) continua no
+código. **Não foi removido** — remover código não é escopo do 2c-i, e a regra da casa é não apagar o
+que ainda pode ser decisão de produto. Fica como dívida da Onda 3 junto com o `<Editor>` dormente:
+ou o dono reativa o fluxo, ou os dois saem no mesmo commit que remover o ramo que não salva.
+Registrado porque código órfão que parece caminho vivo já produziu diagnóstico errado nesta obra.
+
+Segunda dívida, descoberta pelos testes: o `CodeEditorPane` faz `void loadMonaco().then(...)` **sem
+`.catch`**. O stub de `monaco-editor` do projeto lança de propósito ("não disponível em testes
+unitários"), e isso virou **8 rejeições não tratadas** que fechavam o vitest em EXIT 1 mesmo com todos
+os testes verdes. O teste resolveu sobrescrevendo o **pacote** `monaco-editor` — nunca o componente,
+que seria importar abaixo do barrel e violar o FT-01. Mas a fragilidade é real em produção: se o
+chunk do Monaco falhar ao carregar, o usuário fica com um editor vazio e nenhuma explicação. Não
+corrigida aqui para não ampliar o escopo do passo; vai para a Onda 3.
+
+### 6. O que está provado, o que está pendente e o que é homologação humana
+
+**Implementado e testado (13 provas novas, todas verdes):** as abas do módulo aparecem na faixa
+central como irmãs · o corpo capaz é montado pelo App no centro (`center-code-editor` presente) ·
+clicar numa aba projetada faz o `EditorService` do módulo mudar a uri ativa (prova lida do estado de
+verdade, não de mock) · fechar pelo X da faixa abre o diálogo do módulo e Cancelar não fecha · aba
+nativa demo com o corpo montado mantém o estado honesto e o corpo fica oculto · sem `mountCodeEditor`
+o centro falha visível com a mensagem · `attach.save` rejeita quando não há painel com a uri.
+Mais as 9 provas do centro (EditorArea isolado) e as 31 da Onda 2b, intactas.
+
+**Verificação pendente:** o clique na árvore ainda produz aba de fronteira **e** mantém a coluna
+montada — a duplicação temporal que a D146 §3 aceitou e datou para morrer no 2c-ii. `changes`
+continua caindo na casca oca `DiffView` (Onda 3). O F5 restaurando abas de fronteira (RF15-4) não foi
+testado.
+
+**Homologação humana pendente, e não substituída por teste:** Ctrl+S no navegador real gravando no
+disco. Em jsdom o Monaco não carrega, então a prova automatizada para no roteamento
+(`centerSaveRouting.test.tsx`, 11 provas, `CodeEditorPane` em dublê) e na recusa honesta quando não há
+painel. **Nenhum teste desta obra viu o Monaco real gravar um byte.**
+
+**RF15-1 muda de "em aberto na interface" para "acessível pelo caminho vivo, pendente de homologação
+humana".** Não para "concluída": falta o 2c-ii, falta a prova em navegador real, e o dono já deixou
+explícito que visual igual ao mockup não é funcionalidade concluída.
+
+### 7. Custos medidos, sem esconder
+
+`App.tsx` **2739 → 2828 linhas (+89)**; `EditorArea.tsx` **671 → 745 (+74)**. A RNF15-2 exige que o
+`App.tsx` caia abaixo de 2724 e ela **piorou**, exatamente como a D148 anunciou de antemão; a queda
+vem na Onda 3. Inventário permanente: **17 → 19 arquivos**, placar **245 = 228/1/16 → 258 = 241/1/16**
+(a única falha continua sendo a PEND-02 pré-existente de `iconLabels`). Trava `App.test.tsx`
+**preservada: 49 aprovados | 13 pulados (62)**. Typecheck EXIT 0. Evidência:
+`arena-operacional/evidencias/46-inventario-19-arquivos-2c-i.txt`.

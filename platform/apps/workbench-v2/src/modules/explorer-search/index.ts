@@ -159,6 +159,10 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // Salvar/Não Salvar/Cancelar e executa. Sem corpo central montado o pedido não
   // faz nada — e o chamador trata isso como falha visível, nunca como descarte.
   attachApi.requestCloseTab = (input) => { centerCloseRequesters.get(input.sessionId)?.(input); };
+  // Onda 2c-i (D148 §3) — ADITIVO: ativar aba de fronteira. O shell pede, o
+  // EditorService decide: activate() ignora uri ausente do grupo da sessão, então
+  // não há como o shell forçar um estado que o modelo não tem.
+  attachApi.activateTab = (input) => { editorService.activate(input); };
   // eventos editor.* saem pelo onEvent do módulo; expandir/recolher move o layout
   // (display:none — nunca desmonta).
   // c6 — maximizar/restaurar sai como evento editor.* (sessão = a que hospeda o anexo).

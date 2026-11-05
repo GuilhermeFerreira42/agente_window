@@ -62,7 +62,10 @@ import {
 import { filterSearchResults } from './domain/search'
 // FATIA 15 Onda 1 (D144 §3.4): a gestão de abas tem DONO NOVO no shell. O App
 // deixa de decidir política de sucessão — ele orquestra e delega.
-import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel } from './shell/abas'
+import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Aba } from './shell/abas'
+// FATIA 15 Onda 2c-i (D148): a ponte que projeta as abas do módulo para a faixa
+// central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
+import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveDetailPanelVisible, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
@@ -224,6 +227,18 @@ function restoreAttachTabs(module: IExplorerSearchModule): void {
   }
 }
 
+// FATIA 15 Onda 2c-i (D148 §2): espelho de AttachModuleSlot para o CENTRO — ref +
+// mountCodeEditor no efeito + unmountCodeEditor no cleanup. Sem equivalente a
+// `pendingAttachOpen`: abrir arquivo no centro é decisão do shell, que já sabe a uri.
+function CenterCodeEditorSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hostRef.current) module.mountCodeEditor?.(hostRef.current, { sessionId })
+  }, [module, sessionId])
+  useEffect(() => () => module.unmountCodeEditor?.(), [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="center-code-editor-slot" />
+}
+
 function AttachModuleSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -294,6 +309,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (`auxiliaryVisible`) e do gate do Browser — senão o clique no Explorer cai em `pendingAttachOpen`
   // e só abre após F5 (bug do vídeo, docs/25 P20).
   const [attachExpandedSessions, setAttachExpandedSessions] = useState<readonly string[]>([])
+  // FATIA 15 Onda 2c-i: versão das abas do módulo. A projeção é leitura pura de
+  // `attach.getTabs`, que não é reativa; quem avisa que mudou é o onEvent do módulo,
+  // então cada evento de aba bumpa esta versão e o useMemo que projeta recalcula.
+  // Sem isto a faixa central não refletiria abrir/fechar/ativar feitos pelo módulo.
+  const [moduloAbasVersao, setModuloAbasVersao] = useState(0)
   // 5.5: ordem/container das views vêm do layoutState (Side Bar = Activity Bar; Panel = abas do Views Panel)
   const rightViews = useMemo(() => viewsByIds(layout.state.viewLayout.sideBar), [layout.state.viewLayout.sideBar])
   const panelViews = useMemo(() => viewsByIds(layout.state.viewLayout.panel), [layout.state.viewLayout.panel])
@@ -379,6 +399,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
           if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed') snapshotAttachTabs(module, e.sessionId)
+          // Onda 2c-i: as abas do módulo passaram a aparecer também na faixa CENTRAL,
+          // então os eventos que mudam abas precisam invalidar a projeção. `dirtyChanged`
+          // entra aqui e não no snapshot do anexo porque a faixa mostra o ponto de dirty.
+          if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' ||
+              e.type === 'editor.activeChanged' || e.type === 'editor.dirtyChanged') setModuloAbasVersao((v) => v + 1)
           if (e.type === 'editor.attachExpanded') {
             setAttachExpandedSessions((cur) => (cur.includes(e.sessionId) ? cur : [...cur, e.sessionId]))
           }
@@ -699,7 +724,30 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const chatKey = `${activeSession.id}:${activeChatId}`
   const selectedModel = modelByChat[chatKey] ?? 'Auto'
   const selectedMode = modeByChat[chatKey] ?? 'agent'
-  const visibleEditorTabs = useMemo(() => hasSessions ? getEditorTabsVisibleForSession(editorTabs, activeSession.id) : [], [hasSessions, editorTabs, activeSession.id])
+  // FATIA 15 Onda 2c-i (D148 §1): as abas do módulo, projetadas para a sessão ativa.
+  const abasProjetadasDoModulo = useMemo<readonly Aba[]>(() => {
+    if (!hasSessions || !explorerModule) return []
+    return projetarAbasDoModulo(activeSession.id, explorerModule.attach.getTabs({ sessionId: activeSession.id }))
+  }, [hasSessions, explorerModule, activeSession.id, moduloAbasVersao])
+  // A FUSÃO ACONTECE NO DERIVADO, NUNCA NO ESTADO: `editorTabs` continua dono só das
+  // nativas, e a lista que o App usa para decidir passa a incluir as irmãs do módulo.
+  const visibleEditorTabs = useMemo(
+    () => hasSessions ? fundirAbas(getEditorTabsVisibleForSession(editorTabs, activeSession.id), abasProjetadasDoModulo) : [],
+    [hasSessions, editorTabs, activeSession.id, abasProjetadasDoModulo],
+  )
+  // D148 §2/§4: o corpo capaz é fornecido enquanto a sessão tiver abas de ARQUIVO do
+  // módulo — não só quando uma delas está ativa. Manter montado é o que dá atendente a
+  // `requestCloseTab` de uma aba irmã (D147 §5); o EditorArea oculta com display:none
+  // quando a aba ativa é outra, e isso é seguro porque o CodeEditorPane usa
+  // automaticLayout. Se o módulo não oferece mountCodeEditor, o centro FALHA VISÍVEL.
+  const haAbasDeArquivoDoModulo = abasProjetadasDoModulo.some((tab) => tab.type === 'file')
+  const moduloMontaCentro = !!explorerModule && typeof explorerModule.mountCodeEditor === 'function'
+  const codeEditorSlot = haAbasDeArquivoDoModulo && moduloMontaCentro && explorerModule
+    ? <CenterCodeEditorSlot module={explorerModule} sessionId={activeSession.id} />
+    : undefined
+  const codeEditorUnavailable = haAbasDeArquivoDoModulo && !moduloMontaCentro
+    ? 'O módulo Explorer/Busca desta cópia não oferece mountCodeEditor: as abas de arquivo aparecem na faixa, mas ninguém pode gravar em disco a partir do centro. Editar e salvar (RF15-1) não está disponível.'
+    : undefined
   // Tipo da aba ativa — usado para "gate" da ação Toggle Details (só faz sentido
   // em abas com painel de detalhes acoplado: Changes/Files, nunca Browser/Search).
   const activeVisibleTabId = resolverAbaVisivel(visibleEditorTabs, activeTabId)
@@ -848,6 +896,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setActiveTabId(undefined)
       return
     }
+    // Onda 2c-i (D148 §3): aba de fronteira — além de marcar a ativa no shell, é
+    // preciso dizer ao MÓDULO que aquela uri é a ativa, porque é o EditorService dele
+    // que decide o que o corpo central mostra. `activate` ignora uri que não está no
+    // grupo da sessão, então o shell não tem como forçar estado que o modelo não tem.
+    const partes = dividirIdDoModulo(tab.id)
+    if (partes) {
+      explorerModuleRef.current?.attach.activateTab?.({ sessionId: partes.sessionId, uri: partes.uri as WorkspaceUri })
+    }
     setActiveTabId(tab.id)
     setMobilePane('editor')
     mruRef.current = registrarUso(mruRef.current, tab.id)
@@ -994,6 +1050,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const selectEditorTab = (id: string) => {
+    // Onda 2c-i: o clique pode cair numa aba de fronteira, que NÃO vive em
+    // `editorTabs` — ela vem da projeção. Sem este ramo, clicar numa aba do módulo
+    // na faixa central não faria nada (o find devolve undefined e o guard retorna).
+    const projetada = abasProjetadasDoModulo.find((candidate) => candidate.id === id)
+    if (projetada) {
+      activateEditorTab(projetada)
+      return
+    }
     const tab = editorTabs.find((candidate) => candidate.id === id)
     if (!tab || (tab.sessionId && tab.sessionId !== activeSession.id)) return
     activateEditorTab(tab)
@@ -1353,6 +1417,28 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }, [openSearch, handleToggleEditorHidden, handleMobileBack, isPhone])
 
   const closeEditorTab = (id: string) => {
+    // Onda 2c-i (D148 §3): fechar aba de fronteira chama `attach.requestCloseTab` e
+    // NUNCA `setEditorTabs` — quem pode salvar ou descartar é o módulo, porque só ele
+    // alcança o EditorService e o writeFile atômico (Regra 2). O shell pede; o
+    // CenterCodeEditor abre o diálogo Salvar/Não Salvar/Cancelar e executa.
+    const partes = dividirIdDoModulo(id)
+    if (partes) {
+      const uri = partes.uri as WorkspaceUri
+      // R-081 preservado: a mesma regra de CannotClose que vale para as nativas.
+      const projetada = abasProjetadasDoModulo.find((tab) => tab.id === id)
+      if (projetada && !isTabCloseable(projetada, sidePaneState)) return
+      if (haAbasDeArquivoDoModulo && moduloMontaCentro) {
+        explorerModuleRef.current?.attach.requestCloseTab?.({ sessionId: partes.sessionId, uri })
+      } else {
+        // D148 §4 / D147 §5: sem corpo montado o pedido não faz nada, e o chamador
+        // trata como FALHA — NUNCA como descarte silencioso. Nesta cópia o caso é
+        // inatingível para abas `file` (o corpo fica montado enquanto houver aba de
+        // arquivo do módulo); é real para search/changes/diff-arquivo, cujo corpo é
+        // trabalho da Onda 3 (D148 §6). Nada é removido do estado por este caminho.
+        console.warn('[agente-window] fechar aba de fronteira sem corpo central montado — pedido não atendido, nada foi descartado', id)
+      }
+      return
+    }
     const closing = editorTabs.find((tab) => tab.id === id)
     if (!closing) return
     // (E13/R-081) Reforço "CannotClose": abas gerenciadas (Changes/Files) não
@@ -2433,6 +2519,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       customizationsSurface={customizationsSurface}
       providersSurface={<ProvidersView />}
       configSurface={<ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} />}
+      frontierTabs={abasProjetadasDoModulo}
+      codeEditorSlot={codeEditorSlot}
+      codeEditorUnavailable={codeEditorUnavailable}
       onNavigateBrowser={navigateBrowser}
       onBrowserBack={browserBack}
       onBrowserForward={browserForward}

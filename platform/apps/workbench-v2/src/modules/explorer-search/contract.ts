@@ -152,6 +152,14 @@ export interface IEditorAttachApi {
    *  nada: o chamador trata isso como falha VISÍVEL, nunca como descarte
    *  silencioso. */
   requestCloseTab?(input: { sessionId: string; uri: WorkspaceUri }): void;
+  /** FATIA-15 Onda 2c-i (ADITIVO, D148 §3): a faixa de abas do centro é do shell,
+   *  então clicar numa aba projetada tem de dizer ao módulo que aquela uri é a
+   *  ativa — é o EditorService dele que decide o que o CodeEditorPane mostra.
+   *  Mapeia direto para EditorService.activate, que já existe e já é seguro:
+   *  ignora uri que não está no grupo da sessão.
+   *  *Rejeitado (D148 §3):* reaproveitar `open` para ativar — na superfície
+   *  `diff` o open exige o payload AttachDiffPayload, que o App não tem. */
+  activateTab?(input: { sessionId: string; uri: WorkspaceUri }): void;
 }
 
 // ---------------------------------------------------------------------------
