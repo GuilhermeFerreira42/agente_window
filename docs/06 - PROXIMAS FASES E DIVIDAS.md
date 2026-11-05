@@ -1539,3 +1539,21 @@ Baseline `24d1054`; reprodução e evidências no 09, seção do reteste Windows
 - P2: definir recuperação do principal após falha arbitrária da verificação pós-publicação, preservando fail-closed e backup; sem prometer rollback universal. Nova injeção desse ramo não executada após a correção.
 - P2: sanear portabilidade Windows e testes históricos/lint identificados no 09, respeitando áreas congeladas. Não alterar testes para ocultar falhas; mudanças nas áreas congeladas dependem de autorização específica.
 - Homologação humana e provedores reais continuam pendentes; este reteste não inicia D98 nem Fatia 13.
+
+---
+
+### PARTE 2H-H — 2026-11-05 — a Fatia 14 foi executada (D143)
+
+A SPEC 2H acima deixou de ser só especificação: foi implementada nos commits
+`5e36e46`, `1ff7ea0`, `40181bc`, `1e377d5`, `3d6a556`, `26f6088` e `5510e54`.
+
+**Estado dos sete critérios:** 2, 4, 5 e 6 prontos; 3 pronto no servidor e sem
+prova ponta a ponta com modelo real; 1 parcial (rótulo e régua declarada ok, mas a
+colocação da entrada diverge do mockup); 7 incompleto (tsc e unit verdes, E2E não
+verificado, roteiro do dono pendente).
+
+**Três divergências e a lista do que não foi verificado estão em `docs/05`, D143.**
+Elas não foram escondidas nesta parte: quem ler só a SPEC precisa saber que a
+execução existe e que tem ressalvas registradas em outro lugar.
+
+A sequência da D133 segue: **Fatia 15** é a próxima.

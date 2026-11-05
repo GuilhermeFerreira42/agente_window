@@ -415,3 +415,99 @@ comando, e já produziu um falso verde nesta execução.
 
 **R-3 — Nenhuma mensagem de commit afirma o que não foi verificado.** Se um fato
 não foi medido, ele não entra na mensagem; se entra, entra como "não verificado".
+
+---
+
+## D143 — 2026-11-05 — Fatia 14 TECNICAMENTE PRONTA; aceite humano pendente e três divergências relatadas
+
+**Status declarado:** a Fatia 14 (Personalizações — Habilidades + Ferramentas
+reais) está **tecnicamente pronta**. Isso NÃO é aceite. Pela D140, aceite humano
+pendente deve ser **identificado, não inventado** — e está identificado na seção
+"O que não foi verificado" abaixo.
+
+### O que foi entregue, em cinco commits
+
+| Commit | Conteúdo |
+|---|---|
+| `5e36e46` | Casa Personalizações inteira: contrato, descoberta de skills nas duas raízes, estado persistido, projeção das ferramentas reais, rotas, cliente, barrel. 117 testes. |
+| `1ff7ea0` | Cano de instrução de produto nos quatro protocolos (E-1 opção b). |
+| `40181bc` + `1e377d5` | Rename de segurança de nomeação e a correção do erro que ele causou (ver D142). |
+| `3d6a556` | Composição na prefeitura (E-2, E-3 etapa 1) e injeção na casa Agir. 28 testes. |
+| `26f6088` | Tela real ligada ao servidor; App.tsx encolheu de 2753 para 2724 linhas. 17 testes. |
+| `5510e54` | Régua declarada da entrada, ±2px (RF14-6). 10 testes. |
+
+**Placar:** regressão integral **1304 aprovados | 12 reprovados | 23 ignorados
+(1339)** contra o baseline **1127 | 12 | 23**. São **+177 testes** nesta fatia e
+as **mesmas 12 falhas pré-existentes** (PEND-02 e PEND-03). typecheck zero
+diagnósticos. `build:fs-boundary` EXIT 0.
+
+### Os sete critérios de aceite da SPEC 2H, um por um
+
+| # | Critério | Estado | Onde está a prova |
+|---|---|---|---|
+| 1 | Lateral tem "Personalizações", medidas do mockup ±2px | **PARCIAL** | Rótulo PT-BR e alcançável: `App.test.tsx` clica no menuitem. Medidas: `personalizacoesRegua.test.ts` (10 provas, com verificação de que o teste morde). Ver divergência A. |
+| 2 | Criar skill → aparece e liga/desliga funciona | **PRONTO** | `PersonalizacoesView.test.tsx` (criação via POST + recarga) e `rotas.test.ts`/`estado.test.ts` no servidor. |
+| 3 | Invocar `/nome` → agente segue a skill | **PRONTO no servidor** | `composicaoContexto.test.ts` (28 provas) + `instrucoes.test.ts` (15). Falta a ponta a ponta com modelo real — ver divergência C. |
+| 4 | Desligar `excluir` → some do anúncio ao modelo | **PRONTO** | `ferramentasPermitidas` → `anunciarFerramentas(protocolo, permitidas)`; provado em `instrucoes.test.ts` e `composicaoContexto.test.ts`. |
+| 5 | Frontmatter torto → "com erro", lista de pé | **PRONTO** | `skills.test.ts` (61) e `PersonalizacoesView.test.tsx` (faixa "com erro" + motivo, lista segue). |
+| 6 | F5 persiste | **PRONTO** | Estado em `~/.agente_window/personalizacoes.json`, gravação atômica; `estado.test.ts` (26). |
+| 7 | tsc 0 + unit + E2E stub verdes + roteiro do dono | **INCOMPLETO** | tsc 0 e unit verdes. **E2E NÃO VERIFICADO** e roteiro do dono **PENDENTE**. |
+
+### Divergência A — a colocação da entrada não é a do mockup
+
+O mockup de referência
+(`docs/arquivo_morto/pesquisa_bruta/personalizacoes/vscode_agents_mockup_interativo (1).html`)
+trata "AI Customization" como **ícone da activity bar**
+(`.codicon-ai-customization-view-icon`). A implementação existente — herdada do
+mock E16, anterior a esta fatia — coloca a entrada no **menu de nova aba do
+editor**. São elementos diferentes, com geometrias diferentes.
+
+**Decisão:** não reconciliar nesta fatia. Mudar a entrada de lugar é redesenhar o
+layout do Bairro 1, e a SPEC 2H §8 diz que a Fatia 14 é "tornar real o que já
+existe como mock", não reconstruir. A régua do teste é a do CSS que a aplicação
+já tinha, e o cabeçalho de `personalizacoesRegua.test.ts` diz isso explicitamente
+para ninguém citar aquele teste como "o ±2px do mockup está verificado".
+
+**Custo de não decidir agora:** se o dono quiser a entrada na activity bar, é
+trabalho de layout no Bairro 1 e deve entrar como item próprio, não como ajuste da
+Fatia 14.
+
+### Divergência B — o pipeline R-065 foi desconectado da tela
+
+O mock agregava contribuições dinâmicas de agent plugins (R-065) e as projetava na
+seção Plugins. A SPEC 2H limita a v1 a três seções, então a Plugins não é
+renderizada e o encanamento saiu do síndico junto com o resto do mock.
+
+**Nada foi apagado:** `domain/agentPlugins.ts`, `agentPluginsData.ts`,
+`domain/aiCustomizations.ts`, `aiCustomizationsData.ts`,
+`components/CustomizationsView.tsx` e os testes de todos eles continuam intactos e
+verdes (`aiCustomizations.test.ts`, 11 provas). Desconectar a tela do mock não é
+apagar o requisito. Religação fica para as fatias 17+, quando houver dados reais.
+
+### Divergência C — não há prova ponta a ponta com modelo real
+
+O critério 3 está provado em duas pontas separadas: o servidor compõe a instrução
+e a injeta pelo mecanismo nativo de cada protocolo (testes com vizinho falso), e a
+tela carrega e salva de verdade. **Não existe prova de que um modelo real, ao
+receber a instrução, siga a skill.** Isso exige provedor configurado e chamada
+externa, e não foi feito.
+
+### O que NÃO foi verificado (nunca registrar como aprovado)
+
+- **E2E / Playwright (44 specs):** os binários de navegador não estão instalados.
+  O critério 7 pede "E2E stub verdes"; isso **não foi executado**.
+- **Medição real de pixels:** jsdom não faz layout. O que existe é contrato sobre
+  valor declarado.
+- **`vite build`:** continua inviável neste ambiente por memória (OOM documentado).
+- **Roteiro do dono:** pendente por definição — é aceite humano.
+- **Windows real:** não testado.
+- **Modelo real seguindo a skill:** divergência C.
+
+### Dívidas que esta fatia tocou
+
+- **PEND-02 (contratos visuais):** eu **piorei** `themeTokens` ao referenciar quatro
+  tokens `--vscode-inputValidation-*` não declarados, elevando os ofensores de 3
+  para 7. Corrigido no mesmo ato: os quatro foram declarados em `theme.css` nos
+  blocos Dark+ e Light+. Os ofensores voltaram aos 3 `quickInput` originais. O
+  teste **continua reprovado** — é a pendência antiga, delimitada, não maquiada.
+- **PEND-03 (TerminalPanel, 9 falhas):** intocada. Relevante para a Fatia 16.

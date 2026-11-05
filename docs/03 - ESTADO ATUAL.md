@@ -267,3 +267,22 @@ ts funcionais pequenos com typecheck 0 e testes verdes.
 - Playwright Debian confirmou `/tmp` simultaneamente em título, `/fs/root` e `pwd`. Relatório: `arquivo_morto/relatorio_fatia06_final.md`.
 
 **SNAPSHOT HISTÓRICO — ADENDO F5-B e regressão (2026-10-27, antes da revisão D121):** base F5-B em `b3a8520`; commits, canary e evidência seguem documentados para rastreabilidade. D120 permanece: somente `verified` válido libera Agir; `declared` opcional. O placar global citado naquele registro (307/315 suites, 958 pass/12 fail/33 skip) foi superado pela regressão final da missão: 121 arquivos, 117 pass/4 fail; 962 testes pass/12 fail/20 skip (inclui o teste posterior de cancelamento durante registro de modo), com falhas em TerminalPanel (9), iconLabels (1), themeTokens (1) e visualStates (1). Nenhuma chamada real/credencial; sem Windows, E2E browser, push ou homologação.
+
+### Atualização 2026-11-05 (D143) — Fatia 14 tecnicamente pronta
+
+O estado vigente descrito acima avançou: a Fatia 14 foi executada por inteiro, em
+três unidades (casa Personalizações, cano de instrução + composição na prefeitura,
+tela real ligada ao servidor) e sete commits.
+
+- **Casas do Bairro 2 agora são cinco:** agir, config, conversa, provedores e
+  **personalizacoes** (nova, no endereço que a D69 reservava).
+- **A prefeitura ganhou um módulo:** `server/session-persistence/composicaoContexto.ts`,
+  irmão de `chatAlvo.ts`. É onde a instrução de produto é composta, no servidor.
+- **`MensagemAgir.papel` NÃO mudou.** A instrução viaja em campo próprio
+  (`instrucoesDeProduto`) e entra pelo mecanismo nativo de cada protocolo.
+- **Placar:** 1304 aprovados | 12 reprovados | 23 ignorados (1339). As 12 são as
+  pré-existentes PEND-02 e PEND-03. typecheck zero.
+- **App.tsx encolheu** de 2753 para 2724 linhas (RNF14-3).
+- **Aceite humano pendente** e três divergências relatadas: ver `docs/05`, D143.
+
+Próximo pela ordem da D133: **Fatia 15**.
