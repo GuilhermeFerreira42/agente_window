@@ -4,7 +4,11 @@ export type ChatStatus = SessionStatus
 export type MessageRole = 'user' | 'assistant'
 export type ChatVote = 'up' | 'down'
 export type ChatCopyKind = 'message' | 'code'
-export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'customizations' | 'providers' | 'config'
+// FATIA 15 (D146 §1): 'diff-arquivo' e o diff read-only de UM arquivo que so o modulo
+// tem (aba fixa ATTACH_DIFF_URI, original/modified ja resolvidos). Nao pode ser o mesmo
+// tipo de 'diff' porque os dois sao superficies singleton e colidiriam na reutilizacao de
+// aba. Aditivo: verificado que nao ha validador de tipo em runtime e que tabIcon tem default.
+export type EditorTabType = 'file' | 'browser' | 'search' | 'diff' | 'diff-arquivo' | 'customizations' | 'providers' | 'config'
 export type BrowserViewport = 'desktop' | 'tablet' | 'mobile'
 export type BrowserStatus = 'loading' | 'ready' | 'error'
 
