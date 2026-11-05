@@ -688,3 +688,85 @@ pré-existente. Ponto de retorno conhecido: **HEAD `e9cdd10`**, suíte 1304 | 12
 Não reabre a SPEC 2I. Não antecipa as fatias 16–20 nem M1–M8. Não altera a
 sequência da D133. Não cria décimo canônico. Não toca no terminal humano (Regra 1).
 **Não homologa nada** — aceite humano continua sendo do dono.
+
+## D145 — FATIA 15, Onda 1 executada: dono novo no shell, sucessão MRU e três correções de rota (2026-11-05)
+
+**Contexto.** A D144 fechou o gate técnico e a Onda 0 inventariou e classificou os
+testes antes de codar (padrão D74). Esta decisão registra o que a Onda 1 fez, o que
+ela **não** fez e três correções em previsões minhas. Commits: `b26544c` (criação do
+dono, aditivo) e `5bf3e1c` (App delega, módulo antigo removido).
+
+**1. O dono novo existe e é `src/shell/abas.ts`.** Modelo único de aba: o `EditorTab`
+do centro (por **id**) acrescido de `uri`, `dirty` e `preview` — que eram só do modelo
+do anexo (por **uri**). A aba passa a carregar o próprio estado, e é isso que responde
+à tensão central da D144: sem a Regra 10 (montagem permanente), o estado se preserva
+por **modelo**. RF15-2 e RF15-4 dependem disso. Os algoritmos de MRU, preview único e
+bloqueio de dirty **espelham `core/editor/editorService.ts` linha por linha** — Regra
+8 (reposicionar, nunca reescrever) e regra dura 2 (`core/**` intocável, e não foi
+tocado: as 44 travas atravessaram as duas ondas sem nenhuma linha alterada).
+31 provas novas, incluindo uma **discriminante** da política de sucessão.
+
+**2. A máquina de estados 4→2 SAIU da Onda 1 e foi para a Onda 3.** É mudança de
+conteúdo de onda, então vai aqui com alternativa rejeitada.
+
+*Por que mover:* dois dos três inputs da máquina (`editorHidden`, `auxVisible`) só
+existem por causa da coluna, e o `dockedAuxiliaryController` inteiro (Hide/Show
+Editor) é o mecanismo da transição Detail-only da coluna. Além disso a saída da
+máquina é **classe CSS** (`side-pane-${sidePaneState}`, quatro sítios no `App.tsx`) e
+o guard `isTabCloseable(aba, 'detail-only')` é compartilhado por `App.tsx` e
+`EditorArea.tsx`. Colapsar a máquina enquanto a coluna ainda renderiza exigiria uma
+composição transitória do tipo `chatCentralizado(abas) && !renderDesktopAuxiliaryBar`
+— um estado intermediário incoerente carregado por duas ondas e desfeito na terceira.
+
+*Decisão:* a máquina colapsa **junto** com a aposentadoria da coluna, na Onda 3, numa
+mudança só. A Onda 1 ficou com o que é desacoplado dela: o modelo único e a sucessão.
+*Rejeitado:* colapsar na Onda 1 com a composição transitória — antecipa o requisito
+(d) ao custo de duas ondas com o painel em estado híbrido, e o `abas.ts` já traz os
+dois estados prontos e testados, então a Onda 3 só liga.
+
+**3. Correção de uma previsão minha (Onda 0 §3.1).** O mapa dizia que os testes 2–3 de
+`__tests__/editorTabs.test.ts` reprovariam **de propósito** na Onda 1 por causa do MRU.
+Medido, é falso, por dois motivos: com MRU vazio o fallback `tabs[min(idx, len-1)]`
+devolve os **mesmos valores** que a política da vizinha da direita (`b→c`, `c→b`), e o
+que muda é endereço e assinatura, não valor esperado. A diferença real só aparece com
+histórico de uso, e é travada por teste discriminante novo. **Lição: previsão de quebra
+de teste se mede rodando, não se afirma por leitura** — mesma raiz do erro dos 138.
+
+**4. O arquivo de teste antigo foi absorvido, não repontado.** `domain/editorTabs.ts`
+(37 L) e `__tests__/editorTabs.test.ts` (4 testes) saíram em `5bf3e1c`. As quatro
+propriedades estão re-provadas no endereço novo, com mapeamento explícito na mensagem
+do commit (D79: nada some em silêncio). O mapa da Onda 0 classificava esses 4 como
+"Sobrevive"; o correto é **"propriedade sobrevive, arquivo morre por absorção"** —
+manter dois arquivos provando o mesmo contrato seria duplicação.
+
+**5. RNF15-2: o `App.tsx` CRESCEU 15 linhas nesta onda (2725 → 2740).** Registrado sem
+maquiar. O requisito é propriedade do **fim da fatia** e a meta dele é "gestão de abas
+sai do App" — o que saiu nesta onda foi a **política** (sucessão), que é a substância
+da meta. O encolhimento de linhas vem na Onda 3, com a máquina, o Hide/Show Editor e o
+`dockedAuxiliaryController`. Se ao fim da fatia o `App.tsx` não estiver menor que
+2724 linhas, o RNF15-2 será registrado como **não atendido**, não como atendido.
+
+**6. Observação: mais uma referência pendurada, agora na regra dura 3.** A regra diz
+"`App.tsx` só wiring aditivo via barrel (`src/shell/index.ts`)". Esse barrel **não
+existe** e o `App.tsx` já importa cinco módulos do shell diretamente
+(`activityBar`, `sideBar`, `layoutState`, `viewRegistry`, `panel`). Segui a convenção
+real do código (`./shell/abas`) em vez de criar um barrel parcial e conviver com duas
+convenções. Não é violação nova: é violação pré-existente que não vou ampliar nem
+corrigir no meio de uma refactoração de layout. Somando-se ao `docs/18` (D144), são
+**duas** referências penduradas nas regras duras.
+
+**7. Placar medido da Onda 1.** 180 testes = **163 aprovados | 1 reprovado | 16
+ignorados** (13 arquivos), 74,80 s. A única falha é `iconLabels.test.ts:80`, PEND-02
+pré-existente, idêntica à baseline da Onda 0. Aritmética confere: 153 − 4 + 31 = 180.
+`App.test.tsx` 62 verdes (49 ativos + 13 skip), **nenhuma regressão**. typecheck 0.
+Evidências: `41-onda1-modelo-unico-abas.log` (70 testes, dono + travas) e
+`42-onda1b-sucessao-mru-app.log` (180 testes, inventário completo).
+
+**O que a Onda 1 NÃO fez, deliberadamente:** não tocou em `core/**` nem `server/**` do
+módulo; não aposentou a coluna; não colapsou a máquina; não criou nenhum `it.skip`;
+não mexeu em PEND-02; não roteou Explorer/Busca/SCM (Onda 3); não pôs o editor que
+salva no centro (Onda 2).
+
+**Próxima:** Onda 2 — `CodeEditorPane` no centro da aba `file`, reaproveitando
+`writeFileAtomic`. Trava: `editorService` (21) + `editorServiceDiff` (6) +
+`editorTabs.test.tsx` (7) verdes sem nenhuma linha alterada.
