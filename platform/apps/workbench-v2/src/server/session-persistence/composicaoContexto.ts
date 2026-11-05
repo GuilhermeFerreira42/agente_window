@@ -21,8 +21,12 @@
 // resultado é um objeto com campos nomeados, e não uma tupla.
 // ============================================================================
 import type { InstrucaoDeProduto } from '../../bairros/2-inteligencia/casas/agir'
-import { ESTADO_PADRAO, FONTE_PADRAO_NOME_SKILL } from '../../bairros/2-inteligencia/casas/personalizacoes'
-import type { EstadoPersonalizacoes, Skill } from '../../bairros/2-inteligencia/casas/personalizacoes'
+// Importa do CONTRACT da casa, não do barrel: o barrel também exporta a tela
+// React, e a prefeitura roda no servidor — puxar React e CSS para dentro do grafo
+// do servidor por causa de duas constantes seria um defeito gratuito. É o mesmo
+// motivo pelo qual a prefeitura importa `config/server/repo` direto.
+import { ESTADO_PADRAO, FONTE_PADRAO_NOME_SKILL } from '../../bairros/2-inteligencia/casas/personalizacoes/contract'
+import type { EstadoPersonalizacoes, Skill } from '../../bairros/2-inteligencia/casas/personalizacoes/contract'
 import { lerEstado } from '../../bairros/2-inteligencia/casas/personalizacoes/server/estado'
 import { ferramentasPermitidas } from '../../bairros/2-inteligencia/casas/personalizacoes/server/ferramentas'
 import { descobrirSkills, resolverInvocacao } from '../../bairros/2-inteligencia/casas/personalizacoes/server/skills'

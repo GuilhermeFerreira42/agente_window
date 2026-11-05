@@ -1836,48 +1836,79 @@ describe('App session flows', () => {
     expect(document.querySelector('.auxiliary-bar')).toBeInTheDocument()
   })
 
-  // E16 (AI_CUSTOMIZATIONS.md): abre a superfície de customizações pelo menu de
-  // nova aba; contagens == linhas; troca de harness filtra seções; enablement de
-  // built-in alterna; skill runnable dispara ação real (toast).
-  it('abre AI Customizations, troca harness, alterna enablement e executa skill', async () => {
+  // FATIA 14 (SPEC 2H): a superfície de Personalizações deixou de ser o mock E16
+  // e passou a carregar dados REAIS do servidor. O que este teste prova é a
+  // LIGAÇÃO através do síndico: o menu abre a view da casa, a view busca
+  // /api/personalizacoes, e a v1 mostra exatamente as três seções da SPEC — sem o
+  // seletor de harness e sem os cinco cartões que ficam para as fatias 17+.
+  //
+  // Substitui o teste anterior, que exercitava harness/enablement/plugins do mock.
+  // Aquela asserção não foi afrouxada: o comportamento deixou de existir na tela,
+  // porque a SPEC 2H limita a v1 a Visão geral + Habilidades + Ferramentas. Os
+  // módulos de domínio (aiCustomizations, agentPlugins), a view antiga e os testes
+  // próprios de todos eles continuam intactos para as fatias 17+.
+  it('abre Personalizações, carrega dados reais do servidor e mostra as três seções da v1', async () => {
     const user = userEvent.setup()
-    render(<App initialSessionSnapshot={testSessions} />)
-    await openInitialBrowser(user)
+    const chamadas: string[] = []
+    // Sem servidor neste teste: o fetch é falso e devolve uma visão central com
+    // uma skill real e uma ferramenta DESLIGADA, para provar que a tela mostra o
+    // que o servidor mandou — e não um conjunto fixo de mock.
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      chamadas.push(String(url))
+      if (String(url).startsWith('/api/personalizacoes')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            skills: [{
+              id: 'usuario:commit', nome: 'commit', descricao: 'Padroniza commits.',
+              origem: 'usuario', pasta: '/p/commit', arquivo: '/p/commit/SKILL.md',
+              estado: 'ok', corpo: 'Corpo da skill.', ligada: true,
+            }],
+            ferramentas: [
+              { id: 'ler', titulo: 'Ler arquivo', descricao: 'Lê um arquivo.', grupo: 'leitura', ligada: true },
+              { id: 'excluir', titulo: 'Excluir', descricao: 'Apaga um arquivo.', grupo: 'destrutiva', ligada: false },
+            ],
+            estado: { skillsDesligadas: [], ferramentasDesligadas: ['excluir'] },
+            raizProjeto: '/home/dono/projeto',
+          }),
+        }
+      }
+      return { ok: false, status: 404, json: async () => ({}) }
+    }))
 
-    await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
-    await user.click(screen.getByRole('menuitem', { name: 'AI Customizations' }))
+    try {
+      render(<App initialSessionSnapshot={testSessions} />)
+      await openInitialBrowser(user)
 
-    const surface = screen.getByRole('region', { name: 'Personalizações de IA' })
-    expect(surface).toBeInTheDocument()
-    // A seção Plugins não existe no harness Local (default).
-    expect(within(surface).queryByText('Plugins')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
+      // RNF14-4 / SPEC 2H (a): o rótulo visível é "Personalizações".
+      await user.click(screen.getByRole('menuitem', { name: 'Personalizações' }))
 
-    // Trocar para Copilot CLI revela a seção Plugins.
-    await user.selectOptions(within(surface).getByRole('combobox', { name: 'Selecionar harness' }), 'copilot')
-    expect(within(surface).getByText('Plugins')).toBeInTheDocument()
-    // (R-065) Contribuições dinâmicas dos agent plugins aparecem no harness
-    // Copilot (fonte 'plugin'): a colisão de identidade canônica escolhe a
-    // versão do marketplace do "team-toolkit" (triage-bot/scaffold-component).
-    expect(within(surface).getByText('triage-bot')).toBeInTheDocument()
-    expect(within(surface).getByText('scaffold-component')).toBeInTheDocument()
-    // O harness Claude esconde a fonte 'plugin' → some.
-    await user.selectOptions(within(surface).getByRole('combobox', { name: 'Selecionar harness' }), 'claude')
-    expect(within(surface).queryByText('triage-bot')).not.toBeInTheDocument()
-    await user.selectOptions(within(surface).getByRole('combobox', { name: 'Selecionar harness' }), 'copilot')
+      const surface = screen.getByRole('region', { name: 'Personalizações' })
+      expect(surface).toBeInTheDocument()
+      expect(chamadas.some((url) => url.startsWith('/api/personalizacoes'))).toBe(true)
 
-    // Voltar ao Local e desabilitar um skill built-in (commit).
-    await user.selectOptions(within(surface).getByRole('combobox', { name: 'Selecionar harness' }), 'local')
-    await user.click(within(surface).getByRole('button', { name: 'Desabilitar commit' }))
-    expect(within(surface).getByRole('button', { name: 'Habilitar commit' })).toBeInTheDocument()
+      // v1 = Visão geral + Habilidades + Ferramentas, e nada além disso.
+      expect(within(surface).getByText('Visão geral')).toBeInTheDocument()
+      expect(within(surface).getByText('Habilidades')).toBeInTheDocument()
+      expect(within(surface).getByText('Ferramentas')).toBeInTheDocument()
+      for (const ausente of ['Plugins', 'Hooks', 'MCP', 'Instructions', 'Prompts']) {
+        expect(within(surface).queryByText(ausente), ausente).not.toBeInTheDocument()
+      }
+      expect(within(surface).queryByRole('combobox', { name: 'Selecionar harness' })).not.toBeInTheDocument()
 
-    // Executar a skill create-pr dispara feedback observável (mock).
-    await user.click(within(surface).getByRole('button', { name: 'Executar skill create-pr' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Skill create-pr executada (mock)')
-
-    // Filtrar reduz as linhas exibidas mantendo o mesmo modelo (contagem coerente).
-    fireEvent.change(within(surface).getByRole('textbox'), { target: { value: 'pull request' } })
-    expect(within(surface).getByText('create-pr')).toBeInTheDocument()
-    expect(within(surface).queryByText('changelog')).not.toBeInTheDocument()
+      // Os dados vêm do servidor: a skill real aparece, e a ferramenta que o
+      // servidor disse estar desligada oferece "Ligar" enquanto a ligada oferece
+      // "Desligar". Um mock fixo não passaria nestas duas linhas.
+      expect(within(surface).getByText('/commit')).toBeInTheDocument()
+      expect(within(surface).getByText('Padroniza commits.')).toBeInTheDocument()
+      expect(within(surface).getByRole('button', { name: 'Ligar Excluir' })).toBeInTheDocument()
+      expect(within(surface).getByRole('button', { name: 'Desligar Ler arquivo' })).toBeInTheDocument()
+    } finally {
+      // Sem isto, um fetch falso vazaria para os testes seguintes do arquivo.
+      vi.unstubAllGlobals()
+    }
   })
 
 })

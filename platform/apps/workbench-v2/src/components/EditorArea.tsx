@@ -594,7 +594,8 @@ export function EditorArea({
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewFile)}><FileCode2 size={13} /><span>Files</span></button>
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewBrowser)}><Globe2 size={13} /><span>Browser</span></button>
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewSearch)}><Search size={13} /><span>Search</span></button>
-            <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewCustomizations)}><Blocks size={13} /><span>AI Customizations</span></button>
+            {/* RNF14-4 / SPEC 2H (a): o rótulo visível é "Personalizações". */}
+            <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewCustomizations)}><Blocks size={13} /><span>Personalizações</span></button>
           </div>}
         </div>
         <div className="editor-toolbar">

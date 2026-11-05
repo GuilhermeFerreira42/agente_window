@@ -123,6 +123,13 @@
   --vscode-inputOption-hoverBackground: rgba(90, 93, 94, 0.5);
   --vscode-inputValidation-errorBackground: #5a1d1d;
   --vscode-inputValidation-errorBorder: #be1100;
+  /* FATIA 14: estes quatro já eram referenciados pelo CSS mas não estavam
+     declarados, e o contrato de tokens (themeTokens) acusa toda referência sem
+     declaração. Valores do Dark+ do VS Code. */
+  --vscode-inputValidation-errorForeground: #ffffff;
+  --vscode-inputValidation-infoBackground: #063b49;
+  --vscode-inputValidation-infoBorder: #007acc;
+  --vscode-inputValidation-infoForeground: #ffffff;
   --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.2);
   --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.2);
   --vscode-problemsInfoIcon-foreground: #3794ff;
@@ -358,6 +365,11 @@
   --vscode-inputOption-hoverBackground: rgba(184, 184, 184, 0.31);
   --vscode-inputValidation-errorBackground: #f2dede;
   --vscode-inputValidation-errorBorder: #be1100;
+  /* FATIA 14: mesmos quatro tokens, valores do Light+ do VS Code. */
+  --vscode-inputValidation-errorForeground: #000000;
+  --vscode-inputValidation-infoBackground: #d6ecf2;
+  --vscode-inputValidation-infoBorder: #007acc;
+  --vscode-inputValidation-infoForeground: #000000;
   --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.4);
   --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.4);
   --vscode-problemsInfoIcon-foreground: #1a85ff;

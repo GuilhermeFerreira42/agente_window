@@ -136,7 +136,10 @@ describe('customView — utilidades', () => {
   })
 
   it('dá título humano para cada view', () => {
-    expect(customViewTitle('aiCustomizations')).toBe('AI Customizations')
+    // FATIA 14 / RNF14-4: o título visível passou a ser em português. Não é
+    // asserção afrouxada — é o valor esperado trocado para o que a SPEC 2H pede,
+    // e continua sendo uma igualdade exata.
+    expect(customViewTitle('aiCustomizations')).toBe('Personalizações')
     expect(customViewTitle('automations')).toBe('Automations')
     expect(customViewTitle('test')).toBe('Test')
   })

@@ -44,3 +44,7 @@ export { GRUPO_POR_FERRAMENTA, gruposPresentes, projetarFerramentas } from './se
 /** A tela fala com a casa SÓ por aqui (as URLs moram na casa). */
 export { carregarPersonalizacoes, criarSkillNaTela, salvarEstadoPersonalizacoes } from './ui/client/api'
 export type { AlvoPersonalizacoes, PedidoCriarSkillTela } from './ui/client/api'
+
+/** A tela da casa (Fatia 14, SPEC 2H v1). O síndico apenas a renderiza. */
+export { PersonalizacoesView } from './ui/PersonalizacoesView'
+export type { PersonalizacoesViewProps } from './ui/PersonalizacoesView'

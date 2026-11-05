@@ -17,11 +17,9 @@ import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, p
 import { useSessionPersistence } from './services/sessions/useSessionPersistence'
 import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
-import { customizationItems, harnesses, DEFAULT_HARNESS_ID } from './aiCustomizationsData'
-import { toggleEnablement, type EnablementState, type ProjectedItem } from './domain/aiCustomizations'
-import { aggregatePlugins, projectPluginContributions, EMPTY_PLUGIN_ENABLEMENT } from './domain/agentPlugins'
-import { initialPluginDiscoveries } from './agentPluginsData'
-import { CustomizationsView } from './components/CustomizationsView'
+// FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
+// renderiza — nenhum estado de personalização mora aqui.
+import { PersonalizacoesView } from './bairros/2-inteligencia/casas/personalizacoes'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
@@ -513,19 +511,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const multipleSessionsVisibleObs = useRef(observableValue('multipleSessionsVisible', false))
   const visibleSessionResourcesObs = useRef(observableValue<readonly string[]>('visibleSessionResources', [BOOT_SESSION_ID]))
   const liveLayoutRef = useRef<{ auxiliaryVisible: boolean; activeViewContainerId: 'changes' | 'files' }>({ auxiliaryVisible: persistedLayout.current.shell.auxiliaryVisible, activeViewContainerId: 'changes' })
-  // E16 — AI Customizations: harness ativo + enablement dos built-ins (store
-  // separado da descoberta). Estado por janela, como no original.
-  const [harnessId, setHarnessId] = useState(DEFAULT_HARNESS_ID)
-  const [customizationEnablement, setCustomizationEnablement] = useState<EnablementState>({ disabled: [] })
-  // (R-065) Agent plugins contribuídos dinamicamente: o AgentPluginService
-  // agrega as discoveries (colisão por identidade canônica resolvida por
-  // prioridade) e projeta seus conteúdos como itens 'plugin', que fluem pelo
-  // mesmo pipeline de harness/enablement da view de AI Customizations.
-  const pluginDiscoveries = useRef(initialPluginDiscoveries)
-  const allCustomizationItems = useMemo(() => {
-    const plugins = aggregatePlugins(pluginDiscoveries.current, { pluginsEnabled: true })
-    return [...customizationItems, ...projectPluginContributions(plugins, EMPTY_PLUGIN_ENABLEMENT)]
-  }, [])
+  // FATIA 14: o estado de personalizações (harness ativo, enablement dos
+  // built-ins, itens agregados e o pipeline de plugins R-065) SAIU do síndico e
+  // foi para a casa Personalizações, que carrega dados REAIS do servidor em vez
+  // do mock E16. RNF14-3: App.tsx não cresce — encolhe.
+  //
+  // O que NÃO foi apagado: os módulos de domínio aiCustomizations.ts,
+  // aiCustomizationsData.ts, agentPlugins.ts, agentPluginsData.ts, a view
+  // components/CustomizationsView.tsx e os testes de todos eles continuam
+  // intactos. A SPEC 2H limita a v1 a Visão geral + Habilidades + Ferramentas;
+  // os cinco cartões restantes (Agents, Instructions, Prompts, Hooks, MCP,
+  // Plugins) voltam a ser renderizados nas fatias 17+, quando o R-065 for
+  // religado a dados reais. Desconectar a tela do mock não é apagar o requisito.
   // Auxiliary sections mirror the reference view state: collapse/expand is
   // remembered by session instead of leaking between independent workspaces.
   const [checksExpandedBySession, setChecksExpandedBySession] = useState<Record<string, boolean>>({})
@@ -1221,7 +1218,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // back da plataforma consiga dispensá-la.
     if (isPhone) {
       setNavStack((current) =>
-        pushLayer(current, { id: 'custom-view-aiCustomizations', kind: 'custom-view', label: 'AI Customizations' }),
+        pushLayer(current, { id: 'custom-view-aiCustomizations', kind: 'custom-view', label: 'Personalizações' }),
       )
     }
   }, [isPhone, openCustomViewGrid])
@@ -1238,42 +1235,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     })
   }, [])
 
-  const handleRunSkill = (item: ProjectedItem) => {
-    notify(`Skill ${item.name} executada (mock)`)
-  }
-  const handleToggleCustomization = (item: ProjectedItem) => {
-    setCustomizationEnablement((current) => toggleEnablement(current, item))
-    notify(item.enabled ? `${item.name} desabilitada` : `${item.name} habilitada`)
-  }
-  const handleRevealCustomization = (item: ProjectedItem) => {
-    notify(`Aberto: ${item.uri}`)
-  }
+  // A identidade da conversa vai como parâmetro: é ela que permite ao servidor
+  // resolver a raiz de projeto. O caminho NUNCA é enviado pela tela (F1/D113).
+  const alvoPersonalizacoes = { sessionId: activeSession.id, chatId: activeChatId }
 
   const customizationsSurfaceEmbedded = (
-    <CustomizationsView
-      embedded
-      items={allCustomizationItems}
-      harnesses={harnesses}
-      harnessId={harnessId}
-      enablement={customizationEnablement}
-      onChangeHarness={setHarnessId}
-      onToggleEnablement={handleToggleCustomization}
-      onRunSkill={handleRunSkill}
-      onRevealItem={handleRevealCustomization}
-    />
+    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} />
   )
 
   const customizationsSurface = (
-    <CustomizationsView
-      items={allCustomizationItems}
-      harnesses={harnesses}
-      harnessId={harnessId}
-      enablement={customizationEnablement}
-      onChangeHarness={setHarnessId}
-      onToggleEnablement={handleToggleCustomization}
-      onRunSkill={handleRunSkill}
-      onRevealItem={handleRevealCustomization}
-    />
+    <PersonalizacoesView alvo={alvoPersonalizacoes} />
   )
 
   // Hide/Show Editor (⌥⌘E). Par mutuamente exclusivo editor/detalhe: ocultar o

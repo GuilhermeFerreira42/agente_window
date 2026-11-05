@@ -155,7 +155,10 @@ export function saveCustomViewState(state: CustomViewState, storage?: StorageLik
 export function customViewTitle(view: CustomViewId): string {
   switch (view) {
     case 'aiCustomizations':
-      return 'AI Customizations'
+      // FATIA 14 / RNF14-4: o ID interno continua 'aiCustomizations' (mudar o id
+      // quebraria o estado persistido de quem já tem a view aberta), mas o TÍTULO
+      // visível é em português, como exige a SPEC 2H.
+      return 'Personalizações'
     case 'automations':
       return 'Automations'
     case 'test':
