@@ -31,7 +31,18 @@ export const CAMINHO_SKILLS_PROJETO = '.agente/skills'
  * pontas — e, por construção, sem `/`, `\` ou `.`, o que torna impossível um
  * nome atravessar a raiz de armazenamento.
  */
-export const PADRAO_NOME_SKILL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+/**
+ * Fonte do padrão de nome de skill, SEM ÂNCORAS.
+ *
+ * Existe separada para que outro padrão possa ser COMPOSTO com este sem herdar
+ * `^` e `$` no meio da expressão — erro que produz um regex que nunca casa e, o
+ * que é pior, faz testes de "não deve reconhecer" passarem pelo motivo errado.
+ * A definição continua sendo uma só: `PADRAO_NOME_SKILL` é derivada daqui.
+ */
+export const FONTE_PADRAO_NOME_SKILL = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?'
+
+/** Nome de skill válido: minúsculas, dígitos e hífen, sem hífen nas pontas. */
+export const PADRAO_NOME_SKILL = new RegExp(`^${FONTE_PADRAO_NOME_SKILL}$`)
 export const TAMANHO_MAXIMO_NOME_SKILL = 64
 
 /** Limite de descrição — o suficiente para o anúncio, curto o bastante para a lista. */

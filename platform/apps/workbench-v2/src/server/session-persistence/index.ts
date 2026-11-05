@@ -16,6 +16,10 @@ import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, d
 import { resolveShell } from '../../../../../services/pty-server/src/shellDetector'
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
 import { lerConfig } from '../../bairros/2-inteligencia/casas/config/server/repo'
+// FATIA 14 (D69): Personalizações é a casa que nasce nesta fatia. A prefeitura
+// reconhece o caminho e delega — nenhuma regra de skill mora aqui.
+import { rotaPertenceAoModuloPersonalizacoes, tratarRotasPersonalizacoes } from '../../bairros/2-inteligencia/casas/personalizacoes/server/rotas'
+import { comporContexto as comporContextoDePersonalizacoes } from './composicaoContexto'
 import { obterAlvoDeConversa } from './chatAlvo'
 import { iniciarChamadaModelo } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 import { sanarCartoesDeSessao } from '../../services/agir/sanar'
@@ -250,12 +254,24 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       lerExclusaoAutomatica: lerExclusaoAutomaticaAgir,
       definirExclusaoAutomatica: definirExclusaoAutomaticaAgir,
       lerTeto: async () => (await lerConfig()).teto, // FATIA 11: teto fresco da casa Config a cada pedido
+      // FATIA 14 / DP-06: a instrução de produto é composta AQUI, no servidor.
+      // A casa Agir não sabe o que é skill; a casa Personalizações não sabe o que
+      // é execução. A prefeitura é o endereço onde os dois fatos se encontram — e
+      // é ela, não o browser, quem diz qual raiz de projeto vale (F1/D113).
+      comporContexto: comporContextoDePersonalizacoes,
     })) return true
   }
 
-  if (rotaPertenceAoModuloConfig(url.pathname)) {
-    if (await tratarRotasConfig(request, response, url)) return true
-  }
+    if (rotaPertenceAoModuloConfig(url.pathname)) {
+      if (await tratarRotasConfig(request, response, url)) return true
+    }
+
+    // FATIA 14: mesma costura das outras casas — reconhecer o caminho, delegar e
+    // só afirmar que tratou se a casa tratou de fato. `resolverContexto` é o da
+    // sessão persistida: a raiz de projeto NUNCA chega pelo browser.
+    if (rotaPertenceAoModuloPersonalizacoes(url.pathname)) {
+      if (await tratarRotasPersonalizacoes(request, response, url, { resolverContexto: resolverContextoAgir })) return true
+    }
 
   if (url.pathname === WORKSPACES_VALIDATE_ENDPOINT && request.method === 'POST') {
     const input = await readJson<{ path: string }>(request)

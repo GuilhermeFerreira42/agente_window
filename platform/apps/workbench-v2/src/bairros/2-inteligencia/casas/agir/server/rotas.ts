@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto'
 import * as nodePath from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
-import type { EventoAgir, ExecutorFerramenta, FerramentaId, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, FerramentaId, InstrucaoDeProduto, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
@@ -63,6 +63,21 @@ export interface DependenciasAgir {
   criarExecutores?: (raiz: string) => ExecutoresDisco
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
+  /**
+   * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
+   * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
+   * personalização nem descobre arquivo nenhum — recebe pronto, do mesmo jeito
+   * que recebe o teto e o alvo. A direção da dependência não se inverte: a
+   * prefeitura importa a casa, nunca o contrário.
+   *
+   * Ausente = nenhuma instrução e catálogo completo, que é o comportamento
+   * anterior (contrato aditivo de D141). `raizProjeto` vem da SESSÃO persistida,
+   * resolvida por `resolverContexto` — nunca do payload do browser (F1/D113).
+   */
+  comporContexto?: (pedido: { texto: string; raizProjeto: string | null }) => Promise<{
+    instrucoesDeProduto: readonly InstrucaoDeProduto[]
+    ferramentasPermitidas: readonly string[]
+  }>
 }
 
 interface AprovacaoPendente {
@@ -358,11 +373,23 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const reconfirmacoes = fio.execucao.exclusoesTentadas ?? new Set<string>()
   fio.execucao.exclusoesTentadas = reconfirmacoes
   try {
+    // FATIA 14 / DP-06: a instrução de produto é composta pelo SERVIDOR, a partir
+    // da raiz da SESSÃO. O texto lido é a última mensagem do DONO no histórico que
+    // já vai ao modelo — não existe segunda fonte de texto, então não há como a
+    // invocação detectada divergir do que o modelo vai ver.
+    const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
+    const composicao = deps.comporContexto
+      ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
+      : null
     resultado = await rodarAgir({
       vizinho: criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo),
       historico: fio.mensagens,
       executores,
       teto: fio.teto,
+      // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
+      // completo, que é exatamente o comportamento anterior (D141, aditivo).
+      instrucoesDeProduto: composicao?.instrucoesDeProduto,
+      ferramentasPermitidas: composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
