@@ -1,5 +1,15 @@
 # 07 - HISTORICO — Agente Window
 
+## 2026-11-05 — D141: gate técnico da Fatia 14 fechado e PEND-01 resolvida pela Arena
+
+- **Novo baseline reconciliado de forma não destrutiva:** cópia clonada do remoto `be61dcd` e consolidada no commit local `50f9334` (1027 arquivos versionados, árvore limpa, sem remote). O histórico anterior foi descartado **a pedido expresso do dono**; antes disso foi preservada cópia recuperável (`git format-patch` do commit não pushed `d4be61e` e os cinco docs editados) fora do repositório. Nenhum `reset` destrutivo, `clean` forçado ou exclusão em massa foi executado nesta passagem.
+- **Memória operacional criada fora do repositório**, como D140 determina: pasta própria do harness com diário `EXECUCAO_AUTONOMA.md`, `status.json` (fonte única de dados do painel), `dashboard.html` servido por servidor local, `evidencias/` e `checkpoints/`. Nenhum décimo canônico foi criado; nenhum log grande foi incorporado ao repositório.
+- **PEND-01 corrigida (commit local `49dcf51`, sem push):** perfil descartável de testes movido de `platform/.cache/test-runs` para `~/.agente-window-testes`, validado por módulo de política único contra dois invariantes — fora do repositório (D81) e fora de segmento ignorado pelo `NOISE` do watcher. `project.ps1` delega para `project.mjs`, então **Windows e Linux são cobertos pela mesma correção**. Acrescentadas poda de perfis antigos e limpeza ao final da execução.
+- **Baseline de testes estabelecido:** suíte integral **1127 aprovados / 12 reprovados / 23 ignorados**, contra 1121/18/23 da cópia anterior com o harness quebrado — as 6 falsas falhas do grupo PEND-01 desapareceram. `typecheck` zero diagnósticos. As 12 falhas restantes são pré-existentes (PEND-02 e PEND-03) e permanecem registradas como dívida, **sem fingir sinal verde**.
+- **Gate DP-03/DP-06/E-1..E-5 fechado pela D141**, com contrato aditivo, migração em etapas, testes e rollback registrados **antes** de qualquer código da Fatia 14 — na forma que a D129 exigiu e a D140 delegou. Detalhes em `05` D141 e `06` PARTE 2H-G.
+- **Divergência código × documentação reportada:** a nota DEBT-24/D128 em `06` afirmava que `excluir` não executa nada; o código atual desmente. A nota foi preservada como histórico e recebeu correção datada, em vez de ser reescrita.
+- **Nenhuma homologação foi declarada nesta rodada.** O aceite funcional humano permanece exclusivo do dono.
+
 ## 2026-11-04 — D140: dono delega autonomia técnica e retomada sem contexto
 
 - O dono aprovou uma nova regra vigente: Arena como executora decide detalhes técnicos, corrige testes/ambiente, fecha DP-03/DP-06/E-1..E-5 com SPEC e provas, e segue D133 até V1.0 nos limites D140. Não há autorização para mudar produto/segurança, executar operações destrutivas em dados reais, fazer push ou declarar homologação final humana.

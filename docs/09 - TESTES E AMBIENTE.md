@@ -5,6 +5,107 @@
 
 > **Vigência após aceite humano — 2026-11-04:** o dono homologou **com ressalvas somente** exclusão com as novas permissões e de alvo externo à pasta da conversa, nos limites registrados em `08`, e autorizou a passagem à Arena/Debian e o commit relacionado. Os pareceres “aguardar aceite” abaixo são anteriores a esse relato; seus placares e limites técnicos permanecem válidos. **A regressão integral continua PENDENTE, sem aprovação geral e sem baixa integral de DEBT-24.** Nenhum outro cenário manual foi homologado por inferência. Usar a seção de passagem à Arena para continuar o trabalho.
 
+## 2026-11-05 — §3.29 · Arena/Debian sobre o baseline `50f9334`: PEND-01 corrigida e baseline de testes confiável
+
+**Escopo desta passagem:** reconciliar a cópia de forma não destrutiva, corrigir **PEND-01** (autorizada expressamente por D140) **antes** de medir o baseline, e estabelecer o placar de referência da Fatia 14. **Não reexecuta** a regressão da MICRO-FATIA DELETE — `§3.28` permanece como registro histórico daquela homologação, e o plano V3.0 §6 proíbe reabri-la como tarefa preliminar.
+
+### Ambiente
+
+Debian GNU/Linux 13 (trixie), kernel 6.1.158+, 2 núcleos, **1982 MB de RAM com swap zero**, 20 GB livres em `/home/user`. `/tmp` é **tmpfs de 992 MB compartilhada com a RAM**, portanto `TMPDIR` foi redirecionado para `/home/user/.cache/tmp` em toda operação pesada. Node do sandbox é **v20.20.2 e incompatível** — `check-runtime.mjs` o recusa corretamente; a execução usa o Node **26.13.0** preparado em `platform/.runtime` (symlink para `/home/user/.cache/aw-runtime`, ignorado via `.git/info/exclude`, porque `.gitignore` com barra final não casa symlink).
+
+### Receita de retomada (o `.cache` não persiste entre reinícios do workspace)
+
+```sh
+mkdir -p /home/user/.cache/aw-runtime /home/user/.cache/tmp
+ln -sfn /home/user/.cache/aw-runtime /home/user/agente_window/platform/.runtime
+printf 'platform/.runtime\n' >> /home/user/agente_window/.git/info/exclude
+cd /home/user/agente_window && TMPDIR=/home/user/.cache/tmp JOBS=1 npm_config_jobs=1 sh iniciar.sh install
+NR=$(readlink -f platform/.runtime)/node-v26.13.0-linux-x64/bin
+PATH="$NR:$PATH" TMPDIR=/home/user/.cache/tmp sh iniciar.sh <acao>
+```
+
+`JOBS=1` é obrigatório: com swap zero, dois jobs de compilação C++ causam OOM. Para processo memory-hungry, `echo 900 > /proc/self/oom_score_adj` antes de disparar.
+
+### PEND-01 — causa raiz, correção e prova
+
+**Causa raiz única, já diagnosticada em `§3.28` e agora confirmada pela correção:** `platform/scripts/project.mjs` criava o perfil descartável em `platform/.cache/test-runs` e o exportava como `TMPDIR`/home. Isso produz **dois** efeitos independentes:
+
+1. **Viola o invariante D81** — a chave nunca pode morar dentro do repositório.
+2. **Casa com o filtro `NOISE`** de `modules/explorer-search/server/fs/watcher.ts:43`, aplicado na **emissão** (`handleEvent:206`) — todo evento `fs.changed` era descartado em silêncio.
+
+**Efeito colateral, o mais grave:** como `TMPDIR` e home caíam no mesmo dispositivo, `lixeira.test.ts:284` pulava o caso **K3/EXDEV** por `skipIf(!doisDispositivos)` — uma trava de segurança (a recusa de copiar-e-apagar entre partições) **sem nenhuma cobertura**.
+
+**Correção (commit local `49dcf51`, perímetro de 3 arquivos em `platform/scripts/`):**
+
+| Arquivo | Mudança |
+|---|---|
+| `test-home-policy.cjs` **(novo)** | Fonte única da política. Dois invariantes: fora do repositório **e** fora de segmento ignorado pelo `NOISE`. Devolve motivo legível quando recusa. Módulo puro, sem efeito colateral — compartilhado pelo launcher e pelo hook `--require` para que a restrição, que é de segurança, **não derive** entre os dois. |
+| `project.mjs` | Raiz padrão `~/.agente-window-testes` (`AGENTE_WINDOW_TEST_ROOT` sobrescreve) · poda de perfis com mais de 24 h · limpeza ao final da execução (`AGENTE_WINDOW_KEEP_TEST_PROFILE=1` preserva) · fixture espelhando o layout real `~/.agente_window/<arquivo>.json` |
+| `test-profile.cjs` | Valida o perfil **também** quando carregado sem o launcher (um `vitest run` direto), transformando falso-negativo silencioso em erro explicado |
+
+**Windows está coberto pela mesma correção:** `project.ps1:34` delega para `project.mjs`; não existe segunda implementação. A versão de Node/npm da **D137 não foi alterada**, como D140 condicionou.
+
+**Prova — a guarda recusa com motivo legível nos quatro casos:**
+
+| `AGENTE_WINDOW_TEST_HOME` | Resultado |
+|---|---|
+| *(ausente)* | recusa: "Perfil de testes ausente" |
+| `/home/user/agente_window` | recusa: "está dentro do repositório … invariante D81" |
+| `/home/user/.cache/x` | recusa: "contém um segmento ignorado pelo watcher do Explorer" |
+| `/home/user/.agente-window-testes/valido` | **aceito**, `os.homedir()` passa a devolver o perfil |
+
+**Decisão correlata (DO-10):** `config/__tests__/repo.test.ts:70` falhava porque o fixture apontava para `<perfil>/settings.json`, sem o segmento `.agente_window` que a implementação real produz (`config/server/repo.ts:14` e `provedores/server/providersRepo.ts:24` ambos fazem `join(homedir(), '.agente_window', …)`). **O teste estava certo; o fixture é que era infiel.** A correção foi no harness — **nenhuma asserção foi afrouxada**.
+
+### Resultados efetivamente executados
+
+| Verificação | Comando | Resultado |
+|---|---|---|
+| Instalação | `sh iniciar.sh install` | **EXIT 0** — Node 26.13.0, 614 pacotes em 18 s |
+| Runtime | `sh iniciar.sh check` | **OK** — "Node 26.13.0, npm 11.20.0, SQLite e PTY carregados" |
+| Typecheck | `sh iniciar.sh typecheck` | **EXIT 0**, zero diagnósticos |
+| Escopo da PEND-01 (8 arquivos) | `sh iniciar.sh test <8 caminhos>` | **78 aprovados \| 3 ignorados, EXIT 0, zero FAIL** |
+| **Suíte integral** | `NODE_OPTIONS=--max-old-space-size=768 sh iniciar.sh test --maxWorkers=1 --minWorkers=1` | **1127 aprovados \| 12 reprovados \| 23 ignorados (1162)** · 126 de 130 arquivos · 174,72 s |
+| Limpeza segura | `du -sh ~/.agente-window-testes` após a execução | **0 bytes** — nenhuma acumulação |
+
+Os 8 arquivos do escopo PEND-01: `casas/config/__tests__/{repo,rotas}.test.ts` · `casas/provedores/__tests__/{providersRepo,rotas}.test.ts` · `modules/explorer-search/__tests__/{fsWatcher,fsIntegration}.test.ts` · `casas/agir/__tests__/lixeira.test.ts` · `server/session-persistence/__tests__/chatAlvo.test.ts`.
+
+**Comparação direta com a cópia anterior (harness quebrado, `§3.28`):** 1121/18/23 → **1127/12/23**. Delta **+6 aprovados, −6 reprovados** — exatamente as 6 falsas falhas do Grupo I. `fsWatcher.test.ts` passou a observar eventos reais (1,9 s de execução contra falha imediata anterior).
+
+### As 12 falhas restantes — pré-existentes, delimitadas, não corrigidas nesta passagem
+
+| Grupo | Qtde | Arquivo | Causa | Classificação |
+|---|---|---|---|---|
+| **PEND-03** | 9 | `src/__tests__/TerminalPanel.test.tsx` | xterm.js exige `HTMLCanvasElement.getContext`, ausente no jsdom sem o pacote nativo `canvas` | pré-existente de área congelada; relevante para a **Fatia 16**, não para a 14 |
+| **PEND-02** | 3 | `iconLabels`, `themeTokens`, `visualStates` | contratos visuais derivaram da fonte (paridade aria-label/tooltip, 3 tokens, regex de `outline`) | pré-existente; a diagnosticar **sem maquiar teste** |
+
+**Nenhuma é atribuível à PEND-01, à MICRO-FATIA DELETE ou à Fatia 14.** Nenhuma foi "corrigida" afrouxando asserção.
+
+### NÃO verificado nesta cópia — registrado como não verificado, nunca como aprovado
+
+- **`vite build`** — não executado. Na cópia anterior morreu por OOM duas vezes (exit **134** com heap 700; exit **137 `Killed`** com heap 1024 + `oom_score_adj=900`), tendo ~1037 MB disponíveis e **swap zero**; vite 5.4.21 empacotando Monaco. `build:fs-boundary` e `tsc -b` **passam** — só o bundler falha. **É limite de recurso do ambiente, não defeito de produto.**
+- **E2E (44 specs Playwright)** — browsers ausentes (`/opt/playwright` e `~/.cache/ms-playwright` inexistentes). A entrada é `npx playwright test`; **não existe `npm run e2e`**.
+- **`lint`** — não executado nesta cópia. Baseline histórico Linux em `§3.28`.
+- **Windows real** — PowerShell 5.1, `IFileOperation` e a Lixeira do Windows não são verificáveis aqui. **Funcionar no Debian não homologa o Windows.**
+
+### Armadilhas de harness confirmadas novamente (preservar)
+
+- **O vitest ignora em silêncio filtros de caminho que não casam.** Um caminho errado não produz erro: produz "1 arquivo rodou" e parece sucesso. Conferir sempre a contagem de `Test Files` contra o número de caminhos pedidos.
+- **O caminho de controle de um teste de fs-watch não pode conter nenhum token de `NOISE`** (`.git`, `node_modules`, `__pycache__`, `.pytest_cache`, `.tox`, `.nox`, `.venv`, `.next`, `.nuxt`, `.turbo`, `.cache`, `dist`, `out`, `target`, `coverage`). Usar `TMPDIR=/home/user/.cache/tmp` como "fora do checkout" **contamina a sondagem**.
+- **Separar dispositivos para habilitar o K3 quebra 3 testes de `rotas`** — não é defeito. O ambiente correto da suíte é `TMPDIR` e home **no mesmo dispositivo**; separar (home em ext4 × `TMPDIR` em tmpfs) serve **apenas** para sondar o K3 isoladamente.
+- **Nunca invocar `npm run …` sem `PATH` apontando para o Node do runtime** — pega o Node 20 do sistema. **Nunca usar `test:all` como evidência** (`&&` encadeia e esconde falha). `project.mjs test`/`typecheck` cobrem **só** `agents-window-replica-v2`.
+- **Ler regra canônica com `fold -s -w 175`, nunca com `cut -c`** — os parágrafos dos canônicos são linhas únicas de 700–1500 caracteres e `cut` trunca em silêncio.
+
+### Gate D141 — testes que fecham DP-03/DP-06/E-1..E-5
+
+Registrados como **contrato de teste a satisfazer** pela implementação da Fatia 14; o placar de cada um será lançado aqui quando executado. **Nenhum está declarado como aprovado antes de rodar.**
+
+1. O contrato aditivo não quebra chamador antigo: `rodarAgir` sem `instrucoes` comporta-se de forma idêntica.
+2. Instrução de produto **nunca** aparece como `papel:'usuario'` no transcript nem no fio.
+3. Skill **desligada** não é injetada **nem** anunciada ao modelo (RF14-1 e RF14-4).
+4. Cada um dos quatro protocolos (`openai-chat`, `anthropic`, `gemini`, `ollama`) recebe a instrução pelo **próprio mecanismo nativo**.
+5. A composição **reporta a fonte do histórico** usada (etapa 1 de E-3).
+6. `montarHistorico` do browser continua funcionando durante a etapa 1 — duas fontes temporárias **com reporte**, na forma da regra 3 de `04 §1`.
+
 ## 2026-11-04 — SPEC da missão Codex nº 2: conclusão técnica DELETE
 
 Autorização: carta do dono desta data; substitui para esta missão os limites históricos de confirmação obrigatória/território de D97/D134, preservando lixeira exclusiva, identidade, modos read-only, cancelamento e relatos de efeitos. Sem commit/push, sem homologação oficial ou encerramento de DEBT-24, sem Fatias 14/15/M. Base local: commit `77dd348`, com alterações anteriores não commitadas preservadas.

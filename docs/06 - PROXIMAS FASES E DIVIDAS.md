@@ -1386,6 +1386,8 @@ A opção A resolve a divergência de ciclo de vida sem tocar nas sessões PTY h
 
 > ⚠️ **NOTA ADITIVA — DEBT-24/D128 (2026-10-31). A SPEC 2H NÃO É REABERTA por esta nota.** O entregável (d) manda listar `excluir` entre as ferramentas reais com liga/desliga. **Verificado em código: `excluir` hoje não executa nada** (`discos.ts:271` e `lixeira.ts:17-21` retornam falha fixa) — é **regressão sobre a Fatia 12 homologada por D97**, não escopo desta fatia. **Consequência registrada:** implementar (d) com a ferramenta nesse estado **tornaria o defeito visível na interface** (interruptor de uma capacidade inexistente) e, por RF14-4, **anunciaria ao modelo uma capacidade que sempre falha** quando ligada — problema que **já existe hoje** em `ferramentas.ts:58` via `vizinho.ts:179`, sem filtro. **Dependência nova, não registrada em D99** (que analisou "M × Fatias 13–15", não "14 × estado real das ferramentas que ela lista"). **Proposta:** resolver **DEBT-24** antes ou dentro da Fatia 14 (⏳ pendente de aprovação). Enquanto não resolvida, **o anúncio de `excluir` ao modelo deve ser corrigido** independentemente da escolha R1/R2/R3. Também incide sobre esta SPEC o **gate D129**: a injeção de skill exigida por RF14-2 precisa de endereço decidido (DP-06), pois não existe papel `'system'` no contrato nem ponto de composição no servidor.
 
+> ✅ **CORREÇÃO DATADA — D141 (2026-11-05): dois fatos desta nota aditiva foram reverificados no código real (HEAD `49dcf51`) e estão superados.** **(1)** *"`excluir` hoje não executa nada"* **não é mais verdade**: `lixeira.ts` foi restaurada sob D128 com as correções K1/K2/K3 e `discos.ts:268 criarExecutorsReais` devolve executores reais — a MICRO-FATIA DELETE foi implementada e homologada por **D139**. O entregável (d) pode portanto listar `excluir` com liga/desliga **sem** tornar visível um defeito. **(2)** *"não existe papel `'system'` no contrato nem ponto de composição no servidor"* continua **verdadeiro como descrição do estado**, mas deixou de ser bloqueio: o endereço foi decidido por **D141** (E-1 opção (b), campo `instrucoes` separado; E-2 prefeitura). **O texto acima é preservado na íntegra como registro histórico** — não foi reescrito.
+
 **3. Requisitos funcionais:** RF14-1 skill desligada = invisível para o agente · RF14-2 invocar = `/nome` ou clique (manual na v1 — Q14-3 DECIDIDO 20/10; automático é v2 (a) logo após a 14 + Instruções — DECIDIDO 20/10) · RF14-3 frontmatter inválido = skill marcada "com erro" + motivo, nunca quebra a lista · RF14-4 ferramenta desligada = some do anúncio ao modelo · RF14-5 storage: usuário (`~/.agente_window/skills/`) + projeto (`<pasta>/.agente/skills/`) (Q14-4) · RF14-6 medidas da lateral extraídas do mockup viram teste (pixel ±2, padrão da casa).
 
 **4. Requisitos não-funcionais:** RNF14-1 reconstruir nos componentes React (não colar o HTML) · RNF14-2 skill malformada nunca derruba o chat · RNF14-3 App.tsx não cresce (casas novas!) · RNF14-4 PT-BR na UI (padrão `01`).
@@ -1401,6 +1403,33 @@ A opção A resolve a divergência de ciclo de vida sem tocar nas sessões PTY h
 **9. Riscos:** R14-1 escopo (7 cartões!) — mitigação: bound da v1 inegociável (§6). R14-2 compat SKILL.md tem detalhes (frontmatter, pastas) — mitigação: subconjunto documentado + skill-exemplo no repo de testes. R14-3 mockup ≠ React 1:1 — mitigação: régua ±2px, não pixel-perfect cego.
 
 **10. Perguntas abertas:** Q14-1 v1 = Visão geral + Habilidades + Ferramentas (rec: sim)? → DECIDIDO (20/10): sim. · Q14-2 formato SKILL.md-compatível (rec: sim)? → DECIDIDO (20/10): sim. · Q14-3 só invocação manual na v1 (rec: sim)? → DECIDIDO (20/10): sim, manual; v2-auto DECIDIDO (20/10): (a) logo após a 14 (+ Instruções junto). · Q14-4 storage usuário+projeto (rec: sim)? → DECIDIDO (20/10): sim. · Q14-5 Command Center na 17 com a Pesquisa (rec: sim)? → DECIDIDO (20/10): (a) mantém na 17 com a Pesquisa.
+
+## PARTE 2H-G — GATE TÉCNICO DA FATIA 14 (D141): contrato, migração, testes e rollback — FECHADO (2026-11-05)
+
+> **Natureza:** registro executivo do gate que a **D129** exigiu e a **D140** delegou ao executor. A SPEC 2H acima **não é reaberta** — este bloco resolve apenas o que ela própria declara como pendente no parágrafo *"Também incide sobre esta SPEC o gate D129"*. Fundamento, alternativas rejeitadas e justificativas completas em `05` **D141**.
+
+**Decisões fechadas:**
+
+| # | Escolha | Decisão | Efeito na Fatia 14 |
+|---|---|---|---|
+| **E-1** | Papel da instrução no contrato | **(b)** campo separado `instrucoes`, fora do array de mensagens | `MensagemAgir.papel` **não muda**; nenhum contrato de terceiro quebra |
+| **E-2** | Endereço da composição | **prefeitura** — `server/session-persistence/composicaoContexto.ts`, irmão de `chatAlvo.ts` | entra pela costura que já existe (`index.ts:241-243` injeta `obterAlvo`/`resolverContexto`) |
+| **E-3** | Migração do `montarHistorico` | **(b)** 4 etapas aditivas, servidor prefere o próprio transcript **e reporta a fonte** | **etapa 1 só**: servidor compõe instruções; browser continua mandando histórico |
+| **E-4** | Contrato do resultado de ferramenta (DP-03) | **(e)** união discriminada por origem — localizador p/ `ler`/`buscar`/`listar`, conteúdo p/ `executar`, **sem spill** | **NÃO implementada na 14** — a fatia não produz `tool_result` novo; implementação em **M2** |
+| **E-5** | Ordem do gate | **(a)** decidir antes da Fatia 14 | cumprido: gate fechado antes de qualquer código |
+| **DP-03** | Armazenamento/recuperação de resultados | log íntegro + projeção podada + distinção por origem; **conteúdo do workspace nunca é copiado para `~/.agente_window`** | política registrada; código em M2 |
+| **DP-06** | Responsável pela montagem do contexto | **servidor compõe, prefeitura é o endereço, três fatos com três donos** | nenhum segundo montador de contexto; `montarHistorico` permanece com reporte na etapa 1 |
+
+**Contrato aditivo** (na forma da regra *"`contract.ts` apenas aditivo"*):
+`InstrucaoAgir { origem:'skill'; id; nome; corpo }` · `OpcoesAgir.instrucoes?` · `OpcoesVizinho.instrucoes?`. Ponto de aplicação: **`agir.ts:113`**. Tradução por protocolo em `dialogo.ts`, cada um pelo **próprio mecanismo nativo**.
+
+**Migração:** etapa 1 (Fatia 14) → etapa 2 (M2: servidor prefere o transcript e reporta) → etapa 3 (M3: servidor é o dono) → etapa 4 (remoção de `montarHistorico` do browser). Cada etapa é aditiva e reversível isoladamente.
+
+**Rollback:** campos opcionais; ausentes, comportamento idêntico ao anterior. Reverter = remover campo + módulo de composição. **Nenhum formato persistido muda**, nenhuma migração de disco, transcript intocado.
+
+**Testes que fecham o gate:** ver `09`. Resumo: contrato aditivo não quebra chamador antigo · instrução nunca vira `papel:'usuario'` · skill desligada não é injetada nem anunciada · quatro protocolos pelo mecanismo nativo · reporte da fonte do histórico · `montarHistorico` continua funcionando na etapa 1.
+
+**O que este gate NÃO autoriza:** antecipar M1–M8 · reordenar a sequência D133 · reabrir a SPEC 2H · criar décimo canônico · declarar homologação (aceite funcional humano continua do dono).
 
 ## PARTE 2I — SPEC da FATIA 15: Janela única de abas (DEBT-12) — FECHADA (Q&A 100% em 20/10)
 

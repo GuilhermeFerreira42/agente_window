@@ -307,3 +307,43 @@ Resultados técnicos efetivamente executados ficam em `09`; roteiro em `08`; est
 **Registros/visibilidade e portabilidade:** os **nove canônicos são a memória portátil e suficiente** para uma Arena nova que receba apenas a pasta `agente_window/`; ela lê `01`→`02`→`03`, D140 no `05`, `06`/`08`/`09`, confere HEAD, código, testes e somente então age. Na primeira execução, criar **fora do repositório** diário e estado estruturado (ex.: `EXECUCAO_AUTONOMA.md` e `status.json`) e um **dashboard HTML local** derivado do estado, atualizando-os após cada marco. O painel mostra fatia, tarefas, progresso por critérios comprovados, testes pass/fail/skip, riscos, bloqueios, último checkpoint e próxima ação, distinguindo não testado de aprovado. Não exibir segredos. O dashboard é observabilidade, não fonte canônica; quando só a pasta do projeto for transferida, a nova Arena o recria dos canônicos e do Git. Nunca adicionar um décimo canônico ou misturar logs enormes ao repositório.
 
 **Precedência:** quando textos históricos do `01`, `04`, `06`, `08`, `09` ou D129 mandarem pedir permissão para microdecisão técnica dentro desta delegação, aplicar D140 **somente nesse ponto**; regras de proteção do produto e dever de homologação humana permanecem. Em caso de dúvida, classificar a decisão e documentar a justificativa. A D139 já registra DELETE homologada quanto ao aceite; a presente decisão não a reabre nem altera a sequência D133.
+
+
+## D141 — Gate técnico da Fatia 14 fechado: DP-03, DP-06 e E-1..E-5 (2026-11-05)
+
+**Origem e autoridade:** decisão técnica do executor (Arena) no uso da delegação **D140**, que autoriza *"investigar, comparar, decidir e registrar formalmente"* DP-03, DP-06 e E-1..E-5 com contrato, migração, testes e rollback **antes** de implementar a Fatia 14. Nenhuma destas decisões altera experiência de produto, arquitetura fundamental ou limite de segurança: **todas são aditivas e reversíveis**. Registro executivo em `06` PARTE 2H-G; estado em `03`; provas em `09`. Fundamento verificado em código nesta cópia (HEAD `49dcf51`), não apenas nos relatórios históricos.
+
+**E-1 — papel da instrução no contrato → (b) campo separado `instrucoes`, fora do array de mensagens.** Rejeitadas: **(a)** acrescentar `'system'` a `MensagemAgir.papel` — obrigaria os quatro protocolos a traduzir um papel novo e poluiria o transcript, que é o registro fiel da conversa; **(c)** manter `'usuario'` com marcador — faria instrução do produto viajar disfarçada de fala do usuário, exatamente o defeito que o gate existe para impedir. **`MensagemAgir.papel` não muda** (`contract.ts:73` continua `'usuario' | 'assistente' | 'ferramenta'`), portanto nenhum contrato de terceiro quebra — exigência expressa da D140.
+
+**E-2 — endereço da composição → prefeitura, módulo irmão de `chatAlvo.ts`.** A recomendação da investigação (`13_…` §7 e `15_…` §5.2) é *"(a) prefeitura"*; o que ela rejeita é *"(b) novo módulo na casa Agir"* e *"(c) casa nova"*, ambos um *second registry*. **Verificado:** `chatAlvo.ts` tem 57 linhas e uma responsabilidade só (resolver e fixar o par de modelo, guardando o princípio *"segredo nunca vai ao browser"*); acrescentar composição ali misturaria responsabilidades. **Endereço escolhido: `server/session-persistence/composicaoContexto.ts`.** A costura já existe — `session-persistence/index.ts:241-243` já injeta `obterAlvo` e `resolverContexto` como dependências das rotas Agir; a composição entra pela mesma porta, sem rota nova nem registro novo.
+
+**E-3 — migração do `montarHistorico` → (b) quatro etapas aditivas, o servidor prefere o próprio transcript e reporta a fonte usada.** Compatível com a regra 3 de `04 §1` (duas fontes temporárias **com reporte**) e reversível. **Etapa 1 é o escopo da Fatia 14:** o servidor compõe **instruções**; o browser continua mandando o histórico (`App.tsx:1679`); a fonte efetivamente usada é reportada. **Etapas 2–4** (o servidor passar a ser dono do histórico) pertencem a **M2/M3** — antecipá-las violaria o dever de não ampliar escopo para refatoração não relacionada. Fundamento verificado: `transcripts.ts` já grava e `index.ts:121` já restaura dali; `retomarPorFluxo` prova que o servidor mantém `MensagemAgir[]` fiel.
+
+**E-4 — contrato do resultado de ferramenta (DP-03) → (e) união discriminada por origem.** `ler`/`buscar`/`listar` → **localizador** `{arquivo, intervalo, digest, seq}`; `executar` → **conteúdo** (não existe segunda cópia, D126 one-shot). **Sem spill** no primeiro corte. **Decisão de escopo, registrada para não fingir que foi feita:** a Fatia 14 **não implementa** esta migração. Verificado em código: com E-1(b) e invocação manual (RF14-2), a skill entra como **instrução**, não como resultado de ferramenta — logo a Fatia 14 não produz `tool_result` novo e não contradiz DP-03. O que ela toca é o **anúncio** (RF14-4: ferramenta desligada some do anúncio ao modelo), que é outra superfície. A união discriminada será implementada em **M2**, quando houver consumidor; acrescentar campos sem consumidor agora seria complexidade inventada.
+
+**E-5 — ordem do gate → (a) decidir antes da Fatia 14.** Cumprido por esta decisão: o gate fecha antes de qualquer código da fatia.
+
+**DP-03 — política fechada:** *log íntegro + projeção podada + distinção por origem*. **Conteúdo lido do workspace NÃO é copiado para `~/.agente_window`** — vira localizador. Isto responde pela via conservadora à pergunta de privacidade que `13_…` §9 marcava como 🔴 dependente do dono: a opção escolhida é justamente a que **não** move dado privado para fora da proteção do projeto, portanto **não amplia exposição** e não precisa de autorização nova. Sem spill até H1 medir necessidade.
+
+**DP-06 — fechado:** **servidor compõe, prefeitura é o endereço, três fatos com três donos.** Os três fatos já têm dono verificado em código: histórico fiel (`transcripts.ts`), alvo e segredo (`chatAlvo.ts`), autoridade e permissões (`agirContext.ts`). Faltava apenas o dono da **composição**, que é o módulo novo de E-2. **Nenhum segundo montador de contexto é criado:** `montarHistorico` do browser permanece durante a etapa 1 de E-3 **com reporte de fonte**, e é retirado nas etapas seguintes.
+
+**Contrato (aditivo, na forma da regra de `contract.ts` apenas aditivo):**
+```ts
+/** Instrução de produto (DP-06/E-1): o que o PRODUTO manda o modelo fazer —
+ * distinto do que o usuário disse. Nunca entra no transcript como fala. */
+export interface InstrucaoAgir {
+  origem: 'skill'          // origem, para auditoria e anúncio honesto
+  id: string               // identificador estável do item de customização
+  nome: string             // nome invocado (/nome)
+  corpo: string            // conteúdo do SKILL.md após o frontmatter
+}
+// OpcoesAgir  += instrucoes?: readonly InstrucaoAgir[]
+// OpcoesVizinho += instrucoes?: readonly InstrucaoAgir[]
+```
+Cada protocolo traduz a instrução para o **próprio mecanismo nativo** em `dialogo.ts` (OpenAI/Ollama: mensagem `system` à frente; Anthropic: parâmetro `system` de topo; Gemini: `systemInstruction`). Ponto de aplicação verificado: `agir.ts:113`, `vizinho(mensagens, { aoTexto, sinal })`.
+
+**Rollback (todo o gate):** os campos são **opcionais e aditivos**; ausentes, o comportamento é idêntico ao anterior. Reverter = remover o campo e o módulo de composição. **Nenhum dado persistido muda de formato**, nenhuma migração de disco é necessária e o transcript não é tocado.
+
+**Testes que fecham o gate (provas em `09`):** contrato aditivo não quebra chamador antigo · instrução nunca aparece como `papel:'usuario'` · skill desligada não é injetada nem anunciada · os quatro protocolos recebem a instrução pelo mecanismo nativo · a composição reporta a fonte do histórico · `montarHistorico` do browser continua funcionando durante a etapa 1.
+
+**O que D141 NÃO faz:** não reabre a SPEC 2H · não antecipa M1–M8 · não altera a sequência D133 · não cria décimo canônico · **não homologa nada** — o aceite funcional humano permanece exclusivo do dono (`08`, bloco D140).
