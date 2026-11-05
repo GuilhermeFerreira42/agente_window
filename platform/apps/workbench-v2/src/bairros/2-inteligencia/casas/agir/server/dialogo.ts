@@ -9,7 +9,7 @@
 // Sem tradução fiel, o modelo "esquece" o que pediu na iteração anterior — e o
 // loop vira cabra-cega (ou repete, ou inventa). É a segunda metade do anúncio.
 // ============================================================================
-import type { MensagemAgir, ProtocoloAgir } from '../contract'
+import type { InstrucaoAgir, MensagemAgir, ProtocoloAgir } from '../contract'
 
 export function traduzirHistorico(protocolo: ProtocoloAgir, mensagens: MensagemAgir[]): unknown[] {
   return mensagens.map((mensagem): unknown => {
@@ -75,4 +75,58 @@ export function traduzirHistorico(protocolo: ProtocoloAgir, mensagens: MensagemA
         : {}),
     }
   })
+}
+
+// ── Instrução de PRODUTO (D141 / E-1 opção (b), DP-06) ────────────────────────
+// A instrução NÃO é mensagem: entra pelo mecanismo nativo de cada protocolo, no
+// mesmo espírito do anúncio de ferramentas ("um jeito por protocolo, sempre com
+// o MESMO conteúdo"). É assim que uma skill invocada manualmente (RF14-2) chega
+// ao modelo sem virar fala do usuário no transcript.
+
+/**
+ * O texto único da instrução, igual para os quatro protocolos. Diz de onde veio
+ * e por quê — o modelo não deve achar que o produto falou como se fosse o dono.
+ */
+export function textoDeInstrucoes(instrucoes: readonly InstrucaoAgir[]): string {
+  const ativas = instrucoes.filter((instrucao) => instrucao.corpo.trim().length > 0)
+  if (ativas.length === 0) return ''
+  const cabecalho = ativas.length === 1
+    ? 'O dono invocou a habilidade abaixo nesta execução. Siga a instrução dela.'
+    : `O dono invocou ${ativas.length} habilidades nesta execução. Siga as instruções abaixo.`
+  const blocos = ativas.map((instrucao) => `## /${instrucao.nome}\n${instrucao.corpo.trim()}`)
+  return `${cabecalho}\n\n${blocos.join('\n\n')}`
+}
+
+/**
+ * Aplica a instrução ao corpo do pedido, no campo que CADA protocolo reserva
+ * para instrução de sistema. Sem instrução, devolve o corpo intocado — o que
+ * mantém o contrato aditivo de D141 (ausente = comportamento anterior).
+ *
+ *   openai-chat e ollama → mensagem `role:'system'` À FRENTE do histórico
+ *   anthropic            → parâmetro `system` de TOPO (nunca vira mensagem)
+ *   gemini               → `systemInstruction.parts[].text`
+ */
+export function aplicarInstrucoes(
+  protocolo: ProtocoloAgir,
+  corpo: Record<string, unknown>,
+  instrucoes: readonly InstrucaoAgir[],
+): Record<string, unknown> {
+  const texto = textoDeInstrucoes(instrucoes)
+  if (!texto) return corpo
+
+  if (protocolo === 'anthropic') {
+    const anterior = typeof corpo.system === 'string' ? corpo.system : ''
+    return { ...corpo, system: anterior ? `${anterior}\n\n${texto}` : texto }
+  }
+  if (protocolo === 'gemini') {
+    // Nada mais neste código escreve systemInstruction; se um dia escrever,
+    // concatenar em vez de sobrescrever.
+    const anterior = corpo.systemInstruction
+    const partesAnteriores = typeof anterior === 'object' && anterior !== null && Array.isArray((anterior as { parts?: unknown }).parts)
+      ? ((anterior as { parts: unknown[] }).parts)
+      : []
+    return { ...corpo, systemInstruction: { parts: [...partesAnteriores, { text: texto }] } }
+  }
+  const mensagens = Array.isArray(corpo.messages) ? (corpo.messages as unknown[]) : []
+  return { ...corpo, messages: [{ role: 'system', content: texto }, ...mensagens] }
 }

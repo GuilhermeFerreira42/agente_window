@@ -16,6 +16,7 @@ import type {
   EventoAgir,
   ExecutorFerramenta,
   FerramentaId,
+  InstrucaoAgir,
   MensagemAgir,
   PedidoFerramenta,
   RespostaIteracao,
@@ -35,6 +36,17 @@ export interface OpcoesAgir {
   vizinho: VizinhoProvedor
   /** Histórico da conversa (a mensagem nova do dono já entra aqui). */
   historico: MensagemAgir[]
+  /**
+   * Instruções de produto compostas pelo SERVIDOR (D141 / DP-06). Aditivo e
+   * opcional: ausente = nenhuma instrução, comportamento idêntico ao anterior.
+   * O loop apenas REPASSA — ele não decide instrução nenhuma.
+   */
+  instrucoes?: readonly InstrucaoAgir[]
+  /**
+   * Ferramentas que o anúncio ao modelo pode incluir (RF14-4). `undefined` =
+   * catálogo inteiro, que é o comportamento histórico.
+   */
+  ferramentasPermitidas?: readonly string[]
   /** As mãos — C1: falsas; C2: arquivos de verdade. */
   executores: Record<FerramentaId, ExecutorFerramenta>
   /** Saída do fio (C3: vira SSE; testes: lista na mão). */
@@ -113,6 +125,10 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       resposta = await vizinho(mensagens, {
         aoTexto: (pedaco) => emitir({ type: 'chunk', text: pedaco }),
         sinal,
+        // D141: repassa o que o servidor compôs. Continua valendo que o
+        // `historico` de entrada NUNCA é alterado — instrução não é mensagem.
+        instrucoes: opcoes.instrucoes,
+        ferramentasPermitidas: opcoes.ferramentasPermitidas,
       })
     } catch (erro) {
       // Parar no meio do fetch = interrupção SILENCIOSA (lição da 09) —

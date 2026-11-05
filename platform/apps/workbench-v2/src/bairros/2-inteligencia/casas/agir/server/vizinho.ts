@@ -20,7 +20,7 @@ import type {
   VizinhoProvedor,
 } from '../contract'
 import { anunciarFerramentas } from './anuncio'
-import { traduzirHistorico } from './dialogo'
+import { aplicarInstrucoes, traduzirHistorico } from './dialogo'
 import { extrairFerramentas } from './extracao'
 import { ehFerramentaConhecida } from './ferramentas'
 
@@ -177,9 +177,21 @@ function erroPorStatus(status: number, corpoErro = '', chave: string | null = nu
 }
 
 // ── Corpo do pedido: idioma nativo de cada protocolo, agora COM ferramentas ─
-function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[]): { url: string; corpo: Record<string, unknown> } {
+/**
+ * D141: casca fina que aplica a instrução de produto no campo nativo de cada
+ * protocolo. O corpo em si continua sendo montado por `corpoDePedidoBruto`, sem
+ * mudança — a instrução é aditiva e, ausente, o corpo volta intocado.
+ */
+function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[], opcoes?: OpcoesVizinho): { url: string; corpo: Record<string, unknown> } {
+  const { url, corpo } = corpoDePedidoBruto(alvo, mensagens, opcoes?.ferramentasPermitidas)
+  return { url, corpo: aplicarInstrucoes(alvo.protocolo, corpo, opcoes?.instrucoes ?? []) }
+}
+
+function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permitidas?: readonly string[]): { url: string; corpo: Record<string, unknown> } {
   const baseUrl = alvo.baseUrl.replace(/\/+$/, '')
-  const anuncio = anunciarFerramentas(alvo.protocolo)
+  // RF14-4: ferramenta desligada some do anúncio. `undefined` = catálogo inteiro,
+  // que é o comportamento histórico.
+  const anuncio = anunciarFerramentas(alvo.protocolo, permitidas)
   const traduzido = traduzirHistorico(alvo.protocolo, mensagens)
   const temperatura = typeof alvo.temperatura === 'number' ? { temperature: alvo.temperatura } : {}
 
@@ -461,7 +473,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           temperatura: config.temperatura,
           maxSaida: config.maxSaida,
         } : alvo
-        const { url, corpo } = corpoDePedido(alvoAtual, mensagens)
+        const { url, corpo } = corpoDePedido(alvoAtual, mensagens, opcoes)
         return fetch(url, {
           method: 'POST',
           headers: cabecalhos(alvoAtual),

@@ -124,15 +124,46 @@ export interface RespostaIteracao {
 }
 
 /**
+ * Instrução de PRODUTO (D141 / E-1, opção (b)): o que o produto manda o modelo
+ * fazer, distinto do que o usuário disse. Viaja em campo próprio, FORA do array
+ * de mensagens — nunca como `papel:'usuario'`, e nunca entra no transcript.
+ *
+ * `MensagemAgir.papel` não ganha `'system'` de propósito: isso obrigaria os
+ * quatro protocolos a traduzir um papel novo e poluiria o registro fiel da
+ * conversa. Cada protocolo recebe a instrução pelo próprio mecanismo nativo
+ * (ver `server/dialogo.ts` → `aplicarInstrucoes`).
+ */
+export interface InstrucaoAgir {
+  /** De onde veio — para auditoria e para um anúncio honesto ao modelo. */
+  origem: 'skill'
+  /** Identificador estável do item (`<escopo>:<nome>` na casa Personalizações). */
+  id: string
+  /** Nome de invocação (`/nome`). */
+  nome: string
+  /** Corpo da instrução: o conteúdo do SKILL.md depois do frontmatter. */
+  corpo: string
+}
+
+/**
  * Quem fala com o provedor numa iteração. C2 liga isto no HTTP real de cada
  * protocolo (com o anúncio nativo das ferramentas); nos testes da C1 é falso.
  * Contrato do fio: os PEDAÇOS de texto saem AO VIVO por `opcoes.aoTexto` —
  * quem implementa o vizinho é responsável por chamá-lo; o loop não repete
  * o texto depois (fonte única). `sinal` = Parar do dono.
+ *
+ * `instrucoes` e `ferramentasPermitidas` são ADITIVOS e opcionais (D141):
+ * ausentes, o comportamento é idêntico ao anterior.
  */
 export interface OpcoesVizinho {
   aoTexto?: (pedaco: string) => void
   sinal?: AbortSignal
+  /** Instruções de produto compostas pelo SERVIDOR (DP-06). */
+  instrucoes?: readonly InstrucaoAgir[]
+  /**
+   * Ferramentas que o anúncio ao modelo pode incluir (RF14-4). `undefined` =
+   * catálogo inteiro, que é o comportamento histórico.
+   */
+  ferramentasPermitidas?: readonly string[]
 }
 
 export type VizinhoProvedor = (
