@@ -97,6 +97,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     centerRoot = null;
     centerSessionId = null;
     centerPaneApi = null;
+    if (centerMonaco) { outlineTracker.detach(centerMonaco); centerMonaco = null; }
     centerCloseRequesters.clear();
     if (centerContainer) {
       centerContainer.remove();
@@ -108,6 +109,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     const root = attachRoot;
     attachRoot = null;
     attachSessionId = null;
+    // D152 §3: a coluna some → devolve a posse do Outline ao candidato vivo.
+    if (attachMonaco) { outlineTracker.detach(attachMonaco); attachMonaco = null; }
+    attachPaneApi = null;
     if (attachContainer) {
       attachContainer.remove();
       attachContainer = null;
@@ -201,6 +205,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let centerContainer: HTMLElement | null = null;
   let centerSessionId: string | null = null;
   let centerPaneApi: CodeEditorPaneApi | null = null;
+  /** Monaco do centro — para soltar a posse do Outline no unmount (D152 §3). */
+  let centerMonaco: import('monaco-editor').editor.IStandaloneCodeEditor | null = null;
   /** Atendentes de `attach.requestCloseTab`, por sessão. O CenterCodeEditor
    *  registra no mount e retira no unmount. */
   const centerCloseRequesters = new Map<string, CenterCloseRequester>();
@@ -209,12 +215,17 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const outlineTracker = createMonacoOutlineTracker();
   const timelinePort = new BrowserTimelinePort();
   const onEditorReady: AttachAreaProps['onEditorReady'] = (ed, api) => { attachMonaco = ed; attachPaneApi = api; outlineTracker.attach(ed); };
-  // Onda 2b (D146): o painel do centro registra SÓ a api (é ela que salva).
-  // NÃO anexa o outlineTracker de propósito: o Outline (5.6) lê o Monaco do
-  // anexo, e trocar isso agora seria mudança de comportamento não pedida por
-  // este passo. Fica como DÍVIDA DA ONDA 3 — quando a coluna morrer, o Outline
-  // tem de seguir o editor do centro.
-  const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (_ed, api) => { centerPaneApi = api; };
+  // Onda 2b (D146): o painel do centro registra a api (é ela que salva).
+  // Onda 2c-ii (D152 §3): e TAMBÉM entra na fila do outlineTracker. A dívida
+  // registrada na 2b ("quando a coluna morrer, o Outline tem de seguir o editor do
+  // centro") é paga aqui, ANTES de a coluna morrer, e não depois: o tracker agora
+  // aceita N candidatos e o Outline passa a descrever o editor que está em uso,
+  // seja ele o da coluna (durante a sobreposição) ou o do centro (a partir daqui).
+  const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (ed, api) => {
+    centerPaneApi = api;
+    centerMonaco = ed;
+    outlineTracker.attach(ed);
+  };
   const centerProps = (sessionId: string): CenterCodeEditorProps => ({
     sessionId,
     editor: editorService,

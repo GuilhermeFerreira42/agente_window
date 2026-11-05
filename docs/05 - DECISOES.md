@@ -1544,3 +1544,42 @@ corpo — prova por identidade de nó, não por testid.
 **Nota de escopo (não é dívida escondida).** A prova (2) precisou de um escopo `corpoDoCentro()` porque `attach-diff-pane`
 aparece **duas vezes** hoje — coluna e centro. Isso é a sobreposição prevista pela D151 §2/§3 e **desaparece no passo C**,
 quando a coluna for desligada. O escopo continua correto depois e passa a ser o único.
+
+### D154 — Onda 2c-ii, passo C1: o Outline segue o editor, não a coluna — 2026-11-05 (noite)
+
+**A dívida que vinha da Onda 2b.** O comentário de `onCenterEditorReady` (2b, D146) registrava, em letras claras, que o
+`outlineTracker` **não** era ligado ao painel do centro de propósito, e que *"quando a coluna morrer, o Outline tem de
+seguir o editor do centro"* — dívida marcada para a Onda 3. A coluna está prestes a morrer **nesta** onda, então a dívida
+tinha de ser paga **antes**, não depois: pagá-la depois significaria um intervalo com o Outline sem editor.
+
+**O que o tracker era.** Dono de **um** editor (`let editor`), e `attach(ed)` tinha uma guarda `if (editor === ed) return`.
+Com duas superfícies ligadas, a primeira a chegar vencia para sempre — e como o Outline é servido pela Side Bar, ele
+descreveria o editor errado (ou nenhum) assim que a coluna saísse.
+
+**Decisão (D154).** O tracker passa a ser uma **fila de candidatos com posse explícita**:
+
+- `attach(ed)` põe o editor na fila e **toma a posse** (o último a se ligar manda — é o que está em uso);
+- `detach(ed)` devolve a posse ao candidato vivo, ou **zera** as linhas se não sobrou nenhum;
+- `candidateCount()` existe só para testes e diagnóstico;
+- cada candidato tem **os próprios listeners** (`listenersPorEditor`), porque com um vetor único de `disposables` o
+  `attach` de um segundo editor deixaria os listeners do primeiro vivos para sempre e um `dispose` do primeiro levaria os
+  do segundo junto — vazamento silencioso e desligamento cruzado.
+
+**A regra que não pode ser perdida:** ao trocar de dono, as linhas são **limpas antes** de recalcular (`set([], null)`).
+Um Outline que mostra a estrutura do editor anterior enquanto o novo calcula é pior que um Outline vazio — ele **afirma**
+coisas sobre o arquivo ativo que não são verdade. Vazio é honesto; velho é mentira.
+
+**Onde os dois lados se ligam.** `onCenterEditorReady` agora faz `outlineTracker.attach(ed)` (pagando a dívida da 2b);
+`unmountCodeEditor` faz `detach(centerMonaco)` e `unmountAttach` faz `detach(attachMonaco)`. Os holders são zerados no
+mesmo lugar, então um unmount duplo não passa um editor morto para frente.
+
+**Evidência.** `__tests__/outlineCandidates.test.ts` — **7 provas com o tracker REAL** (sem mock), sobre editores falsos
+que só têm o que ele usa: fila vazia ⇒ Outline vazio; attach não duplica; a saída do dono passa a posse; o último
+candidato sair zera; `detach` de estranho é inofensivo; `dispose` limpa; `attach` depois de `dispose` não ressuscita.
+
+**Gate.** typecheck **EXIT 0** + inventário **275 = 258✓|1✗|16skip em 22 arquivos**. Entraram `outlineCandidates` (7) e
+`outlineTimelineModel` (7, que já existia e não estava no gate — o gate passou a incluir o teste do módulo que o passo
+mexe, conforme a lição da D147 §3).
+
+**O que este passo NÃO faz.** Não desliga a coluna. Continua valendo a sobreposição: com as duas superfícies montadas, o
+centro tem a posse (chega depois) e o Outline descreve o editor que o usuário está usando.

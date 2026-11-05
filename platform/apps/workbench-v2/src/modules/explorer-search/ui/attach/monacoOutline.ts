@@ -16,8 +16,24 @@ interface SymbolRegistry {
 }
 
 export interface MonacoOutlineTracker {
-  /** Liga ao editor do anexo (chamado no onEditorReady; idempotente). */
+  /**
+   * Liga um editor candidato (chamado em cada `onEditorReady`; idempotente).
+   *
+   * FATIA 15 Onda 2c-ii (D152 §3): durante a sobreposição da unificação existem
+   * DUAS superfícies capazes de hospedar o Monaco — o Editor Anexo (coluna) e a aba
+   * central. O tracker era dono de UM editor só, e o do anexo vencia por chegar
+   * primeiro; como o Outline é servido pela Side Bar, ele descreveria o editor
+   * errado (ou nenhum) quando a coluna deixasse de existir.
+   *
+   * Agora é uma FILA de candidatos com posse explícita: o editor que está EM USO
+   * manda; `detach` devolve a posse para o próximo vivo. Sem candidato, o Outline
+   * fica vazio em vez de mentir sobre o arquivo ativo.
+   */
   attach(editor: Editor): void;
+  /** Devolve a posse (chamado no unmount da superfície). Idempotente. */
+  detach(editor: Editor): void;
+  /** Quantos editores vivos estão ligados — só para testes e diagnóstico. */
+  candidateCount(): number;
   rows(): OutlineRow[];
   /** URI (string do modelo) a que `rows()` pertence. */
   modelUri(): string | null;
@@ -30,7 +46,15 @@ export interface MonacoOutlineTracker {
 const DEBOUNCE_MS = 250;
 
 export function createMonacoOutlineTracker(): MonacoOutlineTracker {
+  /** Candidatos vivos na ordem em que se ligaram; o ÚLTIMO a se ligar tem a posse. */
+  const candidatos: Editor[] = [];
   let editor: Editor | null = null;
+  /**
+   * Quem ouviu o quê: cada candidato tem os próprios listeners. Sem esta tabela, o
+   * `attach` de um segundo editor deixaria os listeners do primeiro vivos para
+   * sempre (vazamento) e um `dispose` do primeiro levaria os do segundo junto.
+   */
+  const listenersPorEditor = new Map<Editor, Array<{ dispose(): void }>>();
   let registry: SymbolRegistry | null = null;
   let rows: OutlineRow[] = [];
   let uri: string | null = null;
@@ -80,14 +104,38 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
     timer = setTimeout(() => { timer = null; void compute(); }, DEBOUNCE_MS);
   };
 
+  /** Entrega a posse a `ed`: recalcula a partir do modelo DELE e avisa os ouvintes. */
+  const tomarPosse = (ed: Editor) => {
+    if (editor === ed || disposed) return;
+    editor = ed;
+    set([], null);      // as linhas do editor anterior não valem para este
+    void compute();
+  };
+
   return {
     attach(ed) {
-      if (editor === ed || disposed) return;
-      editor = ed;
-      disposables.push(ed.onDidChangeModel(() => { set([], null); void compute(); }));
-      disposables.push(ed.onDidChangeModelContent(() => schedule()));
-      void compute();
+      if (disposed) return;
+      if (candidatos.includes(ed)) { tomarPosse(ed); return; }
+      candidatos.push(ed);
+      listenersPorEditor.set(ed, [
+        ed.onDidChangeModel(() => { if (editor !== ed) return; set([], null); void compute(); }),
+        ed.onDidChangeModelContent(() => { if (editor === ed) schedule(); }),
+      ]);
+      tomarPosse(ed);
     },
+    detach(ed) {
+      const i = candidatos.indexOf(ed);
+      if (i >= 0) candidatos.splice(i, 1);
+      for (const d of listenersPorEditor.get(ed) ?? []) d.dispose();
+      listenersPorEditor.delete(ed);
+      if (editor !== ed) return;
+      // O dono da posse saiu: passa para o candidato vivo (o último que sobrou).
+      const proximo = candidatos[candidatos.length - 1] ?? null;
+      editor = null;
+      if (proximo) tomarPosse(proximo);
+      else { set([], null); }
+    },
+    candidateCount: () => candidatos.length,
     rows: () => rows,
     modelUri: () => uri,
     onChanged(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },
@@ -100,6 +148,10 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
     dispose() {
       disposed = true;
       if (timer) clearTimeout(timer);
+      candidatos.splice(0);
+      for (const ds of listenersPorEditor.values()) for (const d of ds) d.dispose();
+      listenersPorEditor.clear();
+      editor = null;
       for (const d of disposables.splice(0)) d.dispose();
       listeners.clear();
     },
