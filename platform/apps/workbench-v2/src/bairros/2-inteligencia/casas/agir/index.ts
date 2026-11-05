@@ -46,5 +46,5 @@ export type { DescritorFerramenta } from './server/ferramentas'
 export { extrairFerramentas } from './server/extracao'
 
 /** A tela fala com a casa SÓ por aqui (as URLs moram na casa, FT-05). */
-export { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, registrarInstrucaoDeProduto } from './ui/client/api'
+export { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, registrarInstrucaoAgir } from './ui/client/api'
 export type { ControleAgir, EntradaAgir, IdentidadeExecucaoAgir, OuvintesAgir } from './ui/client/api'
