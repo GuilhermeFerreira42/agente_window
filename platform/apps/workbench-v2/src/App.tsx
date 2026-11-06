@@ -67,7 +67,7 @@ import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Ab
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
-import { CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
+import { CenterChangesSlot, CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
@@ -615,6 +615,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const moduloMontaCentro = !!explorerModule && typeof explorerModule.mountCodeEditor === 'function'
   const codeEditorSlot = haAbasDoCorpoCentral && moduloMontaCentro && explorerModule
     ? <CenterCodeEditorSlot module={explorerModule} sessionId={activeSession.id} />
+    : undefined
+  // FATIA 15 Onda 3 (D166): a aba `Changes` do centro passa a mostrar o painel REAL
+  // do módulo (ChangesPane → GitService), no lugar do `DiffView` de demonstração cujo
+  // estado (`diffFilesBySession`) nasce e permanece vazio desde a 5.3. O slot é
+  // montado sempre que o módulo oferece `mountChanges` — não só quando a aba está
+  // ativa — pelo mesmo motivo do corpo de arquivo: desmontar perderia a seleção de
+  // arquivo e a mensagem de commit a cada troca de aba (RF15-2).
+  const moduloMontaChanges = !!explorerModule && typeof explorerModule.mountChanges === 'function'
+  const changesSlot = moduloMontaChanges && explorerModule
+    ? <CenterChangesSlot module={explorerModule} />
     : undefined
   const codeEditorUnavailable = haAbasDoCorpoCentral && !moduloMontaCentro
     ? 'O módulo Explorer/Busca desta cópia não oferece mountCodeEditor: as abas de arquivo aparecem na faixa, mas ninguém pode gravar em disco a partir do centro. Editar e salvar (RF15-1) não está disponível.'
@@ -2379,6 +2389,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       configSurface={<ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} />}
       frontierTabs={abasProjetadasDoModulo}
       codeEditorSlot={codeEditorSlot}
+      changesSlot={changesSlot}
       codeEditorUnavailable={codeEditorUnavailable}
       onNavigateBrowser={navigateBrowser}
       onBrowserBack={browserBack}

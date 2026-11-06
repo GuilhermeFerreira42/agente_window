@@ -40,6 +40,20 @@ export function SearchModuleSlot({ module, focusRequest }: { module: IExplorerSe
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="search-module-slot" />
 }
 
+/** FATIA-15 Onda 3 (D166): slot da aba `Changes` do CORPO CENTRAL → o MESMO
+ *  ChangesPane real da view `scm`. Host próprio (não é a view da Side Bar que
+ *  mudou de lugar): o App mantém este slot montado e só alterna a visibilidade,
+ *  do mesmo jeito que faz com o corpo de arquivo — desmontar perderia seleção e
+ *  mensagem de commit a cada troca de aba (RF15-2). */
+export function CenterChangesSlot({ module }: { module: IExplorerSearchModule }) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hostRef.current) module.mountChanges?.(hostRef.current)
+  }, [module])
+  useEffect(() => () => module.unmountChanges?.(), [module])
+  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="center-changes-slot" />
+}
+
 /** FATIA-05 5.3: slot da view `scm` da Side Bar → Source Control View real.
  *  Mesmo padrão do SearchModuleSlot (mount 1×; troca de view = display flex/none). */
 export function ScmModuleSlot({ module }: { module: IExplorerSearchModule }) {

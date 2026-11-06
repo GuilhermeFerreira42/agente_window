@@ -301,6 +301,20 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       onOpenFile: (uri: WorkspaceUri) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri, kind: 'code' })),
       onOpenDiff: (item, sides) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })),
     }));
+  // FATIA-15 Onda 3 (D166) — aba `Changes` do CORPO CENTRAL. Host próprio, separado
+  // de `scmRoot` de propósito: `mountScm` aceita um host só (é o mount da view da
+  // Side Bar, congelado) e devolveria cedo se o centro passasse por ele.
+  let changesCenterRoot: Root | null = null;
+  let changesCenterContainer: HTMLElement | null = null;
+  const unmountChangesCenter = () => {
+    const root = changesCenterRoot;
+    changesCenterRoot = null;
+    if (changesCenterContainer) {
+      changesCenterContainer.remove();
+      changesCenterContainer = null;
+    }
+    if (root) setTimeout(() => root.unmount(), 0); // ver comentário em unmountSearch
+  };
   const unmountScm = () => {
     const root = scmRoot;
     scmRoot = null;
@@ -426,6 +440,22 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
 
     unmountScm,
 
+    mountChanges(root: HTMLElement): void {
+      if (changesCenterRoot && changesCenterContainer && changesCenterContainer.parentElement === root) return; // mesmo host
+      unmountChangesCenter();
+      const container = root.ownerDocument.createElement('div');
+      container.style.display = 'contents';
+      root.appendChild(container);
+      changesCenterContainer = container;
+      changesCenterRoot = createRoot(container);
+      // Mesmo painel da view `scm` da Side Bar — um SÓ componente para os dois lugares.
+      // O clique num recurso continua indo para `openInAttachSession`, que desde a
+      // 2c-ii resolve a superfície (coluna ou centro) sem esta aba saber disso.
+      changesCenterRoot.render(scmElement());
+    },
+
+    unmountChanges: unmountChangesCenter,
+
     mountAttach(root: HTMLElement, opts: { sessionId: string }): void {
       // mesmo host → só re-render (sessão trocou); host novo → remonta.
       // Esconder/mostrar NÃO passa por aqui (display:none dentro do AttachArea).
@@ -505,6 +535,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       }
       unmountSearch();
       unmountScm();
+      unmountChangesCenter();
       unmountAttach();
       unmountCodeEditor();
       offEditor();

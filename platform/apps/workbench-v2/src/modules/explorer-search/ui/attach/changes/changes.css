@@ -163,3 +163,13 @@
    (no anexo isso vinha do `.editor-container`). Fundo = Side Bar (regra do VS Code para viewlets). */
 .explorer-viewlet.scm-viewlet { position: relative; flex: 1 1 auto; min-height: 0; }
 .scm-viewlet .scm-view { background: var(--vscode-sideBar-background); }
+
+/* FATIA-15 Onda 3 (D166) — o MESMO painel, agora como corpo da aba `Changes` do centro.
+   Dois ajustes e só:
+   (a) altura — no centro o wrapper é item flex do `.editor-body` (display:contents no host
+       do shell passa os filhos adiante), então ele preenche a coluna em vez de encolher;
+       não uso `position:absolute` porque `.editor-body` não é o ancestral posicionado.
+   (b) fundo — viewlet de Side Bar usa `sideBar-background`; no centro a regra é a do
+       VS Code para o editor, senão a aba Changes fica com cara de barra lateral. */
+.center-changes-host .explorer-viewlet.scm-viewlet { position: relative; flex: 1 1 auto; min-height: 0; }
+.center-changes-host .scm-viewlet .scm-view { background: var(--vscode-editor-background); }

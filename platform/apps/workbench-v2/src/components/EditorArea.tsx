@@ -95,6 +95,12 @@ interface EditorAreaProps {
    *  pelo App como slot — o mesmo padrão de `searchSlot`/`customizationsSurface`.
    *  Ausente = a aba ativa não precisa dele (aba nativa demo, browser, search…). */
   codeEditorSlot?: ReactNode
+  /** FATIA-15 Onda 3 (D166): o painel Changes REAL (ChangesPane do módulo, via
+   *  `mountChanges`) para a aba `diff` do centro. Presente → é ele o corpo da aba;
+   *  ausente → o `DiffView` de demonstração continua, para que um shell sem o
+   *  módulo não perca a aba. O `DiffView` pinta arquivos de um estado mock que nasce
+   *  e permanece vazio; o real vem do GitService, que é de quem o módulo é dono. */
+  changesSlot?: ReactNode
   /** D148 §4: quando a aba ativa PRECISA do corpo capaz e o módulo não oferece
    *  `mountCodeEditor`, o App manda a mensagem e o centro FALHA VISÍVEL — nunca
    *  cai em silêncio no `<Editor>` que não salva. */
@@ -443,6 +449,7 @@ export function EditorArea({
   configSurface,
   frontierTabs,
   codeEditorSlot,
+  changesSlot,
   codeEditorUnavailable,
   onNavigateBrowser,
   onBrowserBack,
@@ -659,7 +666,21 @@ export function EditorArea({
         {editorContentVisible && activeTab?.type === 'browser' && activeBrowser && <BrowserPreview view={activeBrowser} monacoTheme={monacoTheme} onNavigate={(url) => onNavigateBrowser(activeBrowser.id, url)} onBack={() => onBrowserBack(activeBrowser.id)} onForward={() => onBrowserForward(activeBrowser.id)} onReload={() => onReloadBrowser(activeBrowser.id)} onStatus={(status) => onBrowserStatus(activeBrowser.id, status)} onChangeViewport={(viewport) => onChangeViewport(activeBrowser.id, viewport)} />}
         {editorContentVisible && activeTab?.type === 'search' && searchSlot}
         {editorContentVisible && activeTab?.type === 'search' && !searchSlot && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
-        {editorContentVisible && activeTab?.type === 'diff' && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
+        {/* D166: o corpo REAL da aba Changes vem do módulo, montado pelo App como
+            slot e apenas ocultado quando a aba ativa é outra (mesmo padrão do
+            corpo de arquivo acima: display:contents quando visível). O `DiffView`
+            mock abaixo só entra quando não há slot — shell sem módulo. */}
+        {changesSlot && (
+          <div
+            className="center-changes-host"
+            data-testid="center-changes-host"
+            style={{ display: editorContentVisible && activeTab?.type === 'diff' ? 'contents' : 'none' }}
+          >
+            {changesSlot}
+          </div>
+        )}
+        {/* Sem slot: código morto congelado */}
+        {editorContentVisible && activeTab?.type === 'diff' && !changesSlot && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
         {editorContentVisible && activeTab?.type === 'providers' && providersSurface}
         {editorContentVisible && activeTab?.type === 'config' && configSurface}

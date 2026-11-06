@@ -239,6 +239,16 @@ export interface IExplorerSearchModule {
    *  `scm` da Side Bar. Clique num recurso abre o diff no anexo. Só DOM dentro de `root`. */
   mountScm(root: HTMLElement): void;
   unmountScm(): void;
+  /** FATIA-15 Onda 3 (ADITIVO, D166): o MESMO ChangesPane real, com host próprio,
+   *  para a aba `Changes` do corpo central.
+   *
+   *  Por que não reusar `mountScm`: ele guarda UM host e devolve cedo quando o host
+   *  é o mesmo — pôr o centro ali roubaria o host da Side Bar (ou o contrário) e o
+   *  painel piscaria entre os dois. Só o mount de uma view é congelado; este é
+   *  novo, então nasce separado.
+   *  Só DOM dentro de `root`; o shell decide onde a aba aparece. */
+  mountChanges?(root: HTMLElement): void;
+  unmountChanges?(): void;
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void;
   dispose(): void;               // libera watchers, comandos registrados, listeners
 }
