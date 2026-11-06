@@ -1750,3 +1750,37 @@ elimina um caminho inteiro (ler arquivo por File System Access) que competia com
 **Gate.** typecheck **EXIT 0** + **289 = 271✓|2✗|16skip em 25 arquivos** — **idêntico ao de antes da remoção**, o que é a
 prova de que o código removido não era exercitado por nada além de si mesmo. As 2 falhas são PEND-02 e themeTokens, ambas
 pré-existentes e medidas com `git stash`.
+
+### D160 — Onda 3, dívida 3 (parte 2): a fronteira shell↔módulo saiu do App — 2026-11-05 (noite)
+
+**O que foi extraído, e por que é coesão e não fatiamento cosmético.**
+
+Para `shell/moduleSlots.tsx` (**69 linhas**): `ExplorerModuleSlot`, `SearchModuleSlot`, `ScmModuleSlot` e
+`CenterCodeEditorSlot`. Os quatro são **a fronteira entre o shell e o módulo** — cada um é um `div` `display:contents` onde
+o módulo monta o próprio DOM. Estavam no meio de 2 500 linhas de estado de sessão/layout/chat, e a fronteira mais importante
+do sistema (Regra 3: o shell não alcança abaixo do barrel) era a coisa mais difícil de achar no arquivo. Agora está num
+lugar só, visível de uma olhada.
+
+Para `shell/persistenciaDeAbas.ts` (**55 linhas**): `loadAttachTabs`, `snapshotAttachTabs`, `restoreAttachTabs`,
+`ACTIVE_SESSION_KEY` e o tipo `PersistedAttachTab`. Responsabilidade com fronteira própria: lê/escreve `localStorage`, fala
+com o módulo **só pelo barrel**, e não toca em estado do React. Todo acesso ao storage já estava em `try/catch` — o
+comentário que explica **por que** (modo privado e cota estourada são normais; perder a memória de abas não pode derrubar o
+app) mudou junto com o código, que é o ponto de mover o arquivo e não só recortar.
+
+**Nada mudou de comportamento.** Os quatro componentes e as três funções são os mesmos, byte a byte; mudaram de arquivo. O
+contrato de cada slot continua idêntico (mesmos `data-testid`: `explorer-module-slot`, `search-module-slot`,
+`scm-module-slot`, `center-code-editor-slot`) — por isso `centerFrontierApp` e `centerCorpoDoModulo`, que os procuram no
+DOM, passam sem uma linha de ajuste.
+
+**Ganho medido.** `App.tsx`: 2 798 → **2 722 linhas** (`wc -l`). Na onda: **2 828 → 2 722 = −106 linhas** do arquivo que o
+RNF15-2 manda reduzir, e — mais importante que o número — **duas responsabilidades com fronteira própria deixaram de morar
+no síndico**.
+
+**Gate.** typecheck **EXIT 0** + **289 = 271✓|2✗|16skip em 25 arquivos**, idêntico ao de antes da extração. As 2 falhas são
+PEND-02 e `themeTokens`, ambas pré-existentes e medidas com `git stash`.
+
+**O que ainda engorda o App, e fica registrado como próximo corte.** O corpo do `App()` ainda tem 2 400+ linhas de estado e
+orquestração (sessões, layout, chat, terminais, browser). Extrair isso não é recortar arquivo: exige separar o **estado de
+layout por sessão** (que hoje conversa com `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do
+editor**. É o corte maior da Onda 3 e precisa de gate próprio, porque mexe em persistência — não se faz junto com limpeza
+de órfão.

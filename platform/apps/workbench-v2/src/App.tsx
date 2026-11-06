@@ -66,6 +66,9 @@ import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Ab
 // FATIA 15 Onda 2c-i (D148): a ponte que projeta as abas do módulo para a faixa
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
+// FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
+import { CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
+import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
@@ -158,85 +161,6 @@ function sameComposerHistoryEntry(left: ComposerHistoryEntry | undefined, right:
   })
 }
 
-// FATIA-04 (4.4): slot DOM do módulo explorer-search. O mount/unmount REAL é
-// do módulo (DOM só dentro do slot; estado do serviço sobrevive a remount).
-function ExplorerModuleSlot({ module }: { module: IExplorerSearchModule }) {
-  const hostRef = useCallback((el: HTMLDivElement | null) => {
-    if (el) module.mount(el)
-    else module.unmount()
-  }, [module])
-  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="explorer-module-slot" />
-}
-
-/** FATIA-04 4.6 (opção A aprovada 2026-09-25): slot da aba Search → módulo real.
- *  Mesmo padrão do ExplorerModuleSlot; `focusRequest` repassa o Ctrl+Shift+F. */
-function SearchModuleSlot({ module, focusRequest }: { module: IExplorerSearchModule; focusRequest: number }) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (hostRef.current) module.mountSearch(hostRef.current, { focusRequest })
-  }, [module, focusRequest])
-  useEffect(() => () => module.unmountSearch(), [module])
-  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="search-module-slot" />
-}
-
-/** FATIA-05 5.3: slot da view `scm` da Side Bar → Source Control View real do módulo.
- *  Mesmo padrão do SearchModuleSlot (mount 1×; troca de view = display flex/none). */
-function ScmModuleSlot({ module }: { module: IExplorerSearchModule }) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (hostRef.current) module.mountScm(hostRef.current)
-  }, [module])
-  useEffect(() => () => module.unmountScm(), [module])
-  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="scm-module-slot" />
-}
-
-/** FATIA-04 4.7 c1 (exceção autorizada 2026-09-26): slot do Editor Anexo na
- *  barra auxiliar → módulo real. Mesmo padrão do SearchModuleSlot. */
-// FATIA-05 5.7 fix (DoD "F5 mantém as 3 abas", 2026-10-01): o módulo persiste largura/maximizado, mas NÃO as abas
-// (fato da 4.7, D2.70). O shell guarda a lista por sessão e reabre no boot — só `kind: 'code'` (diff/changes têm payload).
-const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
-/** FATIA 09 (§3.8): qual sessão estava aberta — o F5 volta para ELA e a
- * conversa (restaurada do .jsonl) aparece na hora. */
-const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
-type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
-function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
-  try {
-    const raw = window.localStorage.getItem(ATTACH_TABS_KEY)
-    const parsed: unknown = raw ? JSON.parse(raw) : null
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, PersistedAttachTab[]>) : {}
-  } catch { return {} }
-}
-function snapshotAttachTabs(module: IExplorerSearchModule, sessionId: string): void {
-  try {
-    const tabs = module.attach.getTabs({ sessionId })
-      .filter((t) => t.kind === 'code')
-      .map((t): PersistedAttachTab => ({ uri: t.uri, pinned: !t.preview, active: !!t.active }))
-    const all = loadAttachTabs()
-    if (tabs.length) all[sessionId] = tabs
-    else delete all[sessionId]
-    window.localStorage.setItem(ATTACH_TABS_KEY, JSON.stringify(all))
-  } catch { /* quota/privado: ignora */ }
-}
-function restoreAttachTabs(module: IExplorerSearchModule): void {
-  const all = loadAttachTabs()
-  for (const [sessionId, tabs] of Object.entries(all)) {
-    if (!Array.isArray(tabs)) continue
-    const ordered = [...tabs.filter((t) => !t.active), ...tabs.filter((t) => t.active)] // ativa por último = fica ativa
-    for (const t of ordered) void module.attach.open({ uri: t.uri, kind: 'code', sessionId, pinned: t.pinned })
-  }
-}
-
-// FATIA 15 Onda 2c-i (D148 §2): espelho de AttachModuleSlot para o CENTRO — ref +
-// mountCodeEditor no efeito + unmountCodeEditor no cleanup. Sem equivalente a
-// `pendingAttachOpen`: abrir arquivo no centro é decisão do shell, que já sabe a uri.
-function CenterCodeEditorSlot({ module, sessionId }: { module: IExplorerSearchModule; sessionId: string }) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (hostRef.current) module.mountCodeEditor?.(hostRef.current, { sessionId })
-  }, [module, sessionId])
-  useEffect(() => () => module.unmountCodeEditor?.(), [module])
-  return <div ref={hostRef} style={{ display: 'contents' }} data-testid="center-code-editor-slot" />
-}
 
 interface AppProps {
   /** Test-only dependency injection; production always hydrates from SQLite. */
