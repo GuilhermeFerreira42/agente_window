@@ -185,7 +185,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // A AuxiliaryBar fica montada enquanto o anexo tiver abas, independente da coluna "Detalhes"
   // (`auxiliaryVisible`) e do gate do Browser — senão o clique no Explorer cai em `pendingAttachOpen`
   // e só abre após F5 (bug do vídeo, docs/25 P20).
-  const [attachExpandedSessions, setAttachExpandedSessions] = useState<readonly string[]>([])
+  // FATIA 15 Onda 3 (D164): `attachExpandedSessions` saiu. Ver comentário no handler de eventos.
   // FATIA 15 Onda 2c-i: versão das abas do módulo. A projeção é leitura pura de
   // `attach.getTabs`, que não é reativa; quem avisa que mudou é o onEvent do módulo,
   // então cada evento de aba bumpa esta versão e o useMemo que projeta recalcula.
@@ -281,14 +281,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           // entra aqui e não no snapshot do anexo porque a faixa mostra o ponto de dirty.
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' ||
               e.type === 'editor.activeChanged' || e.type === 'editor.dirtyChanged') setModuloAbasVersao((v) => v + 1)
-          if (e.type === 'editor.attachExpanded') {
-            setAttachExpandedSessions((cur) => (cur.includes(e.sessionId) ? cur : [...cur, e.sessionId]))
-          }
-          if (e.type === 'editor.attachCollapsed') setAttachExpandedSessions((cur) => cur.filter((id) => id !== e.sessionId))
+          // FATIA 15 Onda 3 (D164): `editor.attachExpanded/attachCollapsed` não alimentam mais
+          // estado do shell. Esse estado existia para dizer "o anexo da coluna tem abas", e a
+          // coluna saiu na 2c-ii. Lista que só cresce e encolhe sem ninguém ler é memória gasta
+          // e ruído para quem lê o arquivo.
           // 5.7 (D6/RF-07) + docs/24 v1.2 (2026-10-02, RF-09 revogado para a 5.7): maximizar/restaurar NÃO mexem na
           // Side Bar — ela fica 274 como estava; só o chat some e o editor toma o centro. Persiste (F5 mantém).
-          if (e.type === 'editor.attachMaximized') layoutRef.current.setEditorMaximized(true)
-          if (e.type === 'editor.attachRestored') layoutRef.current.setEditorMaximized(false)
+          // FATIA 15 Onda 3 (D164): `editor.attachMaximized/attachRestored` NÃO escrevem mais em
+          // `layout.state.editorMaximized`. Aquele campo era o maximizar da COLUNA: nenhum lugar
+          // o lia (a coluna saiu na 2c-ii), mas ele era gravado no disco a cada evento, porque
+          // `useLayoutState` persiste o estado inteiro. Escrever estado que ninguém lê não é só
+          // inútil — é lixo que o próximo leitor vai tentar interpretar. O maximizar do centro é
+          // `editorMaximized` (useState + centerEditorMaximized), que segue vivo e persistido.
         })
         restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
         mountedModule = module
@@ -627,14 +631,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed" —
   // exceto quando há aba global aberta (DEBT-09): aí o editor abre ao lado da landing.
-  // FATIA 15 Onda 3 (D163): `attachExpanded` era lido SÓ para alimentar `auxVisible`, e
-  // `auxiliaryVisible` é constante `false` desde a D2.72 (a coluna não é mais uma coluna
-  // governável). Com a coluna desligada na 2c-ii, a expressão não distingue mais nada.
-  // `attachExpandedSessions` CONTINUA sendo alimentado pelos eventos porque o layout
-  // legado (`layout.state.editorMaximized`) ainda o lê — isso sai no corte de persistência.
-  const attachExpanded = false
   const sidePaneInputs = hasSessions && !landingVisible
-    ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
+    ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible }
     : globalEditorTabs.length > 0
       ? { hasEditorTabs: true, editorHidden, auxVisible: false }
       : { hasEditorTabs: false, editorHidden: true, auxVisible: false }

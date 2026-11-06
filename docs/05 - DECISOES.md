@@ -1879,3 +1879,35 @@ governar layout deixaram de existir, e quem ler o `App.tsx` daqui em diante não
 **Gate.** typecheck **EXIT 0** + **347 = 329✓|2✗|16skip em 29 arquivos**. Entraram `sessionLayout` e `layoutPersistence` no
 gate, porque são os testes que policiam a persistência que este passo deliberadamente **não** tocou. As 2 falhas seguem
 sendo PEND-02 e `themeTokens`.
+
+### D164 — Onda 3, o corte de persistência: estado que era ESCRITO no disco e nunca lido — 2026-11-05 (noite)
+
+**O que o mapeamento mostrou, e por que assusta.** `layout.state.editorMaximized` era o maximizar da **coluna**. Depois da
+2c-ii, **ninguém o lia** — `grep 'state.editorMaximized'` devolvia só dois comentários meus, nenhum consumo. Mas ele
+**continuava sendo gravado no disco a cada evento**: `useLayoutState` persiste o estado inteiro (`saveLayoutState(state)`
+num `useEffect` de `[state]`), e o App chamava `layoutRef.current.setEditorMaximized(...)` em `editor.attachMaximized` e
+`editor.attachRestored`.
+
+Ou seja: cada maximizar/restaurar do anexo escrevia no `localStorage` um campo que ninguém consultaria. **Estado persistido
+e morto é pior que estado morto em memória** — ele sobrevive ao F5, aparece em qualquer inspeção do storage e faz o próximo
+leitor acreditar que governa alguma coisa.
+
+**O que foi removido, nesta ordem (cada passo verde antes do seguinte).**
+
+1. as **duas escritas** em `layout.state.editorMaximized` (D163 já tinha removido a classe CSS inerte do `.top-right-section`);
+2. `attachExpandedSessions` — o estado que dizia "o anexo da coluna tem abas" — e as **duas escritas** que o alimentavam
+   (`editor.attachExpanded`/`attachCollapsed`). Com a leitura já fixada em `false` na D163, restava um vetor que crescia e
+   encolhia sem ninguém ler: memória gasta e ruído;
+3. a variável derivada `attachExpanded` e o `|| attachExpanded` em `auxVisible`.
+
+**O que NÃO foi tocado, deliberadamente.** `shell/layoutState.ts` mantém o campo e o `setEditorMaximized` no contrato. Razão:
+removê-los é mudar **contrato de domínio** e o formato do que já está gravado no disco dos usuários — e isso exige
+**migração**, não limpeza. O código que gravava já não grava; o campo fica como campo dormente até uma decisão de migração.
+⛔ Registrado como dívida aberta, com a condição explícita: **só sai com plano de migração do `localStorage` existente.**
+
+**Ganho.** `App.tsx`: 2 696 → **2 690 linhas**. Na onda: **2 828 → 2 690 = −138** medidos agora (o número oscila porque os
+comentários explicativos entram na conta — e eles ficam, porque substituir código por comentário que explica **por que** o
+código saiu é o que impede a próxima pessoa de ressuscitá-lo).
+
+**Gate.** typecheck **EXIT 0** + **347 = 329✓|2✗|16skip em 29 arquivos**, com `sessionLayout` e `layoutPersistence` no gate —
+são os testes da persistência que este passo mexeu de raspão. As 2 falhas seguem PEND-02 e `themeTokens`.
