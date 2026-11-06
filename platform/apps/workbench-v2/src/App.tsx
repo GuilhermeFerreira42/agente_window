@@ -69,7 +69,7 @@ import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/pon
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
-import { isFileSystemAccessSupported, pickDirectory as pickDirectoryReal, readDirectoryEntries, readFileContent, saveRootHandle, loadRootHandle, clearRootHandle, type FileSystemEntry } from './domain/fileSystem'
+import { isFileSystemAccessSupported, pickDirectory as pickDirectoryReal, readDirectoryEntries, saveRootHandle, loadRootHandle, clearRootHandle, type FileSystemEntry } from './domain/fileSystem'
 import { captureSessionLayout, forgetSessionLayout, restoreSessionLayout, type SessionLayoutMap } from './domain/sessionLayout'
 import { observableValue, transaction } from './domain/observable'
 import { createLayoutSync } from './domain/sessionLayoutSync'
@@ -500,24 +500,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify('Pasta real limpa')
   }
 
-  const handleOpenFileHandle = async (entry: FileSystemEntry) => {
-    if (entry.kind === 'directory') {
-      toggleFolder(entry.path)
-      return
-    }
-    try {
-      const fileHandle = entry.handle as FileSystemFileHandle
-      const content = await readFileContent(fileHandle)
-      // Abrir no editor como file tab real
-      openEditorTab('file', { title: entry.name, path: entry.path, content })
-      // (E10/R-083) mesmo reveal do fluxo do Explorer — o anexo precisa acordar.
-      setEditorHidden(false)
-      notify(`Arquivo real aberto: ${entry.name}`)
-    } catch (e) {
-      console.error(e)
-      notify(`Falha ao ler ${entry.name}`)
-    }
-  }
+  // FATIA 15 Onda 3 (D159): `handleOpenFileHandle` saiu daqui. Era o ÚNICO criador de aba
+  // nativa COM `content` e estava ÓRFÃO desde a 4.7 (declaração sem nenhum chamador — D150 §4).
+  // Toda abertura de arquivo passa pelo módulo (`attach.open`), que escreve/lê pelo servidor
+  // em vez de usar File System Access. Com ele fora, o ramo do `<Editor>` antigo do
+  // EditorArea fica comprovadamente inalcançável: nenhuma aba `file` do App carrega `content`.
 
   // R-030 — Todo o estado de layout por sessão flui de um OBSERVABLE da sessão
   // ativa (nunca de eventos), como no LAYOUT_CONTROLLER.md. As três células
@@ -710,7 +697,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const activeDiffFiles = diffFilesBySession[activeSession.id] ?? []
   const selectedDiffFileId = selectedDiffFileBySession[activeSession.id]
   const checksExpanded = checksExpandedBySession[activeSession.id] ?? true
-  const expandedFolders = expandedFoldersBySession[activeSession.id] ?? {}
   const chatKey = `${activeSession.id}:${activeChatId}`
   const selectedModel = modelByChat[chatKey] ?? 'Auto'
   const selectedMode = modeByChat[chatKey] ?? 'agent'
@@ -2340,16 +2326,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const toggleChecks = () => {
     setChecksExpandedBySession((current) => ({ ...current, [activeSession.id]: !checksExpanded }))
-  }
-
-  const toggleFolder = (folderName: string) => {
-    setExpandedFoldersBySession((current) => ({
-      ...current,
-      [activeSession.id]: {
-        ...(current[activeSession.id] ?? {}),
-        [folderName]: !(current[activeSession.id]?.[folderName] ?? true),
-      },
-    }))
   }
 
   const rerunChecks = (checkName?: string) => {

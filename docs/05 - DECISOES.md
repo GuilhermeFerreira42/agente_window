@@ -1725,3 +1725,28 @@ arquivo que eu mexi. ⛔ **Lição:** um arquivo novo no gate pode revelar falha
 regressão minha. O número honesto do inventário passa a ser **289 = 271✓|2✗|16skip em 25 arquivos**.
 
 **Gate.** typecheck **EXIT 0** + 289 conforme acima. `app.css`: 5 058 → **5 022 linhas**.
+
+### D159 — Onda 3, dívida 3 (parte 1): o código órfão do File System Access saiu do App — 2026-11-05 (noite)
+
+**O que saiu, e por que era seguro.** `handleOpenFileHandle` era o **único criador de aba nativa `file` COM `content`** e
+estava **órfão** — a declaração existia, nenhum chamador. Foi a base da D150 §4: como nenhuma aba `file` do App carrega
+`content`, o ramo do `<Editor>` antigo do `EditorArea` é **inalcançável**. Removido ele, esse ramo fica inalcançável por
+construção, não por inferência.
+
+Em cascata, saíram também: `toggleFolder` (que só ele chamava) e o derivado `expandedFolders` (que só `toggleFolder` lia).
+
+**Um erro meu no meio, corrigido na hora.** Ao remover `toggleFolder` eu concluí que `expandedFoldersBySession` tinha ficado
+órfão e apaguei o `useState` — o typecheck acusou `setExpandedFoldersBySession` em uso real na limpeza ao excluir sessão
+(L1684). Restaurei o estado e mantive só o derivado fora. Fica registrado porque é o tipo de raciocínio que "parece lógico" e
+está errado: procurei por nome de variável, não pelo setter.
+
+**O que ficou de propósito.** `readDirectoryEntries`, `pickDirectory`, `saveRootHandle`/`loadRootHandle` e
+`isFileSystemAccessSupported` **continuam**: são o caminho de "escolher pasta" no desktop, que está vivo. Só `readFileContent`
+saiu do import, porque seu único consumidor era o handler removido.
+
+**Ganho.** `App.tsx`: 2 822 → **2 798 linhas**. É a primeira queda real do RNF15-2 nesta onda — pequena na contagem, mas
+elimina um caminho inteiro (ler arquivo por File System Access) que competia com o caminho real (módulo + servidor).
+
+**Gate.** typecheck **EXIT 0** + **289 = 271✓|2✗|16skip em 25 arquivos** — **idêntico ao de antes da remoção**, o que é a
+prova de que o código removido não era exercitado por nada além de si mesmo. As 2 falhas são PEND-02 e themeTokens, ambas
+pré-existentes e medidas com `git stash`.
