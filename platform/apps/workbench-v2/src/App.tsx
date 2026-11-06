@@ -94,7 +94,6 @@ import {
   type MobileLayer,
   type MobileNavigationStack,
 } from './domain/mobileNavigationStack'
-import { createLayoutController, layoutPlatformFor } from './domain/layoutController'
 import { commitDraft, createManagementState, discardDraft, openDraft, selectProviderForNewSession } from './domain/sessionsManagement'
 import { ChatPanel } from './components/ChatPanel'
 import { EditorArea } from './components/EditorArea'
@@ -643,10 +642,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (E7/R-044) O detalhe é transiente sob uma aba Browser enquanto o editor está
   // visível — some ao ativar Browser e retorna ao voltar p/ Changes/Files. Se o
   // editor for oculto com Browser ativo, o painel mostra o fallback Changes/Files.
-  // (E4/R-033) Controller de layout por plataforma: desktop gerencia a aux bar;
-  // mobile/single-pane a omite por completo (não escondida via CSS). O gate de
-  // render da coluna de detalhes consulta o controller, não `isSinglePane` cru.
-  const layoutController = useMemo(() => createLayoutController(layoutPlatformFor(isSinglePane)), [isSinglePane])
+  // FATIA 15 Onda 3 (D165): `layoutController` saiu. Ele existia para responder uma pergunta
+  // só — "esta plataforma renderiza a coluna de detalhes?" — e quem a fazia era o gate de
+  // render da coluna, removido na D156. Depois disso, `createLayoutController` era chamado a
+  // cada mudança de `isSinglePane` e o resultado não era lido por ninguém.
+  // O DOMÍNIO `domain/layoutController.ts` continua inteiro e testado (layoutController.test.ts):
+  // o que saiu foi a instanciação sem consumidor no síndico, não a regra de plataforma.
   // R-030 — espelha o estado de layout RENDERIZADO da sessão ativa para o ref
   // que a captura (no autorun) lê ao sair da sessão. Atualizado a cada render:
   // enquanto a sessão não troca, este é o estado "ao vivo"; no instante da troca
