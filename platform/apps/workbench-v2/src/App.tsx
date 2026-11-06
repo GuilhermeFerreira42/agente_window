@@ -72,7 +72,6 @@ import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './she
 import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
-import { isFileSystemAccessSupported, pickDirectory as pickDirectoryReal, readDirectoryEntries, saveRootHandle, loadRootHandle, clearRootHandle, type FileSystemEntry } from './domain/fileSystem'
 import { captureSessionLayout, forgetSessionLayout, restoreSessionLayout, type SessionLayoutMap } from './domain/sessionLayout'
 import { observableValue, transaction } from './domain/observable'
 import { createLayoutSync } from './domain/sessionLayoutSync'
@@ -328,67 +327,21 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // são preservados separadamente e nunca limpos ao alternar de sessão.
   const sessionLayouts = useRef<SessionLayoutMap>(loadSessionLayouts())
 
-  // FileSystem real - integração com File System Access API (02_FILESYSTEM_WORKSPACE_REAL)
-  const [fileSystemEntries, setFileSystemEntries] = useState<FileSystemEntry[]>([])
-  const [, setFileSystemRootHandle] = useState<FileSystemDirectoryHandle | null>(null)
-  const [fileSystemRootName, setFileSystemRootName] = useState<string>('')
-  const [fileSystemLoading, setFileSystemLoading] = useState(false)
-  const fileSystemSupported = isFileSystemAccessSupported()
+  // D171: o fluxo de "pasta real" via File System Access saiu daqui. Medido antes
+  // de remover: `fileSystemEntries`, `fileSystemRootName` e `fileSystemLoading`
+  // eram ESCRITOS e nunca lidos (1 ocorrência cada — a da própria declaração),
+  // e `handlePickDirectory`/`handleClearDirectory` não tinham chamador nenhum.
+  // Com `handleOpenFileHandle` fora na D159, o File System Access não tinha mais
+  // caminho vivo: toda abertura de arquivo passa pelo módulo (attach.open), que
+  // fala com o servidor. Manter 54 linhas de estado morto no App era lixo que o
+  // próximo leitor tentaria interpretar. `domain/fileSystem.ts` FICA: é a base
+  // que o seletor de workspace usa (`pickSessionWorkspace`).
 
   // (R-092 / LAYOUT.md §Custom View Grid) Superfície full-surface contribuída,
   // mutuamente exclusiva com Sessions Part, Editor, Auxiliary Bar e Panel.
   const [customView, setCustomView] = useState(() => loadCustomViewState())
   const customViewActive = shouldShowCustomViewGrid(customView)
 
-  // Carregar handle persistido do IndexedDB ao iniciar
-  useEffect(() => {
-    if (!fileSystemSupported) return
-    loadRootHandle().then(async (handle) => {
-      if (handle) {
-        try {
-          const entries = await readDirectoryEntries(handle)
-          setFileSystemRootHandle(handle)
-          setFileSystemRootName(handle.name)
-          setFileSystemEntries(entries)
-        } catch {
-          // Handle salvo ficou inválido (pasta movida/permissão revogada):
-          // seguimos com o workspace mockado em vez de quebrar a inicialização.
-        }
-      }
-    })
-  }, [fileSystemSupported])
-
-  const handlePickDirectory = async () => {
-    if (!fileSystemSupported) {
-      notify('File System Access API não suportada - use Chrome/Edge')
-      return
-    }
-    setFileSystemLoading(true)
-    try {
-      const handle = await pickDirectoryReal()
-      if (handle) {
-        const entries = await readDirectoryEntries(handle)
-        setFileSystemRootHandle(handle)
-        setFileSystemRootName(handle.name)
-        setFileSystemEntries(entries)
-        await saveRootHandle(handle)
-        notify(`Pasta real selecionada: ${handle.name} - ${entries.length} itens`)
-      }
-    } catch (e) {
-      console.error(e)
-      notify('Falha ao escolher pasta')
-    } finally {
-      setFileSystemLoading(false)
-    }
-  }
-
-  const handleClearDirectory = async () => {
-    setFileSystemEntries([])
-    setFileSystemRootHandle(null)
-    setFileSystemRootName('')
-    await clearRootHandle()
-    notify('Pasta real limpa')
-  }
 
   // FATIA 15 Onda 3 (D159): `handleOpenFileHandle` saiu daqui. Era o ÚNICO criador de aba
   // nativa COM `content` e estava ÓRFÃO desde a 4.7 (declaração sem nenhum chamador — D150 §4).
