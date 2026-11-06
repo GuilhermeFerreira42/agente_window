@@ -1784,3 +1784,38 @@ orquestração (sessões, layout, chat, terminais, browser). Extrair isso não �
 layout por sessão** (que hoje conversa com `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do
 editor**. É o corte maior da Onda 3 e precisa de gate próprio, porque mexe em persistência — não se faz junto com limpeza
 de órfão.
+
+### D161 — Onda 3, dívida 3 (parte 3): regra do domínio sai do App — e uma regra que existia em DOIS lugares — 2026-11-05 (noite)
+
+**O que saiu do `App.tsx`.** Quatro funções puras de ambiente e tempo (`ehModoAgir`, `detectTouch`,
+`isSinglePaneWidth`, `timeLabel`) para `domain/appRuntime.ts`, e a regra do histórico do compositor para
+`domain/composerHistory.ts`. Nenhuma delas é "do App": são do ambiente e do domínio. Ficando lá, cada uma era mais uma
+coisa a ler antes de achar o estado de sessão.
+
+**A descoberta que justifica o passo.** A regra do histórico do compositor existia **duas vezes**, com nomes diferentes e
+código idêntico: `sameComposerHistoryEntry` no `App.tsx` e `historyEntriesEqual` no `ChatInput.tsx` — mais
+`COMPOSER_HISTORY_MAX_ENTRIES = 40` declarada nos dois arquivos, e o clone de anexos também duplicado
+(`cloneHistoryEntry` × o `.map` inline no App). **Duplicata de REGRA é pior que duplicata de estilo:** as duas cópias
+precisavam concordar para sempre e nada garantia isso — bastava alguém comparar `kind` de anexo num lado e não no outro
+para o "evitar repetir no histórico" passar a se comportar diferente conforme o caminho. Agora há **uma** implementação,
+e o `ChatInput` passou a consumi-la.
+
+**Dois erros meus, e como foram pegos.**
+
+1. Declarei `COMPOSER_HISTORY_MAX_ENTRIES` "fantasma" no App por causa de um `grep -c` que devolveu **2** (a declaração + o
+   **uso**) e eu li como "declarada e não usada". O typecheck me desmentiu em `App.tsx:2287`: ela **era** usada no
+   `.slice(-COMPOSER_HISTORY_MAX_ENTRIES)`. Corrigi importando a constante do domínio em vez de apagá-la. ⛔ **Lição:** `grep
+   -c` conta ocorrências, não usos — para decidir se algo é órfão, é preciso ver a linha.
+2. `ModoAgir` não mora em `../types`: mora na casa `bairros/2-inteligencia/casas/agir/contract.ts`. O import errado foi
+   pego pelo typecheck antes de rodar teste.
+
+**O ganho que não é contagem de linha.** Estas regras passaram a ser **testáveis barato**: `appRuntime.test.ts` roda **11
+provas em 19 ms**. Antes, exercitar `isSinglePaneWidth` exigia renderizar o `App` inteiro — por isso nunca teve teste. O teste
+prova o contrato que o comentário original apenas declarava ("desktop sem toque nunca vira single-pane, mesmo estreito") e
+que agora está protegido: `375 px` em plataforma sem toque devolve `false`.
+
+**Ganho medido.** `App.tsx`: 2 723 → **2 685 linhas**. Na onda: **2 828 → 2 685 = −143 linhas**. `ChatInput.tsx` também
+encolheu (duas funções e a constante saíram).
+
+**Gate.** typecheck **EXIT 0** + **328 = 310✓|2✗|16skip em 27 arquivos**. As 2 falhas continuam sendo PEND-02 e
+`themeTokens`, pré-existentes. Entraram no gate `appRuntime` (11) e `ChatInput` (o arquivo que perdeu as duplicatas).

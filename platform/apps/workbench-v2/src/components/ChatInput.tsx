@@ -78,22 +78,20 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike
 }
 
+// FATIA 15 Onda 3 (D161): a regra do histórico do compositor estava duplicada
+// AQUI e no App.tsx, com nomes diferentes e código idêntico. Agora é uma só, no
+// domínio — as duas cópias precisavam concordar para sempre e nada garantia isso.
+import {
+  COMPOSER_HISTORY_MAX_ENTRIES,
+  cloneComposerHistoryEntry,
+  sameComposerHistoryEntry,
+} from '../domain/composerHistory'
+
 type AttachmentPickerView = 'sources' | 'workspace'
 
 const createEmptyDraft = (): ComposerDraft => ({ text: '', attachments: [] })
-const COMPOSER_HISTORY_MAX_ENTRIES = 40
 
-function historyEntriesEqual(left: ComposerHistoryEntry | undefined, right: ComposerHistoryEntry): boolean {
-  if (!left || left.text !== right.text || left.model !== right.model || left.mode !== right.mode) return false
-  return left.attachments.length === right.attachments.length && left.attachments.every((attachment, index) => {
-    const other = right.attachments[index]
-    return attachment.id === other.id && attachment.name === other.name && attachment.kind === other.kind
-  })
-}
 
-function cloneHistoryEntry(entry: ComposerHistoryEntry): ComposerHistoryEntry {
-  return { ...entry, attachments: entry.attachments.map((attachment) => ({ ...attachment })) }
-}
 
 function attachmentTypeLabel(attachment: Attachment): string {
   return attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'
@@ -228,12 +226,12 @@ export function ChatInput({
 
   const appendHistoryEntry = (entry: ComposerHistoryEntry) => {
     const currentHistory = history
-    const nextHistory = historyEntriesEqual(currentHistory[currentHistory.length - 1], entry)
+    const nextHistory = sameComposerHistoryEntry(currentHistory[currentHistory.length - 1], entry)
       ? currentHistory
-      : [...currentHistory, cloneHistoryEntry(entry)].slice(-COMPOSER_HISTORY_MAX_ENTRIES)
+      : [...currentHistory, cloneComposerHistoryEntry(entry)].slice(-COMPOSER_HISTORY_MAX_ENTRIES)
 
     if (onAppendComposerHistory) {
-      onAppendComposerHistory(draftKey, cloneHistoryEntry(entry))
+      onAppendComposerHistory(draftKey, cloneComposerHistoryEntry(entry))
     } else {
       setLocalHistoryByChat((current) => ({ ...current, [draftKey]: nextHistory }))
     }
@@ -246,7 +244,7 @@ export function ChatInput({
   }
 
   const restoreHistoryEntry = (entry: ComposerHistoryEntry | undefined, direction: 'previous' | 'next') => {
-    const nextEntry = entry ? cloneHistoryEntry(entry) : createEmptyDraft()
+    const nextEntry = entry ? cloneComposerHistoryEntry(entry) : createEmptyDraft()
     updateDraft(() => ({ text: nextEntry.text, attachments: nextEntry.attachments }))
     if (entry?.mode && entry.mode !== mode) onChangeMode(entry.mode)
     if (entry?.model && entry.model !== model) onChangeModel(entry.model)

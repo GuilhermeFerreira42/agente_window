@@ -79,6 +79,11 @@ import { createLayoutSync } from './domain/sessionLayoutSync'
 import { canSplitMainEditor, createAgentWorkbenchLayout, readSinglePaneSetting } from './domain/agentWorkbenchLayout'
 import { enterDetailOnly, showEditorRestore, EMPTY_DOCKED_STATE, type DockedControllerState } from './domain/dockedAuxiliaryController'
 import { classifyViewport, isPhoneViewport } from './domain/mobileLayout'
+// FATIA 15 Onda 3 (D161): as perguntas de ambiente e a regra do histórico do
+// compositor saíram do App — elas são do DOMÍNIO, não do síndico. A regra do
+// histórico estava duplicada aqui e no ChatInput; agora existe uma só.
+import { detectTouch, ehModoAgir, isSinglePaneWidth, timeLabel } from './domain/appRuntime'
+import { COMPOSER_HISTORY_MAX_ENTRIES, sameComposerHistoryEntry } from './domain/composerHistory'
 import {
   EMPTY_NAVIGATION_STACK,
   navigateBack,
@@ -106,34 +111,6 @@ import {
   type NewSessionViewState,
 } from './domain/newSessionViewState'
 
-function ehModoAgir(value: unknown): value is ModoAgir {
-  return value === 'agent' || value === 'edit' || value === 'ask' || value === 'plan'
-}
-
-// Breakpoints do original (layoutPolicy.ts): phone ≤600px, tablet ≤1024px, e o
-// single-pane só é acionado em plataformas móveis (toque). Encolher uma janela de
-// desktop nunca deve virar single-pane — por isso o gate por toque/SO.
-// A classificação de viewport é derivada pelo domínio `mobileLayout` (R-045/R-047).
-
-/** Detecta plataforma de toque/móvel a partir do ambiente do browser. */
-function detectTouch(): boolean {
-  if (typeof window === 'undefined') return false
-  const nav = window.navigator
-  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
-  const touch = (nav?.maxTouchPoints ?? 0) > 0 || 'ontouchstart' in window
-  const mobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(nav?.userAgent ?? '')
-  return coarse || (touch && mobileUa) || mobileUa
-}
-
-// single-pane só é acionado em plataforma móvel (toque). O domínio `mobileLayout`
-// classifica o viewport; desktop (sem toque) nunca vira single-pane, mesmo
-// estreito. Em plataforma móvel, phone e tablet acionam single-pane.
-function isSinglePaneWidth(width: number): boolean {
-  if (!detectTouch()) return false
-  const viewportClass = classifyViewport({ width, touch: true })
-  return viewportClass === 'phone' || viewportClass === 'tablet'
-}
-
 const BOOT_SESSION_ID = 'draft-empty'
 // 4.8-B3 (hotfix): o Browser NÃO abre por padrão — começar com uma aba Browser
 // ativa escondia a barra auxiliar (regra Browser→aux bar oculta) e cobria o
@@ -146,20 +123,6 @@ const initialBrowserViews: BrowserViewState[] = []
 // O estado `diffFilesBySession` continua existindo só porque o `EditorArea` (intocável até a 5.7)
 // ainda recebe `diffFiles`; nasce e permanece vazio.
 const initialDiffFilesBySession: Record<string, DiffFile[]> = {}
-
-function timeLabel() {
-  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date())
-}
-
-const COMPOSER_HISTORY_MAX_ENTRIES = 40
-
-function sameComposerHistoryEntry(left: ComposerHistoryEntry | undefined, right: ComposerHistoryEntry): boolean {
-  if (!left || left.text !== right.text || left.model !== right.model || left.mode !== right.mode) return false
-  return left.attachments.length === right.attachments.length && left.attachments.every((attachment, index) => {
-    const other = right.attachments[index]
-    return attachment.id === other.id && attachment.name === other.name && attachment.kind === other.kind
-  })
-}
 
 
 interface AppProps {
