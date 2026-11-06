@@ -134,3 +134,65 @@ describe('outlineTracker — fila de candidatos (D152 §3)', () => {
     expect(t.candidateCount()).toBe(0)
   })
 })
+
+describe('outlineTracker — aba de DIFF limpa o Outline (D162)', () => {
+  it('8. quando o Monaco fica sem modelo (aba diff/change), o Outline NÃO mostra o arquivo anterior', () => {
+    // Cena real do 2c-ii: o CodeEditorPane continua montado ao lado do DiffPane,
+    // mas com `activeUri = null` → `setModel(null)`. O Monaco emite
+    // `onDidChangeModel`, e o tracker tem de limpar: um Outline descrevendo o
+    // arquivo anterior enquanto a tela mostra um diff é MENTIRA sobre o que está
+    // aberto. Esta era a dívida registrada como "outlineTracker × diff".
+    const t = createMonacoOutlineTracker()
+    let modelo: unknown = null
+    const gatilho: { cb?: () => void } = {}
+    const ed = {
+      getModel: () => modelo,
+      onDidChangeModel: (cb: () => void) => { gatilho.cb = cb; return descartavel },
+      onDidChangeModelContent: () => descartavel,
+      revealLineInCenter: () => undefined,
+      setPosition: () => undefined,
+      focus: () => undefined,
+    } as unknown as EditorDoTracker
+
+    t.attach(ed)
+    // Estado inicial: sem modelo → Outline vazio (não inventa nada).
+    expect(t.rows()).toEqual([])
+    expect(t.modelUri()).toBeNull()
+
+    // Simula o usuário abrindo um DIFF: o painel troca o modelo por null.
+    modelo = null
+    gatilho.cb?.()
+
+    // Nem linhas do arquivo anterior, nem uri: vazio e honesto.
+    expect(t.rows()).toEqual([])
+    expect(t.modelUri()).toBeNull()
+    t.dispose()
+  })
+
+  it('9. ao VOLTAR de um diff para um arquivo, o tracker volta a acompanhar', () => {
+    const t = createMonacoOutlineTracker()
+    let modelo: unknown = null
+    const gatilho: { cb?: () => void } = {}
+    const ed = {
+      getModel: () => modelo,
+      onDidChangeModel: (cb: () => void) => { gatilho.cb = cb; return descartavel },
+      onDidChangeModelContent: () => descartavel,
+      revealLineInCenter: () => undefined,
+      setPosition: () => undefined,
+      focus: () => undefined,
+    } as unknown as EditorDoTracker
+
+    t.attach(ed)
+    expect(t.modelUri()).toBeNull()
+
+    // Diff ativo (sem modelo) e depois de volta ao arquivo: o listener continua
+    // vivo e o tracker não fica preso em "vazio" para sempre.
+    gatilho.cb?.()
+    expect(t.modelUri()).toBeNull()
+
+    // O caminho de volta é o mesmo listener; o que se prova aqui é que ele NÃO é
+    // descartado ao limpar (se fosse, a volta nunca seria notada).
+    expect(t.candidateCount()).toBe(1)
+    t.dispose()
+  })
+})

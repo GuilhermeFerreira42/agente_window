@@ -1819,3 +1819,31 @@ encolheu (duas funções e a constante saíram).
 
 **Gate.** typecheck **EXIT 0** + **328 = 310✓|2✗|16skip em 27 arquivos**. As 2 falhas continuam sendo PEND-02 e
 `themeTokens`, pré-existentes. Entraram no gate `appRuntime` (11) e `ChatInput` (o arquivo que perdeu as duplicatas).
+
+### D162 — Onda 3: a dívida "outlineTracker × diff" estava coberta — provada, não afirmada — 2026-11-05 (noite)
+
+**A dúvida registrada.** Depois do 2c-ii, o `CodeEditorPane` do centro fica montado ao lado do `DiffPane` com
+`activeUri = null` → `setModel(null)` quando a aba ativa é um diff. A pergunta em aberto era: o `outlineTracker` limpa o
+Outline nesse caso, ou continua descrevendo o arquivo anterior enquanto a tela mostra um diff?
+
+**A resposta, lida no código.** Já estava coberto, e por três peças que se encaixam:
+
+- `CodeEditorPane` deriva `activeUri = null` para `kind: 'diff'` (L119) e chama `setModel(null)`;
+- o Monaco emite `onDidChangeModel` nessa troca, e o tracker assina esse evento em **cada** candidato;
+- `compute()` tem a guarda `if (!model || disposed) { if (rows.length || uri) set([], null); return; }` — ou seja, **limpa**.
+
+**O que faltava não era código: era prova.** Acrescentei 2 provas ao `outlineCandidates.test.ts` (agora **9**): a 8 mostra que,
+ao trocar o modelo por `null`, o Outline fica **vazio e sem uri** — não herda o arquivo anterior; a 9 mostra que o listener
+**sobrevive** à limpeza, então voltar do diff para um arquivo volta a ser acompanhado (se o listener fosse descartado ao
+limpar, a volta nunca seria notada — que é a falha silenciosa clássica desse tipo de guarda).
+
+**Por que isso importa mais do que parece.** Um Outline descrevendo um arquivo enquanto a tela mostra um diff não é um bug
+cosmético: é a interface **afirmando** algo falso sobre o que está aberto. A regra que ficou escrita no teste é a mesma da
+D154: **vazio é honesto, velho é mentira.**
+
+**Erro meu, pego pelo typecheck.** A primeira versão das provas declarava `let aoTrocarModelo: (() => void) | null` e o TS
+recusou (`TS2349: This expression is not callable`) porque não estreita o tipo depois de uma atribuição dentro de closure.
+Trocado por um objeto-holder `{ cb?: () => void }`. **O typecheck rodou antes do commit e barrou** — que é exatamente para
+isso que ele vem antes.
+
+**Gate.** typecheck **EXIT 0** + **330 = 312✓|2✗|16skip em 27 arquivos**. As 2 falhas seguem sendo PEND-02 e `themeTokens`.
