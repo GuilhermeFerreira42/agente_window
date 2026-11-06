@@ -1,17 +1,22 @@
-# Estado vigente — 2026-11-05 (noite, Onda 2c-ii concluída)
+# Estado vigente — 2026-11-05 (noite, Onda 2c-ii concluída · Onda 3 em andamento)
 
-## ⚑ Um visualizador só: o continente central
+## ⚑ Um visualizador só: o continente central — **concluído**
 
-A **Onda 2c-ii está tecnicamente concluída**. A coluna antiga (`AuxiliaryBar` + `AttachModuleSlot`) foi **desligada** e sua
-casca **removida do shell**. O contêiner central é agora a única superfície de abas do módulo: arquivo, diff do Source
-Control, Configurações, Provedores, navegador, busca e changes — todos no mesmo lugar, com a faixa de abas fundida.
+A coluna antiga (`AuxiliaryBar` + `AttachModuleSlot`) foi **desligada** e sua casca **removida**. O contêiner central é a
+única superfície de abas: arquivo, diff do Source Control, Configurações, Provedores, navegador, busca e changes — todos no
+mesmo lugar. Cinco degraus, cada um com gate verde antes do seguinte: **D152 → D153 → D154 → D155 → D156**.
 
-**HEAD:** `452d165` · **gate:** typecheck EXIT 0 + inventário **283 = 266✓|1✗|16skip em 23 arquivos** (única falha: PEND-02,
-pré-existente) · **painel:** 97 grupos, 0 falhas · **snapshot:** 80,5 MB / 2 683 arquivos.
+## ⚑ Onda 3: dívidas técnicas — **em andamento** (4 de 4 tratadas nesta rodada)
 
-**Cinco degraus, cada um com gate verde antes do seguinte:** D152 (a superfície do módulo pode ser o centro) → D153 (o
-`diff-arquivo` ganha corpo no centro) → D154 (o Outline segue o editor, não a coluna) → D155 (coluna desligada) → D156
-(casca removida). Plano em `docs/05` D151 §4; decisões D152-D156.
+**D157** falha ao carregar o Monaco deixa de ser silenciosa · **D158** poda do CSS da coluna **e a descoberta de que o teste
+policiava uma regra que a cascata sobrescrevia** · **D159** o órfão do File System Access sai do App · **D160** a fronteira
+shell↔módulo e a memória de abas saem do App.
+
+`App.tsx`: **2 828 → 2 722 linhas** · `app.css`: 5 058 → 5 022.
+
+**HEAD:** `5ce303d` (10 commits desde `986c585`, linhagem linear) · **gate:** typecheck EXIT 0 + inventário
+**289 = 271✓|2✗|16skip em 25 arquivos**. As 2 falhas são **PEND-02** (iconLabels P7.3) e **themeTokens** — **ambas
+pré-existentes**, medidas com `git stash` antes e depois de cada mudança. · **painel:** 97 grupos, 0 falhas.
 
 ## ⚑ O que continua PENDENTE — e não é detalhe
 
@@ -20,16 +25,19 @@ pré-existente) · **painel:** 97 grupos, 0 falhas · **snapshot:** 80,5 MB / 2 
 - **Ctrl+S gravando byte em disco** com o Monaco real;
 - **F5 restaurando as abas**;
 - **Monaco real carregando** (o dublê prova a fronteira, não o editor);
+- **falha real de chunk do editor** — o `.catch` está provado, mas a rejeição do `import()` dinâmico só existe no navegador;
 - **ambiente Windows**.
 
-Está registrado no `status.json`, no painel e na evidência `49-onda2c-ii-completa.txt`. **Não declarar aprovado o que não
-foi exercitado em ambiente real.**
+Registrado no `status.json` (`fatiaAtual.onda3.homologacaoHumanaPENDENTE`), no painel e em `evidencias/50`.
 
-## ⚑ Próximo: Onda 3
+## ⚑ Próximo corte (Onda 3)
 
-Reduzir `App.tsx` (RNF15-2; hoje 2 822 linhas — a queda grande vem aqui), limpar `attachExpanded`/`auxiliaryTab`/CSS
-`.auxiliary-bar` órfão, e tratar as dívidas: `mountAttach` sem consumidor no produto, `loadMonaco().then()` sem `.catch`,
-`outlineTracker` × diff.
+O corpo de `App()` ainda tem ~2 400 linhas de estado e orquestração. O corte maior exige separar o **estado de layout por
+sessão** (conversa com `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do editor**. Precisa de
+gate próprio porque **mexe em persistência** — não se faz junto com limpeza de órfão.
+
+Dívidas que ficam: `mountAttach` sem consumidor no produto (API congelada; rede de rollback), `attachExpanded`/`auxiliaryTab`
+ainda lidos pela persistência, `outlineTracker` × diff a revisar.
 
 ---
 # 03 - ESTADO ATUAL — onde a obra parou
