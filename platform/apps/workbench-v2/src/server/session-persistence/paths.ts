@@ -15,7 +15,25 @@ function simpleHash(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
+/**
+ * FATIA 15 Onda 3 (D167) — a pasta de dados pode ser DESVIADA por ambiente.
+ *
+ * Por que isto existe (defeito medido, não suposto): os specs E2E rodam contra o
+ * MESMO servidor do app e gravavam no banco REAL do usuário. Rodei
+ * `e2e/diff_sem_travar.spec.ts` com 2 sessões no banco e saí com 3: a nova,
+ * "DIFF-TRAVA reclick", apontando para `/tmp/diff-travar-ws` — pasta que o próprio
+ * spec cria e APAGA no fim. O efeito no app de verdade: árvore vazia, `400
+ * invalid_workspace (ENOENT ... /tmp/diff-travar-ws)` e o agente recusando com
+ * "A pasta de trabalho da sessão não está acessível". O usuário abre o produto e
+ * ele está quebrado por causa de um teste que rodou antes.
+ *
+ * A variável é opt-in: sem ela, nada muda (produção continua em `~/.agente_window`).
+ * Com ela, quem quiser um app de verdade usa outro caminho e os testes não
+ * encostam no estado real.
+ */
 export function getAppDir(): string {
+  const desvio = process.env.AGENTE_WINDOW_DATA_DIR
+  if (typeof desvio === 'string' && desvio.trim() !== '') return resolve(desvio.trim())
   return join(homedir(), APP_DIRECTORY)
 }
 
