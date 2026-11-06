@@ -1911,3 +1911,81 @@ código saiu é o que impede a próxima pessoa de ressuscitá-lo).
 
 **Gate.** typecheck **EXIT 0** + **347 = 329✓|2✗|16skip em 29 arquivos**, com `sessionLayout` e `layoutPersistence` no gate —
 são os testes da persistência que este passo mexeu de raspão. As 2 falhas seguem PEND-02 e `themeTokens`.
+
+### D165 — Onda 3: o `layoutController` instanciado e nunca consultado sai do síndico — 2026-11-05 (noite)
+
+**A medição, antes de qualquer conclusão.** `grep -c layoutController App.tsx` devolvia **2** — e "2" pode ser
+declaração+uso ou import+criação. A linha é que decide: uma no `import` (L97) e uma na criação
+(`createLayoutController(layoutPlatformFor(isSinglePane))`), **zero** ocorrências de `layoutController.` no arquivo inteiro.
+
+**O comentário acima da linha afirmava o contrário** — "o gate de render da coluna consulta o controller, não
+`isSinglePane` cru". Esse gate era o da coluna de detalhes, removido na **D156**. Depois dele, o controller continuava sendo
+**construído a cada mudança de `isSinglePane`** e o resultado não era lido por ninguém, nem no App nem em outro arquivo.
+⛔ **Comentário obsoleto é pior que ausência de comentário:** ele descreve um consumidor que não existe e fez o levantamento
+anterior classificar a linha como "viva". A lição já estava na lista de travas e vale repetir: **medir antes de acreditar no
+comentário**.
+
+**O que saiu e o que NÃO saiu.** Saiu a instanciação e o import. **Não** saiu `domain/layoutController.ts`: a regra de
+plataforma (desktop gerencia a aux bar, mobile não) continua inteira e policiada por `layoutController.test.ts`, que segue no
+gate. O que saiu foi uma chamada sem consumidor no síndico — não a regra. No lugar ficou um comentário de 5 linhas dizendo
+por que a linha saiu, para que a próxima leitura não a ressuscite.
+
+**Gate.** typecheck **EXIT 0** + **347 = 329✓|2✗|16skip em 29 arquivos** — idêntico ao HEAD anterior: remover órfão não
+custou cobertura. As 2 falhas seguem PEND-02 e `themeTokens`.
+
+### D166 — Onda 3, lacuna (3): a aba Changes do centro deixa de ser demonstração — 2026-11-05 (noite)
+
+**O diagnóstico estava escrito no próprio código, e ninguém tinha lido.** Em `App.tsx:122`:
+
+> "`diffFilesBySession` continua existindo só porque o `EditorArea` (intocável até a 5.7) ainda recebe `diffFiles`; nasce e
+> permanece vazio."
+
+E o `EditorArea` fazia `activeTab.type === 'diff' → <DiffView files={diffFiles} />`. Ou seja: desde a 5.3, a aba
+**"Branch Changes"** do centro — a superfície que a decisão do dono (D151 §2) elegeu como única — renderizava um painel cujo
+dado é `{}[sessão] ?? []`. Um estado vazio **honesto**, mas vazio: sem lista de arquivos, sem stage/unstage, sem commit.
+Enquanto isso, o painel **real** (`ChangesPane` + `GitService`, com stage, discard, commit e validação) vivia **só** na view
+`scm` da Side Bar. Era o item (3) das lacunas: *falta host `mountScm` no centro*.
+
+**Por que não dava para simplesmente chamar `mountScm` do centro.** `mountScm(root)` guarda **um** host e devolve cedo quando
+o host é o mesmo. Apontá-lo para o centro teria um de dois efeitos, e os dois são ruins: **roubar** o host da Side Bar (o
+painel sai de lá) ou **ser ignorado** (a aba do centro fica vazia em silêncio). O mount da view `scm` é congelado e não foi
+tocado; o novo nasceu separado e é **aditivo**.
+
+**O que foi feito, peça por peça.**
+
+1. **Contrato (aditivo):** `mountChanges?(root)` / `unmountChanges?()` — opcionais, como `mountCodeEditor`. Um módulo
+   anterior continua satisfazendo o contrato.
+2. **Módulo:** `changesCenterRoot` + `scmElement()` — **o mesmo componente**, um painel só para os dois lugares. Nenhum mock
+   foi escrito para o centro: reaproveitar era a ordem (D151 §2).
+3. **Shell:** `CenterChangesSlot` em `shell/moduleSlots.tsx`, no padrão dos irmãos.
+4. **EditorArea:** prop `changesSlot`. **Com** slot, é ele o corpo da aba `diff`; **sem** slot, o `DiffView` mock continua —
+   fallback de shell-sem-módulo. ⛔ O mock **não foi apagado**: apagá-lo agora quebraria a única renderização existente no
+   caso em que o slot não vem.
+5. **App:** monta o slot **sempre** que o módulo oferece `mountChanges` — não só quando a aba está ativa — e o repassa. O
+   corpo fica **montado** e apenas **ocultado** quando outra aba está ativa (`.center-changes-host` com `display:none`),
+   exatamente como o corpo de arquivo: remontar perderia a seleção de arquivo e a mensagem de commit a cada troca de aba.
+6. **CSS (`changes.css`, 2 regras):** altura (o wrapper vira item flex do `.editor-body`) e fundo
+   (`--vscode-editor-background`, não `sideBar-background` — no centro, a regra é a do VS Code para o editor).
+
+**Provas — 6, em 2 arquivos, uma por lado da fronteira.** `__tests__/centerChanges.test.tsx` (3): com slot, o painel é o
+corpo e o mock **não** aparece (senão haveria dois corpos para a mesma aba); trocar de aba e voltar devolve **o mesmo nó**
+(nada remontou); sem slot, o mock segue sendo o corpo. `modules/explorer-search/__tests__/centerChangesMount.test.tsx` (3):
+`mountChanges` monta o **ChangesPane real** (testid `scm-view` — um mock não teria); montar o centro **não** esvazia a Side
+Bar; montar 2× no mesmo host **não duplica**.
+
+**Dois erros meus, pegos na primeira execução dos testes.** (1) O dublê de fs estava incompleto e a fábrica do módulo assina
+`deps.fs.onEvent` **no construtor** — 3 falhas em `deps.fs.onEvent is not a function`. Trocado pelo `FakeFsPort` da casa, que
+tem o contrato inteiro: **dublê parcial não é dublê, é bomba-relógio**. (2) `act` importado de `'react'` não liga
+`IS_REACT_ACT_ENVIRONMENT`; o correto é o de `@testing-library/react`, que é o que os vizinhos já usavam.
+
+**O que NÃO foi provado.** Que o painel **funciona** contra um repositório git de verdade: o `GitService` fala com `/git/*`
+por HTTP e o jsdom não serve isso. A prova automatizada monta o painel e verifica que o host é dele — **não** que um commit
+acontece. Isso vai para **homologação humana**, junto com Ctrl+S, F5 e o Monaco real.
+
+**Ganho.** `App.tsx`: 2 690 → **2 701** (o slot e o comentário que explica a escolha custam 11 linhas). É o **único** passo
+da onda que **cresce** o arquivo, e ele cresce porque entrega função — a alternativa (chamar `mountScm` do centro) custava 0
+linhas e um painel quebrado. RNF15-2 continua em dívida, com o corte maior descrito na D164 e no `docs/03`.
+
+**Gate.** typecheck **EXIT 0** + **353 = 335✓|2✗|16skip em 31 arquivos** (eram 347 em 29: **+2 arquivos, +6 provas, zero
+regressão**). Entraram no gate os dois arquivos novos, porque são eles que policiam o passo. As 2 falhas seguem PEND-02 e
+`themeTokens`, pré-existentes.

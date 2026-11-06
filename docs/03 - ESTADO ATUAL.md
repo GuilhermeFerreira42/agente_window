@@ -1,22 +1,27 @@
-# Estado vigente — 2026-11-05 (noite, Onda 2c-ii concluída · Onda 3 em andamento)
+# Estado vigente — 2026-11-05 (noite, Onda 3 · 9 dívidas tratadas)
 
-## ⚑ Um visualizador só: o continente central — **concluído**
+## ⚑ Um visualizador só: o contêiner central — **concluído**
 
 A coluna antiga saiu. O contêiner central é a única superfície de abas: arquivo, diff do Source Control, Configurações,
-Provedores, navegador, busca e changes — no mesmo lugar. Cinco degraus com gate verde entre eles: **D152 → D153 → D154 →
-D155 → D156**.
+Provedores, navegador, busca e changes — no mesmo lugar. Degraus com gate verde entre eles: **D152 → D153 → D154 →
+D155 → D156 → D166**.
 
-## ⚑ Onda 3: dívidas técnicas — **6 tratadas** (D157…D162)
+## ⚑ Onda 3: dívidas técnicas — **9 tratadas** (D157…D166)
 
 **D157** falha ao carregar o Monaco deixa de ser silenciosa · **D158** poda do CSS da coluna **e a descoberta de que o teste
 policiava uma regra que a cascata sobrescrevia** · **D159** o órfão do File System Access sai · **D160** a fronteira
 shell↔módulo e a memória de abas saem · **D161** a regra do domínio sai **e descobre-se que a regra do histórico do
-compositor existia em DOIS lugares** · **D162** a dúvida `outlineTracker × diff` já estava coberta — agora está **provada**.
+compositor existia em DOIS lugares** · **D162** a dúvida `outlineTracker × diff` já estava coberta — agora está **provada** ·
+**D163** as duas últimas leituras mortas do layout da coluna · **D164** o estado que era **escrito no disco e nunca lido** ·
+**D165** o `layoutController` instanciado e nunca consultado sai do síndico · **D166** a aba **Changes do centro deixa de
+ser demonstração**: passa a mostrar o `ChangesPane` real (GitService, stage/unstage/discard/commit) no lugar do `DiffView`
+cujo dado é um literal vazio desde a 5.3.
 
-`App.tsx`: **2 828 → 2 685 linhas** · `app.css`: 5 058 → 5 022 · provas: 258 → **330**.
+`App.tsx`: **2 828 → 2 701 linhas** (`wc -l`) · `app.css`: 5 058 → 5 022 · provas do inventário: 258 → **353**.
 
-**HEAD:** `1c43a19` (14 commits desde `986c585`) · **gate:** typecheck EXIT 0 + **330 = 312✓|2✗|16skip em 27 arquivos**. As 2
-falhas são **PEND-02** e **themeTokens**, **pré-existentes** (medidas com `git stash`). · **painel:** 97 grupos, 0 falhas.
+**HEAD:** `6461851` (16 commits desde `986c585`) · **gate:** typecheck EXIT 0 + **353 = 335✓|2✗|16skip em 31 arquivos**. As 2
+falhas são **PEND-02** (`iconLabels`) e **themeTokens**, **pré-existentes** (medidas com `git stash`). · **painel:** 97
+grupos, 0 falhas.
 
 ## ⚑ O que continua PENDENTE — e não é detalhe
 
@@ -26,20 +31,29 @@ falhas são **PEND-02** e **themeTokens**, **pré-existentes** (medidas com `git
 - **F5 restaurando as abas**;
 - **Monaco real carregando**;
 - **falha real de chunk do editor** — o `.catch` está provado, mas a rejeição do `import()` dinâmico só existe no navegador;
-- **ambiente Windows**.
+- **ambiente Windows**;
+- **o painel Changes no centro com um repositório git de verdade** — a prova automatizada monta o painel real, mas o
+  GitService fala com `/git/*` por HTTP, que o jsdom não serve.
 
-Registrado em `status.json` (`fatiaAtual.onda3.homologacaoHumanaPENDENTE`), no painel e em `evidencias/51`.
+Registrado em `status.json` (`fatiaAtual.onda3.homologacaoHumanaPENDENTE`), no painel e em `evidencias/52`.
 
-## ⚑ Próximo corte (Onda 3)
+## ⚑ Próximo corte (Onda 3) — o que sobra, com a condição de cada um
 
-O corpo de `App()` ainda tem ~2 300 linhas de estado e orquestração. O corte maior exige separar o **estado de layout por
-sessão** (conversa com `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do editor**. Precisa de
-**gate próprio** porque mexe em persistência — não se faz junto com limpeza de órfão.
+1. **Corte maior do corpo de `App()` (~2 300 linhas).** Exige separar o **estado de layout por sessão** (conversa com
+   `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do browser/editor**. Gate **próprio** porque
+   mexe em persistência. Tentativas de recorte barato foram medidas e **recusadas**: o estado do browser (`browserViews`)
+   é lido por `assertWorkbenchInvariants` e por `sessionState`, então extrair o hook não reduziria nada de verdade.
+2. **`shell/layoutState.ts` → campo `editorMaximized`.** O código já não grava; o campo continua no **contrato** e no
+   **formato do que está no disco** dos usuários. ⛔ **Só sai com plano de migração do `localStorage`.**
+3. **`mountAttach` + `AttachArea` (coluna).** Sem consumidor no produto desde a D156; **contrato congelado** e é a **rede de
+   rollout** de uma superfície que ainda não teve homologação humana. Sai quando a homologação fechar — não antes.
+4. **`components/AuxiliaryBar.tsx` — mantido, com razão medida.** É o único lugar que produz o `aside.auxiliary-bar` e o
+   `attachSlot` que o `AttachArea` consome; sem ele o caminho de anexo perde o pai e o CSS canônico de `.auxiliary-bar`
+   (policiado por `layoutDensity`) fica órfão de componente vivo. Os testes que o citam hoje são `it.skip` desde a 5.3
+   (`App.test.tsx:1823`, `coverageIntegration.test.tsx:173`) — a **cobertura dele é zero**, e isso fica registrado.
+5. **`auxiliaryTab` / `attachExpanded` / `liveLayoutRef`.** Continuam **vivos**: `auxiliaryTab` tem 4 escritores e alimenta
+   `liveLayoutRef`, que é lido por `captureSessionLayout` na troca de sessão. Não são órfãos — medido com `grep`, não suposto.
 
-Dívidas que ficam: `mountAttach` sem consumidor no produto (API congelada; rede de rollback), `attachExpanded`/`auxiliaryTab`
-ainda lidos pela persistência, CSS canônico de `.auxiliary-bar` enquanto `AuxiliaryBar.tsx` existir.
-
----
 # 03 - ESTADO ATUAL — onde a obra parou
 
 **MANDATO ATUAL — D140 (04/11/2026):** proprietário delegou à Arena/Codex executor decisões técnicas internas necessárias às fatias restantes até V1.0; D129 continua como pré-requisito **técnico a resolver e documentar**, mas não exige mais microaprovações do dono para DP-03, DP-06 e E-1..E-5 dentro dos limites D140. Próxima etapa: reconciliar Git/árvore e decisão D139, ajustar harness PEND-01 e diagnosticar PEND-03 com testes reais, decidir/documentar DP-03/DP-06/E-1..E-5 antes de codificar Fatia 14, seguir D133. Esta atualização é **documental**, não prova de execução, teste ou início de Fatia 14. Checkpoint/dashboard operacionais devem ser recriados e mantidos pela Arena a partir de `03`/`07`/`09` quando receber somente esta pasta; detalhes em `09` D140.
