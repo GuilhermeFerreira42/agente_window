@@ -2,21 +2,21 @@
 
 ## ⚑ Um visualizador só: o continente central — **concluído**
 
-A coluna antiga (`AuxiliaryBar` + `AttachModuleSlot`) foi **desligada** e sua casca **removida**. O contêiner central é a
-única superfície de abas: arquivo, diff do Source Control, Configurações, Provedores, navegador, busca e changes — todos no
-mesmo lugar. Cinco degraus, cada um com gate verde antes do seguinte: **D152 → D153 → D154 → D155 → D156**.
+A coluna antiga saiu. O contêiner central é a única superfície de abas: arquivo, diff do Source Control, Configurações,
+Provedores, navegador, busca e changes — no mesmo lugar. Cinco degraus com gate verde entre eles: **D152 → D153 → D154 →
+D155 → D156**.
 
-## ⚑ Onda 3: dívidas técnicas — **em andamento** (4 de 4 tratadas nesta rodada)
+## ⚑ Onda 3: dívidas técnicas — **6 tratadas** (D157…D162)
 
 **D157** falha ao carregar o Monaco deixa de ser silenciosa · **D158** poda do CSS da coluna **e a descoberta de que o teste
-policiava uma regra que a cascata sobrescrevia** · **D159** o órfão do File System Access sai do App · **D160** a fronteira
-shell↔módulo e a memória de abas saem do App.
+policiava uma regra que a cascata sobrescrevia** · **D159** o órfão do File System Access sai · **D160** a fronteira
+shell↔módulo e a memória de abas saem · **D161** a regra do domínio sai **e descobre-se que a regra do histórico do
+compositor existia em DOIS lugares** · **D162** a dúvida `outlineTracker × diff` já estava coberta — agora está **provada**.
 
-`App.tsx`: **2 828 → 2 722 linhas** · `app.css`: 5 058 → 5 022.
+`App.tsx`: **2 828 → 2 685 linhas** · `app.css`: 5 058 → 5 022 · provas: 258 → **330**.
 
-**HEAD:** `5ce303d` (10 commits desde `986c585`, linhagem linear) · **gate:** typecheck EXIT 0 + inventário
-**289 = 271✓|2✗|16skip em 25 arquivos**. As 2 falhas são **PEND-02** (iconLabels P7.3) e **themeTokens** — **ambas
-pré-existentes**, medidas com `git stash` antes e depois de cada mudança. · **painel:** 97 grupos, 0 falhas.
+**HEAD:** `1c43a19` (14 commits desde `986c585`) · **gate:** typecheck EXIT 0 + **330 = 312✓|2✗|16skip em 27 arquivos**. As 2
+falhas são **PEND-02** e **themeTokens**, **pré-existentes** (medidas com `git stash`). · **painel:** 97 grupos, 0 falhas.
 
 ## ⚑ O que continua PENDENTE — e não é detalhe
 
@@ -24,20 +24,20 @@ pré-existentes**, medidas com `git stash` antes e depois de cada mudança. · *
 
 - **Ctrl+S gravando byte em disco** com o Monaco real;
 - **F5 restaurando as abas**;
-- **Monaco real carregando** (o dublê prova a fronteira, não o editor);
+- **Monaco real carregando**;
 - **falha real de chunk do editor** — o `.catch` está provado, mas a rejeição do `import()` dinâmico só existe no navegador;
 - **ambiente Windows**.
 
-Registrado no `status.json` (`fatiaAtual.onda3.homologacaoHumanaPENDENTE`), no painel e em `evidencias/50`.
+Registrado em `status.json` (`fatiaAtual.onda3.homologacaoHumanaPENDENTE`), no painel e em `evidencias/51`.
 
 ## ⚑ Próximo corte (Onda 3)
 
-O corpo de `App()` ainda tem ~2 400 linhas de estado e orquestração. O corte maior exige separar o **estado de layout por
+O corpo de `App()` ainda tem ~2 300 linhas de estado e orquestração. O corte maior exige separar o **estado de layout por
 sessão** (conversa com `DockedAuxiliaryBarController` e com a persistência) e o **estado de abas do editor**. Precisa de
-gate próprio porque **mexe em persistência** — não se faz junto com limpeza de órfão.
+**gate próprio** porque mexe em persistência — não se faz junto com limpeza de órfão.
 
 Dívidas que ficam: `mountAttach` sem consumidor no produto (API congelada; rede de rollback), `attachExpanded`/`auxiliaryTab`
-ainda lidos pela persistência, `outlineTracker` × diff a revisar.
+ainda lidos pela persistência, CSS canônico de `.auxiliary-bar` enquanto `AuxiliaryBar.tsx` existir.
 
 ---
 # 03 - ESTADO ATUAL — onde a obra parou
