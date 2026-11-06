@@ -45,8 +45,6 @@ function propsBase(sobre: Partial<Props> = {}): Props {
     onCloseTab: vi.fn(),
     onReorderTabs: vi.fn(),
     onNewBrowser: vi.fn(),
-    onNewFile: vi.fn(),
-    onNewSearch: vi.fn(),
     onNewDiff: vi.fn(),
     onNavigateBrowser: vi.fn(),
     onBrowserBack: vi.fn(),

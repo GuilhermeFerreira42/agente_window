@@ -38,6 +38,15 @@ export interface MonacoOutlineTracker {
   /** URI (string do modelo) a que `rows()` pertence. */
   modelUri(): string | null;
   onChanged(cb: () => void): () => void;
+  /**
+   * Posição do cursor no editor com posse (1-based), ou null sem editor/modelo.
+   *
+   * FATIA 15 Onda 3 (D169): o breadcrumb precisa mostrar o CAMINHO DE SÍMBOLOS
+   * até onde o cursor está (igual ao VS Code), não o arquivo inteiro. Em vez de
+   * criar um segundo coletor de símbolos, o breadcrumb lê `rows()` — que é o
+   * MESMO resultado do provedor que o Outline já usa — e casa com esta posição.
+   */
+  cursorPosition(): { line: number; column: number } | null;
   /** Revela a linha/coluna no editor (revealLineInCenter + setPosition + focus). */
   reveal(line: number, column: number): void;
   dispose(): void;
@@ -144,6 +153,17 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
       editor.revealLineInCenter(line);
       editor.setPosition({ lineNumber: line, column });
       editor.focus();
+    },
+    cursorPosition() {
+      if (!editor) return null;
+      // Defensivo de propósito: em produção `editor` é sempre um Monaco real, mas
+      // as fábricas de teste montam o CenterCodeEditor com editores DUBLÊS que não
+      // têm a API inteira. Sem esta guarda o breadcrumb derrubava o componente
+      // inteiro (TypeError: getPosition is not a function) — e breadcrumb é
+      // decoração: ele nunca pode ser motivo de o editor não montar.
+      if (typeof editor.getPosition !== 'function') return null;
+      const pos = editor.getPosition();
+      return pos ? { line: pos.lineNumber, column: pos.column } : null;
     },
     dispose() {
       disposed = true;

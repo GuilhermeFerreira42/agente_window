@@ -55,6 +55,16 @@ const attachApiFor = (layout: AttachLayoutStore, editor: EditorService, save: (u
   open: async ({ uri, kind, line, column, sessionId, pinned, diff }) => { editor.open({ sessionId, uri, kind, line, column, pinned, diff }); },
   close: async ({ uri, sessionId }) => { editor.close({ sessionId, uri }); },
   closeAll: async ({ sessionId }) => { editor.closeAll({ sessionId }); },
+  // D169 — split. O mecanismo vive aqui; o GATE (E15/R-039) é do shell, que
+  // conhece o layout. Sem isso o shell não tinha o que chamar e inventava aba.
+  split: ({ sessionId }) => editor.split(sessionId),
+  unsplit: ({ sessionId, force }) => editor.unsplit({ sessionId, force }),
+  isSplit: ({ sessionId }) => editor.isSplit(sessionId),
+  moveTab: ({ sessionId, uri, to }) => editor.moveTab({ sessionId, uri, to }),
+  sideOf: ({ sessionId, uri }) => {
+    const id = editor.groupIdOf(sessionId, uri);
+    return id === null ? null : id === sessionId ? 'principal' : 'secundario';
+  },
   setVisible: ({ sessionId, visible }) => layout.setVisible(sessionId, visible),
   setWidth: ({ pixels }) => { layout.setWidth(pixels); },
   save: ({ uri }) => save(uri),
@@ -167,6 +177,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // EditorService decide: activate() ignora uri ausente do grupo da sessão, então
   // não há como o shell forçar um estado que o modelo não tem.
   attachApi.activateTab = (input) => { editorService.activate(input); };
+  // D169: clique num painel marca o foco; sem isso o open() não sabe onde abrir.
+  attachApi.setFocusSide = (input) => { editorService.setFocusGroup(input); };
+  attachApi.focusSideOf = (input) => editorService.focusGroupOf(input.sessionId);
   // eventos editor.* saem pelo onEvent do módulo; expandir/recolher move o layout
   // (display:none — nunca desmonta).
   // c6 — maximizar/restaurar sai como evento editor.* (sessão = a que hospeda o anexo).
@@ -191,6 +204,10 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       // fica com chat escondido/Side Bar recolhida e a próxima aba já nasce maximizada.
       if (attachLayout.isMaximized()) attachLayout.setMaximized(false);
     }
+    // DEF-D169-5: o MESMO anunciante cuida do caminho dos eventos. Sem isto, os
+    // dois caminhos (evento e montagem) voltariam a divergir — que é a causa
+    // deste defeito.
+    anunciarAtivo();
     events.fire(e);
   });
   let attachRoot: Root | null = null;
@@ -230,6 +247,28 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     sessionId,
     editor: editorService,
     fs: deps.fs,
+    // D169: o breadcrumb precisa da raiz para mostrar caminho RELATIVO e do
+    // tracker para os símbolos — o MESMO que serve o painel Outline. Nenhuma
+    // coleta nova foi criada.
+    workspaceRoot: deps.workspaceRoot,
+    outline: {
+      rows: () => outlineTracker.rows(),
+      reveal: (line: number, column: number) => outlineTracker.reveal(line, column),
+      cursorPosition: () => {
+        try { return outlineTracker.cursorPosition(); } catch { return null; }
+      },
+      onChanged: (cb: () => void) => outlineTracker.onChanged(cb),
+    },
+    // D169: o painel secundário é montado pelo CenterCodeEditor lendo o grupo.
+    // Passo as capacidades por aqui (e não pelo App) para manter o padrão do
+    // módulo: o shell nunca toca no EditorService.
+    splitCapabilities: {
+      isSplit: () => editorService.isSplit(sessionId),
+      unsplit: (force?: boolean) => editorService.unsplit({ sessionId, force }),
+      // D169: o lado clicado vira o destino dos próximos arquivos abertos.
+      setFocusSide: (side: 'principal' | 'secundario') => editorService.setFocusGroup({ sessionId, side }),
+      focusSideOf: () => editorService.focusGroupOf(sessionId),
+    },
     onEditorReady: onCenterEditorReady,
     onSave: attachSave,
     onReload: attachReload,
@@ -245,6 +284,26 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // Sem isto, desligar a coluna deixaria TODA abertura de arquivo pendente para sempre,
   // porque `openInAttachSession` nunca acharia sessão montada.
   const sessionIdDaSuperficie = (): string | null => attachSessionId ?? centerSessionId;
+  /**
+   * DEF-D169-5 — o aviso "o arquivo ativo é este" passou a ser um lugar só.
+   *
+   * Duas coisas mudam o arquivo ativo e só UMA delas emite evento:
+   *   1. o EditorService (aba aberta/ativada/fechada) → evento, coberto abaixo;
+   *   2. a MONTAGEM da superfície (é `mountCodeEditor` que registra
+   *      `centerSessionId`) → não emite evento nenhum.
+   * Enquanto o aviso morava em cada evento, o caso (2) caía no vazio: se o
+   * arquivo fosse aberto antes do corpo montar, o evento saía com "sem arquivo
+   * ativo" e a montagem depois não avisava ninguém. `anunciarAtivo` é chamado
+   * pelos dois caminhos e compara com o que já foi ENTREGUE.
+   */
+  const ativoOuvintes = new Set<(uri: WorkspaceUri | null) => void>();
+  let ativoEntregue: WorkspaceUri | null = null;
+  const anunciarAtivo = (): void => {
+    const agora = activeCodeUri();
+    if (agora === ativoEntregue) return;
+    ativoEntregue = agora;
+    for (const cb of [...ativoOuvintes]) cb(agora);
+  };
   const activeCodeUri = (): WorkspaceUri | null => {
     const sid = sessionIdDaSuperficie();
     if (!sid) return null;
@@ -254,12 +313,23 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const activeFileApi: ExplorerActiveFileApi = {
     getActiveUri: activeCodeUri,
     onActiveChanged(cb) {
-      let last = activeCodeUri();
-      return editorService.onEvent((e) => {
-        if (e.type !== 'editor.activeChanged' && e.type !== 'editor.tabClosed' && e.type !== 'editor.tabOpened') return;
-        const cur = activeCodeUri();
-        if (cur !== last) { last = cur; cb(cur); }
-      });
+      // DEF-D169-5: o aviso do arquivo ativo é decidido AQUI e em um lugar só
+      // (`anunciarAtivo`), porque ele depende de duas coisas que mudam em
+      // momentos diferentes: o evento do serviço E a montagem da superfície.
+      //
+      // Antes, `last` era fotografado na inscrição. O ExplorerView se inscreve
+      // antes de o corpo do centro montar; nessa janela `activeCodeUri()` é null
+      // (não há sessão de superfície), o primeiro `editor.activeChanged` também
+      // chegava com null e `null === null` engolia o aviso. Nenhum evento vinha
+      // depois — a montagem do centro não emite evento —, então o consumidor
+      // ficava com `activeUri` null para sempre: era o "No symbols found in
+      // document" numa árvore de 2600 linhas.
+      ativoOuvintes.add(cb);
+      // Quem chega com arquivo já aberto recebe o estado atual UMA vez: senão
+      // esperaria um evento que pode não vir.
+      const agora = activeCodeUri();
+      if (agora && agora !== ativoEntregue) { ativoEntregue = agora; cb(agora); }
+      return () => { ativoOuvintes.delete(cb); };
     },
     outline: { rows: () => outlineTracker.rows(), onChanged: (cb) => outlineTracker.onChanged(cb), reveal: (l, c) => outlineTracker.reveal(l, c) },
     timeline: {
@@ -380,6 +450,11 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     },
     get attach() {
       return attachApi;
+    },
+    // DEF-D169-5: o MESMO objeto que o ExplorerView recebe. Um só, não uma cópia
+    // — duas instâncias divergiriam no primeiro aviso.
+    get activeFile() {
+      return activeFileApi;
     },
 
     mount(root: HTMLElement): void {
@@ -504,6 +579,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       // ficou pendente (feita antes de qualquer host montar, ex.: F5 ou boot) tem de
       // sair aqui, senão nunca sairia.
       if (pendingAttachOpen) { const fn = pendingAttachOpen; pendingAttachOpen = null; fn(opts.sessionId); }
+      // DEF-D169-5: a montagem da superfície é o segundo caminho que muda "qual é
+      // o arquivo ativo". Até aqui ninguém avisava o consumidor neste ponto.
+      anunciarAtivo();
     },
 
     unmountCodeEditor,

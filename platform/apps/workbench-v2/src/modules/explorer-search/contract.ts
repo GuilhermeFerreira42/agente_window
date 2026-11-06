@@ -38,6 +38,16 @@ export type ExplorerSearchEvent =
   | { type: 'editor.tabClosed'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.tabPinned'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.activeChanged'; sessionId: string; uri: WorkspaceUri | null }
+  /** FATIA 15 Onda 3 (D169): abriu/fechou a divisão (grupo secundário). O `sessionId`
+   *  aqui é o do grupo PRINCIPAL, sempre — o painel secundário escuta este evento
+   *  para saber que deve aparecer/sumir. */
+  | { type: 'editor.splitChanged'; sessionId: string; split: boolean }
+  /** D169: a aba mudou de lado (`to` é o destino). A origem já emitiu `tabClosed`. */
+  | { type: 'editor.tabMoved'; sessionId: string; uri: WorkspaceUri; to: 'principal' | 'secundario' }
+  /** D169: qual lado tem o foco (decide onde um arquivo aberto aterrissa). */
+  | { type: 'editor.focusGroupChanged'; sessionId: string; side: 'principal' | 'secundario' }
+  /** D169 (aditivo): a URI saiu do grupo 1 porque foi fechada. O shell usa para
+   *  tirar a aba projetada; os painéis já recebem `editor.tabClosed`. */
   | { type: 'editor.dirtyChanged'; sessionId: string; uri: WorkspaceUri; dirty: boolean }
   | { type: 'editor.revealRequested'; sessionId: string; uri: WorkspaceUri; line: number; column?: number }
   | { type: 'editor.attachExpanded'; sessionId: string }   // 1.ª aba aberta → layout mostra o anexo
@@ -160,6 +170,32 @@ export interface IEditorAttachApi {
    *  *Rejeitado (D148 §3):* reaproveitar `open` para ativar — na superfície
    *  `diff` o open exige o payload AttachDiffPayload, que o App não tem. */
   activateTab?(input: { sessionId: string; uri: WorkspaceUri }): void;
+  /**
+   * FATIA 15 Onda 3 (ADITIVO, D169) — SPLIT do editor central.
+   *
+   * OPCIONAIS de propósito: um módulo anterior continua satisfazendo o contrato e
+   * o shell que não os encontrar deve esconder a ação, não fingir que dividiu
+   * (foi exatamente o defeito que isto corrige: o botão "Dividir editor" abria
+   * uma aba falsa `workspace/split`).
+   *
+   * Quem decide SE pode dividir é o shell — o gate E15/R-039 (`canSplitMainEditor`)
+   * vive lá. Aqui só há o mecanismo. `split` devolve o id do grupo secundário
+   * (null se já havia divisão) e NUNCA herda a aba ativa: a mesma URI em dois
+   * grupos disputaria o mesmo modelo do Monaco.
+   */
+  split?(input: { sessionId: string }): string | null;
+  /** Fecha a divisão inteira. `false` = bloqueado por aba dirty (sem `force`). */
+  unsplit?(input: { sessionId: string; force?: boolean }): boolean;
+  /** Existe divisão aberta nesta sessão? */
+  isSplit?(input: { sessionId: string }): boolean;
+  /** Move uma aba para o outro lado (nunca duplica). */
+  moveTab?(input: { sessionId: string; uri: WorkspaceUri; to: 'principal' | 'secundario' }): boolean;
+  /** Em qual lado a URI está ('principal' | 'secundario'), ou null. */
+  sideOf?(input: { sessionId: string; uri: WorkspaceUri }): 'principal' | 'secundario' | null;
+  /** D169: marca o lado com foco (o painel chama ao ser clicado). */
+  setFocusSide?(input: { sessionId: string; side: 'principal' | 'secundario' }): void;
+  /** D169: lado com foco hoje (default 'principal'). */
+  focusSideOf?(input: { sessionId: string }): 'principal' | 'secundario';
 }
 
 // ---------------------------------------------------------------------------
@@ -207,10 +243,18 @@ export interface IExplorerSearchModuleDeps {
   openSourceControl?: () => void;
 }
 
+import type { ExplorerActiveFileApi } from './ui/activeFileApi';
+
 export interface IExplorerSearchModule {
   readonly explorer: IExplorerSearchApi;
   readonly search: ISearchApi;
   readonly attach: IEditorAttachApi;      // editor em anexo lateral (4.6/4.7)
+  /** DEF-D169-5 (ADITIVO): o arquivo ativo do editor para o consumidor de fora.
+   *  Existia só como prop interna do ExplorerView (`activeFile`), e por isso o
+   *  defeito do Outline só era observável pela tela. Exposto aqui, o aviso de
+   *  "arquivo ativo mudou" passa a ser testável SEM navegador — que é o que
+   *  impede o defeito de voltar sem ninguém ver. */
+  readonly activeFile?: ExplorerActiveFileApi;
   /** Renderiza a sidebar (header + árvore + seções) dentro do slot dado. Só DOM dentro de `root`. */
   mount(root: HTMLElement): void;
   unmount(): void;               // remove DOM; estado do serviço sobrevive (quebra isolada)

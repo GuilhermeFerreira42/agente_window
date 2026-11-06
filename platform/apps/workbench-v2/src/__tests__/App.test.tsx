@@ -749,12 +749,17 @@ describe('App session flows', () => {
     const addTab = screen.getByRole('button', { name: 'Adicionar aba do editor' })
     await user.click(addTab)
     expect(screen.getByRole('menu', { name: 'Novas abas do editor' })).toBeInTheDocument()
-    await user.click(screen.getByRole('menuitem', { name: 'Files' }))
-    expect(within(editorPane).getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'true')
-
+    // FATIA 15 Onda 3 (D169): "Files" e "Search" SAÍRAM do menu "+".
+    //  • Files abria uma aba com "Conteúdo indisponível — workspace" (placeholder,
+    //    medido no browser): nunca foi um arquivo. Caminho real = Explorer.
+    //  • Search não abria superfície nenhuma: `openSearch` ativa a view `search`
+    //    da Side Bar desde a 5.2.
+    // A asserção abaixo virou o CONTRÁRIO do que era: prova que os itens não
+    // existem mais, em vez de sumir com a cobertura sem registro.
     await user.click(addTab)
-    await user.click(screen.getByRole('menuitem', { name: 'Search' }))
-    expect(within(editorPane).getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('menuitem', { name: 'Files' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Search' })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
 
     await user.click(addTab)
     await user.click(screen.getByRole('menuitem', { name: 'Changes' }))
@@ -1491,7 +1496,18 @@ describe('App session flows', () => {
     expect(container.querySelector('.desktop-surface-group.editor-maximized')).toBeNull()
   })
 
-  it('divide o editor abrindo uma segunda superfície de arquivos', async () => {
+  // FATIA 15 Onda 3 (D169). Este teste se chamava "divide o editor abrindo uma
+  // segunda superfície de arquivos" e provava só que existia um toast dizendo
+  // "Editor dividido" — nunca que houvesse divisão. O handler, na época, abria
+  // uma ABA FALSA (`Files (divisão)`, `path: 'workspace/split'`): o toast era
+  // verdadeiro e o resultado, mentira.
+  //
+  // Aqui o módulo Explorer/Busca não está montado (jsdom sem os deps reais), logo
+  // o shell não tem `attach.split`. O contrato exige FALHA VISÍVEL — nunca aba
+  // falsa. A prova da divisão de verdade é no browser (dois `.monaco-editor`
+  // vivos, abas independentes) e está registrada no diário; um teste de jsdom não
+  // consegue medir geometria nem modelo do Monaco.
+  it('não finge divisão de editor: sem módulo com split, avisa em vez de abrir aba falsa', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
 
@@ -1499,7 +1515,9 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Dividir editor' }))
 
     const toast = await screen.findByRole('status')
-    expect(toast).toHaveTextContent('Editor dividido')
+    expect(toast).toHaveTextContent('não oferece split')
+    // e, sobretudo: nenhuma aba inventada.
+    expect(screen.queryByRole('tab', { name: /Files \(divisão\)/ })).not.toBeInTheDocument()
   })
 
   it('oculta e mostra o conteúdo do editor mantendo a barra de abas (detail-only)', async () => {

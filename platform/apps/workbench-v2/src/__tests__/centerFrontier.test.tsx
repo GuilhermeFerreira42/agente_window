@@ -77,8 +77,6 @@ function propsBase(sobre: Partial<Props> = {}): Props {
     onCloseTab: vi.fn(),
     onReorderTabs: vi.fn(),
     onNewBrowser: vi.fn(),
-    onNewFile: vi.fn(),
-    onNewSearch: vi.fn(),
     onNewDiff: vi.fn(),
     onNavigateBrowser: vi.fn(),
     onBrowserBack: vi.fn(),
@@ -184,7 +182,14 @@ describe('Fatia 15 Onda 2c-i — a fronteira das abas no centro (D148)', () => {
     render(propsBaseRender({ frontierTabs: projetadas, activeTabId: projetadas[0].id, onCloseTab, codeEditorSlot: corpoFalso }))
     // O botão existe porque isTabCloseable devolve true em 'editor-only' — em
     // 'detail-only' a aba type 'file' é gerenciada e o X dá lugar ao aviso.
-    fireEvent.click(screen.getByLabelText('Fechar a.ts'))
+    //
+    // D170: o fixture abre `a.ts` com `dirty: true` (é o que prova que o dirty
+    // ATRAVESSA a projeção), e desde a D170 a faixa rotula a aba suja como
+    // `Close (unsaved) a.ts`. Antes da D170 este `getByLabelText('Fechar a.ts')`
+    // passava porque o rótulo de sujo era IGNORADO — o teste aprovava por
+    // acidente, sem olhar o estado que o próprio fixture declarava. Agora ele
+    // procura o rótulo que corresponde ao estado real da aba.
+    fireEvent.click(screen.getByLabelText('Close (unsaved) a.ts'))
     expect(onCloseTab).toHaveBeenCalledWith(`${SESSAO}::${URI_A}`)
   })
 

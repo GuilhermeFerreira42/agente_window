@@ -115,7 +115,24 @@ describe('CenterCodeEditor — o corpo da aba central (Onda 2b)', () => {
     expect(container.querySelector('.tabs-container')).toBeNull();
     expect(container.querySelector('.explorer-attach-sash')).toBeNull();
     expect(container.querySelector('[role="separator"]')).toBeNull();
-    expect(container.querySelector('.monaco-breadcrumbs')).toBeNull();
+    // D169 — esta asserção MUDOU DE SENTIDO, e o motivo está registrado:
+    // a regra da Onda 2b era "no centro, o cabeçalho é do shell". Breadcrumb não
+    // é cabeçalho nem faixa de abas: é a faixa de navegação do ARQUIVO, que o dono
+    // pediu explicitamente no editor definitivo (ajuste complementar de
+    // 2026-11-06). O que continua proibido aqui é o que era o objeto da regra:
+    // faixa de abas, aba vazia e sash — as três seguem testadas acima.
+    // A presença do breadcrumb passou a ser EXIGIDA, com caminho, no teste novo
+    // abaixo: trocar "proibido" por "esquecido" seria pior que não testar.
+    expect(container.querySelector('.tabs-container')).toBeNull();
+    expect(container.querySelector('.title.tabs')).toBeNull();
+  });
+
+  it('D169: mostra breadcrumb com o caminho do arquivo quando há aba de código', () => {
+    const { container } = montar();
+    const bc = container.querySelector('[data-testid="center-breadcrumbs"]');
+    expect(bc).not.toBeNull();
+    // caminho relativo à raiz: a barra tem de mostrar a pasta e o nome do arquivo
+    expect(bc?.textContent).toContain('centro.ts');
   });
 
   it('RF15-1: Ctrl+S dentro do editor pede o salvamento da uri', () => {

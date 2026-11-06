@@ -388,3 +388,41 @@
 }
 .attach-viewlet .monaco-keybinding-key-separator { display: inline-block; font-size: 11px; }
 .attach-viewlet .attach-shortcut-chip:hover .monaco-keybinding-key { background-color: var(--vscode-toolbar-hoverBackground); }
+
+/* ============================================================================
+   FATIA 15 Onda 3 (D169) — breadcrumb do EDITOR DEFINITIVO (centro).
+   Reaproveita os estilos `.breadcrumbs-control` acima (a faixa de 22 px já era
+   a régua da casa). Aqui só o que é próprio do centro:
+   (a) `.center-code-editor` é uma coluna flex; a barra precisa ser item flex de
+       altura fixa, senão o Monaco come o espaço dela;
+   (b) os itens de SÍMBOLO agora são <button> (navegáveis de verdade). Botão tem
+       borda/fundo/fonte do agente do usuário por padrão — anulo tudo e devolvo o
+       foco visível, que é requisito de acessibilidade e não estava em jogo antes.
+   Nada de position:fixed e nada de cor fixa (Regras 4 e 5 da casa).
+   ========================================================================= */
+.center-code-editor > .center-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 22px;
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+  background: var(--vscode-breadcrumb-background, var(--vscode-editor-background));
+}
+.center-code-editor > .center-breadcrumbs .breadcrumbs-control { height: 22px; flex: 0 0 auto; }
+.center-code-editor .breadcrumb-symbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+.center-code-editor .breadcrumb-symbol:hover { color: var(--vscode-breadcrumb-focusForeground, var(--vscode-foreground)); }
+.center-code-editor .breadcrumb-symbol:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}

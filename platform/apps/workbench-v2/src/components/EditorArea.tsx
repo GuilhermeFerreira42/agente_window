@@ -57,8 +57,6 @@ interface EditorAreaProps {
   onCloseTab: (id: string) => void
   onReorderTabs: (fromId: string, toId: string) => void
   onNewBrowser: () => void
-  onNewFile: () => void
-  onNewSearch: () => void
   onNewDiff: () => void
   onNavigateBrowser: (id: string, url: string) => void
   onBrowserBack: (id: string) => void
@@ -79,6 +77,16 @@ interface EditorAreaProps {
   editorMaximized: boolean
   onToggleMaximize: () => void
   onSplit: () => void
+  /**
+   * D170-b: "Abrir ao lado" — mover a aba para o OUTRO grupo.
+   *
+   * O mecanismo existia desde a D169 (`EditorService.moveTab`) e o painel
+   * secundário até mandava usar esta ação na sua dica, mas NENHUM controle a
+   * oferecia: o menu da aba tinha só Abrir/Fechar/Dividir. Era mecanismo sem
+   * botão. O shell recebe o id da aba (não a uri) porque é ele que sabe
+   * traduzir id→uri→lado; o EditorArea continua sem conhecer o módulo.
+   */
+  onOpenToSide?: (id: string) => void
   editorContentVisible: boolean
   sidePaneState: SidePaneState
   onToggleEditorHidden: () => void
@@ -440,8 +448,6 @@ export function EditorArea({
   onCloseTab,
   onReorderTabs,
   onNewBrowser,
-  onNewFile,
-  onNewSearch,
   onNewDiff,
   onNewCustomizations,
   customizationsSurface,
@@ -470,6 +476,7 @@ export function EditorArea({
   editorMaximized,
   onToggleMaximize,
   onSplit,
+  onOpenToSide,
   editorContentVisible,
   sidePaneState,
   onToggleEditorHidden,
@@ -527,6 +534,9 @@ export function EditorArea({
         { id: 'select', label: 'Abrir aba', icon: tabIcon(tab), onSelect: () => onSelectTab(tab.id) },
         { id: 'close', label: 'Fechar aba', icon: <X size={14} />, disabled: !closeable, onSelect: () => onCloseTab(tab.id) },
         { id: 'split', label: 'Dividir editor', icon: <SplitSquareHorizontal size={14} />, separatorBefore: true, onSelect: onSplit },
+        // Capacidade ausente = item ausente. Um botão que não faz nada é pior
+        // que um botão que não existe (Regra da falha visível).
+        ...(onOpenToSide ? [{ id: 'open-to-side', label: 'Abrir ao lado', icon: <SplitSquareHorizontal size={14} />, onSelect: () => onOpenToSide(tab.id) }] : []),
       ],
     })
   }
@@ -565,7 +575,7 @@ export function EditorArea({
             const tabId = editorTabDomId('editor-tab', tab.id)
             return (
               <div
-                className={`editor-tab${isActive ? ' is-active' : ''}${tabDragId === tab.id ? ' is-dragging' : ''}${tabDropId === tab.id ? ' is-drop-over' : ''}`}
+                className={`editor-tab${isActive ? ' is-active' : ''}${tab.dirty ? ' is-dirty' : ''}${tabDragId === tab.id ? ' is-dragging' : ''}${tabDropId === tab.id ? ' is-drop-over' : ''}`}
                 role="tab"
                 draggable
                 onDragStart={(event) => {
@@ -593,8 +603,8 @@ export function EditorArea({
                 tabIndex={isActive ? 0 : -1}
                 aria-selected={isActive}
                 aria-controls={isActive ? panelId : undefined}
-                aria-label={tab.title}
-                title={tab.title}
+                aria-label={tab.dirty ? `${tab.title} (alterações não salvas)` : tab.title}
+                title={tab.dirty ? `${tab.title} — alterações não salvas` : tab.title}
                 data-session-id={tab.sessionId}
                 data-browser-id={tab.browserId}
                 data-tab-type={tab.type}
@@ -620,12 +630,18 @@ export function EditorArea({
                 }}
               >
                 {tabIcon(tab)}<span className="editor-tab-title">{tab.title}</span>
+                {/* D170: a marca de não-salvo é do TEXTO e do LEITOR DE TELA, não
+                    só da cor. Sem ela o usuário fechava uma aba suja sem saber
+                    que o diálogo Salvar/Não Salvar viria (ou, pior, sem perceber
+                    que estava descartando trabalho). O ponto fica ANTES do X:
+                    o X continua no mesmo lugar de sempre. */}
+                {tab.dirty && <span className="editor-tab-dirty-dot" data-testid="tab-dirty-dot" aria-hidden="true" />}
                 {isTabCloseable(tab, sidePaneState) ? (
                   <button
                     className="editor-tab-close"
                     type="button"
-                    aria-label={`Fechar ${tab.title}`}
-                    title={`Fechar ${tab.title}`}
+                    aria-label={tab.dirty ? `Close (unsaved) ${tab.title}` : `Fechar ${tab.title}`}
+                    title={tab.dirty ? `Fechar ${tab.title} — há alterações não salvas` : `Fechar ${tab.title}`}
                     onClick={(event) => {
                       event.stopPropagation()
                       onCloseTab(tab.id)
@@ -646,10 +662,19 @@ export function EditorArea({
         <div className="editor-add-tab-wrap" ref={addTabMenuRef}>
           <button className="editor-tab-add-menu-button" type="button" aria-haspopup="menu" aria-expanded={addTabMenuOpen} aria-label="Adicionar aba do editor" title="Adicionar aba do editor" onClick={() => setAddTabMenuOpen((current) => !current)}><ListPlus size={15} /></button>
           {addTabMenuOpen && <div className="editor-tab-add-menu" role="menu" aria-label="Novas abas do editor">
+            {/* FATIA 15 Onda 3 (D169): saíram daqui "Files" e "Search", e o motivo
+                é medido, não estético:
+                • "Files" abria uma aba com "Conteúdo indisponível — workspace":
+                  um placeholder, nunca um arquivo. O Explorer (Side Bar) é o
+                  caminho real para abrir arquivos.
+                • "Search" não abria nada: `openSearch` ativa a view `search` da
+                  Side Bar desde a 5.2, e a aba só aparecia vazia por resíduo de
+                  restauração — o handler do menu nem chega a criar aba.
+                Ficaram os dois que têm superfície REAL: "Changes" (ChangesPane →
+                GitService, 35 itens medidos) e "Browser" (viewport de verdade).
+                Preservado por decisão de produto: "Personalizações" (SPEC 2H a). */}
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewDiff)}><GitCompareArrows size={13} /><span>Changes</span></button>
-            <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewFile)}><FileCode2 size={13} /><span>Files</span></button>
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewBrowser)}><Globe2 size={13} /><span>Browser</span></button>
-            <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewSearch)}><Search size={13} /><span>Search</span></button>
             {/* RNF14-4 / SPEC 2H (a): o rótulo visível é "Personalizações". */}
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewCustomizations)}><Blocks size={13} /><span>Personalizações</span></button>
           </div>}

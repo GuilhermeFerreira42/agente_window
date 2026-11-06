@@ -1060,16 +1060,87 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify('Tamanhos do painel redistribuídos igualmente')
   }
 
-  const handleSplitEditor = () => {
-    // (E15/R-039) No layout single-pane o Main Editor é restrito a exatamente 1
-    // group — split/grid são rejeitados. Enquanto o single-pane estiver ativo, o
-    // gate consulta o serviço de layout (nunca o setting/context key direto).
+  /**
+   * FATIA 15 Onda 3 (D169) — "Dividir editor" DIVIDE de verdade.
+   *
+   * O que este handler fazia antes: emitia "Divisão indisponível…" quando o gate
+   * E15 barrava, e nos outros casos abria uma ABA FALSA chamada "Files (divisão)"
+   * com `path: 'workspace/split'` — um arquivo que não existe no disco. Medido no
+   * browser: nenhuma área nova, nenhum segundo grupo, e um erro de leitura de
+   * arquivo no lugar do editor. Era função de mentira com nome de função.
+   *
+   * Agora: o mecanismo é do módulo (`attach.split` → EditorService, que passa a
+   * manter dois grupos por sessão) e o GATE continua sendo do shell, que é quem
+   * conhece o layout. Nada de aba falsa em nenhum caminho.
+   */
+  /**
+   * D170-b — o gate do split, num lugar só. Duas ações precisam dele agora
+   * ("Dividir editor" e "Abrir ao lado" sem divisão aberta) e duplicar a
+   * condição é como os gates divergem. Devolve o MOTIVO da recusa, ou null.
+   */
+  const motivoSemDivisao = (): string | null => {
+    if (!explorerModuleRef.current?.attach.split) {
+      return 'Divisão indisponível: o módulo Explorer/Busca desta cópia não oferece split'
+    }
     if (isSinglePane && !canSplitMainEditor(agentLayout.current)) {
-      notify('Divisão indisponível: o layout single-pane usa um único grupo de editor')
+      return 'Divisão indisponível: o layout single-pane usa um único grupo de editor'
+    }
+    return null
+  }
+
+  const handleSplitEditor = () => {
+    const motivo = motivoSemDivisao()
+    if (motivo) {
+      notify(motivo)
       return
     }
-    openEditorTab('file', { title: 'Files (divisão)', path: 'workspace/split' })
-    notify('Editor dividido: nova superfície de arquivos aberta')
+    // (E15/R-039) O gate do single-pane continua valendo — está em
+    // `motivoSemDivisao` e NÃO foi afrouxado. (Relaxar o gate é decisão de
+    // produto do dono — ver D169.)
+    const id = explorerModuleRef.current?.attach.split?.({ sessionId: activeSession.id }) ?? null
+    if (id === null) notify('O editor já está dividido')
+    else notify('Editor dividido: escolha um arquivo no Explorer para abrir do outro lado')
+  }
+
+  /**
+   * D170-b — "Abrir ao lado" (menu da aba do centro).
+   *
+   * DEFEITO MEDIDO no browser: o painel secundário anunciava "…ou use «Abrir ao
+   * lado» na aba", e o menu da aba só tinha Abrir/Fechar/Dividir. O
+   * `EditorService.moveTab` (D169) já existia e estava correto — era mecanismo
+   * sem botão. Aqui o shell só traduz: id da aba → uri → pedido ao módulo.
+   *
+   * Sem divisão aberta, o pedido é REJEITADO com aviso, nunca com silêncio: o
+   * usuário clicou, tem de saber por que nada aconteceu. (Criar a divisão
+   * sozinha seria mudar o produto sem decisão do dono.)
+   */
+  const handleOpenToSide = (id: string) => {
+    const projetada = abasProjetadasDoModulo.find((tab) => tab.id === id)
+    const modulo = explorerModuleRef.current
+    if (!projetada?.uri || !modulo?.attach.moveTab) {
+      notify('Abrir ao lado: só abas de arquivo do módulo podem ser movidas para o outro lado')
+      return
+    }
+    // Sem divisão, "abrir ao lado" CRIA o lado. É o que a dica do painel 2
+    // promete ("…ou use «Abrir ao lado» na aba") e é o que o VS Code faz: a ação
+    // entrega a aba do outro lado, não um aviso para dividir antes. O gate do
+    // single-pane continua barrando — recusar é diferente de não fazer nada.
+    const jaDividido = modulo.attach.isSplit?.({ sessionId: activeSession.id }) ?? false
+    if (!jaDividido) {
+      const motivo = motivoSemDivisao()
+      if (motivo) { notify(motivo); return }
+    }
+    // O `if` acima já provou que a capacidade existe; o optional evita repetir a
+    // checagem com dois módulos diferentes em escopo (`modulo` e o ref).
+    if (!jaDividido) {
+      modulo.attach.split?.({ sessionId: activeSession.id })
+    }
+    const lado = modulo.attach.focusSideOf?.({ sessionId: activeSession.id })
+    const destino = lado === 'secundario' ? 'principal' : 'secundario'
+    const moveu = modulo.attach.moveTab({ sessionId: activeSession.id, uri: projetada.uri as WorkspaceUri, to: destino })
+    // A única recusa que sobra é a do serviço: não deixar um painel sem abas.
+    if (!moveu) notify('Abrir ao lado: o painel de origem ficaria sem abas')
+    else notify(destino === 'secundario' ? 'Aba aberta ao lado' : 'Aba movida para o painel principal')
   }
 
   const openEditorTab = useCallback((type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean; imagePreview?: EditorTab['imagePreview']; readError?: string } = { title: type }) => {
@@ -2380,8 +2451,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onCloseTab={closeEditorTab}
       onReorderTabs={handleReorderEditorTabs}
       onNewBrowser={openBrowser}
-      onNewFile={() => openEditorTab('file', { title: 'Files', path: 'workspace' })}
-      onNewSearch={openSearch}
       onNewDiff={() => openDiff(activeSession.id)}
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
@@ -2410,6 +2479,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       editorMaximized={editorMaximized}
       onToggleMaximize={() => setEditorMaximized((current) => !current)}
       onSplit={handleSplitEditor}
+      onOpenToSide={handleOpenToSide}
       editorContentVisible={editorContentVisible}
       sidePaneState={sidePaneState}
       onToggleEditorHidden={handleToggleEditorHidden}

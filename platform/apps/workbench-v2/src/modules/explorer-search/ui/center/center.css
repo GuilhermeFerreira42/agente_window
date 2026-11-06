@@ -31,3 +31,53 @@
   background-color: var(--vscode-editor-background);
   color: var(--vscode-foreground);
 }
+
+/* ============================================================================
+   FATIA 15 Onda 3 (D169) — SPLIT do editor central.
+   O pai da divisão é a RAIZ `.center-code-editor` (que já é flex-column para a
+   faixa de breadcrumb + corpo). Com `.is-split` ela vira linha, e os dois filhos
+   — o `.editor-container` do grupo 1 e o `.center-split-pane` do grupo 2 —
+   dividem a largura. Marcar o container em vez da raiz empilhava os painéis em
+   vez de dividir (medido: apareciam um em cima do outro).
+   Sem `position: fixed`, sem largura em pixel: `flex: 1 1 0` e um separador de
+   1 px. Abaixo de 720 px empilha em vez de esmagar o código.
+   ========================================================================= */
+.explorer-viewlet.attach-viewlet.center-code-editor.is-split { flex-direction: row; }
+.explorer-viewlet.attach-viewlet.center-code-editor.is-split > .center-breadcrumbs { display: none; }
+.explorer-viewlet.attach-viewlet.center-code-editor.is-split > .editor-container {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.explorer-viewlet.attach-viewlet.center-code-editor.is-split > .center-split-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.center-split-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.center-split-pane > .editor-container { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.center-split-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+@media (max-width: 720px) {
+  .explorer-viewlet.attach-viewlet.center-code-editor.is-split { flex-direction: column; }
+  .explorer-viewlet.attach-viewlet.center-code-editor.is-split > .center-split-pane {
+    border-left: 0;
+    border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  }
+}

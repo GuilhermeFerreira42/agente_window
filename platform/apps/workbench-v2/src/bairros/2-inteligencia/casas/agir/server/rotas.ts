@@ -28,6 +28,10 @@ import { permiteSessao } from './ferramentas'
 import { comandoExigeAprovacaoIndividual, criarExecutorComando, type ResolverShellComando } from './executorComando'
 import { criarVizinhoReal } from './vizinho'
 import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } from './autorizacaoExclusao'
+// D170-c (RNF15-2): protocolo HTTP e validação do pedido saíram daqui para
+// `protocoloHttp.ts`. Mesmas funções, mesmas mensagens — o arquivo só parou de
+// acumular três responsabilidades.
+import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, type PedidoValidado } from './protocoloHttp'
 
 const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
@@ -189,79 +193,8 @@ async function concluirCancelamento(execucao: ExecucaoAgir): Promise<'cancelled'
 const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa }>()
 const MAX_RETOMADAS = 20
 
-function sendJson(res: ServerResponse, status: number, corpo: unknown): void {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(JSON.stringify(corpo))
-}
-
-function sendErro(res: ServerResponse, status: number, code: string, message: string): void {
-  sendJson(res, status, { code, message })
-}
-
 function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string): NivelPermissaoAgir {
   return deps.lerPermissao?.(sessionId, chatId, raiz) ?? 'manual'
-}
-
-async function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> {
-  const partes: Buffer[] = []
-  for await (const pedaco of req) partes.push(pedaco as Buffer)
-  const texto = Buffer.concat(partes).toString('utf8')
-  if (!texto) return {}
-  try {
-    const valor = JSON.parse(texto)
-    return typeof valor === 'object' && valor !== null ? (valor as Record<string, unknown>) : {}
-  } catch {
-    throw new Error('Corpo da requisição não é JSON válido.')
-  }
-}
-
-type PedidoValidado = {
-  mensagens: MensagemSimples[]
-  fluxo: string
-  sessionId: string
-  chatId: string
-  selecaoModelo: SelecaoModelo
-}
-
-function validarSelecaoModelo(valor: unknown): SelecaoModelo | null {
-  if (valor === undefined || valor === null || (typeof valor === 'object' && (valor as { tipo?: unknown }).tipo === 'auto')) return { tipo: 'auto' }
-  if (!valor || typeof valor !== 'object') return null
-  const selecao = valor as { tipo?: unknown; providerId?: unknown; modelId?: unknown }
-  if (selecao.tipo !== 'explicita' || typeof selecao.providerId !== 'string' || !selecao.providerId || typeof selecao.modelId !== 'string' || !selecao.modelId) return null
-  return { tipo: 'explicita', providerId: selecao.providerId, modelId: selecao.modelId }
-}
-
-/** Valida o pedido da tela (histórico visível + fluxo + território candidato). */
-function validarPedido(corpo: Record<string, unknown>): { ok: true; pedido: PedidoValidado } | { ok: false; message: string } {
-  const messages = corpo.messages
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return { ok: false, message: 'Histórico vazio: envie ao menos uma mensagem.' }
-  }
-  for (const item of messages) {
-    const mensagem = item as { role?: unknown; content?: unknown }
-    if ((mensagem.role !== 'user' && mensagem.role !== 'assistant') || typeof mensagem.content !== 'string') {
-      return { ok: false, message: 'Histórico em formato inválido.' }
-    }
-  }
-  const fluxo = corpo.fluxo
-  if (typeof fluxo !== 'string' || fluxo.trim() === '') {
-    return { ok: false, message: 'Pedido sem fluxo da conversa (a sessão dona do cartão é obrigatória).' }
-  }
-  const sessionId = typeof corpo.sessionId === 'string' ? corpo.sessionId.trim() : ''
-  const chatId = typeof corpo.chatId === 'string' ? corpo.chatId.trim() : ''
-  if (!sessionId || !chatId) {
-    return { ok: false, message: 'Pedido sem identidade da sessão/conversa; o servidor não iniciou a execução.' }
-  }
-  const selecaoModelo = validarSelecaoModelo(corpo.modelSelection)
-  if (!selecaoModelo) return { ok: false, message: 'Seleção de modelo inválida; escolha Auto ou um par providerId/modelId do catálogo.' }
-  // `workspace`, `permissoes` e `mode` do payload são deliberadamente ignorados:
-  // o contexto e o modo efetivo vêm da autoridade server-side.
-  return { ok: true, pedido: { mensagens: messages as MensagemSimples[], fluxo: fluxo.trim(), sessionId, chatId, selecaoModelo } }
-}
-
-function escreverEvento(res: ServerResponse, evento: EventoAgir): void {
-  res.write(`data: ${JSON.stringify(evento)}\n\n`)
 }
 
 /** Guarda a retomada quando o teto pausou OU um erro transitório
