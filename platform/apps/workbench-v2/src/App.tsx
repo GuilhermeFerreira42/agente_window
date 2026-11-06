@@ -627,8 +627,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed" —
   // exceto quando há aba global aberta (DEBT-09): aí o editor abre ao lado da landing.
-  // 5.7: anexo (editor fino) com abas na sessão ativa — ver `attachExpandedSessions`.
-  const attachExpanded = hasSessions && !!explorerModule && attachExpandedSessions.includes(activeSession.id)
+  // FATIA 15 Onda 3 (D163): `attachExpanded` era lido SÓ para alimentar `auxVisible`, e
+  // `auxiliaryVisible` é constante `false` desde a D2.72 (a coluna não é mais uma coluna
+  // governável). Com a coluna desligada na 2c-ii, a expressão não distingue mais nada.
+  // `attachExpandedSessions` CONTINUA sendo alimentado pelos eventos porque o layout
+  // legado (`layout.state.editorMaximized`) ainda o lê — isso sai no corte de persistência.
+  const attachExpanded = false
   const sidePaneInputs = hasSessions && !landingVisible
     ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible || attachExpanded }
     : globalEditorTabs.length > 0
@@ -2491,9 +2495,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         )}
         <div className="main-region" data-activity-bar-position={layout.state.activityBarPosition}>
           <div className="right-section">
-            {/* 5.7 (D6/RF-07): `editor-maximized` = anexo maximizado COM abas → o centro (chat + EditorArea) some e a
-                AuxiliaryBar toma a faixa inteira; lista de sessões e terminal seguem (fora desta div). Só CSS — nada é desmontado. */}
-            <div className={`top-right-section${attachExpanded && layout.state.editorMaximized ? ' editor-maximized' : ''}`} data-editor-maximized={attachExpanded && layout.state.editorMaximized}>
+            {/* FATIA 15 Onda 3 (D163): `editor-maximized` da COLUNA saiu. As regras CSS que a
+                davam efeito saíram na D158, então a classe era inerte; o `data-editor-maximized`
+                existia só para alimentá-la. O maximizar do centro é outro
+                (`.desktop-surface-group.editor-maximized`, mais abaixo) e continua vivo. */}
+            <div className="top-right-section">
               <div className="main-surface" ref={surfaceGroupRef}>
             <div className="mobile-dock-tabs" role="tablist" aria-label="Navegação single-pane">
               {isPhone && topLayer(navStack) && (

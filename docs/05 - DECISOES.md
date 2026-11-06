@@ -1847,3 +1847,35 @@ Trocado por um objeto-holder `{ cb?: () => void }`. **O typecheck rodou antes do
 isso que ele vem antes.
 
 **Gate.** typecheck **EXIT 0** + **330 = 312✓|2✗|16skip em 27 arquivos**. As 2 falhas seguem sendo PEND-02 e `themeTokens`.
+
+### D163 — Onda 3: as duas últimas leituras mortas do layout da coluna — 2026-11-05 (noite)
+
+**Como cada uma foi declarada morta — por medição, não por leitura.**
+
+1. **`editor-maximized` do `.top-right-section`.** A condição que produzia a classe ainda existia, mas a classe **não tinha
+   mais regra nenhuma no CSS**: `grep -rn 'top-right-section' --include=*.css` devolve três ocorrências, e nenhuma é
+   `.top-right-section.editor-maximized` (as regras saíram na D158). Classe sem regra é inerte. Removida a expressão e o
+   `data-editor-maximized`, que existia só para alimentá-la. **O maximizar do centro é outro** —
+   `.desktop-surface-group.editor-maximized` (app.css:1007) — e continua vivo; por isso o teste `layoutDensity` e o
+   `editorMaximized` do `EditorArea` seguem valendo.
+2. **`attachExpanded`.** Era lido **num único lugar**: `auxVisible: auxiliaryVisible || attachExpanded`. E
+   `auxiliaryVisible` é **constante `false`** desde a D2.72. Com a coluna desligada na 2c-ii, a expressão não distingue mais
+   nada. Virou `false` com o porquê escrito ao lado.
+
+**O que NÃO foi removido, e por que a pressa aqui seria errada.** `attachExpandedSessions` (o estado) e os eventos
+`editor.attachExpanded`/`attachCollapsed` **continuam**: `layout.state.editorMaximized` ainda os lê, e esse estado é
+**persistido** (`editor.attachMaximized` → `setEditorMaximized`). Mexer nisso é mexer em persistência — o corte que exige
+gate próprio. Removi a **leitura** morta, não a **escrita** que outro consumidor vivo depende.
+
+**Um erro meu, e a lição.** Na primeira tentativa de mexer nesta linha eu montei a substituição de string errado e quebrei o
+JSX (`TS1005: ')' expected`). Reverti com `git checkout --` e refiz com **uma** substituição exata, conferindo `count == 1`
+antes. ⛔ **A lição já estava na lista de travas** ("cirurgia de string por `t.index(...)` deixa fechamento sobrando") e eu a
+repeti por tentar economizar uma linha em JSX multi-linha: nesse caso, substitua a **linha inteira**, não um pedaço dela.
+
+**Ganho.** Aqui é honestamente pequeno em linhas (o arquivo fica em 2 691) e grande em clareza: duas condições que pareciam
+governar layout deixaram de existir, e quem ler o `App.tsx` daqui em diante não vai tentar descobrir o que
+`editor-maximized` faz — não faz nada.
+
+**Gate.** typecheck **EXIT 0** + **347 = 329✓|2✗|16skip em 29 arquivos**. Entraram `sessionLayout` e `layoutPersistence` no
+gate, porque são os testes que policiam a persistência que este passo deliberadamente **não** tocou. As 2 falhas seguem
+sendo PEND-02 e `themeTokens`.
