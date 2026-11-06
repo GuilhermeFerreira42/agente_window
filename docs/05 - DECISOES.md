@@ -1694,3 +1694,34 @@ dentro de um teste; esse caminho só existe no navegador com o chunk faltando. E
 registrado como **homologação humana**, não como verde.
 
 **Gate.** typecheck **EXIT 0** + **285 = 268✓|1✗|16skip em 24 arquivos** (eram 283 em 23; +2 provas). Falha única: PEND-02.
+
+### D158 — Onda 3, dívida 2: poda do CSS da coluna, e a regra que mentia — 2026-11-05 (noite)
+
+**O que foi removido do `app.css`:** o bloco inteiro da faixa `[chat][auxiliary-bar]` (piso do chat, teto da barra, as
+regras de `details-collapsed`, o `editor-maximized` da coluna ocupando a faixa, o `auxiliary-column` escondido), o wrapper
+mobile da coluna, e os seletores da coluna nas listas de `is-hidden`, `prefers-reduced-motion` e `single-pane`.
+
+**A descoberta que vale mais que a poda.** Havia **duas** declarações de `.auxiliary-bar`: a canônica (L3059, com
+`flex: 0 0 var(--auxiliary-width)` e `padding-left: 5px`) e uma **duplicata legada** mais abaixo (L4727, com
+`width: 320px` fixo). As duas têm a **mesma especificidade**, então **a última vencia a cascata**:
+
+- o `layoutDensity.test.ts` policiava `rule('.auxiliary-bar')` esperando os valores da **canônica** — e passava porque **lê
+  o arquivo**, não o resultado computado. A regra que ele protegia **não era a regra efetiva**;
+- enquanto a coluna era renderizada, o valor efetivo era `320px` fixo, não `var(--auxiliary-width)`.
+
+**Removi a duplicata.** Sem coluna renderizada as duas eram inertes, então não houve mudança visual — mas agora a canônica é
+também a efetiva, e o teste passa a policiar a regra que realmente vale se a coluna algum dia voltar. É o mesmo defeito de
+classe que a D142 já registrou: **teste que lê o arquivo não prova o que está na tela**; aqui ele ao menos agora lê a regra
+certa.
+
+**O que ficou, de propósito.** `.auxiliary-bar`, `.has-attach-slot` e `.auxiliary-column` continuam: `AuxiliaryBar.tsx` **não
+foi apagado** (é a rede de rollback) e `AttachArea.tsx` ainda faz `closest('.auxiliary-bar')`. Apagar o CSS de um componente
+que existe seria criar a dívida oposta — estilo órfão de componente vivo. Saem juntos, ou não saem.
+
+**Contagem dupla de pré-existentes, medida.** `themeTokens` (token não declarado) e `visualStates` (P7.4) **já falhavam antes
+desta poda**: medi com `git stash` do `app.css` — 2 falhas / 9 passados **antes** e **depois**, idêntico. Elas não estavam no
+gate de 19-24 arquivos que eu vinha rodando; entraram agora porque o gate passou a incluir `themeTokens`, que é o teste do
+arquivo que eu mexi. ⛔ **Lição:** um arquivo novo no gate pode revelar falha pré-existente — isso é o gate funcionando, não
+regressão minha. O número honesto do inventário passa a ser **289 = 271✓|2✗|16skip em 25 arquivos**.
+
+**Gate.** typecheck **EXIT 0** + 289 conforme acima. `app.css`: 5 058 → **5 022 linhas**.
