@@ -242,12 +242,20 @@ sem o repositório" — com isso eu vou direto no caminho.
 
 **Pronto e provado:** visualizador único · abrir arquivo no centro · alternar abas sem perder
 estado · salvar em disco · F5 restaurando · Changes real no centro · dublê de estado isolado
-nos testes · quarentena dos E2E registrada.
+nos testes · quarentena dos E2E registrada · **divisão real do editor, com dois painéis e
+abrir ao lado** · **marca de alteração não salva na faixa central** · **Outline mostrando os
+símbolos** · ocultar/mostrar o editor sem perder abas, em anexo e em maximizado.
 
 **Falta depois da sua homologação:**
 1. **corte maior do `App.tsx`** (~2 300 linhas de estado) — gate próprio, mexe em persistência;
 2. **aposentar `AuxiliaryBar`/`AttachArea`** — só depois que você aprovar, é a rede de rollback;
 3. **reescrever (ou aposentar em definitivo) os E2E quarentenados** — trabalho por spec;
-4. **campo `editorMaximized` dormente** — só sai com migração do `localStorage`.
+4. **campo `editorMaximized` dormente** — só sai com migração do `localStorage`;
+5. **arrastar aba entre os dois painéis (DnD)** — não existe, e eu deliberadamente não
+   implementei sem você decidir: mover aba entre lados hoje é pelo menu (abrir ao lado),
+   que faz o mesmo. Fazer o arrastar atravessar a fronteira shell e módulo é mudança de
+   contrato, não correção de defeito;
+6. **gestão de abas ainda mora no `App.tsx`** — a RNF15-2 pede que ela saia de lá. É o
+   corte de ~2 300 linhas, exige gate próprio. A meta **não** está cumprida.
 
 **Homologação humana: PENDENTE.** Não assino embaixo no seu lugar.
