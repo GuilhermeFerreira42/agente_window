@@ -1,4 +1,4 @@
-# Estado vigente — 2026-11-05 (noite, Onda 3 · 9 dívidas tratadas)
+# Estado vigente — 2026-11-05 (noite, Onda 3 · 10 dívidas tratadas (D157…D166))
 
 ## ⚑ Um visualizador só: o contêiner central — **concluído**
 
@@ -6,7 +6,7 @@ A coluna antiga saiu. O contêiner central é a única superfície de abas: arqu
 Provedores, navegador, busca e changes — no mesmo lugar. Degraus com gate verde entre eles: **D152 → D153 → D154 →
 D155 → D156 → D166**.
 
-## ⚑ Onda 3: dívidas técnicas — **9 tratadas** (D157…D166)
+## ⚑ Onda 3: dívidas técnicas — **10 tratadas** (D157…D166)
 
 **D157** falha ao carregar o Monaco deixa de ser silenciosa · **D158** poda do CSS da coluna **e a descoberta de que o teste
 policiava uma regra que a cascata sobrescrevia** · **D159** o órfão do File System Access sai · **D160** a fronteira
