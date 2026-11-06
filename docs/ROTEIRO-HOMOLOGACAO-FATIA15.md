@@ -92,6 +92,95 @@ do navegador** — hash `dc0cab22 → e2274eb2`, mtime atualizado, conteúdo exa
 **[✅ MEDIDO por mim]**: antes do F5 → `[ARQUIVO-DE-TESTE.txt, README.md]`; depois do F5 →
 idêntico, com o mesmo texto no editor.
 
+**O que o F5 faz com a DIVISÃO** (medido nesta rodada): a divisão **sobrevive** —
+cada painel volta com a sua faixa de abas, sem duplicar arquivo entre os dois lados,
+e o maximizado também volta. O que o F5 **não** preserva é a **edição não salva**:
+o texto volta do disco e a marca de "alteração não salva" desaparece junto. Isso é
+deliberado e honesto (não há gravação de rascunho) — mas se você tiver digitado algo
+que não salvou, o F5 descarta. Vale saber antes de apertar.
+
+---
+
+## 4b. Aba com alteração NÃO SALVA — a marca existe? [👤 SUA VEZ] — 3 min
+
+Esta é a novidade da rodada D170. Antes dela, a faixa central **não** mostrava que
+a aba tinha alteração não salva: o modelo sabia (o app abria o diálogo Salvar / Não
+Salvar / Cancelar), mas nada na tela avisava. Se o app abrir o diálogo e a marca não
+estiver lá, é regressão — me avise.
+
+1. Abra um arquivo pelo Explorer (duplo clique no nome).
+2. Clique dentro do editor e digite qualquer coisa.
+
+- [ ] A aba ganhou um **ponto** (bolinha) ao lado do nome
+- [ ] Passar o mouse na aba mostra o texto "alterações não salvas"
+- [ ] O **X** da aba continua no mesmo lugar e fecha ao clicar
+3. Aperte **Ctrl+S** (ou ⌘S).
+
+- [ ] O ponto **desaparece** (quer dizer: salvou de verdade)
+- [ ] Feche e reabra o arquivo: o que você digitou **continua lá**
+
+4. Digite de novo sem salvar e clique no **X** da aba.
+
+- [ ] Aparece o diálogo com **Salvar / Não Salvar / Cancelar**
+- [ ] **Cancelar** mantém a aba e o texto como estavam
+
+**[✅ MEDIDO por mim]**: limpa → suja (ponto de 7×7 px na cor de "modificado" do
+tema) → Ctrl+S → limpa, **e o texto foi gravado no disco** (conferido lendo o
+arquivo por fora do app).
+
+---
+
+## 4c. Dividir o editor e "Abrir ao lado" [👤 SUA VEZ] — 4 min
+
+O "Dividir editor" agora divide **de verdade** (dois painéis, cada um com sua faixa
+de abas). Antes ele abria uma aba falsa chamada "Files (divisão)" apontando para um
+arquivo que não existe.
+
+1. Abra **dois** arquivos no centro.
+2. Clique no ícone de **dividir** (o botão com dois retângulos, no canto direito da
+   faixa de abas).
+
+- [ ] Apareceu um **segundo painel** à direita, com faixa de abas própria e a
+      mensagem "Escolha um arquivo no Explorer para abrir deste lado…"
+- [ ] O painel da esquerda **não perdeu** nenhuma aba
+
+3. Clique **dentro do painel da direita** (para ele ficar em foco) e escolha um
+   arquivo no Explorer.
+
+- [ ] O arquivo abriu **no painel da direita**, não no da esquerda
+
+4. Clique com o **botão direito** numa aba e escolha **"Abrir ao lado"**.
+
+- [ ] A aba **saiu** do painel onde estava e apareceu no outro lado
+- [ ] O **X** ao lado da faixa do painel direito fecha a divisão
+
+5. Com um arquivo **não salvo** no painel direito, feche a divisão.
+
+- [ ] O app **pergunta** o que fazer (não descarta em silêncio)
+
+**[✅ MEDIDO por mim]**: dividir → clicar no painel 2 → escolher arquivo → abre no
+painel 2 (dois editores, um em cada lado); "Abrir ao lado" move a aba e, **sem**
+divisão aberta, ele **cria** a divisão em vez de reclamar; fechar a divisão com
+alteração não salva abre o diálogo.
+
+---
+
+## 4d. O painel Outline mostra os símbolos? [👤 SUA VEZ] — 2 min
+
+Esta é a correção do último defeito da fatia: com um arquivo grande aberto, o
+Outline dizia "No symbols found in document" (nenhum símbolo) por causa de um aviso
+que se perdia na inicialização.
+
+1. Abra um arquivo **grande e conhecido** (por exemplo `App.tsx` em `src/`).
+2. Na Side Bar, clique no cabeçalho **"Outline"** para expandir (ele nasce recolhido,
+   como no VS Code).
+
+- [ ] Aparecem **muitas** linhas com nomes de funções/constantes
+- [ ] Clicar numa linha leva o cursor até ela no editor
+
+**[✅ MEDIDO por mim]**: 1542 linhas para o `App.tsx` (amostra: `useCallback`,
+`useEffect`, `useMemo`, `useRef`); a mensagem "No symbols found" não aparece.
+
 ---
 
 ## 5. A aba Changes (a novidade desta rodada) [👤 SUA VEZ] — 5 min
