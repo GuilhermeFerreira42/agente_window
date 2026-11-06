@@ -1666,3 +1666,31 @@ mexer em persistência no mesmo commit em que se desliga a interface.
 
 **Gate.** typecheck **EXIT 0** + **283 = 266✓|1✗|16skip em 23 arquivos**, a mesma contagem do C2 — a remoção não custou
 cobertura nem comportamento. Falha única = PEND-02, pré-existente.
+
+### D157 — Onda 3, dívida 1: falha ao carregar o Monaco deixa de ser silenciosa — 2026-11-05 (noite)
+
+**A dívida.** `CodeEditorPane.tsx` fazia `void loadMonaco().then(...)` **sem `.catch`**. Registrada desde a Onda 2b, com um
+sintoma concreto: no teste de integração a rejeição virava *Unhandled Rejection* e derrubava a suíte **com todos os testes
+verdes** — eu tinha contornado isso **no teste** (mockando `monaco-editor`), o que resolvia o ruído e deixava o produto
+intacto. Dívida de verdade, não cosmética.
+
+**Por que importa mais agora do que antes.** A Onda 2c-ii tornou o corpo do centro a **única** superfície de edição. Antes,
+falha ao carregar o Monaco no centro ainda deixava a coluna funcionando; hoje não há plano B. Um painel em branco sem
+mensagem, na única superfície que edita arquivos, é o pior estado possível: parece que o app travou, e o erro real só existe
+no console.
+
+**Decisão (D157).** A falha passa a ser **estado visível** da UI:
+
+- `falhaAoCarregar` (estado) guarda a mensagem;
+- o `.catch` na cadeia do `loadMonaco().then(...)` a preenche — **com guarda `cancelled`**, porque se o componente já saiu
+  não há onde mostrar nada e o silêncio é o comportamento correto (não é engolir: é não pintar em componente morto);
+- o aviso é `role="alert"`, `data-testid="monaco-load-error"`, e reusa as classes já existentes de erro de leitura
+  (`attach-read-error` / `attach-error-detail` / `attach-error-hint`) — **nenhum estilo novo**, Regra 4 e LEGO respeitadas.
+
+**O que a prova cobre, e o que ela NÃO cobre — dito com precisão.** O teste (`monacoLoadFailure.test.tsx`, 2 provas) exercita
+a **cláusula `.catch` de verdade**, fazendo o `editor.create` lançar dentro do `.then`: a mesma cadeia que captura a
+rejeição do carregamento. Ele **não** prova a rejeição do `import()` dinâmico em si — um módulo ESM não rejeita no import
+dentro de um teste; esse caminho só existe no navegador com o chunk faltando. Está anotado assim no próprio arquivo e
+registrado como **homologação humana**, não como verde.
+
+**Gate.** typecheck **EXIT 0** + **285 = 268✓|1✗|16skip em 24 arquivos** (eram 283 em 23; +2 provas). Falha única: PEND-02.

@@ -104,6 +104,15 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
   const pendingReveal = useRef<Map<WorkspaceUri, { line: number; column?: number }>>(new Map());
   const [, bump] = useState(0);
   const rerender = () => bump((x) => x + 1);
+  /**
+   * D157 (dívida da Onda 3): `loadMonaco().then(...)` não tinha `.catch`. Quando o
+   * carregamento do Monaco falhava (chunk não encontrado, CSP, worker bloqueado,
+   * rede), a promise rejeitava sem tratador: nada aparecia na tela, o painel ficava
+   * em branco para sempre e o erro só existia no console — ou virava "Unhandled
+   * Rejection" derrubando a suíte. Falha de carregamento é estado LEGÍTIMO da UI e
+   * tem de ser VISÍVEL, não silencioso.
+   */
+  const [falhaAoCarregar, setFalhaAoCarregar] = useState<string | null>(null);
 
   const active = editor.getActive(sessionId);
   // 4.7-b c2: a aba fixa "Changes" não é um arquivo — o Monaco fica sem modelo e oculto.
@@ -154,6 +163,11 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
         edRef.current = null;
       };
       rerender();
+    }).catch((err: unknown) => {
+      // Não engole: vira estado visível. `cancelled` significa que o componente já
+      // saiu — aí não há onde mostrar nada, e o silêncio é correto.
+      if (cancelled) return;
+      setFalhaAoCarregar(err instanceof Error ? err.message : String(err));
     });
     return () => { cancelled = true; cleanup?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,6 +277,13 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
         <div className="attach-image-preview" data-testid="image-preview-pane">
           <div className="attach-pane-banner"><span>Image Preview</span><span className="attach-pane-name">{name}</span><span className="attach-pane-badge">REAL</span></div>
           <div className="attach-image-body"><img src={`data:${entry.image.mime};base64,${entry.image.dataBase64}`} alt={name} /></div>
+        </div>
+      )}
+      {falhaAoCarregar && (
+        <div className="attach-read-error" role="alert" data-testid="monaco-load-error">
+          <div className="attach-pane-banner error"><span>O editor não pôde ser carregado</span></div>
+          <div className="attach-error-detail">{falhaAoCarregar}</div>
+          <div className="attach-error-hint">Sem o Monaco não há edição nem gravação. Recarregue a página; se persistir, o ambiente bloqueou o carregamento do editor.</div>
         </div>
       )}
       {entry?.status === 'error' && (
