@@ -127,6 +127,22 @@ describe('session persistence HTTP contract', () => {
   let server: HttpServerHandle
   const touched: Array<{ id: string; slug: string }> = []
 
+  it('encaminha a API de Personalizações para a casa, sem cair no fallback de HTML', async () => {
+    const response = await fetch(`${server.baseUrl}/api/personalizacoes`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('application/json')
+    const body = await response.json() as { skills: unknown[]; ferramentas: unknown[] }
+    expect(Array.isArray(body.skills)).toBe(true)
+    expect(Array.isArray(body.ferramentas)).toBe(true)
+    for (const [route, method] of [['skills', 'POST'], ['estado', 'PUT']]) {
+      const invalid = await fetch(`${server.baseUrl}/api/personalizacoes/${route}`, {
+        method, headers: { 'content-type': 'application/json' }, body: '{invalido',
+      })
+      expect(invalid.status).toBe(400)
+      expect(invalid.headers.get('content-type')).toContain('application/json')
+    }
+  })
+
   beforeEach(async () => {
     touched.length = 0
     persistenceFault.failNextRename = false
