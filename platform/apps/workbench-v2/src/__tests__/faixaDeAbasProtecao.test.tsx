@@ -162,6 +162,20 @@ describe('P5/P8 — recursos de browser acompanham a aba', () => {
 })
 
 describe('P10 — o que o F5 realmente preserva (comportamento MEDIDO, nao suposto)', () => {
+  it('remontar o App (F5) descarta Browser nativo e preserva a sessao ativa', async () => {
+    const user = userEvent.setup()
+    const mounted = render(<App initialSessionSnapshot={testSessions} />)
+    await abrirBrowser(user)
+    expect(abas()).toHaveLength(1)
+    const sessionBefore = window.localStorage.getItem('workbench.sessions.active.v1')
+    expect(sessionBefore).toBeTruthy()
+
+    mounted.unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    expect(abas()).toHaveLength(0)
+    expect(window.localStorage.getItem('workbench.sessions.active.v1')).toBe(sessionBefore)
+  })
+
   it('a sessao ativa e a memoria de abas do modulo usam as chaves de storage esperadas', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)

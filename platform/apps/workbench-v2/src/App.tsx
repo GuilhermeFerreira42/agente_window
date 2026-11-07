@@ -41,31 +41,22 @@ import {
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
 import {
   assertWorkbenchInvariants,
-  navigateBrowser as navigateBrowserState,
-  reloadBrowser as reloadBrowserState,
   resolveActiveChatId,
   setAllDiffAccepted,
-  setBrowserStatus as setBrowserStatusState,
-  setBrowserViewport as setBrowserViewportState,
   setDiffAccepted,
-  stepBrowserHistory,
   toggleDiffViewed,
   updateSessionAndChatStatus,
   updateSessionStatus,
 } from './domain/sessionState'
 import {
-  getBrowserViewsForSession,
   getEditorTabsVisibleForSession,
-  removeBrowserResourceForTab,
-  removeBrowserResourcesForSession,
 } from './domain/browserOwnership'
 import { filterSearchResults } from './domain/search'
 // FATIA 15 Onda 1 (D144 §3.4): a gestão de abas tem DONO NOVO no shell. O App
 // deixa de decidir política de sucessão — ele orquestra e delega.
-import { colecaoParaEscopo, fecharAba, resolverAbaVisivel, type Aba } from './shell/abas'
+import { resolverAbaVisivel, type Aba } from './shell/abas'
 // FATIA 15 (D172 / RNF15-2): a IDENTIDADE da aba (de quem e', qual reusa, qual id
 // nasce) sai do App. Fica no Bairro 1: e' politica de Workbench, sem IA.
-import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba } from './shell/identidadeDaAba'
 // FATIA 15 Onda 2c-i (D148): a ponte que projeta as abas do módulo para a faixa
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
@@ -118,7 +109,6 @@ const BOOT_SESSION_ID = 'draft-empty'
 // ativa escondia a barra auxiliar (regra Browser→aux bar oculta) e cobria o
 // Explorer no boot. O estado "sem abas / sem browsers" já é válido (é o que
 // resta ao fechar a aba). Novos browsers vêm de `createBrowser` (botão da UI).
-const initialBrowserViews: BrowserViewState[] = []
 
 // FATIA-05 5.3 (RF-05): a maquete "Changes N" (`initialDiffFiles`/`buildProjectDiffFiles`) foi removida.
 // O estado `diffFilesBySession` continua existindo só porque o `EditorArea` (intocável até a 5.7)
@@ -377,7 +367,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // remembered by session instead of leaking between independent workspaces.
   const [checksExpandedBySession, setChecksExpandedBySession] = useState<Record<string, boolean>>({})
   const [expandedFoldersBySession, setExpandedFoldersBySession] = useState<Record<string, Record<string, boolean>>>({})
-  const [browserViews, setBrowserViews] = useState<BrowserViewState[]>(initialBrowserViews)
   const [searchQuery, setSearchQuery] = useState('menubar')
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
 
@@ -491,8 +480,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const approvalTimer = useRef<number | undefined>(undefined)
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
-  const browserSequence = useRef(0)
-  const browserOrdinalBySession = useRef<Record<string, number>>({})
   // D174: a faixa NATIVA tem um unico dono de estado/memoria no shell. O App
   // segue orquestrando recursos de browser e a porta do modulo (sem copia das abas).
   const activateModuleTab = useCallback((sessionId: string, uri: string) => {
@@ -500,9 +487,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }, [])
   const showActivatedEditor = useCallback(() => setMobilePane('editor'), [])
   const {
-    editorTabs, setEditorTabs, activeTabId, setActiveTabId,
-    activeTabBySession, activeGlobalTabId, mruRef, editorTabSequence,
+    editorTabs, setEditorTabs, activeTabId, setActiveTabId, browserViews, setBrowserViews,
+    activeGlobalTabId,
     activateEditorTab, preferredEditorTabForSession,
+    openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
+    navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor)
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
@@ -895,22 +884,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }
   }
 
-  const createBrowser = () => {
-    const sessionId = activeSession.id
-    const nextOrdinal = browserOrdinalBySession.current[sessionId] ?? getBrowserViewsForSession(browserViews, sessionId).length + 1
-    browserOrdinalBySession.current[sessionId] = nextOrdinal + 1
-    const sequence = browserSequence.current++
-    const id = `browser-${sessionId}-${Date.now()}-${sequence}`
-    const url = `https://agents.local/sessions/${sessionId}`
-    const view: BrowserViewState = { id, sessionId, title: nextOrdinal === 1 ? 'Browser' : `Browser ${nextOrdinal}`, url, history: [url], historyIndex: 0, status: 'loading', viewport: 'desktop', reloadToken: 0 }
-    const tab: EditorTab = { id: `${id}-tab`, type: 'browser', title: view.title, sessionId, browserId: id }
-    activeTabBySession.current[sessionId] = tab.id
-    setBrowserViews((current) => [...current, view])
-    setEditorTabs((current) => [...current, tab])
-    activateEditorTab(tab)
-    setMobilePane('editor')
-  }
-
   const showSessionPicker = () => {
     // Paridade com o Command Center do original: o pill abre o seletor flutuante
     // de sessões (quick-pick "Show Sessions"), não cria uma nova sessão.
@@ -1062,28 +1035,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     else notify(destino === 'secundario' ? 'Aba aberta ao lado' : 'Aba movida para o painel principal')
   }
 
-  const openEditorTab = useCallback((type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean; imagePreview?: EditorTab['imagePreview']; readError?: string } = { title: type }) => {
-    // D172: o App nao decide mais QUEM e' a aba. Ele pergunta ao shell.
-    //   sessaoDonaDaAba  -> de quem e' (regra por tipo)
-    //   abaExistentePara -> da' para reusar?
-    //   idDeAbaNova      -> qual id nasce
-    const pedido = { type, ...options }
-    const existing = abaExistentePara(editorTabs, pedido, activeSession.id)
-    if (existing) {
-      // content ↔ readError sao mutuamente exclusivos: o estado novo sempre
-      // substitui o anterior, nunca fica mock/placeholder residual. O shell diz
-      // SE ha o que reescrever (undefined = nada muda = nenhum setState).
-      const atualizacao = atualizacaoDeAbaReusada(existing, pedido)
-      if (atualizacao) {
-        setEditorTabs((current) => current.map((t) => t.id === existing.id ? { ...t, ...atualizacao } : t))
-      }
-      activateEditorTab(existing)
-      return
-    }
-    const tab: EditorTab = montarAba(pedido, activeSession.id, idDeAbaNova(type, Date.now(), editorTabSequence.current++))
-    setEditorTabs((current) => [...current, tab])
-    activateEditorTab(tab)
-  }, [activeSession.id, activateEditorTab, editorTabs])
+  // A politica de abertura/reuso e a mutacao da faixa sao do hook no shell.
+  const openEditorTab = (type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean; imagePreview?: EditorTab['imagePreview']; readError?: string }) =>
+    openNativeTab(type, options, activeSession.id)
 
   // (BLOCO 4.4-fix BUG-P1 + GAP-V1) Clique num arquivo da árvore (evento
   // explorer.fileOpened): lê o conteúdo REAL via FileSystemPort (Single Port),
@@ -1104,7 +1058,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
   }
 
-  const openBrowser = () => createBrowser()
+  const openBrowser = () => createBrowser(activeSession.id)
   // FATIA 11: o auto-scroll do chat é config do servidor — carrega uma vez;
   // a aba Config avisa quando salvar (sem ela, vale o default LIGADO).
   const [autoScrollChat, setAutoScrollChat] = useState(AUTOSCROLL_PADRAO)
@@ -1316,39 +1270,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // já é escondido em EditorArea; este guard cobre atalhos/DnD/menu de contexto.
     if (!isTabCloseable(closing, sidePaneState)) return
 
-    // FATIA 15 Onda 1 (D144 §3.1): a sucessão vem do dono novo, não do App. MRU
-    // primeiro; vizinha da posição só na falta de histórico (espelha
-    // editorService.close). `colecaoParaEscopo` filtra o MRU — que é global — para
-    // as candidatas do escopo, senão uma aba de outra sessão ganharia o foco e
-    // "abas de S1 não vazam para S2" quebraria. O App continua DONO da remoção
-    // porque ela cascateia os recursos de Browser; do dono novo ele só pede a
-    // sucessora.
-    const sucessoraAoFechar = (candidatas: readonly EditorTab[], ativa: string | undefined) =>
-      fecharAba(colecaoParaEscopo(candidatas, mruRef.current), id, ativa).sucessoraId
-
-    const nextIdBeforeCleanup = sucessoraAoFechar(getEditorTabsVisibleForSession(editorTabs, activeSession.id), activeTabId)
-    const nextResources = removeBrowserResourceForTab({ browserViews, editorTabs }, id)
-    setBrowserViews(nextResources.browserViews)
-    setEditorTabs(nextResources.editorTabs)
-
-    if (closing.sessionId && activeTabBySession.current[closing.sessionId] === id) {
-      const replacement = sucessoraAoFechar(editorTabs.filter((tab) => tab.sessionId === closing.sessionId), id)
-      if (replacement) activeTabBySession.current[closing.sessionId] = replacement
-      else delete activeTabBySession.current[closing.sessionId]
-    }
-    if (!closing.sessionId && activeGlobalTabId.current === id) delete activeGlobalTabId.current
-
-    const visibleAfterClose = getEditorTabsVisibleForSession(nextResources.editorTabs, activeSession.id)
-    const requestedNextId = activeTabId === id ? nextIdBeforeCleanup : activeTabId
-    activateEditorTab(nextResources.editorTabs.find((tab) => tab.id === resolverAbaVisivel(visibleAfterClose, requestedNextId)))
+    // R-081 e a fronteira do modulo sao do App; remocao e sucessao de aba
+    // NATIVA e seu BrowserView sao responsabilidade unica do hook do shell.
+    closeNativeTab(id, activeSession.id)
   }
-
-  const navigateBrowser = (id: string, url: string) => setBrowserViews((current) => current.map((view) => view.id === id ? navigateBrowserState(view, url) : view))
-  const browserBack = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? stepBrowserHistory(view, -1) : view))
-  const browserForward = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? stepBrowserHistory(view, 1) : view))
-  const reloadBrowser = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? reloadBrowserState(view) : view))
-  const setBrowserStatus = (id: string, status: BrowserViewState['status']) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserStatusState(view, status) : view))
-  const setBrowserViewport = (id: string, viewport: BrowserViewport) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserViewportState(view, viewport) : view))
 
   const handleNewSession = () => {
     // FATIA-06.2: o + GLOBAL abre sempre o mesmo SessionLanding validado.
@@ -1480,10 +1405,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     updateSession(id, (session) => ({ ...updateSessionStatus(session, archived ? 'completed' : session.status), archived, section: archived ? 'archived' : 'today' }))
     if (archived) {
       clearPendingTimersForSession(id)
-      const nextResources = removeBrowserResourcesForSession({ browserViews, editorTabs }, id)
-      setBrowserViews(nextResources.browserViews)
-      setEditorTabs(nextResources.editorTabs)
-      delete activeTabBySession.current[id]
+      const nextResources = removeSessionResources(id)
       if (activeSessionId === id) {
         setActiveTabId(resolverAbaVisivel(getEditorTabsVisibleForSession(nextResources.editorTabs, id), activeTabId))
         setTerminalVisible(false)
@@ -1531,10 +1453,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     management.current = discardDraft(management.current, id)
     const remaining = sessions.filter((session) => session.id !== id)
     setSessions(remaining)
-    const nextResources = removeBrowserResourcesForSession({ browserViews, editorTabs }, id)
-    setBrowserViews(nextResources.browserViews)
-    setEditorTabs(nextResources.editorTabs)
-    delete activeTabBySession.current[id]
+    const nextResources = removeSessionResources(id)
     sessionLayouts.current = forgetSessionLayout(sessionLayouts.current, id)
     if (activeSessionId === id) {
       // Ao excluir a última sessão, cai na tela inicial (landing) — não há
