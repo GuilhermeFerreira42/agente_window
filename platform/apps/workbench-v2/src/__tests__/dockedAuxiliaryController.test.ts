@@ -19,6 +19,8 @@ describe('DockedAuxiliaryBarController (R-040)', () => {
     expect(isDockedTab(tab('a', 'browser'))).toBe(false)
     expect(isRestorableTab(tab('a', 'browser'))).toBe(true)
     expect(isRestorableTab(tab('a', 'customizations'))).toBe(true)
+    expect(isRestorableTab(tab('a', 'providers'))).toBe(true)
+    expect(isRestorableTab(tab('a', 'config'))).toBe(true)
     // Search untitled sujo → não restaurável.
     expect(isRestorableTab(tab('a', 'search'))).toBe(false)
   })
@@ -30,12 +32,14 @@ describe('DockedAuxiliaryBarController (R-040)', () => {
       tab('browser1', 'browser'),
       tab('search1', 'search'),
       tab('cust1', 'customizations'),
+      tab('providers1', 'providers'),
+      tab('config1', 'config'),
     ]
     const result = enterDetailOnly(tabs, 's1')
     // Só as acopladas permanecem.
     expect(result.tabs.map((t) => t.id)).toEqual(['diff1', 'file1'])
     // Restauráveis capturadas (browser + customizations), na ordem original.
-    expect(result.state.captured.map((c) => c.tab.id)).toEqual(['browser1', 'cust1'])
+    expect(result.state.captured.map((c) => c.tab.id)).toEqual(['browser1', 'cust1', 'providers1', 'config1'])
     // Search descartado.
     expect(result.dropped.map((t) => t.id)).toEqual(['search1'])
   })

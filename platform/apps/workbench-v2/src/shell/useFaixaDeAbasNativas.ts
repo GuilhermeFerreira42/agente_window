@@ -15,6 +15,8 @@ import {
   stepBrowserHistory,
 } from '../domain/sessionState'
 import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel } from './abas'
+import { reorderEditorTabs } from '../domain/dragAndDrop'
+import { enterDetailOnly, showEditorRestore, EMPTY_DOCKED_STATE, type DockedControllerState } from '../domain/dockedAuxiliaryController'
 import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba, type PedidoDeAba } from './identidadeDaAba'
 import { dividirIdDoModulo } from './ponteAnexo'
 import { lerSnapshotNativas, salvarSnapshotNativas } from './persistenciaNativas'
@@ -38,6 +40,8 @@ export function useFaixaDeAbasNativas(
   const editorTabSequence = useRef(0)
   const browserSequence = useRef(0)
   const browserOrdinalBySession = useRef<Record<string, number>>(initial.ordinalBySession)
+  const dockedController = useRef<DockedControllerState>(EMPTY_DOCKED_STATE)
+  const capturedBrowserViews = useRef<BrowserViewState[]>([])
   // R-040 captura temporariamente BrowserViews e abas ao ocultar o editor. Nao
   // escrever esse estado transitorio no storage; F5 no modo oculto nao as perde.
   const persistencePaused = useRef(false)
@@ -137,6 +141,43 @@ export function useFaixaDeAbasNativas(
     return next
   }
 
+  const reorderNativeTabs = (fromId: string, toId: string) =>
+    setEditorTabs((current) => reorderEditorTabs(current, fromId, toId) as EditorTab[])
+
+  // R-040 pertence ao dono da colecao, nao ao App. O shell entrega apenas os
+  // descartes ao orquestrador para mostrar um aviso; nenhuma copia de estado.
+  const hideNativeTabs = (sessionId: string, onDropped: (dropped: readonly EditorTab[]) => void) => {
+    pauseNativePersistence()
+    setEditorTabs((tabs) => {
+      const result = enterDetailOnly(tabs, sessionId)
+      dockedController.current = result.state
+      const capturedBrowserIds = new Set(result.state.captured
+        .map((entry) => entry.tab)
+        .filter((tab) => tab.type === 'browser' && tab.browserId)
+        .map((tab) => tab.browserId as string))
+      if (capturedBrowserIds.size > 0) {
+        setBrowserViews((views) => {
+          capturedBrowserViews.current = views.filter((view) => capturedBrowserIds.has(view.id))
+          return views.filter((view) => !capturedBrowserIds.has(view.id))
+        })
+      } else capturedBrowserViews.current = []
+      if (result.dropped.length > 0) onDropped(result.dropped)
+      return result.tabs
+    })
+  }
+
+  const restoreNativeTabs = () => {
+    resumeNativePersistence()
+    const restoredViews = [...capturedBrowserViews.current]
+    capturedBrowserViews.current = []
+    setEditorTabs((tabs) => {
+      const result = showEditorRestore(tabs, dockedController.current)
+      dockedController.current = result.state
+      return result.tabs
+    })
+    if (restoredViews.length > 0) setBrowserViews((views) => [...views, ...restoredViews])
+  }
+
   const navigateBrowser = (id: string, url: string) => setBrowserViews((current) => current.map((view) => view.id === id ? navigateBrowserState(view, url) : view))
   const browserBack = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? stepBrowserHistory(view, -1) : view))
   const browserForward = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? stepBrowserHistory(view, 1) : view))
@@ -145,10 +186,10 @@ export function useFaixaDeAbasNativas(
   const setBrowserViewport = (id: string, viewport: BrowserViewport) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserViewportState(view, viewport) : view))
 
   return {
-    editorTabs, setEditorTabs, activeTabId, setActiveTabId, browserViews, setBrowserViews,
+    editorTabs, activeTabId, setActiveTabId, browserViews,
     activeTabBySession, activeGlobalTabId,
     activateEditorTab, preferredEditorTabForSession, openEditorTab, createBrowser,
-    closeNativeTab, removeSessionResources, pauseNativePersistence, resumeNativePersistence,
+    closeNativeTab, removeSessionResources, reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   }
 }

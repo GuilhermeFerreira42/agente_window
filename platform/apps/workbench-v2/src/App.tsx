@@ -64,14 +64,13 @@ import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
 import { CenterChangesSlot, CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
-import { reorderEditorTabs, reorderSessions } from './domain/dragAndDrop'
+import { reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
 import { clampSidebarWidth, loadLayoutState, partSizesForSession, saveLayoutState, SIDEBAR_WIDTH_DEFAULT, loadSessionLayouts, saveSessionLayouts } from './domain/layoutPersistence'
 import { captureSessionLayout, forgetSessionLayout, restoreSessionLayout, type SessionLayoutMap } from './domain/sessionLayout'
 import { observableValue, transaction } from './domain/observable'
 import { createLayoutSync } from './domain/sessionLayoutSync'
 import { canSplitMainEditor, createAgentWorkbenchLayout, readSinglePaneSetting } from './domain/agentWorkbenchLayout'
-import { enterDetailOnly, showEditorRestore, EMPTY_DOCKED_STATE, type DockedControllerState } from './domain/dockedAuxiliaryController'
 import { classifyViewport, isPhoneViewport } from './domain/mobileLayout'
 // FATIA 15 Onda 3 (D161): as perguntas de ambiente e a regra do histórico do
 // compositor saíram do App — elas são do DOMÍNIO, não do síndico. A regra do
@@ -437,11 +436,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // ISessionsManagementService — registro de providers (ordem estável) usado
   // para resolver o provider dono de uma nova sessão (R-002).
   const management = useRef(createManagementState(initialProviders))
-  // (R-040) Estado do DockedAuxiliaryBarController: abas capturadas ao entrar em
-  // Detail-only, restauradas ao mostrar o editor de novo.
-  const dockedController = useRef<DockedControllerState>(EMPTY_DOCKED_STATE)
-  // Views de browser capturadas junto com suas abas ao entrar em Detail-only.
-  const capturedBrowserViews = useRef<BrowserViewState[]>([])
   // Flag para pular assertWorkbenchInvariants durante transições atômicas
   // (Hide/Show editor) onde browserViews e editorTabs ficam temporariamente
   // dessincronizados entre renders.
@@ -487,11 +481,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }, [])
   const showActivatedEditor = useCallback(() => setMobilePane('editor'), [])
   const {
-    editorTabs, setEditorTabs, activeTabId, setActiveTabId, browserViews, setBrowserViews,
+    editorTabs, activeTabId, setActiveTabId, browserViews,
     activeGlobalTabId,
     activateEditorTab, preferredEditorTabForSession,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
-    pauseNativePersistence, resumeNativePersistence,
+    reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor, activeSessionId)
 
@@ -865,7 +859,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setSessions((current) => reorderSessions(current, fromId, toId) as Session[])
   }
   const handleReorderEditorTabs = (fromId: string, toId: string) => {
-    setEditorTabs((current) => reorderEditorTabs(current, fromId, toId) as EditorTab[])
+    reorderNativeTabs(fromId, toId)
   }
 
   const completeChatRun = (session: Session, chatId: string): Session => {
@@ -1155,52 +1149,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setEditorHidden((current) => {
       const next = !current
       if (next) {
-        pauseNativePersistence()
-        setEditorTabs((tabs) => {
-          const result = enterDetailOnly(tabs, activeSession.id)
-          dockedController.current = result.state
-          // Browser tabs capturadas levam junto a sua view viva (a ownership
-          // browser-view↔tab é invariante); guardamos as views para restaurar.
-          const capturedBrowserIds = new Set(
-            result.state.captured
-              .map((entry) => entry.tab)
-              .filter((tab) => tab.type === 'browser' && tab.browserId)
-              .map((tab) => tab.browserId as string),
-          )
-          if (capturedBrowserIds.size > 0) {
-            setBrowserViews((views) => {
-              capturedBrowserViews.current = views.filter((view) => capturedBrowserIds.has(view.id))
-              return views.filter((view) => !capturedBrowserIds.has(view.id))
-            })
-          } else {
-            capturedBrowserViews.current = []
-          }
-          if (result.dropped.length > 0) {
-            const dirty = result.dropped.some((tab) => tab.type === 'search')
-            notify(dirty
-              ? 'Editor oculto: abas não-acopladas fechadas (Search descartado)'
-              : 'Editor oculto: abas não-acopladas fechadas')
-          }
-          return result.tabs
+        hideNativeTabs(activeSession.id, (dropped) => {
+          const dirty = dropped.some((tab) => tab.type === 'search')
+          notify(dirty
+            ? 'Editor oculto: abas não-acopladas fechadas (Search descartado)'
+            : 'Editor oculto: abas não-acopladas fechadas')
         })
       } else {
-        resumeNativePersistence()
-        // (R-040) Show Editor: restaura abas E BrowserViews atomicamente.
-        // A ordem importa: abas PRIMEIRO, depois BrowserViews, para que o
-        // invariante "cada BrowserView tem aba" nunca seja violado entre renders.
-        // skipInvariantCheck pula o assert durante a transição.
-        const restoredViews = [...capturedBrowserViews.current]
-        capturedBrowserViews.current = []
+        // Durante o commit React das duas colecoes o invariante pode ver metade
+        // da transicao. O flag do sindico so protege este instante; a memoria e
+        // os BrowserViews capturados vivem agora exclusivamente no hook.
         skipInvariantCheck.current = true
-        setEditorTabs((tabs) => {
-          const result = showEditorRestore(tabs, dockedController.current)
-          dockedController.current = result.state
-          return result.tabs
-        })
-        if (restoredViews.length > 0) {
-          setBrowserViews((views) => [...views, ...restoredViews])
-        }
-        // Reseta a flag no próximo tick (após o render com ambos atualizados).
+        restoreNativeTabs()
         queueMicrotask(() => { skipInvariantCheck.current = false })
       }
       return next

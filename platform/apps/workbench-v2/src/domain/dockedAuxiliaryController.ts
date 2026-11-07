@@ -31,11 +31,12 @@ export function isDockedTab(tab: EditorTab): boolean {
  * Uma aba não-acoplada é restaurável quando pode ser reaberta de forma idêntica
  * ao mostrar o editor novamente. Search editors são untitled/efêmeros no
  * original ("dirty untitled Search editor") → não-restauráveis (descartados).
- * Browser e AI Customizations são restauráveis.
+ * Browser, AI Customizations, Provedores e Configurações são restauráveis.
+ * D151: recolher/expandir preserva todas as abas do visualizador definitivo.
  */
 export function isRestorableTab(tab: EditorTab): boolean {
   if (isDockedTab(tab)) return true
-  return tab.type === 'browser' || tab.type === 'customizations'
+  return tab.type === 'browser' || tab.type === 'customizations' || tab.type === 'providers' || tab.type === 'config'
 }
 
 /** Uma aba capturada para restauração posterior. */

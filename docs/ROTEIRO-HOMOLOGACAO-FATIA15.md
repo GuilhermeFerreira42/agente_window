@@ -367,3 +367,37 @@ D175b só deve ser anotado depois de terminar; o navegador de Provedores/
 Configurações ainda precisa reexecução se a máquina sofrer crash do Chromium.
 E15-d tem inventário próprio em `docs/INVENTARIO-E15-D.md`; a retirada da rede
 de rollback depende da condição D151/status, não se confunde com UI ativa.
+
+---
+
+## Atualização D176 — candidato técnico para o Codex (2026-11-07)
+
+**Esta é a fotografia corrente, substitui ressalvas anteriores de RNF15-2.**
+`App.tsx` **2.582 linhas** (D174 antes: 2.729); nenhuma declaração
+`useState` de abas/BrowserView e nenhum `setEditorTabs`/`setBrowserViews` no
+`App`. O hook único `shell/useFaixaDeAbasNativas.ts` é dono de abertura,
+fechamento, recursos Browser, memória por sessão, reordenação e captura/
+restauração R-040; o `App` só orquestra sessão/layout e porta do módulo.
+**RNF15-2 implementada**, sem confundir com E15-d.
+
+**Correção de continuidade D151:** com Changes (aba acoplada) e Browser,
+Provedores, Configurações e `data.ts` abertos, ocultar o editor deixa
+visíveis Changes/arquivo; mostrar restaura as nativas, e F5 devolve
+as cinco abas. A regra antiga descartava Provedores/Config: ampliada
+`isRestorableTab` após teste vermelho (2 falhas) e rerodada (16/16).
+Playwright real: 5 abas antes/depois do F5, 0 erros JS, split preservado;
+Browser URL restaurada; controles de ocultar/mostrar preservam as abas.
+
+**Última suite completa (após D176): 1.530 testes = 1.498 aprovados,
+0 falhas, 32 pulados, 442 arquivos, exit 0.** Typecheck EXIT 0;
+gate específico do App, controller e persistência: 87/74/0/13.
+O E2E legado isolado `sessao_14b_git_smoke` foi iniciado mas **não terminou**
+em 240s sob pressão de memória; não contá-lo como verde nem falha de código.
+Os fluxos centrais foram executados em Playwright serial no produto real.
+
+**Pendência formal E15-d:** a superfície antiga não aparece no produto, mas
+`AuxiliaryBar`/`AttachArea` ainda existem como rollback; `pendingAttachOpen`
+continua necessário para abertura antes da montagem do centro. A remoção
+física aguarda a condição D151/status (migração validada e homologação da rede
+de rollback). Inventário e procedimento em `docs/INVENTARIO-E15-D.md`.
+**Homologação humana NÃO aprovada.** O Codex deve auditar este candidato antes.
