@@ -237,6 +237,14 @@ describe('CenterCodeEditor — o corpo da aba central (Onda 2b)', () => {
     expect(rotulos('center-save-dialog')).toEqual([ATTACH_STRINGS.save, ATTACH_STRINGS.dontSave, ATTACH_STRINGS.cancel]);
   });
 
+  it('pedido de fechar arquivo limpo fecha imediatamente, sem diálogo nem escrita', () => {
+    const { pedidos, editor, onSave } = montar();
+    act(() => { (pedidos[0] as CenterCloseRequester)({ sessionId: SESSAO, uri: URI }); });
+    expect(editor.getTabs(SESSAO)).toEqual([]);
+    expect(dialogo('center-save-dialog')).toBeNull();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('Não Salvar descarta: a aba sai do modelo mesmo estando suja', async () => {
     const { pedidos, editor, onSave } = montar();
     act(() => { editor.setDirty({ sessionId: SESSAO, uri: URI, dirty: true }); });
@@ -292,6 +300,7 @@ describe('CenterCodeEditor — o corpo da aba central (Onda 2b)', () => {
 
   it('sem onSave o corpo não finge que salvou: não grava, não mostra erro, não fecha', async () => {
     const { pedidos, editor } = montar({ comOnSave: false });
+    act(() => { editor.setDirty({ sessionId: SESSAO, uri: URI, dirty: true }); });
     fireEvent.click(document.querySelector('[data-testid="disparar-ctrl-s"]')!);
     await assentar();
     expect(document.querySelector('[data-testid="erro-de-save"]')).toBeNull();

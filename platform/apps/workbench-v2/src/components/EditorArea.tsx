@@ -448,7 +448,6 @@ export function EditorArea({
   onCloseTab,
   onReorderTabs,
   onNewBrowser,
-  onNewDiff,
   onNewCustomizations,
   customizationsSurface,
   providersSurface,
@@ -662,7 +661,7 @@ export function EditorArea({
         <div className="editor-add-tab-wrap" ref={addTabMenuRef}>
           <button className="editor-tab-add-menu-button" type="button" aria-haspopup="menu" aria-expanded={addTabMenuOpen} aria-label="Adicionar aba do editor" title="Adicionar aba do editor" onClick={() => setAddTabMenuOpen((current) => !current)}><ListPlus size={15} /></button>
           {addTabMenuOpen && <div className="editor-tab-add-menu" role="menu" aria-label="Novas abas do editor">
-            {/* FATIA 15 Onda 3 (D169): saíram daqui "Files" e "Search", e o motivo
+            {/* FATIA 15: Files, Search e Changes usam a barra lateral. O menu
                 é medido, não estético:
                 • "Files" abria uma aba com "Conteúdo indisponível — workspace":
                   um placeholder, nunca um arquivo. O Explorer (Side Bar) é o
@@ -670,10 +669,9 @@ export function EditorArea({
                 • "Search" não abria nada: `openSearch` ativa a view `search` da
                   Side Bar desde a 5.2, e a aba só aparecia vazia por resíduo de
                   restauração — o handler do menu nem chega a criar aba.
-                Ficaram os dois que têm superfície REAL: "Changes" (ChangesPane →
-                GitService, 35 itens medidos) e "Browser" (viewport de verdade).
+                Changes conserva seu painel e estado pela porta existente da
+                barra lateral; Browser conserva sua ação própria.
                 Preservado por decisão de produto: "Personalizações" (SPEC 2H a). */}
-            <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewDiff)}><GitCompareArrows size={13} /><span>Changes</span></button>
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewBrowser)}><Globe2 size={13} /><span>Browser</span></button>
             {/* RNF14-4 / SPEC 2H (a): o rótulo visível é "Personalizações". */}
             <button type="button" role="menuitem" onClick={() => runAddTabAction(onNewCustomizations)}><Blocks size={13} /><span>Personalizações</span></button>
@@ -681,8 +679,8 @@ export function EditorArea({
         </div>
         <div className="editor-toolbar">
           <button className="toolbar-button" type="button" title="Dividir editor" aria-label="Dividir editor" onClick={onSplit}><SplitSquareHorizontal size={14} /></button>
-          <button className="toolbar-button" type="button" title={editorContentVisible ? 'Ocultar editor' : 'Mostrar editor'} aria-label={editorContentVisible ? 'Ocultar editor' : 'Mostrar editor'} aria-pressed={!editorContentVisible} onClick={onToggleEditorHidden}>{editorContentVisible ? <EyeOff size={14} /> : <Eye size={14} />}</button>
           <button className={`toolbar-button${editorMaximized ? ' is-active' : ''}`} type="button" title={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-label={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-pressed={editorMaximized} onClick={onToggleMaximize}>{editorMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
+          <button className="toolbar-button" type="button" title={editorContentVisible ? 'Recolher editor' : 'Mostrar editor'} aria-label={editorContentVisible ? 'Recolher editor' : 'Mostrar editor'} aria-pressed={!editorContentVisible} onClick={onToggleEditorHidden}>{editorContentVisible ? <X size={14} /> : <Eye size={14} />}</button>
         </div>
       </div>
       <div className="editor-body" id={panelId} role="tabpanel" tabIndex={0} aria-labelledby={activeTabDomId} aria-label={!activeTab ? 'Nenhum editor ativo' : undefined}>

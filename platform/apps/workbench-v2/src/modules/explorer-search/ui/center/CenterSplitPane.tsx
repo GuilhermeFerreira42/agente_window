@@ -127,6 +127,7 @@ export function CenterSplitPane({
       )}
       <div className="editor-container">
         <CodeEditorPane
+          key={grupoId}
           editor={editor}
           sessionId={grupoId}
           fs={fs}

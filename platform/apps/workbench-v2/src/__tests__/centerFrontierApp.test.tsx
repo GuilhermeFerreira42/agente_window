@@ -170,25 +170,19 @@ describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => 
     }, { timeout: 5000 })
   })
 
-  it('3. fechar a aba projetada pelo X da faixa abre o diálogo do MÓDULO (requestCloseTab)', async () => {
+  it('3. X atravessa para o módulo e fecha arquivo limpo sem pedir salvamento', async () => {
     render(<App />)
     const mod = await moduloMontado()
     await abrirArquivoNoModulo(mod)
     await waitFor(() => expect(faixa().queryByRole('tab', { name: /a\.ts/ })).toBeTruthy(), { timeout: 10000 })
     fireEvent.click(faixa().getByRole('tab', { name: /a\.ts/ }))
 
-    // O X da faixa é do shell; o diálogo é do módulo. Ele aparecer prova as duas
-    // pontas: o pedido atravessou E o corpo central está montado para atendê-lo.
-    // `setEditorTabs` não é chamado neste caminho (D148 §3) — quem salva ou
-    // descarta é o módulo, nunca o estado do App.
+    await waitFor(() => expect(screen.getByTestId('center-code-editor')).toBeTruthy())
+    // O shell pede e o módulo fecha. A aba não foi editada: não há decisão de
+    // salvamento. Os casos dirty e falha de escrita têm travas no módulo/E2E.
     fireEvent.click(screen.getByLabelText('Fechar a.ts'))
-    await waitFor(() => expect(screen.getByTestId('center-save-dialog')).toBeTruthy(), { timeout: 5000 })
-    expect(screen.getByTestId('center-save-dialog').textContent).toContain('Deseja salvar as alterações feitas em a.ts?')
-
-    // Cancelar não fecha: a aba continua no módulo e na faixa.
-    fireEvent.click(within(screen.getByTestId('center-save-dialog')).getByText('Cancelar'))
-    await waitFor(() => expect(screen.queryByTestId('center-save-dialog')).toBeNull())
-    expect(faixa().queryByRole('tab', { name: /a\.ts/ })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /^a\.ts/ })).toBeNull())
+    expect(screen.queryByTestId('center-save-dialog')).toBeNull()
   })
 
   it('4. o corpo montado no centro é o CenterCodeEditor REAL do módulo', async () => {

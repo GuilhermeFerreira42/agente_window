@@ -166,7 +166,7 @@ describe('R-040 / RF15-4 — reabrir pelo menu apos ocultar nao perde Browser', 
     const user = userEvent.setup()
     const mounted = render(<App initialSessionSnapshot={testSessions} />)
     await abrirBrowser(user)
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
+    await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     await user.click(screen.getByRole('button', { name: 'Conta' }))
     await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
     expect(abas().map(tituloDe)).toContain('Browser')

@@ -759,10 +759,10 @@ describe('App session flows', () => {
     await user.click(addTab)
     expect(screen.queryByRole('menuitem', { name: 'Files' })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Search' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Changes' })).not.toBeInTheDocument()
     await user.keyboard('{Escape}')
 
-    await user.click(addTab)
-    await user.click(screen.getByRole('menuitem', { name: 'Changes' }))
+    await user.click(screen.getByRole('button', { name: 'Abrir alterações no editor' }))
     expect(within(editorPane).getByRole('tab', { name: 'Branch Changes' })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -1426,7 +1426,7 @@ describe('App session flows', () => {
     await openInitialBrowser(user)
 
     // Oculta o editor (detail-only) para provar que a pill o revela de novo.
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
+    await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     expect(screen.getByTestId('editor-hidden-content')).toBeInTheDocument()
 
     // A pill do cabeçalho do chat abre a aba de diff e revela o editor.
@@ -1528,7 +1528,7 @@ describe('App session flows', () => {
     // A sessão inicial já tem uma aba Browser aberta.
     expect(document.querySelector('.editor-tabs')).not.toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
+    await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     // A barra de abas permanece visível (invariante CAT-A4)...
     expect(document.querySelector('.editor-tabs')).not.toBeNull()
     // ...mas o conteúdo do editor é substituído pelo placeholder de oculto.
@@ -1553,7 +1553,7 @@ describe('App session flows', () => {
     expect(screen.getByRole('tab', { name: 'Browser' })).toBeInTheDocument()
 
     // Hide Editor → Detail-only: a Browser (não-acoplada) é fechada, a Changes fica.
-    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
+    await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     expect(screen.queryByRole('tab', { name: 'Browser' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Branch Changes/ })).toBeInTheDocument()
 

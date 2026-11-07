@@ -30,6 +30,7 @@ import { AttachArea, type AttachAreaProps } from './ui/attach/AttachArea';
 import { CenterCodeEditor, type CenterCodeEditorProps, type CenterCloseRequester } from './ui/center/CenterCodeEditor';
 import { ChangesPane } from './ui/attach/changes/ChangesPane';
 import type { CodeEditorPaneApi, CodeEditorPaneProps } from './ui/attach/CodeEditorPane';
+import { disposeModelResources } from './ui/attach/modelResources';
 import { AttachLayoutStore } from './core/attach/attachLayout';
 import { ATTACH_DIFF_URI, EditorService } from './core/editor/editorService';
 import { GitService } from './core/git/gitService';
@@ -243,7 +244,11 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     centerMonaco = ed;
     outlineTracker.attach(ed);
   };
-  const centerProps = (sessionId: string): CenterCodeEditorProps => ({
+  const centerProps = (sessionId: string): CenterCodeEditorProps => {
+    // O unmount anterior é adiado. Sua limpeza só pode retirar o registro que
+    // ele próprio criou, nunca o atendente de um corpo novo da mesma sessão.
+    let registeredRequester: CenterCloseRequester | null = null;
+    return {
     sessionId,
     editor: editorService,
     fs: deps.fs,
@@ -272,11 +277,17 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     onEditorReady: onCenterEditorReady,
     onSave: attachSave,
     onReload: attachReload,
-    // Registra por sessão; o unmount do corpo retira a MESMA chave (o closure
-    // captura o sessionId com que foi criado, então trocar de sessão não deixa
-    // atendente órfão).
-    onCloseRequester: (r) => { if (r) centerCloseRequesters.set(sessionId, r); else centerCloseRequesters.delete(sessionId); },
-  });
+    onCloseRequester: (r) => {
+      if (r) {
+        registeredRequester = r;
+        centerCloseRequesters.set(sessionId, r);
+      } else if (centerCloseRequesters.get(sessionId) === registeredRequester) {
+        centerCloseRequesters.delete(sessionId);
+        registeredRequester = null;
+      }
+    },
+    };
+  };
   // FATIA 15 Onda 2c-ii (D151 §2): a superfície de abas do módulo pode ser a COLUNA
   // (2c-i, sobreposição) ou só o CENTRO (2c-ii, alvo). Enquanto as duas existirem,
   // `attachSessionId` vem primeiro para não mudar nada do que já funcionava; quando a
@@ -619,6 +630,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       offEditor();
       offLayoutMax(); offLayoutVis();
       outlineTracker.dispose(); // 5.6
+      disposeModelResources(editorService);
       editorService.dispose();
       attachLayout.dispose();
       offGitEvents();

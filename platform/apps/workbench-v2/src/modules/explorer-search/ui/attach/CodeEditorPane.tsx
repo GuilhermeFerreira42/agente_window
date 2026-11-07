@@ -25,6 +25,7 @@ import type { FileSystemPortLike, WorkspaceUri } from '../../contract';
 import type { EditorService } from '../../core/editor/editorService';
 import { uriBasename } from '../../core/uri';
 import { useEditorVersion } from './useEditorVersion';
+import { discardModel, modelEntries, modelSession, modelsChanged, onModelsChanged } from './modelResources';
 
 export const ATTACH_MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
   fontSize: 14,
@@ -55,16 +56,6 @@ export function languageFor(monaco: monaco, name: string): string {
 }
 export function currentTheme(): 'vs' | 'vs-dark' {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('theme-light') ? 'vs' : 'vs-dark';
-}
-
-interface Entry {
-  model: Monaco.editor.ITextModel | null;
-  viewState: Monaco.editor.ICodeEditorViewState | null;
-  savedVersionId: number;
-  status: 'loading' | 'text' | 'image' | 'error';
-  error?: string;
-  image?: { dataBase64: string; mime: string };
-  sub?: Monaco.IDisposable;
 }
 
 export interface CodeEditorPaneProps {
@@ -98,12 +89,14 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
   const hostRef = useRef<HTMLDivElement>(null);
   const edRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<monaco | null>(null);
-  const entries = useRef(new Map<WorkspaceUri, Entry>());
+  const entries = useRef(modelEntries(editor, sessionId));
   const currentUri = useRef<WorkspaceUri | null>(null);
   const highlight = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const pendingReveal = useRef<Map<WorkspaceUri, { line: number; column?: number }>>(new Map());
   const [, bump] = useState(0);
   const rerender = () => bump((x) => x + 1);
+  useEffect(() => onModelsChanged(editor, sessionId, rerender), [editor, sessionId]);
+  const ownerGroup = (uri: WorkspaceUri) => editor.groupIdOf(modelSession(sessionId), uri) ?? sessionId;
   /**
    * D157 (dívida da Onda 3): `loadMonaco().then(...)` não tinha `.catch`. Quando o
    * carregamento do Monaco falhava (chunk não encontrado, CSP, worker bloqueado,
@@ -140,25 +133,30 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
           const e = entries.current.get(uri);
           if (!e?.model) return;
           e.savedVersionId = e.model.getAlternativeVersionId();
-          editor.setDirty({ sessionId, uri, dirty: false });
+          editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: false });
         },
         discard: (uri) => disposeEntry(uri),
         reload: (uri, content) => {
           const e = entries.current.get(uri);
           if (!e?.model) return;
-          if (e.model.getValue() === content) { e.savedVersionId = e.model.getAlternativeVersionId(); editor.setDirty({ sessionId, uri, dirty: false }); return; }
+          if (e.model.getValue() === content) { e.savedVersionId = e.model.getAlternativeVersionId(); editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: false }); return; }
           const full = e.model.getFullModelRange();
           e.model.pushEditOperations([], [{ range: full, text: content }], () => null);
           e.savedVersionId = e.model.getAlternativeVersionId();
-          editor.setDirty({ sessionId, uri, dirty: false });
+          editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: false });
         },
         has: (uri) => !!entries.current.get(uri)?.model,
       });
       cleanup = () => {
         clearHl.dispose();
         mo.disconnect();
-        // desmontagem REAL (só no unmountAttach do módulo, nunca ao recolher)
-        for (const uri of [...entries.current.keys()]) disposeEntry(uri);
+        // O layout pode trocar o host React. O modelo/undo pertence ao módulo,
+        // não a esta instância visual. Fechar a aba ou dispose libera o recurso.
+        if (currentUri.current) {
+          const entry = entries.current.get(currentUri.current);
+          if (entry) entry.viewState = ed.saveViewState();
+        }
+        ed.setModel(null);
         ed.dispose();
         edRef.current = null;
       };
@@ -177,15 +175,13 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     const e = entries.current.get(uri);
     if (!e) return;
     if (currentUri.current === uri) { edRef.current?.setModel(null); currentUri.current = null; }
-    e.sub?.dispose();
-    e.model?.dispose();
-    entries.current.delete(uri);
+    discardModel(entries.current, uri);
   };
 
   // ---- fechar aba → descarta modelo; reveal pedido → guarda até o modelo existir ----
   useEffect(() => editor.onEvent((e) => {
     if (!('sessionId' in e) || e.sessionId !== sessionId) return;
-    if (e.type === 'editor.tabClosed') disposeEntry(e.uri);
+    if (e.type === 'editor.tabClosed' && !editor.groupIdOf(modelSession(sessionId), e.uri)) disposeEntry(e.uri);
     if (e.type === 'editor.revealRequested') {
       pendingReveal.current.set(e.uri, { line: e.line, column: e.column });
       applyReveal(e.uri);
@@ -225,32 +221,33 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     if (!entry) {
       entry = { model: null, viewState: null, savedVersionId: 0, status: 'loading' };
       entries.current.set(activeUri, entry);
+      const loadingEntry = entry;
       const uri = activeUri;
       const name = uriBasename(uri);
       void (async () => {
         try {
           if (isImageName(name)) {
             const bin = await fs.readFileBinary({ uri, maxBytes: 8 * 1024 * 1024 });
-            const e = entries.current.get(uri); if (!e) return;
+            const e = entries.current.get(uri); if (e !== loadingEntry) return;
             e.status = 'image'; e.image = bin;
           } else {
             const read = await fs.readFile({ uri });
-            const e = entries.current.get(uri); if (!e) return;
-            const model = monaco.editor.createModel(read.content, languageFor(monaco, name), monaco.Uri.parse(`attach:${sessionId}${uri.replace(/^file:\/\//, '')}`));
+            const e = entries.current.get(uri); if (e !== loadingEntry) return;
+            const model = monaco.editor.createModel(read.content, languageFor(monaco, name), monaco.Uri.parse(`attach:${modelSession(sessionId)}${uri.replace(/^file:\/\//, '')}`));
             e.model = model;
             e.savedVersionId = model.getAlternativeVersionId();
             e.status = 'text';
             e.sub = model.onDidChangeContent(() => {
-              editor.setDirty({ sessionId, uri, dirty: model.getAlternativeVersionId() !== e.savedVersionId });
+              editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: model.getAlternativeVersionId() !== e.savedVersionId });
             });
             // conflito externo (c5): garante watcher na pasta do arquivo (watcher existente, modo lazy)
             void fs.watch?.({ uri: uri.replace(/\/[^/]*$/, '') as WorkspaceUri }).catch(() => undefined);
           }
         } catch (err) {
-          const e = entries.current.get(uri); if (!e) return;
+          const e = entries.current.get(uri); if (e !== loadingEntry) return;
           e.status = 'error'; e.error = err instanceof Error ? err.message : String(err);
         }
-        rerender();
+        modelsChanged(editor, sessionId);
       })();
     }
     currentUri.current = activeUri;

@@ -178,6 +178,25 @@ async function montarTudo(opts: { comAnexo?: boolean; comCentro?: boolean } = {}
 }
 
 describe('Onda 2b — a fábrica roteia salvar/recarregar para o painel que tem a uri', () => {
+  it('limpeza adiada do corpo anterior não retira o fechamento da nova montagem da mesma sessão', async () => {
+    const { mod } = await montarTudo({ comAnexo: false });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // Reproduz fechar a última aba e reabri-la antes do unmount adiado.
+      await act(async () => {
+        mod.unmountCodeEditor?.();
+        mod.mountCodeEditor?.(host(), { sessionId: S });
+      });
+      await act(async () => { vi.runOnlyPendingTimers(); });
+      act(() => { mod.attach.requestCloseTab?.({ sessionId: S, uri: URI_CENTRO }); });
+      expect(mod.attach.getTabs({ sessionId: S }).some((tab) => tab.uri === URI_CENTRO)).toBe(false);
+      expect(document.querySelector('[data-testid="center-save-dialog"]')).toBeNull();
+    } finally {
+      await act(async () => { mod.dispose(); vi.runOnlyPendingTimers(); });
+      vi.useRealTimers();
+    }
+  });
+
   it('mountCodeEditor existe no contrato e monta o corpo central sem criar caixa de layout no host', async () => {
     const { mod, hostCentro } = await montarTudo({ comAnexo: false });
     expect(typeof mod.mountCodeEditor).toBe('function');
@@ -234,15 +253,12 @@ describe('Onda 2b — a fábrica roteia salvar/recarregar para o painel que tem 
     expect(painel('anexo').recarregados).toEqual([]);
   });
 
-  it('attach.requestCloseTab abre o diálogo de salvar do CENTRO e "Não Salvar" fecha a aba', async () => {
+  it('attach.requestCloseTab encaminha ao CENTRO e fecha a aba limpa sem diálogo', async () => {
     const { mod } = await montarTudo({ comAnexo: false });
     expect(typeof mod.attach.requestCloseTab).toBe('function');
     await act(async () => { mod.attach.requestCloseTab?.({ sessionId: S, uri: URI_CENTRO }); });
     const dialogo = document.querySelector('[data-testid="center-save-dialog"]');
-    expect(dialogo).not.toBeNull();
-    const naoSalvar = dialogo?.querySelector<HTMLElement>('[data-button-id="dontSave"]');
-    expect(naoSalvar).not.toBeNull();
-    await act(async () => { naoSalvar?.click(); });
+    expect(dialogo).toBeNull();
     expect(mod.attach.getTabs({ sessionId: S }).map((t) => t.uri)).toEqual([URI_ANEXO]);
   });
 

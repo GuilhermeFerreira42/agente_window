@@ -112,9 +112,15 @@ export function CenterCodeEditor({
   // então o efeito só roda quando o próprio gancho muda.
   useEffect(() => {
     if (!onCloseRequester) return;
-    onCloseRequester((input) => { setDialog({ kind: 'save', uri: input.uri }); });
+    onCloseRequester((input) => {
+      if (input.sessionId !== sessionId) return;
+      // O serviço já decide se há dirty real: fechar limpo é imediato; só a
+      // recusa por alteração pendente precisa da decisão Salvar/Descartar.
+      if (editor.close({ sessionId, uri: input.uri })) return;
+      setDialog({ kind: 'save', uri: input.uri });
+    });
     return () => onCloseRequester(null);
-  }, [onCloseRequester]);
+  }, [editor, sessionId, onCloseRequester]);
 
   const doSave = async (uri: WorkspaceUri): Promise<boolean> => {
     if (!onSave) return false;
@@ -228,6 +234,7 @@ export function CenterCodeEditor({
           </DiffPaneBoundary>
         )}
         <CodeEditorPane
+          key={sessionId}
           editor={editor}
           sessionId={sessionId}
           fs={fs}
