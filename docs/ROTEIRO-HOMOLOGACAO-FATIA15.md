@@ -288,3 +288,35 @@ Se voce quiser DnD, e' escopo novo — me diga e eu abro como requisito proprio.
 **Ponto de recuperacao disponivel.** `recuperacao-2026-11-06/` (bundle 29 MB + operacionais
 5,3 MB, com sha256 no LEIA-ME). Restauracao testada de verdade, nao presumida. **Baixe para
 fora do sandbox** — dentro dele nao protege contra perda do workspace.
+
+---
+
+## Atualização D174 — estado da faixa nativa saiu do App (2026-11-07)
+
+> **Esta seção é a medição atual; números anteriores acima são históricos.**
+> O total cresceu em 7 por causa dos testes de proteção D173, não por falhas.
+
+- `App.tsx`: **2.729 → 2.692 linhas**. O novo
+  `src/shell/useFaixaDeAbasNativas.ts` é o único dono React da lista de abas
+  nativas, da ativa e da memória por sessão/global, MRU e sequência de ids.
+  Ativação e escolha da aba ao voltar para uma sessão também saíram do `App`.
+- **Sem mudança de F5:** arquivos `kind: code` continuam no módulo e reaparecem;
+  abas nativas e diffs não foram transformadas em dados persistidos. A faixa
+  continua fundindo abas do módulo por projeção, nunca por cópia no estado.
+- Gate específico antes **e** depois: **181 testes = 168 aprovados, 0 falhas,
+  13 pulados**, 38 arquivos. Suíte completa após o corte: **1.522 testes =
+  1.490 aprovados, 0 falhas, 32 pulados**, 439 arquivos. `tsc -b --force` EXIT 0.
+- Navegador real: `data.ts` e `types.ts` em painéis separados, 2 abas antes e
+  depois de F5, 0 duplicatas; Outline expandido com 130 itens; maximizar,
+  restaurar, ocultar e reexibir acionados sem perder as duas abas.
+
+**Ainda não assinar RNF15-2 como concluída:** `openEditorTab`, `createBrowser`
+(que mantém `browserViews`), `closeEditorTab` (que libera recursos de browser)
+e limpeza por sessão ainda são orquestrados no `App`. A meta de linhas melhorou,
+mas a responsabilidade de abas ainda não saiu *inteira*. O contrato de migração
+está em `docs/CONTRATO-MIGRACAO-ESTADO-ABAS.md`; nenhum teste foi afrouxado.
+
+**Roteiro humano deste corte:** abra dois arquivos, ative o primeiro; troque de
+sessão e volte, confira a aba lembrada; abra Browser, feche a aba e confira que
+o endereço do Browser desapareceu; use “Abrir ao lado” e recarregue (F5) com
+os dois painéis. Esses passos não substituem a homologação final do dono.

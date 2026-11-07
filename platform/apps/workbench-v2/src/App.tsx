@@ -62,13 +62,14 @@ import {
 import { filterSearchResults } from './domain/search'
 // FATIA 15 Onda 1 (D144 §3.4): a gestão de abas tem DONO NOVO no shell. O App
 // deixa de decidir política de sucessão — ele orquestra e delega.
-import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Aba } from './shell/abas'
+import { colecaoParaEscopo, fecharAba, resolverAbaVisivel, type Aba } from './shell/abas'
 // FATIA 15 (D172 / RNF15-2): a IDENTIDADE da aba (de quem e', qual reusa, qual id
 // nasce) sai do App. Fica no Bairro 1: e' politica de Workbench, sem IA.
 import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba } from './shell/identidadeDaAba'
 // FATIA 15 Onda 2c-i (D148): a ponte que projeta as abas do módulo para a faixa
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
+import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
 import { CenterChangesSlot, CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
@@ -117,7 +118,6 @@ const BOOT_SESSION_ID = 'draft-empty'
 // ativa escondia a barra auxiliar (regra Browser→aux bar oculta) e cobria o
 // Explorer no boot. O estado "sem abas / sem browsers" já é válido (é o que
 // resta ao fechar a aba). Novos browsers vêm de `createBrowser` (botão da UI).
-const initialEditorTabs: EditorTab[] = []
 const initialBrowserViews: BrowserViewState[] = []
 
 // FATIA-05 5.3 (RF-05): a maquete "Changes N" (`initialDiffFiles`/`buildProjectDiffFiles`) foi removida.
@@ -377,8 +377,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // remembered by session instead of leaking between independent workspaces.
   const [checksExpandedBySession, setChecksExpandedBySession] = useState<Record<string, boolean>>({})
   const [expandedFoldersBySession, setExpandedFoldersBySession] = useState<Record<string, Record<string, boolean>>>({})
-  const [editorTabs, setEditorTabs] = useState<EditorTab[]>(initialEditorTabs)
-  const [activeTabId, setActiveTabId] = useState<string | undefined>(initialEditorTabs[0]?.id)
   const [browserViews, setBrowserViews] = useState<BrowserViewState[]>(initialBrowserViews)
   const [searchQuery, setSearchQuery] = useState('menubar')
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
@@ -494,17 +492,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Editor resources are keyed by an explicit monotonic sequence because
   // Date.now() alone can collide when the user creates tabs quickly.
   const browserSequence = useRef(0)
-  const editorTabSequence = useRef(0)
   const browserOrdinalBySession = useRef<Record<string, number>>({})
-  // The reference editor group remembers its active editor while a session is
-  // swapped. Keep that memory for owned tabs and a separate pointer for shared
-  // Search/file tabs that remain visible across sessions.
-  const activeTabBySession = useRef<Record<string, string>>(initialEditorTabs[0] ? { [BOOT_SESSION_ID]: initialEditorTabs[0].id } : {})
-  const activeGlobalTabId = useRef<string | undefined>()
-  // FATIA 15 Onda 1 (D144 §3.1): ordem de uso das abas, mais recente primeiro. É o
-  // que decide a sucessão ao fechar — MRU, como o VS Code, no lugar da vizinha da
-  // direita. Vive em ref porque é ordem de uso, não estado renderizável.
-  const mruRef = useRef<readonly string[]>([])
+  // D174: a faixa NATIVA tem um unico dono de estado/memoria no shell. O App
+  // segue orquestrando recursos de browser e a porta do modulo (sem copia das abas).
+  const activateModuleTab = useCallback((sessionId: string, uri: string) => {
+    explorerModuleRef.current?.attach.activateTab?.({ sessionId, uri: uri as WorkspaceUri })
+  }, [])
+  const showActivatedEditor = useCallback(() => setMobilePane('editor'), [])
+  const {
+    editorTabs, setEditorTabs, activeTabId, setActiveTabId,
+    activeTabBySession, activeGlobalTabId, mruRef, editorTabSequence,
+    activateEditorTab, preferredEditorTabForSession,
+  } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor)
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
   // tela cheia que esconde as laterais, mantemos o shell montado e usamos uma
@@ -723,42 +722,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     } catch {
       // Clipboard is optional in a sandboxed preview.
     }
-  }
-
-  const activateEditorTab = useCallback((tab: EditorTab | undefined) => {
-    if (!tab) {
-      setActiveTabId(undefined)
-      return
-    }
-    // Onda 2c-i (D148 §3): aba de fronteira — além de marcar a ativa no shell, é
-    // preciso dizer ao MÓDULO que aquela uri é a ativa, porque é o EditorService dele
-    // que decide o que o corpo central mostra. `activate` ignora uri que não está no
-    // grupo da sessão, então o shell não tem como forçar estado que o modelo não tem.
-    const partes = dividirIdDoModulo(tab.id)
-    if (partes) {
-      explorerModuleRef.current?.attach.activateTab?.({ sessionId: partes.sessionId, uri: partes.uri as WorkspaceUri })
-    }
-    setActiveTabId(tab.id)
-    setMobilePane('editor')
-    mruRef.current = registrarUso(mruRef.current, tab.id)
-    if (tab.sessionId) {
-      activeTabBySession.current[tab.sessionId] = tab.id
-    } else {
-      activeGlobalTabId.current = tab.id
-    }
-  }, [])
-
-  const preferredEditorTabForSession = (allTabs: readonly EditorTab[], sessionId: string, requestedId?: string): EditorTab | undefined => {
-    const visibleTabs = getEditorTabsVisibleForSession(allTabs, sessionId)
-    const requested = visibleTabs.find((tab) => tab.id === requestedId)
-    const remembered = visibleTabs.find((tab) => tab.id === activeTabBySession.current[sessionId])
-    // Prefer the target session's remembered editor when it has one. Shared
-    // Search/file tabs stay in the collection and become the fallback when the
-    // target session has no remembered owned editor.
-    if (remembered) return remembered
-    if (requested && !requested.sessionId) return requested
-    const rememberedGlobal = visibleTabs.find((tab) => tab.id === activeGlobalTabId.current)
-    return requested ?? rememberedGlobal ?? visibleTabs[0]
   }
 
   const selectSession = (id: string) => {
