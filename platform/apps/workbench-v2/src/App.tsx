@@ -63,6 +63,9 @@ import { filterSearchResults } from './domain/search'
 // FATIA 15 Onda 1 (D144 §3.4): a gestão de abas tem DONO NOVO no shell. O App
 // deixa de decidir política de sucessão — ele orquestra e delega.
 import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel, type Aba } from './shell/abas'
+// FATIA 15 (D172 / RNF15-2): a IDENTIDADE da aba (de quem e', qual reusa, qual id
+// nasce) sai do App. Fica no Bairro 1: e' politica de Workbench, sem IA.
+import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba } from './shell/identidadeDaAba'
 // FATIA 15 Onda 2c-i (D148): a ponte que projeta as abas do módulo para a faixa
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
@@ -1097,22 +1100,24 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   }
 
   const openEditorTab = useCallback((type: EditorTab['type'], options: { title: string; path?: string; sessionId?: string; content?: string; isRealFile?: boolean; imagePreview?: EditorTab['imagePreview']; readError?: string } = { title: type }) => {
-    const ownerSessionId = options.sessionId ?? (type === 'browser' || type === 'diff' ? activeSession.id : undefined)
-    // For real files with content, don't reuse tab unless same path and same content - allow update
-    const existing = editorTabs.find((tab) => tab.type === type
-      && (type !== 'file' || tab.path === options.path)
-      && (!ownerSessionId || tab.sessionId === ownerSessionId))
+    // D172: o App nao decide mais QUEM e' a aba. Ele pergunta ao shell.
+    //   sessaoDonaDaAba  -> de quem e' (regra por tipo)
+    //   abaExistentePara -> da' para reusar?
+    //   idDeAbaNova      -> qual id nasce
+    const pedido = { type, ...options }
+    const existing = abaExistentePara(editorTabs, pedido, activeSession.id)
     if (existing) {
-      // If real file with new content, update it; readError também atualiza a
-      // aba existente (content ↔ readError são mutuamente exclusivos: o novo
-      // estado sempre substitui o anterior — nunca mock/placeholder residual).
-      if (options.readError || (options.content && existing.content !== options.content)) {
-        setEditorTabs((current) => current.map((t) => t.id === existing.id ? { ...t, content: options.content, readError: options.readError, isRealFile: options.isRealFile ?? t.isRealFile } : t))
+      // content ↔ readError sao mutuamente exclusivos: o estado novo sempre
+      // substitui o anterior, nunca fica mock/placeholder residual. O shell diz
+      // SE ha o que reescrever (undefined = nada muda = nenhum setState).
+      const atualizacao = atualizacaoDeAbaReusada(existing, pedido)
+      if (atualizacao) {
+        setEditorTabs((current) => current.map((t) => t.id === existing.id ? { ...t, ...atualizacao } : t))
       }
       activateEditorTab(existing)
       return
     }
-    const tab: EditorTab = { id: `${type}-${Date.now()}-${editorTabSequence.current++}`, type, title: options.title, path: options.path, sessionId: ownerSessionId, content: options.content, isRealFile: options.isRealFile ?? (!!options.content || !!options.imagePreview), imagePreview: options.imagePreview, readError: options.readError }
+    const tab: EditorTab = montarAba(pedido, activeSession.id, idDeAbaNova(type, Date.now(), editorTabSequence.current++))
     setEditorTabs((current) => [...current, tab])
     activateEditorTab(tab)
   }, [activeSession.id, activateEditorTab, editorTabs])
