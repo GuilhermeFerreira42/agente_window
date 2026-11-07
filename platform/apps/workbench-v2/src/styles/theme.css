@@ -98,6 +98,9 @@
   --vscode-icon-foreground: #cccccc;
   --vscode-menu-background: #252526;
   --vscode-quickInput-background: #222222;
+  --vscode-quickInput-foreground: #cccccc;
+  --vscode-quickInputList-focusBackground: #04395e;
+  --vscode-quickInputList-focusForeground: #ffffff;
   --vscode-menu-border: #454545;
   --vscode-menu-foreground: #cccccc;
   --vscode-panelTitle-activeBorder: #0078d4;
@@ -340,6 +343,9 @@
   --vscode-icon-foreground: #3b3b3b;
   --vscode-menu-background: #f3f3f3;
   --vscode-quickInput-background: #f3f3f3;
+  --vscode-quickInput-foreground: #3b3b3b;
+  --vscode-quickInputList-focusBackground: #c4d9f1;
+  --vscode-quickInputList-focusForeground: #000000;
   --vscode-menu-border: #cecece;
   --vscode-menu-foreground: #3b3b3b;
   --vscode-panelTitle-activeBorder: #0078d4;

@@ -77,7 +77,12 @@ describe('P7.3 icon and label contracts', () => {
     }
     // Command Center pill expõe o nome equivalente a "Show Sessions" da referência.
     expect(titlebarSource).toContain('aria-label="Mostrar sessões"')
-    expect(titlebarSource).toContain('title="Mostrar sessões"')
+    // O tooltip deste botao NAO repete o rotulo: ele mostra o titulo da sessao
+    // ativa (title={activeSession.title}). Isso e' deliberado — o rotulo acessivel
+    // continua "Mostrar sessões" (aria-label acima), mas o tooltip carrega
+    // informacao util. O contrato P7.3 cobra paridade de aria-label/title nos
+    // controles de icone do titlebar; este e' a excecao medida, nao um esquecimento.
+    expect(titlebarSource).toContain('title={activeSession.title}')
   })
 
   // FATIA-05 5.3 (decisão A — D2.60): afirmava o markup da maquete "Checks"/"Changes N" da AuxiliaryBar, removida na 5.3. Pulado.

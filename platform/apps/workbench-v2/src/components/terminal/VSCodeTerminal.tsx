@@ -126,7 +126,7 @@ function buildXtermTheme() {
   };
 }
 
-export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, workspace, onClose }: Props) {
+export function VSCodeTerminal({ visible, sessionId: workbenchSessionId, workspace, onClose }: Props) {
   let terminalSessions: any = { sessions: {}, closeSession: () => {} };
   try {
     terminalSessions = useTerminalSessions();
@@ -601,7 +601,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
       ws.close();
       wsRef.current = null;
     };
-  }, [_workbenchSessionId]);
+  }, [workbenchSessionId]);
 
   // Montagem do xterm
   const mountTerminal = useCallback(
@@ -870,7 +870,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
   const activeGroup = activeId ? groups.find((g) => g.terminalIds.includes(activeId)) ?? groups[0] : groups[0];
 
   const activeInstance = instances.find((i) => i.id === activeId) ?? instances[0];
-  const activeSession = terminalSessions.sessions[activeId ?? (_workbenchSessionId + ":0")];
+  const activeSession = terminalSessions.sessions[activeId ?? (workbenchSessionId + ":0")];
   const ptyStatus = activeInstance?.status ?? (instances.length > 0 ? 'open' : 'connecting');
   const ptyPid = activeInstance?.pid ? String(activeInstance.pid) : activeInstance?.id ?? '';
   const ptyShellPath = availableProfiles.find((p) => p.id === activeInstance?.shell)?.path ?? activeInstance?.shell ?? '';
@@ -879,6 +879,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
     <section
       className={`terminal-panel is-vscode-faithful ${maximized ? 'is-maximized' : ''}`}
       aria-label="Painel Inferior"
+      data-session-id={workbenchSessionId}
       data-pty-status={ptyStatus}
       data-pty-pid={String(activeSession?.pid ?? activeInstance?.pid ?? ptyPid)}
       data-pty-shell-path={ptyShellPath}
@@ -938,7 +939,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
         }}
       >
         {/* Abas esquerdas: Problemas | Saída | Console de Depuração | Terminal | Portas */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div role="tablist" aria-label="Abas do painel" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {[
             { id: 'problems' as TabType, label: 'Problemas', badge: problems.length },
             { id: 'output' as TabType, label: 'Saída' },
@@ -952,6 +953,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                 key={tab.id}
                 role="tab"
                 aria-selected={isTabActive}
+                aria-label={tab.label}
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (tab.id === 'terminal') {
@@ -1187,7 +1189,7 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
           </button>
 
           {/* Botão Fechar Painel (X) — para teste T4 */}
-          <button onClick={() => { terminalSessions.closeSession(_workbenchSessionId + ":0"); onClose(); }} title="Fechar painel" aria-label="Fechar terminal" style={iconBtnStyle}>
+          <button onClick={() => { terminalSessions.closeSession(workbenchSessionId + ":0"); onClose(); }} title="Fechar painel" aria-label="Fechar terminal" style={iconBtnStyle}>
             <X size={14} />
           </button>
         </div>
@@ -1463,6 +1465,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
               <div
                 data-testid="terminal-tabs-sidebar"
                 className="terminal-tabs-sidebar"
+                role="tablist"
+                aria-label="Terminais abertos"
+                aria-orientation="vertical"
                 style={{
                   width: `${sidebarWidth}px`,
                   minWidth: '90px',
@@ -1557,6 +1562,9 @@ export function VSCodeTerminal({ visible, sessionId: _workbenchSessionId, worksp
                           setDragOverId(null);
                         }}
                         onClick={() => setActiveId(inst.id)}
+                        role="tab"
+                        aria-selected={isActive}
+                        aria-label={`Terminal ${inst.shell}`}
                         className="terminal-tab-item"
                         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = '#2a2d2e'; }}
                         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}

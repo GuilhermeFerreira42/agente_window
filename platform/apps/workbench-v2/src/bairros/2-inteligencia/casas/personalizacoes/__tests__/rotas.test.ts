@@ -57,16 +57,29 @@ function json(res: ResFalsa): unknown {
 let pasta: string
 let deps: DependenciasPersonalizacoes
 let raizSessao: string
+let homeAntes: string | undefined
 
+// Os testes DESTE arquivo criam a skill `usuario:commit` (e o teste do POST prova
+// que ela aparece no GET seguinte). As skills de usuario moram em
+// `homedir()/.agente_window/skills`, ou seja: sem isolar o HOME, o arquivo grava
+// no perfil real e o PRIMEIRO teste — que espera visao limpa — passa a depender da
+// ordem e do historico da maquina. Medido em 2026-11-06: com HOME reaproveitado
+// entre rodadas, 3 testes falhavam; com HOME isolado por teste, 30/30.
+// A hermetizacao mora aqui, e nao so no script do gate, porque o arquivo precisa
+// ser correto rodando sozinho tambem.
 beforeEach(async () => {
   pasta = await mkdtemp(join(tmpdir(), 'perso-rotas-'))
   raizSessao = await mkdtemp(join(tmpdir(), 'perso-sessao-'))
   process.env.AGENTE_WINDOW_PERSONALIZACOES_PATH = join(pasta, 'personalizacoes.json')
+  homeAntes = process.env.HOME
+  process.env.HOME = pasta
   deps = {}
 })
 
 afterEach(async () => {
   delete process.env.AGENTE_WINDOW_PERSONALIZACOES_PATH
+  if (homeAntes === undefined) delete process.env.HOME
+  else process.env.HOME = homeAntes
   await rm(pasta, { recursive: true, force: true })
   await rm(raizSessao, { recursive: true, force: true })
 })

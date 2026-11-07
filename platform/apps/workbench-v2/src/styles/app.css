@@ -4836,7 +4836,7 @@ svg {
 .session-landing-manual-toggle { margin-left: 8px; border: 0; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; text-decoration: underline; }
 .session-landing-manual-path { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 8px; }
 .session-landing-manual-path input { min-width: 0; padding: 7px 8px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-widget-border)); }
-.session-landing-manual-path input:focus { outline: 1px solid var(--vscode-focusBorder); }
+.session-landing-manual-path input:focus { outline: var(--vscode-strokeThickness) solid var(--vscode-focusBorder); }
 .session-landing-manual-path button { padding: 6px 10px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: 0; border-radius: 2px; }
 .session-landing-manual-path [role='alert'] { grid-column: 1 / -1; color: var(--vscode-errorForeground); font-size: 11px; }
 .session-landing-path-combobox { position: relative; min-width: 0; }

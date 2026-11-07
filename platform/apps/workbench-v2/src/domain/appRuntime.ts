@@ -10,7 +10,7 @@
 // nenhuma delas tinha teste próprio — o que muda agora, porque testar uma função
 // de domínio é barato e testar através do App inteiro não é.
 // ============================================================================
-import type { ModoAgir } from '../bairros/2-inteligencia/casas/agir/contract'
+import type { ModoAgir } from '../bairros/2-inteligencia/casas/agir'
 import { classifyViewport } from './mobileLayout'
 
 /** Guarda de tipo do modo do compositor. Estreita `unknown` (vindo do storage)
