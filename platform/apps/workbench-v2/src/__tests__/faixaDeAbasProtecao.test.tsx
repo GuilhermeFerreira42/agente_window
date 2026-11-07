@@ -161,8 +161,36 @@ describe('P5/P8 — recursos de browser acompanham a aba', () => {
   })
 })
 
+describe('R-040 / RF15-4 — reabrir pelo menu apos ocultar nao perde Browser', () => {
+  it('ocultar Browser, abrir Provedores e remontar preserva AMBAS as abas', async () => {
+    const user = userEvent.setup()
+    const mounted = render(<App initialSessionSnapshot={testSessions} />)
+    await abrirBrowser(user)
+    await user.click(screen.getByRole('button', { name: 'Ocultar editor' }))
+    await user.click(screen.getByRole('button', { name: 'Conta' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
+    expect(abas().map(tituloDe)).toContain('Browser')
+    expect(abas().map(tituloDe)).toContain('Provedores')
+    mounted.unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    expect(abas().map(tituloDe)).toContain('Browser')
+    expect(abas().map(tituloDe)).toContain('Provedores')
+  })
+})
+
 describe('P10 — o que o F5 realmente preserva (comportamento MEDIDO, nao suposto)', () => {
-  it('remontar o App (F5) descarta Browser nativo e preserva a sessao ativa', async () => {
+  it('RF15-4: Provedores continua como aba nativa apos F5', async () => {
+    const user = userEvent.setup()
+    const mounted = render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getByRole('button', { name: 'Conta' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
+    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(true)
+    mounted.unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(true)
+  })
+
+  it('RF15-4: remontar o App (F5) restaura Browser nativo e preserva a sessao ativa', async () => {
     const user = userEvent.setup()
     const mounted = render(<App initialSessionSnapshot={testSessions} />)
     await abrirBrowser(user)
@@ -172,7 +200,9 @@ describe('P10 — o que o F5 realmente preserva (comportamento MEDIDO, nao supos
 
     mounted.unmount()
     render(<App initialSessionSnapshot={testSessions} />)
-    expect(abas()).toHaveLength(0)
+    expect(abas()).toHaveLength(1)
+    expect(abas()[0]).toHaveAttribute('data-browser-id')
+    expect(screen.getByRole('textbox', { name: 'Endereço' })).toHaveValue('https://agents.local/sessions/s1')
     expect(window.localStorage.getItem('workbench.sessions.active.v1')).toBe(sessionBefore)
   })
 
@@ -183,10 +213,9 @@ describe('P10 — o que o F5 realmente preserva (comportamento MEDIDO, nao supos
 
     // Documenta o contrato de persistencia que a migracao NAO pode quebrar.
     expect(window.localStorage.getItem('workbench.sessions.active.v1')).toBeTruthy()
-    // As abas NATIVAS nao sao persistidas hoje (initialEditorTabs = []), e este
-    // teste trava esse fato para que a migracao nao o mude por acidente. Se o
-    // dono decidir que as nativas devem voltar no F5, este teste muda junto com
-    // a decisao — e nao em silencio no meio de uma refatoracao.
+    // RF15-4/D151: a faixa nativa reconstituivel agora persiste em chave
+    // PROPRIA; nao escrever em chaves antigas nem na do modulo.
+    expect(window.localStorage.getItem('workbench.nativeTabs.v1')).toContain('"browser"')
     expect(window.localStorage.getItem('workbench.editorTabs.v1')).toBeNull()
   })
 })

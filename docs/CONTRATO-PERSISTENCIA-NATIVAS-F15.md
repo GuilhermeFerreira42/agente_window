@@ -1,0 +1,11 @@
+# Contrato executável — F5 das abas nativas (RF15-4 / D151)
+
+**Escopo aprovado:** SPEC 2I exige “F5 restaura abas e modos”; D151 reforça que Configurações, Provedores e Browser coexistem no contêiner central e preservam estado ao expandir/recolher. D173 mediu que apenas `kind: code` voltava: a falta de nativas é lacuna funcional, não pretexto para interromper.
+
+**Dono único:** `shell/useFaixaDeAbasNativas` detém abas nativas, BrowserViews e memória por sessão; `shell/persistenciaNativas` apenas serializa dados validados no `localStorage`, não mantém estado React. O módulo continua dono de `kind: code` e `workbench.attachTabs.v1`. Chave nova `workbench.nativeTabs.v1`; jamais reescrever a chave do módulo.
+
+**Política:** persistir apenas abas nativas reconstituíveis (`browser`, `providers`, `config`, `diff`, `customizations`) e BrowserViews correspondentes. Não serializar conteúdo editável, imagem base64, arquivo mock ou busca transitória. Browser restaura URL/histórico/viewport e reinicia status como `loading`; views órfãs e tabs de sessões removidas não podem aparecer no produto. Abas de arquivo do módulo continuam restauradas por `restoreAttachTabs`; diff de arquivo com payload não é ressuscitado do JSON. `activeTabId`, memória global/por sessão e ordem das nativas são restaurados sem forçar ativação do módulo.
+
+**Proteções antes da implementação:** teste App real remonta, prova Browser/Provedores e sessão ativa; teste de serialização valida JSON malformado, versão desconhecida, tabs/views órfãs, perda de storage e payload não permitido. Gate antes/depois da fronteira e Playwright com dois painéis, Browser e F5; regressão completa. Não adaptar teste verde silenciosamente: a expectativa antiga “Browser desaparece” foi um retrato do defeito; a mudança de expectativa é explícita e vinculada a RF15-4.
+
+**Limite conhecido:** o modo “editor oculto” captura Browser no controlador transitório R-040. Enquanto oculto, o snapshot anterior deve permanecer intacto; após reexibir, a persistência volta a refletir o estado restaurado. A implementação não deve gravar o estado transitório (sem abas) por engano. `localStorage` pode falhar em modo privado: app continua funcionando sem F5, como antes.

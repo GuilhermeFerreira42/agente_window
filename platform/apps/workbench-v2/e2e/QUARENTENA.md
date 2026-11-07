@@ -73,3 +73,24 @@ sh platform/scripts/e2e-isolado.sh e2e/<spec>.spec.ts
 Motivo em `D167`: rodar `playwright test` direto grava no banco REAL do usuário
 (`~/.agente_window/agente_window.db`) — já criou sessão apontando para `/tmp` apagado e deixou
 o produto com árvore vazia.
+
+## Auditoria D175b — classificação para a transferência ao Codex
+
+Esta atualização não transforma skips em verde nem reescreve os specs para "passar".
+Após D151, a referência de layout viva é o **centro**: testes que fazem assert
+sobre `.auxiliary-bar`/`.explorer-attach-area`/sash à direita são **obsoletos
+quanto à superfície**; a capacidade em si continua exigida e precisa de teste
+novo contra `EditorArea`/`CenterCodeEditor`. O teste
+`sessao_14b_git_smoke.spec.ts` não usa essa expectativa e segue **aplicável**.
+Os casos parciais (`sessao_13_search`: 4 passavam/10 falhavam) e os que não
+terminaram (`sessao_12_explorer`, `sessao_15_editor_maximize`) **não** são
+classificados como 100% obsoletos: isolar cada caso é tarefa de auditoria
+independente, sem mudar a expectativa de produto. A suíte unitária integral
+não executa specs E2E; os números 1.523/1.491/0/32 de D175 medem **unitários**,
+não substituem E2E. Ferramenta canônica: `platform/scripts/e2e-isolado.sh`.
+
+A cobertura viva ampliada após D175b inclui remount no **App real** de Browser
+e Provedores, gate de `persistenciaNativas` (JSON malformado, versões, views órfãs,
+sem content de arquivo), Playwright com dois painéis + F5 e Browser oculto + F5.
+Ainda precisa de validação E2E independente de Configurações/Provedores na mesma
+sessão com arquivo modificado; isso não pode ser promovido a "verde" por esta nota.

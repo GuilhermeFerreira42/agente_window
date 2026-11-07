@@ -320,3 +320,50 @@ está em `docs/CONTRATO-MIGRACAO-ESTADO-ABAS.md`; nenhum teste foi afrouxado.
 sessão e volte, confira a aba lembrada; abra Browser, feche a aba e confira que
 o endereço do Browser desapareceu; use “Abrir ao lado” e recarregue (F5) com
 os dois painéis. Esses passos não substituem a homologação final do dono.
+
+---
+
+## Atualização D175/D175b — gestão das nativas e F5 (2026-11-07)
+
+> Esta seção substitui a frase anterior “abas nativas não voltam após F5”.
+> Aquela era uma **medição do defeito antes da implementação**, não o aceite da
+> SPEC 2I. RF15-4 e D151 exigem restauração de abas no visualizador unificado.
+
+**Corte D175:** abertura/reutilização, criação de Browser, navegação da view,
+fechamento com sucessora MRU, liberação do BrowserView e limpeza por sessão
+passaram ao mesmo hook do shell que já possuía o estado D174. `App.tsx` ficou
+com a guarda `CannotClose` da superfície, a porta do módulo e a orquestração
+de sessões/layout. `App.tsx`: **2.692 → 2.611 linhas**. Antes do corte, gate
+181/168/0/13; depois, 182/169/0/13 (um teste novo de remount que fotografava
+o comportamento antigo). Navegador: dois Browsers, fechar um remove sua view,
+sem erros JS; arquivos em split e Outline sobreviveram ao F5.
+
+**RF15-4 / D175b:** `shell/persistenciaNativas.ts` grava, em chave própria
+`workbench.nativeTabs.v1`, somente abas reconstituíveis (Browser, Provedores,
+Configurações, Branch Changes e Personalizações), com a view Browser e suas
+preferências. Não grava conteúdo de arquivo, dados-base64 ou estado do Monaco.
+Arquivos `kind: code` seguem sendo restaurados **pelo módulo**, sem espelhar
+esse estado no hook. Ao ocultar o editor (R-040), o snapshot não é sobrescrito
+pela coleção temporariamente capturada. Testes escritos antes: a expectativa
+nova de Browser após F5 falhou contra o código antigo, como deveria; após a
+implementação, passou. Navegador: Browser volta com URL, mesmo após
+ocultar → F5 → mostrar; split de arquivos se mantém, zero erros JS.
+
+**Roteiro corrente para o dono/Codex:**
+1. Abra `data.ts` e `types.ts` em painéis distintos; F5 deve devolver os dois
+   painéis, sem duplicar abas. Edite e use Ctrl+S; confira o disco.
+2. Abra Browser, Provedores e Configurações como abas do mesmo contêiner.
+   Troque entre elas e um arquivo; F5 deve devolver as abas reconstituíveis.
+3. Em Browser, navegue, volte/avance; abra um segundo, feche-o e veja que a
+   view correspondente desapareceu. F5 deve manter apenas o primeiro.
+4. Com Browser aberto, oculte o editor, pressione F5 e reexiba: Browser não
+   deve sumir. Repita com centro maximizado e restaurado.
+5. Abra Outline, alterne sessão, volte e confira seleção/aba lembrada; feche
+   arquivo não salvo e teste Cancelar, Não salvar e Salvar.
+
+**Limites a declarar:** diff de arquivo com payload, busca transitória e conteúdo
+não salvo não são serializados como aba nativa. O resultado do gate integral
+D175b só deve ser anotado depois de terminar; o navegador de Provedores/
+Configurações ainda precisa reexecução se a máquina sofrer crash do Chromium.
+E15-d tem inventário próprio em `docs/INVENTARIO-E15-D.md`; a retirada da rede
+de rollback depende da condição D151/status, não se confunde com UI ativa.

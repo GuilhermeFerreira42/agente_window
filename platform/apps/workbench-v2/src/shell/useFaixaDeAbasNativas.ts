@@ -2,7 +2,7 @@
 // As abas do modulo NAO entram aqui: o modulo continua dono delas; a fusao
 // ocorre so no derivado `fundirAbas`. Nenhum localStorage novo: a persistencia
 // do modulo continua em persistenciaDeAbas (somente kind: code).
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BrowserViewState, BrowserViewport, EditorTab } from '../types'
 import {
   getBrowserViewsForSession, getEditorTabsVisibleForSession,
@@ -17,22 +17,41 @@ import {
 import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel } from './abas'
 import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba, type PedidoDeAba } from './identidadeDaAba'
 import { dividirIdDoModulo } from './ponteAnexo'
+import { lerSnapshotNativas, salvarSnapshotNativas } from './persistenciaNativas'
 
 export function useFaixaDeAbasNativas(
   onActivateModuleTab: (sessionId: string, uri: string) => void,
   onShowEditor: () => void,
+  currentSessionId: string,
 ) {
-  // A colecao nascia vazia no App original. Alterar o F5 das abas nativas
-  // seria funcionalidade nova, nao parte desta migracao de responsabilidade.
-  const [editorTabs, setEditorTabs] = useState<EditorTab[]>([])
-  const [activeTabId, setActiveTabId] = useState<string | undefined>()
-  const [browserViews, setBrowserViews] = useState<BrowserViewState[]>([])
-  const activeTabBySession = useRef<Record<string, string>>({})
-  const activeGlobalTabId = useRef<string | undefined>()
+  // D175b: snapshot e dado de boot, NAO e' segundo estado. A fonte viva segue
+  // sendo so este hook. `code` e diffs do modulo continuam fora deste snapshot.
+  const [initial] = useState(lerSnapshotNativas)
+  const [editorTabs, setEditorTabs] = useState<EditorTab[]>(initial.tabs)
+  const [activeTabId, setActiveTabId] = useState<string | undefined>(
+    initial.activeBySession[currentSessionId] ?? initial.activeTabId,
+  )
+  const [browserViews, setBrowserViews] = useState<BrowserViewState[]>(initial.browserViews)
+  const activeTabBySession = useRef<Record<string, string>>(initial.activeBySession)
+  const activeGlobalTabId = useRef<string | undefined>(initial.activeGlobalTabId)
   const mruRef = useRef<readonly string[]>([])
   const editorTabSequence = useRef(0)
   const browserSequence = useRef(0)
-  const browserOrdinalBySession = useRef<Record<string, number>>({})
+  const browserOrdinalBySession = useRef<Record<string, number>>(initial.ordinalBySession)
+  // R-040 captura temporariamente BrowserViews e abas ao ocultar o editor. Nao
+  // escrever esse estado transitorio no storage; F5 no modo oculto nao as perde.
+  const persistencePaused = useRef(false)
+  const pauseNativePersistence = () => { persistencePaused.current = true }
+  const resumeNativePersistence = () => { persistencePaused.current = false }
+  useEffect(() => {
+    if (persistencePaused.current) return
+    salvarSnapshotNativas({
+      tabs: editorTabs, browserViews, activeTabId,
+      activeBySession: activeTabBySession.current,
+      activeGlobalTabId: activeGlobalTabId.current,
+      ordinalBySession: browserOrdinalBySession.current,
+    })
+  }, [editorTabs, browserViews, activeTabId, currentSessionId])
 
   const activateEditorTab = useCallback((tab: EditorTab | undefined) => {
     if (!tab) {
@@ -129,7 +148,7 @@ export function useFaixaDeAbasNativas(
     editorTabs, setEditorTabs, activeTabId, setActiveTabId, browserViews, setBrowserViews,
     activeTabBySession, activeGlobalTabId,
     activateEditorTab, preferredEditorTabForSession, openEditorTab, createBrowser,
-    closeNativeTab, removeSessionResources,
+    closeNativeTab, removeSessionResources, pauseNativePersistence, resumeNativePersistence,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   }
 }

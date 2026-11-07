@@ -491,8 +491,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     activeGlobalTabId,
     activateEditorTab, preferredEditorTabForSession,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
+    pauseNativePersistence, resumeNativePersistence,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
-  } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor)
+  } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor, activeSessionId)
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
   // tela cheia que esconde as laterais, mantemos o shell montado e usamos uma
@@ -1054,7 +1055,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // O modo preview (clique simples substitui, itálico) continua disponível pela API `attach.open` sem `pinned` (T6 da 14).
   handleExplorerFileOpenedRef.current = (uri: WorkspaceUri) => {
     setExplorerContextMenu(null)
-    setEditorHidden(false) // pós-11: clique no Explorer REEXIBE o editor (era o "não abre")
+    revealEditor() // pós-11: clique no Explorer REEXIBE o editor (era o "não abre")
     void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
   }
 
@@ -1068,11 +1069,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const openProviders = () => {
     openEditorTab('providers', { title: 'Provedores' })
-    setEditorHidden(false)
+    revealEditor()
   }
   const openConfig = () => {
     openEditorTab('config', { title: 'Configurações' })
-    setEditorHidden(false)
+    revealEditor()
   }
   // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
   // menu "+" ativam a view `search` (sem alternar) e pedem foco ao módulo. A aba "Search"
@@ -1090,7 +1091,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setAuxiliaryTab('changes')
     // (E10/R-083) A Changes pill revela explicitamente o editor mesmo se o side
     // pane estava fechado ou em detail-only — nunca apenas ativa a aba.
-    setEditorHidden(false)
+    revealEditor()
   }
 
   // (R-092) AI Customizations é uma CUSTOM VIEW full-surface, não uma aba:
@@ -1154,6 +1155,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setEditorHidden((current) => {
       const next = !current
       if (next) {
+        pauseNativePersistence()
         setEditorTabs((tabs) => {
           const result = enterDetailOnly(tabs, activeSession.id)
           dockedController.current = result.state
@@ -1182,6 +1184,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           return result.tabs
         })
       } else {
+        resumeNativePersistence()
         // (R-040) Show Editor: restaura abas E BrowserViews atomicamente.
         // A ordem importa: abas PRIMEIRO, depois BrowserViews, para que o
         // invariante "cada BrowserView tem aba" nunca seja violado entre renders.
@@ -1203,6 +1206,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       return next
     })
   }, [activeSession.id])
+
+  // R-040: revelar pelo Explorer/Provedores/Config/Changes deve restaurar a
+  // captura, NAO apenas mudar o booleano. O caminho antigo deixava o snapshot
+  // do Browser congelado e perdia a aba nova no F5 (teste vermelho D175c).
+  const revealEditor = () => {
+    if (editorHidden) handleToggleEditorHidden()
+    else setEditorHidden(false)
+  }
 
   // Toggle Details (⌥⌘L). "Gated": só atua quando a aba ativa tem detalhe
   // acoplado (Changes/Files). Esconder o detalhe com o editor oculto revelaria um
