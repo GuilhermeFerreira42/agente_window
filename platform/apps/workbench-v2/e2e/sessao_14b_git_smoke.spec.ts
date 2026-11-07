@@ -12,12 +12,16 @@
 // ============================================================================
 import { expect, test, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BASE_URL } from './helpers';
 
-const WS = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..'); // raiz do repo (vite.config: ../../.. do workbench-v2)
+// Este fluxo faz stage/unstage/discard reais. O desvio de dados do servidor
+// não isola o Git: exigir uma fixture explícita, fora do checkout.
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const WS = process.env.E2E_WORKSPACE_ROOT ? resolve(process.env.E2E_WORKSPACE_ROOT) : '';
+let fixtureApproved = false;
 const NAME = `e2e-smoke-${process.pid}.txt`;
 const FILE = join(WS, NAME);
 const OUT = process.env.SMOKE_SHOTS_DIR; // opcional: pasta para prints da validação humana
@@ -38,7 +42,17 @@ const uiRows = (page: Page) => page.evaluate(() =>
     .map((r) => `${r.getAttribute('data-in-group')} ${r.getAttribute('data-letter')} ${r.querySelector('.label-name')?.textContent}`));
 
 test.describe('FATIA-04 · 4.7-b — smoke REAL: aba Changes contra o workspace real, só por cliques', () => {
-  test.afterEach(() => { if (existsSync(FILE)) unlinkSync(FILE); });
+  test.beforeAll(async ({ request }) => {
+    expect(WS, 'Defina E2E_WORKSPACE_ROOT para a fixture Git descartável').not.toBe('');
+    expect(relative(REPO, WS).startsWith('..'), 'A fixture deve ficar fora do checkout').toBe(true);
+    expect(readFileSync(join(WS, '.agent-window-e2e-fixture'), 'utf8').trim()).toBe('disposable');
+    const rootResponse = await request.get(`${BASE_URL}/fs/root`, { headers: { Origin: new URL(BASE_URL).origin } });
+    expect(rootResponse.ok()).toBe(true);
+    const { root } = await rootResponse.json();
+    expect(resolve(fileURLToPath(root))).toBe(WS);
+    fixtureApproved = true;
+  });
+  test.afterEach(() => { if (fixtureApproved && existsSync(FILE)) unlinkSync(FILE); });
 
   test('boot → Files (padrão) → header Folders "Open Source Control" → Changes real; arquivo criado no disco aparece sozinho; Stage/Unstage/Discard batem com git status', async ({ page }) => {
     test.setTimeout(120_000);
@@ -75,7 +89,7 @@ test.describe('FATIA-04 · 4.7-b — smoke REAL: aba Changes contra o workspace 
     await expect(page.locator(SCM)).toBeVisible();
     await expect(page.locator(`${SCM} .scm-view[data-loading="false"]`)).toBeAttached({ timeout: 20_000 });
     await expect(page.locator(`${SCM} [data-testid="scm-error"]`)).toHaveCount(0);
-    await expect(page.locator(`${SCM} [data-testid="scm-provider"] .label-name`)).toHaveText(WS.split('/').pop()!);
+    await expect(page.locator(`${SCM} [data-testid="scm-provider"] .label-name`)).toHaveText(basename(WS));
     const branch = git('rev-parse', '--abbrev-ref', 'HEAD').trim();
     if (branch !== 'HEAD') await expect(page.locator(`${SCM} [data-testid="scm-provider"] .label-description`)).toHaveText(branch);
     await expect(page.locator(`${SCM} .scm-view [data-testid="scm-no-repo"]`)).toHaveCount(0);
