@@ -259,3 +259,32 @@ símbolos** · ocultar/mostrar o editor sem perder abas, em anexo e em maximizad
    corte de ~2 300 linhas, exige gate próprio. A meta **não** está cumprida.
 
 **Homologação humana: PENDENTE.** Não assino embaixo no seu lugar.
+
+---
+
+## Atualizacao 2026-11-06 — o que mudou desde a versao anterior deste roteiro
+
+**Numeros de teste (o painel estava errado; corrigido).** A suite fechou em
+**1515 testes = 1483 aprovados | 0 falhas | 32 pulados**. Rodar com:
+`sh platform/scripts/gate-unit.sh` (script novo, no repo — ele fixa TMPDIR/HOME/
+AGENTE_WINDOW_TEST_HOME; rodar vitest "na mao" com TMPDIR dentro de `.cache` fabrica 4 falhas
+falsas). As 9 falhas de `TerminalPanel.test.tsx` foram para quarentena registrada em
+`src/__tests__/QUARENTENA-UNITARIOS.md` — **voce nao precisa homologar um teste que nao testa
+mais o produto**, mas precisa saber que o painel de terminal perdeu cobertura UNITARIA (a
+cobertura dele nesta rodada e' de navegador).
+
+**Passo novo para homologar (RNF15-2 / D172).** Ao abrir arquivos da arvore:
+1. abra `data.ts` → deve aparecer **1** aba;
+2. abra `types.ts` → **2** abas, nenhuma duplicada;
+3. clique de novo em `data.ts` → continua **2** (reusa, nao duplica);
+4. edite e `Ctrl+S` → a marca de nao-salvo some e o arquivo no disco tem o texto.
+Isto prova o caminho que a migracao da D172 tocou (identidade/reuso de aba + salvar).
+
+**Arrastar aba entre os dois paineis — NAO e' exigido pela SPEC.**
+Conferi `docs/06` L1442: RF15-1..4 e RNF15-1..3, nenhum cita arrastar abas entre paineis.
+Fica registrado como lacuna conhecida; mover aba entre lados e' pelo menu **"Abrir ao lado"**.
+Se voce quiser DnD, e' escopo novo — me diga e eu abro como requisito proprio.
+
+**Ponto de recuperacao disponivel.** `recuperacao-2026-11-06/` (bundle 29 MB + operacionais
+5,3 MB, com sha256 no LEIA-ME). Restauracao testada de verdade, nao presumida. **Baixe para
+fora do sandbox** — dentro dele nao protege contra perda do workspace.
