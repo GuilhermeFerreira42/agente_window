@@ -36,7 +36,7 @@ hoje é:
 - as abas do **módulo** (`snapshotAttachTabs`/`restoreAttachTabs`, chave `workbench.attachTabs.v1`,
   gravada a cada `editor.tabOpened/tabClosed/tabPinned/activeChanged`).
 
-Ou seja: **as abas de arquivo e diff voltam depois do F5; as nativas (browser, Provedores,
+Ou seja: **as abas de arquivo (`kind: code`) voltam depois do F5; as diffs NÃO são restauradas; as nativas (browser, Provedores,
 Configurações, resultado de busca) não voltam — e nunca voltaram.** Antes de migrar é obrigatório
 saber se isso é intencional. Se for intencional (leitura da nota de D160: `diff`/`changes` têm
 payload que não faz sentido ressuscitar), então "persistência das abas" = ligar as nativas ao
@@ -95,7 +95,7 @@ nova unidade; testam o **produto**. Se a migração quebrar qualquer um, é regr
 | P7 | aba suja | fechar pede confirmação; Cancelar não fecha |
 | P8 | recursos de browser | fechar aba de browser remove a `BrowserViewState` órfã |
 | P9 | limpeza por sessão | excluir sessão remove só as abas dela |
-| P10 | F5 (módulo) | abas de arquivo/diff voltam; **nativas não** (comportamento atual, documentado) |
+| P10 | F5 (módulo) | somente abas `kind: code` voltam; diff e nativas não (comportamento atual) |
 
 **Estado dos testes de proteção (medido em 2026-11-06):**
 `src/__tests__/faixaDeAbasProtecao.test.tsx` — **7 testes, 7 aprovados**.
@@ -103,7 +103,7 @@ P6, P8 e P9 já existiam e estão verdes em `App.test.tsx` (sucessão ao fechar;
 recursos de browser ao arquivar/excluir sessão). O arquivo novo cobre o que faltava: id estável
 da aba entre renders (P1), não-duplicação ao abrir duas abas (P2), clique em aba existente não
 cria outra (P3), memória por sessão no vai-e-volta (P4), `data-browser-id` ligando aba a
-`BrowserViewState` (P5) e o contrato de chaves de storage (P10).
+`BrowserViewState` (P5) e o contrato de chaves de storage (P10). **P10 é guarda de chave, não uma simulação de F5:** o F5 real de arquivos no split foi medido separadamente no navegador. O teste automatizado de recarga de diff permanece pendente.
 
 Gate completo do escopo, congelado **antes** da migração:
 `arena-operacional/evidencias/gate-estado-abas-ANTES-MIGRACAO.json` — **181 testes = 168 ok |
