@@ -1,3 +1,13 @@
+# 08/11/2026 — consolidação da auditoria independente da Fatia 15
+
+- Base verificada `7ab6a22`, trabalho somente na cópia Arena. Commits locais `f48fd6d`, `0d4b30a`, `d7d62cf` e `80be501`; sem push. Causas e proprietários registrados em D177.
+- Correções comprovadas por regressões vermelhas antes e verdes depois: atendente de X, fechamento limpo, retenção Monaco, split com vários dirty, snapshot de gravação/isolamento entre sessões, erro no segundo painel, primeiro Search, seleção SCM, principal vazio com secundário e rascunhos nativos entre layouts.
+- Typecheck final zero diagnósticos; gate final 126/0/13 (139, 12 arquivos); oito roteiros reais, 38 verificações; Git real isolado 1/1. Integral anterior aos últimos ajustes 1469/36/30 (1535, 156 arquivos), com todas as falhas/ignorados preservados e classificados. Não houve novo skip. Comparação de lint confirmou 20 erros herdados em App/index.
+- Roteiro perigoso que apagava perfil real foi substituído por perfil/fixture descartáveis. Smoke Git exige raiz externa marcada e conferida pelo HTTP. A instância do dono é separada da automação.
+- Estado vigente em 03; medições e limites em 09; relatório/painel fora do repositório. Sem homologação humana, sem encerramento formal, sem avanço do roadmap. E15-d preservada até autorização expressa.
+
+---
+
 # 07 - HISTORICO — Agente Window
 
 ## 2026-11-05 — D141: gate técnico da Fatia 14 fechado e PEND-01 resolvida pela Arena

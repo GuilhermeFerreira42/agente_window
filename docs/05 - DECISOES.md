@@ -1989,3 +1989,14 @@ linhas e um painel quebrado. RNF15-2 continua em dívida, com o corte maior desc
 **Gate.** typecheck **EXIT 0** + **353 = 335✓|2✗|16skip em 31 arquivos** (eram 347 em 29: **+2 arquivos, +6 provas, zero
 regressão**). Entraram no gate os dois arquivos novos, porque são eles que policiam o passo. As 2 falhas seguem PEND-02 e
 `themeTokens`, pré-existentes.
+
+
+## D177 — Correções técnicas da auditoria Fatia 15, sem homologação (08/11/2026)
+
+A inspeção independente de `7ab6a22` comprovou defeitos de ciclo de vida e fechamento. O atendente de fechamento pertence à montagem que o registrou; cleanup antigo não retira um novo. Fechamento limpo consulta EditorService; dirty passa por Save/Don't Save/Cancel. Save só marca o snapshot realmente gravado; texto digitado durante IO e outros donos permanecem dirty. Fechar uma divisão repete a decisão para cada arquivo, sem descarte coletivo implícito.
+
+Modelos Monaco são recursos de UI por serviço/sessão, preservados ao desmontar o host e liberados ao fechar de fato ou dispor o módulo. Abas/grupos/dirty continuam no EditorService. O shell move uma instância visual estável por portal, mantendo Provedores/Config donos de seus formulários. Presença é derivada do estado/captura R-040 já existente; não há cópia de estado dos formulários nem novo gerenciador de abas no App.
+
+Contexto de sessão e intenção explícita de navegação Search/SCM são aditivos no contrato do módulo. Restauração não emite intenção de navegação nem rouba seleção nativa. O hook do shell continua dono de abas nativas/MRU. Personalizações mantém R-092; apenas a guarda HTTP passa a encaminhar ao handler já existente.
+
+Evidências e limites estão em 03/09 e no relatório operacional externo. Esta decisão técnica não homologa Fatia 15, não autoriza remover a rede E15-d e não abre fatias seguintes. Não houve alteração dos contratos congelados core/server, de segurança ou do terminal.

@@ -1,3 +1,15 @@
+# Nota vigente — auditoria Fatia 15 em Windows (08/11/2026)
+
+A auditoria não abriu fatias seguintes. Fatia 15 aguarda homologação humana dirigida e decisão expressa sobre E15-d. Ver 03 e D177.
+
+Dívida de portabilidade automatizada: a integral medida teve 36 falhas em fixtures/asserts com POSIX, URI, separadores e CRLF; classificadas individualmente no relatório externo. Corrigir em trabalho próprio autorizado, sem alterar produção congelada apenas para satisfazer testes. Há 30 ignorados históricos ainda sem prova integral substituta (13 App, 9 TerminalPanel, 1 coverageIntegration, 2 iconLabels, 4 Linux, 1 EXDEV); não foram convertidos em aprovados. O legado Git inconclusivo ganhou prova real isolada 1/1; isso não aprova todo E2E antigo.
+
+Lint permanece com 20 erros herdados em App/index, comparados com a base sem mexer no checkout; quatro avisos nas superfícies verificadas, um novo de Fast Refresh. A ocorrência histórica Canceled do Monaco permanece rastreável; o replay final de layout passou sem pageerror. Não há indicação de perda de conteúdo nos fluxos finais.
+
+Limite de produto a considerar no aceite: F5 não persiste texto dirty. Salvar antes de recarregar. Provedor real/IA, terminal humano, sites externos arbitrários e pacote de produção não receberam homologação nesta auditoria.
+
+---
+
 # 06 - PROXIMAS FASES E DIVIDAS — Roadmap & Matriz de Dívidas
 
 > **REGRA VIGENTE D140 — 2026-11-04:** os trechos antigos abaixo que dizem que PEND-01, DP-03, DP-06 e E-1..E-5 aguardam **nova autorização do dono** são históricos quanto à autoridade: o dono delegou agora à Arena a decisão técnica sob os limites de `05` D140. **Ainda não foram implementados nem resolvidos pela edição documental.** A Fatia 14 depende de *fechar tecnicamente* esses contratos, mas pode ser destravada pela própria Arena sem consulta individual ao dono; as evidências e dívida devem ser atualizadas ao executar. PEND-01 e PEND-03 estão autorizadas para tratamento técnico seguro. Os marcos D133 permanecem.

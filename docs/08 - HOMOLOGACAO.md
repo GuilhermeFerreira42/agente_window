@@ -1,3 +1,11 @@
+# Situação de aceite — Fatia 15 (08/11/2026)
+
+**Não homologada.** O candidato corrigido passou pelos fluxos dirigidos da auditoria; a suíte integral Windows continua com 36 falhas e 30 ignorados classificados em 09/relatório. A decisão humana é exclusivamente do dono. Não encerrar a Fatia 15 nem avançar o roadmap por inferência dos testes focais.
+
+Usar o roteiro existente de homologação da Fatia 15 em perfil descartável. Conferir fechamento limpo imediato, as três escolhas do dirty, erro de Save, divisão com dois dirty e preservação de rascunhos ao recolher/restaurar. F5 restaura conteúdo salvo; salvar antes de recarregar. Provedores/Config são abas; Personalizações mantém a tela R-092. E15-d exige decisão expressa separada para remover fisicamente a rede de rollback.
+
+---
+
 # 08 - HOMOLOGACAO (do humano)
 
 > **D140 — divisão de responsabilidades (04/11/2026):** a Arena/Codex executora pode conferir critérios técnicos e **avançar para a fatia seguinte** com evidências e pendências honestas. Isto **não** é homologação funcional humana; somente o dono aceita a V1.0 final e qualquer decisão reservada de produto/segurança. Os roteiros manuais permanecem disponíveis para execução posterior no Windows, e itens não verificados nunca viram “passou”. Detalhe da delegação em `05` D140.

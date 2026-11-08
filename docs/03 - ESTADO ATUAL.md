@@ -1,3 +1,23 @@
+# Estado vigente — auditoria Windows, consolidada em 08/11/2026
+
+A Fatia 15 é **candidata à homologação humana dirigida, com ressalvas**. Não está homologada nem formalmente encerrada; não avançar no roadmap. Esta entrada substitui, para estado atual, os retratos históricos abaixo.
+
+A auditoria independente partiu de `7ab6a22`. Correções locais, sem push: `f48fd6d` (Monaco/fechamento/recolher), `0d4b30a` (roteamento Personalizações), `d7d62cf` (smoke Git isolado) e `80be501` (split, gravação concorrente, navegação Search/SCM e estabilidade das casas nativas). Somente a cópia Arena foi alterada.
+
+**Comprovado:** arquivo limpo fecha sem diálogo; dirty exige Salvar/Não Salvar/Cancelar; erro de escrita preserva texto; Save só fecha após gravar o snapshot correspondente e não limpa outro dono. Recolher/maximizar/alternar preservam modelos e rascunhos. Fechar divisão trata cada dirty; fechar a última aba principal preserva a secundária. Search pode abrir o primeiro arquivo; Changes seleciona o diff. Provedores/Config mantêm rascunhos ao trocar aba/layout/sessão. Personalizações conserva a custom view R-092.
+
+**Medições:** typecheck EXIT 0; gate final 139 = **126 aprovados / 0 falhas / 13 ignorados**, 12 arquivos; oito roteiros Playwright reais com 38 verificações; smoke Git real isolado 1/1 em 11 s. Integral Windows anterior aos últimos ajustes: 1535 = **1469 aprovados / 36 falhas / 30 ignorados**, 156 arquivos. Não é suíte global verde. Falhas e ignorados estão enumerados e classificados no relatório externo. Os 32 ignorados históricos foram reconciliados: dois casos exclusivos Windows executaram aqui. ESLint ampliado conserva 20 erros herdados de App/index; novas superfícies: zero erros, quatro avisos de Fast Refresh (um novo).
+
+**Donos preservados (RNF15-2):** o hook do shell possui abas nativas e MRU; EditorService possui grupos/dirty; a UI do módulo possui recursos Monaco. O portal estável move uma única superfície e preserva o estado interno das casas, sem duplicar gerenciador no App. Core/server congelados do Explorer e terminal não foram modificados. E15-d mantém a rede física de rollback: remoção exige autorização expressa do dono.
+
+**Limites:** F5 restaura abas/modos e conteúdo salvo; rascunhos não salvos não persistem. Não houve validação com chave/provedor real, inferência IA, pacote de produção ou homologação de terminal. Ocorrência histórica de Canceled do Monaco foi preservada; replay atual do layout terminou sem pageerror.
+
+**Próxima ação:** dono inspeciona e decide a homologação, considerando essas ressalvas, e decide E15-d separadamente. O relatório detalhado fica fora do repo em `../arena-operacional/auditoria-codex-2026-11-07/RELATORIO.md`; testes/comandos no canônico 09, roteiro humano existente e painel operacional. A instância de inspeção usa perfil próprio em http://127.0.0.1:5174/; testes usam 5199.
+
+## Histórico anterior — não tratar como medição atual
+
+---
+
 # Estado vigente — 2026-11-05 (noite, Onda 3 · 10 dívidas tratadas (D157…D166))
 
 ## ⚑ Um visualizador só: o contêiner central — **concluído**

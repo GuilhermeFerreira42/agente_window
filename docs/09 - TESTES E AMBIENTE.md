@@ -1,4 +1,102 @@
+# Auditoria independente Windows — consolidação 08/11/2026
+
+Base `7ab6a22`; código final `80be501`. Nenhuma homologação humana declarada. Evidências completas fora do repo em `../arena-operacional/auditoria-codex-2026-11-07/evidencias`; relatório externo enumera cada falha, teste ignorado, gravidade, impacto e efeito sobre aceite dirigido.
+
+| Verificação | Resultado medido | Limite |
+|---|---|---|
+| Runtime oficial Node 26.13.0 / npm 11.20.0 | 3/3; SQLite e PTY carregados | download oficial com SHA256 conferido |
+| Typecheck final | EXIT 0, zero diagnósticos | typecheck-entrega-final.log |
+| Gate final atual | 139 = 126 pass / 0 fail / 13 skip, 12 arquivos | gate-entrega-final.json; skips App herdados |
+| Integral Windows anterior às últimas correções | 1535 = 1469 pass / 36 fail / 30 skip, 156 arquivos | integral-final.json; não declarar verde nem medida sobre o último código |
+| Playwright real, oito roteiros atuais | 38 verificações passaram | replay-resumo.json e replay-fluxo*.log; não somar aos unitários |
+| E2E legado Git isolado | 1/1 em 11 s; stage/unstage/discard reais | fixture externa marcada, raiz HTTP conferida |
+| ESLint App/index comparado à base | mesmos 20 erros herdados | lint-baseline-comparison.json; não é lint global verde |
+| ESLint superfícies finais | 0 erros / 4 avisos Fast Refresh | lint-superficies-final.log; inclui um novo aviso do portal |
+
+As 36 falhas são: worktrees 1 (CRLF); fsHost 2 e searchEngine 2 (URI); territorio 1 (POSIX); gitHost 10 (mkdir como executável); executorComando 4 e agir/rotas 5 (/bin/sh/comandos POSIX); fronteiras agir 3, config 3, conversa 2, provedores 3 (separadores). Testes/fonte congelada não foram alterados para esconder falhas. Gravidade média de cobertura: impedem declarar suíte global verde; isoladamente não demonstram defeito dos fluxos Fatia 15 auditados. Detalhes e erros originais no relatório/JSON.
+
+Dos 32 skips históricos, dois exclusivos Windows executaram aqui. Restam 30: App 13, TerminalPanel 9, coverageIntegration 1, iconLabels 2, helper Linux 4, EXDEV 1. Não houve skip novo. Execuções com filtro `-t` mostram casos não selecionados; esses não foram contados como novas quarentenas.
+
+O teste longo Browser inicialmente atingia 20 s depois de cumprir a navegação até os últimos fechamentos; instrumentação temporária comprovou o percurso e foi removida. Só esse caso recebeu orçamento de 60 s, mantendo todos os asserts; executou integralmente em 24,33 s e passou no gate final. A sonda concorrente de Save usa marcadores únicos: uma repetição com marcador estático falhou por texto já gravado; log da fixture incorreta preservado e repetição válida passou. Não se confunde falha do ensaio com defeito do produto.
+
+Para reproduzir, usar `platform/scripts/project.ps1` e `AGENTE_WINDOW_TEST_ROOT` fora do repo; limitar Vitest a `--maxWorkers=1 --minWorkers=1` nesta máquina. O gate focal inclui centerCodeEditor, centerSaveRouting, modelResources, App, faixaDeAbasProtecao, persistenciaNativas, frontier do Explorer, searchSessionContext, moduleNavigation, centerFrontier, centerFrontierApp e stableEditorSurface. O log guarda a linha completa executada. Os dois servidores usam perfis isolados; não executar testes na instância de inspeção do dono.
+
+RNF15-2: App apenas liga contexto/intenção e posiciona portal. Hook nativo possui abas/MRU; serviço possui grupos/dirty; recursos Monaco ficam na UI do módulo. Sem importação IA nova no Bairro 1. Diretórios congelados core/server e terminal intocados. Rascunhos nativos conservam a instância, sem copiar seu estado para o síndico. Ver D177.
+
+Provas de navegador: clean/dirty nas duas superfícies e divisão; Save/Don't Save/Cancel; bytes e falha HTTP; edição durante IO; sessões com mesma URI; recolher/maximizar/undo; Outline/breadcrumbs; Browser histórico/viewport/reload/F5; ordem nativa; Search primeiro arquivo/seleção SCM; formulários nativos e gravação Config/F5. F5 não persiste texto dirty. Ocorrência histórica Canceled do Monaco registrada, sem supressão; replay atual de layout sem pageerror. Sem chave real, IA, pacote de produção ou homologação terminal.
+
+---
+
 # 09 - TESTES E AMBIENTE (da IA)
+
+**Estado das telas nativas (RF15-2/D151):** o rascunho de Modelo em Provedores
+foi perdido ao alternar arquivo/Provedores (`fluxo9-antes.log`). Os corpos eram
+desmontados na troca de aba e o EditorArea remontava ao trocar de pai React.
+Preservar uma instância visual em portal estável do shell, movendo o mesmo host
+entre os lugares de layout (LEGO), e ocultar os corpos enquanto suas abas
+existirem ou estiverem capturadas pelo R-040. Não copiar estado das casas nem
+persistir rascunhos/chaves. Testar identidade/rascunho em troca de host, ocultação,
+abas e maximizar/restaurar, além da regressão do Monaco e F5.
+
+**Complemento focal da auditoria:** Search encontrou resultado no Windows, mas
+o clique antes da primeira aba ficou aguardando `mountCodeEditor`; esse mount
+dependia justamente da criação da aba. Resolver o ciclo por contexto da sessão
+ativa entregue ao módulo em porta opcional/aditiva, sem depender do DOM do editor.
+O App só liga essa porta; a abertura de Search/SCM continua no módulo. Testar
+resultado antes de montar editor e troca de sessão, além do fluxo real lateral.
+Não remover a fila de boot/F5 nem a rede de rollback E15-d.
+
+**Navegação e divisão:** a intenção explícita de Search/SCM precisa selecionar o
+corpo no contêiner quando Browser/Changes estava ativo; eventos de restauração
+não podem roubar foco. A decisão de seleção fica no hook único do shell; o App
+apenas encaminha a intenção e revela o layout. Ao fechar a última aba principal,
+o grupo secundário deve continuar acessível: `isSplit` participa da visibilidade,
+sem criar aba fictícia nem segundo gerenciador. Provas reais vermelha/verde:
+`fluxo8-depois.log`/`fluxo8-final.log` e
+`split-principal-antes.log`/`split-principal-depois.log` no operacional externo.
+
+**Orçamento de teste Windows:** o caso unitário de múltiplos Browsers foi
+instrumentado até os últimos fechamentos, sem travamento funcional. Com os
+mesmos asserts completou em **24,33 s**; o limite anterior de 20 s expirava.
+Somente esse caso passou a ter 60 s. Diagnóstico e repetição preservados em
+`browser-unit-diagnostico.log` e `browser-unit-orcamento.log`; nenhum skip novo.
+
+## Auditoria independente Windows — 2026-11-07 · base `7ab6a22`
+
+**SPEC de correção focal (RF15-1/RF15-2):** o Playwright abriu, editou e fechou o
+mesmo arquivo repetidamente; depois de Salvar e Não Salvar, um novo X em aba suja
+deixou de apresentar o diálogo. Investigar a limpeza adiada do corpo anterior:
+`unmountCodeEditor` agenda `root.unmount()`, e o callback antigo pode retirar o
+atendente registrado pela nova montagem da mesma sessão. Critério: desmontar o
+corpo antigo depois de montar o novo não pode desregistrar o fechamento do novo;
+o X deve continuar atendendo Salvar/Não Salvar/Cancelar. Proteger com teste de
+integração da fábrica, reproduzindo essa ordem, e repetir o fluxo no Monaco real.
+Perímetro previsto: `modules/explorer-search/index.ts` e teste de roteamento do
+centro; nenhum `core/**`, `server/**`, contrato público ou estado paralelo.
+Reversão: reverter somente o commit focal. E15-d e homologação humana preservados.
+
+**SPEC de integração Personalizações:** o navegador real recebeu HTML do Vite
+em `GET /api/personalizacoes`, resultando em erro de JSON. A prefeitura já tem
+o tratador da casa, mas sua guarda inicial não reconhece essas rotas. Incluir
+o predicado existente nessa guarda; provar GET JSON e validação de POST/PUT
+pela porta HTTP real no teste `session-persistence/index.test.ts`, antes/depois,
+e repetir a tela. Nenhuma rota, contrato ou permissão nova; sem reescrever a
+casa nem alterar o layout R-092 (custom view de superfície inteira, preservado
+pelo mapa da D144). Rollback restrito ao commit dessa integração.
+
+**Complemento do dono / proteção dos modelos:** remover Changes do menu redundante
+(Files/Search já ausentes), X de recolher junto de maximizar usando o controlador
+existente, arquivo limpo fecha sem diálogo. Teste vermelho de fechamento limpo:
+1 falha/21 aprovações. Playwright confirmou perda do texto dirty em recolher/reabrir:
+o layout troca a árvore React, o cleanup do `CodeEditorPane` destrói seus modelos,
+mas o `EditorService` conserva a aba dirty. Proteger os modelos Monaco no próprio
+módulo, por serviço/sessão, com descarte no fechamento real e dispose do módulo;
+não duplicar abas, conteúdo em outro estado React ou controlador de layout.
+Compartilhar o recurso entre os dois grupos da mesma sessão permite mover a aba
+sem reler disco. Isolar sessões e testar reload, falha de escrita, undo, recolher,
+maximizar/restaurar e split. Perímetro: UI do módulo e seu wiring interno, shell/
+EditorArea e testes. Core/server congelados preservados. Reversão por commit.
+
 
 > **VIGÊNCIA D140 — execução técnica delegada (04/11/2026):** Arena nova que receba apenas `agente_window/` deve ler `01`, `03`, `05` D140 e reconciliar `git status`, HEAD, fontes e gates. É permitido corrigir PEND-01 (perfil efêmero fora do repositório e de `.cache`) e diagnosticar PEND-03 sem enfraquecer testes. Fechar DP-03/DP-06/E-1..E-5 com SPEC, testes e decisão registrada **antes** de codificar 14; seguir D133 de modo autônomo e verificável. O relato da regressão DELETE abaixo é histórico, não deve ser reexecutado como tarefa inicial. Criar diário, `status.json` e dashboard HTML **fora do repositório**, derivando o estado dos nove canônicos e do Git, e atualizar após cada marco; não prometer live update sem processo ativo. Quando for entregue só esta pasta, esses artefatos externos não estarão incluídos: recriá-los, não exigir a conversa antiga. Não alterar dados reais nem publicar sem autorização.
 

@@ -1,3 +1,9 @@
+# Atualização de entrega — 08/11/2026
+
+A auditoria independente da base `7ab6a22` foi executada e recebeu correções locais até `80be501`. Consultar primeiro o estado vigente em 03 e as medições em 09; o conteúdo anterior abaixo descreve a entrega recebida. O candidato aguarda homologação humana dirigida, com ressalvas explícitas. E15-d não foi removida nem homologada. Relatório e evidências ficam na pasta operacional externa; não avançar o roadmap.
+
+---
+
 # Candidato à auditoria independente — Fatia 15 (SPEC 2I)
 
 **Não é homologação humana.** O Codex executa auditoria técnica independente; o dono homologa depois. Este documento é o ponto de entrada do auditor, sempre subordinado à SPEC `docs/06` §2I e às decisões `docs/05` (D140, D151).

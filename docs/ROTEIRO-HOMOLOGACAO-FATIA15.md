@@ -1,4 +1,24 @@
+# Complemento vigente — inspeção do candidato corrigido (08/11/2026)
+
+As medições atuais estão em 09. Nenhuma marca histórica de teste abaixo representa aprovação humana.
+
+1. Abra dois arquivos descartáveis: o X de um arquivo limpo deve fechar imediatamente; o dirty deve oferecer Salvar/Não Salvar/Cancelar. Em Salvar, confira o conteúdo real no disco antes de considerar o fechamento correto. Cancelar conserva o texto.
+2. Repita no modo maximizado e na divisão. Com dois arquivos dirty no grupo secundário, fechar a divisão pede decisão para cada um; cancelar o segundo conserva esse arquivo. Fechar a última aba principal mantém a secundária acessível.
+3. O X ao lado de maximizar recolhe a superfície inteira. Restaurar deve conservar abas, ativa, texto e dirty. Esse X não fecha os arquivos.
+4. Provedores/Config: digite um rascunho descartável, alterne abas, maximize e recolha/restaure. O rascunho deve continuar. Não forneça chave real para este ensaio. Salvar configurações deve persistir no perfil de inspeção.
+5. Salve os arquivos antes de F5: o contrato restaura abas/modos e conteúdo salvo; não promete recuperação de rascunho dirty. Busca/Files/Changes continuam acessíveis pela sidebar/cabeçalho, sem botões redundantes no menu do visualizador.
+
+A decisão de aceite e a autorização de remoção física E15-d são do dono. Os resultados técnicos não as substituem.
+
+---
+
 # Roteiro de homologação — Fatia 15 (visualizador único)
+
+> **Atualização 07/11/2026 — auditoria independente no Windows, base `7ab6a22`.**
+> O produto recebeu correções de fechamento, preservação de modelos Monaco,
+> navegação Search/SCM e divisão. Medições antigas abaixo são históricas; provas
+> atuais e limites estão no `09`. **O dono ainda não homologou a Fatia 15.**
+> A remoção física E15-d depende de sua autorização expressa.
 
 **Para:** dono do produto · **Data:** 2026-11-06 · **Base:** `7e41063`
 **Tempo estimado:** 20 a 25 minutos · **O que se homologa:** o produto, não o código.
@@ -16,14 +36,16 @@ seleção"*. Isso é **esperado**, não é defeito: o app não guarda chave nenh
 Para o teste de interface, **não é necessário** configurar provedor — nenhum passo abaixo
 depende de uma resposta do agente.
 
-**Se a árvore do Explorer aparecer vazia**, não é o produto: é estado velho de teste. Foi um
-defeito real, já corrigido (D167). Rode:
+**Se a árvore do Explorer aparecer vazia**, confira a pasta da sessão e o erro mostrado.
+Estado antigo de testes é uma causa possível (D167), não um diagnóstico automático.
+**Preserve o perfil do usuário.** Faça esta validação em perfil descartável separado,
+com `AGENTE_WINDOW_DATA_DIR`, provedores, configurações e home isolados conforme `09`.
+Selecione uma pasta de fixture existente; não apague `~/.agente_window` para testar.
+O histórico só é descartável quando o perfil foi criado expressamente para a auditoria.
 
-```sh
-rm -rf ~/.agente_window && mkdir -p ~/.agente_window
-```
-
-…e recarregue. O histórico de sessões é descartável nesta homologação.
+**Auditoria independente Windows — 2026-11-07:** use arquivos descartáveis da fixture
+nos passos abaixo, inclusive no lugar de `README.md`, `iniciar.sh` e `App.tsx` do projeto.
+Não edite arquivos reais nem faça stage, discard ou commit em repositório do usuário.
 
 ---
 
@@ -185,9 +207,12 @@ que se perdia na inicialização.
 
 ## 5. A aba Changes (a novidade desta rodada) [👤 SUA VEZ] — 5 min
 
-1. **Modifique um arquivo e não salve** (ou crie um arquivo novo). Sem mudança no repositório,
+1. **Modifique e salve um arquivo da fixture Git isolada** (ou crie nela um arquivo novo).
+   Edição ainda não salva no Monaco não altera o estado do Git. Sem mudança no repositório,
    a lista fica vazia — e isso está correto.
-2. No centro, clique no **+** da faixa de abas → escolha **Changes**.
+2. Na barra lateral, abra **Source Control / Changes**. Para inspecionar o painel
+   central, use **Abrir alterações no editor** no cabeçalho. Search, Files e Changes
+   saíram do menu redundante do visualizador; a barra lateral mantém seus recursos.
 3. Deve abrir a aba **Branch Changes** com o painel de verdade: nome do repositório, branch,
    lista de arquivos modificados e a caixa **Message (Ctrl+Enter to commit…)**.
 
@@ -198,7 +223,7 @@ que se perdia na inicialização.
 - [ ] Clicar no arquivo abre o **diff** lado a lado
 - [ ] A aba continua com o conteúdo ao trocar de aba e voltar
 
-> **Não commite** nada de verdade a menos que queira: é o repositório da obra.
+> Execute operações Git de validação somente no repositório descartável da fixture.
 
 **[✅ MEDIDO por mim]**: repo detectado (`isRepo: true`), `Changes 1`, `ARQUIVO-DE-TESTE.txt`
 listado, input de commit presente, e o painel vazio de demonstração **não** aparece.
@@ -207,10 +232,12 @@ listado, input de commit presente, e o painel vazio de demonstração **não** a
 
 ## 6. Configurações, Provedores e navegador no mesmo contêiner [👤 SUA VEZ] — 3 min
 
-1. Pelo **+** da faixa de abas, abra **Personalizações**, depois **Files**, depois **Browser**.
-2. Todos devem abrir **como abas do mesmo centro**, não em painel paralelo.
+1. Por **Conta**, abra **Provedores** e **Configurações**; por **+**, abra **Browser**.
+2. Esses conteúdos abrem como abas do mesmo contêiner.
+3. **Personalizações** mantém a custom view R-092 da Fatia 14: ao fechar,
+   as abas e o layout anteriores devem reaparecer. Não é uma aba comum.
 
-- [ ] Personalizações abre como aba do centro
+- [ ] Personalizações carrega sem erro e devolve o layout/abas ao fechar
 - [ ] Provedores abre como aba do centro
 - [ ] Browser abre como aba do centro
 - [ ] Nenhum visualizador paralelo apareceu
@@ -222,8 +249,8 @@ listado, input de commit presente, e o painel vazio de demonstração **não** a
 | Item | Por que não |
 |---|---|
 | Resposta do agente | sem provedor configurado (não há chave nesta máquina) |
-| Terminal integrado | o PTY sobe, mas o uso real depende de sessão com provedor |
-| Windows | esta cópia roda em Linux; **funcionar aqui não homologa o Windows** |
+| Terminal integrado | funciona sem IA/provedor; terminal humano permanece fora do perímetro desta fatia |
+| Windows | auditoria técnica independente executada; aceite humano continua reservado ao dono |
 | Falha real de chunk do Monaco | exige quebrar o bundle de propósito no servidor |
 
 ---
