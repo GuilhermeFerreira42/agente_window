@@ -1,3 +1,9 @@
+# Limites correntes — D181, 08/11/2026
+
+Placeholder visível ao ocultar, lista histórica de Open Editors e pesquisa central demonstrativa foram substituídos pelos fluxos reais descritos no 03. Persistem: limites físicos de teclas do navegador, seleção nativa de pasta ainda sem prova headless, paridade integral da grade/janelas do VS Code, funcionalidades futuras de Personalizações, Canceled nativo do Monaco e o placar integral histórico. Repetição isolada resolveu os dois casos vermelhos de integração sem mudança de timeout; logs preservados, não apagados. F5 conserva somente o salvo. E15-d física/homologação não autorizadas por esta revisão. Não avançar de fatia.
+
+---
+
 # Limites vigentes após D180 — 08/11/2026
 
 A restrição a dois grupos registrada em D178/D179 foi substituída, por pedido expresso do dono, por grupos horizontais sucessivos. A limitação anterior não deve orientar novas inspeções. A largura real do Monaco, sua altura normal e a navegação do caminho foram corrigidas após a inspeção; o F1 permanece como aprovado visualmente.

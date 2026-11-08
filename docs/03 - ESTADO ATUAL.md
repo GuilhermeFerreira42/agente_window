@@ -1,3 +1,17 @@
+# Estado vigente — usabilidade familiar ao VS Code, D181 (08/11/2026)
+
+Base 8276ac4; entrega local «fix(workbench): align editor visibility and search workflows», sem push. Substitui somente o estado corrente D180 abaixo. Diretriz do dono: VS Code/Agents Window reconhecível, com nossa arquitetura; significados e transições familiares, sem controles de enfeite. F1 permanece como aprovado.
+
+Implementado e demonstrado em Chromium/Windows, perfil descartável 5199: X oculta toda a coluna e deixa chat ocupar o centro, mantendo abas/modelos/rascunhos; Mostrar editor ou abrir arquivo revela. Barra superior conserva caminho completo no tooltip e abre busca por nome/extensão (inclusive *.html); menu separado para digitar pasta ou procurar pasta. Search abre detalhes por padrão e oferece atualizar/limpar/recolher resultados e abrir uma pesquisa REAL no editor, com consulta independente da lateral. Open Editors deriva do EditorService e fecha a aba verdadeira pelo fluxo dirty. Seções do Explorer admitem arraste e ordem persistente; Outline ordena/recolhe símbolos e Timeline atualiza/filtra. Personalizações tem entrada lateral recolhível, navegação e cartões funcionais para as três seções reais da v1; criação e liga/desliga continuam usando a API real.
+
+Provas: 73 verificações Playwright em 11 roteiros (9 novas, 4 complementares, 11 de editor/grupos e 49 de regressão, incluindo 24 de teclado). Typecheck EXIT 0. ESLint: 20 erros herdados idênticos à base no perímetro atual (17 App, 3 index), nenhum novo; quatro avisos. Gate de 22 arquivos: 236 casos, 221 pass/2 falhas/13 ignorados; um timeout em exclusão da última sessão e falha seguinte no estado vazio. Repetidos juntos isoladamente: 2/2 aprovados, sem alterar timeout/asserts. Logs originais preservados. Replay completo do App concluído: 49 aprovados, zero falhas, 13 ignorados preexistentes (62 casos), sem alterar timeout/asserts. Considerando o replay: 223 casos distintos aprovados e 13 ignorados, sem somar repetições. Evidência consolidada e eventual replay completo do App no relatório operacional, sem somar repetições como testes novos.
+
+Limites: Ctrl+W físico pode encerrar a aba do navegador; eventos enviados pelo Playwright não provam interceptação do Chrome. Use os controles de fechar do editor/paleta quando o navegador reservar a combinação. Seletor nativo de pasta não foi acionado no teste headless; digitação é alternativa disponível. Personalizações não antecipa funcionalidades das Fatias 17+. Layout de grupos horizontais, provedores de linguagem e preview mantêm limites D180. F5 não recupera rascunhos. O aviso nativo Canceled do Monaco continua registrado. Integral histórica (36 falhas/30 ignorados), E15-d física e homologação humana permanecem pendentes; não avançar de fatia.
+
+Próxima ação: inspeção humana em 5174 com arquivos descartáveis; salvar antes de recarregar para carregar o corte atual. Sem automação sobre o perfil pessoal. Relatório: ../arena-operacional/feedback-2026-11-08/revisao-1436/RELATORIO.md; HEAD/tree e recuperação existentes no operacional.
+
+---
+
 # Estado vigente — revisão do editor após inspeção, D180 (08/11/2026)
 
 Base 36cba54. Entrega local «fix(editor): size the real surface and support successive groups», sem push. Esta entrada substitui o estado D179 abaixo. A inspeção humana revelou que a prova anterior de maximização mediu o contêiner externo, deixando passar o Monaco estreito; o relatório anterior não constitui prova dessa propriedade. F1 foi aprovado visualmente pelo dono e preservado; isso não homologa a Fatia 15.

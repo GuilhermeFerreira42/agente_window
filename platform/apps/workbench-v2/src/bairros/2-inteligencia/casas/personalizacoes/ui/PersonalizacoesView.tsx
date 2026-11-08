@@ -62,6 +62,7 @@ function mensagemDe(erro: unknown): string {
 export interface PersonalizacoesViewProps {
   /** true quando renderizada dentro do Custom View Grid (o grid já dá o título). */
   embedded?: boolean
+  sectionRequest?: { section: Secao; serial: number }
   /**
    * Identidade da conversa ativa. Sem ela o servidor não resolve a raiz de
    * projeto e só o escopo do usuário aparece — a tela diz isso em vez de fingir
@@ -70,7 +71,7 @@ export interface PersonalizacoesViewProps {
   alvo?: AlvoPersonalizacoes
 }
 
-export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesViewProps) {
+export function PersonalizacoesView({ embedded = false, alvo, sectionRequest }: PersonalizacoesViewProps) {
   const [visao, setVisao] = useState<VisaoPersonalizacoes | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erroCarregar, setErroCarregar] = useState('')
@@ -79,6 +80,12 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
   const [aviso, setAviso] = useState('')
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<Partial<Record<Secao, boolean>>>({})
+  const [activeSection, setActiveSection] = useState<Secao>('visao')
+  const navigateSection = useCallback((section: Secao) => {
+    setActiveSection(section); setCollapsed(current => ({ ...current, [section]: false }));
+    requestAnimationFrame(() => document.getElementById(`personalizacoes-section-${section}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }))
+  }, [])
+  useEffect(() => { if (sectionRequest && !carregando) navigateSection(sectionRequest.section) }, [sectionRequest, carregando, navigateSection])
   const [formAberto, setFormAberto] = useState(false)
   const [novoNome, setNovoNome] = useState('')
   const [novaDescricao, setNovaDescricao] = useState('')
@@ -182,6 +189,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
       await carregar(true)
       setAviso(`Habilidade ${criada.nome} criada em ${ROTULO_ESCOPO[criada.origem]}.`)
       setFormAberto(false)
+      navigateSection('habilidades')
       setNovoNome('')
       setNovaDescricao('')
       setNovoCorpo('')
@@ -192,7 +200,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
       setOcupado('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [novoNome, novaDescricao, novoCorpo, novoEscopo, carregar])
+  }, [novoNome, novaDescricao, novoCorpo, novoEscopo, carregar, navigateSection])
 
   const filtro = query.trim().toLowerCase()
   const skillsFiltradas = useMemo(() => {
@@ -228,7 +236,12 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
   const totalFerramentas = visao?.ferramentas.length ?? 0
 
   return (
-    <section className="customizations-view" aria-label="Personalizações">
+    <section className="customizations-view personalizations-manager" aria-label="Personalizações">
+      <nav className="personalizations-navigation" aria-label="Seções de Personalizações">
+        <span className="personalizations-navigation-title">Personalizações</span>
+        {SECOES.map(section => <button type="button" key={section.id} aria-current={activeSection === section.id ? 'page' : undefined} onClick={() => navigateSection(section.id)}>{section.icone}{section.rotulo}</button>)}
+      </nav>
+      <div className="personalizations-manager-content">
       <header className="customizations-header">
         <div className="customizations-title">
           <Blocks size={15} />
@@ -332,7 +345,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
           const isCollapsed = collapsed[secao.id] ?? false
           const contentId = `personalizacoes-secao-${secao.id}`
           return (
-            <div className="customizations-section" key={secao.id} role="treeitem" aria-expanded={!isCollapsed}>
+            <div className="customizations-section" id={`personalizacoes-section-${secao.id}`} style={{ display: activeSection === secao.id ? undefined : 'none' }} key={secao.id} role="treeitem" aria-expanded={!isCollapsed}>
               <button
                 type="button"
                 className="customizations-section-header"
@@ -342,7 +355,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
               >
                 {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                 {secao.icone}
-                <span className="customizations-section-label">{secao.rotulo}</span>
+                <span className="customizations-section-label">{secao.id === 'visao' ? 'Resumo' : secao.id === 'habilidades' ? 'Habilidades instaladas' : 'Ferramentas disponíveis'}</span>
                 <span className="customizations-section-count">
                   {secao.id === 'habilidades' ? skillsFiltradas.length : secao.id === 'ferramentas' ? ferramentasFiltradas.length : 3}
                 </span>
@@ -351,6 +364,8 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
                 <div className="customizations-section-body" id={contentId} role="group">
 
                   {secao.id === 'visao' && (
+                    <div>
+                    <div className="personalizations-overview-cards"><button type="button" aria-label="Gerenciar habilidades" onClick={() => navigateSection('habilidades')}><Sparkles size={20}/><strong>Gerenciar habilidades</strong><span>{habilidadesAtivas} ativas</span></button><button type="button" aria-label="Gerenciar ferramentas" onClick={() => navigateSection('ferramentas')}><Wrench size={20}/><strong>Gerenciar ferramentas</strong><span>{ferramentasLigadas} de {totalFerramentas} ligadas</span></button></div>
                     <dl className="customizations-resumo">
                       <div><dt>Habilidades ativas</dt><dd>{habilidadesAtivas} de {visao?.skills.length ?? 0}</dd></div>
                       <div><dt>Habilidades com erro</dt><dd>{habilidadesComErro}</dd></div>
@@ -364,6 +379,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
                         </dd>
                       </div>
                     </dl>
+                    </div>
                   )}
 
                   {secao.id === 'habilidades' && (
@@ -483,6 +499,7 @@ export function PersonalizacoesView({ embedded = false, alvo }: PersonalizacoesV
             </div>
           )
         })}
+      </div>
       </div>
     </section>
   )

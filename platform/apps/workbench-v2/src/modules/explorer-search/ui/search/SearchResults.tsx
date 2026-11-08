@@ -22,6 +22,7 @@ import { groupMatchesByFile, type FileMatchGroup } from '../../core/search/model
 
 export interface SearchResultsProps {
   matches: SearchMatch[];
+  collapseAll?: boolean;
   root: WorkspaceUri;
   /** Comprimento do termo casado em cada match (para recortar o preview). */
   matchLengthOf: (m: SearchMatch) => number;
@@ -93,11 +94,13 @@ function RowActions({ items }: { items: Array<{ cls: string; label: string; onCl
 }
 
 export function SearchResults({
-  matches, root, matchLengthOf, onOpenMatch, onEscape, focusRequest,
+  matches, root, collapseAll, matchLengthOf, onOpenMatch, onEscape, focusRequest,
   replaceActive = false, replacementOf, onReplaceMatch, onReplaceFile, onDismissMatch, onDismissFile,
 }: SearchResultsProps) {
   const groups = useMemo(() => groupMatchesByFile(matches, root), [matches, root]);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const groupRef = useRef(groups); groupRef.current = groups;
+  useEffect(() => { if (collapseAll !== undefined) setCollapsed(collapseAll ? new Set(groupRef.current.map(group => group.uri)) : new Set()); }, [collapseAll]);
   const [focusIndex, setFocusIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 

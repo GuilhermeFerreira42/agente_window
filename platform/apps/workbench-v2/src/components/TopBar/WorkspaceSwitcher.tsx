@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Check, Folder, FolderOpen, LoaderCircle, Search, X } from 'lucide-react'
+import { Check, ChevronDown, Folder, FolderOpen, LoaderCircle, Search, X } from 'lucide-react'
 import { listSessionWorkspaceDirectories, type WorkspaceDirectoryEntry } from '../../services/sessions/sessionsClient'
 
 interface WorkspaceSwitcherProps {
   currentPath: string
   pending?: boolean
   onConfirm: (path: string) => Promise<void>
+  onFindFile?: () => void
   onBrowse?: () => void
 }
 
@@ -15,8 +16,11 @@ function listPath(value: string): string {
   return value.replace(/[\\/][^\\/]*$/, '') || '/'
 }
 
-export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onBrowse }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onBrowse, onFindFile }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [pathMode, setPathMode] = useState(!onFindFile)
+  useEffect(() => { if (!open && onFindFile) setPathMode(false) }, [open, onFindFile])
   const [value, setValue] = useState(currentPath)
   const [folders, setFolders] = useState<WorkspaceDirectoryEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -40,11 +44,11 @@ export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onB
     return () => window.clearTimeout(timer)
   }, [open, value])
   useEffect(() => {
-    if (!open) return
-    const close = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); setValue(currentPath) } }
+    if (!open && !menuOpen) return
+    const close = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); setMenuOpen(false); setValue(currentPath) } }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
-  }, [currentPath, open])
+  }, [currentPath, open, menuOpen])
 
   const choose = (folder: WorkspaceDirectoryEntry) => {
     const separator = folder.path.includes('\\') && !folder.path.includes('/') ? '\\' : '/'
@@ -66,13 +70,21 @@ export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onB
   }
 
   return <div className={`workspace-switcher${open ? ' is-open' : ''}`} ref={rootRef}>
-    <div className="workspace-switcher-control">
+    {!pathMode && onFindFile ? <div className="workspace-switcher-control command-center-files">
+      <button type="button" className="workspace-file-search" aria-label="Pesquisar arquivos no projeto" title={currentPath} onClick={onFindFile}><Search size={14}/><span>{currentPath || 'Pesquisar arquivos'}</span><kbd>Ctrl+P</kbd></button>
+      <button type="button" className="workspace-command-menu" aria-label="Opções do projeto" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><ChevronDown size={14}/></button>
+    </div> : <div className="workspace-switcher-control">
       <Search size={14} aria-hidden="true"/>
       <input ref={inputRef} aria-label="Workspace atual" role="combobox" aria-expanded={open} aria-controls="workspace-switcher-list" aria-autocomplete="list" value={value} title={currentPath} onFocus={(event) => { setOpen(true); event.currentTarget.select() }} onChange={(event) => { setValue(event.target.value); setOpen(true) }} onKeyDown={keyDown}/>
       {open && <button type="button" className="workspace-switcher-clear" aria-label="Cancelar troca de workspace" onClick={() => { setOpen(false); setValue(currentPath) }}><X size={13}/></button>}
       {onBrowse && <button type="button" className="workspace-switcher-browse" aria-label="Procurar pasta" title="Procurar pasta" onClick={onBrowse}><FolderOpen size={14}/></button>}
       <button type="button" className="workspace-switcher-use" disabled={pending || !value.trim()} onClick={() => void confirm()}>{pending ? <LoaderCircle className="spin-icon" size={13}/> : <Check size={13}/>}<span>Usar esta pasta</span></button>
-    </div>
+    </div>}
+    {menuOpen && <div className="workspace-switcher-dropdown workspace-command-options" role="menu" aria-label="Opções do projeto">
+      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onFindFile?.() }}>Pesquisar arquivos</button>
+      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setPathMode(true); setOpen(true); requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select() }) }}>Digitar caminho de pasta</button>
+      {onBrowse && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onBrowse() }}>Procurar pasta…</button>}
+    </div>}
     {open && <div className="workspace-switcher-dropdown" id="workspace-switcher-list" role="listbox" aria-label="Pastas do workspace">
       {loading && <div className="workspace-switcher-state">Listando pastas…</div>}
       {!loading && error && <div className="workspace-switcher-state is-error" role="alert">{error}</div>}

@@ -281,6 +281,9 @@ export interface IExplorerSearchModule {
    *  do SearchView mock da aba `search`. Só DOM dentro de `root`. */
   mountSearch(root: HTMLElement, opts?: { focusRequest?: number }): void;
   unmountSearch(): void;
+  /** D181: documento de pesquisa real, com consulta independente da lateral. */
+  mountSearchEditor?(root: HTMLElement, opts: { sessionId: string; focusRequest: number }): void;
+  unmountSearchEditor?(): void;
   /** 4.7 c1 (evolução ADITIVA, opção A aprovada 2026-09-26): renderiza o
    *  Editor Anexo dentro do `attachSlot` da barra auxiliar (à esquerda da
    *  árvore). `attach.setVisible` só alterna display:none — nunca desmonta. */

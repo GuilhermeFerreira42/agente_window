@@ -6,7 +6,7 @@ export function useWorkbenchShortcuts(handlers: WorkbenchShortcutHandlers, regis
   const current = useRef(handlers);
   current.current = handlers;
   useEffect(() => {
-    const ids: Record<string, string> = { '\\': 'workbench.action.splitEditor', b: 'workbench.action.toggleSidebarVisibility', '`': 'workbench.action.terminal.toggleTerminal', ',': 'workbench.action.openSettings', f11: 'workbench.action.toggleFullScreen' };
+    const ids: Record<string, string> = { 'search-editor': 'workbench.action.openSearchEditor', '\\': 'workbench.action.splitEditor', b: 'workbench.action.toggleSidebarVisibility', '`': 'workbench.action.terminal.toggleTerminal', ',': 'workbench.action.openSettings', f11: 'workbench.action.toggleFullScreen' };
     const offs = Object.entries(ids).map(([key, id]) => registry.register({ id, title: id, run: () => current.current[key]?.() }));
     return () => offs.forEach(off => off());
   }, [registry]);

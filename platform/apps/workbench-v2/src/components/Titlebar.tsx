@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Bot,
+  Eye,
   CircleAlert,
   CircleUserRound,
   GitCompareArrows,
@@ -33,6 +34,8 @@ interface TitlebarProps {
   workspacePath: string
   workspaceChangePending?: boolean
   onChangeWorkspace: (path: string) => Promise<void>
+  onFindFile?: () => void
+  onShowEditor?: () => void
   onBrowseWorkspace: () => void
   onAccountAction: (action: string) => void
 }
@@ -55,6 +58,8 @@ export function Titlebar({
   workspacePath,
   workspaceChangePending,
   onChangeWorkspace,
+  onFindFile,
+  onShowEditor,
   onBrowseWorkspace,
   onAccountAction,
 }: TitlebarProps) {
@@ -90,11 +95,12 @@ export function Titlebar({
         </div>
 
         <div className="titlebar-center">
-          {approved ? <div className="command-center is-approved"><span className="command-center-approved-label">Ação aprovada</span></div> : <WorkspaceSwitcher currentPath={workspacePath} pending={workspaceChangePending} onConfirm={onChangeWorkspace} onBrowse={onBrowseWorkspace}/>} 
+          {approved ? <div className="command-center is-approved"><span className="command-center-approved-label">Ação aprovada</span></div> : <WorkspaceSwitcher currentPath={workspacePath} pending={workspaceChangePending} onConfirm={onChangeWorkspace} onBrowse={onBrowseWorkspace} onFindFile={onFindFile}/>}
           <button className="workspace-switcher-sessions" type="button" aria-label="Mostrar sessões" title={activeSession.title} onClick={onShowSessions}>{activeSession.status === 'needs-input' ? <CircleAlert size={12}/> : <Bot size={12}/>}</button>
         </div>
 
         <div className="titlebar-right">
+          {onShowEditor && <button className="titlebar-button" type="button" aria-label="Mostrar editor" title="Mostrar editor" onClick={onShowEditor}><Eye size={15} /></button>}
           <button className="titlebar-button is-secondary" type="button" aria-label="Nova sessão" title="Nova sessão" onClick={onNewSession}>
             <Plus size={15} />
           </button>

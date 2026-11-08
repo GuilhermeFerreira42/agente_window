@@ -64,6 +64,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
       run: async () => { dismiss(); await action.run(); },
     })) ?? [];
     const extra = [
+      ['workbench.action.closeActiveEditor', 'Fechar editor'],
       ['workbench.action.quickOpen', 'Abrir arquivo rapidamente'], ['workbench.action.files.newFile', 'Novo arquivo'],
       ['workbench.action.files.saveAs', 'Salvar como'], ['workbench.action.splitEditor', 'Dividir editor'],
       ['workbench.action.openSettings', 'Abrir configurações'], ['workbench.action.toggleSidebarVisibility', 'Alternar barra lateral'],

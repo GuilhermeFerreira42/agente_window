@@ -1,3 +1,20 @@
+# Evidência vigente — D181, 08/11/2026
+
+Diretório externo: ../arena-operacional/feedback-2026-11-08/revisao-1436. Testes no perfil descartável 5199; inspeção pessoal 5174 não automatizada. Runtime oficial fixado Node26.13.0/npm11.20.0, Playwright1.63 Chromium no Windows. Vídeo atual lido localmente em quadros e ASR local, sem transferir mídia. HTML fornecido consultado como referência visual, sem executar seus scripts externos.
+
+- navegador.log/resultado.json: nove verificações de ocultação/rascunho/largura <=4px, revelar pelo Explorer, *.html aninhado, menu de caminhos, ações Search, Open Editors dirty real, arraste+F5 e Personalizações real.
+- complementar.log/resultado.json: quatro verificações de Search Editor real/cópia/consulta independente/abrir arquivo, Outline e Timeline. Filtro de Timeline testado; não implica que todo repositório tenha histórico.
+- editor-regressao.mjs.log/resultado.json: onze verificações anteriores de largura efetiva, cinco grupos, preservar texto, fechar/reabrir, F5, breadcrumbs, símbolos, caminhos especiais e preview.
+- regressao/resumo.json: oito roteiros, 49 verificações, incluindo 24 de teclas. Total atual 73, sem somar repetições nem medições anteriores não repetidas. Ctrl+W automatizado só comprova handler do produto, não a combinação física reservada ao Chrome.
+- gate.json/gate-final.log: 236 = 221 aprovados/2 falhas/13 ignorados em 22 arquivos. Timeout na exclusão da última sessão e falha posterior na landing vazia; reteste-integracao.json/log repete ambos juntos: 2 aprovados, sem mudar asserts/timeouts. Os 60 omitidos por -t não são skips novos da suíte. Reteste-timeout é outra repetição do mesmo caso, não teste inédito. Relatório guarda replay completo do App, se concluído, separadamente. Replay completo do App concluído: 49 aprovados, zero falhas, 13 ignorados preexistentes (62 casos), sem alterar timeout/asserts. Considerando o replay: 223 casos distintos aprovados e 13 ignorados, sem somar repetições.
+- typecheck-final.log: EXIT 0. lint-final.json compara cada arquivo alterado à base 8276ac4: 20 erros idênticos herdados (App17/index3), zero novo, quatro avisos; não confundir com perímetro D180 de 21.
+
+Falhas de harness preservadas: fluxo4 exigia placeholder visível, substituído pela exigência explícita D181 de invisibilidade; atalhos dependiam de fixture curta alterada por outro roteiro, agora semeada com linha longa, cursor posicionado explicitamente e texto conferido antes de formatar. Corrigida codificação da cópia do roteiro. Não se alterou produto para encobrir essas ocorrências. Canceled/Delayer nativo do Monaco continua em PAGEERRORS. Integral histórica 1469 pass/36 fail/30 skip não repetida. Sem execução de provedor IA, mudança em terminal/fs/server, push, homologação ou E15-d físico.
+
+Comandos pelo launcher platform/scripts/project.ps1 test [22 caminhos no gate-final.log] --maxWorkers=1 --minWorkers=1; typecheck pelo mesmo launcher. AGENTE_WINDOW_TEST_ROOT no operacional feedback/unitarios. Recuperação existente somente é substituída após clone/HEAD/tree/fsck e extração SHA256, com mídias temporárias/perfis excluídos; hashes finais fora do repo.
+
+---
+
 # Medição vigente — complemento de atalhos em 08/11/2026
 
 Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   ArchiveRestore,
@@ -47,6 +47,7 @@ interface SessionSidebarProps {
   activeChatId: string
   onSelectSession: (id: string) => void
   onSelectChat: (sessionId: string, chatId: string) => void
+  onOpenPersonalizations?: (section: 'visao' | 'habilidades' | 'ferramentas') => void
   onNewSession: () => void
   onTogglePinned: (id: string) => void
   onToggleArchived: (id: string) => void
@@ -296,6 +297,7 @@ export function SessionSidebar({
   onSelectSession,
   onSelectChat,
   onNewSession,
+  onOpenPersonalizations,
   onTogglePinned,
   onToggleArchived,
   onDelete,
@@ -307,6 +309,8 @@ export function SessionSidebar({
   onRemoveGroup,
   onOpenBeside,
 }: SessionSidebarProps) {
+  const [personalizationsCollapsed, setPersonalizationsCollapsed] = useState(() => { try { return localStorage.getItem('workbench.personalizations.collapsed') === 'true' } catch { return false } })
+  useEffect(() => { try { localStorage.setItem('workbench.personalizations.collapsed', String(personalizationsCollapsed)) } catch { /* private/quota */ } }, [personalizationsCollapsed])
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [readState, setReadState] = useState<SessionFilters['readState']>('all')
@@ -597,8 +601,11 @@ export function SessionSidebar({
         {groups.map((group) => renderGroup(group))}
         {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
       </div>
+      {onOpenPersonalizations && <section className="personalizations-shortcuts" aria-label="Atalhos de Personalizações">
+        <button className="personalizations-shortcuts-header" type="button" aria-expanded={!personalizationsCollapsed} onClick={() => setPersonalizationsCollapsed(value => !value)}><span>Personalizações</span>{personalizationsCollapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}</button>
+        {!personalizationsCollapsed && <div>{([{ id: 'visao', label: 'Visão geral' }, { id: 'habilidades', label: 'Habilidades' }, { id: 'ferramentas', label: 'Ferramentas' }] as const).map(section => <button type="button" key={section.id} onClick={() => onOpenPersonalizations(section.id)}>{section.label}</button>)}</div>}
+      </section>}
       <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
     </aside>
   )
 }
-

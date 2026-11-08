@@ -1522,7 +1522,7 @@ describe('App session flows', () => {
     expect(screen.queryByRole('tab', { name: /Files \(divisão\)/ })).not.toBeInTheDocument()
   })
 
-  it('oculta e mostra o conteúdo do editor mantendo a barra de abas (detail-only)', async () => {
+  it('D181: oculta a coluna inteira e restaura as abas preservadas', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
@@ -1531,10 +1531,10 @@ describe('App session flows', () => {
     expect(document.querySelector('.editor-tabs')).not.toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
-    // A barra de abas permanece visível (invariante CAT-A4)...
+    // A árvore preserva as abas; o usuário não vê a coluna recolhida.
     expect(document.querySelector('.editor-tabs')).not.toBeNull()
-    // ...mas o conteúdo do editor é substituído pelo placeholder de oculto.
-    expect(screen.getByTestId('editor-hidden-content')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-hidden-content')).not.toBeVisible()
+    expect(document.querySelector('.editor-pane')).not.toBeVisible()
 
     // O botão da toolbar (o primeiro) alterna de volta para "Mostrar editor".
     await user.click(screen.getAllByRole('button', { name: 'Mostrar editor' })[0])
@@ -1544,7 +1544,7 @@ describe('App session flows', () => {
   // R-040: o DockedAuxiliaryBarController fecha as abas NÃO-acopladas ao entrar
   // em Detail-only (mantém Changes/Files acopladas), capturando as restauráveis
   // (Browser) e restaurando-as ao mostrar o editor de novo.
-  it('Detail-only fecha a aba Browser não-acoplada e a restaura ao mostrar o editor (R-040)', async () => {
+  it('D181: ocultar preserva Browser e Changes sem remover seus recursos', async () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
     await openInitialBrowser(user)
@@ -1557,7 +1557,8 @@ describe('App session flows', () => {
     // Hide Editor → Detail-only: a Browser (não-acoplada) é fechada, a Changes fica.
     await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     expect(screen.queryByRole('tab', { name: 'Browser' })).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Branch Changes/ })).toBeInTheDocument()
+    expect(Array.from(document.querySelectorAll('.editor-tab-title')).map(tab => tab.textContent)).toEqual(expect.arrayContaining(['Browser', 'Branch Changes']))
+    expect(document.querySelector('.editor-pane')).not.toBeVisible()
 
     // Show Editor → a Browser capturada é restaurada.
     await user.click(screen.getAllByRole('button', { name: 'Mostrar editor' })[0])
@@ -1923,7 +1924,8 @@ describe('App session flows', () => {
       // "Desligar". Um mock fixo não passaria nestas duas linhas.
       expect(within(surface).getByText('/commit')).toBeInTheDocument()
       expect(within(surface).getByText('Padroniza commits.')).toBeInTheDocument()
-      expect(within(surface).getByRole('button', { name: 'Ligar Excluir' })).toBeInTheDocument()
+      await user.click(within(surface).getByRole('button', { name: 'Ferramentas' }))
+      expect(within(surface).getByRole('button', { name: 'Ligar Excluir' })).toBeVisible()
       expect(within(surface).getByRole('button', { name: 'Desligar Ler arquivo' })).toBeInTheDocument()
     } finally {
       // Sem isto, um fetch falso vazaria para os testes seguintes do arquivo.

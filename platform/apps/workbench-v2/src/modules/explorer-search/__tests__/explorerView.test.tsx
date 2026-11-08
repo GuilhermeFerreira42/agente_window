@@ -8,7 +8,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { ExplorerView } from '../ui/ExplorerView';
+import { ExplorerView, type ExplorerViewProps } from '../ui/ExplorerView';
+import { EditorService } from '../core/editor/editorService';
 import { ExplorerService } from '../core/explorerService';
 import { FakeFsPort } from './fakeFs';
 import { asWorkspaceUri } from '../core/uri';
@@ -52,11 +53,12 @@ beforeEach(() => {
   };
 });
 
-async function bootView(): Promise<ReturnType<typeof render>> {
+async function bootView(editorList?: ExplorerViewProps['editorList']): Promise<ReturnType<typeof render>> {
   await service.openFolder({ uri: ROOT });
   const view = render(
     <ExplorerView
       service={service}
+      editorList={editorList}
       menus={menus}
       contextMenu={{ open: (input) => menuOpen.push(input) }}
       fs={fs}
@@ -218,8 +220,11 @@ describe('ExplorerView — input inline criar/renomear (A1.1/A1.2, 04_02 §4)', 
 });
 
 describe('ExplorerView — seções (A2.4) + overflow (A1.5)', () => {
-  it('Open Editors: OCULTA por padrão (VS Code, c5); após explorer.views.toggle.openEditors é um pane colapsado que lista os arquivos abertos (A2.4)', async () => {
-    await bootView();
+  it('Open Editors deriva das abas reais; fechar remove a aba, não só uma linha histórica', async () => {
+    const editor = new EditorService();
+    const uri = asWorkspaceUri('/ws/README.md');
+    editor.open({ sessionId: 's1', uri, kind: 'code', pinned: true });
+    await bootView({ entries: () => editor.getTabs('s1').map(tab => ({ uri: tab.uri, groupId: 's1', dirty: tab.dirty, active: tab.active })), onChanged: cb => editor.onEvent(() => cb()), activate: (_group, file) => editor.activate({ sessionId: 's1', uri: file }), close: (_group, file) => { editor.close({ sessionId: 's1', uri: file }); }, saveAll: async () => undefined });
     expect(screen.queryByRole('button', { name: 'Open Editors Section' }), 'oculta por padrão').toBeNull();
     await menus.execute('explorer.views.toggle.openEditors');
     const header = await screen.findByRole('button', { name: 'Open Editors Section' });
@@ -229,6 +234,10 @@ describe('ExplorerView — seções (A2.4) + overflow (A1.5)', () => {
     expect(header.getAttribute('aria-expanded')).toBe('true');
     const list = screen.getByRole('list', { name: 'Open Editors' });
     expect(within(list).getByText('README.md')).toBeTruthy();
+    fireEvent.click(within(list).getByRole('button', { name: 'Close Editor' }));
+    expect(editor.getTabs('s1')).toHaveLength(0);
+    expect(within(list).queryByText('README.md')).toBeNull();
+    editor.dispose();
   });
 
   it('Timeline e Outline presentes (A2.5/A2.6 mínimo)', async () => {

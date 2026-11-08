@@ -12,6 +12,8 @@ O **Agente Window** é construído sob uma proporção clara de fidelidade:
 - **Régua fixada (D71, 2026-10-14): VS Code 1.135** — versão de referência para fidelidade (comportamento + visual), homologada pelo dono. Versões **posteriores** (1.136+) são consultadas apenas como **refinamento futuro** — nunca para contradizer a 1.135.
 - Base em React + Vite em `platform/apps/workbench-v2/`. Monorepo npm em `platform/`. Idioma do time: PT-BR simples; UI em inglês (fiel ao VS Code).
 
+**Reforço do dono (08/11/2026, D181):** experiência reconhecível como VS Code/Agents Window modificado, intuitiva para quem conhece editores semelhantes. Arquitetura própria não justifica mudar o significado de controles ou oferecer interações sem efeito real. Paridade é critério de validação, não afirmação de completude atual.
+
 ### 1.1 Objetivo final do produto
 O **Agente Window** deverá ser um ambiente de desenvolvimento assistido por inteligência artificial, extensível e independente de provedor, capaz de executar tarefas complexas de engenharia de software com **autonomia controlada**. Deverá auxiliar o usuário ao longo de todo o ciclo de desenvolvimento de projetos de software: investigação, compreensão, planejamento, documentação, implementação, testes, manutenção e evolução.
 

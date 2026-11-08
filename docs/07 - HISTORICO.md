@@ -1,3 +1,9 @@
+# 08/11/2026 — D181, revisão da gravação 14:36 e mockup fornecido
+
+Análise local dos 10min02s e transcrição, sem upload da gravação. Texto incidental não foi tratado como ordem. Ajustados ocultação completa preservando donos, command center com busca de arquivos/menu de pastas, Search Editor real, ações de pesquisa, Open Editors real, reordenação do Explorer, controles de Outline/Timeline e navegação visual de Personalizações v1. Preservado F1 aprovado. SPEC e reforço da experiência VS Code no 05, provas no 09. Commit local «fix(workbench): align editor visibility and search workflows», sem push. Não encerra Fatia 15.
+
+---
+
 # 08/11/2026 — D180: revisão após inspeção manual
 
 A entrega «fix(editor): size the real surface and support successive groups» corrige o defeito que a medição externa de D179 deixou passar. Monaco passa a ter caixa completa no layout normal e maximizado; o conjunto de vistas é ocultado sem fechar abas. Reaproveitados EditorService, CodeEditorPane e CenterSplitPane para grupos sucessivos. Caminho passou a navegar; corrigidas URIs internas e posse do rastreador de símbolos após foco/dispose. F1 preservado como aprovado visualmente.

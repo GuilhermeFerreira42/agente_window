@@ -14,7 +14,7 @@ import React from 'react';
 import type { ExplorerService } from '../core/explorerService';
 import { ExplorerCreateConflictError, ExplorerRenameConflictError } from '../core/explorerService';
 import type { ExplorerItem } from '../core/explorerModel';
-import type { CommandRegistryLike, FileSystemPortLike, WorkspaceUri, ExplorerSearchEvent } from '../contract';
+import type { CommandRegistryLike, FileSystemPortLike, WorkspaceUri } from '../contract';
 import { uriBasename, uriDirname, uriJoinPath, uriPath, uriRelative } from '../core/uri';
 import { decideDragOver, planDrop, resolveDropTarget } from '../core/dndPolicy';
 import type { DndData } from '../core/dndPolicy';
@@ -49,6 +49,13 @@ export interface ExplorerViewProps {
   /** 5.6 (A0.6): arquivo ativo do anexo → Outline (símbolos do Monaco) e Timeline (git log).
    *  Opcional/aditivo: sem ele as seções mostram só a mensagem padrão. */
   activeFile?: ExplorerActiveFileApi;
+  editorList?: {
+    entries(): Array<{ uri: WorkspaceUri; groupId: string; dirty: boolean; active: boolean }>;
+    onChanged(cb: () => void): () => void;
+    activate(groupId: string, uri: WorkspaceUri): void;
+    close(groupId: string, uri: WorkspaceUri): void;
+    saveAll(): Promise<void>;
+  };
 }
 
 const DND_MIME = 'application/vnd.code.tree.explorer';
@@ -73,8 +80,13 @@ interface PaneProps {
   onHeaderContextMenu?(ev: React.MouseEvent): void;
 }
 
-const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, headerClassName, paneClassName, actions, headerExtra, children, onHeaderContextMenu }) => (
-  <div className="split-view-view visible" data-pane={id}>
+const PANE_DND = 'application/x-agente-window-pane';
+const PaneOrder = React.createContext<{ order: string[]; move(from: string, to: string): void } | null>(null);
+
+const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, headerClassName, paneClassName, actions, headerExtra, children, onHeaderContextMenu }) => {
+  const layout = React.useContext(PaneOrder);
+  return <div className="split-view-view visible" data-pane={id} style={{ order: layout?.order.indexOf(id) }}>
+
     <div className={`pane vertical${expanded ? ' expanded' : ''}${paneClassName ? ' ' + paneClassName : ''}`}>
       <div
         className={`pane-header${expanded ? ' expanded' : ''}${headerClassName ? ' ' + headerClassName : ''}`}
@@ -82,8 +94,13 @@ const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, h
         tabIndex={0}
         aria-expanded={expanded}
         aria-label={ariaLabel}
+        draggable={!!layout}
+        title="Arraste para reorganizar; Alt+seta move a seção"
+        onDragStart={event => { if ((event.target as Element).closest('a,button,input')) { event.preventDefault(); return; } event.stopPropagation(); event.dataTransfer.setData(PANE_DND, id); event.dataTransfer.effectAllowed = 'move'; }}
+        onDragOver={event => { if (event.dataTransfer.types.includes(PANE_DND)) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }}
+        onDrop={event => { const from = event.dataTransfer.getData(PANE_DND); if (from) { event.preventDefault(); event.stopPropagation(); layout?.move(from, id); } }}
         onClick={onToggle}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        onKeyDown={(e) => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && layout) { e.preventDefault(); const next = layout.order[layout.order.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1)]; if (next) layout.move(id, next); } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
         onContextMenu={onHeaderContextMenu}
       >
         <div className={`twisty-container codicon codicon-view-pane-container-${expanded ? 'expanded' : 'collapsed'}`} />
@@ -95,8 +112,8 @@ const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, h
       </div>
       {expanded && <div className="pane-body">{children}</div>}
     </div>
-  </div>
-);
+  </div>;
+};
 
 // ---------------------------------------------------------------------------
 // Toolbar do pane-header (`.monaco-toolbar > .monaco-action-bar > ul.actions-container`)
@@ -286,7 +303,7 @@ class ViewRenderTick {
 
 interface TransferStatus { kind: 'upload' | 'download'; text: string }
 interface ConflictState { name: string; resolve: (action: 'replace' | 'skip' | 'cancel') => void }
-interface OpenEditorEntry { uri: WorkspaceUri }
+interface OpenEditorEntry { uri: WorkspaceUri; groupId: string; dirty: boolean; active: boolean }
 type PaneId = 'folders' | 'openEditors' | 'outline' | 'timeline';
 const VIEWS_VISIBILITY_STORAGE_KEY = 'explorer-search.viewsVisibility.v1';
 
@@ -301,13 +318,28 @@ const FOLDER_ACTIONS: HeaderAction[] = [
 // ---------------------------------------------------------------------------
 // ExplorerView
 // ---------------------------------------------------------------------------
-export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges, activeFile }: ExplorerViewProps): React.ReactElement {
+export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges, activeFile, editorList }: ExplorerViewProps): React.ReactElement {
   const tickRef = React.useRef<ViewRenderTick | null>(null);
   if (!tickRef.current) tickRef.current = new ViewRenderTick();
   const tick = tickRef.current;
   const version = React.useSyncExternalStore(tick.subscribe, tick.snapshot, tick.snapshot);
   React.useEffect(() => () => tick.dispose(), [tick]);
 
+  const [paneOrder, setPaneOrder] = React.useState<string[]>(() => {
+    const defaults = ['folders', 'openEditors', 'outline', 'timeline'];
+    try { const saved: unknown = JSON.parse(localStorage.getItem('explorer-search.paneOrder.v1') ?? 'null'); if (Array.isArray(saved)) return [...new Set([...saved.filter(id => defaults.includes(id)), ...defaults])]; } catch { /* default */ }
+    return defaults;
+  });
+  const movePane = (from: string, to: string) => setPaneOrder(current => {
+    if (from === to || !current.includes(from) || !current.includes(to)) return current;
+    const result = [...current]; result.splice(result.indexOf(from), 1); result.splice(current.indexOf(to), 0, from); return result;
+  });
+  React.useEffect(() => { try { localStorage.setItem('explorer-search.paneOrder.v1', JSON.stringify(paneOrder)); } catch { /* private/quota */ } }, [paneOrder]);
+  const [outlineSorted, setOutlineSorted] = React.useState(false);
+  const [outlineCollapsed, setOutlineCollapsed] = React.useState(false);
+  const [timelineFilter, setTimelineFilter] = React.useState('');
+  const [timelineFilterOpen, setTimelineFilterOpen] = React.useState(false);
+  const [actionError, setActionError] = React.useState('');
   // ---- estado local ----
   const [expandedPanes, setExpandedPanes] = React.useState<Record<PaneId, boolean>>({
     folders: true, openEditors: false, outline: false, timeline: false,
@@ -330,7 +362,8 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   const [dropTargetUri, setDropTargetUri] = React.useState<WorkspaceUri | null>(null);
   const [transferStatus, setTransferStatus] = React.useState<TransferStatus | null>(null);
   const [conflict, setConflict] = React.useState<ConflictState | null>(null);
-  const [openEditors, setOpenEditors] = React.useState<OpenEditorEntry[]>([]);
+  const [openEditors, setOpenEditors] = React.useState<OpenEditorEntry[]>(() => editorList?.entries() ?? []);
+  React.useEffect(() => { const sync = () => setOpenEditors(editorList?.entries() ?? []); sync(); return editorList?.onChanged(sync); }, [editorList]);
   // 5.6 — Outline/Timeline REAIS (A0.6): seguem o arquivo ativo do anexo.
   const [activeUri, setActiveUri] = React.useState<WorkspaceUri | null>(() => activeFile?.getActiveUri() ?? null);
   const [outlineRows, setOutlineRows] = React.useState<OutlineRow[]>(() => activeFile?.outline.rows() ?? []);
@@ -442,10 +475,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   }, [version, rows, service]);
 
   // ---- eventos do serviço → re-render + Open Editors + Timeline ----
-  React.useEffect(() => service.onEvent((e: ExplorerSearchEvent) => {
-    if (e.type === 'explorer.fileOpened') {
-      setOpenEditors((prev) => (prev.some((o) => o.uri === e.uri) ? prev : [...prev, { uri: e.uri }]));
-    }
+  React.useEffect(() => service.onEvent(() => {
     tick.bump();
   }), [service, tick]);
 
@@ -475,7 +505,8 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
     void activeFile.timeline.openDiff(activeUri, item).catch(() => undefined);
   };
   // Outline só faz sentido quando os símbolos são do arquivo ativo (o tracker zera ao trocar de modelo).
-  const outlineVisibleRows = activeUri ? outlineRows : [];
+  const outlineVisibleRows = activeUri ? [...outlineRows].filter(row => !outlineCollapsed || row.depth === 0).sort((a, b) => outlineSorted ? a.name.localeCompare(b.name) : a.line - b.line) : [];
+  const visibleTimeline = timeline.filter(item => `${item.label} ${item.author}`.toLocaleLowerCase().includes(timelineFilter.toLocaleLowerCase()));
 
   // ---- context keys (04_03 §7) publicadas via menus.setContext ----
   const computeContext = React.useCallback((contextUri?: WorkspaceUri | null): ExplorerContextValues => {
@@ -1014,7 +1045,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
   };
 
   return (
-    <div
+    <PaneOrder.Provider value={{ order: paneOrder, move: movePane }}><div
       className="composite viewlet explorer-viewlet"
       data-testid="explorer-view"
       onFocus={() => { viewletFocusRef.current = true; menus.setContext('explorerViewletFocus', true); }}
@@ -1025,6 +1056,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
       }}
       onDragLeave={(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setDropTargetUri(null); }}
     >
+      {actionError && <div className="pane-message" role="alert">{actionError}</div>}
       <input ref={uploadInputRef} type="file" multiple hidden data-testid="explorer-upload-input" onChange={onUploadInputChange} />
       <div className="monaco-pane-view">
         <div className="monaco-split-view2 vertical">
@@ -1081,7 +1113,8 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                 expanded={expandedPanes.openEditors}
                 onToggle={() => togglePane('openEditors')}
                 onHeaderContextMenu={onPaneHeaderContextMenu('openEditors')}
-                headerExtra={<div className="open-editors-dirty-count-container" />}
+                headerExtra={<div className="open-editors-dirty-count-container">{openEditors.filter(entry => entry.dirty).length || ''}</div>}
+                actions={editorList && <HeaderActions actions={[{ id: 'save-all', label: 'Salvar todos os arquivos', icon: 'save-all' }, { id: 'close-active', label: 'Fechar editor ativo', icon: 'close' }]} onRun={id => { if (id === 'save-all') void editorList.saveAll().catch(error => setActionError(String(error))); else { const entry = openEditors.find(item => item.active); if (entry) editorList.close(entry.groupId, entry.uri); } }} />}
               >
                 <div className="pane-body-inner open-editors show-file-icons">
                   <div className="monaco-list list_id_2 mouse-support" role="list" aria-label="Open Editors">
@@ -1091,20 +1124,20 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                           const item = service.findItem(o.uri);
                           const name = uriBasename(o.uri);
                           return (
-                            <div key={o.uri} className="monaco-list-row" role="listitem" aria-label={name}
+                            <div key={`${o.groupId}:${o.uri}`} className={`monaco-list-row${o.active ? ' selected focused' : ''}`} role="listitem" aria-label={name}
                               style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px` }}
-                              onClick={() => openRow(o.uri)}>
+                              onClick={() => editorList?.activate(o.groupId, o.uri)}>
                               <div className="monaco-action-bar">
                                 <ul className="actions-container" role="toolbar">
                                   <li className="action-item" role="presentation">
                                     <a className="action-label codicon codicon-close" role="button" aria-label="Close Editor" title="Close Editor"
-                                      onClick={(ev) => { ev.stopPropagation(); setOpenEditors((prev) => prev.filter((x) => x.uri !== o.uri)); }} />
+                                      tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); editorList?.close(o.groupId, o.uri); } }} onClick={(ev) => { ev.stopPropagation(); editorList?.close(o.groupId, o.uri); }} />
                                   </li>
                                 </ul>
                               </div>
                               <div className={`${item ? iconLabelClasses(item) : 'monaco-icon-label file-icon explorer-item'} open-editor`} aria-label={o.uri}>
                                 <div className="monaco-icon-label-container">
-                                  <span className="monaco-icon-name-container"><a className="label-name">{name}</a></span>
+                                  <span className="monaco-icon-name-container"><a className="label-name">{name}{o.dirty ? ' •' : ''}</a></span>
                                 </div>
                               </div>
                             </div>
@@ -1117,7 +1150,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
               </Pane>}
 
               {/* ---- Outline ---- */}
-              {viewsVisibility.outline && <Pane id="outline" title="Outline" ariaLabel="Outline Section" expanded={expandedPanes.outline} onToggle={() => togglePane('outline')} onHeaderContextMenu={onPaneHeaderContextMenu('outline')}>
+              {viewsVisibility.outline && <Pane id="outline" title="Outline" ariaLabel="Outline Section" expanded={expandedPanes.outline} onToggle={() => togglePane('outline')} onHeaderContextMenu={onPaneHeaderContextMenu('outline')} actions={<HeaderActions actions={[{ id: 'sort', label: 'Ordenar símbolos por nome', icon: 'sort-precedence' }, { id: 'collapse', label: outlineCollapsed ? 'Expandir símbolos' : 'Recolher símbolos', icon: 'collapse-all' }]} onRun={id => id === 'sort' ? setOutlineSorted(value => !value) : setOutlineCollapsed(value => !value)} />}>
                 <div className="outline-pane">
                   {outlineVisibleRows.length === 0
                     ? <div className="pane-message">No symbols found in document</div>
@@ -1158,15 +1191,16 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
               </Pane>}
 
               {/* ---- Timeline ---- */}
-              {viewsVisibility.timeline && <Pane id="timeline" title="Timeline" ariaLabel="Timeline Section" expanded={expandedPanes.timeline} onToggle={() => togglePane('timeline')} headerClassName="timeline-view" onHeaderContextMenu={onPaneHeaderContextMenu('timeline')}>
+              {viewsVisibility.timeline && <Pane id="timeline" title="Timeline" ariaLabel="Timeline Section" expanded={expandedPanes.timeline} onToggle={() => togglePane('timeline')} headerClassName="timeline-view" onHeaderContextMenu={onPaneHeaderContextMenu('timeline')} actions={<HeaderActions actions={[{ id: 'refresh', label: 'Atualizar histórico', icon: 'refresh', disabled: !activeUri }, { id: 'filter', label: 'Filtrar histórico', icon: 'filter' }]} onRun={id => { if (id === 'filter') setTimelineFilterOpen(value => !value); else if (activeUri && activeFile) void activeFile.timeline.load(activeUri).then(setTimeline).catch(error => setActionError(String(error))); }} />}>
                 <div className="timeline-pane">
-                  {timeline.length === 0
+                  {timelineFilterOpen && <input aria-label="Filtrar histórico" value={timelineFilter} onChange={event => setTimelineFilter(event.target.value)} />}
+                  {visibleTimeline.length === 0
                     ? <div className="pane-message">The active editor cannot provide timeline information.</div>
                     : (
                       <div className="monaco-list" role="tree" aria-label="Timeline">
                         <div className="monaco-scrollable-element" role="presentation">
-                          <div className="monaco-list-rows" style={{ height: timeline.length * ROW_HEIGHT }}>
-                            {timeline.map((t, i) => (
+                          <div className="monaco-list-rows" style={{ height: visibleTimeline.length * ROW_HEIGHT }}>
+                            {visibleTimeline.map((t, i) => (
                               <div
                                 key={t.id}
                                 className={`monaco-list-row${timelineSelected === t.id ? ' selected focused' : ''}`}
@@ -1227,7 +1261,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
           </div>
         </div>
       )}
-    </div>
+    </div></PaneOrder.Provider>
   );
 }
 

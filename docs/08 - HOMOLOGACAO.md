@@ -1,3 +1,20 @@
+# Inspeção vigente — D181, 08/11/2026
+
+Salve seus rascunhos e recarregue 5174. Com arquivos descartáveis, confira um item de cada vez:
+
+1. X principal oculta toda a coluna; chat ganha largura. Mostrar editor devolve abas e texto; abrir arquivo pelo Explorer também revela.
+2. Barra superior mostra caminho (inteiro no tooltip); clique busca por nome ou *.html. Menu separado permite digitar pasta/procurar pasta.
+3. Pesquisa lateral distingue conteúdo de nome e abre Replace/incluir/excluir. Atualizar, limpar e recolher/expandir devem agir nos resultados.
+4. Abrir pesquisa no editor copia a consulta e produz resultados reais; editar ali não altera consulta lateral. Resultado abre arquivo.
+5. Habilite Open Editors pelo menu de cabeçalho; fechar uma linha fecha a aba verdadeira. Dirty exige Salvar/Não Salvar/Cancelar.
+6. Arraste seções do Explorer e recarregue para conferir ordem. Outline ordena/recolhe símbolos reais; Timeline atualiza e filtra histórico disponível.
+7. Personalizações no rodapé esquerdo recolhe/expande e abre Visão geral/Habilidades/Ferramentas. Navegação mostra uma seção por vez; criar/ligar/desligar permanece real.
+8. Confira novamente maximizar, divisões sucessivas, breadcrumbs e preview Markdown. F1 mantém visual aprovado; Alt+Z alterna quebra visual.
+
+Ctrl+W pode ser reservado pelo navegador; fechar pela UI/paleta é o caminho disponível. Pesquisa de arquivo não troca a pasta sem confirmação. F5 não preserva rascunhos. Esta lista é para seu aceite, ainda não é homologação da Fatia 15.
+
+---
+
 # Inspeção vigente — D180 (08/11/2026)
 
 Salve eventual rascunho antes de recarregar a página para carregar todos os componentes atualizados. Confira a largura real do texto ao maximizar e sua altura ao restaurar. Use o X da barra principal: todo o conjunto de editores deve sumir, com abas conservadas; Mostrar editor devolve as mesmas vistas. O X dentro de um grupo fecha aquele grupo.

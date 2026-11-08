@@ -33,6 +33,9 @@ export interface SearchPanelProps {
   focusRequest?: number;
   /** c6 — clique/Enter num match: o módulo emite `explorer.fileOpened` (+ reveal no Explorer). */
   onOpenMatch?: (m: SearchMatch) => void;
+  onOpenEditor?: () => void;
+  storageKey?: string;
+  autoSearch?: boolean;
 }
 
 // c6 — persistência (searchView.ts saveState: query/replace/toggles/include/
@@ -43,12 +46,12 @@ export interface PersistedSearchState {
   isCaseSensitive: boolean; isWholeWord: boolean; isRegExp: boolean; preserveCase: boolean; useExcludeSettings: boolean;
   replaceOpen: boolean; detailsOpen: boolean;
 }
-function loadPersisted(): PersistedSearchState | null {
+function loadPersisted(storageKey = SEARCH_STORAGE_KEY): PersistedSearchState | null {
   try {
-    const raw = globalThis.localStorage?.getItem(SEARCH_STORAGE_KEY);
+    const raw = globalThis.localStorage?.getItem(storageKey);
     if (!raw) return null;
     const v = JSON.parse(raw) as Partial<PersistedSearchState>;
-    if (typeof v.pattern !== 'string' || v.pattern.length === 0) return null;
+    if (typeof v.pattern !== 'string') return null;
     return {
       pattern: v.pattern, replacement: typeof v.replacement === 'string' ? v.replacement : '',
       include: typeof v.include === 'string' ? v.include : '', exclude: typeof v.exclude === 'string' ? v.exclude : '',
@@ -195,8 +198,8 @@ export interface SearchState {
   matches: SearchMatch[]; fileCount: number; truncated: boolean; status: 'idle' | 'searching' | 'done' | 'error'; error?: string;
 }
 
-export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchPanelProps) {
-  const [persisted] = useState(() => loadPersisted());
+export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEditor, storageKey = SEARCH_STORAGE_KEY, autoSearch = false }: SearchPanelProps) {
+  const [persisted] = useState(() => loadPersisted(storageKey));
   const [pattern, setPattern] = useState(persisted?.pattern ?? '');
   const [replacement, setReplacement] = useState(persisted?.replacement ?? '');
   const [include, setInclude] = useState(persisted?.include ?? '');
@@ -204,18 +207,17 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchP
   const [toggles, setToggles] = useState<SearchToggles>(persisted
     ? { isCaseSensitive: persisted.isCaseSensitive, isWholeWord: persisted.isWholeWord, isRegExp: persisted.isRegExp, preserveCase: persisted.preserveCase, useExcludeSettings: persisted.useExcludeSettings }
     : { isCaseSensitive: false, isWholeWord: false, isRegExp: false, preserveCase: false, useExcludeSettings: true });
-  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? false);
-  const [detailsOpen, setDetailsOpen] = useState(persisted?.detailsOpen ?? false);
+  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? true);
+  const [detailsOpen, setDetailsOpen] = useState(persisted?.detailsOpen ?? true);
   // estado restaurado NÃO dispara busca sozinho (só digitação/Enter)
-  const armedRef = useRef(!persisted);
+  const armedRef = useRef(autoSearch || !persisted || persisted.pattern.length === 0);
 
   useEffect(() => {
     try {
-      if (pattern.length === 0) { globalThis.localStorage?.removeItem(SEARCH_STORAGE_KEY); return; }
       const v: PersistedSearchState = { pattern, replacement, include, exclude, ...toggles, replaceOpen, detailsOpen };
-      globalThis.localStorage?.setItem(SEARCH_STORAGE_KEY, JSON.stringify(v));
+      globalThis.localStorage?.setItem(storageKey, JSON.stringify(v));
     } catch { /* storage indisponível */ }
-  }, [pattern, replacement, include, exclude, toggles, replaceOpen, detailsOpen]);
+  }, [pattern, replacement, include, exclude, toggles, replaceOpen, detailsOpen, storageKey]);
   const [state, setState] = useState<SearchState>(() => {
     // remontagem (troca de aba): reaproveita o último resultado se for da mesma consulta
     const last = search.lastResult;
@@ -231,6 +233,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchP
   // c5 — matches descartados (Dismiss) ou já trocados saem da árvore sem nova busca
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [confirm, setConfirm] = useState<{ message: string; run: () => void } | null>(null);
+  const [allCollapsed, setAllCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const flip = useCallback((k: keyof SearchToggles) => setToggles((t) => ({ ...t, [k]: !t[k] })), []);
@@ -243,7 +246,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchP
 
   // eventos do serviço → estado
   useEffect(() => search.onEvent((e) => {
-    if (e.type === 'search.started') setState((s) => ({ ...s, status: 'searching' }));
+    if (e.type === 'search.started') { setAllCollapsed(false); setState((s) => ({ ...s, status: 'searching' })); }
     else if (e.type === 'search.finished') { setState({ matches: e.matches, fileCount: e.fileCount, truncated: e.truncated, status: 'done' }); setDismissed(new Set()); setNotice(null); }
     else if (e.type === 'error' && (e.code === 'invalid_query' || e.code === 'search_failed')) setState((s) => ({ ...s, status: 'error', error: e.message }));
   }), [search]);
@@ -354,6 +357,12 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchP
 
   return (
     <div className="search-view explorer-viewlet" data-testid="explorer-search-panel">
+      <div className="search-view-toolbar" role="toolbar" aria-label="Ações da pesquisa">
+        <button type="button" title="Atualizar pesquisa" aria-label="Atualizar pesquisa" disabled={!pattern} onClick={() => search.query({ root, query })}><span className="codicon codicon-refresh" /></button>
+        <button type="button" title="Limpar pesquisa" aria-label="Limpar pesquisa" onClick={() => { search.cancelPending(); setPattern(''); setNotice(null); setDismissed(new Set()); }}><span className="codicon codicon-clear-all" /></button>
+        {onOpenEditor && <button type="button" title="Abrir pesquisa no editor" aria-label="Abrir pesquisa no editor" onClick={onOpenEditor}><span className="codicon codicon-go-to-file" /></button>}
+        <button type="button" title={allCollapsed ? 'Expandir resultados' : 'Recolher resultados'} aria-label={allCollapsed ? 'Expandir resultados' : 'Recolher resultados'} onClick={() => setAllCollapsed(value => !value)}><span className="codicon codicon-collapse-all" /></button>
+      </div>
       <div className="search-widgets-container">
         <div className={`search-widget${replaceOpen ? ' replace-active' : ''}`}>
           <div
@@ -431,6 +440,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch }: SearchP
       <div className="results" data-testid="explorer-search-results">
         <SearchResults
           matches={visible}
+          collapseAll={allCollapsed}
           root={root}
           matchLengthOf={matchLengthOf}
           focusRequest={listFocusRequest}

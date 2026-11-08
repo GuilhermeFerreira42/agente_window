@@ -35,7 +35,9 @@ export function EditorFileDialog({ mode, fs, root, onAccept, onCancel }: {
     setBusy(true); setError('');
     try { await onAccept(path.trim()); } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
   };
-  const matches = files.filter(file => file.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 100);
+  const normalized = query.trim().toLocaleLowerCase();
+  const glob = normalized.includes('*') ? new RegExp(normalized.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*'), 'i') : null;
+  const matches = files.filter(file => glob ? glob.test(file) : file.toLocaleLowerCase().includes(normalized)).slice(0, 100);
   return <div className="editor-command-backdrop" onKeyDown={event => {
     event.stopPropagation();
     if (event.key === 'Escape' && !busy) onCancel();

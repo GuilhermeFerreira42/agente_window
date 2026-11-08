@@ -173,6 +173,7 @@ describe('PersonalizacoesView · liga/desliga persiste (critérios 2, 4 e 6)', (
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
 
+    await user.click(within(regiao).getByRole('button', { name: 'Habilidades' }))
     await user.click(within(regiao).getByRole('button', { name: 'Desligar commit' }))
 
     const put = chamadas.find((chamada) => chamada.method === 'PUT')
@@ -193,6 +194,7 @@ describe('PersonalizacoesView · liga/desliga persiste (critérios 2, 4 e 6)', (
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
 
+    await user.click(within(regiao).getByRole('button', { name: 'Habilidades' }))
     await user.click(within(regiao).getByRole('button', { name: 'Ligar commit' }))
 
     const put = chamadas.find((chamada) => chamada.method === 'PUT')
@@ -208,6 +210,7 @@ describe('PersonalizacoesView · liga/desliga persiste (critérios 2, 4 e 6)', (
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
 
+    await user.click(within(regiao).getByRole('button', { name: 'Ferramentas' }))
     await user.click(within(regiao).getByRole('button', { name: 'Desligar Excluir' }))
 
     const put = chamadas.find((chamada) => chamada.method === 'PUT')
@@ -221,6 +224,7 @@ describe('PersonalizacoesView · liga/desliga persiste (critérios 2, 4 e 6)', (
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
 
+    await user.click(within(regiao).getByRole('button', { name: 'Ferramentas' }))
     await user.click(within(regiao).getByRole('button', { name: 'Desligar o grupo Leitura' }))
 
     const put = chamadas.find((chamada) => chamada.method === 'PUT')
@@ -235,6 +239,7 @@ describe('PersonalizacoesView · liga/desliga persiste (critérios 2, 4 e 6)', (
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
 
+    await user.click(within(regiao).getByRole('button', { name: 'Ferramentas' }))
     await user.click(within(regiao).getByRole('button', { name: 'Ligar o grupo Leitura' }))
 
     const put = chamadas.find((chamada) => chamada.method === 'PUT')
@@ -355,3 +360,17 @@ describe('PersonalizacoesView · robustez (RNF14-2 e RF14-3)', () => {
     expect(fn.mock.calls.length).toBe(antes)
   })
 })
+
+it('D181: navegação abre uma seção por vez e a visão geral oferece cartões funcionais', async () => {
+  const user = userEvent.setup(); mockFetch({ skills: [skill({ nome: 'commit' })] });
+  render(<PersonalizacoesView />);
+  await screen.findByRole('button', { name: 'Gerenciar habilidades' });
+  const region = tela();
+  expect(within(region).getByText('Habilidades ativas')).toBeVisible();
+  await user.click(within(region).getByRole('button', { name: 'Gerenciar habilidades' }));
+  expect(within(region).getByText('/commit')).toBeVisible();
+  expect(within(region).getByText('Habilidades ativas')).not.toBeVisible();
+  await user.click(within(region).getByRole('button', { name: 'Ferramentas' }));
+  expect(within(region).getByRole('button', { name: 'Desligar Excluir' })).toBeVisible();
+  expect(within(region).getByText('/commit')).not.toBeVisible();
+});

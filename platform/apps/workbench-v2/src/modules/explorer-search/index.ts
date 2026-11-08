@@ -23,8 +23,8 @@ import type {
 import { SearchService } from './core/search/searchService';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { ExplorerView } from './ui/ExplorerView';
-import { SearchPanel } from './ui/search/SearchPanel';
+import { ExplorerView, type ExplorerViewProps } from './ui/ExplorerView';
+import { SearchPanel, SEARCH_STORAGE_KEY } from './ui/search/SearchPanel';
 import { AttachArea, type AttachAreaProps } from './ui/attach/AttachArea';
 // FATIA-15 Onda 2b (D146 §2) — corpo da aba central capaz de salvar.
 import { CenterCodeEditor, type CenterCodeEditorProps, type CenterCloseRequester } from './ui/center/CenterCodeEditor';
@@ -341,7 +341,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const activeCodeUri = (): WorkspaceUri | null => {
     const sid = sessionIdDaSuperficie();
     if (!sid) return null;
-    const t = editorService.getActive(sid);
+    const t = editorService.getActive(editorService.focusedGroupId(sid));
     return t && t.kind === 'code' ? t.uri : null;
   };
   const activeFileApi: ExplorerActiveFileApi = {
@@ -389,7 +389,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // executada assim que o anexo montar (zero aba fantasma / sumiço pós-F5).
   let pendingAttachOpen: ((sessionId: string) => void) | null = null;
   attachApi.setSessionContext = ({ sessionId }) => {
-    sessionContext = sessionId;
+    sessionContext = sessionId; for (const cb of editorListListeners) cb();
     if (pendingAttachOpen) {
       const open = pendingAttachOpen;
       pendingAttachOpen = null;
@@ -409,6 +409,26 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const onOpenMatch = (m: SearchMatch) => {
     openInAttachSession((sessionId) => editorService.open({ sessionId, uri: m.uri, kind: 'code', line: m.line, column: m.column }));
     void service.reveal({ uri: m.uri }).catch(() => undefined);
+  };
+  const editorListListeners = new Set<() => void>();
+  const editorList: NonNullable<ExplorerViewProps['editorList']> = {
+    entries: () => {
+      const sid = sessionIdDaSuperficie();
+      return sid ? editorService.groupIds(sid).flatMap(groupId => editorService.getTabs(groupId).filter(tab => tab.kind === 'code').map(tab => ({ uri: tab.uri, groupId, dirty: tab.dirty, active: tab.active && editorService.focusedGroupId(sid) === groupId }))) : [];
+    },
+    onChanged: cb => { editorListListeners.add(cb); const off = editorService.onEvent(() => cb()); return () => { off(); editorListListeners.delete(cb); }; },
+    activate: (groupId, uri) => { const sid = sessionIdDaSuperficie(); if (!sid) return; editorService.activate({ sessionId: groupId, uri }); events.fire({ type: 'editor.navigationRequested', sessionId: sid, uri: editorService.getActive(sid)?.uri ?? uri }); },
+    close: (groupId, uri) => { const sid = sessionIdDaSuperficie(); if (sid) centerCloseRequesters.get(sid)?.({ sessionId: sid, groupId, uri }); },
+    saveAll: async () => { for (const uri of new Set(editorList.entries().filter(tab => tab.dirty).map(tab => tab.uri))) await attachSave(uri); },
+  };
+  const searchDocuments = new Map<string, SearchService>();
+  const searchDocumentRequests = new Map<string, number>();
+  let searchDocumentRoot: Root | null = null;
+  let searchDocumentContainer: HTMLElement | null = null;
+  const unmountSearchEditor = () => {
+    const previous = searchDocumentRoot; searchDocumentRoot = null;
+    searchDocumentContainer?.remove(); searchDocumentContainer = null;
+    if (previous) setTimeout(() => previous.unmount(), 0);
   };
   // 5.3 — Source Control View na Side Bar: mesmo ChangesPane da 4.7-b; clique num
   // recurso abre o diff read-only NO ANEXO (aba fixa Diff — até a 5.7).
@@ -528,15 +548,33 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
           service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
           // 5.3: "Open Source Control" (header Folders) → view `scm` da Side Bar (o shell decide onde ela vive).
           onOpenChanges: deps.openSourceControl,
-          activeFile: activeFileApi, // 5.6
+          activeFile: activeFileApi, editorList, // EditorService owns the list
         }),
       );
     },
 
+    mountSearchEditor(root, opts): void {
+      let service = searchDocuments.get(opts.sessionId);
+      if (!service) { service = new SearchService(deps.fs); searchDocuments.set(opts.sessionId, service); }
+      const storageKey = `${SEARCH_STORAGE_KEY}.editor.${opts.sessionId}`;
+      if (searchDocumentRequests.get(opts.sessionId) !== opts.focusRequest) {
+        try { const seed = localStorage.getItem(SEARCH_STORAGE_KEY); if (seed) localStorage.setItem(storageKey, seed); } catch { /* private/quota */ }
+        searchDocumentRequests.set(opts.sessionId, opts.focusRequest);
+      }
+      if (!searchDocumentRoot || searchDocumentContainer?.parentElement !== root) {
+        unmountSearchEditor();
+        searchDocumentContainer = root.ownerDocument.createElement('div');
+        searchDocumentContainer.style.display = 'contents'; root.appendChild(searchDocumentContainer);
+        searchDocumentRoot = createRoot(searchDocumentContainer);
+      }
+      searchDocumentRoot.render(createElement(SearchPanel, { key: `${opts.sessionId}:${opts.focusRequest}`, search: service, root: deps.workspaceRoot, storageKey, autoSearch: true, focusRequest: opts.focusRequest, onOpenMatch }));
+    },
+    unmountSearchEditor,
+
     mountSearch(root: HTMLElement, opts?: { focusRequest?: number }): void {
       // mesmo host → só re-render (foco pedido); host novo → remonta.
       if (searchRoot && searchContainer && searchContainer.parentElement === root) {
-        searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenMatch }));
+        searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
         return;
       }
       unmountSearch();
@@ -545,7 +583,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       root.appendChild(container);
       searchContainer = container;
       searchRoot = createRoot(container);
-      searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenMatch }));
+      searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
     },
 
     unmountSearch,
@@ -667,6 +705,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       unmountCodeEditor();
       offEditor();
       offLayoutMax(); offLayoutVis();
+      unmountSearchEditor(); for (const document of searchDocuments.values()) document.dispose(); searchDocuments.clear(); searchDocumentRequests.clear();
+      editorListListeners.clear();
       offOutlineFocus(); centerEditors.clear();
       outlineTracker.dispose(); // 5.6
       disposeModelResources(editorService);

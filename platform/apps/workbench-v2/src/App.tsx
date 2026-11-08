@@ -65,7 +65,7 @@ import { useStableEditorSurface } from './shell/stableEditorSurface'
 import { useWorkbenchShortcuts } from './shell/useWorkbenchShortcuts'
 import { renderDocumentMarkdown } from './shell/renderDocumentMarkdown'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
-import { CenterChangesSlot, CenterCodeEditorSlot, EditorCommandsSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
+import { CenterSearchSlot, CenterChangesSlot, CenterCodeEditorSlot, EditorCommandsSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
 import { reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
@@ -492,7 +492,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     activeGlobalTabId,
     activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
-    reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
+    reorderNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor, activeSessionId)
 
@@ -1130,6 +1130,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     )
   }, [auxiliaryVisible, editorHidden, terminalVisible])
 
+  const [personalizationsRoute, setPersonalizationsRoute] = useState<{ section: 'visao' | 'habilidades' | 'ferramentas'; serial: number }>({ section: 'visao', serial: 0 })
   const openCustomizations = useCallback(() => {
     openCustomViewGrid('aiCustomizations')
     // (LAYOUT.md) No phone a custom view entra na pilha de navegação, para que o
@@ -1158,11 +1159,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const alvoPersonalizacoes = { sessionId: activeSession.id, chatId: activeChatId }
 
   const customizationsSurfaceEmbedded = (
-    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} />
+    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
   )
 
   const customizationsSurface = (
-    <PersonalizacoesView alvo={alvoPersonalizacoes} />
+    <PersonalizacoesView alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
   )
 
   // Hide/Show Editor (⌥⌘E). Par mutuamente exclusivo editor/detalhe: ocultar o
@@ -1173,31 +1174,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Detail-only FECHA as abas não-acopladas (mantém Changes/Files), CAPTURANDO
   // as restauráveis (Browser/Customizations) e DESCARTANDO as não-restauráveis
   // (Search untitled sujo). Mostrar o editor restaura as capturadas ao fim.
+  // D181: ocultar é layout; todos os donos de abas/modelos permanecem vivos.
   const handleToggleEditorHidden = useCallback(() => {
-    setEditorHidden((current) => {
-      const next = !current
-      if (next) {
-        hideNativeTabs(activeSession.id, (dropped) => {
-          const dirty = dropped.some((tab) => tab.type === 'search')
-          notify(dirty
-            ? 'Editor oculto: abas não-acopladas fechadas (Search descartado)'
-            : 'Editor oculto: abas não-acopladas fechadas')
-        })
-      } else {
-        // Durante o commit React das duas colecoes o invariante pode ver metade
-        // da transicao. O flag do sindico so protege este instante; a memoria e
-        // os BrowserViews capturados vivem agora exclusivamente no hook.
-        skipInvariantCheck.current = true
-        restoreNativeTabs()
-        queueMicrotask(() => { skipInvariantCheck.current = false })
-      }
-      return next
-    })
-  }, [activeSession.id])
+    setEditorHidden(current => !current)
+  }, [])
 
-  // R-040: revelar pelo Explorer/Provedores/Config/Changes deve restaurar a
-  // captura, NAO apenas mudar o booleano. O caminho antigo deixava o snapshot
-  // do Browser congelado e perdia a aba nova no F5 (teste vermelho D175c).
   const revealEditor = () => {
     if (editorHidden) handleToggleEditorHidden()
     else setEditorHidden(false)
@@ -2275,10 +2256,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     </div>
   )
 
+  const [searchEditorFocus, setSearchEditorFocus] = useState(0)
   const executeEditorCommand = (id: string) => {
     void explorerMenusRef.current.execute(id, { sessionId: activeSession.id }).catch(error => notify(error instanceof Error ? error.message : String(error)))
   }
   useWorkbenchShortcuts({
+    'search-editor': () => { setSearchEditorFocus(value => value + 1); openEditorTab('search', { title: 'Search', sessionId: activeSession.id }); revealEditor() },
     p: () => executeEditorCommand('workbench.action.quickOpen'),
     t: () => executeEditorCommand('workbench.action.showAllSymbols'),
     o: () => executeEditorCommand('workbench.action.files.openFile'),
@@ -2304,6 +2287,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       tabs={editorTabs}
       activeTabId={activeTabId}
       browserViews={browserViews}
+      searchSlot={explorerModule?.mountSearchEditor ? <CenterSearchSlot module={explorerModule} sessionId={activeSession.id} focusRequest={searchEditorFocus} /> : <div role="status">Pesquisa indisponível neste momento.</div>}
       searchQuery={searchQuery}
       searchResults={filteredSearchResults}
       searchFocusRequest={searchFocusRequest}
@@ -2403,6 +2387,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         workspacePath={landingVisible ? (selectedWorkspace?.path ?? activeSession.workspacePath) : (activeSession.worktreePath ?? activeSession.workspacePath)}
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
+        onFindFile={() => executeEditorCommand('workbench.action.quickOpen')}
+        onShowEditor={editorHidden && (visibleEditorTabs.length > 0 || moduloTemDivisao) ? revealEditor : undefined}
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
@@ -2427,6 +2413,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           onReorderSessions={handleReorderSessions}
           onAssignGroup={handleAssignGroup}
           onRemoveGroup={handleRemoveGroup}
+          onOpenPersonalizations={section => { setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 })); openCustomizations() }}
           onOpenBeside={isSinglePane ? undefined : openSessionBeside}
         />
         {sidebarVisible && (
@@ -2503,9 +2490,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                 )}
               </div>
             ) : (
-              // Modelo de 4 estados do painel lateral (SINGLE_PANE_SCENARIOS.md).
-              // A barra de abas permanece visível quando há abas, mesmo se o
-              // conteúdo do editor estiver oculto (estado detail-only).
+              // D181: ocultar conserva os donos das abas, mas retira toda a coluna.
               editorContentVisible ? (
                 editorMaximized ? (
                   <div className={`desktop-surface-group editor-maximized side-pane-${sidePaneState}`}>{renderEditor()}</div>
@@ -2530,11 +2515,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                   </PanelGroup>
                 )
               ) : tabBarVisible ? (
-                // Detail-only / editor oculto: mantém a barra de abas, mas o chat
-                // absorve a largura do conteúdo do editor.
+                // O host permanece montado e invisível; o chat recebe a largura.
                 <div className={`desktop-surface-group side-pane-${sidePaneState}`}>
                   <div className="chat-region">{renderChat()}</div>
-                  {renderEditor()}
+                  <div style={{ display: 'none' }} aria-hidden="true">{renderEditor()}</div>
                 </div>
               ) : (
                 // Sem conteúdo de editor e sem abas: o chat é a única superfície da

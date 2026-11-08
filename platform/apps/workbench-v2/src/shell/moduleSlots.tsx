@@ -87,3 +87,11 @@ export function CenterCodeEditorSlot({ module, sessionId }: { module: IExplorerS
   useEffect(() => () => module.unmountCodeEditor?.(), [module])
   return <div ref={hostRef} style={{ display: 'contents' }} data-testid="center-code-editor-slot" />
 }
+
+/** D181: uma consulta de pesquisa real por sessão; a lateral conserva sua consulta. */
+export function CenterSearchSlot({ module, sessionId, focusRequest }: { module: IExplorerSearchModule; sessionId: string; focusRequest: number }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (host.current) module.mountSearchEditor?.(host.current, { sessionId, focusRequest }) }, [module, sessionId, focusRequest])
+  useEffect(() => () => module.unmountSearchEditor?.(), [module])
+  return <div ref={host} style={{ display: 'contents' }} data-testid="center-search-slot" />
+}
