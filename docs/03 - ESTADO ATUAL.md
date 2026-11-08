@@ -1,3 +1,15 @@
+# Estado vigente — revisão do editor após inspeção, D180 (08/11/2026)
+
+Base 36cba54. Entrega local «fix(editor): size the real surface and support successive groups», sem push. Esta entrada substitui o estado D179 abaixo. A inspeção humana revelou que a prova anterior de maximização mediu o contêiner externo, deixando passar o Monaco estreito; o relatório anterior não constitui prova dessa propriedade. F1 foi aprovado visualmente pelo dono e preservado; isso não homologa a Fatia 15.
+
+**Corrigido e medido:** superfície estável com caixa real e largura/altura completas no modo normal e maximizado; X oculta todas as vistas, mantendo abas e rascunhos; divisões sucessivas criam grupos novos à direita do foco, com um modelo/undo por sessão/arquivo e cursores independentes. Quatro cliques foram testados como cinco vistas, com cinco ciclos ocultar/reabrir, troca de arquivo e F5 restaurando grupos/ordem/ativa. Fechar grupos preserva último dono dirty e promove o restante. Preview Markdown/texto está no botão de livro. Breadcrumb mostra raiz/caminho, endereço completo no tooltip, abre pastas/arquivos e navega por símbolos reais nas linguagens suportadas. Corrigida URI interna de caminhos com espaços/acentos/%/#; não foi alterado o serviço fs. O rastreador de símbolos acompanha foco e dispose, em lugar de ficar preso a editor encerrado.
+
+**Provas atuais:** typecheck 0; gate de 19 arquivos: 196 = 183 aprovados / 0 falhas / 13 ignorados preexistentes. Após o ajuste final de limpeza de vistas/foco, suplemento de quatro arquivos 31/31, incluindo um teste adicional de recurso compartilhado; não somar repetições. Onze roteiros Playwright: 76 verificações (11 novas + 16 de duas vistas + 49 de regressão, incluindo 24 de teclado). ESLint no perímetro alterado: 21 erros idênticos à base (17 App, 3 index, 1 teste antigo), nenhum novo; 10 avisos. A integral histórica 36 falhas/30 ignorados não foi repetida. Canceled do Monaco continua nos logs, sem perda demonstrada.
+
+**Limites:** grupos horizontais sucessivos; não é réplica integral da grade bidimensional, janelas flutuantes ou remapeamento de teclas do VS Code. Símbolos dependem de provedor da linguagem; BAT sem provedor não recebe funções inventadas. Preview continua sem execução de HTML e com imagens em texto alternativo. F5 só restaura conteúdo salvo. E15-d física preservada. **Próxima ação:** inspeção humana em 5174 e decisão de homologação; não avançar de fatia. Relatório atual externo: ../arena-operacional/feedback-2026-11-08/revisao-1312/RELATORIO.md. HEAD/tree e recuperação no operacional; testes só em 5199, sem automação dos arquivos pessoais do perfil de inspeção.
+
+---
+
 # Estado vigente — correções de uso do editor, D179 (08/11/2026)
 
 Substitui o retrato de atalhos abaixo para o corte atual. Base b3d845b; entrega no commit local «fix(editor): preserve shared views and address Windows feedback». HEAD/tree finais no status operacional e ponto de recuperação existente; sem push. Fatia 15 continua candidata à homologação humana dirigida, com ressalvas, sem encerramento formal.

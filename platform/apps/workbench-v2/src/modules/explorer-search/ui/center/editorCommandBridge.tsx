@@ -2,7 +2,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import type * as Monaco from 'monaco-editor';
 import type { IExplorerSearchModuleDeps, WorkspaceUri } from '../../contract';
 import type { EditorService } from '../../core/editor/editorService';
-import { GRUPO_SECUNDARIO } from '../../core/editor/editorService';
 import { modelEntries } from '../attach/modelResources';
 import { EditorFileDialog, type FileCommand } from './EditorFileDialog';
 import { EditorShortcutDialog, type ShortcutRow } from './EditorShortcutDialog';
@@ -18,7 +17,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
   let root: Root | null = null;
   let unmount: (() => void) | null = null;
   const editors = new Map<string, Monaco.editor.IStandaloneCodeEditor>();
-  const activeGroup = (sid: string) => editor.focusGroupOf(sid) === 'secundario' ? GRUPO_SECUNDARIO(sid) : sid;
+  const activeGroup = (sid: string) => editor.focusedGroupId(sid);
   const instance = (sid: string) => {
     const candidate = editors.get(activeGroup(sid));
     const node = candidate?.getDomNode();
@@ -28,7 +27,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
     const base = deps.workspaceRoot.replace(/\/$/, '') + '/';
     const relative = path.replace(/\\/g, '/');
     if (!relative || relative.startsWith('/') || /^[a-z]+:/i.test(relative) || relative.split('/').some(p => p === '..' || p === '.' || !p)) throw new Error('Informe um caminho relativo dentro do projeto.');
-    return (base + relative.split('/').map(encodeURIComponent).join('/')) as WorkspaceUri;
+    return (base + relative) as WorkspaceUri;
   };
   const showFile = (mode: FileCommand, sid: string) => {
     if (!root) throw new Error('O seletor de arquivos ainda não está disponível.');

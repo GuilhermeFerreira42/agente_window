@@ -1,3 +1,13 @@
+# Inspeção vigente — D180 (08/11/2026)
+
+Salve eventual rascunho antes de recarregar a página para carregar todos os componentes atualizados. Confira a largura real do texto ao maximizar e sua altura ao restaurar. Use o X da barra principal: todo o conjunto de editores deve sumir, com abas conservadas; Mostrar editor devolve as mesmas vistas. O X dentro de um grupo fecha aquele grupo.
+
+Clique quatro vezes em Dividir: devem existir cinco vistas. Foque um grupo e abra outro arquivo. Edite em duas vistas do mesmo arquivo, salve e confira o disco; ocultar/reabrir conserva rascunhos, e F5 conserva apenas o salvo. Feche grupos até sobrar um: fechar a última vista dirty deve pedir decisão.
+
+Abra Markdown e use o botão de livro para o preview. Na faixa abaixo das abas, clique no nome do arquivo ou da pasta para navegar; o tooltip traz o endereço inteiro. Em TypeScript, navegue até uma função pelo botão de símbolos. Arquivo BAT sem provedor pode mostrar apenas caminho. O F1 fica como aprovado visualmente. Esta revisão continua aguardando seu aceite da Fatia 15.
+
+---
+
 # Inspeção dirigida do editor — D179 (08/11/2026)
 
 Ainda depende do seu aceite. Abra um arquivo e divida: o mesmo texto deve aparecer nos dois lados, com cursores independentes. Edite, feche uma cópia e confira o rascunho na outra; ao fechar a última, confira Salvar/Não Salvar/Cancelar. Feche o principal e confira a promoção do painel restante, sem área vazia.

@@ -34,7 +34,6 @@ import { CodeEditorPane, type CodeEditorPaneProps } from '../attach/CodeEditorPa
 import { DiffPane } from '../attach/diff/DiffPane';
 import { DiffPaneBoundary } from '../attach/diff/DiffPaneBoundary';
 import { Breadcrumbs, BreadcrumbsSimbolos, simbolosAteCursor } from '../attach/Breadcrumbs';
-import { GRUPO_SECUNDARIO } from '../../core/editor/editorService';
 import { CenterSplitPane } from './CenterSplitPane';
 import type { OutlineRow } from '../../core/outline/outlineModel';
 import { AttachDialog } from '../attach/AttachDialog';
@@ -96,7 +95,7 @@ export function CenterCodeEditor({
   // divisão inteira são o mesmo fluxo (c5) com consequências diferentes — antes
   // de existir split só havia aba, então um campo a mais é o acréscimo mínimo.
   const [dialog, setDialog] = useState<
-    { kind: 'save' | 'conflict'; uri: WorkspaceUri; alvo?: 'aba' | 'divisao' } | null
+    { kind: 'save' | 'conflict'; uri: WorkspaceUri; groupId?: string; alvo?: 'aba' | 'divisao' } | null
   >(null);
   const [saveError, setSaveError] = useState<{ uri: WorkspaceUri; message: string } | null>(null);
 
@@ -150,36 +149,14 @@ export function CenterCodeEditor({
    * `useState` local seria uma segunda verdade sobre "existe divisão?" — e o F5
    * restauraria abas sem restaurar o booleano.
    */
-  const [dividido, setDividido] = useState<boolean>(() => splitCapabilities?.isSplit() ?? false);
-  useEffect(() => {
-    setDividido(splitCapabilities?.isSplit() ?? false);
-    return editor.onEvent((e) => {
-      if (!('sessionId' in e) || e.sessionId !== sessionId) return;
-      if (e.type === 'editor.splitChanged') setDividido(e.split);
-    });
-  }, [editor, sessionId, splitCapabilities]);
-
-  /**
-   * Fechar a divisão inteira. Dirty bloqueia (regra do serviço) e a resposta vai
-   * para o MESMO diálogo do c5 — Salvar / Não Salvar / Cancelar. Não criei um
-   * segundo fluxo de confirmação: o usuário já conhece este.
-   */
-  const fecharDivisao = () => {
-    if (!splitCapabilities) return;
-    if (splitCapabilities.unsplit()) return;      // sem dirty: fechou agora
-    const suja = editor.getTabs(GRUPO_SECUNDARIO(sessionId)).find((tab) => tab.dirty && !editor.getTabs(sessionId).some(view => view.uri === tab.uri));
-    if (!suja) return;                            // não deveria acontecer: o serviço só bloqueia por dirty
-    setDialog({ kind: 'save', uri: suja.uri, alvo: 'divisao' });
+  const dividido = !!splitCapabilities && editor.isSplit(sessionId);
+  const fecharDivisao = (groupId = editor.groupIds(sessionId).find(id => id !== sessionId)) => {
+    if (!groupId) return;
+    if (editor.closeGroup(sessionId, groupId)) return;
+    const suja = editor.getTabs(groupId).find(tab => tab.dirty && !editor.groupIds(sessionId).some(id => id !== groupId && editor.getTabs(id).some(other => other.uri === tab.uri)));
+    if (suja) setDialog({ kind: 'save', uri: suja.uri, groupId, alvo: 'divisao' });
   };
 
-  /**
-   * FATIA 15 Onda 3 (D169) — trilha de símbolos do breadcrumb.
-   *
-   * Recalcula em três eventos, que são os três que o VS Code usa: o cursor mudou,
-   * os símbolos mudaram (o provedor do TS só registra depois do worker subir) e o
-   * modelo trocou. Sem `outline` (shell sem a capacidade), a trilha fica vazia —
-   * o caminho do arquivo continua aparecendo, então nada mente.
-   */
   const [trilha, setTrilha] = useState<OutlineRow[]>([]);
   const [versaoSimbolos, setVersaoSimbolos] = useState(0);
   useEffect(() => {
@@ -222,13 +199,14 @@ export function CenterCodeEditor({
       {/* D169: breadcrumb do editor definitivo — caminho do arquivo (relativo à
           raiz) + trilha de símbolos do cursor. Só com arquivo ativo: em diff e em
           aba vazia não há arquivo a descrever, e uma barra vazia é ruído. */}
+      <div className="editor-container">
       {activeUri && (
         <div className="center-breadcrumbs" data-testid="center-breadcrumbs">
-          <Breadcrumbs root={(workspaceRoot ?? activeUri) as WorkspaceUri} uri={activeUri as WorkspaceUri} />
-          <BreadcrumbsSimbolos trilha={trilha} onIr={(row) => outline?.reveal(row.line, row.column)} />
+          <Breadcrumbs root={(workspaceRoot ?? activeUri) as WorkspaceUri} uri={activeUri as WorkspaceUri} fs={fs} onOpen={uri => editor.open({ sessionId, uri, kind: 'code', pinned: true })} />
+          <BreadcrumbsSimbolos rows={editor.focusedGroupId(sessionId) === sessionId ? outline?.rows() : []} trilha={editor.focusedGroupId(sessionId) === sessionId ? trilha : []} onIr={(row) => outline?.reveal(row.line, row.column)} />
         </div>
       )}
-      <div className="editor-container">
+
         {isDiffActive && (
           <DiffPaneBoundary
             resetKey={`${diffPayload.title}:${diffPayload.original.length}:${diffPayload.modified.length}`}
@@ -259,10 +237,12 @@ export function CenterCodeEditor({
 
       {/* D169 — o SEGUNDO grupo. Montado só quando o serviço diz que há divisão:
           o estado vive lá (sobrevive a anexo↔maximizado, que é layout do shell).
-          O corpo é o mesmo CodeEditorPane; o modelo do Monaco é por painel porque
-          cada grupo tem abas próprias — a mesma URI nunca está nos dois lados. */}
-      {dividido && (
+          O corpo é o mesmo CodeEditorPane; vistas da mesma URI compartilham o
+          modelo na sessão, com cursor/scroll independentes. */}
+      {dividido && editor.groupIds(sessionId).filter(id => id !== sessionId).map(groupId => (
         <CenterSplitPane
+          key={groupId}
+          groupId={groupId}
           editor={editor}
           sessionId={sessionId}
           fs={fs}
@@ -270,14 +250,14 @@ export function CenterCodeEditor({
           onCloseBlocked={(input) => setDialog({ kind: 'save', uri: input.uri })}
           onSave={async (uri) => { await doSave(uri); }}
           saveError={saveError}
-          onCloseSplit={fecharDivisao}
+          onCloseSplit={() => fecharDivisao(groupId)}
           renderMarkdown={renderMarkdown}
           onWorkbenchCommand={onWorkbenchCommand}
-          onFocusSide={() => splitCapabilities?.setFocusSide('secundario')}
+          onFocusSide={() => editor.focusGroupId(sessionId, groupId)}
           workspaceRoot={workspaceRoot}
           outline={outline}
         />
-      )}
+      ))}
 
       {dialog?.kind === 'save' && (
         <AttachDialog
@@ -294,12 +274,12 @@ export function CenterCodeEditor({
               label: ATTACH_STRINGS.save,
               primary: true,
               onSelect: () => {
-                const { uri: u, alvo } = dialog;
+                const { uri: u, alvo, groupId } = dialog;
                 setDialog(null);
                 void doSave(u).then((ok) => {
                   if (!ok) return;
-                  if (alvo === 'divisao') fecharDivisao();
-                  else editor.close({ sessionId: editor.groupIdOf(sessionId, u) ?? sessionId, uri: u });
+                  if (alvo === 'divisao') fecharDivisao(groupId);
+                  else editor.close({ sessionId: groupId ?? editor.groupIdOf(sessionId, u) ?? sessionId, uri: u });
                 });
               },
             },
@@ -307,10 +287,10 @@ export function CenterCodeEditor({
               id: 'dontSave',
               label: ATTACH_STRINGS.dontSave,
               onSelect: () => {
-                const { uri: u, alvo } = dialog;
+                const { uri: u, alvo, groupId } = dialog;
                 setDialog(null);
-                editor.close({ sessionId: editor.groupIdOf(sessionId, u) ?? sessionId, uri: u, force: true });
-                if (alvo === 'divisao') fecharDivisao();
+                editor.close({ sessionId: groupId ?? editor.groupIdOf(sessionId, u) ?? sessionId, uri: u, force: true });
+                if (alvo === 'divisao') fecharDivisao(groupId);
               },
             },
             { id: 'cancel', label: ATTACH_STRINGS.cancel, onSelect: () => setDialog(null) },

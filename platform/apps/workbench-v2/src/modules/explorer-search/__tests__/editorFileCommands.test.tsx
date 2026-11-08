@@ -34,6 +34,13 @@ async function enter(command: string, menus: CommandRegistryLike, path: string) 
   await act(async () => { fireEvent.submit(screen.getByRole('textbox').closest('form')!); });
 }
 describe('comandos de arquivo: fronteira e gravação', () => {
+  it('preserva espaços, acentos, porcentagem e cerquilha na URI interna', async () => {
+    const { fs, menus, editor } = setup();
+    const create = vi.spyOn(fs, 'createFile').mockResolvedValue();
+    await enter('workbench.action.files.newFile', menus, 'nível com espaço/100% #1.txt');
+    expect(create).toHaveBeenCalledWith({ uri: asWorkspaceUri('file:///C:/fixture/nível com espaço/100% #1.txt'), content: '' });
+    expect(editor.getActive('s1')?.uri).toBe('file:///C:/fixture/nível com espaço/100% #1.txt');
+  });
   it('recusa caminho fora da raiz sem executar criação', async () => {
     const { fs, menus } = setup();
     const create = vi.spyOn(fs, 'createFile');

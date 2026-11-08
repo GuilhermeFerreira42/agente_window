@@ -15,7 +15,7 @@
 // "Dividir editor" do centro existia mas não dividia nada (abria uma aba falsa
 // `workspace/split`), porque o gate de single-pane (E15/R-039) rejeita o split
 // enquanto o layout single-pane está ligado. A partir daqui o serviço sabe
-// manter DOIS grupos por sessão (principal/secundário), com abas, ativa e MRU
+// manter grupos por sessão (D180: divisões sucessivas), com abas, ativa e MRU
 // INDEPENDENTES — é o que o VS Code chama de `editorGroupModel` por grupo.
 //
 // D179: duas vistas do mesmo arquivo compartilham UM modelo lógico na sessão,
@@ -77,7 +77,7 @@ export class EditorService {
   private readonly events = new Emitter<ExplorerSearchEvent>();
   private disposed = false;
   private readonly closingGroups = new Set<string>();
-  private logicalSession(group: string): string { return group.endsWith('#2') ? group.slice(0, -2) : group; }
+  private logicalSession(group: string): string { return group.replace(/#[2-9]\d*$/, '').replace(/#1\d+$/, ''); }
 
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void { return this.events.add(cb); }
 
@@ -160,7 +160,7 @@ export class EditorService {
       this.fire({ type: 'editor.tabOpened', sessionId, uri, kind, preview: tab.preview });
     }
     this.setActive(g, sessionId, uri);
-    this.setFocusGroup({ sessionId: base, side: sessionId.endsWith('#2') ? 'secundario' : 'principal' });
+    this.focusGroupId(base, sessionId);
     if (wasEmpty) this.fire({ type: 'editor.attachExpanded', sessionId });
     if (typeof input.line === 'number') {
       this.fire({ type: 'editor.revealRequested', sessionId, uri, line: input.line, column: input.column });
@@ -172,7 +172,7 @@ export class EditorService {
     const g = this.groups.get(input.sessionId);
     if (!g || !g.tabs.some((t) => t.uri === input.uri)) return;
     this.setActive(g, input.sessionId, input.uri);
-    this.setFocusGroup({ sessionId: this.logicalSession(input.sessionId), side: input.sessionId.endsWith('#2') ? 'secundario' : 'principal' });
+    this.focusGroupId(this.logicalSession(input.sessionId), input.sessionId);
   }
 
   setPresentation(input: { sessionId: string; uri: WorkspaceUri; presentation: 'code' | 'preview' }): void {
@@ -228,27 +228,30 @@ export class EditorService {
     return true;
   }
 
-  /** Um grupo vazio não vira uma segunda tela sem função. A vista restante mantém seus modelos. */
+  /** Remove grupos vazios e promove a primeira vista restante sem renumerar as outras. */
   private normalizeEmptyGroups(sessionId: string): void {
-    const secondaryId = GRUPO_SECUNDARIO(sessionId);
-    const secondary = this.groups.get(secondaryId), primary = this.groups.get(sessionId);
-    if (!secondary || !primary) return;
-    if (!secondary.tabs.length) {
-      this.groups.delete(secondaryId);
-    } else if (!primary.tabs.length) {
-      primary.tabs = secondary.tabs;
-      primary.active = secondary.active;
-      primary.mru = secondary.mru;
-      this.groups.delete(secondaryId);
-      this.fire({ type: 'editor.groupPromoted', sessionId, fromGroupId: secondaryId });
-      for (const tab of primary.tabs) {
-        this.fire({ type: 'editor.tabClosed', sessionId: secondaryId, uri: tab.uri });
-        this.fire({ type: 'editor.tabOpened', sessionId, uri: tab.uri, kind: tab.kind, preview: tab.preview });
+    let changed = false;
+    for (const id of this.groupIds(sessionId).filter(id => id !== sessionId)) {
+      if (!this.groups.get(id)?.tabs.length) { this.groups.delete(id); changed = true; }
+    }
+    const primary = this.groups.get(sessionId);
+    if (primary && !primary.tabs.length) {
+      const from = this.groupIds(sessionId).find(id => id !== sessionId);
+      if (from) {
+        const remaining = this.groups.get(from)!;
+        primary.tabs = remaining.tabs; primary.active = remaining.active; primary.mru = remaining.mru;
+        this.groups.delete(from);
+        this.fire({ type: 'editor.groupPromoted', sessionId, fromGroupId: from });
+        for (const tab of primary.tabs) {
+          this.fire({ type: 'editor.tabClosed', sessionId: from, uri: tab.uri });
+          this.fire({ type: 'editor.tabOpened', sessionId, uri: tab.uri, kind: tab.kind, preview: tab.preview });
+        }
+        this.fire({ type: 'editor.activeChanged', sessionId, uri: primary.active });
+        changed = true;
       }
-      this.fire({ type: 'editor.activeChanged', sessionId, uri: primary.active });
-    } else return;
-    this.focused.set(sessionId, sessionId);
-    this.fire({ type: 'editor.splitChanged', sessionId, split: false });
+    }
+    if (!this.groups.has(this.focused.get(sessionId) ?? sessionId)) this.focusGroupId(sessionId, sessionId);
+    if (changed) this.fire({ type: 'editor.splitChanged', sessionId, split: this.isSplit(sessionId) });
   }
 
   /** false = sobraram abas dirty (sem `force`). A aba fixa "Changes" NÃO é
@@ -274,14 +277,20 @@ export class EditorService {
   // ---- D169: split ----
 
   /** O grupo secundário desta sessão existe (há divisão aberta)? */
-  isSplit(sessionId: string): boolean { return this.groups.has(GRUPO_SECUNDARIO(sessionId)); }
+  isSplit(sessionId: string): boolean { return this.groupIds(sessionId).length > 1; }
 
-  /** Ids dos grupos desta sessão, na ordem de exibição (principal primeiro). */
+  /** Ordem visual dos grupos; o id histórico #2 continua válido. */
   groupIds(sessionId: string): string[] {
-    const out: string[] = [];
-    if (this.groups.has(sessionId)) out.push(sessionId);
-    if (this.groups.has(GRUPO_SECUNDARIO(sessionId))) out.push(GRUPO_SECUNDARIO(sessionId));
-    return out;
+    return [...this.groups.keys()].filter(id => this.logicalSession(id) === sessionId);
+  }
+  focusedGroupId(sessionId: string): string {
+    const id = this.focused.get(sessionId);
+    return id && this.groups.has(id) ? id : sessionId;
+  }
+  focusGroupId(sessionId: string, groupId: string): void {
+    if (this.disposed || !this.groupIds(sessionId).includes(groupId) || this.focused.get(sessionId) === groupId) return;
+    this.focused.set(sessionId, groupId);
+    this.fire({ type: 'editor.focusGroupChanged', sessionId, side: groupId === sessionId ? 'principal' : 'secundario' });
   }
 
   /**
@@ -302,39 +311,39 @@ export class EditorService {
   /** D179: outra vista do arquivo atual, com o MESMO modelo lógico nesta sessão. */
   duplicateToSide(sessionId: string): string | null {
     if (this.disposed) return null;
-    const base = this.logicalSession(sessionId);
-    const sourceId = this.focusGroupOf(base) === 'secundario' ? GRUPO_SECUNDARIO(base) : base;
+    const base = this.logicalSession(sessionId), sourceId = this.focusedGroupId(base);
     const source = this.getActive(sourceId);
     if (!source || source.kind !== 'code') return null;
-    if (!this.isSplit(base)) this.split(base);
-    const targetId = sourceId === base ? GRUPO_SECUNDARIO(base) : base;
+    let number = 2;
+    while (this.groups.has(`${base}#${number}`)) number++;
+    const targetId = `${base}#${number}`;
     this.pin({ sessionId: sourceId, uri: source.uri });
-    const target = this.group(targetId);
-    if (!target.tabs.some(tab => tab.uri === source.uri)) {
-      target.tabs.push({ ...source, preview: false });
-      this.fire({ type: 'editor.tabOpened', sessionId: targetId, uri: source.uri, kind: source.kind, preview: false });
-    }
-    this.setActive(target, targetId, source.uri);
-    this.setFocusGroup({ sessionId: base, side: targetId === base ? 'principal' : 'secundario' });
+    const target: Group = { tabs: [{ ...source, preview: false }], active: source.uri, mru: [source.uri] };
+    const ordered = [...this.groups.entries()];
+    ordered.splice(ordered.findIndex(([id]) => id === sourceId) + 1, 0, [targetId, target]);
+    this.groups.clear(); for (const [id, group] of ordered) this.groups.set(id, group);
+    this.fire({ type: 'editor.tabOpened', sessionId: targetId, uri: source.uri, kind: source.kind, preview: false });
+    this.fire({ type: 'editor.activeChanged', sessionId: targetId, uri: source.uri });
+    this.focusGroupId(base, targetId);
+    this.fire({ type: 'editor.splitChanged', sessionId: base, split: true });
     return targetId;
+  }
+
+  closeGroup(sessionId: string, groupId: string, force = false): boolean {
+    const group = this.groups.get(groupId);
+    if (!group || !this.groupIds(sessionId).includes(groupId)) return true;
+    if (!force && group.tabs.some(tab => tab.dirty && !this.groupIds(sessionId).some(id => id !== groupId && this.groups.get(id)?.tabs.some(other => other.uri === tab.uri)))) return false;
+    this.closingGroups.add(sessionId);
+    try { for (const tab of [...group.tabs]) this.close({ sessionId: groupId, uri: tab.uri, force: true }); }
+    finally { this.closingGroups.delete(sessionId); }
+    this.normalizeEmptyGroups(sessionId);
+    return true;
   }
 
   /** Remove o grupo secundário INTEIRO. Bloqueado por dirty sem `force`. */
   unsplit(input: { sessionId: string; force?: boolean }): boolean {
-    if (this.disposed) return false;
-    const id = GRUPO_SECUNDARIO(input.sessionId);
-    const g = this.groups.get(id);
-    if (!g) return true;
-    if (!input.force && g.tabs.some((t) => t.dirty && !this.groups.get(input.sessionId)?.tabs.some(tab => tab.uri === t.uri))) return false;
-    // Fecho as abas uma a uma para o painel descartar os modelos do Monaco
-    // (`editor.tabClosed` é o gatilho do `disposeEntry`), e só então removo o grupo.
-    this.closingGroups.add(input.sessionId);
-    try { for (const t of [...g.tabs]) this.close({ sessionId: id, uri: t.uri, force: true }); }
-    finally { this.closingGroups.delete(input.sessionId); }
-    this.groups.delete(id);
-    this.focused.set(input.sessionId, input.sessionId);
-    this.fire({ type: 'editor.splitChanged', sessionId: input.sessionId, split: false });
-    return true;
+    const id = this.groupIds(input.sessionId).find(id => id !== input.sessionId);
+    return id ? this.closeGroup(input.sessionId, id, input.force) : true;
   }
 
   /**
@@ -374,18 +383,12 @@ export class EditorService {
 
   /** Marca qual lado tem o foco (chamado pelo painel ao receber foco de verdade). */
   setFocusGroup(input: { sessionId: string; side: 'principal' | 'secundario' }): void {
-    if (this.disposed) return;
-    const id = input.side === 'principal' ? input.sessionId : GRUPO_SECUNDARIO(input.sessionId);
-    if (!this.groups.has(id)) return;
-    if (this.focused.get(input.sessionId) === id) return;
-    this.focused.set(input.sessionId, id);
-    this.fire({ type: 'editor.focusGroupChanged', sessionId: input.sessionId, side: input.side });
+    const id = input.side === 'principal' ? input.sessionId : this.groupIds(input.sessionId).find(id => id !== input.sessionId);
+    if (id) this.focusGroupId(input.sessionId, id);
   }
 
-  /** Lado com foco (default: principal). */
   focusGroupOf(sessionId: string): 'principal' | 'secundario' {
-    const id = this.focused.get(sessionId);
-    return id && id !== sessionId && this.groups.has(id) ? 'secundario' : 'principal';
+    return this.focusedGroupId(sessionId) === sessionId ? 'principal' : 'secundario';
   }
 
   /** Em qual grupo (id de grupo) esta URI está, nesta sessão. `null` = em lugar nenhum. */

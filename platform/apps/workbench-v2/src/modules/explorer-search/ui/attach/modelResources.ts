@@ -21,7 +21,7 @@ interface Resources {
 }
 const resources = new WeakMap<EditorService, Resources>();
 // O sufixo é o contrato de GRUPO_SECUNDARIO; as vistas compartilham o modelo da sessão.
-export const modelSession = (group: string): string => group.endsWith('#2') ? group.slice(0, -2) : group;
+export const modelSession = (group: string): string => group.replace(/#(?:[2-9]\d*|1\d+)$/, '');
 
 export function discardModel(entries: Map<WorkspaceUri, ModelEntry>, uri: WorkspaceUri): void {
   const entry = entries.get(uri);
@@ -43,8 +43,8 @@ function resourceFor(editor: EditorService): Resources {
       }
       return;
     }
-    if (event.type === 'editor.splitChanged' && !event.split) {
-      for (const entry of own.sessions.get(event.sessionId)?.values() ?? []) entry.viewStates?.delete(`${event.sessionId}#2`);
+    if (event.type === 'editor.splitChanged') {
+      for (const entry of own.sessions.get(event.sessionId)?.values() ?? []) [...(entry.viewStates?.keys() ?? [])].filter(id => !editor.groupIds(event.sessionId).includes(id)).forEach(id => entry.viewStates?.delete(id));
       return;
     }
     if (event.type !== 'editor.tabClosed') return;

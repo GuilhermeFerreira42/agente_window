@@ -271,6 +271,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
           if (e.type === 'editor.navigationRequested') handleModuleNavigationRef.current?.(e.sessionId, e.uri)
           if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
+          if (e.type === 'editor.splitChanged' || e.type === 'editor.focusGroupChanged' || e.type === 'editor.groupPromoted') snapshotAttachTabs(module, e.sessionId)
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed' || e.type === 'editor.presentationChanged') snapshotAttachTabs(module, e.sessionId)
           // Onda 2c-i: as abas do módulo passaram a aparecer também na faixa CENTRAL,
           // então os eventos que mudam abas precisam invalidar a projeção. `dirtyChanged`
@@ -2339,7 +2340,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onCreatePr={() => notify('Pull request preparado')}
       editorMaximized={editorMaximized}
       onToggleMaximize={() => { if (!editorMaximized) revealEditor(); setEditorMaximized((current) => !current) }}
-      onSplit={() => { explorerModule?.attach.setFocusSide?.({ sessionId: activeSession.id, side: 'principal' }); handleSplitEditor() }}
+      onSplit={handleSplitEditor}
       onTogglePreview={() => { explorerModule?.attach.setFocusSide?.({ sessionId: activeSession.id, side: 'principal' }); revealEditor(); executeEditorCommand('editor.action.togglePreview') }}
       onOpenToSide={handleOpenToSide}
       editorContentVisible={editorContentVisible}

@@ -1,3 +1,11 @@
+# Limites vigentes após D180 — 08/11/2026
+
+A restrição a dois grupos registrada em D178/D179 foi substituída, por pedido expresso do dono, por grupos horizontais sucessivos. A limitação anterior não deve orientar novas inspeções. A largura real do Monaco, sua altura normal e a navegação do caminho foram corrigidas após a inspeção; o F1 permanece como aprovado visualmente.
+
+Permanecem sem promessa de paridade: grade bidimensional redimensionável e janelas flutuantes, remapeamento de teclas, linguagens sem provedores de símbolos e imagens no preview. Detalhe do comportamento vigente no 03. A integral Windows histórica, Canceled do Monaco, homologação humana e decisão física E15-d continuam pendentes; nenhuma fatia nova iniciada.
+
+---
+
 # Limites vigentes após D179 — 08/11/2026
 
 A divisão vazia e o modal F1 grande foram corrigidos nesta entrega; não permanecem dívida com o comportamento anterior. D179 permite duas vistas do mesmo arquivo, preservando o modelo; o layout segue limitado a dois grupos. A lista de atalhos permite consultar, filtrar e executar; não oferece edição/remapeamento de combinações. Preview Markdown usa o renderizador já instalado, ignora HTML e mostra o texto alternativo de imagens. Não se promete paridade integral com o VS Code.

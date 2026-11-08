@@ -1,3 +1,11 @@
+# 08/11/2026 — D180: revisão após inspeção manual
+
+A entrega «fix(editor): size the real surface and support successive groups» corrige o defeito que a medição externa de D179 deixou passar. Monaco passa a ter caixa completa no layout normal e maximizado; o conjunto de vistas é ocultado sem fechar abas. Reaproveitados EditorService, CodeEditorPane e CenterSplitPane para grupos sucessivos. Caminho passou a navegar; corrigidas URIs internas e posse do rastreador de símbolos após foco/dispose. F1 preservado como aprovado visualmente.
+
+SPEC registrada antes do código em D180; medições vermelhas e de regressão preservadas fora do repo. Gate anterior interrompido durante alteração de fontes não foi contado como aprovado; gate completo posterior passou. Provas e estado atuais estão no 09/03, sem homologação da fatia.
+
+---
+
 # 08/11/2026 — correções de uso do editor (D179)
 
 Entrega local «fix(editor): preserve shared views and address Windows feedback», partindo de b3d845b, sem push. Corrigidos fechamento de grupos, divisão do arquivo atual, preview, maximização, paleta/ajuda e proteção de binários. A SPEC D179 foi registrada antes da implementação; provas vermelhas foram preservadas. O teste de fronteira detectou dependência de renderização entrando diretamente no módulo: corrigida por porta injetada, sem afrouxar a regra. Ajustado somente o assert legado que exigia principal vazio; agora exige promoção do arquivo restante sem perda.

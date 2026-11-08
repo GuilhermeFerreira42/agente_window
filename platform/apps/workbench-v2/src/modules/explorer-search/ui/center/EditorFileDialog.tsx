@@ -23,7 +23,7 @@ export function EditorFileDialog({ mode, fs, root, onAccept, onCancel }: {
         for (const entry of await fs.list({ uri: queue.shift()! })) {
           if (['.git', 'node_modules', '.runtime', 'dist', 'build'].includes(entry.name)) continue;
           if (entry.kind === 'directory') queue.push(entry.uri);
-          else paths.push(decodeURIComponent(entry.uri.slice(root.replace(/\/$/, '').length + 1)));
+          else paths.push(entry.uri.slice(root.replace(/\/$/, '').length + 1));
         }
       }
       if (alive) setFiles(paths.sort());

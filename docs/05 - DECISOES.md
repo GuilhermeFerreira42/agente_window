@@ -2027,3 +2027,16 @@ Limites visíveis: dois grupos, criação dentro do projeto, salvar como para de
 ### D179 — resultado implementado e limites (08/11/2026)
 
 Duplicação usa capacidade aditiva duplicateToSide; split legado vazio preservado. Modelos continuam na UI do módulo, grupos/dirty no EditorService; renderer Markdown entra por porta opcional do host, sem import do shell pelo módulo ou dependência de IA. Texto e undo são únicos por sessão/URI; estado de vista e apresentação são por grupo. Fechar a última vista dirty continua protegido. Nenhum pacote novo, server/fs ou terminal alterado. A paleta foi ajustada no escopo atual, sem adiar o modal demonstrado; não inclui remapeamento de teclas. Provas e exceções no 09; aceite humano em aberto.
+
+## D180 — Revisão após inspeção manual: layout real, grupos e breadcrumbs (08/11/2026)
+
+Pedido expresso do dono, base 36cba54: preservar o F1 aprovado; corrigir maximização estreita e X que deixa outro editor visível; preview localizável; divisões sucessivas como VS Code; caminho e símbolos navegáveis. A prova anterior mediu largura do contêiner externo, não do Monaco: insuficiente para o defeito do print. Corrigir a prova antes do código.
+
+SPEC: uma única superfície estável com host flex dimensionado em todos os layouts; ocultar todo o conjunto de grupos mantendo abas/modelos. EditorService permanece único dono dos grupos, agora lista ordenada de grupos por sessão, sem limite artificial de dois; split legado preservado, duplicação cria um grupo novo a cada clique com modelo único, cursor próprio e foco explícito. Remover grupo protege último dono dirty e promove grupo restante; F5 restaura a lista. Contrato aditivo para enumerar/focar grupos; compatibilidade de principal/secundário conservada. Breadcrumb relativo ao workspace, tooltip completo e picker de arquivos/pastas, símbolos pelo provedor existente. Sem alterar terminal, fs/server, permissões, dependências ou F1.
+
+Aceite quantitativo: 4 cliques em dividir => 5 vistas do arquivo atual, edição/undo sincronizados e cursores independentes; abrir outro arquivo no grupo focado; fechar grupos/última vista com dirty protegido; F5 restaura grupos salvos e apresentações; maximizar faz o editor efetivo preencher o centro (diferença <= 4 px), não apenas o wrapper; 5 ciclos X/reabrir e maximizar/restaurar com 0 editores visíveis quando oculto, sem instâncias extras ou perda de rascunho. Caminho de fixture aninhada com espaços e Unicode aparece e navega; símbolos reais TypeScript navegam. Provas vermelhas/verde e captura operacional fora dos fontes. Sem homologação nem avanço de fatia.
+
+
+### D180 — implementação e verificação
+
+O limite artificial de dois grupos é superado somente pelo pedido atual: ids de grupos explícitos, ordem e foco pertencem ao mesmo EditorService; APIs de principal/secundário continuam compatíveis. Duas vistas continuam compartilhando modelo, enquanto cursor/apresentação são por grupo. Cache de vistas remove grupos encerrados; confirmação protege o último dono dirty. Metadados aditivos conservam ordem/foco no F5, sem persistir rascunhos. A URI interna existente é um caminho literal: o adaptador UI deixou de codificar espaços/Unicode/%/#, sem tocar fs/server. Renderer e F1 preservados. Provas quantitativas e ressalvas no 09; sem homologação humana atribuída.

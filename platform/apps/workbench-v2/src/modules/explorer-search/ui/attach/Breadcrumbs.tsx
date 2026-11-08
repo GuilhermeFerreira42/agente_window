@@ -4,9 +4,9 @@
 // separador `codicon-breadcrumb-separator` (chevron-right), último item com
 // ícone Seti. Picker (dropdown ao clicar) é débito 4.7-c (D2.23).
 // ============================================================================
-import React from 'react';
-import type { WorkspaceUri } from '../../contract';
-import { uriPath, uriRelative } from '../../core/uri';
+import React, { useEffect, useRef, useState } from 'react';
+import type { FileSystemPortLike, WorkspaceUri } from '../../contract';
+import { uriPath, uriRelative, uriBasename, uriDirname, uriJoinPath } from '../../core/uri';
 import type { OutlineRow } from '../../core/outline/outlineModel';
 import { fileIconLabelClasses } from './fileIconClasses';
 
@@ -52,33 +52,45 @@ export function simbolosAteCursor(rows: readonly OutlineRow[], linha: number): O
   return cadeia;
 }
 
-export function Breadcrumbs({ root, uri }: { root: WorkspaceUri; uri: WorkspaceUri }) {
+export function Breadcrumbs({ root, uri, fs, onOpen }: { root: WorkspaceUri; uri: WorkspaceUri; fs?: Partial<Pick<FileSystemPortLike, 'list'>>; onOpen?: (uri: WorkspaceUri) => void }) {
   const segs = breadcrumbSegments(root, uri);
-  return (
-    <div className="breadcrumbs-control" data-testid="attach-breadcrumbs">
-      <div className="monaco-breadcrumbs" role="list" aria-label="Breadcrumbs">
-        {segs.map((seg, i) => {
-          const last = i === segs.length - 1;
-          return (
-            <React.Fragment key={`${i}-${seg}`}>
-              <div className={`monaco-breadcrumb-item${last ? ' focused' : ''}`} role="listitem" title={seg}>
-                {last ? (
-                  <div className={fileIconLabelClasses(seg)}>
-                    <span className="monaco-icon-label-container"><span className="monaco-icon-name-container"><a className="label-name">{seg}</a></span></span>
-                  </div>
-                ) : (
-                  <div className="monaco-icon-label">
-                    <span className="monaco-icon-label-container"><span className="monaco-icon-name-container"><a className="label-name">{seg}</a></span></span>
-                  </div>
-                )}
-              </div>
-              {!last && <span className="codicon codicon-breadcrumb-separator" aria-hidden="true" />}
-            </React.Fragment>
-          );
-        })}
-      </div>
+  const relative = uriRelative(root, uri);
+  const inside = relative !== undefined;
+  const parts = inside ? [{ label: uriBasename(root), uri: root }, ...segs.map((seg, i) => ({ label: seg, uri: uriJoinPath(root, ...segs.slice(0, i + 1)) }))] : segs.map((seg, i) => ({ label: seg, uri: (`file:///${segs.slice(0, i + 1).join('/')}`) as WorkspaceUri }));
+  const host = useRef<HTMLDivElement>(null);
+  const [directory, setDirectory] = useState<WorkspaceUri | null>(null);
+  const [entries, setEntries] = useState<Awaited<ReturnType<FileSystemPortLike['list']>>>([]);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  useEffect(() => { setDirectory(null); }, [uri]);
+  useEffect(() => {
+    let alive = true; setEntries([]); setError(''); setQuery('');
+    if (directory && fs?.list) void fs.list({ uri: directory }).then(items => { if (alive) setEntries(items.sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1)); }).catch(e => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
+  }, [directory, fs]);
+  useEffect(() => {
+    if (!directory) return;
+    const dismiss = (event: PointerEvent) => { if (!host.current?.contains(event.target as Node)) setDirectory(null); };
+    document.addEventListener('pointerdown', dismiss); return () => document.removeEventListener('pointerdown', dismiss);
+  }, [directory]);
+  return <div ref={host} className="breadcrumbs-control" data-testid="attach-breadcrumbs" title={uriPath(uri)}>
+    <div className="monaco-breadcrumbs" role="list" aria-label="Breadcrumbs">
+      {parts.map((part, i) => <React.Fragment key={part.uri}>
+        <div className={`monaco-breadcrumb-item${i === parts.length - 1 ? ' focused' : ''}`} role="listitem">
+          <button type="button" className={`breadcrumb-path ${i === parts.length - 1 ? fileIconLabelClasses(part.label) : 'monaco-icon-label'}`} title={uriPath(part.uri)} disabled={!fs?.list || !onOpen} aria-label={`Navegar: ${part.label}`} aria-expanded={!!directory && directory === (i === parts.length - 1 ? uriDirname(uri) : part.uri)} onClick={() => setDirectory(i === parts.length - 1 ? uriDirname(uri) : part.uri)}>{part.label}</button>
+        </div>
+        {i < parts.length - 1 && <span className="codicon codicon-breadcrumb-separator" aria-hidden="true" />}
+      </React.Fragment>)}
     </div>
-  );
+    {directory && <div className="breadcrumb-picker" role="dialog" aria-label="Navegar pelo caminho" onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') setDirectory(null); }}>
+      <div className="breadcrumb-picker-heading" title={uriPath(directory)}>{uriPath(directory)}</div>
+      <input autoFocus aria-label="Filtrar arquivos do caminho" value={query} onChange={event => setQuery(event.target.value)} />
+      {directory !== root && <button type="button" onClick={() => setDirectory(uriDirname(directory))}>.. / Pasta acima</button>}
+      {error && <p role="alert">{error}</p>}
+      {entries.filter(entry => entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(entry => <button key={entry.uri} type="button" onClick={() => { if (entry.kind === 'directory') setDirectory(entry.uri); else { setDirectory(null); onOpen?.(entry.uri); } }}>{entry.kind === 'directory' ? '▸ ' : ''}{entry.name}</button>)}
+      <button type="button" onClick={() => setDirectory(null)}>Fechar navegação</button>
+    </div>}
+  </div>;
 }
 
 /**
@@ -86,8 +98,9 @@ export function Breadcrumbs({ root, uri }: { root: WorkspaceUri; uri: WorkspaceU
  * Cada item é um BOTÃO de verdade — o pedido era navegável, não decorativo.
  * Sem símbolos no cursor, devolve null: nada de barra mentirosa.
  */
-export function BreadcrumbsSimbolos({ trilha, onIr }: { trilha: readonly OutlineRow[]; onIr: (row: OutlineRow) => void }) {
-  if (trilha.length === 0) return null;
+export function BreadcrumbsSimbolos({ trilha, onIr, rows = trilha }: { trilha: readonly OutlineRow[]; rows?: readonly OutlineRow[]; onIr: (row: OutlineRow) => void }) {
+  const [open, setOpen] = useState(false);
+  if (rows.length === 0) return null;
   return (
     <>
       {trilha.map((row) => (
@@ -107,6 +120,11 @@ export function BreadcrumbsSimbolos({ trilha, onIr }: { trilha: readonly Outline
           </div>
         </React.Fragment>
       ))}
+      <button type="button" className="breadcrumb-symbol" aria-label="Navegar pelos símbolos" aria-expanded={open} onClick={() => setOpen(value => !value)}>…</button>
+      {open && <div className="breadcrumb-picker" role="dialog" aria-label="Símbolos do arquivo" onKeyDown={event => { if (event.key === 'Escape') setOpen(false); }}>
+        {rows.map(row => <button key={row.id} type="button" onClick={() => { onIr(row); setOpen(false); }}>{row.name}</button>)}
+        <button type="button" onClick={() => setOpen(false)}>Fechar símbolos</button>
+      </div>}
     </>
   );
 }

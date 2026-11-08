@@ -1,3 +1,9 @@
+# Revisão vigente de inspeção — D180, 08/11/2026
+
+O cenário antigo limitado a dois grupos foi substituído. Siga o bloco atual do canônico 08: cinco vistas por divisões sucessivas; maximizar/restaurar verifica a caixa efetiva; X principal oculta tudo sem fechar abas; X de um grupo fecha somente esse grupo. Caminho navega por pastas/arquivos e símbolos conforme linguagem. F1 aprovado visualmente e preservado. Sem homologação formal.
+
+---
+
 # Complemento de inspeção — D179, 08/11/2026
 
 Use primeiro os cenários atuais do canônico 08: dividir duplica a vista do arquivo, fechar principal promove o painel restante, última vista dirty pede decisão, preview Markdown/texto e maximizar após recolher funcionam. F1 fora do código é compacto, ajuda de teclas é tabela, binário não aceita edição. Este complemento substitui expectativas antigas de divisão vazia. Não é homologação.

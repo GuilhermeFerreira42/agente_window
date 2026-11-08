@@ -61,3 +61,44 @@ describe('D179: vistas de um arquivo e grupos vazios', () => {
     expect(editor.getActive('s1')?.dirty).toBe(true);
   });
 });
+
+describe('D180: grupos sucessivos', () => {
+  it('cada divisão cria novo grupo à direita do foco, inclusive acima de nove', () => {
+    const editor = setup();
+    for (let i = 0; i < 11; i++) editor.duplicateToSide('s1');
+    expect(editor.groupIds('s1')).toHaveLength(12);
+    expect(editor.focusedGroupId('s1')).toBe('s1#12');
+    for (const id of editor.groupIds('s1')) expect(editor.getActive(id)?.uri).toBe(A);
+    editor.focusGroupId('s1', 's1#2');
+    editor.duplicateToSide('s1');
+    expect(editor.groupIds('s1').slice(1, 3)).toEqual(['s1#2', 's1#13']);
+    editor.setDirty({ sessionId: 's1#12', uri: A, dirty: true });
+    expect(editor.groupIds('s1').every(id => editor.getActive(id)?.dirty)).toBe(true);
+  });
+  it('fechar grupo de cópias dirty mantém o último dono e normaliza foco', () => {
+    const editor = setup(); editor.duplicateToSide('s1'); editor.duplicateToSide('s1');
+    editor.setDirty({ sessionId: 's1#3', uri: A, dirty: true });
+    expect(editor.closeGroup('s1', 's1#3')).toBe(true);
+    expect(editor.focusedGroupId('s1')).toBe('s1');
+    expect(editor.closeGroup('s1', 's1#2')).toBe(true);
+    expect(editor.closeGroup('s1', 's1')).toBe(false);
+    expect(editor.getActive('s1')?.dirty).toBe(true);
+  });
+  it('grupo com arquivo único dirty exige confirmação sem perder irmãos', () => {
+    const editor = setup(); editor.duplicateToSide('s1'); editor.duplicateToSide('s1');
+    editor.open({ sessionId: 's1#3', uri: B, kind: 'code', pinned: true });
+    editor.setDirty({ sessionId: 's1#3', uri: B, dirty: true });
+    expect(editor.closeGroup('s1', 's1#3')).toBe(false);
+    expect(editor.groupIds('s1')).toHaveLength(3);
+    expect(editor.closeGroup('s1', 's1#3', true)).toBe(true);
+    expect(editor.getActive('s1')?.uri).toBe(A);
+  });
+  it('promove somente um grupo e conserva os demais na mesma sessão', () => {
+    const editor = setup(); editor.duplicateToSide('s1'); editor.duplicateToSide('s1');
+    editor.open({ sessionId: 's2', uri: B, kind: 'code', pinned: true });
+    expect(editor.close({ sessionId: 's1', uri: A })).toBe(true);
+    expect(editor.groupIds('s1')).toEqual(['s1', 's1#3']);
+    expect(editor.getActive('s1')?.uri).toBe(A);
+    expect(editor.getActive('s2')?.uri).toBe(B);
+  });
+});

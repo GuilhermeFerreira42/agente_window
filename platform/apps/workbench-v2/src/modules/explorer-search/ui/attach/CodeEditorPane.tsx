@@ -64,7 +64,7 @@ export function currentTheme(): 'vs' | 'vs-dark' {
 export interface CodeEditorPaneProps {
   editor: EditorService;
   sessionId: string;
-  fs: Pick<FileSystemPortLike, 'readFile' | 'readFileBinary'> & Partial<Pick<FileSystemPortLike, 'watch'>>;
+  fs: Pick<FileSystemPortLike, 'readFile' | 'readFileBinary'> & Partial<Pick<FileSystemPortLike, 'watch' | 'list'>>;
   /** Gancho para o barrel expor a instância (E2E/c5 save). */
   onEditorReady?: (ed: Monaco.editor.IStandaloneCodeEditor, api: CodeEditorPaneApi, groupId?: string) => void;
   /** c5: Ctrl+S dentro do Monaco → salvar a URI ativa. */
@@ -108,7 +108,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     const entry = entries.current.get(uri);
     if (!entry) return;
     entry.viewState = ed.saveViewState();
-    (entry.viewStates ??= new Map()).set(sessionId, entry.viewState);
+    if (editor.groupIds(modelSession(sessionId)).includes(sessionId)) (entry.viewStates ??= new Map()).set(sessionId, entry.viewState);
   };
   /**
    * D157 (dívida da Onda 3): `loadMonaco().then(...)` não tinha `.catch`. Quando o
@@ -134,7 +134,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
       const ed = monaco.editor.create(hostRef.current, { ...ATTACH_MONACO_OPTIONS, theme: currentTheme(), model: null });
       edRef.current = ed;
       const disposeShortcuts = registerEditorShortcuts(monaco, ed, id => commandRef.current?.(id));
-      const focus = ed.onDidFocusEditorText(() => editor.setFocusGroup({ sessionId: modelSession(sessionId), side: sessionId.endsWith('#2') ? 'secundario' : 'principal' }));
+      const focus = ed.onDidFocusEditorText(() => editor.focusGroupId(modelSession(sessionId), sessionId));
       highlight.current = ed.createDecorationsCollection();
       const clearHl = ed.onDidChangeCursorPosition(() => highlight.current?.clear());
       const blur = ed.onDidBlurEditorWidget(() => { if (currentUri.current) rememberView(currentUri.current, ed); });
@@ -208,7 +208,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     if (e.type === 'editor.tabClosed') {
       if (currentUri.current === e.uri && edRef.current) {
         rememberView(e.uri, edRef.current);
-        if (sessionId.endsWith('#2') && !editor.isSplit(modelSession(sessionId)) && editor.getTabs(modelSession(sessionId)).some(tab => tab.uri === e.uri)) {
+        if (sessionId !== modelSession(sessionId) && !editor.groupIds(modelSession(sessionId)).includes(sessionId) && editor.getTabs(modelSession(sessionId)).some(tab => tab.uri === e.uri)) {
           const entry = entries.current.get(e.uri);
           if (entry?.viewState) entry.viewStates?.set(modelSession(sessionId), entry.viewState);
         }

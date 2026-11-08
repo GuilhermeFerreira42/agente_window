@@ -25,7 +25,7 @@
 // como divergirem.
 // ============================================================================
 import React from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Columns2 } from 'lucide-react';
 import type { WorkspaceUri } from '../../contract';
 import { GRUPO_SECUNDARIO, type EditorService } from '../../core/editor/editorService';
 import type { OutlineRow } from '../../core/outline/outlineModel';
@@ -38,6 +38,7 @@ export interface CenterSplitPaneProps {
   editor: EditorService;
   /** Sessão LÓGICA (a do grupo principal). O id de grupo é derivado aqui. */
   sessionId: string;
+  groupId?: string;
   fs: CodeEditorPaneProps['fs'];
   onEditorReady?: CodeEditorPaneProps['onEditorReady'];
   onWorkbenchCommand?: CodeEditorPaneProps['onWorkbenchCommand'];
@@ -60,9 +61,9 @@ export interface CenterSplitPaneProps {
 }
 
 export function CenterSplitPane({
-  editor, sessionId, fs, onEditorReady, onWorkbenchCommand, renderMarkdown, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
+  editor, sessionId, groupId, fs, onEditorReady, onWorkbenchCommand, renderMarkdown, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
 }: CenterSplitPaneProps) {
-  const grupoId = GRUPO_SECUNDARIO(sessionId);
+  const grupoId = groupId ?? GRUPO_SECUNDARIO(sessionId);
   // O painel lê o grupo e reage a QUALQUER evento dele (a versão é por grupo).
   useEditorVersion(editor, grupoId);
 
@@ -110,6 +111,7 @@ export function CenterSplitPane({
         // abas em 24 px (medido no browser).
         actions={(
           <>
+          {onWorkbenchCommand && <button className="toolbar-button" type="button" title="Dividir editor" aria-label="Dividir editor" onClick={() => onWorkbenchCommand('workbench.action.splitEditor')}><Columns2 size={14} /></button>}
           {onWorkbenchCommand && activeUri && /\.(md|markdown|txt|text|log)$/i.test(activeUri) && <button className="toolbar-button" type="button" title="Alternar visualização do arquivo" aria-label="Alternar visualização do arquivo" onClick={() => onWorkbenchCommand('editor.action.togglePreview')}><BookOpen size={14} /></button>}
           <button
             type="button"
@@ -123,8 +125,8 @@ export function CenterSplitPane({
       />
       {activeUri && (
         <div className="center-breadcrumbs" data-testid="center-split-breadcrumbs">
-          <Breadcrumbs root={(workspaceRoot ?? activeUri) as WorkspaceUri} uri={activeUri as WorkspaceUri} />
-          <BreadcrumbsSimbolos trilha={trilha} onIr={(row) => outline?.reveal(row.line, row.column)} />
+          <Breadcrumbs root={(workspaceRoot ?? activeUri) as WorkspaceUri} uri={activeUri as WorkspaceUri} fs={fs} onOpen={uri => editor.open({ sessionId: grupoId, uri, kind: 'code', pinned: true })} />
+          <BreadcrumbsSimbolos rows={editor.focusedGroupId(sessionId) === grupoId ? outline?.rows() : []} trilha={editor.focusedGroupId(sessionId) === grupoId ? trilha : []} onIr={(row) => outline?.reveal(row.line, row.column)} />
         </div>
       )}
       {!activeUri && (

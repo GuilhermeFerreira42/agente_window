@@ -116,18 +116,7 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
     void compute();
   };
 
-  return {
-    attach(ed) {
-      if (disposed) return;
-      if (candidatos.includes(ed)) { tomarPosse(ed); return; }
-      candidatos.push(ed);
-      listenersPorEditor.set(ed, [
-        ed.onDidChangeModel(() => { if (editor !== ed) return; set([], null); void compute(); }),
-        ed.onDidChangeModelContent(() => { if (editor === ed) schedule(); }),
-      ]);
-      tomarPosse(ed);
-    },
-    detach(ed) {
+  const detachEditor = (ed: Editor) => {
       const i = candidatos.indexOf(ed);
       if (i >= 0) candidatos.splice(i, 1);
       for (const d of listenersPorEditor.get(ed) ?? []) d.dispose();
@@ -135,10 +124,26 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
       if (editor !== ed) return;
       // O dono da posse saiu: passa para o candidato vivo (o último que sobrou).
       const proximo = candidatos[candidatos.length - 1] ?? null;
-      editor = null;
+      editor = null; seq++;
       if (proximo) tomarPosse(proximo);
       else { set([], null); }
+      };
+
+  return {
+    attach(ed) {
+      if (disposed) return;
+      if (candidatos.includes(ed)) { tomarPosse(ed); return; }
+      candidatos.push(ed);
+      const ownListeners = [
+        ed.onDidChangeModel(() => { if (editor !== ed) return; set([], null); void compute(); }),
+        ed.onDidChangeModelContent(() => { if (editor === ed) schedule(); }),
+      ];
+      if (ed.onDidFocusEditorText) ownListeners.push(ed.onDidFocusEditorText(() => tomarPosse(ed)));
+      if (ed.onDidDispose) ownListeners.push(ed.onDidDispose(() => detachEditor(ed)));
+      listenersPorEditor.set(ed, ownListeners);
+      tomarPosse(ed);
     },
+    detach: detachEditor,
     candidateCount: () => candidatos.length,
     rows: () => rows,
     modelUri: () => uri,

@@ -182,6 +182,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // D169: clique num painel marca o foco; sem isso o open() não sabe onde abrir.
   attachApi.setFocusSide = (input) => { editorService.setFocusGroup(input); };
   attachApi.focusSideOf = (input) => editorService.focusGroupOf(input.sessionId);
+  attachApi.groupIds = input => editorService.groupIds(input.sessionId);
+  attachApi.focusedGroupId = input => editorService.focusedGroupId(input.sessionId);
+  attachApi.focusGroupId = input => editorService.focusGroupId(input.sessionId, input.groupId);
   // eventos editor.* saem pelo onEvent do módulo; expandir/recolher move o layout
   // (display:none — nunca desmonta).
   // c6 — maximizar/restaurar sai como evento editor.* (sessão = a que hospeda o anexo).
@@ -246,8 +249,18 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // centro") é paga aqui, ANTES de a coluna morrer, e não depois: o tracker agora
   // aceita N candidatos e o Outline passa a descrever o editor que está em uso,
   // seja ele o da coluna (durante a sobreposição) ou o do centro (a partir daqui).
+  const centerEditors = new Map<string, Parameters<NonNullable<CodeEditorPaneProps['onEditorReady']>>[0]>();
+  const offOutlineFocus = editorService.onEvent(event => {
+    if (event.type !== 'editor.focusGroupChanged') return;
+    const candidate = centerEditors.get(editorService.focusedGroupId(event.sessionId));
+    if (candidate) outlineTracker.attach(candidate);
+  });
   const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (ed, api, groupId) => {
-    if (groupId) editorCommands.register(groupId, ed);
+    if (groupId) {
+      editorCommands.register(groupId, ed);
+      centerEditors.set(groupId, ed);
+      ed.onDidDispose?.(() => { if (centerEditors.get(groupId) === ed) centerEditors.delete(groupId); });
+    }
     centerPaneApi = api;
     centerMonaco = ed;
     outlineTracker.attach(ed);
@@ -654,6 +667,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       unmountCodeEditor();
       offEditor();
       offLayoutMax(); offLayoutVis();
+      offOutlineFocus(); centerEditors.clear();
       outlineTracker.dispose(); // 5.6
       disposeModelResources(editorService);
       editorService.dispose();

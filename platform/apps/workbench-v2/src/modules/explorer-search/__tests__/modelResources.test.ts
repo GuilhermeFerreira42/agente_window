@@ -48,3 +48,16 @@ describe('recursos Monaco sobrevivem ao host, sem duplicar o dono das abas', () 
     disposeModelResources(editor); editor.dispose();
   });
 });
+
+it('D180: fechar um grupo intermediário limpa só sua vista, sem descartar o modelo compartilhado', () => {
+  const editor = new EditorService();
+  editor.open({ sessionId: 's1', uri, kind: 'code', pinned: true });
+  editor.duplicateToSide('s1'); editor.duplicateToSide('s1');
+  const resource = entry(); resource.value.viewStates = new Map([['s1', null], ['s1#2', null], ['s1#3', null]]);
+  modelEntries(editor, 's1').set(uri, resource.value);
+  expect(editor.closeGroup('s1', 's1#2')).toBe(true);
+  expect([...resource.value.viewStates.keys()]).toEqual(['s1', 's1#3']);
+  expect(resource.dispose).not.toHaveBeenCalled();
+  expect(modelEntries(editor, 's1#3').get(uri)).toBe(resource.value);
+  disposeModelResources(editor); editor.dispose();
+});

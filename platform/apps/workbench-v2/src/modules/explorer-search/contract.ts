@@ -196,6 +196,10 @@ export interface IEditorAttachApi {
   split?(input: { sessionId: string }): string | null;
   /** D179: segunda vista do arquivo atual; split() vazio permanece compatível. */
   duplicateToSide?(input: { sessionId: string }): string | null;
+  /** D180: grupos em ordem visual e foco explícito; lados legados permanecem. */
+  groupIds?(input: { sessionId: string }): string[];
+  focusedGroupId?(input: { sessionId: string }): string;
+  focusGroupId?(input: { sessionId: string; groupId: string }): void;
   /** Fecha a divisão inteira. `false` = bloqueado por aba dirty (sem `force`). */
   unsplit?(input: { sessionId: string; force?: boolean }): boolean;
   /** Existe divisão aberta nesta sessão? */

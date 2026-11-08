@@ -196,3 +196,15 @@ describe('outlineTracker — aba de DIFF limpa o Outline (D162)', () => {
     t.dispose()
   })
 })
+
+it('D180: foco transfere símbolos ao editor vivo e dispose devolve a posse', () => {
+  const t = createMonacoOutlineTracker();
+  let focusA = () => {}, disposeA = () => {};
+  const a = { ...editorFalso().ed, getPosition: () => ({ lineNumber: 2, column: 3 }), onDidFocusEditorText: (cb: () => void) => { focusA = cb; return descartavel; }, onDidDispose: (cb: () => void) => { disposeA = cb; return descartavel; } } as unknown as EditorDoTracker;
+  const b = { ...editorFalso().ed, getPosition: () => ({ lineNumber: 8, column: 1 }) } as unknown as EditorDoTracker;
+  t.attach(a); t.attach(b);
+  expect(t.cursorPosition()?.line).toBe(8);
+  focusA(); expect(t.cursorPosition()).toEqual({ line: 2, column: 3 });
+  disposeA(); expect(t.candidateCount()).toBe(1); expect(t.cursorPosition()?.line).toBe(8);
+  t.dispose();
+});

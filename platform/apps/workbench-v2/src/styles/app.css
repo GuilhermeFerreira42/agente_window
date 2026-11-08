@@ -5041,3 +5041,6 @@ svg {
   outline: var(--vscode-strokeThickness) solid var(--vscode-focusBorder);
   outline-offset: 1px;
 }
+
+/* D180: o portal tem um host real; a superfície ocupa sua caixa em qualquer layout. */
+[data-testid="stable-editor-content"] > .editor-pane { flex: 1 1 0; width: 100%; }

@@ -8,14 +8,14 @@ function EditorSurfaceSlot({ container }: { container: HTMLElement }) {
     owner?.appendChild(container)
     return () => { if (container.parentElement === owner) container.remove() }
   }, [container])
-  return <div ref={host} style={{ display: 'contents' }} data-testid="stable-editor-slot" />
+  return <div ref={host} style={{ display: 'flex', flex: '1 1 0', minWidth: 0, minHeight: 0, width: '100%', height: '100%' }} data-testid="stable-editor-slot" />
 }
 
 /** Uma instância visual reposicionada. Cada casa continua dona do seu estado. */
 export function useStableEditorSurface(content: ReactNode) {
   const [container] = useState(() => {
     const element = document.createElement('div')
-    element.style.display = 'contents'
+    Object.assign(element.style, { display: 'flex', flex: '1 1 0', minWidth: '0', minHeight: '0', width: '100%', height: '100%' })
     element.dataset.testid = 'stable-editor-content'
     return element
   })
