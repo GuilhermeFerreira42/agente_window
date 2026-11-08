@@ -22,7 +22,7 @@ const ATTACH_TABS_KEY = 'workbench.attachTabs.v1'
  *  (restaurada do .jsonl) aparece na hora. */
 export const ACTIVE_SESSION_KEY = 'workbench.sessions.active.v1'
 
-export type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean }
+export type PersistedAttachTab = { uri: WorkspaceUri; pinned: boolean; active: boolean; presentation?: 'code' | 'preview' }
 
 export function loadAttachTabs(): Record<string, PersistedAttachTab[]> {
   try {
@@ -36,7 +36,7 @@ export function snapshotAttachTabs(module: IExplorerSearchModule, sessionId: str
   try {
     const tabs = module.attach.getTabs({ sessionId })
       .filter((t) => t.kind === 'code')
-      .map((t): PersistedAttachTab => ({ uri: t.uri, pinned: !t.preview, active: !!t.active }))
+      .map((t): PersistedAttachTab => ({ uri: t.uri, pinned: !t.preview, active: !!t.active, ...(t.presentation ? { presentation: t.presentation } : {}) }))
     const all = loadAttachTabs()
     if (tabs.length) all[sessionId] = tabs
     else delete all[sessionId]
@@ -50,6 +50,6 @@ export function restoreAttachTabs(module: IExplorerSearchModule): void {
     if (!Array.isArray(tabs)) continue
     // ativa por último = fica ativa
     const ordered = [...tabs.filter((t) => !t.active), ...tabs.filter((t) => t.active)]
-    for (const t of ordered) void module.attach.open({ uri: t.uri, kind: 'code', sessionId, pinned: t.pinned })
+    for (const t of ordered) void module.attach.open({ uri: t.uri, kind: 'code', sessionId, pinned: t.pinned, ...(t.presentation ? { presentation: t.presentation } : {}) })
   }
 }

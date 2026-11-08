@@ -153,7 +153,7 @@ describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => 
     fireEvent.click(screen.getByRole('menuitem', { name: /^Abrir ao lado$/ }))
     await waitFor(() => expect(mod.attach.sideOf?.({ sessionId: sid, uri: ARQ_A })).toBe('secundario'))
   })
-  it('fechar a última aba principal preserva a divisão que ainda tem arquivo', async () => {
+  it('fechar a última aba principal promove o arquivo restante sem deixar grupo vazio', async () => {
     render(<App initialSessionSnapshot={testSessions} />)
     const mod = await moduloMontado()
     await abrirArquivoNoModulo(mod)
@@ -166,8 +166,9 @@ describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => 
       await mod.attach.open({ sessionId: sid!, uri: `${RAIZ}/b.ts` as WorkspaceUri, kind: 'code', pinned: true })
       await mod.attach.close({ sessionId: sid!, uri: ARQ_A })
     })
-    await waitFor(() => expect(screen.getByTestId('center-split-pane')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByTestId('center-split-pane')).toBeNull())
     expect(screen.getByRole('tab', { name: /b\.ts/ })).toBeTruthy()
+    expect(mod.attach.getTabs({ sessionId: sid! }).some(tab => tab.uri === `${RAIZ}/b.ts`)).toBe(true)
   })
   it('1. as abas abertas no módulo aparecem na faixa CENTRAL, e o corpo capaz é montado', async () => {
     render(<App />)

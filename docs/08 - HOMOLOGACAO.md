@@ -1,3 +1,13 @@
+# Inspeção dirigida do editor — D179 (08/11/2026)
+
+Ainda depende do seu aceite. Abra um arquivo e divida: o mesmo texto deve aparecer nos dois lados, com cursores independentes. Edite, feche uma cópia e confira o rascunho na outra; ao fechar a última, confira Salvar/Não Salvar/Cancelar. Feche o principal e confira a promoção do painel restante, sem área vazia.
+
+Em Markdown ou texto, use o botão de visualização; no Markdown, Ctrl+Shift+V também abre o preview. Confira edição e preview lado a lado. Recolha o editor e maximize: deve aparecer ampliado. Abra F1 fora do código e compare a paleta compacta; dentro do código permanece a paleta nativa do Monaco. Ctrl+K Ctrl+S mostra a tabela pesquisável. Abra um atalho Windows: deve aparecer aviso de binário, sem edição como texto. Alt+Z continua alternando a quebra visual.
+
+Use arquivos descartáveis para testar. F5 restaura só conteúdo já salvo. As ressalvas de suíte integral e a decisão separada sobre E15-d permanecem; testes técnicos não encerram a Fatia 15.
+
+---
+
 # Complemento para inspeção — atalhos (08/11/2026)
 
 No arquivo de código, Alt+Z deve alternar a quebra visual; F1 abre a paleta, e Ctrl+K seguido de Ctrl+S mostra os atalhos. Conferir também abrir/salvar/fechar pelo teclado e foco dos dois grupos. Salvar como pede destino novo e conserva o arquivo se a gravação falhar. Recursos de linguagem dependem do provedor; atalhos reservados podem ser tomados pelo navegador. A correção e seus testes não representam sua homologação da Fatia 15.

@@ -1,3 +1,9 @@
+# Complemento de inspeção — D179, 08/11/2026
+
+Use primeiro os cenários atuais do canônico 08: dividir duplica a vista do arquivo, fechar principal promove o painel restante, última vista dirty pede decisão, preview Markdown/texto e maximizar após recolher funcionam. F1 fora do código é compacto, ajuda de teclas é tabela, binário não aceita edição. Este complemento substitui expectativas antigas de divisão vazia. Não é homologação.
+
+---
+
 # Complemento vigente — inspeção do candidato corrigido (08/11/2026)
 
 As medições atuais estão em 09. Nenhuma marca histórica de teste abaixo representa aprovação humana.

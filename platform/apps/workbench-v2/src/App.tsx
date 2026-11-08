@@ -63,6 +63,7 @@ import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/pon
 import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
 import { useStableEditorSurface } from './shell/stableEditorSurface'
 import { useWorkbenchShortcuts } from './shell/useWorkbenchShortcuts'
+import { renderDocumentMarkdown } from './shell/renderDocumentMarkdown'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
 import { CenterChangesSlot, CenterCodeEditorSlot, EditorCommandsSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
@@ -255,6 +256,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const root: WorkspaceUri = await fs.discoverRoot()
         if (cancelled) return
         const module = createExplorerSearchModule({
+          renderMarkdown: renderDocumentMarkdown,
           fs,
           menus: explorerMenusRef.current,
           contextMenu: { open: (input) => setExplorerContextMenu(input) },
@@ -269,7 +271,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
           if (e.type === 'editor.navigationRequested') handleModuleNavigationRef.current?.(e.sessionId, e.uri)
           if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
-          if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed') snapshotAttachTabs(module, e.sessionId)
+          if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed' || e.type === 'editor.presentationChanged') snapshotAttachTabs(module, e.sessionId)
           // Onda 2c-i: as abas do módulo passaram a aparecer também na faixa CENTRAL,
           // então os eventos que mudam abas precisam invalidar a projeção. `dirtyChanged`
           // entra aqui e não no snapshot do anexo porque a faixa mostra o ponto de dirty.
@@ -994,7 +996,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // (E15/R-039) O gate do single-pane continua valendo — está em
     // `motivoSemDivisao` e NÃO foi afrouxado. (Relaxar o gate é decisão de
     // produto do dono — ver D169.)
-    const id = explorerModuleRef.current?.attach.split?.({ sessionId: activeSession.id }) ?? null
+    const attach = explorerModuleRef.current?.attach
+    if (attach?.duplicateToSide) {
+      const id = attach.duplicateToSide({ sessionId: activeSession.id })
+      if (id) { revealEditor(); notify('Arquivo aberto nos dois painéis') }
+      else notify('Abra um arquivo para dividir o editor')
+      return
+    }
+    const id = attach?.split?.({ sessionId: activeSession.id }) ?? null
     if (id === null) notify('O editor já está dividido')
     else notify('Editor dividido: escolha um arquivo no Explorer para abrir do outro lado')
   }
@@ -2329,8 +2338,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onCommit={() => notify('Commit preparado para a sessão')}
       onCreatePr={() => notify('Pull request preparado')}
       editorMaximized={editorMaximized}
-      onToggleMaximize={() => setEditorMaximized((current) => !current)}
-      onSplit={handleSplitEditor}
+      onToggleMaximize={() => { if (!editorMaximized) revealEditor(); setEditorMaximized((current) => !current) }}
+      onSplit={() => { explorerModule?.attach.setFocusSide?.({ sessionId: activeSession.id, side: 'principal' }); handleSplitEditor() }}
+      onTogglePreview={() => { explorerModule?.attach.setFocusSide?.({ sessionId: activeSession.id, side: 'principal' }); revealEditor(); executeEditorCommand('editor.action.togglePreview') }}
       onOpenToSide={handleOpenToSide}
       editorContentVisible={editorContentVisible}
       sidePaneState={sidePaneState}

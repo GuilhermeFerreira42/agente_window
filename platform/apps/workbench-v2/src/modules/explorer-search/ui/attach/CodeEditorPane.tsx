@@ -27,6 +27,7 @@ import { uriBasename } from '../../core/uri';
 import { useEditorVersion } from './useEditorVersion';
 import { discardModel, modelEntries, modelSession, modelsChanged, onModelsChanged } from './modelResources';
 import { registerEditorShortcuts } from './editorShortcuts';
+import { DocumentPreview, supportsDocumentPreview } from './DocumentPreview';
 
 export const ATTACH_MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
   fontSize: 14,
@@ -40,6 +41,7 @@ export const ATTACH_MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionO
 };
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'avif']);
+const BINARY_EXT = /\.(lnk|exe|dll|zip|7z|rar|pdf|mp3|mp4|wav|avi|mov|docx?|xlsx?|pptx?|sqlite|db|woff2?|ttf)$/i;
 function isImageName(name: string): boolean {
   const i = name.lastIndexOf('.');
   return i > 0 && IMAGE_EXT.has(name.slice(i + 1).toLowerCase());
@@ -68,6 +70,7 @@ export interface CodeEditorPaneProps {
   /** c5: Ctrl+S dentro do Monaco → salvar a URI ativa. */
   onSaveRequest?: (uri: WorkspaceUri) => void;
   onWorkbenchCommand?: (id: string) => void;
+  renderMarkdown?: (content: string) => React.ReactNode;
   /** c5: mensagem de falha de save da URI ativa (some na próxima edição). */
   saveError?: string | null;
 }
@@ -84,7 +87,7 @@ export interface CodeEditorPaneApi {
   has(uri: WorkspaceUri): boolean;
 }
 
-export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveRequest, onWorkbenchCommand, saveError }: CodeEditorPaneProps) {
+export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveRequest, onWorkbenchCommand, renderMarkdown, saveError }: CodeEditorPaneProps) {
   const commandRef = useRef(onWorkbenchCommand);
   commandRef.current = onWorkbenchCommand;
   const saveRef = useRef(onSaveRequest);
@@ -101,6 +104,12 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
   const rerender = () => bump((x) => x + 1);
   useEffect(() => onModelsChanged(editor, sessionId, rerender), [editor, sessionId]);
   const ownerGroup = (uri: WorkspaceUri) => editor.groupIdOf(modelSession(sessionId), uri) ?? sessionId;
+  const rememberView = (uri: WorkspaceUri, ed: Monaco.editor.IStandaloneCodeEditor) => {
+    const entry = entries.current.get(uri);
+    if (!entry) return;
+    entry.viewState = ed.saveViewState();
+    (entry.viewStates ??= new Map()).set(sessionId, entry.viewState);
+  };
   /**
    * D157 (dívida da Onda 3): `loadMonaco().then(...)` não tinha `.catch`. Quando o
    * carregamento do Monaco falhava (chunk não encontrado, CSP, worker bloqueado,
@@ -128,6 +137,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
       const focus = ed.onDidFocusEditorText(() => editor.setFocusGroup({ sessionId: modelSession(sessionId), side: sessionId.endsWith('#2') ? 'secundario' : 'principal' }));
       highlight.current = ed.createDecorationsCollection();
       const clearHl = ed.onDidChangeCursorPosition(() => highlight.current?.clear());
+      const blur = ed.onDidBlurEditorWidget(() => { if (currentUri.current) rememberView(currentUri.current, ed); });
       // Ctrl+S / Cmd+S (workbench.action.files.save)
       ed.addAction({ id: 'workbench.action.files.save', label: 'Salvar arquivo', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS], run: () => { if (currentUri.current) saveRef.current?.(currentUri.current); } });
       // tema segue o shell (classe theme-light no <html>)
@@ -163,12 +173,12 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
         disposeShortcuts();
         focus.dispose();
         clearHl.dispose();
+        blur.dispose();
         mo.disconnect();
         // O layout pode trocar o host React. O modelo/undo pertence ao módulo,
         // não a esta instância visual. Fechar a aba ou dispose libera o recurso.
         if (currentUri.current) {
-          const entry = entries.current.get(currentUri.current);
-          if (entry) entry.viewState = ed.saveViewState();
+          rememberView(currentUri.current, ed);
         }
         ed.setModel(null);
         ed.dispose();
@@ -195,7 +205,17 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
   // ---- fechar aba → descarta modelo; reveal pedido → guarda até o modelo existir ----
   useEffect(() => editor.onEvent((e) => {
     if (!('sessionId' in e) || e.sessionId !== sessionId) return;
-    if (e.type === 'editor.tabClosed' && !editor.groupIdOf(modelSession(sessionId), e.uri)) disposeEntry(e.uri);
+    if (e.type === 'editor.tabClosed') {
+      if (currentUri.current === e.uri && edRef.current) {
+        rememberView(e.uri, edRef.current);
+        if (sessionId.endsWith('#2') && !editor.isSplit(modelSession(sessionId)) && editor.getTabs(modelSession(sessionId)).some(tab => tab.uri === e.uri)) {
+          const entry = entries.current.get(e.uri);
+          if (entry?.viewState) entry.viewStates?.set(modelSession(sessionId), entry.viewState);
+        }
+        edRef.current.setModel(null); currentUri.current = null;
+      }
+      if (!editor.groupIdOf(modelSession(sessionId), e.uri)) disposeEntry(e.uri);
+    }
     if (e.type === 'editor.revealRequested') {
       pendingReveal.current.set(e.uri, { line: e.line, column: e.column });
       applyReveal(e.uri);
@@ -227,8 +247,7 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     if (!ed || !monaco) return;
     // salva viewState da anterior
     if (currentUri.current && currentUri.current !== activeUri) {
-      const prev = entries.current.get(currentUri.current);
-      if (prev) prev.viewState = ed.saveViewState();
+      rememberView(currentUri.current, ed);
     }
     if (!activeUri) { ed.setModel(null); currentUri.current = null; return; }
     let entry = entries.current.get(activeUri);
@@ -244,9 +263,13 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
             const bin = await fs.readFileBinary({ uri, maxBytes: 8 * 1024 * 1024 });
             const e = entries.current.get(uri); if (e !== loadingEntry) return;
             e.status = 'image'; e.image = bin;
+          } else if (BINARY_EXT.test(name)) {
+            const e = entries.current.get(uri); if (e !== loadingEntry) return;
+            e.status = 'binary';
           } else {
             const read = await fs.readFile({ uri });
             const e = entries.current.get(uri); if (e !== loadingEntry) return;
+            if (read.content.includes('\0')) { e.status = 'binary'; modelsChanged(editor, sessionId); return; }
             const model = monaco.editor.createModel(read.content, languageFor(monaco, name), monaco.Uri.parse(`attach:${modelSession(sessionId)}${uri.replace(/^file:\/\//, '')}`));
             e.model = model;
             e.savedVersionId = model.getAlternativeVersionId();
@@ -268,7 +291,8 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
     if (entry.model) {
       if (ed.getModel() !== entry.model) {
         ed.setModel(entry.model);
-        if (entry.viewState) ed.restoreViewState(entry.viewState);
+        const state = entry.viewStates?.get(sessionId) ?? entry.viewState;
+        if (state) ed.restoreViewState(state);
       }
       applyReveal(activeUri);
     } else {
@@ -279,11 +303,13 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
   const entry = activeUri ? entries.current.get(activeUri) : undefined;
   const showMonaco = !!entry && entry.status === 'text';
   const name = activeUri ? uriBasename(activeUri) : '';
+  const showPreview = showMonaco && !!entry.model && active?.presentation === 'preview' && supportsDocumentPreview(name);
 
   return (
     <div className="attach-editor-pane" data-testid="attach-editor-pane">
       {saveError && showMonaco && <div className="attach-save-error" role="alert" data-testid="attach-save-error">{saveError}</div>}
-      <div ref={hostRef} className="attach-monaco-host" style={{ display: showMonaco ? undefined : 'none' }} />
+      <div ref={hostRef} className="attach-monaco-host" style={{ display: showMonaco && !showPreview ? undefined : 'none' }} />
+      {showPreview && entry.model && <DocumentPreview model={entry.model} name={name} renderMarkdown={renderMarkdown} />}
       {entry?.status === 'image' && entry.image && (
         <div className="attach-image-preview" data-testid="image-preview-pane">
           <div className="attach-pane-banner"><span>Image Preview</span><span className="attach-pane-name">{name}</span><span className="attach-pane-badge">REAL</span></div>
@@ -302,6 +328,12 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
           <div className="attach-pane-banner error"><span>Não foi possível ler o arquivo</span><span className="attach-pane-name">{name}</span></div>
           <div className="attach-error-detail">{entry.error}</div>
           <div className="attach-error-hint">A leitura veio do backend Single Port (/fs/read). Verifique se o arquivo existe em disco.</div>
+        </div>
+      )}
+      {entry?.status === 'binary' && (
+        <div className="attach-read-error" role="status" data-testid="binary-file-preview">
+          <div className="attach-pane-banner"><span>Arquivo binário</span><span>{name}</span></div>
+          <p>Este arquivo não pode ser exibido como texto. Seu conteúdo foi preservado e não será regravado pelo editor.</p>
         </div>
       )}
     </div>

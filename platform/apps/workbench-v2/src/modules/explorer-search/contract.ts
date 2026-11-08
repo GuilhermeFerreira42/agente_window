@@ -8,6 +8,8 @@
 // ./index.ts (função sem corpo não compila em arquivo de implementação).
 // ============================================================================
 
+import type { ReactNode } from 'react';
+
 /** Re-export do tipo canônico (docs/04). Nunca usar `any` em porta de serviço. */
 export type WorkspaceUri = `file://${string}`;
 
@@ -44,6 +46,7 @@ export type ExplorerSearchEvent =
    *  aqui é o do grupo PRINCIPAL, sempre — o painel secundário escuta este evento
    *  para saber que deve aparecer/sumir. */
   | { type: 'editor.splitChanged'; sessionId: string; split: boolean }
+  | { type: 'editor.groupPromoted'; sessionId: string; fromGroupId: string }
   /** D169: a aba mudou de lado (`to` é o destino). A origem já emitiu `tabClosed`. */
   | { type: 'editor.tabMoved'; sessionId: string; uri: WorkspaceUri; to: 'principal' | 'secundario' }
   /** D169: qual lado tem o foco (decide onde um arquivo aberto aterrissa). */
@@ -51,6 +54,7 @@ export type ExplorerSearchEvent =
   /** D169 (aditivo): a URI saiu do grupo 1 porque foi fechada. O shell usa para
    *  tirar a aba projetada; os painéis já recebem `editor.tabClosed`. */
   | { type: 'editor.dirtyChanged'; sessionId: string; uri: WorkspaceUri; dirty: boolean }
+  | { type: 'editor.presentationChanged'; sessionId: string; uri: WorkspaceUri; presentation: 'code' | 'preview' }
   | { type: 'editor.revealRequested'; sessionId: string; uri: WorkspaceUri; line: number; column?: number }
   | { type: 'editor.attachExpanded'; sessionId: string }   // 1.ª aba aberta → layout mostra o anexo
   | { type: 'editor.attachCollapsed'; sessionId: string }  // última aba fechada → layout esconde (display:none, nunca desmonta)
@@ -134,6 +138,7 @@ export interface AttachDiffPayload {
   modified: string;
 }
 export interface AttachTab {
+  presentation?: 'code' | 'preview';
   uri: WorkspaceUri; kind: 'code' | 'search' | 'changes' | 'diff'; dirty: boolean;
   /** 4.7-c (aditivo): presente só em `kind: 'diff'`. */
   diff?: AttachDiffPayload;
@@ -149,6 +154,7 @@ export interface IEditorAttachApi {
   open(input: { uri: WorkspaceUri; kind: 'code' | 'search' | 'changes' | 'diff'; line?: number; column?: number; sessionId: string;
     /** 4.7 c2 (aditivo, opcional): true = pinado (duplo clique); ausente = preview (clique simples). */
     pinned?: boolean;
+    presentation?: 'code' | 'preview';
     diff?: AttachDiffPayload }): Promise<void>;
   close(input: { uri: WorkspaceUri; sessionId: string }): Promise<void>;
   closeAll(input: { sessionId: string }): Promise<void>;   // recolhe o anexo (sem desmontar)
@@ -184,10 +190,12 @@ export interface IEditorAttachApi {
    *
    * Quem decide SE pode dividir é o shell — o gate E15/R-039 (`canSplitMainEditor`)
    * vive lá. Aqui só há o mecanismo. `split` devolve o id do grupo secundário
-   * (null se já havia divisão) e NUNCA herda a aba ativa: a mesma URI em dois
-   * grupos disputaria o mesmo modelo do Monaco.
+   * (null se já havia divisão) e permanece vazio para clientes legados.
+   * D179 acrescenta duplicateToSide: duas vistas compartilham um modelo lógico.
    */
   split?(input: { sessionId: string }): string | null;
+  /** D179: segunda vista do arquivo atual; split() vazio permanece compatível. */
+  duplicateToSide?(input: { sessionId: string }): string | null;
   /** Fecha a divisão inteira. `false` = bloqueado por aba dirty (sem `force`). */
   unsplit?(input: { sessionId: string; force?: boolean }): boolean;
   /** Existe divisão aberta nesta sessão? */
@@ -228,6 +236,8 @@ export interface CommandRegistryLike {
 }
 
 export interface IExplorerSearchModuleDeps {
+  /** Adaptador UI opcional do host; o módulo não importa renderizadores externos. */
+  renderMarkdown?: (content: string) => ReactNode;
   fs: FileSystemPortLike;        // adapter 04_10 §2.1 (IFileService → FileSystemPort)
   menus: CommandRegistryLike;    // adapter 04_10 §2.4 (MenuRegistry → CommandRegistry)
   contextMenu: {

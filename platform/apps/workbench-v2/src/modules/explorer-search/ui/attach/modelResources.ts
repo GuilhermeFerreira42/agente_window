@@ -7,8 +7,9 @@ import type { WorkspaceUri } from '../../contract';
 export interface ModelEntry {
   model: Monaco.editor.ITextModel | null;
   viewState: Monaco.editor.ICodeEditorViewState | null;
+  viewStates?: Map<string, Monaco.editor.ICodeEditorViewState | null>;
   savedVersionId: number;
-  status: 'loading' | 'text' | 'image' | 'error';
+  status: 'loading' | 'text' | 'image' | 'binary' | 'error';
   error?: string;
   image?: { dataBase64: string; mime: string };
   sub?: Monaco.IDisposable;
@@ -19,7 +20,7 @@ interface Resources {
   off: () => void;
 }
 const resources = new WeakMap<EditorService, Resources>();
-// O sufixo é o contrato de GRUPO_SECUNDARIO; os dois lados movem a mesma aba.
+// O sufixo é o contrato de GRUPO_SECUNDARIO; as vistas compartilham o modelo da sessão.
 export const modelSession = (group: string): string => group.endsWith('#2') ? group.slice(0, -2) : group;
 
 export function discardModel(entries: Map<WorkspaceUri, ModelEntry>, uri: WorkspaceUri): void {
@@ -35,6 +36,17 @@ function resourceFor(editor: EditorService): Resources {
   resource = { sessions: new Map(), listeners: new Map(), off: () => {} };
   const own = resource;
   own.off = editor.onEvent((event) => {
+    if (event.type === 'editor.groupPromoted') {
+      for (const entry of own.sessions.get(event.sessionId)?.values() ?? []) {
+        const state = entry.viewStates?.get(event.fromGroupId);
+        if (state) { entry.viewStates?.set(event.sessionId, state); entry.viewState = state; }
+      }
+      return;
+    }
+    if (event.type === 'editor.splitChanged' && !event.split) {
+      for (const entry of own.sessions.get(event.sessionId)?.values() ?? []) entry.viewStates?.delete(`${event.sessionId}#2`);
+      return;
+    }
     if (event.type !== 'editor.tabClosed') return;
     const session = modelSession(event.sessionId);
     // tabClosed também é emitido ao mover entre grupos; nesse caso o recurso

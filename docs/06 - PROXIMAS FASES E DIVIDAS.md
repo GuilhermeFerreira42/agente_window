@@ -1,3 +1,11 @@
+# Limites vigentes após D179 — 08/11/2026
+
+A divisão vazia e o modal F1 grande foram corrigidos nesta entrega; não permanecem dívida com o comportamento anterior. D179 permite duas vistas do mesmo arquivo, preservando o modelo; o layout segue limitado a dois grupos. A lista de atalhos permite consultar, filtrar e executar; não oferece edição/remapeamento de combinações. Preview Markdown usa o renderizador já instalado, ignora HTML e mostra o texto alternativo de imagens. Não se promete paridade integral com o VS Code.
+
+Mantêm-se as ressalvas de portabilidade, Canceled do Monaco e homologação humana descritas no estado 03. A remoção física E15-d continua dependente de autorização expressa. Nenhuma fase nova foi iniciada.
+
+---
+
 # Complemento de limites — atalhos (08/11/2026)
 
 D178 registra a implementação solicitada nesta fatia. Restam limites explícitos: somente dois grupos; Ctrl+3 não cria terceiro; recursos semânticos dependem dos provedores nativos e do conteúdo disponível; nem todas as teclas do navegador/SO podem ser capturadas. Salvar como aceita destino novo; sobrescrita com confirmação não foi adicionada. Quick open lista até 5.000 arquivos; Ctrl+T examina até 200 arquivos de até 256 KB, descartando modelos temporários. MacOS físico e cada combinação da tabela original não foram validados individualmente. Abertura de definição ao lado e navegação semântica entre projetos arbitrários não foram demonstradas nesta rodada. Não inferir cobertura dessas capacidades a partir de F12/F2 no arquivo TypeScript.

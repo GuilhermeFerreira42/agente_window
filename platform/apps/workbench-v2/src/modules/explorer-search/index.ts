@@ -54,12 +54,13 @@ const notYet = (slice: string): never => {
 // 4.7 c1: layout (setVisible/setWidth) real; c2: abas (open/close/closeAll/
 // getTabs) reais via EditorService puro; save entra em c5.
 const attachApiFor = (layout: AttachLayoutStore, editor: EditorService, save: (uri: WorkspaceUri) => Promise<void>): IEditorAttachApi => ({
-  open: async ({ uri, kind, line, column, sessionId, pinned, diff }) => { editor.open({ sessionId, uri, kind, line, column, pinned, diff }); },
+  open: async ({ uri, kind, line, column, sessionId, pinned, presentation, diff }) => { editor.open({ sessionId, uri, kind, line, column, pinned, presentation, diff }); },
   close: async ({ uri, sessionId }) => { editor.close({ sessionId, uri }); },
   closeAll: async ({ sessionId }) => { editor.closeAll({ sessionId }); },
   // D169 — split. O mecanismo vive aqui; o GATE (E15/R-039) é do shell, que
   // conhece o layout. Sem isso o shell não tinha o que chamar e inventava aba.
   split: ({ sessionId }) => editor.split(sessionId),
+  duplicateToSide: ({ sessionId }) => editor.duplicateToSide(sessionId),
   unsplit: ({ sessionId, force }) => editor.unsplit({ sessionId, force }),
   isSplit: ({ sessionId }) => editor.isSplit(sessionId),
   moveTab: ({ sessionId, uri, to }) => editor.moveTab({ sessionId, uri, to }),
@@ -232,7 +233,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const editorCommands = createEditorCommandBridge({ deps, editor: editorService,
     session: () => sessionContext ?? centerSessionId,
     navigate: (sessionId, uri) => events.fire({ type: 'editor.navigationRequested', sessionId, uri }),
-    close: (sessionId, uri) => centerCloseRequesters.get(sessionId)?.({ sessionId, uri }),
+    close: (sessionId, uri, groupId) => centerCloseRequesters.get(sessionId)?.({ sessionId, uri, groupId }),
   });
   // 5.6 (A0.6) — Outline lê os símbolos do modelo ativo do Monaco do anexo; Timeline
   // fala com /git/log + /git/show(sha). Tudo aditivo: ExplorerView recebe `activeFile`.
@@ -259,6 +260,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     sessionId,
     editor: editorService,
     fs: deps.fs,
+    renderMarkdown: deps.renderMarkdown,
     // D169: o breadcrumb precisa da raiz para mostrar caminho RELATIVO e do
     // tracker para os símbolos — o MESMO que serve o painel Outline. Nenhuma
     // coleta nova foi criada.

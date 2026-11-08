@@ -1736,3 +1736,26 @@ em `iconLabels.test.ts:80`, que está reprovado por PEND-02 — corrigir ali no 
 de uma refactoração de layout misturaria duas causas e arriscaria maquiar. Fica
 registrado que ele **já estava reprovado antes**, para que ninguém atribua a falha
 à Fatia 15.
+
+
+## Feedback em vídeo — plano de verificação antes das correções (08/11/2026)
+
+Base b3d845b, D179. O vídeo foi amostrado a cada 5s e transcrito localmente, sem enviar mídia a terceiros. As imagens confirmam o grupo vazio após fechar, o split sem conteúdo, maximização permanecendo recolhida, referência de preview Markdown e a lista de atalhos original. Em 3:10, .lnk aparece como NUL/texto binário no Monaco; criar fixture binária para testar bloqueio de edição/gravação.
+
+Capturar vermelho para fechar último arquivo com split vazio, dividir arquivo atual, maximizar após recolher e abrir binário. Depois medir duas vistas do mesmo conteúdo, edição/undo/salvar, erro de escrita, última vista dirty, sessões/F5, preview Markdown/texto sem executar HTML, comandos da paleta/teclado e aparência nas duas posições. Preservar a suíte anterior como histórico; não converter seus skips/falhas globais em aprovação. Provas ficam fora do repo em ../arena-operacional/feedback-2026-11-08.
+
+
+## D179 — execução e fechamento das correções do editor (08/11/2026)
+
+Base b3d845b, Windows, runtime oficial Node 26.13.0/npm 11.20.0. Todas as sondas usam Chromium fixado e perfil descartável 5199; 5174 permanece disponível para inspeção humana, sem automação. Artefatos fora do repo: ../arena-operacional/feedback-2026-11-08.
+
+- Antes: baseline-feedback.json reproduz divisão vazia, grupo fantasma, maximizar sem revelar e binário editável. vistas-antes.log registra testes vermelhos do serviço.
+- Depois: gate-feedback.json tem 190 testes, 177 aprovados, 0 falhas, 13 ignorados, 19 arquivos. Cobriu os 16 arquivos anteriores mais editorServiceViews, editorService e editorServiceDiff. Sem novos skips. Typecheck-final.log EXIT=0. Depois do import apenas de tipo, fronteira-final.log confirma 7/7 novamente.
+- Comando oficial: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/scripts/project.ps1 test [os 19 caminhos registrados integralmente em gate-feedback.log] --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=[feedback]/gate-feedback.json; AGENTE_WINDOW_TEST_ROOT=[feedback]/unitarios. Typecheck via mesmo launcher, ação typecheck.
+- smoke.mjs: 10 verificações aprovadas; avancado.mjs: 6. Confirmam bytes em disco, duas vistas/undo, cursores independentes, última vista dirty, promoção do secundário, preview seguro/vivo, F5, isolamento entre sessões, erro de escrita/retry, binário sem POST /fs/write, maximização e F1 com execução real.
+- regressao/resumo.json: oito roteiros, 49 verificações aprovadas (24 teclado, 25 fluxos). Alt+Z, multicursor, formatação, F2/F12, clipboard e arquivos; Provedores/Config, Browser, Outline/breadcrumbs, Search/SCM e gravação concorrente. O fluxo7 teve caminho externo incorreto na cópia do roteiro; log preservado, caminho corrigido e três verificações aprovadas no replay. Os roteiros antigos que exigiam divisão vazia não são contados como repetidos; comportamento intencional substituído pelas provas D179.
+- gate-antes-porta-render.json preserva a falha FT02 detectada no desenvolvimento. Corrigida com renderer injetado, sem allowlist/skip novo. O assert de centerFrontierApp mudou de principal vazio para promoção e retenção de b.ts, não foi removido.
+- lint-final.json: comparação por regra/mensagem com b3d845b comprova 26 erros herdados idênticos: App 17, index 3, teste centerFrontierApp 6. Zero erro novo; 9 avisos no perímetro ampliado. Regra de tipo import do renderer foi corrigida.
+- PAGEERRORS preserva Canceled/Delayer/WordHighlighter do Monaco 0.52.2; não suprimido, sem perda demonstrada. A integral histórica 1535/1469/36/30 não foi repetida e não fica verde por inferência. Nenhum teste com chave/provedor real, pacote de produção ou homologação do terminal.
+
+Referência local somente leitura: três arquivos específicos do zip fornecido (quickInput.css, editorGroupView.ts e keybindingsEditor.ts), extraídos fora dos fontes. Nenhum build/import do VS Code. Apresentação usa tokens existentes; Markdown omite HTML executável e imagens remotas. Sem novo gerenciador de abas/modelos. A recuperação existente é atualizada por bundle completo e tar operacional com restauração de prova, sem criar backup paralelo. HEAD/tree/hashes finais no README do ponto existente e status operacional.

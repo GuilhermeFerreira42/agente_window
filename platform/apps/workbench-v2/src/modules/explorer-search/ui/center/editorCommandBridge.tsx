@@ -7,12 +7,13 @@ import { modelEntries } from '../attach/modelResources';
 import { EditorFileDialog, type FileCommand } from './EditorFileDialog';
 import { EditorShortcutDialog, type ShortcutRow } from './EditorShortcutDialog';
 import { WorkspaceSymbolsDialog } from './WorkspaceSymbolsDialog';
+import { supportsDocumentPreview } from '../attach/DocumentPreview';
 
 /** Adaptador UI: registry existente → arquivo/serviço/diálogo existentes. */
 export function createEditorCommandBridge({ deps, editor, session, navigate, close }: {
   deps: IExplorerSearchModuleDeps; editor: EditorService; session(): string | null;
   navigate(sessionId: string, uri: WorkspaceUri): void;
-  close(sessionId: string, uri: WorkspaceUri): void;
+  close(sessionId: string, uri: WorkspaceUri, groupId: string): void;
 }) {
   let root: Root | null = null;
   let unmount: (() => void) | null = null;
@@ -31,7 +32,8 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
   };
   const showFile = (mode: FileCommand, sid: string) => {
     if (!root) throw new Error('O seletor de arquivos ainda não está disponível.');
-    const source = editor.getActive(activeGroup(sid));
+    const sourceGroup = activeGroup(sid);
+    const source = editor.getActive(sourceGroup);
     if (mode === 'save-as' && (!source || source.kind !== 'code' || !instance(sid))) throw new Error('Abra um arquivo de código para salvar como.');
     const dismiss = () => { root?.render(null); instance(sid)?.focus(); };
     root.render(<EditorFileDialog key={Date.now()} mode={mode} root={deps.workspaceRoot} fs={deps.fs} onCancel={dismiss} onAccept={async path => {
@@ -46,7 +48,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
         await deps.fs.createFile({ uri, content: snapshot });
       }
       if (mode === 'save-as' && source && modelEntries(editor, sid).get(source.uri)?.model?.getValue() === snapshot) {
-        editor.close({ sessionId: editor.groupIdOf(sid, source.uri) ?? sid, uri: source.uri, force: true });
+        editor.close({ sessionId: sourceGroup, uri: source.uri, force: true });
       }
       editor.open({ sessionId: activeGroup(sid), uri, kind: 'code', pinned: true });
       navigate(sid, uri);
@@ -56,7 +58,8 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
   const showCommands = (sid: string, palette = false) => {
     if (!root) throw new Error('A lista de comandos ainda não está disponível.');
     const ed = instance(sid);
-    const dismiss = () => { root?.render(null); ed?.focus(); };
+    const previous = document.activeElement;
+    const dismiss = () => { root?.render(null); if (ed) ed.focus(); else if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
     const rows: ShortcutRow[] = ed?.getSupportedActions().map(action => ({
       id: action.id.replace(/^.*:(?=(?:editor\.action\.|workbench\.action\.))/, ''), label: action.label, enabled: action.isSupported(),
       run: async () => { dismiss(); await action.run(); },
@@ -68,7 +71,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
       ['workbench.action.terminal.toggleTerminal', 'Alternar terminal integrado'], ['workbench.action.toggleFullScreen', 'Alternar tela cheia'],
       ['workbench.action.showAllSymbols', 'Símbolos no projeto'],
     ];
-    for (const [id, label] of extra) if (!rows.some(row => row.id === id)) rows.push({ id, label, enabled: true, run: async () => { dismiss(); await deps.menus.execute(id, { sessionId: sid }); } });
+    for (const [id, label] of extra) if (!rows.some(row => row.id === id)) rows.push({ id, label, enabled: !['workbench.action.files.saveAs', 'workbench.action.splitEditor'].includes(id) || !!ed, run: async () => { dismiss(); await deps.menus.execute(id, { sessionId: sid }); } });
     root.render(<EditorShortcutDialog rows={rows} commands={palette} onCancel={dismiss} />);
   };
   const commands: Record<string, (sid: string) => void | Promise<void>> = {
@@ -77,13 +80,19 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
     'workbench.action.files.newFile': sid => showFile('new', sid),
     'workbench.action.files.saveAs': sid => showFile('save-as', sid),
     'workbench.action.files.save': async sid => {
-      const ed = instance(sid);
+      const group = activeGroup(sid), tab = editor.getActive(group);
+      const ed = instance(sid) ?? (tab?.presentation === 'preview' ? editors.get(group) : null);
       if (!ed) throw new Error('Abra um arquivo de código para salvar.');
       await ed.getAction('workbench.action.files.save')?.run();
     },
-    'workbench.action.closeActiveEditor': sid => { const tab = editor.getActive(activeGroup(sid)); if (tab) close(sid, tab.uri); },
+    'workbench.action.closeActiveEditor': sid => { const group = activeGroup(sid), tab = editor.getActive(group); if (tab) close(sid, tab.uri, group); },
     'workbench.action.showCommands': async sid => { const ed = instance(sid); if (ed) { ed.focus(); await ed.getAction('editor.action.quickCommand')?.run(); } else showCommands(sid, true); },
     'workbench.action.openGlobalKeybindings': sid => showCommands(sid),
+    'editor.action.togglePreview': sid => {
+      const group = activeGroup(sid), tab = editor.getActive(group);
+      if (!tab || tab.kind !== 'code' || !supportsDocumentPreview(tab.uri)) throw new Error('A visualização está disponível para arquivos Markdown e texto.');
+      editor.setPresentation({ sessionId: group, uri: tab.uri, presentation: tab.presentation === 'preview' ? 'code' : 'preview' });
+    },
     'workbench.action.showAllSymbols': sid => {
       if (!root) throw new Error('A busca de símbolos ainda não está disponível.');
       const dismiss = () => { root?.render(null); instance(sid)?.focus(); };

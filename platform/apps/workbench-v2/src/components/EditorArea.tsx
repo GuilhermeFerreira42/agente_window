@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Blocks,
+  BookOpen,
   Check,
   CircleAlert,
   CircleCheck,
@@ -77,6 +78,7 @@ interface EditorAreaProps {
   editorMaximized: boolean
   onToggleMaximize: () => void
   onSplit: () => void
+  onTogglePreview?: () => void
   /**
    * D170-b: "Abrir ao lado" — mover a aba para o OUTRO grupo.
    *
@@ -475,6 +477,7 @@ export function EditorArea({
   editorMaximized,
   onToggleMaximize,
   onSplit,
+  onTogglePreview,
   onOpenToSide,
   editorContentVisible,
   sidePaneState,
@@ -532,7 +535,7 @@ export function EditorArea({
       items: [
         { id: 'select', label: 'Abrir aba', icon: tabIcon(tab), onSelect: () => onSelectTab(tab.id) },
         { id: 'close', label: 'Fechar aba', icon: <X size={14} />, disabled: !closeable, onSelect: () => onCloseTab(tab.id) },
-        { id: 'split', label: 'Dividir editor', icon: <SplitSquareHorizontal size={14} />, separatorBefore: true, onSelect: onSplit },
+        { id: 'split', label: 'Dividir editor', icon: <SplitSquareHorizontal size={14} />, separatorBefore: true, onSelect: () => { onSelectTab(tab.id); onSplit() } },
         // Capacidade ausente = item ausente. Um botão que não faz nada é pior
         // que um botão que não existe (Regra da falha visível).
         ...(onOpenToSide ? [{ id: 'open-to-side', label: 'Abrir ao lado', icon: <SplitSquareHorizontal size={14} />, onSelect: () => onOpenToSide(tab.id) }] : []),
@@ -678,6 +681,7 @@ export function EditorArea({
           </div>}
         </div>
         <div className="editor-toolbar">
+          {onTogglePreview && activeTab?.type === 'file' && /\.(md|markdown|txt|text|log)$/i.test(activeTab.path ?? activeTab.title) && <button className="toolbar-button" type="button" title="Alternar visualização do arquivo" aria-label="Alternar visualização do arquivo" onClick={onTogglePreview}><BookOpen size={14} /></button>}
           <button className="toolbar-button" type="button" title="Dividir editor" aria-label="Dividir editor" onClick={onSplit}><SplitSquareHorizontal size={14} /></button>
           <button className={`toolbar-button${editorMaximized ? ' is-active' : ''}`} type="button" title={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-label={editorMaximized ? 'Restaurar editor' : 'Maximizar editor'} aria-pressed={editorMaximized} onClick={onToggleMaximize}>{editorMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
           <button className="toolbar-button" type="button" title={editorContentVisible ? 'Recolher editor' : 'Mostrar editor'} aria-label={editorContentVisible ? 'Recolher editor' : 'Mostrar editor'} aria-pressed={!editorContentVisible} onClick={onToggleEditorHidden}>{editorContentVisible ? <X size={14} /> : <Eye size={14} />}</button>

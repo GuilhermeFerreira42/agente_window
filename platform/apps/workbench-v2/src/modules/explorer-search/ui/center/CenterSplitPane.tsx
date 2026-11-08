@@ -25,6 +25,7 @@
 // como divergirem.
 // ============================================================================
 import React from 'react';
+import { BookOpen } from 'lucide-react';
 import type { WorkspaceUri } from '../../contract';
 import { GRUPO_SECUNDARIO, type EditorService } from '../../core/editor/editorService';
 import type { OutlineRow } from '../../core/outline/outlineModel';
@@ -40,6 +41,7 @@ export interface CenterSplitPaneProps {
   fs: CodeEditorPaneProps['fs'];
   onEditorReady?: CodeEditorPaneProps['onEditorReady'];
   onWorkbenchCommand?: CodeEditorPaneProps['onWorkbenchCommand'];
+  renderMarkdown?: CodeEditorPaneProps['renderMarkdown'];
   /** Fechar aba dirty: o serviço bloqueia; o diálogo é o mesmo do centro (c5). */
   onCloseBlocked: (input: { sessionId: string; uri: WorkspaceUri }) => void;
   onSave?: (uri: WorkspaceUri) => Promise<void>;
@@ -58,7 +60,7 @@ export interface CenterSplitPaneProps {
 }
 
 export function CenterSplitPane({
-  editor, sessionId, fs, onEditorReady, onWorkbenchCommand, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
+  editor, sessionId, fs, onEditorReady, onWorkbenchCommand, renderMarkdown, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
 }: CenterSplitPaneProps) {
   const grupoId = GRUPO_SECUNDARIO(sessionId);
   // O painel lê o grupo e reage a QUALQUER evento dele (a versão é por grupo).
@@ -107,6 +109,8 @@ export function CenterSplitPane({
         // altura da faixa do painel 1 — um cabeçalho próprio desalinhava as duas
         // abas em 24 px (medido no browser).
         actions={(
+          <>
+          {onWorkbenchCommand && activeUri && /\.(md|markdown|txt|text|log)$/i.test(activeUri) && <button className="toolbar-button" type="button" title="Alternar visualização do arquivo" aria-label="Alternar visualização do arquivo" onClick={() => onWorkbenchCommand('editor.action.togglePreview')}><BookOpen size={14} /></button>}
           <button
             type="button"
             className="toolbar-button"
@@ -114,6 +118,7 @@ export function CenterSplitPane({
             aria-label="Fechar editor dividido"
             onClick={onCloseSplit}
           >✕</button>
+          </>
         )}
       />
       {activeUri && (
@@ -136,6 +141,7 @@ export function CenterSplitPane({
           onEditorReady={onEditorReady}
           onSaveRequest={(uri) => { void onSave?.(uri); }}
           onWorkbenchCommand={onWorkbenchCommand}
+          renderMarkdown={renderMarkdown}
           saveError={saveError?.uri === activeUri ? saveError.message : null}
         />
       </div>

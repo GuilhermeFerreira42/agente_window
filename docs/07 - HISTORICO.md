@@ -1,3 +1,11 @@
+# 08/11/2026 — correções de uso do editor (D179)
+
+Entrega local «fix(editor): preserve shared views and address Windows feedback», partindo de b3d845b, sem push. Corrigidos fechamento de grupos, divisão do arquivo atual, preview, maximização, paleta/ajuda e proteção de binários. A SPEC D179 foi registrada antes da implementação; provas vermelhas foram preservadas. O teste de fronteira detectou dependência de renderização entrando diretamente no módulo: corrigida por porta injetada, sem afrouxar a regra. Ajustado somente o assert legado que exigia principal vazio; agora exige promoção do arquivo restante sem perda.
+
+Estado e contagens atuais no 03; comandos e provas no 09. Houve correção de caminho de fixture no replay externo e repetição aprovada. Documentação, painel e recuperação foram consolidados na mesma entrega, sem converter resultado técnico em homologação.
+
+---
+
 # 08/11/2026 — atalhos solicitados pelo dono (D178)
 
 Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.

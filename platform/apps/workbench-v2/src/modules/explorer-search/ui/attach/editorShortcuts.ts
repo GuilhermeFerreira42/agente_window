@@ -18,6 +18,7 @@ export function registerEditorShortcuts(monaco: typeof Monaco, editor: Monaco.ed
     ['workbench.action.openGlobalKeybindings', 'Atalhos de teclado', monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS)],
   ] as const;
   const actions = workbench.map(([id, label, key]) => editor.addAction({ id, label, keybindings: [key], run: () => command(id) }));
+  const preview = editor.addAction({ id: 'editor.action.togglePreview', label: 'Alternar visualização Markdown', precondition: 'editorLangId == markdown', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV], run: () => command('editor.action.togglePreview') });
   const wrap = editor.addAction({
     id: 'editor.action.toggleWordWrap',
     label: 'Alternar quebra de linha (Toggle Word Wrap)',
@@ -32,5 +33,5 @@ export function registerEditorShortcuts(monaco: typeof Monaco, editor: Monaco.ed
   // pelo dono, sem substituir o formatador registrado para a linguagem.
   editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
     () => { void editor.getAction('editor.action.formatDocument')?.run(); });
-  return () => { wrap.dispose(); actions.forEach(action => action.dispose()); };
+  return () => { wrap.dispose(); preview.dispose(); actions.forEach(action => action.dispose()); };
 }

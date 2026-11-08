@@ -18,12 +18,11 @@
 // manter DOIS grupos por sessão (principal/secundário), com abas, ativa e MRU
 // INDEPENDENTES — é o que o VS Code chama de `editorGroupModel` por grupo.
 //
-// A decisão de projeto que importa: uma aba NUNCA está nos dois grupos ao mesmo
-// tempo. O `CodeEditorPane` cacheia UM modelo do Monaco por URI; se a mesma URI
-// vivesse em dois grupos, os dois painéis disputariam o mesmo modelo (o segundo
-// `createModel` com a mesma uri estoura) ou editariam o mesmo texto por baixo um
-// do outro. Por isso "abrir do outro lado" MOVE a aba (migração), preservando
-// dirty/preview — e o painel de origem solta o modelo no `editor.tabClosed`.
+// D179: duas vistas do mesmo arquivo compartilham UM modelo lógico na sessão,
+// com cursor/scroll próprios na UI. Dirty/saved são propagados só entre essas
+// vistas. A última vista protege o rascunho; grupos vazios são normalizados.
+// `split()` vazio é preservado para clientes antigos; `duplicateToSide()` é a
+// ação de dividir o arquivo atual. Sessões diferentes continuam independentes.
 // ============================================================================
 import type { AttachDiffPayload, AttachTab, ExplorerSearchEvent, WorkspaceUri } from '../../contract';
 import { Emitter } from '../emitter';
@@ -56,13 +55,14 @@ export interface OpenInput {
   kind: AttachTabKind;
   /** true = abre/promove a pinado (duplo clique, Ctrl+Enter, "Keep Open"). */
   pinned?: boolean;
+  presentation?: 'code' | 'preview';
   line?: number;
   column?: number;
   /** 4.7-c: obrigatório quando kind === 'diff'. */
   diff?: AttachDiffPayload;
 }
 
-interface TabState { uri: WorkspaceUri; kind: AttachTabKind; dirty: boolean; preview: boolean; diff?: AttachDiffPayload }
+interface TabState { uri: WorkspaceUri; kind: AttachTabKind; dirty: boolean; preview: boolean; presentation?: 'code' | 'preview'; diff?: AttachDiffPayload }
 interface Group { tabs: TabState[]; active: WorkspaceUri | null; mru: WorkspaceUri[] }
 
 export class EditorService {
@@ -76,6 +76,8 @@ export class EditorService {
   private readonly focused = new Map<string, string>();
   private readonly events = new Emitter<ExplorerSearchEvent>();
   private disposed = false;
+  private readonly closingGroups = new Set<string>();
+  private logicalSession(group: string): string { return group.endsWith('#2') ? group.slice(0, -2) : group; }
 
   onEvent(cb: (e: ExplorerSearchEvent) => void): () => void { return this.events.add(cb); }
 
@@ -103,10 +105,11 @@ export class EditorService {
   open(input: OpenInput): void {
     if (this.disposed) return;
     const { uri, kind } = input;
-    // D169: se a URI já está aberta em QUALQUER lado, ativo aquele lado (nunca
-    // abro a mesma URI em dois grupos — ver cabeçalho). Senão, abro no lado com
-    // foco: é o que faz o painel dividido receber arquivos do Explorer.
-    const jahAberta = this.groupIdOf(input.sessionId, uri);
+    // Abertura normal reutiliza a vista existente, preferindo o grupo focado.
+    // Um id de grupo explícito também restaura vistas duplicadas no F5 (D179).
+    const base = this.logicalSession(input.sessionId);
+    const preferred = input.sessionId === base ? (this.focused.get(base) ?? base) : input.sessionId;
+    const jahAberta = this.groups.get(preferred)?.tabs.some(t => t.uri === uri) ? preferred : input.sessionId === base ? this.groupIdOf(base, uri) : null;
     const alvo = jahAberta ?? (this.focused.get(input.sessionId) && this.groups.has(this.focused.get(input.sessionId)!)
       ? this.focused.get(input.sessionId)!
       : input.sessionId);
@@ -120,6 +123,7 @@ export class EditorService {
     const wasEmpty = g.tabs.length === 0;
     const existing = g.tabs.find((t) => t.uri === uri);
     if (existing) {
+      if (input.presentation) this.setPresentation({ sessionId, uri, presentation: input.presentation });
       if (input.pinned && existing.preview) {
         existing.preview = false;
         this.fire({ type: 'editor.tabPinned', sessionId, uri });
@@ -142,7 +146,8 @@ export class EditorService {
       g.tabs.unshift(tab);
       this.fire({ type: 'editor.tabOpened', sessionId, uri, kind, preview: false });
     } else {
-      const tab: TabState = { uri, kind, dirty: false, preview: !input.pinned };
+      const sibling = this.groups.get(base)?.tabs.find(tab => tab.uri === uri);
+      const tab: TabState = { uri, kind, dirty: sibling?.dirty ?? false, preview: !input.pinned && !sibling?.dirty, presentation: input.presentation };
       const previewIdx = tab.preview ? g.tabs.findIndex((t) => t.preview && !t.dirty) : -1;
       if (previewIdx >= 0) {
         const old = g.tabs[previewIdx];
@@ -155,6 +160,7 @@ export class EditorService {
       this.fire({ type: 'editor.tabOpened', sessionId, uri, kind, preview: tab.preview });
     }
     this.setActive(g, sessionId, uri);
+    this.setFocusGroup({ sessionId: base, side: sessionId.endsWith('#2') ? 'secundario' : 'principal' });
     if (wasEmpty) this.fire({ type: 'editor.attachExpanded', sessionId });
     if (typeof input.line === 'number') {
       this.fire({ type: 'editor.revealRequested', sessionId, uri, line: input.line, column: input.column });
@@ -166,6 +172,15 @@ export class EditorService {
     const g = this.groups.get(input.sessionId);
     if (!g || !g.tabs.some((t) => t.uri === input.uri)) return;
     this.setActive(g, input.sessionId, input.uri);
+    this.setFocusGroup({ sessionId: this.logicalSession(input.sessionId), side: input.sessionId.endsWith('#2') ? 'secundario' : 'principal' });
+  }
+
+  setPresentation(input: { sessionId: string; uri: WorkspaceUri; presentation: 'code' | 'preview' }): void {
+    if (this.disposed) return;
+    const tab = this.groups.get(input.sessionId)?.tabs.find(t => t.uri === input.uri);
+    if (!tab || tab.kind !== 'code' || tab.presentation === input.presentation) return;
+    tab.presentation = input.presentation;
+    this.fire({ type: 'editor.presentationChanged', ...input });
   }
 
   pin(input: { sessionId: string; uri: WorkspaceUri }): void {
@@ -178,15 +193,16 @@ export class EditorService {
 
   setDirty(input: { sessionId: string; uri: WorkspaceUri; dirty: boolean }): void {
     if (this.disposed) return;
-    const t = this.groups.get(input.sessionId)?.tabs.find((x) => x.uri === input.uri);
-    if (!t || t.kind === 'changes' || t.kind === 'diff' || t.dirty === input.dirty) return;
-    t.dirty = input.dirty;
-    if (input.dirty && t.preview) {
-      // editar promove o preview (editorGroupModel: pin on edit)
-      t.preview = false;
-      this.fire({ type: 'editor.tabPinned', sessionId: input.sessionId, uri: input.uri });
+    for (const sessionId of this.groupIds(this.logicalSession(input.sessionId))) {
+      const t = this.groups.get(sessionId)?.tabs.find((x) => x.uri === input.uri);
+      if (!t || t.kind === 'changes' || t.kind === 'diff' || t.dirty === input.dirty) continue;
+      t.dirty = input.dirty;
+      if (input.dirty && t.preview) {
+        t.preview = false;
+        this.fire({ type: 'editor.tabPinned', sessionId, uri: input.uri });
+      }
+      this.fire({ type: 'editor.dirtyChanged', sessionId, uri: input.uri, dirty: input.dirty });
     }
-    this.fire({ type: 'editor.dirtyChanged', sessionId: input.sessionId, uri: input.uri, dirty: input.dirty });
   }
 
   /** false = bloqueado por dirty (sem `force`). */
@@ -195,7 +211,9 @@ export class EditorService {
     const g = this.groups.get(input.sessionId);
     const idx = g ? g.tabs.findIndex((t) => t.uri === input.uri) : -1;
     if (!g || idx < 0) return true;
-    if (g.tabs[idx].dirty && !input.force) return false;
+    const base = this.logicalSession(input.sessionId);
+    const anotherView = this.groupIds(base).some(id => id !== input.sessionId && this.groups.get(id)?.tabs.some(t => t.uri === input.uri));
+    if (g.tabs[idx].dirty && !input.force && !anotherView) return false;
     g.tabs.splice(idx, 1);
     g.mru = g.mru.filter((u) => u !== input.uri);
     this.fire({ type: 'editor.tabClosed', sessionId: input.sessionId, uri: input.uri });
@@ -206,7 +224,31 @@ export class EditorService {
       else this.fire({ type: 'editor.activeChanged', sessionId: input.sessionId, uri: null });
     }
     if (g.tabs.length === 0) this.fire({ type: 'editor.attachCollapsed', sessionId: input.sessionId });
+    if (!this.closingGroups.has(base)) this.normalizeEmptyGroups(base);
     return true;
+  }
+
+  /** Um grupo vazio não vira uma segunda tela sem função. A vista restante mantém seus modelos. */
+  private normalizeEmptyGroups(sessionId: string): void {
+    const secondaryId = GRUPO_SECUNDARIO(sessionId);
+    const secondary = this.groups.get(secondaryId), primary = this.groups.get(sessionId);
+    if (!secondary || !primary) return;
+    if (!secondary.tabs.length) {
+      this.groups.delete(secondaryId);
+    } else if (!primary.tabs.length) {
+      primary.tabs = secondary.tabs;
+      primary.active = secondary.active;
+      primary.mru = secondary.mru;
+      this.groups.delete(secondaryId);
+      this.fire({ type: 'editor.groupPromoted', sessionId, fromGroupId: secondaryId });
+      for (const tab of primary.tabs) {
+        this.fire({ type: 'editor.tabClosed', sessionId: secondaryId, uri: tab.uri });
+        this.fire({ type: 'editor.tabOpened', sessionId, uri: tab.uri, kind: tab.kind, preview: tab.preview });
+      }
+      this.fire({ type: 'editor.activeChanged', sessionId, uri: primary.active });
+    } else return;
+    this.focused.set(sessionId, sessionId);
+    this.fire({ type: 'editor.splitChanged', sessionId, split: false });
   }
 
   /** false = sobraram abas dirty (sem `force`). A aba fixa "Changes" NÃO é
@@ -244,9 +286,8 @@ export class EditorService {
 
   /**
    * Cria o grupo secundário VAZIO e devolve o id. O painel secundário abre com a
-   * aba que o usuário escolher — não herdo a ativa de propósito: duplicar a
-   * mesma aba nos dois lados é exatamente o estado que o cache de modelos não
-   * suporta (ver cabeçalho). Devolve null se já havia split (idempotente).
+   * aba que o cliente legado escolher. D179 usa duplicateToSide para abrir uma
+   * segunda vista do arquivo atual. Devolve null se já havia split (idempotente).
    */
   split(sessionId: string): string | null {
     if (this.disposed) return null;
@@ -258,17 +299,40 @@ export class EditorService {
     return id;
   }
 
+  /** D179: outra vista do arquivo atual, com o MESMO modelo lógico nesta sessão. */
+  duplicateToSide(sessionId: string): string | null {
+    if (this.disposed) return null;
+    const base = this.logicalSession(sessionId);
+    const sourceId = this.focusGroupOf(base) === 'secundario' ? GRUPO_SECUNDARIO(base) : base;
+    const source = this.getActive(sourceId);
+    if (!source || source.kind !== 'code') return null;
+    if (!this.isSplit(base)) this.split(base);
+    const targetId = sourceId === base ? GRUPO_SECUNDARIO(base) : base;
+    this.pin({ sessionId: sourceId, uri: source.uri });
+    const target = this.group(targetId);
+    if (!target.tabs.some(tab => tab.uri === source.uri)) {
+      target.tabs.push({ ...source, preview: false });
+      this.fire({ type: 'editor.tabOpened', sessionId: targetId, uri: source.uri, kind: source.kind, preview: false });
+    }
+    this.setActive(target, targetId, source.uri);
+    this.setFocusGroup({ sessionId: base, side: targetId === base ? 'principal' : 'secundario' });
+    return targetId;
+  }
+
   /** Remove o grupo secundário INTEIRO. Bloqueado por dirty sem `force`. */
   unsplit(input: { sessionId: string; force?: boolean }): boolean {
     if (this.disposed) return false;
     const id = GRUPO_SECUNDARIO(input.sessionId);
     const g = this.groups.get(id);
     if (!g) return true;
-    if (!input.force && g.tabs.some((t) => t.dirty)) return false;
+    if (!input.force && g.tabs.some((t) => t.dirty && !this.groups.get(input.sessionId)?.tabs.some(tab => tab.uri === t.uri))) return false;
     // Fecho as abas uma a uma para o painel descartar os modelos do Monaco
     // (`editor.tabClosed` é o gatilho do `disposeEntry`), e só então removo o grupo.
-    for (const t of [...g.tabs]) this.close({ sessionId: id, uri: t.uri, force: true });
+    this.closingGroups.add(input.sessionId);
+    try { for (const t of [...g.tabs]) this.close({ sessionId: id, uri: t.uri, force: true }); }
+    finally { this.closingGroups.delete(input.sessionId); }
     this.groups.delete(id);
+    this.focused.set(input.sessionId, input.sessionId);
     this.fire({ type: 'editor.splitChanged', sessionId: input.sessionId, split: false });
     return true;
   }
@@ -285,6 +349,10 @@ export class EditorService {
     if (!origemId || origemId === destinoId) return false;
     const origem = this.groups.get(origemId);
     if (!origem || !this.groups.has(destinoId)) return false;
+    if (this.groups.get(destinoId)!.tabs.some(tab => tab.uri === input.uri)) {
+      this.activate({ sessionId: destinoId, uri: input.uri });
+      return this.close({ sessionId: origemId!, uri: input.uri });
+    }
     if (origem.tabs.length <= 1) return false;   // não deixo um painel sem nenhuma aba
     const idx = origem.tabs.findIndex((t) => t.uri === input.uri);
     if (idx < 0) return false;
@@ -331,10 +399,10 @@ export class EditorService {
   /** c5: aba salva com sucesso (quem escreve no disco é o barrel; aqui só o estado). */
   markSaved(input: { sessionId: string; uri: WorkspaceUri }): void {
     if (this.disposed) return;
-    const t = this.groups.get(input.sessionId)?.tabs.find((x) => x.uri === input.uri);
-    if (!t) return;
-    if (t.dirty) { t.dirty = false; this.fire({ type: 'editor.dirtyChanged', sessionId: input.sessionId, uri: input.uri, dirty: false }); }
-    this.fire({ type: 'editor.saved', sessionId: input.sessionId, uri: input.uri });
+    this.setDirty({ ...input, dirty: false });
+    for (const sessionId of this.groupIds(this.logicalSession(input.sessionId))) {
+      if (this.groups.get(sessionId)?.tabs.some(t => t.uri === input.uri)) this.fire({ type: 'editor.saved', sessionId, uri: input.uri });
+    }
   }
 
   /** c5: `fs.changed` numa URI aberta → emite por sessão com o estado dirty

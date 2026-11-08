@@ -1,3 +1,15 @@
+# Estado vigente — correções de uso do editor, D179 (08/11/2026)
+
+Substitui o retrato de atalhos abaixo para o corte atual. Base b3d845b; entrega no commit local «fix(editor): preserve shared views and address Windows feedback». HEAD/tree finais no status operacional e ponto de recuperação existente; sem push. Fatia 15 continua candidata à homologação humana dirigida, com ressalvas, sem encerramento formal.
+
+Corrigidos: grupo vazio fantasma ao fechar; Dividir abre o arquivo atual nos dois painéis; cursores independentes, modelo/undo/dirty compartilhados dentro da sessão; promoção do grupo restante ao fechar o principal; preview Markdown/texto, com botão e Ctrl+Shift+V para Markdown; maximizar revela o editor recolhido; F1 compacto e ajuda de teclas em tabela. Arquivos binários reconhecidos deixam de virar texto editável. O código puro do EditorService recebeu o ajuste pontual especificado em D179, superando somente nesse ponto a afirmação histórica de core intocado; server/fs e terminal permanecem intocados.
+
+**Verificado:** typecheck 0; gate de 19 arquivos: 190 = 177 aprovados / 0 falhas / 13 ignorados preexistentes. Dois roteiros reais novos: 16 verificações; oito roteiros de regressão repetidos: 49 verificações, incluindo 24 de teclado e 25 de fluxos existentes. Total 65 verificações reais aprovadas no corte, sem contar repetições e provas vermelhas. ESLint ampliado: 26 erros herdados comprovadamente iguais à base (17 App, 3 index, 6 teste preexistente), zero novos erros; 9 avisos. A suíte integral não foi repetida: o placar anterior de 36 falhas/30 ignorados permanece histórico e não verde. Canceled nativo do Monaco continua nos logs; não se demonstrou perda de texto.
+
+**Limites e próximo passo:** inspeção humana em 5174, decisão de homologação e E15-d separada. Dois grupos; preview sem execução de HTML e imagens representadas pelo texto alternativo; sem editor de remapeamento de atalhos. F5 restaura vistas/modos e conteúdo salvo, não rascunhos. Provas detalhadas em 09 e ../arena-operacional/feedback-2026-11-08/RELATORIO.md. Instância de teste 5199 só com arquivos descartáveis; não houve automação do perfil pessoal em 5174.
+
+---
+
 # Complemento vigente — atalhos do editor (08/11/2026)
 
 Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.
