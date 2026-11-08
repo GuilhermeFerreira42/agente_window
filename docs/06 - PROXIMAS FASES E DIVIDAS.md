@@ -1,3 +1,11 @@
+# Complemento de limites — atalhos (08/11/2026)
+
+D178 registra a implementação solicitada nesta fatia. Restam limites explícitos: somente dois grupos; Ctrl+3 não cria terceiro; recursos semânticos dependem dos provedores nativos e do conteúdo disponível; nem todas as teclas do navegador/SO podem ser capturadas. Salvar como aceita destino novo; sobrescrita com confirmação não foi adicionada. Quick open lista até 5.000 arquivos; Ctrl+T examina até 200 arquivos de até 256 KB, descartando modelos temporários. MacOS físico e cada combinação da tabela original não foram validados individualmente. Abertura de definição ao lado e navegação semântica entre projetos arbitrários não foram demonstradas nesta rodada. Não inferir cobertura dessas capacidades a partir de F12/F2 no arquivo TypeScript.
+
+A integral Windows anterior continua como dívida de 36 falhas/30 ignorados. A ocorrência de Canceled do Monaco segue registrada. Nenhuma dessas ressalvas foi apagada, nenhum contrato congelado foi alterado e nenhuma homologação humana foi atribuída ao dono.
+
+---
+
 # Nota vigente — auditoria Fatia 15 em Windows (08/11/2026)
 
 A auditoria não abriu fatias seguintes. Fatia 15 aguarda homologação humana dirigida e decisão expressa sobre E15-d. Ver 03 e D177.

@@ -150,7 +150,7 @@ describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => 
       mod.attach.setFocusSide?.({ sessionId: sid, side: 'secundario' })
     })
     fireEvent.contextMenu(faixa().getByRole('tab', { name: /a\.ts/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Abrir ao lado', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Abrir ao lado$/ }))
     await waitFor(() => expect(mod.attach.sideOf?.({ sessionId: sid, uri: ARQ_A })).toBe('secundario'))
   })
   it('fechar a última aba principal preserva a divisão que ainda tem arquivo', async () => {

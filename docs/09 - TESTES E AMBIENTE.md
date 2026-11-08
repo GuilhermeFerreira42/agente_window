@@ -1,3 +1,28 @@
+# Medição vigente — complemento de atalhos em 08/11/2026
+
+Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.
+
+| Prova | Evidência externa |
+|---|---|
+| Gate final atual | evidencias/gate-atalhos-final.json e .log |
+| Alt+Z vermelho/verde | atalhos-antes.log / atalhos-baseline-entrega.log |
+| Teclado: três roteiros, 33 verificações | atalhos-resumo-final.json, atalhos-{funcionais,grupos,nativos}-entrega.log |
+| Regressão anterior repetida: 38 verificações | replay-resumo.json, replay-apos-atalhos.log, replay-fluxo*.log |
+| Typecheck | atalhos-typecheck-final.log, EXIT=0 |
+| Lint dos arquivos novos/apoio | atalhos-lint.log: zero erros, um aviso Fast Refresh |
+| Regressão foco × Abrir ao lado | replay-fluxo6-final-pre-espera.log vermelho; replay-fluxo6-final.log e atalhos-contexto-split.log verdes |
+| Fronteira do teste novo | gate-atalhos-fronteira-teste-antes.json vermelho; gate final verde sem exceção |
+
+As ações de edição vêm das contribuições Monaco já carregadas. Alt+Z recebeu ação local; Ctrl+Shift+P alias da paleta; atalhos de arquivo/shell vão aos donos existentes. Ctrl+K Ctrl+S exibe lista filtrável de ações reais e disponibilidade; os acordes nativos continuam funcionando. Não são dezenas de implementações paralelas. F12 e F2 foram demonstrados em TypeScript; formatação e seleção usaram o provedor real. Ctrl+T coletou símbolos de arquivo fechado usando o mesmo coletor do Outline.
+
+Os testes novos protegem recusa de caminho fora da raiz, falha de Salvar como sem perder origem, digitação durante IO e cleanup de registro substituído. Busca de arquivos suporta filtro parcial/Enter e navegação por setas. Destinos existentes são recusados; não se simulou sobrescrita. Ctrl+W respeitou dirty inclusive quando o principal ficou vazio. Terminal foi somente aberto/recolhido; não foram enviados comandos. Fullscreen foi medido no Chromium automatizado, sem prometer interceptação de tecla reservada no navegador/OS do usuário. Clipboard foi testado com permissão explícita no contexto descartável do navegador.
+
+Não se alega verificação individual de cada combinação da tabela enviada, macOS físico, terceiro grupo, linguagens sem provedor ou navegação semântica de qualquer projeto arbitrário. O layout atual tem dois grupos. Há limites visíveis de 5.000 arquivos no picker e 200 arquivos/256 KB na busca de símbolos. Os Canceled nativos permanecem com stacks nos logs; ações/dados foram verificados, sem supressão. A integral global anterior (1469/36/30) não foi repetida sobre este corte e continua não verde. Nenhum skip novo.
+
+Evidências seguem em ../arena-operacional/auditoria-codex-2026-11-07. O relatório foi atualizado para este complemento; não somar verificações de navegador aos casos Vitest.
+
+---
+
 # Auditoria independente Windows — consolidação 08/11/2026
 
 Base `7ab6a22`; código final `80be501`. Nenhuma homologação humana declarada. Evidências completas fora do repo em `../arena-operacional/auditoria-codex-2026-11-07/evidencias`; relatório externo enumera cada falha, teste ignorado, gravidade, impacto e efeito sobre aceite dirigido.

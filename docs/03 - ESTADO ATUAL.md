@@ -1,3 +1,15 @@
+# Complemento vigente — atalhos do editor (08/11/2026)
+
+Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.
+
+Alt+Z alterna quebra visual sem editar o arquivo nem gerar dirty. F1/Ctrl+Shift+P abrem a paleta; Ctrl+K Ctrl+S mostra atalhos filtráveis. Ctrl+P/O, Ctrl+N e Ctrl+Shift+S usam diálogos do módulo, com caminhos relativos e criação exclusiva. Ctrl+W/F4 passam pelo fechamento protegido; Ctrl+barra e Ctrl+1/2 usam os dois grupos existentes. Ctrl+B, Ctrl+crase, Ctrl+vírgula e F11 ligam as ações do shell. Ctrl+T usa os provedores reais de símbolos, inclusive em arquivos fechados, com limites visíveis. Edição, busca, multicursor, formatação e navegação reutilizam o Monaco.
+
+O layout continua com dois grupos; não há terceiro grupo. Novo arquivo pede nome no projeto; Salvar como requer destino novo e recusa sobrescrita. Busca rápida lista até 5.000 arquivos; símbolos examinam até 200 arquivos de até 256 KB, nas linguagens suportadas. Recursos sem provedor e atalhos reservados pelo navegador não recebem promessa de paridade com o VS Code desktop. Testes foram executados em Chromium/Windows; macOS e combinações físicas do SO não foram homologados. Nem cada combinação da tabela original foi testada individualmente. Ocorrências de Canceled do Monaco continuam registradas, sem perda de texto demonstrada.
+
+Documentação da auditoria anterior abaixo permanece histórica para aquele corte. A integral global não foi reexecutada depois dos atalhos: os 36 fails/30 skips anteriores continuam ressalva, nunca selo verde. Evidências no 09 e relatório operacional externo.
+
+---
+
 # Estado vigente — auditoria Windows, consolidada em 08/11/2026
 
 A Fatia 15 é **candidata à homologação humana dirigida, com ressalvas**. Não está homologada nem formalmente encerrada; não avançar no roadmap. Esta entrada substitui, para estado atual, os retratos históricos abaixo.

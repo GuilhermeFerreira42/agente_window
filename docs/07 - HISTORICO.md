@@ -1,3 +1,13 @@
+# 08/11/2026 — atalhos solicitados pelo dono (D178)
+
+Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.
+
+Alt+Z foi reproduzido vermelho antes e verde depois. Ligados paleta, ajuda de teclas, arquivos, grupos, sidebar, terminal, configurações e símbolos no projeto. Foram conferidos bytes, dirty, clipboard autorizado, multicursor, formatação de documento/seleção, F2/F12, erro de Save e proteção contra sobrescrita. A regressão detectou e corrigiu Abrir ao lado usando foco transitório em vez do dono da aba. Fronteira LEGO detectou import externo em um teste novo: corrigido com porta de teste local, sem relaxar regra nem criar skip. Os logs vermelhos foram preservados.
+
+Registros anteriores não são homologação. A integral global anterior continua não verde; Canceled nativo registrado; somente Windows/Chromium medido.
+
+---
+
 # 08/11/2026 — consolidação da auditoria independente da Fatia 15
 
 - Base verificada `7ab6a22`, trabalho somente na cópia Arena. Commits locais `f48fd6d`, `0d4b30a`, `d7d62cf` e `80be501`; sem push. Causas e proprietários registrados em D177.

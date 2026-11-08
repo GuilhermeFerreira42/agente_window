@@ -2000,3 +2000,14 @@ Modelos Monaco são recursos de UI por serviço/sessão, preservados ao desmonta
 Contexto de sessão e intenção explícita de navegação Search/SCM são aditivos no contrato do módulo. Restauração não emite intenção de navegação nem rouba seleção nativa. O hook do shell continua dono de abas nativas/MRU. Personalizações mantém R-092; apenas a guarda HTTP passa a encaminhar ao handler já existente.
 
 Evidências e limites estão em 03/09 e no relatório operacional externo. Esta decisão técnica não homologa Fatia 15, não autoriza remover a rede E15-d e não abre fatias seguintes. Não houve alteração dos contratos congelados core/server, de segurança ou do terminal.
+
+
+## D178 — Atalhos no editor definitivo, escopo autorizado pelo dono (08/11/2026)
+
+O dono entregou o comando histórico e solicitou incorporar os atalhos nesta Fatia 15, citando Alt+Z inoperante. A ampliação é expressa; não abre a Fatia 20 nem altera a sequência do roadmap.
+
+Manter contribuições nativas do Monaco, acrescentando apenas ligações ausentes do standalone e ações do Workbench. Hook do shell trata atalhos globais e acordes sem capturar Ctrl+K Ctrl+F do Monaco; comandos usam o registry existente. Registro tem posse por entrada: cleanup antigo não apaga substituto. O módulo hospeda diálogos por porta opcional mountEditorCommands, disponível antes do primeiro arquivo. Files/grupos/dirty continuam nos mesmos donos; App só liga comandos, sem estado paralelo de abas.
+
+Novo/Salvar como usam createFile exclusivo (wx), não sobrescrevem destinos. Origem só é fechada após copiar seu snapshot; digitação durante IO mantém origem dirty. Busca de símbolos reutiliza o coletor nativo compartilhado com Outline, em leitura limitada/cancelável, descartando modelos temporários. Ctrl+1/2 usa foco real, mas Abrir ao lado consulta o dono da URI, não o foco transitório de um menu.
+
+Limites visíveis: dois grupos, criação dentro do projeto, salvar como para destino novo, quick open até 5.000 arquivos, símbolos até 200 arquivos de 256 KB com provedor. Atalhos do navegador/SO e recursos de linguagem têm limites próprios. Core/server congelados e terminal não alterados; nenhum pacote novo. Atalhos integrados por autorização expressa do dono em 08/11/2026, código 5da7ffd. Typecheck EXIT 0; gate final 156 = 143 aprovados / 0 falhas / 13 ignorados, 16 arquivos. Três roteiros Playwright de teclado: 33 verificações; oito roteiros anteriores repetidos: 38 verificações. Sem homologação humana, sem encerramento formal da Fatia 15.

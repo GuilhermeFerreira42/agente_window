@@ -1,3 +1,9 @@
+# Complemento para inspeção — atalhos (08/11/2026)
+
+No arquivo de código, Alt+Z deve alternar a quebra visual; F1 abre a paleta, e Ctrl+K seguido de Ctrl+S mostra os atalhos. Conferir também abrir/salvar/fechar pelo teclado e foco dos dois grupos. Salvar como pede destino novo e conserva o arquivo se a gravação falhar. Recursos de linguagem dependem do provedor; atalhos reservados podem ser tomados pelo navegador. A correção e seus testes não representam sua homologação da Fatia 15.
+
+---
+
 # Situação de aceite — Fatia 15 (08/11/2026)
 
 **Não homologada.** O candidato corrigido passou pelos fluxos dirigidos da auditoria; a suíte integral Windows continua com 36 falhas e 30 ignorados classificados em 09/relatório. A decisão humana é exclusivamente do dono. Não encerrar a Fatia 15 nem avançar o roadmap por inferência dos testes focais.
