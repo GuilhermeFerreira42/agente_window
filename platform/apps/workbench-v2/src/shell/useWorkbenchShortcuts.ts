@@ -34,6 +34,7 @@ export function useWorkbenchShortcuts(handlers: WorkbenchShortcutHandlers, regis
       const command = mod ? `${event.shiftKey ? 'shift+' : ''}${key}` : /^f(1|11)$/.test(key) ? key : '';
       const action = current.current[command];
       if (!action) return;
+      if (command === 'w' && !(event.target as Element | null)?.closest?.('.editor-pane,.monaco-editor')) return;
       // Dentro de um diálogo, seus botões/campos conservam o teclado.
       if ((event.target as Element | null)?.closest('[role="dialog"],[aria-modal="true"]')) return;
       event.preventDefault();

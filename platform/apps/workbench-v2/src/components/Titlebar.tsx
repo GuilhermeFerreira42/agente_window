@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Bot,
+  ArrowLeft,
+  ArrowRight,
   Eye,
-  CircleAlert,
   CircleUserRound,
   GitCompareArrows,
   Globe2,
@@ -35,6 +36,7 @@ interface TitlebarProps {
   workspaceChangePending?: boolean
   onChangeWorkspace: (path: string) => Promise<void>
   onFindFile?: () => void
+  navigation?: { canBack: boolean; canForward: boolean; back(): void; forward(): void }
   onShowEditor?: () => void
   onBrowseWorkspace: () => void
   onAccountAction: (action: string) => void
@@ -59,6 +61,7 @@ export function Titlebar({
   workspaceChangePending,
   onChangeWorkspace,
   onFindFile,
+  navigation,
   onShowEditor,
   onBrowseWorkspace,
   onAccountAction,
@@ -88,15 +91,15 @@ export function Titlebar({
             <PanelLeft size={15} />
             {unreadCount > 0 && <span className="unread-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
           </button>
-          <div className="brand" aria-label="Agent Sessions">
+          <button type="button" className="brand" aria-label="Mostrar sessões" title={activeSession.title} onClick={onShowSessions}>
             <span className="brand-mark" aria-hidden="true"><Bot size={12} /></span>
             <span className="brand-label">Agent Sessions</span>
-          </div>
+          </button>
         </div>
 
         <div className="titlebar-center">
+          {navigation && <div className="workbench-navigation" role="group" aria-label="Histórico do Agent Window"><button className="titlebar-button" type="button" title="Voltar" aria-label="Voltar no Agent Window" disabled={!navigation.canBack} onClick={navigation.back}><ArrowLeft size={15}/></button><button className="titlebar-button" type="button" title="Avançar" aria-label="Avançar no Agent Window" disabled={!navigation.canForward} onClick={navigation.forward}><ArrowRight size={15}/></button></div>}
           {approved ? <div className="command-center is-approved"><span className="command-center-approved-label">Ação aprovada</span></div> : <WorkspaceSwitcher currentPath={workspacePath} pending={workspaceChangePending} onConfirm={onChangeWorkspace} onBrowse={onBrowseWorkspace} onFindFile={onFindFile}/>}
-          <button className="workspace-switcher-sessions" type="button" aria-label="Mostrar sessões" title={activeSession.title} onClick={onShowSessions}>{activeSession.status === 'needs-input' ? <CircleAlert size={12}/> : <Bot size={12}/>}</button>
         </div>
 
         <div className="titlebar-right">

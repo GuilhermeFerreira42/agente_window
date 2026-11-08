@@ -1,3 +1,9 @@
+# 08/11/2026 — D182, pacote complementar do proprietário
+
+Conferido ZIP de SPEC RF-A..G, cinco PNG e HTML contra HEAD 6407a25. Baseline confirmou ausência de histórico e Personalizações full-surface. Implementados modal comum preservando superfícies, categorias futuras honestamente indisponíveis, histórico interno separado do Browser, Quick Open superior, pasta/menu, lateral compacta e Search reaberto expandido. Corrigida mensagem de filtro Timeline vazio. Testes detectaram nomes ambíguos de Voltar e remoção do seletor de sessões: corrigidos com rótulos contextuais e acesso na marca. Gate final 272/0/13, suplemento 38/38, typecheck 0 e 89 verificações reais. Commit local «fix(workbench): implement reference modal and internal navigation», sem push. Limites no 03/06/09; não encerra Fatia 15.
+
+---
+
 # 08/11/2026 — D181, revisão da gravação 14:36 e mockup fornecido
 
 Análise local dos 10min02s e transcrição, sem upload da gravação. Texto incidental não foi tratado como ordem. Ajustados ocultação completa preservando donos, command center com busca de arquivos/menu de pastas, Search Editor real, ações de pesquisa, Open Editors real, reordenação do Explorer, controles de Outline/Timeline e navegação visual de Personalizações v1. Preservado F1 aprovado. SPEC e reforço da experiência VS Code no 05, provas no 09. Commit local «fix(workbench): align editor visibility and search workflows», sem push. Não encerra Fatia 15.

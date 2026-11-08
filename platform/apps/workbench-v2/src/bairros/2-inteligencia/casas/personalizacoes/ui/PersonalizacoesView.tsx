@@ -2,8 +2,8 @@
 // Casa Personalizações — TELA (Fatia 14, SPEC 2H v1).
 //
 // v1 é exatamente o que a SPEC limita: VISÃO GERAL + HABILIDADES + FERRAMENTAS.
-// Os outros cinco cartões do mockup ficam para as fatias 17+, e por isso esta
-// tela não os renderiza — não é esquecimento, é o escopo decidido.
+// D182: categorias futuras aparecem apenas como navegação para uma mensagem
+// explícita de indisponibilidade; não possuem serviços/configuração simulados.
 //
 // Segue a convenção das outras casas (ConfigView, ProvidersView): a casa é dona
 // da própria tela e fala com o servidor SÓ por `./client/api` (FT-05 — as URLs
@@ -18,7 +18,7 @@
 // importasse, o barrel da casa passaria a arrastar CSS para dentro do grafo do
 // servidor, que é quem importa o barrel para ler as constantes do contrato.
 // ============================================================================
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Blocks,
   ChevronDown,
@@ -35,6 +35,8 @@ import {
 } from 'lucide-react'
 import type { EstadoPersonalizacoes, GrupoFerramenta, Skill, VisaoPersonalizacoes } from '../contract'
 import { ROTULO_GRUPO_FERRAMENTA } from '../contract'
+import { PERSONALIZATION_SECTIONS, type PersonalizationSection } from './sections'
+import { PersonalizationIcon } from './PersonalizationIcon'
 import {
   carregarPersonalizacoes,
   criarSkillNaTela,
@@ -62,7 +64,8 @@ function mensagemDe(erro: unknown): string {
 export interface PersonalizacoesViewProps {
   /** true quando renderizada dentro do Custom View Grid (o grid já dá o título). */
   embedded?: boolean
-  sectionRequest?: { section: Secao; serial: number }
+  sectionRequest?: { section: PersonalizationSection; serial: number }
+  onSectionChange?: (section: PersonalizationSection) => void
   /**
    * Identidade da conversa ativa. Sem ela o servidor não resolve a raiz de
    * projeto e só o escopo do usuário aparece — a tela diz isso em vez de fingir
@@ -71,7 +74,7 @@ export interface PersonalizacoesViewProps {
   alvo?: AlvoPersonalizacoes
 }
 
-export function PersonalizacoesView({ embedded = false, alvo, sectionRequest }: PersonalizacoesViewProps) {
+export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, onSectionChange }: PersonalizacoesViewProps) {
   const [visao, setVisao] = useState<VisaoPersonalizacoes | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erroCarregar, setErroCarregar] = useState('')
@@ -80,10 +83,11 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest }: 
   const [aviso, setAviso] = useState('')
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<Partial<Record<Secao, boolean>>>({})
-  const [activeSection, setActiveSection] = useState<Secao>('visao')
-  const navigateSection = useCallback((section: Secao) => {
+  const [activeSection, setActiveSection] = useState<PersonalizationSection>('visao')
+  const content = useRef<HTMLDivElement>(null)
+  const navigateSection = useCallback((section: PersonalizationSection) => {
     setActiveSection(section); setCollapsed(current => ({ ...current, [section]: false }));
-    requestAnimationFrame(() => document.getElementById(`personalizacoes-section-${section}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }))
+    requestAnimationFrame(() => { if (content.current) content.current.scrollTop = 0 })
   }, [])
   useEffect(() => { if (sectionRequest && !carregando) navigateSection(sectionRequest.section) }, [sectionRequest, carregando, navigateSection])
   const [formAberto, setFormAberto] = useState(false)
@@ -239,9 +243,11 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest }: 
     <section className="customizations-view personalizations-manager" aria-label="Personalizações">
       <nav className="personalizations-navigation" aria-label="Seções de Personalizações">
         <span className="personalizations-navigation-title">Personalizações</span>
-        {SECOES.map(section => <button type="button" key={section.id} aria-current={activeSection === section.id ? 'page' : undefined} onClick={() => navigateSection(section.id)}>{section.icone}{section.rotulo}</button>)}
+        {PERSONALIZATION_SECTIONS.map(section => <button type="button" key={section.id} aria-current={activeSection === section.id ? 'page' : undefined} onClick={() => { navigateSection(section.id); onSectionChange?.(section.id) }}><PersonalizationIcon section={section.id}/>{section.label}</button>)}
       </nav>
-      <div className="personalizations-manager-content">
+      <div ref={content} className="personalizations-manager-content">
+      {!PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.available && <div className="personalizations-unavailable" role="status"><h2>{PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.label}</h2><p>Esta funcionalidade ainda não está disponível nesta versão.</p><p>Prevista para uma etapa futura. Nenhuma configuração foi alterada.</p></div>}
+      <div hidden={!PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.available}>
       <header className="customizations-header">
         <div className="customizations-title">
           <Blocks size={15} />
@@ -499,6 +505,7 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest }: 
             </div>
           )
         })}
+      </div>
       </div>
       </div>
     </section>

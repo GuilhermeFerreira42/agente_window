@@ -1,3 +1,9 @@
+# Limites correntes — D182, 08/11/2026
+
+As lacunas executáveis do pacote complementar foram corrigidas e verificadas: modal, navegação interna, Quick Open, pasta digitada, lateral e Search expandido. Permanecem limites/decisões: Ctrl+W físico reservado ao navegador; execução Linux headless e picker nativo sem prova nesta rodada; multi-root/Open Folders extras fora do contrato atual de uma raiz; serviços futuros de Personalizações indisponíveis. Igualdade visual pixel a pixel não foi demonstrada. F5 não preserva rascunhos; Canceled do Monaco e a integral histórica não estão resolvidos por este gate. E15-d física/homologação continuam reservadas. Não avançar automaticamente de fatia.
+
+---
+
 # Limites correntes — D181, 08/11/2026
 
 Placeholder visível ao ocultar, lista histórica de Open Editors e pesquisa central demonstrativa foram substituídos pelos fluxos reais descritos no 03. Persistem: limites físicos de teclas do navegador, seleção nativa de pasta ainda sem prova headless, paridade integral da grade/janelas do VS Code, funcionalidades futuras de Personalizações, Canceled nativo do Monaco e o placar integral histórico. Repetição isolada resolveu os dois casos vermelhos de integração sem mudança de timeout; logs preservados, não apagados. F5 conserva somente o salvo. E15-d física/homologação não autorizadas por esta revisão. Não avançar de fatia.

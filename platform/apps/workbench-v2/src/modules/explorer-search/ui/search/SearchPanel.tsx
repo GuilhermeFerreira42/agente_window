@@ -207,8 +207,8 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const [toggles, setToggles] = useState<SearchToggles>(persisted
     ? { isCaseSensitive: persisted.isCaseSensitive, isWholeWord: persisted.isWholeWord, isRegExp: persisted.isRegExp, preserveCase: persisted.preserveCase, useExcludeSettings: persisted.useExcludeSettings }
     : { isCaseSensitive: false, isWholeWord: false, isRegExp: false, preserveCase: false, useExcludeSettings: true });
-  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? true);
-  const [detailsOpen, setDetailsOpen] = useState(persisted?.detailsOpen ?? true);
+  const [replaceOpen, setReplaceOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   // estado restaurado NÃO dispara busca sozinho (só digitação/Enter)
   const armedRef = useRef(autoSearch || !persisted || persisted.pattern.length === 0);
 
@@ -239,7 +239,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const flip = useCallback((k: keyof SearchToggles) => setToggles((t) => ({ ...t, [k]: !t[k] })), []);
 
   // foco pedido pelo shell (Ctrl+Shift+F) e no mount
-  useEffect(() => { searchRef.current?.focus(); searchRef.current?.select(); }, [focusRequest]);
+  useEffect(() => { setReplaceOpen(true); setDetailsOpen(true); searchRef.current?.focus(); searchRef.current?.select(); }, [focusRequest]);
   useEffect(() => {
     if (replaceOpen && focusReplaceNext.current) { replaceRef.current?.focus(); focusReplaceNext.current = false; }
   }, [replaceOpen]);

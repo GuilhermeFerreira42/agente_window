@@ -57,6 +57,7 @@ export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onB
   }
   const confirm = async () => {
     if (!value.trim() || pending) return
+    if (!/^(?:[a-z]:[\\/]|\\\\[^\\]+\\[^\\]+|\/)/i.test(value.trim())) { setError('Informe um caminho absoluto no servidor.'); return }
     setError('')
     try { await onConfirm(value.trim()); setOpen(false) }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); setOpen(true) }
@@ -69,9 +70,16 @@ export function WorkspaceSwitcher({ currentPath, pending = false, onConfirm, onB
     else if (event.key === 'Escape') { event.preventDefault(); setOpen(false); setValue(currentPath) }
   }
 
-  return <div className={`workspace-switcher${open ? ' is-open' : ''}`} ref={rootRef}>
+  return <div className={`workspace-switcher${open ? ' is-open' : ''}`} ref={rootRef} onKeyDown={event => {
+    if (!menuOpen) return
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); rootRef.current?.querySelector<HTMLButtonElement>('[aria-label="Selecionar pasta"]')?.focus() }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); const items = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []); const index = items.indexOf(document.activeElement as HTMLButtonElement); items[(index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus()
+    }
+  }}>
     {!pathMode && onFindFile ? <div className="workspace-switcher-control command-center-files">
       <button type="button" className="workspace-file-search" aria-label="Pesquisar arquivos no projeto" title={currentPath} onClick={onFindFile}><Search size={14}/><span>{currentPath || 'Pesquisar arquivos'}</span><kbd>Ctrl+P</kbd></button>
+      <button type="button" className="workspace-folder-action" aria-label="Selecionar pasta" title="Selecionar pasta do servidor" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><FolderOpen size={15}/></button>
       <button type="button" className="workspace-command-menu" aria-label="Opções do projeto" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}><ChevronDown size={14}/></button>
     </div> : <div className="workspace-switcher-control">
       <Search size={14} aria-hidden="true"/>

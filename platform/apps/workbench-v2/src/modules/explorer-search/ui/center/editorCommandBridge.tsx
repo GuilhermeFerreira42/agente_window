@@ -35,7 +35,7 @@ export function createEditorCommandBridge({ deps, editor, session, navigate, clo
     const source = editor.getActive(sourceGroup);
     if (mode === 'save-as' && (!source || source.kind !== 'code' || !instance(sid))) throw new Error('Abra um arquivo de código para salvar como.');
     const dismiss = () => { root?.render(null); instance(sid)?.focus(); };
-    root.render(<EditorFileDialog key={Date.now()} mode={mode} root={deps.workspaceRoot} fs={deps.fs} onCancel={dismiss} onAccept={async path => {
+    root.render(<EditorFileDialog key={Date.now()} mode={mode} root={deps.workspaceRoot} fs={deps.fs} onCancel={dismiss} onCommand={id => { dismiss(); void deps.menus.execute(id, { sessionId: sid }); }} onAccept={async path => {
       const uri = pathUri(path);
       let snapshot: string | undefined;
       if (mode === 'open') {

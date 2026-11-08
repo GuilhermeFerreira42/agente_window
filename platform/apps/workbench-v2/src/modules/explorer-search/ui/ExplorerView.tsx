@@ -1195,7 +1195,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
                 <div className="timeline-pane">
                   {timelineFilterOpen && <input aria-label="Filtrar histórico" value={timelineFilter} onChange={event => setTimelineFilter(event.target.value)} />}
                   {visibleTimeline.length === 0
-                    ? <div className="pane-message">The active editor cannot provide timeline information.</div>
+                    ? <div className="pane-message">{timeline.length && timelineFilter ? 'Nenhum evento corresponde ao filtro.' : 'The active editor cannot provide timeline information.'}</div>
                     : (
                       <div className="monaco-list" role="tree" aria-label="Timeline">
                         <div className="monaco-scrollable-element" role="presentation">

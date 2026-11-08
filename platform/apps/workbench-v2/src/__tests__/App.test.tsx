@@ -1631,9 +1631,9 @@ describe('App session flows', () => {
     expect(handle).not.toBeNull()
     expect(body.style.getPropertyValue('--sidebar-width')).toBe('360px')
 
-    // Duplo-clique restaura o padrão (300px) e avisa.
+    // Duplo-clique restaura o padrão (280px) e avisa.
     fireEvent.doubleClick(handle as HTMLElement)
-    expect(body.style.getPropertyValue('--sidebar-width')).toBe('300px')
+    expect(body.style.getPropertyValue('--sidebar-width')).toBe('280px')
     const toast = await screen.findByRole('status')
     expect(toast).toHaveTextContent('Largura da barra de sessões restaurada')
   })
@@ -1914,7 +1914,7 @@ describe('App session flows', () => {
       expect(within(surface).getByText('Visão geral')).toBeInTheDocument()
       expect(within(surface).getByText('Habilidades')).toBeInTheDocument()
       expect(within(surface).getByText('Ferramentas')).toBeInTheDocument()
-      for (const ausente of ['Plugins', 'Hooks', 'MCP', 'Instructions', 'Prompts']) {
+      for (const ausente of ['Configurar Hooks', 'Adicionar servidor MCP', 'Instructions', 'Prompts']) {
         expect(within(surface).queryByText(ausente), ausente).not.toBeInTheDocument()
       }
       expect(within(surface).queryByRole('combobox', { name: 'Selecionar harness' })).not.toBeInTheDocument()

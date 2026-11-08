@@ -117,14 +117,16 @@ describe('PersonalizacoesView · carga e escopo da v1', () => {
     expect(within(regiao).getByText('Ferramentas')).toBeInTheDocument()
   })
 
-  it('a v1 NÃO renderiza os outros cartões do mockup — eles são das fatias 17+', async () => {
+  it('D182: categorias futuras indicam indisponibilidade sem simular configuração', async () => {
+    const user = userEvent.setup()
     mockFetch({ skills: [skill({ nome: 'commit' })] })
     render(<PersonalizacoesView />)
     const regiao = await waitFor(() => tela())
-    for (const rotulo of ['Agents', 'Instructions', 'Prompts', 'Hooks', 'MCP', 'Plugins']) {
-      expect(within(regiao).queryByText(rotulo), rotulo).not.toBeInTheDocument()
+    for (const rotulo of ['Agentes', 'Instruções', 'Hooks', 'Servidores MCP', 'Plugins']) {
+      await user.click(within(regiao).getByRole('button', { name: rotulo }))
+      expect(within(regiao).getByRole('status')).toHaveTextContent('ainda não está disponível')
+      expect(within(regiao).queryByRole('button', { name: 'Nova habilidade' })).not.toBeInTheDocument()
     }
-    // O seletor de harness é peça do mock E16 e não existe na versão real.
     expect(within(regiao).queryByRole('combobox', { name: 'Selecionar harness' })).not.toBeInTheDocument()
   })
 

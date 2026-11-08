@@ -19,7 +19,7 @@ import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessio
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
-import { PersonalizacoesView } from './bairros/2-inteligencia/casas/personalizacoes'
+import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
@@ -63,6 +63,7 @@ import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/pon
 import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
 import { useStableEditorSurface } from './shell/stableEditorSurface'
 import { useWorkbenchShortcuts } from './shell/useWorkbenchShortcuts'
+import { useWorkbenchHistory } from './shell/useWorkbenchHistory'
 import { renderDocumentMarkdown } from './shell/renderDocumentMarkdown'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
 import { CenterSearchSlot, CenterChangesSlot, CenterCodeEditorSlot, EditorCommandsSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
@@ -339,7 +340,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (R-092 / LAYOUT.md §Custom View Grid) Superfície full-surface contribuída,
   // mutuamente exclusiva com Sessions Part, Editor, Auxiliary Bar e Panel.
   const [customView, setCustomView] = useState(() => loadCustomViewState())
-  const customViewActive = shouldShowCustomViewGrid(customView)
+  const customViewActive = shouldShowCustomViewGrid(customView) && customView.activeView !== 'aiCustomizations'
 
 
   // FATIA 15 Onda 3 (D159): `handleOpenFileHandle` saiu daqui. Era o ÚNICO criador de aba
@@ -366,15 +367,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // aiCustomizationsData.ts, agentPlugins.ts, agentPluginsData.ts, a view
   // components/CustomizationsView.tsx e os testes de todos eles continuam
   // intactos. A SPEC 2H limita a v1 a Visão geral + Habilidades + Ferramentas;
-  // os cinco cartões restantes (Agents, Instructions, Prompts, Hooks, MCP,
-  // Plugins) voltam a ser renderizados nas fatias 17+, quando o R-065 for
-  // religado a dados reais. Desconectar a tela do mock não é apagar o requisito.
+  // D182 mostra categorias futuras apenas para informar indisponibilidade;
+  // os serviços correspondentes continuam reservados às fatias futuras.
   // Auxiliary sections mirror the reference view state: collapse/expand is
   // remembered by session instead of leaking between independent workspaces.
   const [checksExpandedBySession, setChecksExpandedBySession] = useState<Record<string, boolean>>({})
   const [expandedFoldersBySession, setExpandedFoldersBySession] = useState<Record<string, Record<string, boolean>>>({})
   const [searchQuery, setSearchQuery] = useState('menubar')
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+  useEffect(() => { if (layout.state.sideBarVisible && layout.state.activeView === 'search') setSearchFocusRequest(value => value + 1) }, [layout.state.sideBarVisible, layout.state.activeView])
 
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
@@ -1116,9 +1117,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     revealEditor()
   }
 
-  // (R-092) AI Customizations é uma CUSTOM VIEW full-surface, não uma aba:
-  // ao abrir, captura a visibilidade desejada das parts e as cobre por inteiro
-  // (só Title Bar e Sidebar sobrevivem).
+  // D182: Personalizações usa modal. O dono de rota/persistência R-092 continua
+  // guardando a visibilidade anterior; as superfícies permanecem montadas.
   const openCustomViewGrid = useCallback((view: CustomViewId) => {
     setCustomView((current) =>
       openCustomView(current, view, {
@@ -1130,7 +1130,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     )
   }, [auxiliaryVisible, editorHidden, terminalVisible])
 
-  const [personalizationsRoute, setPersonalizationsRoute] = useState<{ section: 'visao' | 'habilidades' | 'ferramentas'; serial: number }>({ section: 'visao', serial: 0 })
+  const [personalizationsRoute, setPersonalizationsRoute] = useState<{ section: PersonalizationSection; serial: number }>({ section: 'visao', serial: 0 })
   const openCustomizations = useCallback(() => {
     openCustomViewGrid('aiCustomizations')
     // (LAYOUT.md) No phone a custom view entra na pilha de navegação, para que o
@@ -2363,8 +2363,24 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     touchStartRef.current = null
   }
 
+  const historyTabs = (sessionId: string) => fundirAbas(getEditorTabsVisibleForSession(editorTabs, sessionId), explorerModule ? projetarAbasDoModulo(sessionId, explorerModule.attach.getTabs({ sessionId })) : [])
+  const navigation = useWorkbenchHistory({
+    route: { sessionId: activeSession.id, chatId: activeChatId, tabId: activeTabId, modal: customView.activeView === 'aiCustomizations', section: personalizationsRoute.section, mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
+    valid: route => sessions.some(session => session.id === route.sessionId) && (!route.tabId || historyTabs(route.sessionId).some(tab => tab.id === route.tabId)),
+    restore: route => {
+      selectSession(route.sessionId)
+      setActiveChatBySession(current => ({ ...current, [route.sessionId]: route.chatId }))
+      setNewSessionLanding(route.landing)
+      setPersonalizationsRoute(current => ({ section: route.section, serial: current.serial + 1 }))
+      if (route.modal) openCustomizations(); else closeCustomViewGrid()
+      activateEditorTab(historyTabs(route.sessionId).find(tab => tab.id === route.tabId))
+      setEditorHidden(route.editorHidden); setMobilePane(route.mobilePane)
+      layout.showView(route.sideBarView); layout.setSideBarVisible(route.sideBarVisible)
+    },
+  })
+
   return (
-    <div 
+    <div
       className={`app-frame agent-sessions-workbench${isSinglePane ? ' single-pane' : ''}${customViewActive ? ' custom-view-active' : ''}`}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -2388,6 +2404,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onFindFile={() => executeEditorCommand('workbench.action.quickOpen')}
+        navigation={navigation}
         onShowEditor={editorHidden && (visibleEditorTabs.length > 0 || moduloTemDivisao) ? revealEditor : undefined}
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
@@ -2594,6 +2611,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         </div>
       </div>
       {toast && <div className="toast" role="status"><Info size={14} /><span>{toast}</span><button type="button" aria-label="Fechar aviso" title="Fechar aviso" onClick={() => setToast(undefined)}><X size={13} /></button></div>}
+      {customView.activeView === 'aiCustomizations' && <PersonalizationsModal alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} onSectionChange={section => setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 }))} onClose={closeCustomViewGrid} />}
       {explorerContextMenu && (
         <ExplorerContextMenuHost
           state={explorerContextMenu}

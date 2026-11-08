@@ -1,3 +1,21 @@
+# Evidência vigente — D182, pacote RF-A..G (08/11/2026)
+
+Artefatos externos em ../arena-operacional/feedback-2026-11-08/spec-14-15. Fonte base 6407a25, Windows real, Node26.13.0/npm11.20.0 fixados, Chromium/Playwright1.63. Testes em 5199/fixtures próprias; perfil pessoal 5174 apenas disponibilidade HTTP. ZIP de especificação e imagens lidos como requisitos/referências; scripts incidentais do HTML não foram executados nem tratados como ordens. Não é necessário outro ZIP de código: clone autorizado existente foi conferido.
+
+- baseline.mjs: antes do patch, zero modal de Personalizações e zero botão Voltar. Capturas antes-lateral/antes-personalizacoes preservadas.
+- gate-final.json/log: 27 arquivos, 285 = 272 aprovados/0 falhas/13 ignorados preexistentes, 392,11s. Gate original preserva 267/5/13: ambiguidade de Voltar e seletor de sessões temporariamente ausente; corrigidos sem mudar os testes para ignorar o defeito.
+- suplementar.json/log: história interna, ExplorerView e PersonalizacoesView, 38/38 após ajustes finais de foco e mensagem; não somar como casos inéditos. Focal anterior 47/47; Sidebar primeiro falhou por assert síncrono para foco solicitado via RAF, corrigido para esperar o efeito real sem aumentar timeout.
+- regressao/resumo.json: 89 verificações em 13 roteiros; 11 novos de modal/histórico/Quick Open/Search e cinco de caminho/erro/troca/F5; 73 de regressão de editor/Browser/keyboard/Search/Explorer/Personalizações. Logs finais específicos relacionados no resumo, sem somar replays. Monaco confirmado com dimensões reais e grupos sucessivos; bytes/draft/dirty e decisões de fechamento continuam cobertos.
+- Outline: filhos reais contam >0, recolhimento remove filhos e expandir restaura; aquecimento do provedor pode exceder 5s sob carga, roteiro espera até 20s. Timeline usa Git real da fixture, filtro remove/restaura eventos e tem mensagem de zero correspondências. Logs anteriores vermelhos preservados.
+- typecheck-final.log EXIT 0; lint-final.log/json compara cada fonte alterado com 6407a25: 17 erros idênticos herdados no App, nenhum novo; quatro avisos. Perímetros antigos 20/21 não são comparações equivalentes.
+- visual.log/medidas-visuais.json: modal 1054×586 em viewport 1351×807; em 520×807, modal contido e controles utilizáveis. Quick Open capturado na resolução exata do PNG 04. comparacao.html e imagens mostram referência/candidato lado a lado; diferenças de dados, fonte/ícones/branding e modos futuros indisponíveis são declaradas. Não é medição ±2px de toda a interface.
+
+Linux headless não executado. Entrada absoluta/manual é independente do picker Windows e testes UI existentes cobrem POSIX, mas isso não equivale a executar Debian. Picker nativo não acionado no headless. Caminho relativo/inexistente/arquivo recusado sem perder workspace anterior; nenhuma ACL pessoal foi alterada para simular permissão negada. Multi-root não foi adicionado ao contrato de uma raiz por sessão; troca/F5 eliminam listagem anterior. Ctrl+W por CDP só comprova handler/contexto: reserva física pelo browser permanece, como documentado oficialmente em code.visualstudio.com/docs/remote/vscode-web. A integral histórica 1469/36/30 não foi repetida. Canceled nativo do Monaco segue nos logs, sem perda demonstrada. Não houve inferência IA, alteração de terminal/fs/server/permissões, push ou homologação.
+
+Comandos: launcher platform/scripts/project.ps1 test [27 caminhos de gate-final.log] --maxWorkers=1 --minWorkers=1; typecheck pelo mesmo launcher, AGENTE_WINDOW_TEST_ROOT no operacional feedback/unitarios. Recuperação existente atualizada somente após commit, clone/HEAD/tree/fsck e extração/SHA256; hashes finais no LEIA-ME externo. Não criar backup redundante. Matriz completa no relatório operacional; E15-d física permanece reservada.
+
+---
+
 # Evidência vigente — D181, 08/11/2026
 
 Diretório externo: ../arena-operacional/feedback-2026-11-08/revisao-1436. Testes no perfil descartável 5199; inspeção pessoal 5174 não automatizada. Runtime oficial fixado Node26.13.0/npm11.20.0, Playwright1.63 Chromium no Windows. Vídeo atual lido localmente em quadros e ASR local, sem transferir mídia. HTML fornecido consultado como referência visual, sem executar seus scripts externos.

@@ -48,3 +48,7 @@ export type { AlvoPersonalizacoes, PedidoCriarSkillTela } from './ui/client/api'
 /** A tela da casa (Fatia 14, SPEC 2H v1). O síndico apenas a renderiza. */
 export { PersonalizacoesView } from './ui/PersonalizacoesView'
 export type { PersonalizacoesViewProps } from './ui/PersonalizacoesView'
+export { PersonalizationsModal } from './ui/PersonalizationsModal'
+export { PersonalizationIcon } from './ui/PersonalizationIcon'
+export { PERSONALIZATION_SECTIONS } from './ui/sections'
+export type { PersonalizationSection } from './ui/sections'

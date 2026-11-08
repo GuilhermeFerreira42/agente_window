@@ -5073,3 +5073,44 @@ svg {
 .personalizations-overview-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 14px 0; }
 .personalizations-overview-cards button { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 20px; background: var(--vscode-editor-background); color: inherit; border: 1px solid var(--vscode-panel-border); border-radius: 6px; text-align: left; cursor: pointer; }
 .personalizations-overview-cards button:hover { border-color: var(--vscode-focusBorder); }
+
+/* D182 — referências fornecidas: barra principal e modal comum. */
+.workbench-navigation { display: flex; gap: 2px; }
+.titlebar-button:disabled { opacity: .35; cursor: default; }
+.titlebar-inner { grid-template-columns: minmax(130px, 1fr) minmax(0, 2.8fr) minmax(170px, 1fr); }
+.titlebar-center { min-width: 0; width: 100%; }
+.titlebar-center .workspace-switcher { width: 100%; min-width: 0; max-width: 1000px; }
+.workspace-folder-action { display: grid; place-items: center; flex: 0 0 27px; padding: 0; background: transparent; border: 0; border-left: 1px solid var(--vscode-panel-border); color: inherit; cursor: pointer; }
+.workspace-file-search { padding: 3px 8px; font-size: 12px; }
+.workspace-file-search > span { text-overflow: clip; overflow-x: auto; scrollbar-width: none; }
+.workspace-file-search kbd { display: none; }
+.workspace-command-options { width: 300px; left: auto; right: 0; border-radius: 5px; background: var(--vscode-menu-background, #252526); box-shadow: 0 3px 12px #0006; }
+.workspace-command-options button { padding: 6px 14px; }
+.sessions-sidebar-header { min-height: 42px; border-bottom: 0; padding: 10px 14px 6px; }
+.sessions-count { margin-left: 4px; padding: 1px 5px; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 10px; font-weight: 400; }
+.sessions-header-actions .sessions-new { width: auto; padding: 1px 8px; border: 1px solid var(--vscode-panel-border); border-radius: 3px; font-size: 12px; }
+.personalizations-shortcuts { padding: 7px 13px 11px; max-height: 45%; overflow: auto; }
+.personalizations-shortcuts > div { padding: 1px 0 0; }
+.personalizations-shortcuts > div button { gap: 9px; min-height: 28px; padding: 4px 10px; border-radius: 4px; }
+.personalizations-shortcuts-header { min-height: 31px; font-size: 12px; }
+.personalizations-modal-backdrop { position: fixed; inset: 0; z-index: 10010; background: #0009; display: grid; place-items: center; }
+.personalizations-modal { width: min(1054px, 86vw); height: min(586px, 82vh); display: flex; flex-direction: column; min-height: 0; padding: 0 5px 16px; background: var(--vscode-editorWidget-background, #252526); color: var(--vscode-foreground); border: 1px solid var(--vscode-widget-border, #454545); border-radius: 8px; box-shadow: 0 8px 30px #0006; overflow: hidden; outline: none; }
+.personalizations-modal.is-maximized { width: calc(100vw - 32px); height: calc(100vh - 32px); }
+.personalizations-modal-title { flex: 0 0 39px; padding: 0 5px; display: flex; align-items: center; justify-content: space-between; }
+.personalizations-modal-title h1 { font-size: 12px; font-weight: 600; margin: 0; }
+.personalizations-modal-title > div { display: flex; }
+.personalizations-modal-title button { border: 0; color: inherit; background: transparent; width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; border-radius: 4px; }
+.personalizations-modal-title button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.personalizations-modal .personalizations-manager { flex: 1; width: 100%; grid-template-columns: 194px minmax(0, 1fr); background: transparent; }
+.personalizations-modal .personalizations-navigation { background: transparent; border-right: 0; padding: 0 6px 0 0; gap: 1px; overflow-y: auto; }
+.personalizations-modal .personalizations-navigation-title { display: none; }
+.personalizations-modal .personalizations-navigation button { padding: 5px 9px; border-radius: 4px; gap: 8px; min-height: 26px; font-size: 12px; }
+.personalizations-modal .personalizations-manager-content { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 24px; background: var(--vscode-editor-background); margin-right: 10px; }
+.personalizations-unavailable h2 { margin: 16px 0 8px; font-size: 18px; font-weight: 600; }
+.personalizations-unavailable p { color: var(--vscode-descriptionForeground); max-width: 600px; }
+@media (max-width: 800px) { .titlebar-inner { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 3px; }.titlebar-left .brand { display: none; }.personalizations-modal { width: 96vw; height: 90vh; }.personalizations-modal .personalizations-manager { grid-template-columns: 148px minmax(0,1fr); }.personalizations-modal .personalizations-manager-content { padding: 12px; } }
+.sessions-toolbar[hidden] { display: none; }
+.titlebar .brand { border: 0; padding: 0; background: transparent; cursor: pointer; }
+.sessions-chats-header { display: flex; align-items: center; gap: 6px; padding: 6px 10px; width: 100%; border: 0; background: transparent; color: var(--vscode-descriptionForeground); text-align: left; cursor: pointer; }
+.sessions-chats-header span { flex: 1; }
+.sessions-chats-header:hover { background: var(--vscode-list-hoverBackground); }

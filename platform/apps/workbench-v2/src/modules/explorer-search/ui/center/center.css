@@ -145,3 +145,19 @@
 .explorer-viewlet.attach-viewlet.center-code-editor > .editor-container > .attach-editor-pane { position: relative; inset: auto; flex: 1 1 0; min-height: 0; }
 .center-code-editor .center-breadcrumbs { display: flex; align-items: center; height: 22px; min-height: 22px; flex: 0 0 22px; z-index: 2; border-bottom: 1px solid var(--vscode-panel-border); }
 .center-code-editor .center-breadcrumbs .breadcrumbs-control { overflow: visible; flex: 0 1 auto; min-width: 0; }
+
+/* D182 — Quick Open superior, seleção mantida no campo. */
+.editor-quick-open-backdrop { position: fixed; inset: 0; z-index: 10020; background: transparent; display: flex; align-items: flex-start; justify-content: center; padding-top: 7px; }
+.editor-quick-open { width: min(600px, 94vw); max-height: min(440px, 90vh); padding: 6px; border: 1px solid var(--vscode-widget-border, #454545); border-radius: 8px; box-shadow: 0 8px 30px #0007; background: var(--vscode-quickInput-background, #252526); color: var(--vscode-quickInput-foreground, #ccc); font-size: 13px; }
+.editor-quick-open input { width: 100%; height: 27px; display: block; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-focusBorder); border-radius: 3px; padding: 3px 6px; outline: none; margin-bottom: 6px; }
+.editor-quick-open button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.editor-quick-open-modes button, .editor-quick-open .editor-command-files button { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 23px; padding: 2px 8px; text-align: left; border-radius: 3px; }
+.editor-quick-open-modes span, .quick-open-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.editor-quick-open-modes kbd { margin-left: auto; font-size: 10px; opacity: .8; border: 1px solid var(--vscode-panel-border); border-radius: 2px; padding: 0 3px; }
+.editor-quick-open-modes { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 4px; margin-bottom: 3px; }
+.editor-quick-open .editor-command-files { overflow-y: auto; max-height: min(315px, 55vh); }
+.editor-quick-open [role=option][aria-selected=true] button, .editor-quick-open button:hover { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.quick-open-directory { color: var(--vscode-descriptionForeground); font-size: 11px; margin-left: auto; min-width: 0; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.editor-quick-open p { margin: 7px 6px; font-size: 12px; }
+.quick-open-footer { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 5px 4px 0; color: var(--vscode-descriptionForeground); font-size: 10px; }
+.quick-open-footer button { font-size: 11px; }

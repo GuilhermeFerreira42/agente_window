@@ -17,10 +17,12 @@ import {
   Pin,
   PinOff,
   Search,
+  SlidersHorizontal,
   Trash2,
   Wrench,
 } from 'lucide-react'
 import type { NestedChat, Session, SessionStatus } from '../types'
+import { PERSONALIZATION_SECTIONS, PersonalizationIcon, type PersonalizationSection } from '../bairros/2-inteligencia/casas/personalizacoes'
 import { ContextMenu, type ContextMenuState } from './ContextMenu'
 import { DragTypes, canReorderSessions } from '../domain/dragAndDrop'
 import {
@@ -47,7 +49,7 @@ interface SessionSidebarProps {
   activeChatId: string
   onSelectSession: (id: string) => void
   onSelectChat: (sessionId: string, chatId: string) => void
-  onOpenPersonalizations?: (section: 'visao' | 'habilidades' | 'ferramentas') => void
+  onOpenPersonalizations?: (section: PersonalizationSection) => void
   onNewSession: () => void
   onTogglePinned: (id: string) => void
   onToggleArchived: (id: string) => void
@@ -312,6 +314,8 @@ export function SessionSidebar({
   const [personalizationsCollapsed, setPersonalizationsCollapsed] = useState(() => { try { return localStorage.getItem('workbench.personalizations.collapsed') === 'true' } catch { return false } })
   useEffect(() => { try { localStorage.setItem('workbench.personalizations.collapsed', String(personalizationsCollapsed)) } catch { /* private/quota */ } }, [personalizationsCollapsed])
   const [query, setQuery] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [chatsCollapsed, setChatsCollapsed] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [readState, setReadState] = useState<SessionFilters['readState']>('all')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ s1: true, s2: true })
@@ -563,13 +567,14 @@ export function SessionSidebar({
   return (
     <aside className={`sessions-sidebar${visible ? '' : ' is-hidden'}`} aria-label="Lista de sessões" aria-hidden={!visible}>
       <div className="sessions-sidebar-header">
-        <span className="sessions-sidebar-title">Sessions</span>
+        <span className="sessions-sidebar-title">Sessões <span className="sessions-count">{totalVisible}/{sessions.length}</span></span>
         <div className="sessions-header-actions">
-          <button className="toolbar-button" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}><FilePlus2 size={14} /></button>
-          <button className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => document.getElementById('sessions-filter-input')?.focus()}><Search size={14} /></button>
+          <button className="toolbar-button sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>Novo</button>
+          <button className="toolbar-button" type="button" title="Filtros de sessões" aria-label="Filtros de sessões" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={14}/></button>
+          <button className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => { setFiltersOpen(true); requestAnimationFrame(() => document.getElementById('sessions-filter-input')?.focus()) }}><Search size={14} /></button>
         </div>
       </div>
-      <div className="sessions-toolbar">
+      <div className="sessions-toolbar" hidden={!filtersOpen}>
         <label className="sessions-filter" htmlFor="sessions-filter-input">
           <Search size={12} />
           <input id="sessions-filter-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar sessões" />
@@ -598,12 +603,14 @@ export function SessionSidebar({
         </select>
       </div>
       <div className="sessions-list-scroll" ref={listRef} onKeyDown={handleListKeyDown}>
-        {groups.map((group) => renderGroup(group))}
-        {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
+        <button className="sessions-chats-header" type="button" aria-expanded={!chatsCollapsed} onClick={() => setChatsCollapsed(value => !value)}><MessageCircle size={14}/><span>Chats</span>{chatsCollapsed ? <ChevronRight size={12}/> : <ChevronDown size={12}/>}</button>
+        <div hidden={chatsCollapsed}>{groups.map((group) => renderGroup(group))}
+          {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
+        </div>
       </div>
       {onOpenPersonalizations && <section className="personalizations-shortcuts" aria-label="Atalhos de Personalizações">
         <button className="personalizations-shortcuts-header" type="button" aria-expanded={!personalizationsCollapsed} onClick={() => setPersonalizationsCollapsed(value => !value)}><span>Personalizações</span>{personalizationsCollapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}</button>
-        {!personalizationsCollapsed && <div>{([{ id: 'visao', label: 'Visão geral' }, { id: 'habilidades', label: 'Habilidades' }, { id: 'ferramentas', label: 'Ferramentas' }] as const).map(section => <button type="button" key={section.id} onClick={() => onOpenPersonalizations(section.id)}>{section.label}</button>)}</div>}
+        {!personalizationsCollapsed && <div>{PERSONALIZATION_SECTIONS.map(section => <button type="button" key={section.id} onClick={() => onOpenPersonalizations(section.id)}><PersonalizationIcon section={section.id}/>{section.label}</button>)}</div>}
       </section>}
       <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
     </aside>

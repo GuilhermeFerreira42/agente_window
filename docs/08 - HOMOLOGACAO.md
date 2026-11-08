@@ -1,3 +1,19 @@
+# Inspeção vigente — D182, pacote RF-A..G (08/11/2026)
+
+Salve seus rascunhos antes de recarregar 5174. Confira um item por vez em arquivos descartáveis:
+
+1. Lateral principal: Sessões/contagem/Novo, Chats, grupos reais e filtros no botão de ajustes; Personalizações recolhe e mostra oito categorias.
+2. Clique em Hooks/Agentes/MCP: deve abrir o mesmo modal e informar indisponibilidade. Habilidades e Ferramentas usam dados reais. Troque de categoria sem fechar; maximize/restaure, Tab/Shift+Tab, Esc e X. Chat, abas e texto devem voltar com foco coerente.
+3. Digite html, .html ou *.html no Quick Open (clique no caminho ou Ctrl+P); confira homônimos pelos caminhos, setas/Enter/Esc e Ctrl+Shift+P. F1 mantém apresentação aprovada.
+4. Pasta ao lado do caminho: digite caminho absoluto do SERVIDOR, válido e inválido. O inválido conserva a pasta anterior; o válido atualiza caminho/Explorer e persiste após F5. Seletor gráfico é adicional.
+5. Voltar/Avançar da barra principal navegam entre chats, Configurações e Search/Explorer sem atuar no Browser embutido. Drafts devem permanecer. A marca Agent Sessions abre o seletor de sessões.
+6. Search reabre expandido. Reordene cabeçalhos Explorer e confira F5; Open Editors fecha a aba real com proteção dirty. Timeline filtra e informa quando não há correspondências.
+7. Repita ocultar/restaurar, maximizar, várias divisões, preview Markdown e Alt+Z. X principal oculta tudo sem apagar rascunho; X da aba fecha. Salvar/Não salvar/Cancelar devem decidir apenas alterações reais.
+
+Ctrl+W físico pode ser reservado ao Chrome; não é homologado pelo evento automatizado. Linux headless e picker nativo continuam sem validação real nesta rodada. O candidato e a comparação visual estão disponíveis, mas o aceite da Fatia 15 é exclusivamente seu; E15-d física permanece separada.
+
+---
+
 # Inspeção vigente — D181, 08/11/2026
 
 Salve seus rascunhos e recarregue 5174. Com arquivos descartáveis, confira um item de cada vez:
