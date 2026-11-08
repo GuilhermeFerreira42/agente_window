@@ -17,6 +17,12 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import type { IExplorerSearchModule } from '../modules/explorer-search'
 
+export function EditorCommandsSlot({ module }: { module: IExplorerSearchModule }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => host.current ? module.mountEditorCommands?.(host.current) : undefined, [module])
+  return <div ref={host} data-testid="editor-commands-slot" />
+}
+
 /** FATIA-04 (4.4): slot DOM do módulo explorer-search.
  *  O mount/unmount REAL é do módulo (DOM só dentro do slot; o estado do serviço
  *  sobrevive a remount). Usa `useCallback` como ref: o React chama a função com

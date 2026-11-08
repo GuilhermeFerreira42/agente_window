@@ -31,6 +31,7 @@ import { CenterCodeEditor, type CenterCodeEditorProps, type CenterCloseRequester
 import { ChangesPane } from './ui/attach/changes/ChangesPane';
 import type { CodeEditorPaneApi, CodeEditorPaneProps } from './ui/attach/CodeEditorPane';
 import { disposeModelResources } from './ui/attach/modelResources';
+import { createEditorCommandBridge } from './ui/center/editorCommandBridge';
 import { AttachLayoutStore } from './core/attach/attachLayout';
 import { ATTACH_DIFF_URI, EditorService } from './core/editor/editorService';
 import { GitService } from './core/git/gitService';
@@ -228,6 +229,11 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   /** Atendentes de `attach.requestCloseTab`, por sessão. O CenterCodeEditor
    *  registra no mount e retira no unmount. */
   const centerCloseRequesters = new Map<string, CenterCloseRequester>();
+  const editorCommands = createEditorCommandBridge({ deps, editor: editorService,
+    session: () => sessionContext ?? centerSessionId,
+    navigate: (sessionId, uri) => events.fire({ type: 'editor.navigationRequested', sessionId, uri }),
+    close: (sessionId, uri) => centerCloseRequesters.get(sessionId)?.({ sessionId, uri }),
+  });
   // 5.6 (A0.6) — Outline lê os símbolos do modelo ativo do Monaco do anexo; Timeline
   // fala com /git/log + /git/show(sha). Tudo aditivo: ExplorerView recebe `activeFile`.
   const outlineTracker = createMonacoOutlineTracker();
@@ -239,7 +245,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // centro") é paga aqui, ANTES de a coluna morrer, e não depois: o tracker agora
   // aceita N candidatos e o Outline passa a descrever o editor que está em uso,
   // seja ele o da coluna (durante a sobreposição) ou o do centro (a partir daqui).
-  const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (ed, api) => {
+  const onCenterEditorReady: CodeEditorPaneProps['onEditorReady'] = (ed, api, groupId) => {
+    if (groupId) editorCommands.register(groupId, ed);
     centerPaneApi = api;
     centerMonaco = ed;
     outlineTracker.attach(ed);
@@ -275,6 +282,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       focusSideOf: () => editorService.focusGroupOf(sessionId),
     },
     onEditorReady: onCenterEditorReady,
+    onWorkbenchCommand: (id) => { void deps.menus.execute(id, { sessionId }).catch(error => events.fire({ type: 'error', code: 'command_failed', message: String(error) })); },
     onSave: attachSave,
     onReload: attachReload,
     onCloseRequester: (r) => {
@@ -467,6 +475,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   });
 
   const module: IExplorerSearchModule = {
+    mountEditorCommands: (root) => editorCommands.mount(root),
     explorer: service,
 
     get search() {
@@ -627,6 +636,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     },
 
     dispose(): void {
+      editorCommands.dispose();
       if (reactRoot) {
         reactRoot.unmount();
         reactRoot = null;

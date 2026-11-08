@@ -7,7 +7,8 @@
 // Achatamento/kinds ficam no core puro (core/outline/outlineModel).
 // ============================================================================
 import type * as Monaco from 'monaco-editor';
-import { flattenSymbols, type OutlineRow, type OutlineSymbolInput } from '../../core/outline/outlineModel';
+import { flattenSymbols, type OutlineRow } from '../../core/outline/outlineModel';
+import { readDocumentSymbols } from './documentSymbols';
 
 type Editor = Monaco.editor.IStandaloneCodeEditor;
 interface SymbolRegistry {
@@ -98,13 +99,7 @@ export function createMonacoOutlineTracker(): MonacoOutlineTracker {
     const reg = await loadRegistry();
     if (!reg || my !== seq || model.isDisposed()) return;
     const providers = reg.ordered(model);
-    const all: OutlineSymbolInput[] = [];
-    for (const p of providers) {
-      try {
-        const res = await p.provideDocumentSymbols(model, { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) } as Monaco.CancellationToken);
-        if (Array.isArray(res)) all.push(...(res as unknown as OutlineSymbolInput[]));
-      } catch { /* provider falhou → ignora (VS Code: onUnexpectedExternalError) */ }
-    }
+    const all = await readDocumentSymbols(model, providers, { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) } as Monaco.CancellationToken);
     if (my !== seq || disposed) return;
     set(flattenSymbols(all), model.uri.toString());
   };

@@ -26,6 +26,7 @@ import type { EditorService } from '../../core/editor/editorService';
 import { uriBasename } from '../../core/uri';
 import { useEditorVersion } from './useEditorVersion';
 import { discardModel, modelEntries, modelSession, modelsChanged, onModelsChanged } from './modelResources';
+import { registerEditorShortcuts } from './editorShortcuts';
 
 export const ATTACH_MONACO_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
   fontSize: 14,
@@ -63,9 +64,10 @@ export interface CodeEditorPaneProps {
   sessionId: string;
   fs: Pick<FileSystemPortLike, 'readFile' | 'readFileBinary'> & Partial<Pick<FileSystemPortLike, 'watch'>>;
   /** Gancho para o barrel expor a instância (E2E/c5 save). */
-  onEditorReady?: (ed: Monaco.editor.IStandaloneCodeEditor, api: CodeEditorPaneApi) => void;
+  onEditorReady?: (ed: Monaco.editor.IStandaloneCodeEditor, api: CodeEditorPaneApi, groupId?: string) => void;
   /** c5: Ctrl+S dentro do Monaco → salvar a URI ativa. */
   onSaveRequest?: (uri: WorkspaceUri) => void;
+  onWorkbenchCommand?: (id: string) => void;
   /** c5: mensagem de falha de save da URI ativa (some na próxima edição). */
   saveError?: string | null;
 }
@@ -82,7 +84,9 @@ export interface CodeEditorPaneApi {
   has(uri: WorkspaceUri): boolean;
 }
 
-export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveRequest, saveError }: CodeEditorPaneProps) {
+export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveRequest, onWorkbenchCommand, saveError }: CodeEditorPaneProps) {
+  const commandRef = useRef(onWorkbenchCommand);
+  commandRef.current = onWorkbenchCommand;
   const saveRef = useRef(onSaveRequest);
   saveRef.current = onSaveRequest;
   useEditorVersion(editor, sessionId);
@@ -120,10 +124,12 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
       monacoRef.current = monaco;
       const ed = monaco.editor.create(hostRef.current, { ...ATTACH_MONACO_OPTIONS, theme: currentTheme(), model: null });
       edRef.current = ed;
+      const disposeShortcuts = registerEditorShortcuts(monaco, ed, id => commandRef.current?.(id));
+      const focus = ed.onDidFocusEditorText(() => editor.setFocusGroup({ sessionId: modelSession(sessionId), side: sessionId.endsWith('#2') ? 'secundario' : 'principal' }));
       highlight.current = ed.createDecorationsCollection();
       const clearHl = ed.onDidChangeCursorPosition(() => highlight.current?.clear());
       // Ctrl+S / Cmd+S (workbench.action.files.save)
-      ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => { if (currentUri.current) saveRef.current?.(currentUri.current); });
+      ed.addAction({ id: 'workbench.action.files.save', label: 'Salvar arquivo', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS], run: () => { if (currentUri.current) saveRef.current?.(currentUri.current); } });
       // tema segue o shell (classe theme-light no <html>)
       const mo = new MutationObserver(() => monaco.editor.setTheme(currentTheme()));
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -152,8 +158,10 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
           editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: false });
         },
         has: (uri) => !!entries.current.get(uri)?.model,
-      });
+      }, sessionId);
       cleanup = () => {
+        disposeShortcuts();
+        focus.dispose();
         clearHl.dispose();
         mo.disconnect();
         // O layout pode trocar o host React. O modelo/undo pertence ao módulo,

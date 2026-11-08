@@ -137,6 +137,22 @@ async function abrirArquivoNoModulo(mod: IExplorerSearchModule): Promise<void> {
 const faixa = () => within(document.querySelector('.editor-tabs') as HTMLElement)
 
 describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => {
+  it('Abrir ao lado usa o dono da aba mesmo quando o foco de texto está no outro grupo', async () => {
+    render(<App initialSessionSnapshot={testSessions} />)
+    const mod = await moduloMontado()
+    await abrirArquivoNoModulo(mod)
+    await waitFor(() => expect(screen.getByTestId('center-code-editor')).toBeTruthy(), { timeout: 10000 })
+    const sid = document.querySelector('.session-row.is-selected')!.getAttribute('data-session-id')!
+    await act(async () => {
+      await mod.attach.open({ sessionId: sid, uri: `${RAIZ}/b.ts` as WorkspaceUri, kind: 'code', pinned: true })
+      await mod.attach.open({ sessionId: sid, uri: `${RAIZ}/c.ts` as WorkspaceUri, kind: 'code', pinned: true })
+      mod.attach.split?.({ sessionId: sid })
+      mod.attach.setFocusSide?.({ sessionId: sid, side: 'secundario' })
+    })
+    fireEvent.contextMenu(faixa().getByRole('tab', { name: /a\.ts/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Abrir ao lado', exact: true }))
+    await waitFor(() => expect(mod.attach.sideOf?.({ sessionId: sid, uri: ARQ_A })).toBe('secundario'))
+  })
   it('fechar a última aba principal preserva a divisão que ainda tem arquivo', async () => {
     render(<App initialSessionSnapshot={testSessions} />)
     const mod = await moduloMontado()

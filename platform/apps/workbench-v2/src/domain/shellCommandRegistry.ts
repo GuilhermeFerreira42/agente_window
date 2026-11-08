@@ -13,9 +13,10 @@ export function createShellCommandRegistry(): CommandRegistryLike {
 
   return {
     register(command) {
-      commands.set(command.id, { title: command.title, run: command.run });
+      const entry = { title: command.title, run: command.run };
+      commands.set(command.id, entry);
       return () => {
-        commands.delete(command.id);
+        if (commands.get(command.id) === entry) commands.delete(command.id);
       };
     },
     async execute(commandId, ctx) {

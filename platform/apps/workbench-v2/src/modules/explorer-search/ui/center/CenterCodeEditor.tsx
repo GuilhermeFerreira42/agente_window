@@ -55,6 +55,7 @@ export interface CenterCodeEditorProps {
   fs: CodeEditorPaneProps['fs'];
   /** Gancho do barrel para registrar a instância do Monaco e a api do painel. */
   onEditorReady?: CodeEditorPaneProps['onEditorReady'];
+  onWorkbenchCommand?: CodeEditorPaneProps['onWorkbenchCommand'];
   /** Salva a URI (writeFile atomic) — rejeita em falha; dirty limpa só após resolver. */
   onSave?: (uri: WorkspaceUri) => Promise<void>;
   /** Recarrega do disco (conflito externo → "Recarregar"). */
@@ -85,7 +86,7 @@ export interface CenterCodeEditorProps {
 }
 
 export function CenterCodeEditor({
-  editor, sessionId, fs, onEditorReady, onSave, onReload, onCloseRequester, workspaceRoot, outline, splitCapabilities,
+  editor, sessionId, fs, onEditorReady, onWorkbenchCommand, onSave, onReload, onCloseRequester, workspaceRoot, outline, splitCapabilities,
 }: CenterCodeEditorProps) {
   useEditorVersion(editor, sessionId);
   // Diálogos e erro de save — mesma dupla do AttachArea (c5), menos o 'save' por
@@ -116,7 +117,7 @@ export function CenterCodeEditor({
       if (input.sessionId !== sessionId) return;
       // O serviço já decide se há dirty real: fechar limpo é imediato; só a
       // recusa por alteração pendente precisa da decisão Salvar/Descartar.
-      if (editor.close({ sessionId, uri: input.uri })) return;
+      if (editor.close({ sessionId: editor.groupIdOf(sessionId, input.uri) ?? sessionId, uri: input.uri })) return;
       setDialog({ kind: 'save', uri: input.uri });
     });
     return () => onCloseRequester(null);
@@ -241,6 +242,7 @@ export function CenterCodeEditor({
           fs={fs}
           onEditorReady={onEditorReady}
           onSaveRequest={(uri) => { void doSave(uri); }}
+          onWorkbenchCommand={onWorkbenchCommand}
           saveError={saveError && saveError.uri === activeTab?.uri ? saveError.message : null}
         />
         {/* Marca de estado honesto: nenhum diff e nenhum arquivo legivel na aba ativa. */}
@@ -266,6 +268,7 @@ export function CenterCodeEditor({
           onSave={async (uri) => { await doSave(uri); }}
           saveError={saveError}
           onCloseSplit={fecharDivisao}
+          onWorkbenchCommand={onWorkbenchCommand}
           onFocusSide={() => splitCapabilities?.setFocusSide('secundario')}
           workspaceRoot={workspaceRoot}
           outline={outline}

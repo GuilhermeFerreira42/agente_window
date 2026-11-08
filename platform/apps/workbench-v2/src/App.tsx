@@ -62,8 +62,9 @@ import { resolverAbaVisivel, type Aba } from './shell/abas'
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
 import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
 import { useStableEditorSurface } from './shell/stableEditorSurface'
+import { useWorkbenchShortcuts } from './shell/useWorkbenchShortcuts'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
-import { CenterChangesSlot, CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
+import { CenterChangesSlot, CenterCodeEditorSlot, EditorCommandsSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
 import { reorderSessions } from './domain/dragAndDrop'
 import { isChatCentered, isEditorContentVisible, isTabBarVisible, isTabCloseable, resolveSidePaneState } from './domain/sidePane'
@@ -1031,7 +1032,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     if (!jaDividido) {
       modulo.attach.split?.({ sessionId: activeSession.id })
     }
-    const lado = modulo.attach.focusSideOf?.({ sessionId: activeSession.id })
+    // O menu pertence à aba clicada. Ao fechar um menu, o foco de texto pode
+    // voltar ao outro Monaco; isso não muda o dono da URI que vamos mover.
+    const lado = modulo.attach.sideOf?.({ sessionId: activeSession.id, uri: projetada.uri as WorkspaceUri })
+      ?? modulo.attach.focusSideOf?.({ sessionId: activeSession.id })
     const destino = lado === 'secundario' ? 'principal' : 'secundario'
     const moveu = modulo.attach.moveTab({ sessionId: activeSession.id, uri: projetada.uri as WorkspaceUri, to: destino })
     // A única recusa que sobra é a do serviço: não deixar um painel sem abas.
@@ -2261,6 +2265,29 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     </div>
   )
 
+  const executeEditorCommand = (id: string) => {
+    void explorerMenusRef.current.execute(id, { sessionId: activeSession.id }).catch(error => notify(error instanceof Error ? error.message : String(error)))
+  }
+  useWorkbenchShortcuts({
+    p: () => executeEditorCommand('workbench.action.quickOpen'),
+    t: () => executeEditorCommand('workbench.action.showAllSymbols'),
+    o: () => executeEditorCommand('workbench.action.files.openFile'),
+    n: () => executeEditorCommand('workbench.action.files.newFile'),
+    s: () => executeEditorCommand('workbench.action.files.save'),
+    'shift+s': () => executeEditorCommand('workbench.action.files.saveAs'),
+    'shift+p': () => executeEditorCommand('workbench.action.showCommands'),
+    f1: () => executeEditorCommand('workbench.action.showCommands'),
+    w: () => { if (activeTabId) { if (dividirIdDoModulo(activeTabId)) executeEditorCommand('workbench.action.closeActiveEditor'); else closeEditorTab(activeTabId) } },
+    f4: () => { if (activeTabId) { if (dividirIdDoModulo(activeTabId)) executeEditorCommand('workbench.action.closeActiveEditor'); else closeEditorTab(activeTabId) } },
+    '\\': handleSplitEditor,
+    '1': () => executeEditorCommand('workbench.action.focusFirstEditorGroup'),
+    '2': () => executeEditorCommand('workbench.action.focusSecondEditorGroup'),
+    b: layout.toggleSideBar,
+    '`': () => setTerminalVisible(current => !current),
+    ',': openConfig,
+    'k s': () => executeEditorCommand('workbench.action.openGlobalKeybindings'),
+    f11: () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(error => notify(String(error))) },
+  }, explorerMenusRef.current)
   const editorSurface = useStableEditorSurface(
     <EditorArea
       activeSessionId={activeSession.id}
@@ -2370,6 +2397,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       />
       <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} />
       {editorSurface.portal}
+      {explorerModule && <EditorCommandsSlot module={explorerModule} />}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
         <SessionSidebar
           sessions={sessions}

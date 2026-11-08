@@ -39,6 +39,7 @@ export interface CenterSplitPaneProps {
   sessionId: string;
   fs: CodeEditorPaneProps['fs'];
   onEditorReady?: CodeEditorPaneProps['onEditorReady'];
+  onWorkbenchCommand?: CodeEditorPaneProps['onWorkbenchCommand'];
   /** Fechar aba dirty: o serviço bloqueia; o diálogo é o mesmo do centro (c5). */
   onCloseBlocked: (input: { sessionId: string; uri: WorkspaceUri }) => void;
   onSave?: (uri: WorkspaceUri) => Promise<void>;
@@ -57,7 +58,7 @@ export interface CenterSplitPaneProps {
 }
 
 export function CenterSplitPane({
-  editor, sessionId, fs, onEditorReady, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
+  editor, sessionId, fs, onEditorReady, onWorkbenchCommand, onCloseBlocked, onSave, saveError, onCloseSplit, onFocusSide, workspaceRoot, outline,
 }: CenterSplitPaneProps) {
   const grupoId = GRUPO_SECUNDARIO(sessionId);
   // O painel lê o grupo e reage a QUALQUER evento dele (a versão é por grupo).
@@ -134,6 +135,7 @@ export function CenterSplitPane({
           fs={fs}
           onEditorReady={onEditorReady}
           onSaveRequest={(uri) => { void onSave?.(uri); }}
+          onWorkbenchCommand={onWorkbenchCommand}
           saveError={saveError?.uri === activeUri ? saveError.message : null}
         />
       </div>

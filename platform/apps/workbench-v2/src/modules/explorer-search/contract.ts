@@ -282,6 +282,8 @@ export interface IExplorerSearchModule {
    *  silêncio ao editor que não salva. */
   mountCodeEditor?(root: HTMLElement, opts: { sessionId: string }): void;
   unmountCodeEditor?(): void;
+  /** Diálogos de comandos do módulo, disponíveis antes de abrir a primeira aba. */
+  mountEditorCommands?(root: HTMLElement): () => void;
   /** FATIA-05 5.3 (evolução ADITIVA, decisão A 2026-09-30): renderiza a Source Control
    *  View (ChangesPane real da 4.7-b) dentro do slot dado — o shell a coloca na view
    *  `scm` da Side Bar. Clique num recurso abre o diff no anexo. Só DOM dentro de `root`. */
