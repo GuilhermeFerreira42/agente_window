@@ -129,6 +129,7 @@ export function CenterCodeEditor({
       setSaveError(null);
       return true;
     } catch (err) {
+      editor.activate({ sessionId: editor.groupIdOf(sessionId, uri) ?? sessionId, uri });
       setSaveError({
         uri,
         message: ATTACH_STRINGS.saveFailed(uriBasename(uri), err instanceof Error ? err.message : String(err)),
@@ -262,7 +263,8 @@ export function CenterCodeEditor({
           fs={fs}
           onEditorReady={onEditorReady}
           onCloseBlocked={(input) => setDialog({ kind: 'save', uri: input.uri })}
-          onSave={onSave}
+          onSave={async (uri) => { await doSave(uri); }}
+          saveError={saveError}
           onCloseSplit={fecharDivisao}
           onFocusSide={() => splitCapabilities?.setFocusSide('secundario')}
           workspaceRoot={workspaceRoot}
@@ -289,8 +291,8 @@ export function CenterCodeEditor({
                 setDialog(null);
                 void doSave(u).then((ok) => {
                   if (!ok) return;
-                  if (alvo === 'divisao') splitCapabilities?.unsplit(true);
-                  else editor.close({ sessionId, uri: u, force: true });
+                  if (alvo === 'divisao') fecharDivisao();
+                  else editor.close({ sessionId: editor.groupIdOf(sessionId, u) ?? sessionId, uri: u });
                 });
               },
             },
@@ -300,8 +302,8 @@ export function CenterCodeEditor({
               onSelect: () => {
                 const { uri: u, alvo } = dialog;
                 setDialog(null);
-                if (alvo === 'divisao') splitCapabilities?.unsplit(true);
-                else editor.close({ sessionId, uri: u, force: true });
+                editor.close({ sessionId: editor.groupIdOf(sessionId, u) ?? sessionId, uri: u, force: true });
+                if (alvo === 'divisao') fecharDivisao();
               },
             },
             { id: 'cancel', label: ATTACH_STRINGS.cancel, onSelect: () => setDialog(null) },

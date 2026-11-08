@@ -158,10 +158,9 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     // A mensagem conserva o trecho que o FT-04 (frontier.test.ts:198) trava e
     // acrescenta a segunda superfície, que passou a existir nesta onda.
     if (content === null) throw new Error(`[explorer-search] attach.save: ${uri} não está aberto no anexo nem na aba central`);
-    lastSaved.set(uri, content);
     await deps.fs.writeFile({ uri, content, atomic: true });
-    painel?.markSaved(uri);
-    for (const sid of editorService.sessionsWith(uri)) editorService.markSaved({ sessionId: sid, uri });
+    lastSaved.set(uri, content);
+    painel?.markSaved(uri, content);
   };
   const attachReload = async (uri: WorkspaceUri): Promise<void> => {
     const read = await deps.fs.readFile({ uri });
@@ -222,6 +221,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   let centerRoot: Root | null = null;
   let centerContainer: HTMLElement | null = null;
   let centerSessionId: string | null = null;
+  let sessionContext: string | null = null;
   let centerPaneApi: CodeEditorPaneApi | null = null;
   /** Monaco do centro — para soltar a posse do Outline no unmount (D152 §3). */
   let centerMonaco: import('monaco-editor').editor.IStandaloneCodeEditor | null = null;
@@ -294,7 +294,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // coluna for desligada, sobra a sessão do centro e o comportamento é o mesmo de antes.
   // Sem isto, desligar a coluna deixaria TODA abertura de arquivo pendente para sempre,
   // porque `openInAttachSession` nunca acharia sessão montada.
-  const sessionIdDaSuperficie = (): string | null => attachSessionId ?? centerSessionId;
+  const sessionIdDaSuperficie = (): string | null => sessionContext ?? attachSessionId ?? centerSessionId;
   /**
    * DEF-D169-5 — o aviso "o arquivo ativo é este" passou a ser um lugar só.
    *
@@ -365,10 +365,23 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // passa em mountAttach. Antes da montagem, a abertura fica pendente e é
   // executada assim que o anexo montar (zero aba fantasma / sumiço pós-F5).
   let pendingAttachOpen: ((sessionId: string) => void) | null = null;
+  attachApi.setSessionContext = ({ sessionId }) => {
+    sessionContext = sessionId;
+    if (pendingAttachOpen) {
+      const open = pendingAttachOpen;
+      pendingAttachOpen = null;
+      open(sessionId);
+    }
+  };
   const openInAttachSession = (fn: (sessionId: string) => void): void => {
+    const navigate = (sessionId: string) => {
+      fn(sessionId);
+      const active = editorService.getActive(sessionId);
+      if (active) events.fire({ type: 'editor.navigationRequested', sessionId, uri: active.uri });
+    };
     const sid = sessionIdDaSuperficie();
-    if (sid) fn(sid);
-    else pendingAttachOpen = fn;
+    if (sid) navigate(sid);
+    else pendingAttachOpen = navigate;
   };
   const onOpenMatch = (m: SearchMatch) => {
     openInAttachSession((sessionId) => editorService.open({ sessionId, uri: m.uri, kind: 'code', line: m.line, column: m.column }));

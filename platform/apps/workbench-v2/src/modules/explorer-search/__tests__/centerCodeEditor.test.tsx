@@ -20,7 +20,7 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
-import { EditorService } from '../core/editor/editorService';
+import { EditorService, GRUPO_SECUNDARIO } from '../core/editor/editorService';
 import { asWorkspaceUri } from '../core/uri';
 import { ATTACH_STRINGS } from '../ui/attach/attachStrings';
 import { CenterCodeEditor, type CenterCloseRequester } from '../ui/center/CenterCodeEditor';
@@ -70,7 +70,7 @@ function montar(opts: { onSave?: (uri: WorkspaceUri) => Promise<void>; comOnSave
   // pinned: uma aba em preview é SUBSTITUÍDA pela próxima abertura (editorService
   // fecha a anterior), o que falsearia os testes que abrem uma segunda uri.
   editor.open({ sessionId: sessao, uri: URI, kind: 'code', pinned: true });
-  const onSave = opts.onSave ?? vi.fn(async () => {});
+  const onSave = opts.onSave ?? vi.fn(async (uri: WorkspaceUri) => { editor.markSaved({ sessionId: sessao, uri }); });
   const onReload = vi.fn(async () => {});
   const pedidos: Array<CenterCloseRequester | null> = [];
   const utils = render(
@@ -243,6 +243,33 @@ describe('CenterCodeEditor — o corpo da aba central (Onda 2b)', () => {
     expect(editor.getTabs(SESSAO)).toEqual([]);
     expect(dialogo('center-save-dialog')).toBeNull();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('fechar split com dois arquivos sujos pede decisão para cada um e Cancelar preserva o restante', async () => {
+    const editor = new EditorService();
+    const group = GRUPO_SECUNDARIO(SESSAO);
+    const other = asWorkspaceUri('/ws/segundo.ts');
+    editor.open({ sessionId: SESSAO, uri: asWorkspaceUri('/ws/principal.ts'), kind: 'code', pinned: true });
+    editor.split(SESSAO);
+    for (const uri of [URI, other]) {
+      editor.open({ sessionId: group, uri, kind: 'code', pinned: true });
+      editor.setDirty({ sessionId: group, uri, dirty: true });
+    }
+    const onSave = vi.fn(async (uri: WorkspaceUri) => { editor.markSaved({ sessionId: group, uri }); });
+    render(<CenterCodeEditor editor={editor} sessionId={SESSAO} fs={fsFalso} onSave={onSave}
+      splitCapabilities={{ isSplit: () => editor.isSplit(SESSAO),
+        unsplit: (force) => editor.unsplit({ sessionId: SESSAO, force }),
+        setFocusSide: () => {}, focusSideOf: () => 'secundario' }} />);
+    fireEvent.click(document.querySelector('[aria-label="Fechar editor dividido"]')!);
+    fireEvent.click(botao('center-save-dialog', 'save'));
+    await assentar();
+    expect(editor.isSplit(SESSAO)).toBe(true);
+    expect(dialogo('center-save-dialog')?.textContent).toContain('segundo.ts');
+    fireEvent.click(botao('center-save-dialog', 'cancel'));
+    expect(editor.getTabs(group)).toHaveLength(2);
+    expect(editor.getTabs(group).find((t) => t.uri === other)?.dirty).toBe(true);
+    expect(onSave).toHaveBeenCalledWith(URI);
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
   it('Não Salvar descarta: a aba sai do modelo mesmo estando suja', async () => {

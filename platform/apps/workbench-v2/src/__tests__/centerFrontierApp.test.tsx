@@ -20,7 +20,7 @@
 // Custo conhecido: renderizar o App inteiro leva dezenas de segundos. Vale porque
 // a RF15-1 só pode ser declarada acessível na interface com prova de integração.
 // ============================================================================
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
@@ -137,6 +137,22 @@ async function abrirArquivoNoModulo(mod: IExplorerSearchModule): Promise<void> {
 const faixa = () => within(document.querySelector('.editor-tabs') as HTMLElement)
 
 describe('Fatia 15 Onda 2c-i — o App atravessa a fronteira (D148 §3)', () => {
+  it('fechar a última aba principal preserva a divisão que ainda tem arquivo', async () => {
+    render(<App initialSessionSnapshot={testSessions} />)
+    const mod = await moduloMontado()
+    await abrirArquivoNoModulo(mod)
+    await waitFor(() => expect(screen.getByTestId('center-code-editor')).toBeTruthy(), { timeout: 10000 })
+    const sid = document.querySelector('.session-row.is-selected')?.getAttribute('data-session-id')
+    expect(sid).toBeTruthy()
+    await act(async () => {
+      mod.attach.split?.({ sessionId: sid! })
+      mod.attach.setFocusSide?.({ sessionId: sid!, side: 'secundario' })
+      await mod.attach.open({ sessionId: sid!, uri: `${RAIZ}/b.ts` as WorkspaceUri, kind: 'code', pinned: true })
+      await mod.attach.close({ sessionId: sid!, uri: ARQ_A })
+    })
+    await waitFor(() => expect(screen.getByTestId('center-split-pane')).toBeTruthy())
+    expect(screen.getByRole('tab', { name: /b\.ts/ })).toBeTruthy()
+  })
   it('1. as abas abertas no módulo aparecem na faixa CENTRAL, e o corpo capaz é montado', async () => {
     render(<App />)
     const mod = await moduloMontado()

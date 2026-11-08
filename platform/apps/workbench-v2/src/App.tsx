@@ -61,6 +61,7 @@ import { resolverAbaVisivel, type Aba } from './shell/abas'
 // central. É do bairro 1 (shell) — por aqui o App não desce abaixo do barrel.
 import { dividirIdDoModulo, fundirAbas, projetarAbasDoModulo } from './shell/ponteAnexo'
 import { useFaixaDeAbasNativas } from './shell/useFaixaDeAbasNativas'
+import { useStableEditorSurface } from './shell/stableEditorSurface'
 // FATIA 15 Onda 3 (D160): a fronteira shell↔módulo e a memória de abas saíram do App.
 import { CenterChangesSlot, CenterCodeEditorSlot, ExplorerModuleSlot, ScmModuleSlot, SearchModuleSlot } from './shell/moduleSlots'
 import { ACTIVE_SESSION_KEY, restoreAttachTabs, snapshotAttachTabs } from './shell/persistenciaDeAbas'
@@ -191,6 +192,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [scmBadge, setScmBadge] = useState(0)
   const explorerFsRef = useRef<BrowserFsPort | null>(null)
   const handleExplorerFileOpenedRef = useRef<(uri: WorkspaceUri) => void>()
+  const handleModuleNavigationRef = useRef<(sessionId: string, uri: WorkspaceUri) => void>()
   const explorerMenusRef = useRef(createShellCommandRegistry())
 
   // FATIA-06.1: SQLite mantém o catálogo e um JSONL por sessão mantém o
@@ -264,13 +266,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         module.onEvent((e) => {
           if (e.type === 'error') console.warn('[explorer-search]', e.code, e.message)
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
+          if (e.type === 'editor.navigationRequested') handleModuleNavigationRef.current?.(e.sessionId, e.uri)
           if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed') snapshotAttachTabs(module, e.sessionId)
           // Onda 2c-i: as abas do módulo passaram a aparecer também na faixa CENTRAL,
           // então os eventos que mudam abas precisam invalidar a projeção. `dirtyChanged`
           // entra aqui e não no snapshot do anexo porque a faixa mostra o ponto de dirty.
           if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' ||
-              e.type === 'editor.activeChanged' || e.type === 'editor.dirtyChanged') setModuloAbasVersao((v) => v + 1)
+              e.type === 'editor.activeChanged' || e.type === 'editor.dirtyChanged' || e.type === 'editor.splitChanged') setModuloAbasVersao((v) => v + 1)
           // FATIA 15 Onda 3 (D164): `editor.attachExpanded/attachCollapsed` não alimentam mais
           // estado do shell. Esse estado existia para dizer "o anexo da coluna tem abas", e a
           // coluna saiu na 2c-ii. Lista que só cresce e encolhe sem ninguém ler é memória gasta
@@ -483,7 +486,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const {
     editorTabs, activeTabId, setActiveTabId, browserViews,
     activeGlobalTabId,
-    activateEditorTab, preferredEditorTabForSession,
+    activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
     reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
@@ -515,6 +518,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     ? (sessions.find((session) => session.id === activeSessionId) ?? sessions[0])
     : draftSession
   const activeChatId = resolveActiveChatId(activeSession, activeChatBySession)
+  // Só contexto de navegação: Search/SCM podem abrir a primeira aba antes do
+  // corpo Monaco existir. O módulo continua dono da abertura e dos grupos.
+  useEffect(() => {
+    explorerModule?.attach.setSessionContext?.({ sessionId: activeSession.id })
+  }, [explorerModule, activeSession.id])
   // (R-063) Rótulo estável "session-N" por sessão: o terminal segue a sessão
   // ativa e o número é atribuído por ordem de primeira aparição (não muda ao
   // reordenar a lista). Espelha o cenário e2e 05-full-workflow.
@@ -550,7 +558,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // o MESMO: é ele que guarda os modelos do Monaco, e desmontá-lo ao trocar de tipo
   // perderia o estado que RF15-2 manda preservar. Por isso o slot monta quando QUALQUER
   // um dos dois existir, não só `file`.
-  const haAbasDoCorpoCentral = abasProjetadasDoModulo.some((tab) => tab.type === 'file' || tab.type === 'diff-arquivo')
+  const moduloTemDivisao = !!explorerModule?.attach.isSplit?.({ sessionId: activeSession.id })
+  const haAbasDoCorpoCentral = moduloTemDivisao || abasProjetadasDoModulo.some((tab) => tab.type === 'file' || tab.type === 'diff-arquivo')
   const moduloMontaCentro = !!explorerModule && typeof explorerModule.mountCodeEditor === 'function'
   const codeEditorSlot = haAbasDoCorpoCentral && moduloMontaCentro && explorerModule
     ? <CenterCodeEditorSlot module={explorerModule} sessionId={activeSession.id} />
@@ -580,7 +589,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // centraliza (landing). Forçamos os inputs do side pane para o estado "closed" —
   // exceto quando há aba global aberta (DEBT-09): aí o editor abre ao lado da landing.
   const sidePaneInputs = hasSessions && !landingVisible
-    ? { hasEditorTabs: visibleEditorTabs.length > 0, editorHidden, auxVisible: auxiliaryVisible }
+    ? { hasEditorTabs: visibleEditorTabs.length > 0 || moduloTemDivisao, editorHidden, auxVisible: auxiliaryVisible }
     : globalEditorTabs.length > 0
       ? { hasEditorTabs: true, editorHidden, auxVisible: false }
       : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
@@ -1051,6 +1060,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setExplorerContextMenu(null)
     revealEditor() // pós-11: clique no Explorer REEXIBE o editor (era o "não abre")
     void explorerModule?.attach.open({ uri, kind: 'code', sessionId: activeSession.id, pinned: true })
+    const active = explorerModule?.attach.getTabs({ sessionId: activeSession.id }).find((tab) => tab.active)
+    if (active) acceptModuleNavigation(activeSession.id, active.uri)
+  }
+  handleModuleNavigationRef.current = (sessionId, uri) => {
+    if (acceptModuleNavigation(sessionId, uri)) revealEditor()
   }
 
   const openBrowser = () => createBrowser(activeSession.id)
@@ -2247,7 +2261,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     </div>
   )
 
-  const renderEditor = () => (
+  const editorSurface = useStableEditorSurface(
     <EditorArea
       activeSessionId={activeSession.id}
       tabs={editorTabs}
@@ -2265,8 +2279,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onNewDiff={() => openDiff(activeSession.id)}
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
-      providersSurface={<ProvidersView />}
-      configSurface={<ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} />}
+      providersSurface={hasNativeSurface('providers') ? <ProvidersView /> : undefined}
+      configSurface={hasNativeSurface('config') ? <ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} /> : undefined}
       frontierTabs={abasProjetadasDoModulo}
       codeEditorSlot={codeEditorSlot}
       changesSlot={changesSlot}
@@ -2297,6 +2311,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       theme={theme}
     />
   )
+
+  const renderEditor = () => editorSurface.slot
 
   const touchStartRef = useRef<{ x: number, y: number } | null>(null)
 
@@ -2353,6 +2369,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
       <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} />
+      {editorSurface.portal}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
         <SessionSidebar
           sessions={sessions}

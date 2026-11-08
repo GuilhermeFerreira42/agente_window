@@ -63,6 +63,12 @@ const abaComConteudo = (id: string, content: string): EditorTab => ({
 
 const corpoFalso: ReactNode = <div data-testid="corpo-capaz-falso">corpo capaz</div>
 
+it('mantém o slot do grupo secundário visível quando não há aba principal', () => {
+  render(<EditorArea {...propsBase({ codeEditorSlot: corpoFalso })} />)
+  expect(screen.getByTestId('corpo-capaz-falso')).toBeVisible()
+  expect(screen.queryByTestId('editor-empty-state')).toBeNull()
+})
+
 function propsBase(sobre: Partial<Props> = {}): Props {
   return {
     activeSessionId: SESSAO,

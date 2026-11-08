@@ -18,7 +18,7 @@ import { colecaoParaEscopo, fecharAba, registrarUso, resolverAbaVisivel } from '
 import { reorderEditorTabs } from '../domain/dragAndDrop'
 import { enterDetailOnly, showEditorRestore, EMPTY_DOCKED_STATE, type DockedControllerState } from '../domain/dockedAuxiliaryController'
 import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba, type PedidoDeAba } from './identidadeDaAba'
-import { dividirIdDoModulo } from './ponteAnexo'
+import { dividirIdDoModulo, idDaAbaDoModulo } from './ponteAnexo'
 import { lerSnapshotNativas, salvarSnapshotNativas } from './persistenciaNativas'
 
 export function useFaixaDeAbasNativas(
@@ -70,6 +70,18 @@ export function useFaixaDeAbasNativas(
     if (tab.sessionId) activeTabBySession.current[tab.sessionId] = tab.id
     else activeGlobalTabId.current = tab.id
   }, [onActivateModuleTab, onShowEditor])
+
+  // A URI já foi ativada pelo módulo. Adota a intenção na faixa sem chamar
+  // activateTab de volta e sem confundir restauração com navegação do usuário.
+  const acceptModuleNavigation = useCallback((sessionId: string, uri: string): boolean => {
+    if (sessionId !== currentSessionId) return false
+    const id = idDaAbaDoModulo(sessionId, uri)
+    setActiveTabId(id)
+    activeTabBySession.current[sessionId] = id
+    mruRef.current = registrarUso(mruRef.current, id)
+    onShowEditor()
+    return true
+  }, [currentSessionId, onShowEditor])
 
   const preferredEditorTabForSession = useCallback((allTabs: readonly EditorTab[], sessionId: string, requestedId?: string): EditorTab | undefined => {
     const visibleTabs = getEditorTabsVisibleForSession(allTabs, sessionId)
@@ -184,11 +196,13 @@ export function useFaixaDeAbasNativas(
   const reloadBrowser = (id: string) => setBrowserViews((current) => current.map((view) => view.id === id ? reloadBrowserState(view) : view))
   const setBrowserStatus = (id: string, status: BrowserViewState['status']) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserStatusState(view, status) : view))
   const setBrowserViewport = (id: string, viewport: BrowserViewport) => setBrowserViews((current) => current.map((view) => view.id === id ? setBrowserViewportState(view, viewport) : view))
+  const hasNativeSurface = (type: EditorTab['type']) => editorTabs.some(tab => tab.type === type)
+    || dockedController.current.captured.some(entry => entry.tab.type === type)
 
   return {
     editorTabs, activeTabId, setActiveTabId, browserViews,
     activeTabBySession, activeGlobalTabId,
-    activateEditorTab, preferredEditorTabForSession, openEditorTab, createBrowser,
+    activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession, openEditorTab, createBrowser,
     closeNativeTab, removeSessionResources, reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   }

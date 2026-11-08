@@ -686,7 +686,9 @@ describe('App session flows', () => {
     await closeTab('Browser')
     expect(editorTabs()).toHaveLength(0)
     expect(screen.queryByRole('textbox', { name: 'Endereço' })).not.toBeInTheDocument()
-  })
+    // Windows/jsdom: instrumentado até os últimos fechamentos antes de 20 s.
+    // Este caso percorre dezenas de interações; mantém todas as expectativas.
+  }, 60_000)
 
   it('seleciona a próxima aba correta ao fechar e expõe o tabpanel ativo', async () => {
     const user = userEvent.setup()

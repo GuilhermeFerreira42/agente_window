@@ -73,7 +73,7 @@ export interface CodeEditorPaneApi {
   /** Conteúdo atual do modelo da URI (c5: save). */
   getContent(uri: WorkspaceUri): string | null;
   /** Marca a versão atual como salva (c5: após writeFile) → dirty false. */
-  markSaved(uri: WorkspaceUri): void;
+  markSaved(uri: WorkspaceUri, savedContent?: string): void;
   /** Descarta o modelo (c5: fechar sem salvar / conflito externo). */
   discard(uri: WorkspaceUri): void;
   /** c5: substitui o conteúdo pelo do disco (edição única → undo preserva), zera dirty, mantém cursor/scroll. */
@@ -129,9 +129,15 @@ export function CodeEditorPane({ editor, sessionId, fs, onEditorReady, onSaveReq
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
       onEditorReady?.(ed, {
         getContent: (uri) => entries.current.get(uri)?.model?.getValue() ?? null,
-        markSaved: (uri) => {
+        markSaved: (uri, savedContent) => {
           const e = entries.current.get(uri);
           if (!e?.model) return;
+          // Uma escrita assíncrona só salva o snapshot enviado. Digitação nova
+          // durante a escrita continua pendente e não pode ser fechada à força.
+          if (savedContent !== undefined && e.model.getValue() !== savedContent) {
+            editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: true });
+            return;
+          }
           e.savedVersionId = e.model.getAlternativeVersionId();
           editor.setDirty({ sessionId: ownerGroup(uri), uri, dirty: false });
         },

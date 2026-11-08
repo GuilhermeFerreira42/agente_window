@@ -38,6 +38,8 @@ export type ExplorerSearchEvent =
   | { type: 'editor.tabClosed'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.tabPinned'; sessionId: string; uri: WorkspaceUri }
   | { type: 'editor.activeChanged'; sessionId: string; uri: WorkspaceUri | null }
+  /** Intenção explícita de navegação (Search/SCM); restauração não rouba foco. */
+  | { type: 'editor.navigationRequested'; sessionId: string; uri: WorkspaceUri }
   /** FATIA 15 Onda 3 (D169): abriu/fechou a divisão (grupo secundário). O `sessionId`
    *  aqui é o do grupo PRINCIPAL, sempre — o painel secundário escuta este evento
    *  para saber que deve aparecer/sumir. */
@@ -139,6 +141,8 @@ export interface AttachTab {
   preview?: boolean; active?: boolean;
 }
 export interface IEditorAttachApi {
+  /** Contexto de navegação antes de existir corpo Monaco (Search/SCM → primeira aba). */
+  setSessionContext?(input: { sessionId: string }): void;
   /** Abre (ou foca) um recurso no anexo. `line` para reveal (search → resultado). */
   /** 4.7-b c2 (aditivo): `kind: 'changes'` = aba fixa da Source Control View (uri sintética). */
   /** 4.7-c (aditivo): `kind: 'diff'` = aba fixa Diff (uri sintética) com `diff` obrigatório. */

@@ -50,7 +50,7 @@ interface EditorAreaProps {
   searchFocusRequest: number
   /** FATIA-04 4.6 (opção A): Search Panel REAL do módulo explorer-search.
    *  Presente → renderizado no lugar do SearchView mock; ausente → mock preservado. */
-  searchSlot?: import('react').ReactNode
+  searchSlot?: ReactNode
   diffFiles: DiffFile[]
   selectedDiffFileId?: string
   onSelectTab: (id: string) => void
@@ -513,7 +513,7 @@ export function EditorArea({
   // a aba ativa do módulo (search/changes) é do shell, não do módulo.
   const tipoDoCorpoCentral = activeTab?.type === 'file' || activeTab?.type === 'diff-arquivo'
   const corpoCentralEmUso = abaAtivaEhDoModulo && tipoDoCorpoCentral && (!!codeEditorSlot || !!codeEditorUnavailable)
-  const corpoCentralVisivel = editorContentVisible && abaAtivaEhDoModulo && tipoDoCorpoCentral
+  const corpoCentralVisivel = editorContentVisible && ((abaAtivaEhDoModulo && tipoDoCorpoCentral) || (!activeTab && !!codeEditorSlot))
   const activeBrowser = activeTab?.browserId ? browserViews.find((view) => view.id === activeTab.browserId && view.sessionId === activeSessionId) : undefined
   const [addTabMenuOpen, setAddTabMenuOpen] = useState(false)
   const [tabMenu, setTabMenu] = useState<ContextMenuState | null>(null)
@@ -684,8 +684,8 @@ export function EditorArea({
         </div>
       </div>
       <div className="editor-body" id={panelId} role="tabpanel" tabIndex={0} aria-labelledby={activeTabDomId} aria-label={!activeTab ? 'Nenhum editor ativo' : undefined}>
-        {!editorContentVisible && hasActiveSurface && <div className="editor-hidden-content" data-testid="editor-hidden-content"><EyeOff size={26} /><strong>Editor oculto</strong><span>A barra de abas permanece visível. Use "Mostrar editor" para reexibir o conteúdo.</span><button className="secondary-button" type="button" onClick={onToggleEditorHidden}><Eye size={13} />Mostrar editor</button></div>}
-        {editorContentVisible && !hasActiveSurface && <div className="editor-empty" data-testid="editor-empty-state"><Code2 size={30} /><strong>Nenhum editor ativo</strong><span>Browser, Search e Branch Changes abrem aqui — não na barra auxiliar.</span><button className="secondary-button" type="button" onClick={onNewBrowser}><Globe2 size={13} />Abrir Browser</button></div>}
+        {!editorContentVisible && (hasActiveSurface || !!codeEditorSlot) && <div className="editor-hidden-content" data-testid="editor-hidden-content"><EyeOff size={26} /><strong>Editor oculto</strong><span>A barra de abas permanece visível. Use "Mostrar editor" para reexibir o conteúdo.</span><button className="secondary-button" type="button" onClick={onToggleEditorHidden}><Eye size={13} />Mostrar editor</button></div>}
+        {editorContentVisible && !hasActiveSurface && !codeEditorSlot && <div className="editor-empty" data-testid="editor-empty-state"><Code2 size={30} /><strong>Nenhum editor ativo</strong><span>Browser, Search e Branch Changes abrem aqui — não na barra auxiliar.</span><button className="secondary-button" type="button" onClick={onNewBrowser}><Globe2 size={13} />Abrir Browser</button></div>}
         {editorContentVisible && activeTab?.type === 'browser' && activeBrowser && <BrowserPreview view={activeBrowser} monacoTheme={monacoTheme} onNavigate={(url) => onNavigateBrowser(activeBrowser.id, url)} onBack={() => onBrowserBack(activeBrowser.id)} onForward={() => onBrowserForward(activeBrowser.id)} onReload={() => onReloadBrowser(activeBrowser.id)} onStatus={(status) => onBrowserStatus(activeBrowser.id, status)} onChangeViewport={(viewport) => onChangeViewport(activeBrowser.id, viewport)} />}
         {editorContentVisible && activeTab?.type === 'search' && searchSlot}
         {editorContentVisible && activeTab?.type === 'search' && !searchSlot && <SearchView query={searchQuery} results={searchResults} searchFocusRequest={searchFocusRequest} onChangeQuery={onChangeSearchQuery} onOpenResult={onOpenSearchResult} />}
@@ -705,8 +705,8 @@ export function EditorArea({
         {/* Sem slot: código morto congelado */}
         {editorContentVisible && activeTab?.type === 'diff' && !changesSlot && <DiffView files={diffFiles} selectedFileId={selectedDiffFileId} onSelectFile={onSelectDiffFile} onAccept={onAcceptDiff} onRevert={onRevertDiff} onAcceptAll={onAcceptAllDiff} onRevertAll={onRevertAllDiff} onToggleViewed={onToggleViewed} onCommit={onCommit} onCreatePr={onCreatePr} monacoTheme={monacoTheme} />}
         {editorContentVisible && activeTab?.type === 'customizations' && customizationsSurface}
-        {editorContentVisible && activeTab?.type === 'providers' && providersSurface}
-        {editorContentVisible && activeTab?.type === 'config' && configSurface}
+        {providersSurface && <div key="providers" data-testid="center-providers-host" style={{ display: editorContentVisible && activeTab?.type === 'providers' ? 'contents' : 'none' }}>{providersSurface}</div>}
+        {configSurface && <div key="config" data-testid="center-config-host" style={{ display: editorContentVisible && activeTab?.type === 'config' ? 'contents' : 'none' }}>{configSurface}</div>}
         {/* FATIA 15 Onda 2c-i (D148 §2): o corpo capaz de salvar. Fica MONTADO
             enquanto o slot existir e é apenas OCULTADO quando a aba ativa é outra —
             display:none, nunca desmontar: é o padrão da casa (attach.setVisible,
