@@ -1,3 +1,9 @@
+# Interação com commits no Graph — D185 (09/11/2026)
+
+Base `45c4271`. Clicar num commit ou pressionar Enter expande a lista de arquivos. Clicar num arquivo abre o diff histórico no Monaco. O merge usa o primeiro pai como referência, e o commit inicial usa uma versão original vazia. Aceite humano pendente.
+
+---
+
 # Revisão corretiva da barra lateral direita — D185 (09/11/2026)
 
 Base local `3a18790`. A lateral direita segue o workbench padrão do VS Code 1.135.0. O Explorer corrige guias, cabeçalhos, ações e seleção imediata de pasta. Search abre com filtros recolhidos por padrão. Source Control tem Changes, menu de contexto, operações do repositório e Graph dos commits recentes. As divisórias têm área de captura de 8 px, e a do chat/Monaco redistribui as colunas em 50/50 ao receber duplo clique.

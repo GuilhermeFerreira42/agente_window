@@ -4,7 +4,7 @@ Use **Sidebar fixture session** em um perfil de validação.
 
 1. Expanda uma pasta no Explorer. Confira a distância entre guia, ícone e nome. Abra o menu de três pontos do cabeçalho e alterne Open Editors. Em uma pasta descartável, experimente copiar e colar logo após selecionar o destino.
 2. Abra Search e confira se o menu de filtros começa fechado. Abra e feche os detalhes. Aplique um filtro e abra um resultado no editor.
-3. Abra Source Control em um repositório descartável. Confira Changes, Staged Changes, o menu de contexto e o Graph com um merge. Abra um diff e volte para a aba do arquivo.
+3. Abra Source Control em um repositório descartável. Confira Changes, Staged Changes e o menu de contexto. No Graph, clique em um commit para ver seus arquivos. Clique em um arquivo para abrir o diff histórico e volte para a aba anterior.
 4. Arraste a lateral direita e restaure com duplo clique. Com um arquivo aberto, repita na divisória entre o chat e o Monaco e confira a divisão 50/50. Faça também com o Split Editor aberto.
 5. Abra e feche Personalizações pela lateral esquerda. Confirme que as abas e o conteúdo aberto continuam disponíveis.
 

@@ -141,7 +141,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // 4.7-b c2 — Git: raiz = raiz do workspace (decisão do usuário); o primeiro status
   // acontece quando o ChangesPane monta (setRoot). 5.3: o pane vive na view `scm` da
   // Side Bar (montada 1× pelo shell), então o status — e o badge — nascem no boot.
-  const gitService = new GitService(new BrowserGitPort(), {
+  const gitPort = new BrowserGitPort();
+  const gitService = new GitService(gitPort, {
     canChangeWorktree: uris => uris ? !uris.some(uri => editorService.hasDirtyUri(uri)) : !editorService.hasAnyDirty(),
   });
   const offGitEvents = gitService.onEvent((e) => events.fire(e));
@@ -441,6 +442,17 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const scmElement = () => createElement('div', { className: 'explorer-viewlet scm-viewlet', 'data-testid': 'scm-viewlet' },
     createElement(ChangesPane, {
       git: gitService, root: deps.workspaceRoot, repositoryControls: true, contextMenu: deps.contextMenu,
+      loadCommit: oid => gitPort.commitChanges(deps.workspaceRoot, oid),
+      openCommitFile: async (oid, parent, file) => {
+        const session = sessionIdDaSuperficie();
+        const [original, modified] = await Promise.all([
+          parent && file.status !== 'A' ? timelinePort.showAt(deps.workspaceRoot, file.previousUri, parent) : '',
+          file.status !== 'D' ? timelinePort.showAt(deps.workspaceRoot, file.uri, oid) : '',
+        ]);
+        if (session !== sessionIdDaSuperficie()) return;
+        const title = `${uriBasename(file.uri)} (${oid.slice(0, 7)})`;
+        openInAttachSession(sessionId => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: file.uri, title, original, modified } }));
+      },
       onOpenFile: (uri: WorkspaceUri) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri, kind: 'code' })),
       onOpenDiff: (item, sides) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })),
     }));

@@ -1,3 +1,9 @@
+# Evidência D185 — interação com commits do Graph (09/11/2026)
+
+O Playwright expandiu um merge com clique e um commit inicial com Enter, abriu os arquivos alterados no Monaco, confirmou o conteúdo histórico e recolheu o commit. Repositório descartável na 5198. Prova em `revisao-lateral/graph-clique.log`.
+
+---
+
 # Evidência D185 — revisão corretiva da barra lateral direita (09/11/2026)
 
 Operacional externo em `revisao-lateral`. Capturas do workbench padrão do VS Code 1.135.0 (08d4889f9ec4a1685d257b9b95de036c8e1ce1e5) e do candidato em viewport de 1440 × 900, lateral de 289 px e tema escuro. `comparacao.html` reúne as capturas e os logs. Perfil do navegador e repositórios de teste descartáveis na 5198.

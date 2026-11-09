@@ -227,7 +227,24 @@
 .scm-history-body { min-height: 0; overflow: auto; }
 .scm-history-body p { margin: 8px 12px; white-space: normal; }
 .scm-history-body ol { margin: 0; padding: 0 10px; list-style: none; }
-.scm-history-body li { display: flex; align-items: center; gap: 6px; height: 22px; }
+.scm-graph-row, .scm-commit-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.scm-graph-row:is(:hover, [aria-expanded="true"]), .scm-commit-file:hover { background: var(--vscode-list-hoverBackground); }
+.scm-commit-files { padding-inline-start: 18px; }
+.scm-commit-file { justify-content: space-between; padding-inline-end: 4px; }
+.scm-commit-file span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scm-history-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scm-history-author {
   max-width: 30%;

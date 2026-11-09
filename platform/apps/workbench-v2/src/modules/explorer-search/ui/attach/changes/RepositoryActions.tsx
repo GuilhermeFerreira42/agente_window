@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GitRepositoryAction, GitRepositoryDetails, GitService } from '../../../core/git/gitService';
 import { AttachDialog } from '../AttachDialog';
-import { RepositoryGraph } from './RepositoryGraph';
+import { RepositoryGraph, type CommitGraphActions } from './RepositoryGraph';
 
-export function RepositoryActions({ git, branch, onCommit, commitBusy, commitRevision, children }: {
+export function RepositoryActions({ git, branch, loadCommit, openCommitFile, onCommit, commitBusy, commitRevision, children }: {
   git: GitService; branch: string | null; onCommit: () => void; commitBusy: boolean; commitRevision: number; children: ReactNode;
-}) {
+} & Partial<CommitGraphActions>) {
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const historyRef = useRef<HTMLElement>(null);
@@ -139,7 +139,7 @@ export function RepositoryActions({ git, branch, onCommit, commitBusy, commitRev
         </div>
         {historyOpen && <div className="scm-history-body">
           {error && <p role="alert">{error}</p>}
-          {details && (details.history.length ? <RepositoryGraph history={details.history} branch={branch} /> : <p>No commits yet.</p>)}
+          {details && (details.history.length ? <RepositoryGraph history={details.history} branch={branch} loadCommit={loadCommit} openCommitFile={openCommitFile} /> : <p>No commits yet.</p>)}
         </div>}
       </section>
       {confirm && <AttachDialog

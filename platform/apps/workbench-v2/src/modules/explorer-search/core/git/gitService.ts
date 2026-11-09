@@ -46,6 +46,11 @@ export interface GitRepositoryDetails {
   merging: boolean;
 }
 
+export interface GitCommitChanges {
+  parent: string | null;
+  files: Array<{ path: string; uri: WorkspaceUri; previousUri: WorkspaceUri; status: string }>;
+}
+
 export interface GitPortLike {
   repositoryDetails?(root: WorkspaceUri): Promise<GitRepositoryDetails>;
   repositoryAction?(root: WorkspaceUri, action: GitRepositoryAction, target?: string, expectedBranch?: string): Promise<void>;

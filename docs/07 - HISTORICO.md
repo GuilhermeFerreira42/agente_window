@@ -1,3 +1,9 @@
+# 09/11/2026 — D185, clique nos commits do Graph
+
+Os commits do Graph abrem a lista de arquivos alterados e reutilizam o Monaco para o diff histórico. Estado em 03 e prova em 09.
+
+---
+
 # 09/11/2026 — D185, correções da barra lateral direita
 
 Revisão da homologação D184 no workbench padrão do VS Code 1.135.0. Ajustes em Explorer, Search, Source Control, Graph e divisórias. Estado em 03, roteiro em 08 e provas em 09.

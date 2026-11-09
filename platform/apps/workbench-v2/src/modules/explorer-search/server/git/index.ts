@@ -84,6 +84,9 @@ export function createExplorerGitServer(options: ExplorerGitServerOptions): Expl
           case 'repository':
             sendJson(res, 200, await host.repositoryDetails(repo));
             return true;
+          case 'commit-changes':
+            sendJson(res, 200, await host.commitChanges(repo, body.oid));
+            return true;
           case 'repository-action':
             await host.repositoryAction(repo, body.action, body.target, body.expectedBranch);
             res.statusCode = 204; res.end();

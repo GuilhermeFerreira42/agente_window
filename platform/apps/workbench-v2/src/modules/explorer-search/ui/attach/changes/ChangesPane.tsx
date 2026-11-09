@@ -17,12 +17,15 @@ import type { GroupActionId, ResourceActionId } from './ChangesList';
 import { uriBasename } from '../../../core/uri';
 import { CHANGES_STRINGS } from './changesStrings';
 import { RepositoryActions } from './RepositoryActions';
+import type { CommitGraphActions } from './RepositoryGraph';
 import './changes.css';
 
 export interface ChangesPaneProps {
   git: GitService;
   root: WorkspaceUri;
   repositoryControls?: boolean;
+  loadCommit?: CommitGraphActions['loadCommit'];
+  openCommitFile?: CommitGraphActions['openCommitFile'];
   contextMenu?: IExplorerSearchModuleDeps['contextMenu'];
   /** 4.7-b: clique num recurso → abria o arquivo (mantido como fallback quando não há onOpenDiff). */
   onOpenFile: (uri: WorkspaceUri) => void;
@@ -30,7 +33,7 @@ export interface ChangesPaneProps {
   onOpenDiff?: (item: GitResourceItem, sides: GitDiffSides) => void;
 }
 
-export function ChangesPane({ git, root, repositoryControls, contextMenu, onOpenFile, onOpenDiff }: ChangesPaneProps) {
+export function ChangesPane({ git, root, repositoryControls, loadCommit, openCommitFile, contextMenu, onOpenFile, onOpenDiff }: ChangesPaneProps) {
   const paneRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!repositoryControls) return;
@@ -130,7 +133,7 @@ export function ChangesPane({ git, root, repositoryControls, contextMenu, onOpen
           </div>
         </div>
       ) : hasRepositoryControls ? (
-        <RepositoryActions git={git} branch={state.branch} onCommit={onCommitRequest} commitBusy={busy} commitRevision={commitRevision}>{changes}</RepositoryActions>
+        <RepositoryActions git={git} branch={state.branch} loadCommit={loadCommit} openCommitFile={openCommitFile} onCommit={onCommitRequest} commitBusy={busy} commitRevision={commitRevision}>{changes}</RepositoryActions>
       ) : changes}
       {discard && <ConfirmDialog request={discard} onConfirm={confirmDiscard} onCancel={() => setDiscard(null)} />}
       {askStageAll && (

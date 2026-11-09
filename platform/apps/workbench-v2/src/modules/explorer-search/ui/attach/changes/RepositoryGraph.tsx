@@ -1,11 +1,50 @@
-import type { GitRepositoryDetails } from '../../../core/git/gitService';
+import { useEffect, useState } from 'react';
+import type { GitCommitChanges, GitRepositoryDetails } from '../../../core/git/gitService';
+
+export interface CommitGraphActions {
+  loadCommit(oid: string): Promise<GitCommitChanges>;
+  openCommitFile(oid: string, parent: string | null, file: GitCommitChanges['files'][number]): Promise<void>;
+}
+
+function CommitFiles({ oid, loadCommit, openCommitFile }: { oid: string } & CommitGraphActions) {
+  const [changes, setChanges] = useState<GitCommitChanges>();
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let current = true;
+    void loadCommit(oid).then(result => {
+      if (current) setChanges(result);
+    }, () => {
+      if (current) setError('Não foi possível carregar os arquivos do commit. Reabra o commit para tentar novamente.');
+    });
+    return () => { current = false; };
+  }, [loadCommit, oid]);
+
+  return (
+    <div className="scm-commit-files">
+      {error && <p role="alert">{error}</p>}
+      {!changes && !error && <p role="status">Carregando arquivos…</p>}
+      {changes?.files.length === 0 && <p>Este commit não alterou arquivos em relação ao primeiro pai.</p>}
+      {changes?.files.map(file => (
+        <button type="button" key={file.uri} className="scm-commit-file" title={file.path} onClick={() => {
+          setError('');
+          void openCommitFile(oid, changes.parent, file).catch(() => setError('Não foi possível abrir o diff deste arquivo.'));
+        }}>
+          <span>{file.path}</span><span aria-label="Status">{file.status}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const ROW_HEIGHT = 22;
 const LANE_WIDTH = 12;
 const CENTER = ROW_HEIGHT / 2;
 const laneX = (lane: number) => lane * LANE_WIDTH + LANE_WIDTH / 2;
 
-export function RepositoryGraph({ history, branch }: { history: GitRepositoryDetails['history']; branch: string | null }) {
+export function RepositoryGraph({ history, branch, loadCommit, openCommitFile }: {
+  history: GitRepositoryDetails['history']; branch: string | null;
+} & Partial<CommitGraphActions>) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const lanes: Array<string | null> = [];
   const visible = new Set(history.map(commit => commit.oid));
   const rows = history.map(commit => {
@@ -32,15 +71,21 @@ export function RepositoryGraph({ history, branch }: { history: GitRepositoryDet
         const x = laneX(lane);
         return (
           <li key={commit.oid} title={`${commit.subject} (${commit.oid})`} data-commit={commit.oid} data-parent-count={commit.parents?.length}>
-            <svg className="scm-graph-lanes" width={width} height={ROW_HEIGHT} aria-hidden="true">
-              {through.map(column => <path key={column} d={`M${laneX(column)} 0 V${ROW_HEIGHT}`} />)}
-              {incoming !== -1 && <path d={`M${x} 0 V${CENTER}`} />}
-              {parents.map(column => <path key={column} d={`M${x} ${CENTER} C${x} ${ROW_HEIGHT},${laneX(column)} ${CENTER},${laneX(column)} ${ROW_HEIGHT}`} />)}
-              <circle cx={x} cy={CENTER} r={index === 0 ? 5 : 4} className={index === 0 ? 'scm-graph-head' : undefined} />
-            </svg>
-            <span className="scm-history-subject">{commit.subject}</span>
-            {commit.author && <span className="scm-history-author">{commit.author}</span>}
-            {index === 0 && branch && <span className="scm-history-branch" title={branch}>{branch}</span>}
+            <button type="button" className="scm-graph-row" disabled={!loadCommit || !openCommitFile}
+              aria-expanded={expanded === commit.oid} onClick={() => setExpanded(value => value === commit.oid ? null : commit.oid)}>
+              <svg className="scm-graph-lanes" width={width} height={ROW_HEIGHT} aria-hidden="true">
+                {through.map(column => <path key={column} d={`M${laneX(column)} 0 V${ROW_HEIGHT}`} />)}
+                {incoming !== -1 && <path d={`M${x} 0 V${CENTER}`} />}
+                {parents.map(column => <path key={column} d={`M${x} ${CENTER} C${x} ${ROW_HEIGHT},${laneX(column)} ${CENTER},${laneX(column)} ${ROW_HEIGHT}`} />)}
+                <circle cx={x} cy={CENTER} r={index === 0 ? 5 : 4} className={index === 0 ? 'scm-graph-head' : undefined} />
+              </svg>
+              <span className="scm-history-subject">{commit.subject}</span>
+              {commit.author && <span className="scm-history-author">{commit.author}</span>}
+              {index === 0 && branch && <span className="scm-history-branch" title={branch}>{branch}</span>}
+            </button>
+            {expanded === commit.oid && loadCommit && openCommitFile && (
+              <CommitFiles key={commit.oid} oid={commit.oid} loadCommit={loadCommit} openCommitFile={openCommitFile} />
+            )}
           </li>
         );
       })}

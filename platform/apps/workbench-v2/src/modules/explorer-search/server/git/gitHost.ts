@@ -10,7 +10,7 @@
 import { execFile } from 'node:child_process';
 import { lstat, readFile, readlink, realpath } from 'node:fs/promises';
 import { devNull } from 'node:os';
-import type { GitRepositoryDetails } from '../../core/git/gitService';
+import type { GitCommitChanges, GitRepositoryDetails } from '../../core/git/gitService';
 import type { WorkspaceUri } from '../../contract';
 import nodePath from 'node:path';
 import { FsHostError, resolveRootPath, toFsPath, toWorkspaceUri, type PathApi } from '../fs/fsHost';
@@ -258,6 +258,27 @@ export class GitHost {
       }),
       merging: merging.code === 0,
     };
+  }
+
+  async commitChanges(repo: WorkspaceUri, oid: unknown): Promise<GitCommitChanges> {
+    if (!isCommitSha(oid)) throw new GitHostError('invalid_action', 'Commit inválido.');
+    const cwd = await this.verifiedRepository(repo);
+    const [, parent] = (await this.run(cwd, ['rev-list', '--parents', '-n', '1', `${oid}^{commit}`, '--'])).trim().split(' ');
+    const revisions = parent ? [parent, oid] : ['--root', oid];
+    const output = await this.run(cwd, ['diff-tree', '--no-commit-id', '--name-status', '-z', '-r', '-M', ...revisions, '--']);
+    const fields = output.split('\0');
+    const files: GitCommitChanges['files'] = [];
+    for (let index = 0; fields[index];) {
+      const status = fields[index++][0];
+      const previousPath = fields[index++];
+      const path = status === 'R' || status === 'C' ? fields[index++] : previousPath;
+      files.push({
+        status, path,
+        uri: toWorkspaceUri(this.rootPath, `${cwd}/${path}`, this.p),
+        previousUri: toWorkspaceUri(this.rootPath, `${cwd}/${previousPath}`, this.p),
+      });
+    }
+    return { parent: parent ?? null, files };
   }
 
   async repositoryAction(repo: WorkspaceUri, action: unknown, target: unknown, expectedBranch: unknown): Promise<void> {
