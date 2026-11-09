@@ -173,3 +173,26 @@
        VS Code para o editor, senão a aba Changes fica com cara de barra lateral. */
 .center-changes-host .explorer-viewlet.scm-viewlet { position: relative; flex: 1 1 auto; min-height: 0; }
 .center-changes-host .scm-viewlet .scm-view { background: var(--vscode-editor-background); }
+
+.scm-repository-actions {
+  flex: 0 0 auto;
+  max-height: 48%;
+  overflow: auto;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
+}
+.scm-repository-actions summary { cursor: pointer; }
+.scm-repository-actions fieldset { min-width: 0; margin: 4px 0; padding: 4px; border: 1px solid var(--vscode-sideBarSectionHeader-border); }
+.scm-repository-actions :is(input, select, button) {
+  max-width: 100%;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-sideBarSectionHeader-border));
+  padding: 2px 4px;
+}
+.scm-repository-actions button:not(:disabled):hover { background: var(--vscode-toolbar-hoverBackground); }
+.scm-repository-actions button:disabled { opacity: .5; }
+.scm-repository-buttons,
+.scm-repository-actions form { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.scm-repository-actions ol { padding-left: 18px; }
+.scm-repository-actions li { overflow-wrap: anywhere; }

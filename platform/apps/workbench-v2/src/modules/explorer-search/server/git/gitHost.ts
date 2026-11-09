@@ -8,7 +8,9 @@
 // discard (checkout -q -- | clean -f -q -- untracked), commit (-m), init.
 // ============================================================================
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile, readlink, realpath } from 'node:fs/promises';
+import { devNull } from 'node:os';
+import type { GitRepositoryDetails } from '../../core/git/gitService';
 import type { WorkspaceUri } from '../../contract';
 import nodePath from 'node:path';
 import { FsHostError, resolveRootPath, toFsPath, toWorkspaceUri, type PathApi } from '../fs/fsHost';
@@ -33,7 +35,7 @@ export interface GitHostStatus {
   entries: GitHostEntry[];
 }
 
-export type GitErrorCode = 'forbidden_path' | 'not_a_repo' | 'invalid_message' | 'nothing_to_commit' | 'git_unavailable' | 'io';
+export type GitErrorCode = 'forbidden_path' | 'not_a_repo' | 'invalid_message' | 'invalid_action' | 'nothing_to_commit' | 'git_unavailable' | 'io';
 
 export class GitHostError extends Error {
   constructor(readonly code: GitErrorCode, message: string) {
@@ -69,7 +71,7 @@ export const nodeGitExec: ExecLike = (cwd, args) =>
       'git',
       args,
       { cwd, timeout: EXEC_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, encoding: 'utf-8', windowsHide: true,
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' } },
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_LITERAL_PATHSPECS: '1', LC_ALL: 'C' } },
       (err, stdout, stderr) => {
         const code = (err as NodeJS.ErrnoException | null)?.code;
         if (err && (code === 'ENOENT' || code === 'EACCES')) {
@@ -161,7 +163,11 @@ export class GitHost {
     this.p = options.pathApi ?? nodePath;
     this.rootPath = resolveRootPath(String(options.workspaceRoot), this.p);
     this.exec = options.exec ?? nodeGitExec;
-    this.readWorktree = options.readWorktree ?? ((abs) => readFile(abs, 'utf8'));
+    this.readWorktree = options.readWorktree ?? (async abs => {
+      await this.assertWorkspacePath(nodePath.dirname(abs));
+      if ((await lstat(abs)).isSymbolicLink()) return readlink(abs);
+      return readFile(await this.assertWorkspacePath(abs), 'utf8');
+    });
   }
 
   /** Resolve o repo (uri de pasta dentro do workspace) para caminho do SO. */
@@ -187,7 +193,7 @@ export class GitHost {
   private async run(cwd: string, args: string[]): Promise<string> {
     const r = await this.exec(cwd, args);
     if (r.code === -1) throw new GitHostError('git_unavailable', 'git não encontrado no PATH');
-    if (r.code !== 0) throw new GitHostError('io', r.stderr.trim() || `git ${args[0]} falhou (${r.code})`);
+    if (r.code !== 0) throw new GitHostError('io', r.stderr.trim() || r.stdout.trim() || `Git falhou (${r.code})`);
     return r.stdout;
   }
 
@@ -211,6 +217,112 @@ export class GitHost {
       .map((r) => ({ ...r, uri: toWorkspaceUri(this.rootPath, `${cwd}/${r.path}`, this.p) }))
       .sort((a, b) => a.path.localeCompare(b.path));
     return { isRepo: true, branch, entries };
+  }
+
+  private async assertWorkspacePath(candidate: string): Promise<string> {
+    const [root, resolved] = await Promise.all([realpath(this.rootPath), realpath(candidate)]);
+    const relative = nodePath.relative(root, resolved);
+    if (relative === '..' || relative.startsWith(`..${nodePath.sep}`) || nodePath.isAbsolute(relative)) {
+      throw new GitHostError('forbidden_path', 'Caminho Git fora do workspace.');
+    }
+    return resolved;
+  }
+
+  validateRepositoryPath(repo: WorkspaceUri): Promise<string> {
+    return this.assertWorkspacePath(this.repoPath(repo));
+  }
+
+  private async verifiedRepository(repo: WorkspaceUri): Promise<string> {
+    const resolved = await this.validateRepositoryPath(repo);
+    if (!await this.isRepo(repo)) throw new GitHostError('not_a_repo', 'Selecione a raiz do repositório.');
+    return resolved;
+  }
+
+  async repositoryDetails(repo: WorkspaceUri): Promise<GitRepositoryDetails> {
+    const cwd = await this.verifiedRepository(repo);
+    const [branches, remotes, head, merging] = await Promise.all([
+      this.run(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']),
+      this.run(cwd, ['remote']),
+      this.exec(cwd, ['rev-parse', '--verify', 'HEAD']),
+      this.exec(cwd, ['rev-parse', '--verify', 'MERGE_HEAD']),
+    ]);
+    const log = head.code === 0 ? await this.run(cwd, ['log', '-n', '30', '--format=%H%x00%s']) : '';
+    return {
+      branches: branches.trim().split(/\r?\n/).filter(Boolean),
+      remotes: remotes.trim().split(/\r?\n/).filter(Boolean),
+      history: log.trim().split(/\r?\n/).filter(Boolean).map(line => {
+        const [oid, subject = ''] = line.split('\0');
+        return { oid, subject };
+      }),
+      merging: merging.code === 0,
+    };
+  }
+
+  async repositoryAction(repo: WorkspaceUri, action: unknown, target: unknown, expectedBranch: unknown): Promise<void> {
+    const cwd = await this.verifiedRepository(repo);
+    const settings = ['-c', `core.hooksPath=${devNull}`, '-c', 'submodule.recurse=false'];
+    if (action === 'abort-merge') {
+      await this.run(cwd, [...settings, 'merge', '--abort']);
+      return;
+    }
+    if (typeof target !== 'string' || !target || target.startsWith('-')) {
+      throw new GitHostError('invalid_action', 'Selecione uma branch ou um remoto válido.');
+    }
+    switch (action) {
+      case 'create':
+      case 'switch':
+      case 'delete':
+      case 'merge': {
+        const checked = await this.exec(cwd, ['check-ref-format', '--branch', target]);
+        if (checked.code !== 0 || checked.stdout.trim() !== target) throw new GitHostError('invalid_action', 'Nome de branch inválido.');
+        if (action !== 'create') await this.run(cwd, ['show-ref', '--verify', `refs/heads/${target}`]);
+        const commands = {
+          create: ['branch', '--', target],
+          switch: ['switch', '--no-guess', '--', target],
+          delete: ['branch', '-d', '--', target],
+          merge: ['merge', '--no-edit', '--', `refs/heads/${target}`],
+        };
+        await this.run(cwd, [...settings, ...commands[action]]);
+        return;
+      }
+      case 'fetch':
+      case 'pull':
+      case 'push': {
+        const names = (await this.run(cwd, ['remote'])).trim().split(/\r?\n/);
+        if (!names.includes(target)) throw new GitHostError('invalid_action', 'Remoto não configurado.');
+        const urls = (await this.run(cwd, ['remote', 'get-url', '--all', ...(action === 'push' ? ['--push'] : []), target])).trim().split(/\r?\n/);
+        if (!urls.length || urls.some(value => {
+          try {
+            const url = new URL(value);
+            return url.protocol !== 'https:' || !url.hostname || !!(url.username || url.password || url.search || url.hash);
+          } catch {
+            return true;
+          }
+        })) {
+          throw new GitHostError('invalid_action', 'Use um remoto HTTPS configurado sem credenciais na URL.');
+        }
+        const options = [...settings, '-c', 'protocol.allow=never', '-c', 'protocol.https.allow=always'];
+        const branch = action === 'fetch' ? null : (await this.run(cwd, ['symbolic-ref', '--quiet', 'HEAD'])).trim();
+        if (branch && branch !== `refs/heads/${expectedBranch}`) {
+          throw new GitHostError('invalid_action', 'A branch ativa mudou. Confira o estado antes de repetir a operação.');
+        }
+        try {
+          if (!branch) {
+            await this.run(cwd, [...options, 'fetch', '--no-recurse-submodules', '--', target]);
+          } else {
+            const command = action === 'pull'
+              ? ['pull', '--ff-only', '--no-recurse-submodules', '--', target, branch]
+              : ['push', '--recurse-submodules=no', '--', target, `${branch}:${branch}`];
+            await this.run(cwd, [...options, ...command]);
+          }
+        } catch {
+          throw new GitHostError('io', 'A operação remota falhou. Confira as permissões, a conectividade e o estado das branches no servidor.');
+        }
+        return;
+      }
+      default:
+        throw new GitHostError('invalid_action', 'Operação Git desconhecida.');
+    }
   }
 
   async init(repo: WorkspaceUri): Promise<void> {
@@ -258,7 +370,11 @@ export class GitHost {
     const [rel] = this.relPaths(repo, [uri]);
     if (ref === 'worktree') {
       try { return { content: await this.readWorktree(toFsPath(this.rootPath, uri, this.p)) }; }
-      catch { return { content: '' }; }
+      catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return { content: '' };
+        throw error;
+      }
     }
     const spec = ref === 'HEAD' ? `HEAD:${rel}` : ref === 'index' ? `:${rel}` : `${ref}:./${rel}`;
     const r = await this.exec(cwd, ['show', spec]);

@@ -93,6 +93,14 @@ export class EditorService {
     const t = g.tabs.find((x) => x.uri === g.active);
     return t ? { ...t, active: true } : null;
   }
+  hasAnyDirty(): boolean {
+    return Array.from(this.groups.values()).some(group => group.tabs.some(tab => tab.dirty));
+  }
+
+  hasDirtyUri(uri: WorkspaceUri): boolean {
+    return Array.from(this.groups.values()).some(group => group.tabs.some(tab => tab.uri === uri && tab.dirty));
+  }
+
   hasDirty(sessionId: string): boolean { return (this.groups.get(sessionId)?.tabs ?? []).some((t) => t.dirty); }
   /** Todas as sessões com esta URI aberta (c5: conflito externo / save). */
   sessionsWith(uri: WorkspaceUri): string[] {

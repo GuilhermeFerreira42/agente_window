@@ -33,6 +33,8 @@ export interface SearchEngineOptions {
   maxFiles?: number;
   maxFileBytes?: number;
   signal?: AbortSignal;
+  onDirectory?: (uri: WorkspaceUri) => void;
+  includeFile?: (relativePath: string) => boolean;
 }
 
 export type SearchEngineEvent =
@@ -97,6 +99,7 @@ export async function* runSearch(
     } catch {
       continue; // pasta sumiu/sem permissão: segue
     }
+    opts.onDirectory?.(toWorkspaceUri(rootPath, dir));
     dirents.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     const subdirs: string[] = [];
     for (const d of dirents) {
@@ -110,7 +113,7 @@ export async function* runSearch(
       }
       if (!d.isFile()) continue;
       const rel = toRel(abs);
-      if (!fileMatchesQuery(compiled, rel)) continue;
+      if (opts.includeFile?.(rel) === false || !fileMatchesQuery(compiled, rel)) continue;
       let size: number;
       try {
         size = (await stat(abs)).size;

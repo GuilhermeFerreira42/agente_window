@@ -11,6 +11,8 @@
 // ============================================================================
 
 import React from 'react';
+import { createPortal } from 'react-dom';
+import { AttachDialog } from './attach/AttachDialog';
 import type { ExplorerService } from '../core/explorerService';
 import { ExplorerCreateConflictError, ExplorerRenameConflictError } from '../core/explorerService';
 import type { ExplorerItem } from '../core/explorerModel';
@@ -25,7 +27,7 @@ import { computeExplorerContext, resolveExplorerContextMenu } from '../core/menu
 import type { ExplorerContextValues } from '../core/menus/explorerMenus';
 import {
   DEFAULT_VIEWS_VISIBILITY, EXPLORER_VIEWS, applyViewVisibility, normalizeViewsVisibility,
-  resolveViewTitleContextMenu, viewHideCommandId, viewToggleCommandId,
+  resolveViewTitleContextMenu, resolveViewsToggleMenu, viewHideCommandId, viewToggleCommandId,
 } from '../core/menus/viewTitleMenus';
 import type { ExplorerViewId, ExplorerViewsVisibility } from '../core/menus/viewTitleMenus';
 import { saveBlob } from './transfer/saveBlob';
@@ -36,6 +38,8 @@ import type { TimelineItem } from '../core/timeline/timelineModel';
 import './explorer.css';
 
 export interface ExplorerViewProps {
+  workspaceRoot?: WorkspaceUri;
+  toolbarTarget?: HTMLElement;
   service: ExplorerService;
   menus: CommandRegistryLike;
   contextMenu: {
@@ -66,7 +70,7 @@ const INDENT = 8; // `--vscode-tree-indent` padrão
 // Pane (split-view-view > pane > pane-header + pane-body)
 // ---------------------------------------------------------------------------
 interface PaneProps {
-  id: string;
+  id: PaneId;
   title: string;
   ariaLabel: string;
   expanded: boolean;
@@ -81,15 +85,55 @@ interface PaneProps {
 }
 
 const PANE_DND = 'application/x-agente-window-pane';
-const PaneOrder = React.createContext<{ order: string[]; move(from: string, to: string): void } | null>(null);
+const PaneOrder = React.createContext<{
+  order: string[];
+  resizable: PaneId[];
+  weights: Partial<Record<PaneId, number>>;
+  move(from: string, to: string): void;
+  resize(id: PaneId, previous: PaneId, weights?: [number, number]): void;
+} | null>(null);
+
+const defaultPaneWeight = (id: PaneId) => id === 'folders' ? 2 : 1;
 
 const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, headerClassName, paneClassName, actions, headerExtra, children, onHeaderContextMenu }) => {
   const layout = React.useContext(PaneOrder);
-  return <div className="split-view-view visible" data-pane={id} style={{ order: layout?.order.indexOf(id) }}>
+  const [dropOver, setDropOver] = React.useState(false);
+  const paneRef = React.useRef<HTMLDivElement>(null);
+  const drag = React.useRef<{ y: number; upper: number; lower: number; minUpper: number; minLower: number; totalWeight: number }>();
+  const index = layout?.resizable.indexOf(id) ?? -1;
+  const previous = index > 0 ? layout?.resizable[index - 1] : undefined;
+  const weight = layout?.weights[id] ?? defaultPaneWeight(id);
+  return <div ref={paneRef} className="split-view-view visible" data-pane={id} style={{ order: layout?.order.indexOf(id), flexGrow: index >= 0 ? weight : undefined }}>
+    {previous && layout && <div className="explorer-pane-sash" role="separator" aria-orientation="horizontal"
+      aria-label={`Redimensionar ${title}`} title="Arraste para redimensionar (duplo-clique para restaurar)"
+      onPointerDown={event => {
+        const upper = paneRef.current?.parentElement?.querySelector<HTMLElement>(`[data-pane="${previous}"]`);
+        const lower = paneRef.current;
+        if (event.button !== 0 || !upper || !lower) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag.current = {
+          y: event.clientY, upper: upper.offsetHeight, lower: lower.offsetHeight,
+          minUpper: parseFloat(getComputedStyle(upper).minHeight) || 0,
+          minLower: parseFloat(getComputedStyle(lower).minHeight) || 0,
+          totalWeight: (layout.weights[previous] ?? defaultPaneWeight(previous)) + weight,
+        };
+      }}
+      onPointerMove={event => {
+        const start = drag.current;
+        if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        const delta = Math.max(start.minUpper - start.upper, Math.min(start.lower - start.minLower, event.clientY - start.y));
+        const ratio = (start.upper + delta) / (start.upper + start.lower);
+        const upperWeight = start.totalWeight * ratio;
+        layout.resize(id, previous, [start.totalWeight - upperWeight, upperWeight]);
+      }}
+      onLostPointerCapture={() => { drag.current = undefined; }}
+      onDoubleClick={() => layout.resize(id, previous)}
+    />}
 
     <div className={`pane vertical${expanded ? ' expanded' : ''}${paneClassName ? ' ' + paneClassName : ''}`}>
       <div
-        className={`pane-header${expanded ? ' expanded' : ''}${headerClassName ? ' ' + headerClassName : ''}`}
+        className={`pane-header${expanded ? ' expanded' : ''}${headerClassName ? ' ' + headerClassName : ''}${dropOver ? ' pane-drop-target' : ''}`}
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
@@ -97,8 +141,9 @@ const Pane: React.FC<PaneProps> = ({ id, title, ariaLabel, expanded, onToggle, h
         draggable={!!layout}
         title="Arraste para reorganizar; Alt+seta move a seção"
         onDragStart={event => { if ((event.target as Element).closest('a,button,input')) { event.preventDefault(); return; } event.stopPropagation(); event.dataTransfer.setData(PANE_DND, id); event.dataTransfer.effectAllowed = 'move'; }}
-        onDragOver={event => { if (event.dataTransfer.types.includes(PANE_DND)) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }}
-        onDrop={event => { const from = event.dataTransfer.getData(PANE_DND); if (from) { event.preventDefault(); event.stopPropagation(); layout?.move(from, id); } }}
+        onDragOver={event => { if (event.dataTransfer.types.includes(PANE_DND)) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; setDropOver(true); } }}
+        onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropOver(false); }}
+        onDrop={event => { setDropOver(false); const from = event.dataTransfer.getData(PANE_DND); if (from) { event.preventDefault(); event.stopPropagation(); layout?.move(from, id); } }}
         onClick={onToggle}
         onKeyDown={(e) => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && layout) { e.preventDefault(); const next = layout.order[layout.order.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1)]; if (next) layout.move(id, next); } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
         onContextMenu={onHeaderContextMenu}
@@ -318,43 +363,73 @@ const FOLDER_ACTIONS: HeaderAction[] = [
 // ---------------------------------------------------------------------------
 // ExplorerView
 // ---------------------------------------------------------------------------
-export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenChanges, activeFile, editorList }: ExplorerViewProps): React.ReactElement {
+export function ExplorerView({ workspaceRoot, toolbarTarget, service, menus, contextMenu, fs, baseUrl, onOpenChanges, activeFile, editorList }: ExplorerViewProps): React.ReactElement {
   const tickRef = React.useRef<ViewRenderTick | null>(null);
   if (!tickRef.current) tickRef.current = new ViewRenderTick();
   const tick = tickRef.current;
   const version = React.useSyncExternalStore(tick.subscribe, tick.snapshot, tick.snapshot);
   React.useEffect(() => () => tick.dispose(), [tick]);
 
+  const scope = workspaceRoot ? `:${encodeURIComponent(workspaceRoot)}` : '';
+  const orderKey = `explorer-search.paneOrder.v1${scope}`;
+  const weightsKey = `explorer-search.paneWeights.v1${scope}`;
+  const expansionKey = `explorer-search.paneExpansion.v1${scope}`;
+  const visibilityKey = `${VIEWS_VISIBILITY_STORAGE_KEY}${scope}`;
   const [paneOrder, setPaneOrder] = React.useState<string[]>(() => {
     const defaults = ['folders', 'openEditors', 'outline', 'timeline'];
-    try { const saved: unknown = JSON.parse(localStorage.getItem('explorer-search.paneOrder.v1') ?? 'null'); if (Array.isArray(saved)) return [...new Set([...saved.filter(id => defaults.includes(id)), ...defaults])]; } catch { /* default */ }
+    try { const saved: unknown = JSON.parse(localStorage.getItem(orderKey) ?? 'null'); if (Array.isArray(saved)) return [...new Set([...saved.filter(id => defaults.includes(id)), ...defaults])]; } catch { /* default */ }
     return defaults;
   });
   const movePane = (from: string, to: string) => setPaneOrder(current => {
     if (from === to || !current.includes(from) || !current.includes(to)) return current;
     const result = [...current]; result.splice(result.indexOf(from), 1); result.splice(current.indexOf(to), 0, from); return result;
   });
-  React.useEffect(() => { try { localStorage.setItem('explorer-search.paneOrder.v1', JSON.stringify(paneOrder)); } catch { /* private/quota */ } }, [paneOrder]);
+  React.useEffect(() => { try { localStorage.setItem(orderKey, JSON.stringify(paneOrder)); } catch { /* private/quota */ } }, [orderKey, paneOrder]);
+  const [paneWeights, setPaneWeights] = React.useState<Partial<Record<PaneId, number>>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(weightsKey) ?? '{}') as Record<string, unknown>;
+      return Object.fromEntries(Object.entries(saved).filter(([id, value]) =>
+        ['folders', 'outline', 'timeline'].includes(id) && typeof value === 'number' && Number.isFinite(value) && value > 0));
+    } catch { return {}; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem(weightsKey, JSON.stringify(paneWeights)); } catch { /* private/quota */ }
+  }, [weightsKey, paneWeights]);
+  const resizePane = (id: PaneId, previous: PaneId, weights?: [number, number]) => {
+    setPaneWeights(current => ({ ...current, [id]: weights?.[0], [previous]: weights?.[1] }));
+  };
   const [outlineSorted, setOutlineSorted] = React.useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = React.useState(false);
   const [timelineFilter, setTimelineFilter] = React.useState('');
   const [timelineFilterOpen, setTimelineFilterOpen] = React.useState(false);
   const [actionError, setActionError] = React.useState('');
+  const [deleteRequest, setDeleteRequest] = React.useState<WorkspaceUri[] | null>(null);
   // ---- estado local ----
-  const [expandedPanes, setExpandedPanes] = React.useState<Record<PaneId, boolean>>({
-    folders: true, openEditors: false, outline: false, timeline: false,
+  const [expandedPanes, setExpandedPanes] = React.useState<Record<PaneId, boolean>>(() => {
+    const defaults = { folders: true, openEditors: false, outline: false, timeline: false };
+    try {
+      const saved = JSON.parse(localStorage.getItem(expansionKey) ?? 'null') as Partial<Record<PaneId, unknown>> | null;
+      for (const id of Object.keys(defaults) as PaneId[]) {
+        const value = saved?.[id];
+        if (typeof value === 'boolean') defaults[id] = value;
+      }
+    } catch { /* default */ }
+    return defaults;
   });
+  React.useEffect(() => {
+    try { localStorage.setItem(expansionKey, JSON.stringify(expandedPanes)); } catch { /* private/quota */ }
+  }, [expansionKey, expandedPanes]);
   // 4.5 c5 — visibilidade das views (ViewTitleContext). Padrão VS Code: Open
   // Editors OCULTA. Persistida por workspace (estado de UI, não de disco).
   const [viewsVisibility, setViewsVisibility] = React.useState<ExplorerViewsVisibility>(() => {
     try {
-      const raw = globalThis.localStorage?.getItem(VIEWS_VISIBILITY_STORAGE_KEY);
+      const raw = globalThis.localStorage?.getItem(visibilityKey);
       return raw ? normalizeViewsVisibility(JSON.parse(raw)) : DEFAULT_VIEWS_VISIBILITY;
     } catch { return DEFAULT_VIEWS_VISIBILITY; }
   });
   React.useEffect(() => {
-    try { globalThis.localStorage?.setItem(VIEWS_VISIBILITY_STORAGE_KEY, JSON.stringify(viewsVisibility)); } catch { /* storage indisponível */ }
-  }, [viewsVisibility]);
+    try { globalThis.localStorage?.setItem(visibilityKey, JSON.stringify(viewsVisibility)); } catch { /* storage indisponível */ }
+  }, [visibilityKey, viewsVisibility]);
   const setViewVisible = React.useCallback((id: ExplorerViewId, next: boolean) => {
     setViewsVisibility((cur) => applyViewVisibility(cur, id, next));
   }, []);
@@ -694,8 +769,7 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
         id: 'explorer.delete', title: 'Delete Permanently',
         run: () => {
           const sel = service.getSelection();
-          if (sel.length === 0) return;
-          void service.remove({ uris: sel, useTrash: false }).then(() => tick.bump(), () => tick.bump());
+          if (sel.length > 0) setDeleteRequest([...sel]);
         },
       }),
       // G2 — upstream fileActions.contribution.ts:603/610 → fileCommands.ts
@@ -1044,8 +1118,9 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
     return out;
   };
 
+  const resizable = (paneOrder as PaneId[]).filter(id => id !== 'openEditors' && viewsVisibility[id] && expandedPanes[id]);
   return (
-    <PaneOrder.Provider value={{ order: paneOrder, move: movePane }}><div
+    <PaneOrder.Provider value={{ order: paneOrder.filter(id => viewsVisibility[id as PaneId]), resizable, weights: paneWeights, move: movePane, resize: resizePane }}><div
       className="composite viewlet explorer-viewlet"
       data-testid="explorer-view"
       onFocus={() => { viewletFocusRef.current = true; menus.setContext('explorerViewletFocus', true); }}
@@ -1056,6 +1131,26 @@ export function ExplorerView({ service, menus, contextMenu, fs, baseUrl, onOpenC
       }}
       onDragLeave={(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setDropTargetUri(null); }}
     >
+      {toolbarTarget && createPortal(
+        <button type="button" className="explorer-title-action codicon codicon-ellipsis" aria-label="Views and More Actions..." title="Views and More Actions..."
+          onClick={event => {
+            const anchor = event.currentTarget.getBoundingClientRect();
+            contextMenu.open({ x: anchor.left, y: anchor.bottom, items: resolveViewsToggleMenu(viewsVisibility) });
+          }}
+        />, toolbarTarget,
+      )}
+      {deleteRequest && <AttachDialog kind="warning" testId="explorer-delete-confirm"
+        message={deleteRequest.length === 1 ? `Excluir “${uriBasename(deleteRequest[0])}” permanentemente?` : `Excluir ${deleteRequest.length} itens permanentemente?`}
+        detail="A exclusão remove os itens e seus conteúdos do workspace sem enviá-los para a lixeira."
+        onCancel={() => setDeleteRequest(null)}
+        buttons={[
+          { id: 'cancel', label: 'Cancelar', primary: true, onSelect: () => setDeleteRequest(null) },
+          { id: 'delete', label: 'Excluir permanentemente', onSelect: () => {
+            setDeleteRequest(null);
+            void service.remove({ uris: deleteRequest, useTrash: false }).catch(error => setActionError(String(error)));
+          } },
+        ]}
+      />}
       {actionError && <div className="pane-message" role="alert">{actionError}</div>}
       <input ref={uploadInputRef} type="file" multiple hidden data-testid="explorer-upload-input" onChange={onUploadInputChange} />
       <div className="monaco-pane-view">

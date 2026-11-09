@@ -50,6 +50,7 @@ export class ExplorerFsWatcher {
 
   private listeners = new Set<(batch: FsChangedBatch) => void>();
   private dirWatchers = new Map<string, fs.FSWatcher>(); // fsPath → watcher
+  private readonly searchDirectories = new Set<string>();
   private dirInodes = new Map<string, number>(); // fsPath → inode observado (detecta dir recriado)
   private rootWatcher: fs.FSWatcher | null = null;
   private pendingAdded = new Set<WorkspaceUri>();
@@ -85,12 +86,13 @@ export class ExplorerFsWatcher {
   }
 
   /** A2.1: diretório listado passa a ser observado (modo lazy). */
-  ensureWatch(uri: WorkspaceUri): void {
+  ensureWatch(uri: WorkspaceUri, fromSearch = false): void {
     if (this.disposed || this.mode !== 'lazy-per-dir') return;
     const fsPath = toFsPath(this.rootPath, uri);
     if (!this.isInside(fsPath) || NOISE.test(fsPath)) return;
     let stat: fs.Stats;
     try {
+      if (!this.isInside(fs.realpathSync(fsPath))) return;
       stat = fs.statSync(fsPath);
     } catch {
       return; // arquivo ou inexistente — só dirs interessam
@@ -100,7 +102,16 @@ export class ExplorerFsWatcher {
     // descarta e observa de novo (senão a pasta nunca mais emite eventos).
     const known = this.dirInodes.get(fsPath);
     if (known !== undefined && known !== stat.ino) this.dropDirWatcher(fsPath);
+    if (!fromSearch) {
+      this.searchDirectories.delete(fsPath);
+      if (!this.dirWatchers.has(fsPath) && this.dirWatchers.size >= this.maxWatchers) {
+        const searchDirectory = this.searchDirectories.values().next().value;
+        if (searchDirectory) this.dropDirWatcher(searchDirectory);
+      }
+    }
+    const alreadyObserved = this.dirWatchers.has(fsPath);
     this.watchDir(fsPath, stat.ino);
+    if (fromSearch && !alreadyObserved && this.dirWatchers.has(fsPath)) this.searchDirectories.add(fsPath);
   }
 
   private dropDirWatcher(fsPath: string): void {
@@ -109,6 +120,7 @@ export class ExplorerFsWatcher {
     w.removeAllListeners();
     w.close();
     this.dirWatchers.delete(fsPath);
+    this.searchDirectories.delete(fsPath);
     this.dirInodes.delete(fsPath);
   }
 
@@ -126,6 +138,7 @@ export class ExplorerFsWatcher {
       w.close();
     }
     this.dirWatchers.clear();
+    this.searchDirectories.clear();
     this.listeners.clear();
     this.pendingAdded.clear();
     this.pendingRemoved.clear();
@@ -195,6 +208,7 @@ export class ExplorerFsWatcher {
       w.removeAllListeners();
       w.close();
       this.dirWatchers.delete(fsDirPath);
+      this.searchDirectories.delete(fsDirPath);
       this.dirInodes.delete(fsDirPath);
     });
     this.dirWatchers.set(fsDirPath, w);

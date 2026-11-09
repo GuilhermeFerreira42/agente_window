@@ -330,13 +330,16 @@ svg {
   margin-left: -2px;
   margin-right: -2px;
   z-index: 5;
+}
+
+:is(.sidebar-resize-handle, .side-bar-sash) {
   cursor: col-resize;
+  touch-action: none;
   background: transparent;
   transition: background 120ms ease;
 }
 
-.sidebar-resize-handle:hover,
-.sidebar-resize-handle:active {
+:is(.sidebar-resize-handle, .side-bar-sash):is(:hover, :active, .active, :focus-visible) {
   background: var(--vscode-focusBorder);
 }
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { assertNodePtyAvailable, createPtyWebSocketBridge, PTY_WS_PATH } from '../../../platform/services/pty-server/dist/singlePort.js'
 import { WebSocketServer } from 'ws'
 import { createExplorerFsServer, FS_WATCH_PATH } from './dist-fs-server/server/fs/index.js'
+import { createExplorerGitServer, GIT_HTTP_PREFIX } from './dist-fs-server/server/git/index.js'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -72,6 +73,8 @@ async function start() {
     createWsServer: () => new WebSocketServer({ noServer: true }),
   })
 
+  const gitServer = createExplorerGitServer({ workspaceRoot: fsRoot })
+
   const server = http.createServer((req, res) => {
     const localDecision = validateLocalRequest(req)
     if (!localDecision.ok) {
@@ -93,8 +96,10 @@ async function start() {
       return
     }
 
-    if (url.pathname.startsWith('/fs/')) {
-      fsServer
+    const workspaceHandler = url.pathname.startsWith(GIT_HTTP_PREFIX) ? gitServer
+      : url.pathname.startsWith('/fs/') ? fsServer : null
+    if (workspaceHandler) {
+      workspaceHandler
         .tryHandleHttp(req, res)
         .then((handled) => {
           if (!handled) {

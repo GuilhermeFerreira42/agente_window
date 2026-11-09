@@ -22,6 +22,7 @@ import {
   open,
   readFile as nodeReadFile,
   readdir,
+  realpath,
   rename,
   rm,
   stat as nodeStat,
@@ -31,7 +32,7 @@ import nodePath, { basename, dirname, extname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { WorkspaceUri } from '../../contract';
 
-export type FsErrorCode = 'forbidden_path' | 'file_exists' | 'file_not_found' | 'io';
+export type FsErrorCode = 'forbidden_path' | 'file_exists' | 'file_not_found' | 'file_changed' | 'io';
 
 /** Erro tipado espelhado para o cliente (`code` atravessa o HTTP). */
 export class FsHostError extends Error {
@@ -245,7 +246,7 @@ export class FsHost {
   }
 
   /** Escrita ATÔMICA: temp na mesma pasta + rename (zero escrita parcial). */
-  async writeFileAtomic(uri: WorkspaceUri, content: string): Promise<void> {
+  async writeFileAtomic(uri: WorkspaceUri, content: string, expectedContent?: string): Promise<void> {
     const finalPath = this.pathOf(uri);
     return this.enqueue(finalPath, async () => {
       const tmpPath = join(
@@ -253,7 +254,17 @@ export class FsHost {
         `.vscode-fstmp-${Date.now()}-${randomBytes(4).toString('hex')}`,
       );
       try {
+        if (expectedContent !== undefined) {
+          const [root, target] = await Promise.all([realpath(this.rootPath), realpath(finalPath)]);
+          const relative = nodePath.relative(root, target);
+          if (relative === '..' || relative.startsWith(`..${nodePath.sep}`) || nodePath.isAbsolute(relative)) {
+            throw new FsHostError('forbidden_path', 'Arquivo fora do workspace.');
+          }
+        }
         await nodeWriteFile(tmpPath, content, { encoding: 'utf-8', flag: 'w' });
+        if (expectedContent !== undefined && await nodeReadFile(finalPath, 'utf-8') !== expectedContent) {
+          throw new FsHostError('file_changed', 'O arquivo mudou no disco. Atualize a pesquisa antes de substituir.');
+        }
         await rename(tmpPath, finalPath);
       } catch (e) {
         await rm(tmpPath, { force: true }).catch(() => undefined);
@@ -352,6 +363,7 @@ export class FsHost {
 
 /** Mapeamento de erros Node → FsHostError tipado (code atravessa o HTTP). */
 export function mapNodeError(e: unknown, uri: WorkspaceUri): FsHostError {
+  if (e instanceof FsHostError) return e;
   const err = e as NodeJS.ErrnoException;
   switch (err?.code) {
     case 'ENOENT':

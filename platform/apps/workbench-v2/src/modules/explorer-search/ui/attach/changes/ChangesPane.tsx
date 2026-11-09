@@ -16,18 +16,29 @@ import { AttachDialog } from '../AttachDialog';
 import type { GroupActionId, ResourceActionId } from './ChangesList';
 import { uriBasename } from '../../../core/uri';
 import { CHANGES_STRINGS } from './changesStrings';
+import { RepositoryActions } from './RepositoryActions';
 import './changes.css';
 
 export interface ChangesPaneProps {
   git: GitService;
   root: WorkspaceUri;
+  repositoryControls?: boolean;
   /** 4.7-b: clique num recurso → abria o arquivo (mantido como fallback quando não há onOpenDiff). */
   onOpenFile: (uri: WorkspaceUri) => void;
   /** 4.7-c c2: clique num recurso (M/A/D/U) → aba fixa Diff com os lados já resolvidos. */
   onOpenDiff?: (item: GitResourceItem, sides: GitDiffSides) => void;
 }
 
-export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPaneProps) {
+export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenDiff }: ChangesPaneProps) {
+  const paneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!repositoryControls) return;
+    // O watcher do Explorer ignora .git. Atualiza o índice quando a view está visível.
+    const timer = window.setInterval(() => {
+      if (!document.hidden && paneRef.current?.getClientRects().length && !git.getState().loading) void git.refreshNow();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [git, repositoryControls]);
   const [state, setState] = useState<GitServiceState>(() => git.getState());
   useEffect(() => git.onStateChanged(setState), [git]);
   // primeira montagem: garante raiz + status (idempotente; o barrel também chama)
@@ -91,7 +102,7 @@ export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPanePr
   };
 
   return (
-    <div className="scm-view show-file-icons" data-testid="scm-view" data-loading={state.loading} data-is-repo={state.isRepo} role="region" aria-label="Source Control">
+    <div ref={paneRef} className="scm-view show-file-icons" data-testid="scm-view" data-loading={state.loading} data-is-repo={state.isRepo} role="region" aria-label="Source Control">
       {/* c4: erro de commit é mostrado no diálogo `scm-commit-error`; a barra não o repete */}
       {((state.error && state.error !== commitError) || openError) && <div className="scm-error" role="alert" data-testid="scm-error">{state.error ?? openError}</div>}
       {!state.isRepo && !state.loading ? (
@@ -108,6 +119,7 @@ export function ChangesPane({ git, root, onOpenFile, onOpenDiff }: ChangesPanePr
       ) : (<>
         <CommitInput ref={inputRef} branch={state.branch} value={message} validation={validation} busy={busy}
           onChange={(v) => { setMessage(v); if (validation) setValidation(null); }} onCommit={onCommitRequest} />
+        {repositoryControls && state.isRepo && git.supportsRepositoryActions() && <RepositoryActions git={git} branch={state.branch} />}
         <ChangesListLazy state={state} repoName={repoName} onRefresh={() => { void git.refreshNow(); }} onOpen={onOpen} onAction={onAction} onGroupAction={onGroupAction} />
       </>)}
       {discard && <ConfirmDialog request={discard} onConfirm={confirmDiscard} onCancel={() => setDiscard(null)} />}

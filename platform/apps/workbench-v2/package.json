@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "build:fs-server": "tsc -p server/tsconfig.server.json && node -e \"require('node:fs').writeFileSync('dist-fs-server/package.json', JSON.stringify({type:'commonjs'})+\\\"\\\\n\\\")\"",
+    "build:fs-server": "tsc -p server/tsconfig.server.json && node -e \"require('node:fs').writeFileSync('dist-fs-server/package.json', JSON.stringify({type:'commonjs'}))\"",
     "predev": "node ../../scripts/check-runtime.mjs",
     "prebuild": "node ../../scripts/check-runtime.mjs",
     "prebuild:fs-boundary": "node ../../scripts/check-runtime.mjs",

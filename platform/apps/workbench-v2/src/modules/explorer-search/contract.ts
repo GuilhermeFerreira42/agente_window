@@ -31,7 +31,7 @@ export type ExplorerSearchEvent =
   | { type: 'fs.downloadStarted'; uri: WorkspaceUri }
   | { type: 'search.started'; id: string }
   | { type: 'search.progress'; id: string; filesScanned: number; matches: number }
-  | { type: 'search.finished'; id: string; matches: SearchMatch[]; fileCount: number; truncated: boolean }
+  | { type: 'search.finished'; id: string; matches: SearchMatch[]; fileCount: number; truncated: boolean; background?: true }
   | { type: 'search.cancelled'; id: string }
   | { type: 'search.replaceApplied'; files: number; replacements: number }
   // 4.7 c2 (evolução ADITIVA): Editor Anexo — modelo de abas por sessão.
@@ -71,6 +71,7 @@ export type ExplorerSearchEvent =
 // Search (membro do módulo: Explorer + Search = 1 módulo lateral, docs/12 LEGO)
 // ---------------------------------------------------------------------------
 export interface SearchQuery {
+  useIgnoreFiles?: boolean;
   pattern: string;
   isCaseSensitive?: boolean;
   isWholeWord?: boolean;
@@ -79,7 +80,7 @@ export interface SearchQuery {
   exclude?: string;      // glob; default: node_modules, .git, dist, build, out, .next
 }
 export interface SearchMatch { uri: WorkspaceUri; line: number; column: number; preview: string; }
-export interface SearchReplaceSummary { files: number; replacements: number; }
+export interface SearchReplaceSummary { files: number; replacements: number; failures?: Array<{ uri: WorkspaceUri; message: string }>; missed?: number; }
 /** Handle retornado por query() — cancelável (última busca vence). */
 export interface SearchHandle { readonly id: string; cancel(): void; }
 
@@ -221,7 +222,7 @@ export interface FileSystemPortLike {
   list(input: { uri: WorkspaceUri }): Promise<Array<{ uri: WorkspaceUri; name: string; kind: 'file' | 'directory' }>>;
   readFile(input: { uri: WorkspaceUri }): Promise<{ content: string; encoding: 'utf-8' }>;
   readFileBinary(input: { uri: WorkspaceUri; maxBytes?: number }): Promise<{ dataBase64: string; mime: string }>;
-  writeFile(input: { uri: WorkspaceUri; content: string; atomic: true }): Promise<void>;
+  writeFile(input: { uri: WorkspaceUri; content: string; atomic: true; expectedContent?: string }): Promise<void>;
   stat(input: { uri: WorkspaceUri }): Promise<{ uri: WorkspaceUri; size: number; mtimeMs: number; readonly: boolean; kind: 'file' | 'directory' }>;
   createFile(input: { uri: WorkspaceUri; content?: string }): Promise<void>;
   createFolder(input: { uri: WorkspaceUri }): Promise<void>;
@@ -229,7 +230,7 @@ export interface FileSystemPortLike {
   move(input: { from: WorkspaceUri; to: WorkspaceUri }): Promise<void>;
   remove(input: { uri: WorkspaceUri; recursive?: boolean }): Promise<void>;
   watch(input: { uri: WorkspaceUri }): Promise<{ watcherId: string }>;
-  onEvent(cb: (e: { type: 'fs.changed'; changes: Array<{ uri: WorkspaceUri; kind: 'added' | 'removed' | 'changed' }> }) => void): () => void;
+  onEvent(cb: (e: { type: 'fs.changed'; reconnected?: true; changes: Array<{ uri: WorkspaceUri; kind: 'added' | 'removed' | 'changed' }> }) => void): () => void;
 }
 
 export interface CommandRegistryLike {

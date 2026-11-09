@@ -1,3 +1,9 @@
+# 09/11/2026 — D184, barra lateral direita
+
+Entrega local `feat(workbench): refine and validate the right sidebar`. Ajustes em Explorer, Search, Source Control e divisória com prova funcional em workspace descartável. Estado em 03, roteiro em 08 e provas em 09.
+
+---
+
 # 09/11/2026 — D183
 
 Lateral e Personalizações refinadas pela Agents Window oficial 1.135.0. Verificados busca inline, filtros reais, agrupamento persistido, caixa do modal, resize, navegação, campos adaptativos e tema. Gate 93/0/13, repetição final 44/44, Playwright 10 cenários. Decisão em 05 e evidências em 09. Entrega para homologação do proprietário.

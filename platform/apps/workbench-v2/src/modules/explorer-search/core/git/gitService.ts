@@ -37,7 +37,18 @@ export interface GitDiffSides {
   title: string;
 }
 
+export type GitRepositoryAction = 'create' | 'switch' | 'delete' | 'merge' | 'abort-merge' | 'fetch' | 'pull' | 'push';
+
+export interface GitRepositoryDetails {
+  branches: string[];
+  remotes: string[];
+  history: Array<{ oid: string; subject: string }>;
+  merging: boolean;
+}
+
 export interface GitPortLike {
+  repositoryDetails?(root: WorkspaceUri): Promise<GitRepositoryDetails>;
+  repositoryAction?(root: WorkspaceUri, action: GitRepositoryAction, target?: string, expectedBranch?: string): Promise<void>;
   status(root: WorkspaceUri): Promise<GitStatus>;
   /** 4.7-c: conteúdo de um lado; ausente → ''. */
   show(root: WorkspaceUri, uri: WorkspaceUri, ref: GitShowRef): Promise<string>;
@@ -144,6 +155,7 @@ export function buildGroups(entries: GitEntry[]): GitResourceGroup[] {
 
 export interface GitServiceOptions {
   debounceMs?: number;
+  canChangeWorktree?: (uris?: readonly WorkspaceUri[]) => boolean;
   setTimeout?: (cb: () => void, ms: number) => unknown;
   clearTimeout?: (h: unknown) => void;
 }
@@ -160,7 +172,7 @@ export class GitService {
   private readonly setT: (cb: () => void, ms: number) => unknown;
   private readonly clearT: (h: unknown) => void;
 
-  constructor(private readonly port: GitPortLike, opts: GitServiceOptions = {}) {
+  constructor(private readonly port: GitPortLike, private readonly opts: GitServiceOptions = {}) {
     this.debounceMs = opts.debounceMs ?? GIT_REFRESH_DEBOUNCE_MS;
     this.setT = opts.setTimeout ?? ((cb, ms) => globalThis.setTimeout(cb, ms));
     this.clearT = opts.clearTimeout ?? ((h) => globalThis.clearTimeout(h as ReturnType<typeof setTimeout>));
@@ -216,10 +228,34 @@ export class GitService {
     }
   }
 
+  supportsRepositoryActions(): boolean { return !!this.port.repositoryDetails && !!this.port.repositoryAction; }
+  async repositoryDetails(): Promise<GitRepositoryDetails> {
+    if (!this.root || !this.port.repositoryDetails) throw new Error('Operações do repositório indisponíveis.');
+    return this.port.repositoryDetails(this.root);
+  }
+  repositoryAction(action: GitRepositoryAction, target?: string, expectedBranch?: string): Promise<void> {
+    return this.op(async root => {
+      if (!this.port.repositoryAction) throw new Error('Operações do repositório indisponíveis.');
+      if (action === 'switch' || action === 'merge' || action === 'abort-merge' || action === 'pull') this.assertWorktreeSafe();
+      await this.port.repositoryAction(root, action, target, expectedBranch);
+    });
+  }
+
   init(): Promise<void> { return this.op((r) => this.port.init(r)); }
   stage(uris: WorkspaceUri[]): Promise<void> { return this.op((r) => this.port.stage(r, uris)); }
   unstage(uris: WorkspaceUri[]): Promise<void> { return this.op((r) => this.port.unstage(r, uris)); }
-  discard(uris: WorkspaceUri[]): Promise<void> { return this.op((r) => this.port.discard(r, uris)); }
+  private assertWorktreeSafe(uris?: readonly WorkspaceUri[]): void {
+    if (this.opts.canChangeWorktree?.(uris) === false) {
+      throw new Error('Salve ou descarte as alterações abertas no editor antes de modificar a árvore de trabalho pelo Git.');
+    }
+  }
+
+  discard(uris: WorkspaceUri[]): Promise<void> {
+    return this.op((r) => {
+      this.assertWorktreeSafe(uris);
+      return this.port.discard(r, uris);
+    });
+  }
   stageAll(): Promise<void> { return this.stage(this.urisOf('workingTree')); }
   unstageAll(): Promise<void> { return this.unstage(this.urisOf('index')); }
 

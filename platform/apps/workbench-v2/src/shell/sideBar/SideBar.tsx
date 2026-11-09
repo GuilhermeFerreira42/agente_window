@@ -139,6 +139,7 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
       ref={rootRef}
       className={`part sidebar ${side}${dropOver ? ' drop-target' : ''}`}
       data-testid="side-bar"
+      data-active-view={active?.id}
       role="none"
       style={{ display: visible ? 'flex' : 'none', width: effectiveWidth, flexBasis: effectiveWidth }}
       onDragEnter={onRootDragOver}
@@ -163,6 +164,7 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize Primary Side Bar"
+        title="Arraste para redimensionar (duplo-clique para restaurar)"
         aria-valuemin={SIDE_BAR_MIN_WIDTH}
         aria-valuemax={maxSideBarWidth(available)}
         aria-valuenow={effectiveWidth}
@@ -172,6 +174,7 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
         onPointerMove={onSashPointerMove}
         onPointerUp={onSashPointerUp}
         onPointerCancel={onSashPointerUp}
+        onLostPointerCapture={onSashPointerUp}
         onDoubleClick={onResetWidth}
         onKeyDown={onSashKeyDown}
       />

@@ -39,6 +39,7 @@ export interface SearchServiceOptions {
   maxFiles?: number;
   /** Transporte explícito; default: `fs` se tiver `searchText`, senão fallback local. */
   transport?: SearchTransportLike;
+  canReplace?: (uri: WorkspaceUri) => boolean;
 }
 
 export interface ReplaceAllSummary extends SearchReplaceSummary {
@@ -54,12 +55,13 @@ export class SearchService implements ISearchApi {
   private readonly debounceMs: number;
   private readonly maxResults: number;
   private readonly maxFiles: number;
+  private refreshQueued = false;
   private pending: { id: string; timer: ReturnType<typeof setTimeout> | null; ac: AbortController } | null = null;
   /** c6 — último resultado concluído (o SearchView do VS Code guarda o modelo
    *  enquanto a view fica escondida; aqui a UI é desmontada ao trocar de aba). */
   lastResult: { root: WorkspaceUri; query: SearchQuery; matches: SearchMatch[]; fileCount: number; truncated: boolean } | null = null;
 
-  constructor(private readonly fs: FileSystemPortLike, opts: SearchServiceOptions = {}) {
+  constructor(private readonly fs: FileSystemPortLike, private readonly opts: SearchServiceOptions = {}) {
     this.debounceMs = opts.debounceMs ?? SEARCH_DEBOUNCE_MS;
     this.maxResults = opts.maxResults ?? SEARCH_DEFAULT_MAX_RESULTS;
     this.maxFiles = opts.maxFiles ?? SEARCH_DEFAULT_MAX_FILES;
@@ -72,6 +74,7 @@ export class SearchService implements ISearchApi {
 
   /** Cancela a busca em voo/agendada (usado por Clear Search Results e dispose). */
   cancelPending(): void {
+    this.refreshQueued = false;
     if (!this.pending) return;
     const p = this.pending;
     this.pending = null;
@@ -80,8 +83,28 @@ export class SearchService implements ISearchApi {
     this.events.fire({ type: 'search.cancelled', id: p.id });
   }
 
-  query(input: { root: WorkspaceUri; query: SearchQuery; onResult?: (r: { matches: SearchMatch[]; fileCount: number; truncated: boolean }) => void }): SearchHandle {
+  clearResults(): void {
+    this.cancelPending();
+    this.lastResult = null;
+  }
+
+  refresh(): void {
+    if (this.pending) {
+      this.refreshQueued = this.pending.timer === null;
+      return;
+    }
+    if (this.lastResult) this.query(this.lastResult, true);
+  }
+
+  private assertReplaceAllowed(uri: WorkspaceUri): void {
+    if (this.opts.canReplace?.(uri) === false) {
+      throw new Error('O arquivo tem alterações não salvas no editor. Salve ou descarte o rascunho antes de substituir.');
+    }
+  }
+
+  query(input: { root: WorkspaceUri; query: SearchQuery; onResult?: (r: { matches: SearchMatch[]; fileCount: number; truncated: boolean }) => void }, background = false): SearchHandle {
     this.cancelPending(); // última busca vence
+    if (!background) this.lastResult = null;
     const id = `search-${++seq}`;
     const ac = new AbortController();
     const entry = { id, timer: null as ReturnType<typeof setTimeout> | null, ac };
@@ -89,20 +112,26 @@ export class SearchService implements ISearchApi {
     const run = async () => {
       entry.timer = null;
       if (ac.signal.aborted) return;
-      this.events.fire({ type: 'search.started', id });
+      if (!background) this.events.fire({ type: 'search.started', id });
       try {
         const r = await this.transport.searchText({ root: input.root, query: input.query, maxResults: this.maxResults, maxFiles: this.maxFiles, signal: ac.signal });
         if (ac.signal.aborted) return;
         this.events.fire({ type: 'search.progress', id, filesScanned: r.filesScanned, matches: r.matchCount });
         this.lastResult = { root: input.root, query: input.query, matches: r.matches, fileCount: r.fileCount, truncated: r.truncated };
-        this.events.fire({ type: 'search.finished', id, matches: r.matches, fileCount: r.fileCount, truncated: r.truncated });
+        this.events.fire({ type: 'search.finished', id, matches: r.matches, fileCount: r.fileCount, truncated: r.truncated, ...(background ? { background: true } : {}) });
         input.onResult?.({ matches: r.matches, fileCount: r.fileCount, truncated: r.truncated });
       } catch (e) {
         if (ac.signal.aborted) return;
         const code = (e as { code?: string })?.code === 'invalid_query' ? 'invalid_query' : 'search_failed';
         this.events.fire({ type: 'error', code, message: (e as Error)?.message ?? String(e) });
       } finally {
-        if (this.pending === entry) this.pending = null;
+        if (this.pending === entry) {
+          this.pending = null;
+          if (this.refreshQueued) {
+            this.refreshQueued = false;
+            this.refresh();
+          }
+        }
       }
     };
     if (this.debounceMs > 0) entry.timer = setTimeout(() => void run(), this.debounceMs);
@@ -124,10 +153,12 @@ export class SearchService implements ISearchApi {
     const failures: ReplaceAllSummary['failures'] = [];
     for (const uri of uris) {
       try {
+        this.assertReplaceAllowed(uri);
         const { content } = await this.fs.readFile({ uri });
+        this.assertReplaceAllowed(uri);
         const r = replaceInContent(content, compiled, input.replacement, input.query.isRegExp === true);
         if (r.count === 0) continue;
-        await this.fs.writeFile({ uri, content: r.content, atomic: true });
+        await this.fs.writeFile({ uri, content: r.content, atomic: true, expectedContent: content });
         files++;
         replacements += r.count;
       } catch (e) {
@@ -154,11 +185,13 @@ export class SearchService implements ISearchApi {
     const failures: ReplaceAllSummary['failures'] = [];
     for (const [uri, targets] of byUri) {
       try {
+        this.assertReplaceAllowed(uri);
         const { content } = await this.fs.readFile({ uri });
+        this.assertReplaceAllowed(uri);
         const r = replaceMatchesInContent(content, compiled, input.replacement, input.query.isRegExp === true, targets, input.preserveCase === true);
         missed += r.missed;
         if (r.count === 0) continue;
-        await this.fs.writeFile({ uri, content: r.content, atomic: true });
+        await this.fs.writeFile({ uri, content: r.content, atomic: true, expectedContent: content });
         files++;
         replacements += r.count;
       } catch (e) {

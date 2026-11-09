@@ -25,15 +25,19 @@ import type { IncomingMessage as IMRequest } from 'node:http';
 import type { ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { createReadStream } from 'node:fs';
+import { realpath } from 'node:fs/promises';
+import { isAbsolute, relative, sep } from 'node:path';
 import { URL } from 'node:url';
 import type { WorkspaceUri } from '../../contract';
 import {
   assertWorkspaceRoot,
   FsHost,
   FsHostError,
+  toFsPath,
   toWorkspaceUri,
 } from './fsHost';
 import { ExplorerFsWatcher, type FsChangedBatch } from './watcher';
+import { nodeGitExec } from '../git/gitHost';
 import { runSearch, type SearchEngineEvent } from './searchEngine';
 import type { SearchMatch, SearchQuery } from '../../contract';
 
@@ -91,6 +95,7 @@ function statusOf(code: string): number {
     case 'file_not_found':
       return 404;
     case 'file_exists':
+    case 'file_changed':
       return 409;
     case 'invalid_query':
       return 400;
@@ -253,6 +258,7 @@ export async function createExplorerFsServer(
           const q = (body.query ?? {}) as Partial<SearchQuery>;
           const query: SearchQuery = {
             pattern: typeof q.pattern === 'string' ? q.pattern : '',
+            useIgnoreFiles: q.useIgnoreFiles !== false,
             isCaseSensitive: q.isCaseSensitive === true,
             isWholeWord: q.isWholeWord === true,
             isRegExp: q.isRegExp === true,
@@ -263,7 +269,20 @@ export async function createExplorerFsServer(
             typeof body[k] === 'number' && Number.isFinite(body[k] as number) && (body[k] as number) > 0 ? (body[k] as number) : undefined;
           const ac = new AbortController();
           req.on('close', () => ac.abort()); // cliente desistiu (última busca vence)
-          const gen = runSearch(host.rootPath, root, query, { maxResults: num('maxResults'), maxFiles: num('maxFiles'), signal: ac.signal });
+          const [workspace, scope] = await Promise.all([realpath(host.rootPath), realpath(toFsPath(host.rootPath, root))]);
+          const scopeRelative = relative(workspace, scope);
+          if (scopeRelative === '..' || scopeRelative.startsWith(`..${sep}`) || isAbsolute(scopeRelative)) {
+            throw new FsHostError('forbidden_path', 'Escopo de pesquisa fora do workspace.');
+          }
+          const trackedAndVisible = query.useIgnoreFiles
+            ? await nodeGitExec(scope, ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '.'])
+            : undefined;
+          const visibleFiles = trackedAndVisible?.code === 0 ? new Set(trackedAndVisible.stdout.split('\0')) : undefined;
+          const gen = runSearch(host.rootPath, root, query, {
+            maxResults: num('maxResults'), maxFiles: num('maxFiles'), signal: ac.signal,
+            onDirectory: uri => watcher.ensureWatch(uri, true),
+            includeFile: visibleFiles ? path => visibleFiles.has(path) : undefined,
+          });
           const wantsStream = String(req.headers.accept ?? '').includes('application/x-ndjson');
           // primeiro evento fora do try de headers: erros de query viram 400 JSON
           const first = await gen.next();
@@ -290,7 +309,7 @@ export async function createExplorerFsServer(
         }
         switch (p) {
           case '/fs/write': {
-            await host.writeFileAtomic(needUri(), String(body.content ?? ''));
+            await host.writeFileAtomic(needUri(), String(body.content ?? ''), typeof body.expectedContent === 'string' ? body.expectedContent : undefined);
             res.statusCode = 204;
             res.end();
             return true;

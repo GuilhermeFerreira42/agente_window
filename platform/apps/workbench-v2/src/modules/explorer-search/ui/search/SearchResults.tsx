@@ -104,9 +104,7 @@ export function SearchResults({
   const [focusIndex, setFocusIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // nova busca → estado de colapso zera (o modelo é recriado no upstream); o
   // índice de foco só é limitado (após Dismiss/Replace o foco cai no vizinho)
-  useEffect(() => { setCollapsed(new Set()); }, [matches]);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -137,7 +135,8 @@ export function SearchResults({
   }, [focusRequest, rows.length]);
 
   useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>('.monaco-list-row.focused');
+    if (!listRef.current?.contains(document.activeElement)) return;
+    const el = listRef.current.querySelector<HTMLElement>('.monaco-list-row.focused');
     el?.scrollIntoView({ block: 'nearest' });
   }, [focusIndex, rows]);
 

@@ -6,3 +6,14 @@
 /* "No changes detected": mesmo padrão do letterpress do empty state do anexo — texto secundário centralizado */
 .attach-viewlet .attach-diff-empty { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 13px; user-select: none; }
 .attach-viewlet .attach-diff-empty .codicon-check { font-size: 16px; color: var(--vscode-testing-iconPassed, var(--vscode-descriptionForeground)); }
+
+.attach-diff-actions { display: flex; justify-content: flex-end; padding: 4px 8px; }
+.attach-diff-actions button {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-sideBarSectionHeader-border);
+  border-radius: var(--vscode-cornerRadius-small, 4px);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.attach-diff-actions button:is(:hover, [aria-pressed="true"]) { background: var(--vscode-toolbar-hoverBackground); }

@@ -55,24 +55,26 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   const modelsRef = useRef<{ original: Monaco.editor.ITextModel; modified: Monaco.editor.ITextModel } | null>(null);
   const appliedRef = useRef<{ resource: string; original: string; modified: string } | null>(null);
   const [ready, setReady] = useState(false);
+  const [sideBySide, setSideBySide] = useState(true);
   const identical = payload.original === payload.modified;
 
   // cria o DiffEditor uma vez
   useEffect(() => {
     let disposed = false;
+    let themeObserver: MutationObserver | undefined;
     void loadMonaco().then((monaco) => {
       if (disposed || !hostRef.current) return;
       monacoRef.current = monaco;
       const ed = monaco.editor.createDiffEditor(hostRef.current, { ...ATTACH_DIFF_OPTIONS, theme: currentTheme() });
       edRef.current = ed;
-      const mo = new MutationObserver(() => monaco.editor.setTheme(currentTheme()));
-      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      themeObserver = new MutationObserver(() => monaco.editor.setTheme(currentTheme()));
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
       setReady(true);
       onReady?.(ed);
-      return () => mo.disconnect();
     });
     return () => {
       disposed = true;
+      themeObserver?.disconnect();
       // pós-11 C7: o EDITOR solta primeiro — descartar os models com o
       // DiffEditor vivo joga "TextModel got disposed before model got reset"
       // e o React desmonta o anexo inteiro ("não abre nenhum arquivo", vídeo4).
@@ -81,6 +83,10 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (ready) edRef.current?.updateOptions({ renderSideBySide: sideBySide });
+  }, [ready, sideBySide]);
 
   // troca de payload → novos models
   useEffect(() => {
@@ -114,6 +120,11 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
           <span className="attach-diff-empty-text">{DIFF_STRINGS.noChanges}</span>
         </div>
       )}
+      {!identical && <div className="attach-diff-actions">
+        <button type="button" aria-pressed={!sideBySide} onClick={() => setSideBySide(value => !value)}>
+          Comparação em linha
+        </button>
+      </div>}
       <div ref={hostRef} className="attach-diff-host" style={{ display: identical ? 'none' : undefined }} />
     </div>
   );

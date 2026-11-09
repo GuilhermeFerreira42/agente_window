@@ -22,6 +22,7 @@ export const EDITOR_MIN_WIDTH = 220
 export interface LayoutState {
   /** null = ainda não arrastado → usa `defaultSideBarWidth(largura)`. */
   readonly sideBarWidth: number | null
+  readonly sideBarWidthsByWorkspace?: Readonly<Record<string, number | null>>
   readonly sideBarVisible: boolean
   readonly activeView: ViewId
   /** 5.4: só `left`/`right` chegam aqui (loader/setter filtram); ver ActivityBarPosition. */
@@ -65,7 +66,12 @@ export function loadLayoutState(storage: Pick<Storage, 'getItem'> | undefined = 
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return DEFAULT_LAYOUT_STATE
     const p = parsed as Record<string, unknown>
+    const rawWidths = p.sideBarWidthsByWorkspace;
+    const widths = rawWidths && typeof rawWidths === 'object' && !Array.isArray(rawWidths)
+      ? Object.fromEntries(Object.entries(rawWidths).filter(([, value]) => value === null || (typeof value === 'number' && Number.isFinite(value) && value >= SIDE_BAR_MIN_WIDTH)))
+      : undefined;
     return {
+      ...(widths ? { sideBarWidthsByWorkspace: widths } : {}),
       sideBarWidth: typeof p.sideBarWidth === 'number' && Number.isFinite(p.sideBarWidth) && p.sideBarWidth >= SIDE_BAR_MIN_WIDTH ? Math.round(p.sideBarWidth) : null,
       sideBarVisible: typeof p.sideBarVisible === 'boolean' ? p.sideBarVisible : DEFAULT_LAYOUT_STATE.sideBarVisible,
       activeView: isViewId(p.activeView) ? p.activeView : DEFAULT_LAYOUT_STATE.activeView,
@@ -110,13 +116,25 @@ export interface LayoutStateApi {
 }
 
 /** Hook do shell: estado + persistência síncrona a cada mudança. */
-export function useLayoutState(): LayoutStateApi {
-  const [state, setState] = useState<LayoutState>(() => loadLayoutState())
+export function useLayoutState(workspace?: string): LayoutStateApi {
+  const [stored, setState] = useState<LayoutState>(() => loadLayoutState())
   const first = useRef(true)
   useEffect(() => {
     if (first.current) { first.current = false; return }
-    saveLayoutState(state)
-  }, [state])
+    saveLayoutState(stored)
+  }, [stored])
+  useEffect(() => {
+    if (!workspace) return
+    setState(current => current.sideBarWidthsByWorkspace || current.sideBarWidth === null
+      ? current
+      : { ...current, sideBarWidthsByWorkspace: { [workspace]: current.sideBarWidth } })
+  }, [workspace])
+  const state = useMemo(() => {
+    const widths = stored.sideBarWidthsByWorkspace
+    if (!workspace || !widths) return stored
+    const sideBarWidth = Object.prototype.hasOwnProperty.call(widths, workspace) ? widths[workspace] : null
+    return { ...stored, sideBarWidth }
+  }, [stored, workspace])
 
   const selectView = useCallback((id: ViewId) => {
     setState((s) => (s.activeView === id && s.sideBarVisible)
@@ -128,8 +146,13 @@ export function useLayoutState(): LayoutStateApi {
   }, [])
   const toggleSideBar = useCallback(() => setState((s) => ({ ...s, sideBarVisible: !s.sideBarVisible })), [])
   const setSideBarVisible = useCallback((visible: boolean) => setState((s) => (s.sideBarVisible === visible ? s : { ...s, sideBarVisible: visible })), [])
-  const setSideBarWidth = useCallback((width: number) => setState((s) => (s.sideBarWidth === width ? s : { ...s, sideBarWidth: width })), [])
-  const resetSideBarWidth = useCallback(() => setState((s) => (s.sideBarWidth === null ? s : { ...s, sideBarWidth: null })), [])
+  const persistSideBarWidth = useCallback((width: number | null) => setState(current => {
+    if (!workspace) return current.sideBarWidth === width ? current : { ...current, sideBarWidth: width }
+    if (current.sideBarWidthsByWorkspace?.[workspace] === width) return current
+    return { ...current, sideBarWidthsByWorkspace: { ...current.sideBarWidthsByWorkspace, [workspace]: width } }
+  }), [workspace])
+  const setSideBarWidth = persistSideBarWidth
+  const resetSideBarWidth = useCallback(() => persistSideBarWidth(null), [persistSideBarWidth])
 
   const setActivityBarPosition = useCallback((position: ActivityBarPosition) => {
     if (!isSupportedActivityBarPosition(position)) return

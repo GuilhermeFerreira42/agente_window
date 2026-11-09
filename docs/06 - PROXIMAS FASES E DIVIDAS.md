@@ -1,3 +1,9 @@
+# Limites correntes da barra lateral direita — D184 (09/11/2026)
+
+Ficam registrados como diferenças da referência o Graph visual do SCM, as opções e os submenus ainda sem paridade, o modelo de um repositório Git raiz por workspace, a exclusão permanente com confirmação no Explorer e as operações remotas restritas a HTTPS. A cobertura de atualização de pastas obedece ao limite de diretórios do watcher. A validação em Debian headless e a matriz completa de fidelidade visual e atalhos seguem pendentes.
+
+---
+
 # Limites correntes — D182, 08/11/2026
 
 As lacunas executáveis do pacote complementar foram corrigidas e verificadas: modal, navegação interna, Quick Open, pasta digitada, lateral e Search expandido. Permanecem limites/decisões: Ctrl+W físico reservado ao navegador; execução Linux headless e picker nativo sem prova nesta rodada; multi-root/Open Folders extras fora do contrato atual de uma raiz; serviços futuros de Personalizações indisponíveis. Igualdade visual pixel a pixel não foi demonstrada. F5 não preserva rascunhos; Canceled do Monaco e a integral histórica não estão resolvidos por este gate. E15-d física/homologação continuam reservadas. Não avançar automaticamente de fatia.

@@ -170,7 +170,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const [auxiliaryTab, setAuxiliaryTab] = useState<'changes' | 'files'>('changes')
   // FATIA-05 5.1 c2 — estado do chassi (view ativa, Side Bar visível/largura) persistido em workbench.layoutState.v1.
-  const layout = useLayoutState()
+  const layout = useLayoutState(explorerWorkspacePath)
   // RF-09 (docs/24 §6.1, P1=A): anexo maximizado recolhe a Side Bar; restaurar devolve o estado anterior.
   // Ref porque o listener do módulo é registrado uma vez (boot) e precisa ver a API mais recente.
   const layoutRef = useRef(layout)
@@ -243,6 +243,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   useEffect(() => {
     let cancelled = false
     let mountedModule: IExplorerSearchModule | undefined
+    let watchClient: ExplorerFsWatchClient | undefined
     void (async () => {
       try {
         if (explorerWorkspacePath) {
@@ -252,7 +253,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           })
           if (!response.ok) throw new Error(`Falha ao ativar workspace no Explorer (${response.status})`)
         }
-        const fs = new BrowserFsPort({ watchClient: new ExplorerFsWatchClient({}) })
+        if (cancelled) return
+        watchClient = new ExplorerFsWatchClient({})
+        const fs = new BrowserFsPort({ watchClient })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
         if (cancelled) return
@@ -304,6 +307,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     return () => {
       cancelled = true
       mountedModule?.dispose()
+      watchClient?.dispose()
     }
   }, [explorerWorkspacePath])
   useEffect(() => {

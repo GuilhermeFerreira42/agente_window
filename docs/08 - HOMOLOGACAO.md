@@ -1,3 +1,17 @@
+# Inspeção D184 — barra lateral direita (09/11/2026)
+
+Use a sessão descartável **Sidebar fixture session** no perfil de validação. Salve rascunhos antes de recarregar sua sessão real.
+
+1. Arraste a divisória direita, recarregue e restaure a largura com duplo clique.
+2. Reordene, expanda e redimensione as seções do Explorer. Confira a persistência e o menu conforme o elemento selecionado.
+3. Pesquise, aplique os filtros, abra um resultado e substitua texto em arquivos descartáveis. Confira a proteção de uma aba suja.
+4. Abra o diff de um arquivo no Source Control e alterne linha e lado a lado. Exercite stage, unstage, branch, merge e operações em um remoto descartável.
+5. Escreva no workspace pelo terminal e confira a atualização da árvore, busca e alterações Git.
+
+O roteiro detalhado e as capturas estão no relatório operacional. Aceite humano pendente.
+
+---
+
 # Inspeção D183 — lateral e Personalizações (09/11/2026)
 
 Salve rascunhos antes de recarregar o perfil de inspeção.

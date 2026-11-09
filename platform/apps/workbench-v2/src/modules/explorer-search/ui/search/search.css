@@ -447,5 +447,6 @@
 
 .search-view-toolbar { display: flex; justify-content: flex-end; gap: 2px; padding: 3px 8px; flex: 0 0 auto; }
 .search-view-toolbar button { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.part.sidebar .title-actions .search-view-toolbar { padding: 0; }
 .search-view-toolbar button:hover { background: var(--vscode-toolbar-hoverBackground); }
 .search-view-toolbar button:disabled { opacity: .4; cursor: default; }

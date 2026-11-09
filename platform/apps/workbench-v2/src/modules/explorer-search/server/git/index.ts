@@ -30,7 +30,8 @@ function statusOf(code: string): number {
   switch (code) {
     case 'forbidden_path': return 403;
     case 'not_a_repo': return 404;
-    case 'invalid_message': return 400;
+    case 'invalid_message':
+    case 'invalid_action': return 400;
     case 'nothing_to_commit': return 409;
     case 'git_unavailable': return 503;
     default: return 500;
@@ -75,9 +76,17 @@ export function createExplorerGitServer(options: ExplorerGitServerOptions): Expl
         const root = body.root;
         if (typeof root !== 'string') throw new GitHostError('io', 'root ausente');
         const repo = root as WorkspaceUri;
+        await host.validateRepositoryPath(repo);
         switch (op) {
           case 'status':
             sendJson(res, 200, await host.status(repo));
+            return true;
+          case 'repository':
+            sendJson(res, 200, await host.repositoryDetails(repo));
+            return true;
+          case 'repository-action':
+            await host.repositoryAction(repo, body.action, body.target, body.expectedBranch);
+            res.statusCode = 204; res.end();
             return true;
           case 'init':
             await host.init(repo);

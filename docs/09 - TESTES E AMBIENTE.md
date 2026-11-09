@@ -1,3 +1,14 @@
+# Evidência D184 — barra lateral direita (09/11/2026)
+
+Operacional externo em `lateral-direita-1.135`. VS Code 1.135.0 Microsoft assinado, tag correspondente a 08d4889f9ec4a1685d257b9b95de036c8e1ce1e5. Comparação em 1440 × 900, tema escuro, com largura de 296 px para as duas barras.
+
+- Bateria dirigida ampliada: 578 aprovados, 7 falhas reproduzidas em 2adcbc7 e 13 ignorados. A repetição dirigida final foi 68/68, com sobreposição à bateria. Typecheck aprovado.
+- Playwright em Chromium com processos e repositórios descartáveis no Windows. Roteiros em `browser-final.log`, `browser-explorer.log` e `browser-avancado.log`. Push, Fetch e Pull exercitados por HTTPS local.
+- Compilação do backend e build Vite aprovados. Smoke do preview integrado com Git de servidor e rejeição de caminho externo, em `preview.log`.
+- A validação executável em Debian e a suíte integral estão pendentes.
+
+---
+
 # Evidência D183 — Agents Window oficial 1.135.0 (09/11/2026)
 
 Operacional em ../arena-operacional/referencia-1.135. Tag 1.135.0, revisão 08d4889f9ec4a1685d257b9b95de036c8e1ce1e5. Binário Microsoft assinado, modo portátil e abertura da Agents Window pela opção oferecida de continuar sem login. Fonte oficial e binário ficam na pasta isolada de referência, fora do Git. Capturas oficiais e do produto em 1440×900 no comparativo.

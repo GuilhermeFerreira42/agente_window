@@ -28,6 +28,13 @@ afterEach(() => {
   rmSync(fixture, { recursive: true, force: true });
 });
 
+it('escrita condicional rejeita uma versão de disco ultrapassada', async () => {
+  const file = uri('src/a.txt');
+  await host.writeFileAtomic(file, 'beta', 'alfa');
+  await expect(host.writeFileAtomic(file, 'gama', 'alfa')).rejects.toMatchObject({ code: 'file_changed' });
+  expect((await host.readFile(file)).content).toBe('beta');
+});
+
 describe('fsHost — leitura (list/stat/read/binário)', () => {
   it('list e stat com mtime/size/kind/readonly', async () => {
     const entries = await host.list(uri(''));

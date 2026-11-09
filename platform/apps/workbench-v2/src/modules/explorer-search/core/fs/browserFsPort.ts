@@ -155,8 +155,8 @@ export class BrowserFsPort implements FileSystemPortLike {
     );
   }
 
-  writeFile(input: { uri: WorkspaceUri; content: string; atomic: true }): Promise<void> {
-    return this.post('/fs/write', { uri: input.uri, content: input.content });
+  writeFile(input: { uri: WorkspaceUri; content: string; atomic: true; expectedContent?: string }): Promise<void> {
+    return this.post('/fs/write', { uri: input.uri, content: input.content, expectedContent: input.expectedContent });
   }
 
   createFile(input: { uri: WorkspaceUri; content?: string }): Promise<void> {

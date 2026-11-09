@@ -21,6 +21,7 @@
   },
   "include": [
     "../src/modules/explorer-search/contract.ts",
-    "../src/modules/explorer-search/server/fs/**/*.ts"
+    "../src/modules/explorer-search/server/fs/**/*.ts",
+    "../src/modules/explorer-search/server/git/**/*.ts"
   ]
 }

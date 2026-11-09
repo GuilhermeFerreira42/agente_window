@@ -80,7 +80,7 @@
 /* ---------------------------------------------------------------------------
  * paneview.css
  * ------------------------------------------------------------------------- */
-.explorer-viewlet .monaco-pane-view { width: 100%; height: 100%; min-height: 0; flex: 1 1 0; --pane-header-size: 22px; }
+.explorer-viewlet .monaco-pane-view { width: 100%; height: 100%; min-height: 0; flex: 1 1 0; --pane-header-size: 28px; }
 .explorer-viewlet .monaco-split-view2 { position: relative; width: 100%; height: 100%; min-height: 0; }
 .explorer-viewlet .monaco-split-view2 > .monaco-scrollable-element { width: 100%; height: 100%; min-height: 0; position: relative; overflow: hidden; }
 /* split-view real posiciona por top/height absolutos; aqui = coluna flex com a
@@ -89,17 +89,17 @@
 /* monaco-editor.css (já carregado pelo workbench) põe `.split-view-view{position:absolute}` — no VS Code
  * o JS calcula top/height; aqui a coluna flex faz esse papel, então neutralizamos o absolute. */
 .explorer-viewlet .monaco-split-view2 > .monaco-scrollable-element > .split-view-container > .split-view-view { position: relative; width: 100%; flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders'] { flex: 0 0 22px; }
+.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders'] { flex: 0 0 var(--pane-header-size); }
 .explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 1 1 0; }
 /* Panes auxiliares expandidos: no VS Code o SplitView (paneview.ts/splitview.ts
  * `layout`) reparte a altura entre panes expandidos respeitando `minimumBodySize`
  * (Open Editors = conteúdo até 9 linhas; Outline/Timeline compartilham o resto).
  * Na coluna flex: Open Editors cresce até o conteúdo; Outline/Timeline recebem uma
  * fatia (peso 1 vs pasta peso 2) com corpo mínimo garantido — nunca 0px. */
-.explorer-viewlet .split-view-view[data-pane='openEditors']:has(> .pane.expanded) { flex: 0 1 auto; min-height: calc(22px + 22px); max-height: calc(22px + 9 * 22px); }
+.explorer-viewlet .split-view-view[data-pane='openEditors']:has(> .pane.expanded) { flex: 0 1 auto; min-height: calc(var(--pane-header-size) + 22px); max-height: calc(var(--pane-header-size) + 9 * 22px); }
 .explorer-viewlet .split-view-view[data-pane='outline']:has(> .pane.expanded),
-.explorer-viewlet .split-view-view[data-pane='timeline']:has(> .pane.expanded) { flex: 1 1 0; min-height: calc(22px + 3 * 22px); }
-.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 2 1 0; min-height: calc(22px + 3 * 22px); }
+.explorer-viewlet .split-view-view[data-pane='timeline']:has(> .pane.expanded) { flex: 1 1 0; min-height: calc(var(--pane-header-size) + 3 * 22px); }
+.explorer-viewlet .split-view-container > .split-view-view[data-pane='folders']:has(> .pane.expanded) { flex: 2 1 0; min-height: calc(var(--pane-header-size) + 3 * 22px); }
 
 .explorer-viewlet .monaco-pane-view .pane { overflow: hidden; width: 100%; height: 100%; display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
 .explorer-viewlet .monaco-pane-view .pane > .pane-header {
@@ -119,6 +119,9 @@
   border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
 }
 .explorer-viewlet .monaco-pane-view .split-view-view:first-of-type > .pane > .pane-header { border-top: none !important; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header.pane-drop-target {
+  box-shadow: inset 0 2px var(--vscode-focusBorder);
+}
 .explorer-viewlet .monaco-pane-view .pane > .pane-header:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .explorer-viewlet .monaco-pane-view .pane > .pane-header:focus:not(:focus-visible) { outline: none; }
 .explorer-viewlet .monaco-pane-view .pane > .pane-header > .codicon:first-of-type { margin: 0 2px; }
@@ -134,7 +137,39 @@
   font-weight: inherit;
   line-height: inherit;
 }
-.explorer-viewlet .monaco-pane-view .pane > .pane-header > .title { text-transform: uppercase; }
+.explorer-viewlet .monaco-pane-view .pane > .pane-header > .title { text-transform: none; }
+.explorer-title-action {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small, 4px);
+  background: transparent;
+  color: var(--vscode-icon-foreground, inherit);
+  cursor: pointer;
+}
+.explorer-title-action:hover { background: var(--vscode-toolbar-hoverBackground); }
+.part.sidebar .explorer-viewlet .monaco-pane-view {
+  box-sizing: border-box;
+  padding-inline: var(--vscode-spacing-size80, 8px) var(--vscode-spacing-size40, 4px);
+}
+.part.sidebar .explorer-viewlet .monaco-pane-view .pane > .pane-header { background: transparent; }
+.part.sidebar .explorer-viewlet .monaco-list-row,
+.part.sidebar .search-view .monaco-list-row,
+.part.sidebar .scm-view .monaco-list-row {
+  border-radius: var(--vscode-cornerRadius-small, 4px);
+}
+.explorer-pane-sash {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  z-index: 2;
+  cursor: row-resize;
+  touch-action: none;
+  transition: background 120ms ease;
+}
+.explorer-pane-sash:is(:hover, :active) { background: var(--vscode-focusBorder); }
 /* nome da pasta raiz preserva caixa (explorer.pane.preserve-workspace-name-case) */
 .explorer-viewlet .monaco-pane-view .pane.preserve-workspace-name-case > .pane-header > .title { text-transform: none; }
 .explorer-viewlet .monaco-pane-view .pane > .pane-header > .actions { display: none; margin-left: auto; margin-right: 8px; }

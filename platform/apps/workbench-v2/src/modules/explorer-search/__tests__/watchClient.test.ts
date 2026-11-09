@@ -112,9 +112,10 @@ describe('explorerFsWatchClient — WS do contrato no core puro', () => {
     vi.advanceTimersByTime(250);
     const s4 = FakeSocket.instances[3];
     s4.fire('open');
+    expect(events).toEqual([{ type: 'fs.changed', changes: [], reconnected: true }]);
     s4.fire('message', { data: 'not-json{' });
     s4.fire('message', { data: JSON.stringify({ op: 'watched' }) });
-    expect(events).toEqual([]);
+    expect(events).toHaveLength(1);
   });
 
   it('dispose encerra tudo e não re-connecta', () => {

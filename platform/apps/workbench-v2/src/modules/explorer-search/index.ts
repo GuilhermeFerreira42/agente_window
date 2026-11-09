@@ -24,7 +24,8 @@ import { SearchService } from './core/search/searchService';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ExplorerView, type ExplorerViewProps } from './ui/ExplorerView';
-import { SearchPanel, SEARCH_STORAGE_KEY } from './ui/search/SearchPanel';
+import { SearchPanel } from './ui/search/SearchPanel';
+import { SEARCH_STORAGE_KEY } from './core/constants';
 import { AttachArea, type AttachAreaProps } from './ui/attach/AttachArea';
 // FATIA-15 Onda 2b (D146 §2) — corpo da aba central capaz de salvar.
 import { CenterCodeEditor, type CenterCodeEditorProps, type CenterCloseRequester } from './ui/center/CenterCodeEditor';
@@ -93,8 +94,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   const off = service.onEvent((e) => events.fire(e));
   // 4.6 c2: ISearchApi real — transporte HTTP se deps.fs for BrowserFsPort
   // (searchText), senão walker local sobre a própria porta.
-  const searchService = new SearchService(deps.fs);
-  const offSearch = searchService.onEvent((e) => events.fire(e));
+
   let reactRoot: Root | null = null;
   let slotContainer: HTMLElement | null = null;
   let searchRoot: Root | null = null;
@@ -134,10 +134,16 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // 4.7 c1 — Editor Anexo: layout puro + root React no `attachSlot` da barra.
   const attachLayout = new AttachLayoutStore(typeof localStorage === 'undefined' ? null : localStorage);
   const editorService = new EditorService();
+  const searchOptions = { canReplace: (uri: WorkspaceUri) => !editorService.hasDirtyUri(uri) };
+  const searchService = new SearchService(deps.fs, searchOptions);
+  const offSearch = searchService.onEvent((e) => events.fire(e));
+  const sidebarSearchStorage = `${SEARCH_STORAGE_KEY}:${encodeURIComponent(deps.workspaceRoot)}`;
   // 4.7-b c2 — Git: raiz = raiz do workspace (decisão do usuário); o primeiro status
   // acontece quando o ChangesPane monta (setRoot). 5.3: o pane vive na view `scm` da
   // Side Bar (montada 1× pelo shell), então o status — e o badge — nascem no boot.
-  const gitService = new GitService(new BrowserGitPort());
+  const gitService = new GitService(new BrowserGitPort(), {
+    canChangeWorktree: uris => uris ? !uris.some(uri => editorService.hasDirtyUri(uri)) : !editorService.hasAnyDirty(),
+  });
   const offGitEvents = gitService.onEvent((e) => events.fire(e));
   // c5 — save ATÔMICO: conteúdo do modelo → fs.writeFile({atomic:true}) (temp +
   // rename no fsHost); dirty limpa SÓ depois da promise resolver; falha mantém
@@ -434,7 +440,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // recurso abre o diff read-only NO ANEXO (aba fixa Diff — até a 5.7).
   const scmElement = () => createElement('div', { className: 'explorer-viewlet scm-viewlet', 'data-testid': 'scm-viewlet' },
     createElement(ChangesPane, {
-      git: gitService, root: deps.workspaceRoot,
+      git: gitService, root: deps.workspaceRoot, repositoryControls: true,
       onOpenFile: (uri: WorkspaceUri) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri, kind: 'code' })),
       onOpenDiff: (item, sides) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })),
     }));
@@ -501,7 +507,15 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     }
     // 4.7-b c2: qualquer mudança no workspace → re-status Git (debounce; só com raiz definida)
     if (gitService.getRoot()) gitService.handleFsChanged();
+    searchService.refresh();
+    for (const document of searchDocuments.values()) document.refresh();
     const dirs = new Set<WorkspaceUri>();
+    if (e.reconnected) {
+      dirs.add(deps.workspaceRoot);
+      for (const { item } of service.getVisibleRows()) {
+        if (item.isDirectory && service.isExpandedUri(item.resource)) dirs.add(item.resource);
+      }
+    }
     for (const change of e.changes) dirs.add(uriDirname(change.uri));
     for (const dir of dirs) {
       if (!service.isExpandedUri(dir) && dir !== deps.workspaceRoot) continue;
@@ -545,7 +559,8 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       reactRoot = createRoot(container);
       reactRoot.render(
         createElement(ExplorerView, {
-          service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
+          toolbarTarget: root.closest('.part.sidebar')?.querySelector<HTMLElement>('.title-actions') ?? undefined,
+          workspaceRoot: deps.workspaceRoot, service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
           // 5.3: "Open Source Control" (header Folders) → view `scm` da Side Bar (o shell decide onde ela vive).
           onOpenChanges: deps.openSourceControl,
           activeFile: activeFileApi, editorList, // EditorService owns the list
@@ -555,10 +570,10 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
 
     mountSearchEditor(root, opts): void {
       let service = searchDocuments.get(opts.sessionId);
-      if (!service) { service = new SearchService(deps.fs); searchDocuments.set(opts.sessionId, service); }
+      if (!service) { service = new SearchService(deps.fs, searchOptions); searchDocuments.set(opts.sessionId, service); }
       const storageKey = `${SEARCH_STORAGE_KEY}.editor.${opts.sessionId}`;
       if (searchDocumentRequests.get(opts.sessionId) !== opts.focusRequest) {
-        try { const seed = localStorage.getItem(SEARCH_STORAGE_KEY); if (seed) localStorage.setItem(storageKey, seed); } catch { /* private/quota */ }
+        try { const seed = localStorage.getItem(sidebarSearchStorage); if (seed) localStorage.setItem(storageKey, seed); } catch { /* private/quota */ }
         searchDocumentRequests.set(opts.sessionId, opts.focusRequest);
       }
       if (!searchDocumentRoot || searchDocumentContainer?.parentElement !== root) {
@@ -574,7 +589,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
     mountSearch(root: HTMLElement, opts?: { focusRequest?: number }): void {
       // mesmo host → só re-render (foco pedido); host novo → remonta.
       if (searchRoot && searchContainer && searchContainer.parentElement === root) {
-        searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
+        searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, storageKey: sidebarSearchStorage, autoSearch: true, toolbarTarget: root.closest('.part.sidebar')?.querySelector<HTMLElement>('.title-actions') ?? undefined, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
         return;
       }
       unmountSearch();
@@ -583,7 +598,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
       root.appendChild(container);
       searchContainer = container;
       searchRoot = createRoot(container);
-      searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
+      searchRoot.render(createElement(SearchPanel, { search: searchService, root: deps.workspaceRoot, storageKey: sidebarSearchStorage, autoSearch: true, toolbarTarget: root.closest('.part.sidebar')?.querySelector<HTMLElement>('.title-actions') ?? undefined, focusRequest: opts?.focusRequest, onOpenEditor: () => { void deps.menus.execute('workbench.action.openSearchEditor'); }, onOpenMatch }));
     },
 
     unmountSearch,

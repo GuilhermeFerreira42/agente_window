@@ -4,7 +4,7 @@
 // PURO (FT-07): só globals web.
 // ============================================================================
 import type { WorkspaceUri } from '../../contract';
-import type { GitPortLike, GitShowRef, GitStatus } from './gitService';
+import type { GitRepositoryAction, GitRepositoryDetails, GitPortLike, GitShowRef, GitStatus } from './gitService';
 
 export class BrowserGitError extends Error {
   constructor(readonly code: string, message: string, readonly status: number) {
@@ -35,6 +35,9 @@ export class BrowserGitPort implements GitPortLike {
     const text = await res.text();
     return (text.length > 0 ? JSON.parse(text) : undefined) as T;
   }
+
+  repositoryDetails(root: WorkspaceUri): Promise<GitRepositoryDetails> { return this.post('repository', { root }); }
+  repositoryAction(root: WorkspaceUri, action: GitRepositoryAction, target?: string, expectedBranch?: string): Promise<void> { return this.post('repository-action', { root, action, target, expectedBranch }); }
 
   status(root: WorkspaceUri): Promise<GitStatus> { return this.post('status', { root }); }
   init(root: WorkspaceUri): Promise<void> { return this.post('init', { root }); }

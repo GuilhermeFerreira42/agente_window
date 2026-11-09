@@ -1,3 +1,11 @@
+# Estado vigente — barra lateral direita na régua 1.135.0, D184 (09/11/2026)
+
+Base 2adcbc7. Explorer, Search e Source Control foram revisados contra o VS Code oficial 1.135.0 executado com a barra primária à direita. A divisória direita compartilha os estilos da esquerda. O Explorer persiste ordem, altura, visibilidade e expansão de seções. Search acompanha o watcher e protege o disco e rascunhos na substituição. Source Control usa o Git do servidor, com histórico, branches, merge, remoto HTTPS e diff do Monaco.
+
+Validação e limites em 09 e 06. O aceite humano continua pendente. Próxima ação de revisão em 08. Relatório e capturas no operacional externo em `lateral-direita-1.135`.
+
+---
+
 # Estado vigente — lateral e Personalizações na régua 1.135.0, D183 (09/11/2026)
 
 Base 8c156e4. A referência primária desta rodada é a Agents Window oficial 1.135.0, executada em perfil portátil Microsoft assinado e confrontada com a tag correspondente. Relatório e comparativo em ../arena-operacional/referencia-1.135.

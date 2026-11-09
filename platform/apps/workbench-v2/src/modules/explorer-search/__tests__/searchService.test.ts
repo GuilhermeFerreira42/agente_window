@@ -59,6 +59,25 @@ describe('SearchService.query — debounce + última vence', () => {
     expect(r.matches.some((m: { uri: string }) => m.uri.includes('node_modules'))).toBe(false);
   });
 
+  it('atualiza resultados em segundo plano e não restaura uma pesquisa limpa', async () => {
+    const fs = seed();
+    const svc = new SearchService(fs);
+    const events: ExplorerSearchEvent[] = [];
+    svc.onEvent(event => events.push(event));
+    svc.query({ root: ROOT, query: { pattern: 'needle' } });
+    await vi.advanceTimersByTimeAsync(250);
+    fs.files.set(`${ROOT}/src/new.txt`, 'needle');
+    svc.refresh();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(events.filter(event => event.type === 'search.started')).toHaveLength(1);
+    expect(events[events.length - 1]).toMatchObject({ type: 'search.finished', background: true, fileCount: 3 });
+    svc.clearResults();
+    svc.refresh();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(svc.lastResult).toBeNull();
+    expect(events.filter(event => event.type === 'search.finished')).toHaveLength(2);
+  });
+
   it('segunda query dentro do debounce cancela a primeira (search.cancelled) — só a última roda', async () => {
     const svc = new SearchService(seed()); const evs: ExplorerSearchEvent[] = []; svc.onEvent((e) => evs.push(e));
     const h1 = svc.query({ root: ROOT, query: { pattern: 'need' } });

@@ -28,6 +28,7 @@ export function fsPlugin(options: FsPluginOptions): Plugin {
     async configureServer(server) {
       let root = process.env.FS_TEST_ROOT ?? options.root;
       const activateRoot = async (nextRoot: string) => {
+        if (fsServer && nextRoot === root) return;
         const nextFsServer = await createExplorerFsServer({
           root: nextRoot as `file://${string}` | string as `file://${string}`,
           watcherCoalesceMs: WATCHER_COALESCE_MS,

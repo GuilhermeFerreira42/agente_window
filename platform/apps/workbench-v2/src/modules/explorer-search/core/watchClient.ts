@@ -11,6 +11,7 @@ import type { WorkspaceUri } from '../contract';
 
 export interface FsChangedEvent {
   type: 'fs.changed';
+  reconnected?: true;
   changes: Array<{ uri: WorkspaceUri; kind: 'added' | 'removed' | 'changed' }>;
 }
 
@@ -48,6 +49,7 @@ export class ExplorerFsWatchClient {
   private readonly listeners = new Set<(e: FsChangedEvent) => void>();
   private counter = 0;
   private reconnectAttempts = 0;
+  private hasConnected = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private readyListeners: (() => void)[] = [];
 
@@ -84,13 +86,19 @@ export class ExplorerFsWatchClient {
     this.openFlag = false;
 
     socket.addEventListener('open', () => {
+      if (this.socket !== socket || this.disposed) return;
       this.openFlag = true;
       this.reconnectAttempts = 0;
       // re-inscreve todos os watchers registrados (upstream: re-subscribe)
       for (const uri of this.watchers) this.send({ op: 'watch', uri });
+      if (this.hasConnected) {
+        for (const cb of [...this.listeners]) cb({ type: 'fs.changed', changes: [], reconnected: true });
+      }
+      this.hasConnected = true;
       for (const ready of this.readyListeners.splice(0)) ready();
     });
     socket.addEventListener('message', (arg) => {
+      if (this.socket !== socket || this.disposed) return;
       try {
         const data = (arg as { data?: unknown })?.data ?? arg;
         const msg = JSON.parse(String(data)) as Record<string, unknown> & FsChangedEvent;
@@ -102,6 +110,7 @@ export class ExplorerFsWatchClient {
       }
     });
     const handleDown = () => {
+      if (this.socket !== socket || this.disposed) return;
       this.openFlag = false;
       this.socket = undefined;
       this.scheduleReconnect();

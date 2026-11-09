@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import type { ExplorerSearchEvent, ISearchApi, SearchMatch, SearchQuery, SearchReplaceSummary, WorkspaceUri } from '../../contract';
 import { formatResultsMessage, NO_RESULTS_MESSAGE, type FileMatchGroup } from '../../core/search/model';
+import { SEARCH_STORAGE_KEY } from '../../core/constants';
 import { compileSearchQuery } from '../../core/search/queryBuilder';
 import { replacementFor } from '../../core/search/textMatcher';
 import { SearchResults } from './SearchResults';
@@ -23,6 +24,7 @@ export interface SearchPanelProps {
   search: ISearchApi & {
     onEvent(cb: (e: ExplorerSearchEvent) => void): () => void;
     cancelPending(): void;
+    clearResults?(): void;
     /** c5 — troca pontual (1 match / 1 arquivo); fora do contrato congelado. */
     replaceMatches?(input: { query: SearchQuery; replacement: string; matches: ReadonlyArray<SearchMatch>; preserveCase?: boolean }): Promise<SearchReplaceSummary>;
     /** c6 — resultado retido pelo serviço (a UI é desmontada ao trocar de aba). */
@@ -35,12 +37,13 @@ export interface SearchPanelProps {
   onOpenMatch?: (m: SearchMatch) => void;
   onOpenEditor?: () => void;
   storageKey?: string;
+  toolbarTarget?: HTMLElement;
   autoSearch?: boolean;
 }
 
 // c6 — persistência (searchView.ts saveState: query/replace/toggles/include/
 // exclude + widgets abertos). Só o estado do widget; resultados não.
-export const SEARCH_STORAGE_KEY = 'explorer-search.search.v1';
+export { SEARCH_STORAGE_KEY } from '../../core/constants';
 export interface PersistedSearchState {
   pattern: string; replacement: string; include: string; exclude: string;
   isCaseSensitive: boolean; isWholeWord: boolean; isRegExp: boolean; preserveCase: boolean; useExcludeSettings: boolean;
@@ -198,7 +201,7 @@ export interface SearchState {
   matches: SearchMatch[]; fileCount: number; truncated: boolean; status: 'idle' | 'searching' | 'done' | 'error'; error?: string;
 }
 
-export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEditor, storageKey = SEARCH_STORAGE_KEY, autoSearch = false }: SearchPanelProps) {
+export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEditor, storageKey = SEARCH_STORAGE_KEY, autoSearch = false, toolbarTarget }: SearchPanelProps) {
   const [persisted] = useState(() => loadPersisted(storageKey));
   const [pattern, setPattern] = useState(persisted?.pattern ?? '');
   const [replacement, setReplacement] = useState(persisted?.replacement ?? '');
@@ -207,8 +210,8 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const [toggles, setToggles] = useState<SearchToggles>(persisted
     ? { isCaseSensitive: persisted.isCaseSensitive, isWholeWord: persisted.isWholeWord, isRegExp: persisted.isRegExp, preserveCase: persisted.preserveCase, useExcludeSettings: persisted.useExcludeSettings }
     : { isCaseSensitive: false, isWholeWord: false, isRegExp: false, preserveCase: false, useExcludeSettings: true });
-  const [replaceOpen, setReplaceOpen] = useState(true);
-  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? true);
+  const [detailsOpen, setDetailsOpen] = useState(persisted?.detailsOpen ?? true);
   // estado restaurado NÃO dispara busca sozinho (só digitação/Enter)
   const armedRef = useRef(autoSearch || !persisted || persisted.pattern.length === 0);
 
@@ -223,6 +226,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
     const last = search.lastResult;
     const same = last && persisted && last.root === root && last.query.pattern === persisted.pattern
       && (last.query.isCaseSensitive === true) === persisted.isCaseSensitive && (last.query.isWholeWord === true) === persisted.isWholeWord
+      && (last.query.useIgnoreFiles !== false) === persisted.useExcludeSettings
       && (last.query.isRegExp === true) === persisted.isRegExp && (last.query.include ?? '') === persisted.include.trim() && (last.query.exclude ?? '') === persisted.exclude.trim();
     return same && last ? { matches: last.matches, fileCount: last.fileCount, truncated: last.truncated, status: 'done' } : { matches: [], fileCount: 0, truncated: false, status: 'idle' };
   });
@@ -239,7 +243,11 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const flip = useCallback((k: keyof SearchToggles) => setToggles((t) => ({ ...t, [k]: !t[k] })), []);
 
   // foco pedido pelo shell (Ctrl+Shift+F) e no mount
-  useEffect(() => { setReplaceOpen(true); setDetailsOpen(true); searchRef.current?.focus(); searchRef.current?.select(); }, [focusRequest]);
+  useEffect(() => {
+    if (focusRequest) { setReplaceOpen(true); setDetailsOpen(true); }
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  }, [focusRequest]);
   useEffect(() => {
     if (replaceOpen && focusReplaceNext.current) { replaceRef.current?.focus(); focusReplaceNext.current = false; }
   }, [replaceOpen]);
@@ -247,18 +255,21 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   // eventos do serviço → estado
   useEffect(() => search.onEvent((e) => {
     if (e.type === 'search.started') { setAllCollapsed(false); setState((s) => ({ ...s, status: 'searching' })); }
-    else if (e.type === 'search.finished') { setState({ matches: e.matches, fileCount: e.fileCount, truncated: e.truncated, status: 'done' }); setDismissed(new Set()); setNotice(null); }
+    else if (e.type === 'search.finished') {
+      setState({ matches: e.matches, fileCount: e.fileCount, truncated: e.truncated, status: 'done' });
+      if (!e.background) { setDismissed(new Set()); setNotice(null); }
+    }
     else if (e.type === 'error' && (e.code === 'invalid_query' || e.code === 'search_failed')) setState((s) => ({ ...s, status: 'error', error: e.message }));
   }), [search]);
 
   const query: SearchQuery = useMemo(() => ({
-    pattern, isCaseSensitive: toggles.isCaseSensitive, isWholeWord: toggles.isWholeWord, isRegExp: toggles.isRegExp,
+    pattern, useIgnoreFiles: toggles.useExcludeSettings, isCaseSensitive: toggles.isCaseSensitive, isWholeWord: toggles.isWholeWord, isRegExp: toggles.isRegExp,
     include: include.trim() || undefined, exclude: exclude.trim() || undefined,
-  }), [pattern, toggles.isCaseSensitive, toggles.isWholeWord, toggles.isRegExp, include, exclude]);
+  }), [pattern, toggles.useExcludeSettings, toggles.isCaseSensitive, toggles.isWholeWord, toggles.isRegExp, include, exclude]);
 
   // busca enquanto digita (search.searchOnType) — debounce/cancel são do serviço
   useEffect(() => {
-    if (pattern.length === 0) { search.cancelPending(); setState({ matches: [], fileCount: 0, truncated: false, status: 'idle' }); setNotice(null); return; }
+    if (pattern.length === 0) { if (search.clearResults) search.clearResults(); else search.cancelPending(); setState({ matches: [], fileCount: 0, truncated: false, status: 'idle' }); setNotice(null); return; }
     if (!armedRef.current) { armedRef.current = true; return; }
     const h = search.query({ root, query });
     return () => h.cancel();
@@ -313,8 +324,12 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const replaceSome = useCallback(async (ms: ReadonlyArray<SearchMatch>) => {
     if (!search.replaceMatches || ms.length === 0) return;
     try {
-      await search.replaceMatches({ query, replacement, matches: ms, preserveCase: toggles.preserveCase });
-      drop(ms);
+      const result = await search.replaceMatches({ query, replacement, matches: ms, preserveCase: toggles.preserveCase });
+      const failed = new Set(result.failures?.map(failure => failure.uri));
+      if (!result.missed) drop(ms.filter(match => !failed.has(match.uri)));
+      if (result.failures?.length || result.missed) {
+        setNotice([...result.failures?.map(failure => failure.message) ?? [], ...(result.missed ? ['O conteúdo mudou desde a busca. Confira os resultados novamente.'] : [])].join(' '));
+      }
     } catch (e) {
       setNotice((e as Error)?.message ?? String(e));
     }
@@ -333,18 +348,24 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
       message: replaceConfirmMessage(occ, fil, rep),
       run: () => {
         setConfirm(null);
-        const doIt = dismissed.size === 0 || !search.replaceMatches
+        const doIt = !search.replaceMatches
           ? search.replaceAll({ root, query, replacement: rep })
           : search.replaceMatches({ query, replacement: rep, matches: visible, preserveCase: toggles.preserveCase });
         void doIt.then((r) => {
-          setNotice(replaceDoneMessage(r.replacements, r.files, rep));
+          const summary = replaceDoneMessage(r.replacements, r.files, rep);
+          if (r.failures?.length || r.missed) {
+            const details = r.failures?.map(failure => failure.message).join(' ') ?? '';
+            setNotice(`${summary} ${details} ${r.missed ? 'Alguns resultados mudaram desde a busca.' : ''}`.trim());
+            return;
+          }
+          setNotice(summary);
           setState({ matches: [], fileCount: 0, truncated: false, status: 'idle' });
           setDismissed(new Set());
           searchRef.current?.focus();
         }).catch((e) => setNotice((e as Error)?.message ?? String(e)));
       },
     });
-  }, [visible, visibleFiles, replacement, dismissed.size, search, root, query, toggles.preserveCase]);
+  }, [visible, visibleFiles, replacement, search, root, query, toggles.preserveCase]);
 
   const onReplaceKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.altKey && e.key.toLowerCase() === 'p') { e.preventDefault(); flip('preserveCase'); return; }
@@ -355,14 +376,17 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
     ? (state.matches.length === 0 ? NO_RESULTS_MESSAGE : visible.length === 0 ? '' : formatResultsMessage(visible.length, visibleFiles, state.truncated))
     : state.status === 'error' ? state.error ?? '' : '');
 
-  return (
-    <div className="search-view explorer-viewlet" data-testid="explorer-search-panel">
-      <div className="search-view-toolbar" role="toolbar" aria-label="Ações da pesquisa">
+  const toolbar = (
+    <div className="search-view-toolbar" role="toolbar" aria-label="Ações da pesquisa">
         <button type="button" title="Atualizar pesquisa" aria-label="Atualizar pesquisa" disabled={!pattern} onClick={() => search.query({ root, query })}><span className="codicon codicon-refresh" /></button>
         <button type="button" title="Limpar pesquisa" aria-label="Limpar pesquisa" onClick={() => { search.cancelPending(); setPattern(''); setNotice(null); setDismissed(new Set()); }}><span className="codicon codicon-clear-all" /></button>
         {onOpenEditor && <button type="button" title="Abrir pesquisa no editor" aria-label="Abrir pesquisa no editor" onClick={onOpenEditor}><span className="codicon codicon-go-to-file" /></button>}
         <button type="button" title={allCollapsed ? 'Expandir resultados' : 'Recolher resultados'} aria-label={allCollapsed ? 'Expandir resultados' : 'Recolher resultados'} onClick={() => setAllCollapsed(value => !value)}><span className="codicon codicon-collapse-all" /></button>
-      </div>
+    </div>
+  );
+  return (
+    <div className="search-view explorer-viewlet" data-testid="explorer-search-panel">
+      {toolbarTarget ? createPortal(toolbar, toolbarTarget) : toolbar}
       <div className="search-widgets-container">
         <div className={`search-widget${replaceOpen ? ' replace-active' : ''}`}>
           <div
@@ -427,7 +451,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
                 <h4>files to exclude</h4>
                 <PatternInput
                   value={exclude} placeholder="" ariaLabel="Search Exclude Patterns" onChange={setExclude}
-                  toggles={[{ cls: 'codicon-exclude', title: 'Use Exclude Settings and Ignore Files', checked: toggles.useExcludeSettings, onToggle: () => flip('useExcludeSettings') }]}
+                  toggles={[{ cls: 'codicon-exclude', title: 'Use Git Ignore Files', checked: toggles.useExcludeSettings, onToggle: () => flip('useExcludeSettings') }]}
                 />
               </div>
             </>
@@ -439,6 +463,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
       </div>
       <div className="results" data-testid="explorer-search-results">
         <SearchResults
+          key={JSON.stringify(query)}
           matches={visible}
           collapseAll={allCollapsed}
           root={root}
