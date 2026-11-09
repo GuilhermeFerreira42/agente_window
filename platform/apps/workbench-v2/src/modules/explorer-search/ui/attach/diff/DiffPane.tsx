@@ -29,6 +29,8 @@ export const ATTACH_DIFF_OPTIONS: Monaco.editor.IStandaloneDiffEditorConstructio
   readOnly: true,
   originalEditable: false,
   renderSideBySide: true,
+  // Honor the layout chosen in the diff toolbar, even with a wide sidebar.
+  useInlineViewWhenSpaceIsLimited: false,
   renderOverviewRuler: true,
   enableSplitViewResizing: true,
   scrollBeyondLastLine: true,

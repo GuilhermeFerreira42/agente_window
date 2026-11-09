@@ -1,5 +1,7 @@
 # Evidência D185 — apresentação do Graph e diff (09/11/2026)
 
+Na verificação do Alt+Z com o diff em 378 px, o Playwright confirmou duas colunas de 189 px. As linhas renderizadas passaram de 2 para 19 em cada coluna, e o segundo Alt+Z, acionado na coluna original, restaurou 2 em ambas. Prova em `revisao-lateral/wrap-duplo-final.log`.
+
 O vídeo foi conferido por quadros e transcrição local. O Playwright verificou caminho aninhado acima do diff, mudança na quantidade de linhas renderizadas com Alt+Z, etiqueta de referência remota e foco no commit atual. Os atalhos do Graph executaram Push confirmado, Fetch e Pull em remoto HTTPS descartável. Typecheck e 33 testes dirigidos passaram. Logs da rodada em `revisao-lateral/1714-*.log`.
 
 ---

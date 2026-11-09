@@ -1,6 +1,6 @@
 # Graph e diff após revisão em vídeo — D185 (09/11/2026)
 
-Base `f6e292d`. O Graph exibe referências Git locais e remotas conhecidas pelo repositório, usa cores nas linhas e nos estados de arquivo e oferece localizar o commit atual, Fetch, Pull e Push. O diff mostra o caminho do arquivo e aceita Alt+Z nos dois lados. Aceite humano pendente.
+Base `f6e292d`. O Graph exibe referências Git locais e remotas conhecidas pelo repositório, usa cores nas linhas e nos estados de arquivo e oferece localizar o commit atual, Fetch, Pull e Push. O diff mostra o caminho do arquivo. Ele respeita o modo de comparação escolhido mesmo em área estreita e aplica Alt+Z às duas colunas no modo lado a lado. Aceite humano pendente.
 
 ---
 

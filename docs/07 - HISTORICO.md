@@ -2,6 +2,8 @@
 
 Revisão em vídeo dos rótulos de branches, atalhos do Graph, caminho do arquivo e quebra de linha no Monaco. Estado em 03 e prova em 09.
 
+A verificação seguinte corrigiu a troca automática para o modo em linha quando o espaço fica estreito. A comparação respeita o modo escolhido na barra do diff.
+
 ---
 
 # 09/11/2026 — D185, clique nos commits do Graph
