@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowDownToLine, ArrowUp, LocateFixed } from 'lucide-react';
 import type { GitRepositoryAction, GitRepositoryDetails, GitService } from '../../../core/git/gitService';
 import { AttachDialog } from '../AttachDialog';
 import { RepositoryGraph, type CommitGraphActions } from './RepositoryGraph';
@@ -82,6 +83,21 @@ export function RepositoryActions({ git, branch, loadCommit, openCommitFile, onC
       setBusy(false);
     }
   };
+  const confirmPush = (remote: string) => setConfirm({
+    action: 'push', target: remote, expectedBranch: branch ?? undefined,
+    message: `Enviar “${branch}” para “${remote}”?`, detail: 'Os commits desta branch serão publicados no remoto selecionado.',
+  });
+  const graphRemoteAction = (action: 'fetch' | 'pull' | 'push') => {
+    const remotes = details?.remotes ?? [];
+    const remote = remotes[0];
+    if (!remote) return;
+    if (remotes.length > 1) {
+      setOpen(true);
+      return;
+    }
+    if (action === 'push') confirmPush(remote);
+    else void run(action, remote, action === 'pull' ? branch ?? undefined : undefined);
+  };
 
   return (
     <>
@@ -122,7 +138,7 @@ export function RepositoryActions({ git, branch, loadCommit, openCommitFile, onC
                 <div className="scm-repository-buttons">
                   <button type="button" disabled={!selectedRemote} onClick={() => void run('fetch', selectedRemote)}>Fetch</button>
                   <button type="button" disabled={!selectedRemote || !branch || details.merging} onClick={() => void run('pull', selectedRemote, branch ?? undefined)}>Pull</button>
-                  <button type="button" disabled={!selectedRemote || !branch} onClick={() => setConfirm({ action: 'push', target: selectedRemote, expectedBranch: branch ?? undefined, message: `Enviar “${branch}” para “${selectedRemote}”?`, detail: 'Os commits desta branch serão publicados no remoto selecionado.' })}>Push</button>
+                  <button type="button" disabled={!selectedRemote || !branch} onClick={() => confirmPush(selectedRemote)}>Push</button>
                 </div>
               </fieldset>
             </>}
@@ -135,6 +151,17 @@ export function RepositoryActions({ git, branch, loadCommit, openCommitFile, onC
           <button type="button" className="scm-section-toggle" aria-expanded={historyOpen} onClick={() => setHistoryOpen(value => !value)}>
             <span aria-hidden="true" className={`codicon codicon-chevron-${historyOpen ? 'down' : 'right'}`} />Graph
           </button>
+          {historyOpen && <>
+            <button type="button" className="scm-toolbar-button" aria-label="Reveal Current Commit" title="Reveal Current Commit" disabled={!details?.history.length}
+              onClick={() => {
+                const head = historyRef.current?.querySelector<HTMLButtonElement>('.scm-graph-row');
+                head?.scrollIntoView({ block: 'nearest' });
+                head?.focus({ preventScroll: true });
+              }}><LocateFixed size={16} aria-hidden="true" /></button>
+            <button type="button" className="scm-toolbar-button" aria-label="Fetch from Graph" title="Fetch" disabled={busy || !details?.remotes.length} onClick={() => graphRemoteAction('fetch')}><ArrowDownToLine size={16} aria-hidden="true" /></button>
+            <button type="button" className="scm-toolbar-button" aria-label="Pull from Graph" title="Pull" disabled={busy || !branch || details?.merging || !details?.remotes.length} onClick={() => graphRemoteAction('pull')}><ArrowDown size={16} aria-hidden="true" /></button>
+            <button type="button" className="scm-toolbar-button" aria-label="Push from Graph" title="Push" disabled={busy || !branch || !details?.remotes.length} onClick={() => graphRemoteAction('push')}><ArrowUp size={16} aria-hidden="true" /></button>
+          </>}
           <button type="button" className="scm-toolbar-button codicon codicon-refresh" title="Refresh History" aria-label="Refresh History" onClick={refresh} />
         </div>
         {historyOpen && <div className="scm-history-body">

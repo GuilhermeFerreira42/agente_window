@@ -210,7 +210,7 @@ export function AttachArea({ store, sessionId, editor, root, onCloseBlocked, fs,
             {!activeTab && <AttachEmptyState />}
             {isDiffActive && diffPayload && (
               <DiffPaneBoundary resetKey={`${diffPayload.title}:${diffPayload.original.length}:${diffPayload.modified.length}`} fileName={diffPayload.title}>
-                <DiffPane sessionId={sessionId} payload={diffPayload} />
+                <DiffPane sessionId={sessionId} payload={diffPayload} root={root} />
               </DiffPaneBoundary>
             )}
             <CodeEditorPane editor={editor} sessionId={sessionId} fs={fs} onEditorReady={onEditorReady}

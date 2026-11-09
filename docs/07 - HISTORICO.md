@@ -1,3 +1,9 @@
+# 09/11/2026 — D185, apresentação do Graph e diff
+
+Revisão em vídeo dos rótulos de branches, atalhos do Graph, caminho do arquivo e quebra de linha no Monaco. Estado em 03 e prova em 09.
+
+---
+
 # 09/11/2026 — D185, clique nos commits do Graph
 
 Os commits do Graph abrem a lista de arquivos alterados e reutilizam o Monaco para o diff histórico. Estado em 03 e prova em 09.

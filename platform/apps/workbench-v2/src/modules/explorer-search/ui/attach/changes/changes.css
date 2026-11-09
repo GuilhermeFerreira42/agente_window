@@ -197,7 +197,7 @@
   font: inherit;
   text-align: start;
 }
-.scm-toolbar-button { width: 22px; height: 22px; padding: 0; border-radius: 4px; }
+.scm-toolbar-button { display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 4px; }
 .scm-toolbar-button:hover { background: var(--vscode-toolbar-hoverBackground); }
 .scm-toolbar-button:disabled { opacity: .5; cursor: default; }
 .scm-changes-body:not([hidden]) { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
@@ -215,15 +215,24 @@
 .scm-history:has(.scm-history-body) { flex-basis: 48%; }
 .scm-changes-body[hidden] + .scm-history:has(.scm-history-body) { flex: 1; max-height: none; min-height: 0; }
 .scm-history-branch {
-  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 18px;
   max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   padding-inline: 6px;
   border-radius: 8px;
-  background: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background: var(--vscode-scmGraph-historyItemRefColor, var(--vscode-focusBorder));
+  color: var(--vscode-button-foreground);
 }
+.scm-history-branch[data-remote="true"] {
+  background: var(--vscode-scmGraph-historyItemRemoteRefColor, var(--vscode-terminal-ansiMagenta));
+}
+.scm-history-branch svg { flex: none; }
+.scm-history-branch span { overflow: hidden; text-overflow: ellipsis; }
 .scm-history-body { min-height: 0; overflow: auto; }
 .scm-history-body p { margin: 8px 12px; white-space: normal; }
 .scm-history-body ol { margin: 0; padding: 0 10px; list-style: none; }
@@ -244,7 +253,14 @@
 .scm-graph-row:is(:hover, [aria-expanded="true"]), .scm-commit-file:hover { background: var(--vscode-list-hoverBackground); }
 .scm-commit-files { padding-inline-start: 18px; }
 .scm-commit-file { justify-content: space-between; padding-inline-end: 4px; }
-.scm-commit-file span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scm-commit-file-label { min-width: 0; align-items: center; }
+.scm-commit-file-label > :is(span, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scm-commit-file-label > span { flex: 0 0 auto; max-width: 100%; }
+.scm-commit-file-label small { margin-inline-start: 5px; color: var(--vscode-descriptionForeground); }
+.scm-commit-file-status { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+.scm-commit-file-status[data-status="A"] { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.scm-commit-file-status[data-status="D"] { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.scm-commit-file-status[data-status="R"] { color: var(--vscode-gitDecoration-renamedResourceForeground); }
 .scm-history-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scm-history-author {
   max-width: 30%;
@@ -257,6 +273,8 @@
 .scm-graph-lanes { flex: none; color: var(--vscode-scmGraph-foreground1, var(--vscode-focusBorder)); }
 .scm-graph-lanes path { stroke: currentColor; fill: none; }
 .scm-graph-lanes circle { fill: currentColor; }
+.scm-graph-lanes [data-lane="1"] { color: var(--vscode-scmGraph-foreground2, var(--vscode-gitDecoration-addedResourceForeground)); }
+.scm-graph-lanes [data-lane="2"] { color: var(--vscode-scmGraph-foreground3, var(--vscode-terminal-ansiMagenta)); }
 .scm-graph-lanes .scm-graph-head { fill: var(--vscode-sideBar-background); stroke: currentColor; stroke-width: 2px; }
 .scm-repository-actions {
   position: absolute;

@@ -42,7 +42,7 @@ export type GitRepositoryAction = 'create' | 'switch' | 'delete' | 'merge' | 'ab
 export interface GitRepositoryDetails {
   branches: string[];
   remotes: string[];
-  history: Array<{ oid: string; subject: string; parents?: string[]; author?: string }>;
+  history: Array<{ oid: string; subject: string; parents?: string[]; author?: string; refs?: Array<{ name: string; remote: boolean }> }>;
   merging: boolean;
 }
 

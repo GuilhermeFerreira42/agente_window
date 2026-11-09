@@ -1,3 +1,9 @@
+# Evidência D185 — apresentação do Graph e diff (09/11/2026)
+
+O vídeo foi conferido por quadros e transcrição local. O Playwright verificou caminho aninhado acima do diff, mudança na quantidade de linhas renderizadas com Alt+Z, etiqueta de referência remota e foco no commit atual. Os atalhos do Graph executaram Push confirmado, Fetch e Pull em remoto HTTPS descartável. Typecheck e 33 testes dirigidos passaram. Logs da rodada em `revisao-lateral/1714-*.log`.
+
+---
+
 # Evidência D185 — interação com commits do Graph (09/11/2026)
 
 O Playwright expandiu um merge com clique e um commit inicial com Enter, abriu os arquivos alterados no Monaco, confirmou o conteúdo histórico e recolheu o commit. Repositório descartável na 5198. Prova em `revisao-lateral/graph-clique.log`.

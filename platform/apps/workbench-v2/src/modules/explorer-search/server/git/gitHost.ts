@@ -240,8 +240,8 @@ export class GitHost {
 
   async repositoryDetails(repo: WorkspaceUri): Promise<GitRepositoryDetails> {
     const cwd = await this.verifiedRepository(repo);
-    const [branches, remotes, head, merging] = await Promise.all([
-      this.run(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']),
+    const [refsOutput, remotes, head, merging] = await Promise.all([
+      this.run(cwd, ['for-each-ref', '--format=%(objectname)%00%(refname)%00%(symref)', 'refs/heads/', 'refs/remotes/']),
       this.run(cwd, ['remote']),
       this.exec(cwd, ['rev-parse', '--verify', 'HEAD']),
       this.exec(cwd, ['rev-parse', '--verify', 'MERGE_HEAD']),
@@ -249,12 +249,19 @@ export class GitHost {
     const log = head.code === 0
       ? await this.run(cwd, ['log', '--topo-order', '-n', '30', '--format=%H%x00%P%x00%an%x00%s'])
       : '';
+    const refs = refsOutput.split(/\r?\n/).filter(Boolean).flatMap(line => {
+      const [oid, ref, symbolic] = line.split('\0');
+      if (symbolic) return [];
+      const remote = ref.startsWith('refs/remotes/');
+      return [{ oid, name: ref.slice(remote ? 'refs/remotes/'.length : 'refs/heads/'.length), remote }];
+    });
     return {
-      branches: branches.trim().split(/\r?\n/).filter(Boolean),
+      branches: refs.filter(ref => !ref.remote).map(ref => ref.name),
       remotes: remotes.trim().split(/\r?\n/).filter(Boolean),
       history: log.trim().split(/\r?\n/).filter(Boolean).map(line => {
         const [oid, parents = '', author = '', subject = ''] = line.split('\0');
-        return { oid, subject, parents: parents.split(' ').filter(Boolean), author };
+        return { oid, subject, parents: parents.split(' ').filter(Boolean), author,
+          refs: refs.filter(ref => ref.oid === oid).map(({ name, remote }) => ({ name, remote })) };
       }),
       merging: merging.code === 0,
     };

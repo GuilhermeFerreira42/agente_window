@@ -9,7 +9,8 @@
 // ============================================================================
 import React, { useEffect, useRef, useState } from 'react';
 import type * as Monaco from 'monaco-editor';
-import type { AttachDiffPayload } from '../../../contract';
+import type { AttachDiffPayload, WorkspaceUri } from '../../../contract';
+import { Breadcrumbs } from '../Breadcrumbs';
 import { uriBasename } from '../../../core/uri';
 import { ATTACH_MONACO_OPTIONS, currentTheme, languageFor } from '../CodeEditorPane';
 import { DIFF_STRINGS } from './diffStrings';
@@ -44,11 +45,12 @@ export const ATTACH_DIFF_OPTIONS: Monaco.editor.IStandaloneDiffEditorConstructio
 export interface DiffPaneProps {
   sessionId: string;
   payload: AttachDiffPayload;
+  root?: WorkspaceUri;
   /** Só testes/hook DEV. */
   onReady?: (editor: Monaco.editor.IStandaloneDiffEditor) => void;
 }
 
-export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
+export function DiffPane({ sessionId, payload, root, onReady }: DiffPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const edRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null);
   const monacoRef = useRef<monaco | null>(null);
@@ -56,6 +58,7 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   const appliedRef = useRef<{ resource: string; original: string; modified: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [sideBySide, setSideBySide] = useState(true);
+  const [wrap, setWrap] = useState(false);
   const identical = payload.original === payload.modified;
 
   // cria o DiffEditor uma vez
@@ -85,8 +88,8 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   }, []);
 
   useEffect(() => {
-    if (ready) edRef.current?.updateOptions({ renderSideBySide: sideBySide });
-  }, [ready, sideBySide]);
+    if (ready) edRef.current?.updateOptions({ renderSideBySide: sideBySide, diffWordWrap: wrap ? 'on' : 'off' });
+  }, [ready, sideBySide, wrap]);
 
   // troca de payload → novos models
   useEffect(() => {
@@ -113,7 +116,14 @@ export function DiffPane({ sessionId, payload, onReady }: DiffPaneProps) {
   }, [ready, identical, payload, sessionId]);
 
   return (
-    <div className="attach-editor-pane attach-diff-pane" data-testid="attach-diff-pane" data-identical={identical} data-resource={payload.resource} role="region" aria-label={payload.title}>
+    <div className="attach-editor-pane attach-diff-pane" data-testid="attach-diff-pane" data-identical={identical} data-resource={payload.resource}
+      data-word-wrap={wrap} role="region" aria-label={payload.title} onKeyDownCapture={event => {
+        if (event.code !== 'KeyZ' || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) setWrap(value => !value);
+      }}>
+      {root && <Breadcrumbs root={root} uri={payload.resource} />}
       {identical && (
         <div className="attach-diff-empty" data-testid="attach-diff-empty">
           <span className="codicon codicon-check" aria-hidden="true" />

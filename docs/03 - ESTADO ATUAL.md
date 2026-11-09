@@ -1,3 +1,9 @@
+# Graph e diff após revisão em vídeo — D185 (09/11/2026)
+
+Base `f6e292d`. O Graph exibe referências Git locais e remotas conhecidas pelo repositório, usa cores nas linhas e nos estados de arquivo e oferece localizar o commit atual, Fetch, Pull e Push. O diff mostra o caminho do arquivo e aceita Alt+Z nos dois lados. Aceite humano pendente.
+
+---
+
 # Interação com commits no Graph — D185 (09/11/2026)
 
 Base `45c4271`. Clicar num commit ou pressionar Enter expande a lista de arquivos. Clicar num arquivo abre o diff histórico no Monaco. O merge usa o primeiro pai como referência, e o commit inicial usa uma versão original vazia. Aceite humano pendente.

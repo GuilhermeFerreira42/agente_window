@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Cloud, GitBranch } from 'lucide-react';
 import type { GitCommitChanges, GitRepositoryDetails } from '../../../core/git/gitService';
+import { fileIconLabelClasses } from '../fileIconClasses';
 
 export interface CommitGraphActions {
   loadCommit(oid: string): Promise<GitCommitChanges>;
@@ -24,14 +26,20 @@ function CommitFiles({ oid, loadCommit, openCommitFile }: { oid: string } & Comm
       {error && <p role="alert">{error}</p>}
       {!changes && !error && <p role="status">Carregando arquivos…</p>}
       {changes?.files.length === 0 && <p>Este commit não alterou arquivos em relação ao primeiro pai.</p>}
-      {changes?.files.map(file => (
-        <button type="button" key={file.uri} className="scm-commit-file" title={file.path} onClick={() => {
+      {changes?.files.map(file => {
+        const slash = file.path.lastIndexOf('/');
+        const name = file.path.slice(slash + 1);
+        return <button type="button" key={file.uri} className="scm-commit-file" title={file.path} onClick={() => {
           setError('');
           void openCommitFile(oid, changes.parent, file).catch(() => setError('Não foi possível abrir o diff deste arquivo.'));
         }}>
-          <span>{file.path}</span><span aria-label="Status">{file.status}</span>
-        </button>
-      ))}
+          <span className={fileIconLabelClasses(name, ['scm-commit-file-label'])}>
+            <span>{name}</span>
+            {slash !== -1 && <small>{file.path.slice(0, slash)}</small>}
+          </span>
+          <span className="scm-commit-file-status" data-status={file.status} aria-label="Status">{file.status}</span>
+        </button>;
+      })}
     </div>
   );
 }
@@ -74,14 +82,19 @@ export function RepositoryGraph({ history, branch, loadCommit, openCommitFile }:
             <button type="button" className="scm-graph-row" disabled={!loadCommit || !openCommitFile}
               aria-expanded={expanded === commit.oid} onClick={() => setExpanded(value => value === commit.oid ? null : commit.oid)}>
               <svg className="scm-graph-lanes" width={width} height={ROW_HEIGHT} aria-hidden="true">
-                {through.map(column => <path key={column} d={`M${laneX(column)} 0 V${ROW_HEIGHT}`} />)}
-                {incoming !== -1 && <path d={`M${x} 0 V${CENTER}`} />}
-                {parents.map(column => <path key={column} d={`M${x} ${CENTER} C${x} ${ROW_HEIGHT},${laneX(column)} ${CENTER},${laneX(column)} ${ROW_HEIGHT}`} />)}
-                <circle cx={x} cy={CENTER} r={index === 0 ? 5 : 4} className={index === 0 ? 'scm-graph-head' : undefined} />
+                {through.map(column => <path key={column} data-lane={column % 3} d={`M${laneX(column)} 0 V${ROW_HEIGHT}`} />)}
+                {incoming !== -1 && <path data-lane={lane % 3} d={`M${x} 0 V${CENTER}`} />}
+                {parents.map(column => <path key={column} data-lane={column % 3} d={`M${x} ${CENTER} C${x} ${ROW_HEIGHT},${laneX(column)} ${CENTER},${laneX(column)} ${ROW_HEIGHT}`} />)}
+                <circle data-lane={lane % 3} cx={x} cy={CENTER} r={index === 0 ? 5 : 4} className={index === 0 ? 'scm-graph-head' : undefined} />
               </svg>
               <span className="scm-history-subject">{commit.subject}</span>
               {commit.author && <span className="scm-history-author">{commit.author}</span>}
-              {index === 0 && branch && <span className="scm-history-branch" title={branch}>{branch}</span>}
+              {(commit.refs ?? (index === 0 && branch ? [{ name: branch, remote: false }] : [])).map(ref => (
+                <span key={ref.name} className="scm-history-branch" data-remote={ref.remote} title={ref.name}>
+                  {ref.remote ? <Cloud size={12} aria-hidden="true" /> : <GitBranch size={12} aria-hidden="true" />}
+                  <span>{ref.name}</span>
+                </span>
+              ))}
             </button>
             {expanded === commit.oid && loadCommit && openCommitFile && (
               <CommitFiles key={commit.oid} oid={commit.oid} loadCommit={loadCommit} openCommitFile={openCommitFile} />

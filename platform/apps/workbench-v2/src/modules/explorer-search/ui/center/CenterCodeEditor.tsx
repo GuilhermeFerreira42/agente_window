@@ -212,7 +212,7 @@ export function CenterCodeEditor({
             resetKey={`${diffPayload.title}:${diffPayload.original.length}:${diffPayload.modified.length}`}
             fileName={diffPayload.title}
           >
-            <DiffPane sessionId={sessionId} payload={diffPayload} />
+            <DiffPane sessionId={sessionId} payload={diffPayload} root={workspaceRoot} />
           </DiffPaneBoundary>
         )}
         <CodeEditorPane
