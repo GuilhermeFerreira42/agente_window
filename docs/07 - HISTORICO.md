@@ -1,3 +1,9 @@
+# 09/11/2026 — D183
+
+Lateral e Personalizações refinadas pela Agents Window oficial 1.135.0. Verificados busca inline, filtros reais, agrupamento persistido, caixa do modal, resize, navegação, campos adaptativos e tema. Gate 93/0/13, repetição final 44/44, Playwright 10 cenários. Decisão em 05 e evidências em 09. Entrega para homologação do proprietário.
+
+---
+
 # 08/11/2026 — D182, pacote complementar do proprietário
 
 Conferido ZIP de SPEC RF-A..G, cinco PNG e HTML contra HEAD 6407a25. Baseline confirmou ausência de histórico e Personalizações full-surface. Implementados modal comum preservando superfícies, categorias futuras honestamente indisponíveis, histórico interno separado do Browser, Quick Open superior, pasta/menu, lateral compacta e Search reaberto expandido. Corrigida mensagem de filtro Timeline vazio. Testes detectaram nomes ambíguos de Voltar e remoção do seletor de sessões: corrigidos com rótulos contextuais e acesso na marca. Gate final 272/0/13, suplemento 38/38, typecheck 0 e 89 verificações reais. Commit local «fix(workbench): implement reference modal and internal navigation», sem push. Limites no 03/06/09; não encerra Fatia 15.

@@ -1,3 +1,17 @@
+# Estado vigente — lateral e Personalizações na régua 1.135.0, D183 (09/11/2026)
+
+Base 8c156e4. A referência primária desta rodada é a Agents Window oficial 1.135.0, executada em perfil portátil Microsoft assinado e confrontada com a tag correspondente. Relatório e comparativo em ../arena-operacional/referencia-1.135.
+
+Lateral: cabeçalho de 40 px, busca inline independente, opções de ordenar/agrupar e recolher grupos, filtros de provedor/estado/workspace/leitura derivados das sessões. A seleção mantém o contexto ativo. Agrupamento por data continua como preferência inicial existente e a opção por workspace é persistida. Ações, conversas e grupos usam os mesmos donos de estado.
+
+Personalizações: modal com caixa 1152×692 medida em 1440×900, navegação e categoria na mesma instância, busca separada por categoria, alça de resize, tema e adaptação estreita. Instrução de habilidade cresce até o limite e então rola. As três áreas com serviços continuam disponíveis e as outras exibem seu estado. A criação de habilidade usa o formulário do produto.
+
+Provas: bateria de integração 93 aprovados, 0 falhas, 13 ignorados existentes. Repetição final 44/44 no perímetro direto, sem somar repetições. Typecheck e ESLint do perímetro aprovados. Playwright Chromium/Windows: 10 cenários no perfil descartável, sem pageerror. A referência portátil oficial foi inspecionada pelo fluxo sem login. O perfil oficial tem histórico vazio e a aparência das linhas foi cotejada pelo fonte e pelos dados de teste do Agent Window. A suíte integral não foi repetida.
+
+Inspeção humana pendente. Roteiro em 08. Escopo desta rodada restrito à lateral esquerda e Personalizações.
+
+---
+
 # Estado vigente — pacote complementar RF-A..G, D182 (08/11/2026)
 
 Base 6407a25; entrega local «fix(workbench): implement reference modal and internal navigation», sem push. Este retrato substitui D181 abaixo. O pacote do proprietário esclareceu referências: mockup/prints para lateral principal e Personalizações; VS Code para command center, Quick Open e Explorer. Não recomeçar a obra nem antecipar o roadmap.

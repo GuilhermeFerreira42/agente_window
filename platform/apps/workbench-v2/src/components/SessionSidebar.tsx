@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   ChevronDown,
   ChevronRight,
+  Check,
   CircleAlert,
   Columns2,
   CircleCheck,
@@ -20,6 +21,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Wrench,
+  X,
 } from 'lucide-react'
 import type { NestedChat, Session, SessionStatus } from '../types'
 import { PERSONALIZATION_SECTIONS, PersonalizationIcon, type PersonalizationSection } from '../bairros/2-inteligencia/casas/personalizacoes'
@@ -29,7 +31,9 @@ import {
   EMPTY_FILTERS,
   applyWorkspaceCapping,
   buildSessionsList,
+  sessionProvider,
   type SessionFilters,
+  type SessionGrouping,
   type SessionGroup,
   type SortMode,
 } from '../domain/sessionsList'
@@ -38,6 +42,13 @@ import {
 // só os primeiros N workspaces de uma seção aparecem; o do workspace ativo é
 // sempre promovido; a busca revela todos.
 const WORKSPACE_CAP = 3
+const STATUS_LABELS: Record<SessionStatus, string> = {
+  untitled: 'Sem título',
+  working: 'Em andamento',
+  'needs-input': 'Aguardando resposta',
+  completed: 'Concluída',
+  error: 'Com erro',
+}
 import { customGroupLabels } from '../data'
 import { isNavigationKey, nextRovingIndex } from '../domain/keyboardNavigation'
 import { createSectionOrderState, orderCustomGroups } from '../domain/sectionOrder'
@@ -314,10 +325,20 @@ export function SessionSidebar({
   const [personalizationsCollapsed, setPersonalizationsCollapsed] = useState(() => { try { return localStorage.getItem('workbench.personalizations.collapsed') === 'true' } catch { return false } })
   useEffect(() => { try { localStorage.setItem('workbench.personalizations.collapsed', String(personalizationsCollapsed)) } catch { /* private/quota */ } }, [personalizationsCollapsed])
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [chatsCollapsed, setChatsCollapsed] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [readState, setReadState] = useState<SessionFilters['readState']>('all')
+  const [provider, setProvider] = useState('')
+  const [status, setStatus] = useState<SessionStatus | ''>('')
+  const [workspace, setWorkspace] = useState('')
+  const [grouping, setGrouping] = useState<SessionGrouping>(() => {
+    try { return localStorage.getItem('workbench.sessions.grouping') === 'workspace' ? 'workspace' : 'date' } catch { return 'date' }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('workbench.sessions.grouping', grouping) } catch { /* storage indisponível */ }
+  }, [grouping])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ s1: true, s2: true })
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({ pinned: true, older: true, archived: true })
   const [editingId, setEditingId] = useState<string | undefined>()
@@ -330,6 +351,21 @@ export function SessionSidebar({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropOverId, setDropOverId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const searchButtonRef = useRef<HTMLButtonElement>(null)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (searchOpen) searchRef.current?.focus() }, [searchOpen])
+  useEffect(() => {
+    if (!filtersOpen) return
+    filterPanelRef.current?.querySelector('select')?.focus()
+    const dismiss = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!filterPanelRef.current?.contains(target) && !filterButtonRef.current?.contains(target)) setFiltersOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [filtersOpen])
 
   // R-076 — navegação por teclado (roving focus) entre as linhas de sessão.
   // As setas movem o foco DOM entre os itens `[data-session-nav]` renderizados,
@@ -434,13 +470,24 @@ export function SessionSidebar({
   // Lista agrupada/ordenada/filtrada, derivada do domínio (E6). Exclui automação,
   // mantém a sessão ativa sempre visível e ordena os grupos por precedência.
   // Filtros: query de texto, readState, sortMode (SESSIONS_LIST.md original).
+  const filterOptions = useMemo(() => {
+    const primary = sessions.filter(session => !session.automation)
+    return {
+      providers: [...new Set(primary.map(sessionProvider).filter(Boolean))].sort(),
+      statuses: [...new Set(primary.map(session => session.status))],
+      workspaces: [...new Set(primary.map(session => session.workspace).filter(Boolean))].sort(),
+    }
+  }, [sessions])
   const filters: SessionFilters = useMemo(
     () => ({
       ...EMPTY_FILTERS,
       query,
       readState,
+      providers: provider && filterOptions.providers.includes(provider) ? [provider] : [],
+      statuses: status && filterOptions.statuses.includes(status) ? [status] : [],
+      workspace: filterOptions.workspaces.includes(workspace) ? workspace : undefined,
     }),
-    [query, readState],
+    [query, readState, provider, status, workspace, filterOptions],
   )
   const groups = useMemo(
     () => buildSessionsList(
@@ -450,10 +497,59 @@ export function SessionSidebar({
       activeSessionId,
       customGroupLabels,
       (presentIds, labelOf) => orderCustomGroups(sectionOrder, presentIds, labelOf),
+      grouping,
     ),
-    [sessions, filters, sortMode, activeSessionId, sectionOrder],
+    [sessions, filters, sortMode, activeSessionId, sectionOrder, grouping],
   )
   const totalVisible = useMemo(() => groups.reduce((sum, group) => sum + group.sessions.length, 0), [groups])
+  const closeSearch = () => {
+    setSearchOpen(false)
+    setQuery('')
+    requestAnimationFrame(() => searchButtonRef.current?.focus())
+  }
+
+  const closeFilters = () => {
+    setFiltersOpen(false)
+    filterButtonRef.current?.focus()
+  }
+
+  const openSessionOptions = () => {
+    const anchor = filterButtonRef.current?.getBoundingClientRect()
+    if (!anchor) return
+    setFiltersOpen(false)
+    setContextMenu({
+      x: anchor.left,
+      y: anchor.bottom,
+      label: 'Opções das sessões',
+      items: [
+        { id: 'filters', label: 'Filtrar…', icon: <SlidersHorizontal size={13} />, onSelect: () => setFiltersOpen(true) },
+        ...([
+          ['manual', 'Ordem manual'],
+          ['created', 'Ordenar por criação'],
+          ['updated', 'Ordenar por atualização'],
+        ] as const).map(([id, label], index) => ({
+          id, label, separatorBefore: index === 0, checked: sortMode === id,
+          icon: sortMode === id ? <Check size={13} /> : <span />,
+          onSelect: () => setSortMode(id),
+        })),
+        ...([
+          ['workspace', 'Agrupar por workspace'],
+          ['date', 'Agrupar por data'],
+        ] as const).map(([id, label], index) => ({
+          id, label, separatorBefore: index === 0, checked: grouping === id,
+          icon: grouping === id ? <Check size={13} /> : <span />,
+          onSelect: () => setGrouping(id),
+        })),
+        {
+          id: 'collapse', label: 'Recolher todos os grupos', separatorBefore: true,
+          onSelect: () => setCollapsedSections(current => ({
+            ...current,
+            ...Object.fromEntries(groups.map(group => [group.id, true])),
+          })),
+        },
+      ],
+    })
+  }
 
   const renderGroup = (group: SessionGroup) => {
     const name = group.id
@@ -476,7 +572,7 @@ export function SessionSidebar({
     const visibleWorkspaces = capResult.visible
     const hiddenWorkspaceCount = capResult.hiddenCount
     const collapsed = collapsedSections[name] ?? false
-    const contentId = `sessions-section-${name}`
+    const contentId = `sessions-section-${encodeURIComponent(name)}`
     const hiddenOlderCount = totalCount - items.length
     return (
       <section className="session-section-block" key={name}>
@@ -488,13 +584,14 @@ export function SessionSidebar({
           onClick={() => setCollapsedSections((current) => ({ ...current, [name]: !collapsed }))}
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+          {group.section.kind === 'workspace' && <Folder size={13} />}
           <span>{group.label}</span>
           <span className="session-section-count">{totalCount}</span>
         </button>
         {!collapsed && <div id={contentId} className="session-section-content">
           {visibleWorkspaces.map((workspace) => (
             <div key={`${name}-${workspace}`}>
-              <div className="workspace-section-header"><Folder size={12} /><span>{workspace}</span></div>
+              {group.section.kind !== 'workspace' && <div className="workspace-section-header"><Folder size={12} /><span>{workspace}</span></div>}
               {(grouped[workspace] ?? []).map((session) => (
                 <SessionRow
                   key={`${name}-${session.id}`}
@@ -567,29 +664,35 @@ export function SessionSidebar({
   return (
     <aside className={`sessions-sidebar${visible ? '' : ' is-hidden'}`} aria-label="Lista de sessões" aria-hidden={!visible}>
       <div className="sessions-sidebar-header">
-        <span className="sessions-sidebar-title">Sessões <span className="sessions-count">{totalVisible}/{sessions.length}</span></span>
-        <div className="sessions-header-actions">
-          <button className="toolbar-button sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>Novo</button>
-          <button className="toolbar-button" type="button" title="Filtros de sessões" aria-label="Filtros de sessões" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={14}/></button>
-          <button className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => { setFiltersOpen(true); requestAnimationFrame(() => document.getElementById('sessions-filter-input')?.focus()) }}><Search size={14} /></button>
-        </div>
+        {searchOpen ? (
+          <div className="sessions-inline-search" onKeyDown={event => {
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            event.stopPropagation()
+            closeSearch()
+          }}>
+            <Search size={13} aria-hidden="true" />
+            <input ref={searchRef} aria-label="Filtrar sessões" value={query} onChange={event => setQuery(event.target.value)} placeholder="Filtrar sessões" />
+            <button className="toolbar-button" type="button" aria-label="Fechar busca de sessões" onClick={closeSearch}><X size={14} /></button>
+          </div>
+        ) : (
+          <>
+            <span className="sessions-sidebar-title">Sessões{totalVisible !== sessions.length && <span className="sessions-count">{totalVisible}/{sessions.length}</span>}</span>
+            <div className="sessions-header-actions">
+              <button className="toolbar-button sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>Novo</button>
+              <button ref={filterButtonRef} className="toolbar-button" type="button" title="Filtros de sessões" aria-label="Filtros de sessões" aria-haspopup="menu" aria-expanded={filtersOpen || contextMenu?.label === 'Opções das sessões'} onClick={openSessionOptions}><SlidersHorizontal size={14}/></button>
+              <button ref={searchButtonRef} className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => { setFiltersOpen(false); setSearchOpen(true) }}><Search size={14} /></button>
+            </div>
+          </>
+        )}
       </div>
-      <div className="sessions-toolbar" hidden={!filtersOpen}>
-        <label className="sessions-filter" htmlFor="sessions-filter-input">
-          <Search size={12} />
-          <input id="sessions-filter-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar sessões" />
-        </label>
-        <select
-          className="sessions-sort-select"
-          id="sessions-sort-select"
-          value={sortMode}
-          onChange={(event) => setSortMode(event.target.value as SortMode)}
-          aria-label="Ordenar sessões"
-        >
-          <option value="manual">Manual</option>
-          <option value="created">Criação</option>
-          <option value="updated">Atualização</option>
-        </select>
+      {filtersOpen && <div ref={filterPanelRef} className="sessions-toolbar sessions-filter-panel" role="group" aria-label="Filtros de sessões" onKeyDown={event => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        event.stopPropagation()
+        closeFilters()
+      }}>
+        <label>Leitura
         <select
           className="sessions-read-filter"
           id="sessions-read-filter"
@@ -601,18 +704,40 @@ export function SessionSidebar({
           <option value="unread">Não lidas</option>
           <option value="read">Lidas</option>
         </select>
-      </div>
+        </label>
+        <label>Provedor
+          <select aria-label="Filtrar por provedor" value={filters.providers[0] ?? ''} onChange={event => setProvider(event.target.value)}>
+            <option value="">Todos</option>
+            {filterOptions.providers.map(id => <option key={id} value={id}>{id === 'local' ? 'Local' : id}</option>)}
+          </select>
+        </label>
+        <label>Estado
+          <select aria-label="Filtrar por estado" value={filters.statuses[0] ?? ''} onChange={event => setStatus(event.target.value as SessionStatus | '')}>
+            <option value="">Todos</option>
+            {filterOptions.statuses.map(id => <option key={id} value={id}>{STATUS_LABELS[id]}</option>)}
+          </select>
+        </label>
+        <label>Workspace
+          <select aria-label="Filtrar por workspace" value={filters.workspace ?? ''} onChange={event => setWorkspace(event.target.value)}>
+            <option value="">Todos</option>
+            {filterOptions.workspaces.map(id => <option key={id} value={id}>{id}</option>)}
+          </select>
+        </label>
+      </div>}
       <div className="sessions-list-scroll" ref={listRef} onKeyDown={handleListKeyDown}>
         <button className="sessions-chats-header" type="button" aria-expanded={!chatsCollapsed} onClick={() => setChatsCollapsed(value => !value)}><MessageCircle size={14}/><span>Chats</span>{chatsCollapsed ? <ChevronRight size={12}/> : <ChevronDown size={12}/>}</button>
-        <div hidden={chatsCollapsed}>{groups.map((group) => renderGroup(group))}
+        {!chatsCollapsed && <div>{groups.map((group) => renderGroup(group))}
           {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
-        </div>
+        </div>}
       </div>
       {onOpenPersonalizations && <section className="personalizations-shortcuts" aria-label="Atalhos de Personalizações">
         <button className="personalizations-shortcuts-header" type="button" aria-expanded={!personalizationsCollapsed} onClick={() => setPersonalizationsCollapsed(value => !value)}><span>Personalizações</span>{personalizationsCollapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}</button>
         {!personalizationsCollapsed && <div>{PERSONALIZATION_SECTIONS.map(section => <button type="button" key={section.id} onClick={() => onOpenPersonalizations(section.id)}><PersonalizationIcon section={section.id}/>{section.label}</button>)}</div>}
       </section>}
-      <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
+      <ContextMenu menu={contextMenu} onClose={() => {
+        if (contextMenu?.label === 'Opções das sessões') filterButtonRef.current?.focus()
+        setContextMenu(null)
+      }} />
     </aside>
   )
 }

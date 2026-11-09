@@ -123,7 +123,7 @@ describe('SessionSidebar', () => {
     const otherSession: Session = { ...sessions[0], id: 's-other', title: 'Outra sessão', chats: [], mainChatId: 'chat-main' }
     const view = render(<SessionSidebar {...props} sessions={[sessions[0], otherSession]} activeSessionId="s-test" />)
 
-    await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(screen.getByRole('button', { name: 'Buscar sessões' }))
     const filter = view.getByPlaceholderText('Filtrar sessões')
     await user.type(filter, 'inexistente')
 
@@ -216,6 +216,7 @@ describe('SessionSidebar', () => {
     render(<SessionSidebar {...props} sessions={items} activeSessionId="x" />)
 
     await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Filtrar…' }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por leitura' }), 'unread')
     expect(screen.getByText('Não lida')).toBeInTheDocument()
     expect(screen.queryByText('Lida')).not.toBeInTheDocument()
@@ -254,7 +255,7 @@ describe('SessionSidebar', () => {
     expect(workspaceHeaders()).toHaveLength(3)
 
     // Busca ignora o capping (revela todos).
-    await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(screen.getByRole('button', { name: 'Buscar sessões' }))
     await user.type(screen.getByPlaceholderText('Filtrar sessões'), 'Sessão')
     expect(workspaceHeaders()).toHaveLength(5)
   })
@@ -270,9 +271,28 @@ describe('SessionSidebar', () => {
     render(<SessionSidebar {...props} sessions={items} activeSessionId="x" />)
 
     await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Ordenar sessões' }), 'created')
+    await user.click(screen.getByRole('menuitemradio', { name: 'Ordenar por criação' }))
     const titles = screen.getAllByText(/Antiga|Recente/).map((node) => node.textContent)
     expect(titles.indexOf('Recente')).toBeLessThan(titles.indexOf('Antiga'))
+  })
+  it('deriva provedores de sessões e combina o filtro com agrupamento por workspace', async () => {
+    const user = userEvent.setup()
+    const { props, unmount } = renderSidebar()
+    unmount()
+    const local = { ...sessions[0], title: 'Conversa local' }
+    const external = { ...sessions[0], id: 'external', title: 'Conversa externa', provider: 'provedor-externo', workspace: 'Projeto externo' }
+    render(<SessionSidebar {...props} sessions={[local, external]} activeSessionId="" />)
+    await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Agrupar por workspace' }))
+    expect(screen.getByRole('button', { name: /Projeto externo/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Filtrar…' }))
+    const provider = screen.getByRole('combobox', { name: 'Filtrar por provedor' })
+    expect(screen.getByRole('option', { name: 'Local' })).toBeInTheDocument()
+    await user.selectOptions(provider, 'provedor-externo')
+    expect(screen.getByText('Conversa externa')).toBeInTheDocument()
+    expect(screen.queryByText('Conversa local')).not.toBeInTheDocument()
+    localStorage.removeItem('workbench.sessions.grouping')
   })
 })
 

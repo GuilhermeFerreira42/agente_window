@@ -81,15 +81,21 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
   const [ocupado, setOcupado] = useState('')
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
-  const [query, setQuery] = useState('')
+  const [queries, setQueries] = useState<Partial<Record<PersonalizationSection | 'shared', string>>>({})
   const [collapsed, setCollapsed] = useState<Partial<Record<Secao, boolean>>>({})
-  const [activeSection, setActiveSection] = useState<PersonalizationSection>('visao')
+  const [activeSection, setActiveSection] = useState<PersonalizationSection>(sectionRequest?.section ?? 'visao')
+  const queryKey = embedded ? activeSection : 'shared'
+  const query = queries[queryKey] ?? ''
   const content = useRef<HTMLDivElement>(null)
+  const categorySearch = useRef<HTMLInputElement>(null)
   const navigateSection = useCallback((section: PersonalizationSection) => {
     setActiveSection(section); setCollapsed(current => ({ ...current, [section]: false }));
     requestAnimationFrame(() => { if (content.current) content.current.scrollTop = 0 })
   }, [])
   useEffect(() => { if (sectionRequest && !carregando) navigateSection(sectionRequest.section) }, [sectionRequest, carregando, navigateSection])
+  useEffect(() => {
+    if (embedded && !carregando) categorySearch.current?.focus()
+  }, [activeSection, carregando, embedded])
   const [formAberto, setFormAberto] = useState(false)
   const [novoNome, setNovoNome] = useState('')
   const [novaDescricao, setNovaDescricao] = useState('')
@@ -238,17 +244,51 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
   const habilidadesComErro = visao?.skills.filter((skill) => skill.estado === 'com_erro').length ?? 0
   const ferramentasLigadas = visao?.ferramentas.filter((ferramenta) => ferramenta.ligada).length ?? 0
   const totalFerramentas = visao?.ferramentas.length ?? 0
+  const category = PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)!
+  const selectCategory = (section: PersonalizationSection) => {
+    navigateSection(section)
+    onSectionChange?.(section)
+  }
+  const newSkillButton = (
+    <button type="button" className="customizations-nova" onClick={() => setFormAberto(open => !open)} aria-expanded={formAberto}>
+      <Plus size={13} /> Nova habilidade
+    </button>
+  )
 
   return (
     <section className="customizations-view personalizations-manager" aria-label="Personalizações">
-      <nav className="personalizations-navigation" aria-label="Seções de Personalizações">
+      <nav className="personalizations-navigation" aria-label="Seções de Personalizações" onKeyDown={event => {
+        const keys = ['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End']
+        if (!keys.includes(event.key)) return
+        const buttons = Array.from(event.currentTarget.querySelectorAll('button'))
+        const index = buttons.indexOf(event.target as HTMLButtonElement)
+        if (index < 0) return
+        const direction = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : index + direction
+        event.preventDefault()
+        buttons[Math.max(0, Math.min(buttons.length - 1, next))]?.focus()
+      }}>
         <span className="personalizations-navigation-title">Personalizações</span>
-        {PERSONALIZATION_SECTIONS.map(section => <button type="button" key={section.id} aria-current={activeSection === section.id ? 'page' : undefined} onClick={() => { navigateSection(section.id); onSectionChange?.(section.id) }}><PersonalizationIcon section={section.id}/>{section.label}</button>)}
+        {PERSONALIZATION_SECTIONS.map(section => {
+          const count = section.id === 'habilidades' ? visao?.skills.length : section.id === 'ferramentas' ? totalFerramentas : undefined
+          return (
+            <button type="button" key={section.id} aria-current={activeSection === section.id ? 'page' : undefined} onClick={() => selectCategory(section.id)}>
+              <PersonalizationIcon section={section.id} />
+              <span>{section.label}</span>
+              {embedded && !!count && <span className="personalizations-nav-count" aria-hidden="true">{count}</span>}
+            </button>
+          )
+        })}
       </nav>
       <div ref={content} className="personalizations-manager-content">
-      {!PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.available && <div className="personalizations-unavailable" role="status"><h2>{PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.label}</h2><p>Esta funcionalidade ainda não está disponível nesta versão.</p><p>Prevista para uma etapa futura. Nenhuma configuração foi alterada.</p></div>}
-      <div hidden={!PERSONALIZATION_SECTIONS.find(section => section.id === activeSection)?.available}>
-      <header className="customizations-header">
+      {!category.available && <div className="personalizations-unavailable" role="status"><h2>{category.label}</h2><p>Esta funcionalidade ainda não está disponível nesta versão.</p></div>}
+      <div hidden={!category.available}>
+      {embedded ? (
+        <header className="personalizations-category-heading">
+          <h2>{category.label}</h2>
+          <p>{activeSection === 'habilidades' ? 'Instruções reutilizáveis que o agente carrega quando são relevantes para a tarefa.' : activeSection === 'ferramentas' ? 'Gerencie as ferramentas disponíveis para os agentes do seu workspace.' : 'Gerencie as personalizações disponíveis para a conversa e o workspace.'}</p>
+        </header>
+      ) : <header className="customizations-header">
         <div className="customizations-title">
           <Blocks size={15} />
           {/* Dentro do grid o título já vem do cabeçalho dele; repetir criaria dois
@@ -258,15 +298,8 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
             {habilidadesAtivas}
           </span>
         </div>
-        <button
-          type="button"
-          className="customizations-nova"
-          onClick={() => setFormAberto((aberto) => !aberto)}
-          aria-expanded={formAberto}
-        >
-          <Plus size={13} /> Nova habilidade
-        </button>
-      </header>
+        {newSkillButton}
+      </header>}
 
       {/* O dono precisa VER quando algo não funcionou — nada aqui falha em silêncio. */}
       {erroCarregar && (
@@ -279,7 +312,24 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
       {aviso && !erro && <div className="customizations-banner is-ok" role="status">{aviso}</div>}
       {ocupado && <div className="customizations-banner" role="status"><LoaderCircle size={13} className="spin-icon" /> {ocupado}</div>}
 
-      {formAberto && (
+      {(!embedded || activeSection !== 'visao') && <div className="personalizations-category-toolbar">
+        <label className="customizations-filter">
+          <Search size={12} aria-hidden="true" />
+          <input
+            ref={categorySearch}
+            value={query}
+            onChange={event => {
+              const value = event.target.value
+              setQueries(current => ({ ...current, [queryKey]: value }))
+            }}
+            placeholder="Filtrar personalizações"
+            aria-label="Filtrar personalizações"
+          />
+        </label>
+        {embedded && activeSection === 'habilidades' && newSkillButton}
+      </div>}
+
+      {formAberto && (!embedded || activeSection === 'habilidades') && (
         <form
           className="customizations-form"
           onSubmit={(evento) => { evento.preventDefault(); void criarSkill() }}
@@ -308,7 +358,7 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
             <textarea
               value={novoCorpo}
               onChange={(evento) => setNovoCorpo(evento.target.value)}
-              rows={5}
+              rows={3}
               placeholder="O que o agente deve fazer quando esta habilidade for invocada."
               required
             />
@@ -331,20 +381,6 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
           </div>
         </form>
       )}
-
-      <label className="customizations-filter" htmlFor="personalizacoes-filtro">
-        <Search size={12} />
-        <input
-          id="personalizacoes-filtro"
-          value={query}
-          onChange={(evento) => setQuery(evento.target.value)}
-          placeholder="Filtrar personalizações"
-          // O label em volta só tem o ícone de lupa, então não dá nome acessível
-          // ao campo. O aria-label é o que torna o filtro encontrável por nome —
-          // e por leitor de tela.
-          aria-label="Filtrar personalizações"
-        />
-      </label>
 
       <div className="customizations-tree" role="tree" aria-label="Árvore de personalizações">
         {SECOES.map((secao) => {

@@ -1,3 +1,15 @@
+# Evidência D183 — Agents Window oficial 1.135.0 (09/11/2026)
+
+Operacional em ../arena-operacional/referencia-1.135. Tag 1.135.0, revisão 08d4889f9ec4a1685d257b9b95de036c8e1ce1e5. Binário Microsoft assinado, modo portátil e abertura da Agents Window pela opção oferecida de continuar sem login. Fonte oficial e binário ficam na pasta isolada de referência, fora do Git. Capturas oficiais e do produto em 1440×900 no comparativo.
+
+- testes.json/log: 93 aprovados, 0 falhas, 13 ignorados, 4 arquivos (App, lateral, domínio de sessões e Personalizações).
+- focal-final.json/log: 44/44 nos 3 arquivos do perímetro direto após os ajustes finais. São casos da bateria, não somar.
+- typecheck-final.log: exit 0; lint.json: 0 erros/avisos nos arquivos TypeScript alterados.
+- browser.json e browser-final.log: 10 cenários no Chromium/Windows em 5199. Busca/Esc, opções e persistência, ações de sessão/hover, sash lateral, oito atalhos, filtros e foco interno, rascunho e altura, resize, rolagem e tema claro.
+- A validação usa a instalação portátil isolada e o perfil descartável. A suíte integral e a homologação humana estão fora destes placares.
+
+---
+
 # Evidência vigente — D182, pacote RF-A..G (08/11/2026)
 
 Artefatos externos em ../arena-operacional/feedback-2026-11-08/spec-14-15. Fonte base 6407a25, Windows real, Node26.13.0/npm11.20.0 fixados, Chromium/Playwright1.63. Testes em 5199/fixtures próprias; perfil pessoal 5174 apenas disponibilidade HTTP. ZIP de especificação e imagens lidos como requisitos/referências; scripts incidentais do HTML não foram executados nem tratados como ordens. Não é necessário outro ZIP de código: clone autorizado existente foi conferido.

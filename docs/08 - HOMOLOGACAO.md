@@ -1,3 +1,16 @@
+# Inspeção D183 — lateral e Personalizações (09/11/2026)
+
+Salve rascunhos antes de recarregar o perfil de inspeção.
+
+1. Abra a busca na lateral. Confira o foco, filtre pelo título de uma sessão e feche com Esc. No botão de opções, teste o agrupamento por workspace, os filtros de provedor/estado e o recolhimento dos grupos.
+2. Abra cada categoria de Personalizações pela lateral. Alterne dentro do modal, confira a busca independente, maximize/restaure e use a alça inferior direita. Feche por Esc ou pelo X e confira o retorno do foco.
+3. Em Habilidades, abra Nova habilidade. Digite linhas na Instrução e confira crescimento e rolagem após o limite. Alterne categoria e volte para conferir o rascunho enquanto a janela está aberta.
+4. Reduza a janela e alterne o tema. Confira a navegação horizontal no modal estreito e a rolagem do conteúdo. Compare a referência e o candidato no relatório.
+
+O aceite humano está pendente.
+
+---
+
 # Inspeção vigente — D182, pacote RF-A..G (08/11/2026)
 
 Salve seus rascunhos antes de recarregar 5174. Confira um item por vez em arquivos descartáveis:

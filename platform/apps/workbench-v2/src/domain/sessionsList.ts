@@ -7,6 +7,7 @@ import type { Session, SessionSection } from '../types'
  */
 
 export type SortMode = 'manual' | 'created' | 'updated'
+export type SessionGrouping = 'date' | 'workspace'
 
 export interface SessionFilters {
   /** Free-text query, matched against title, workspace, branch and chat titles. */
@@ -15,6 +16,7 @@ export interface SessionFilters {
   statuses: readonly Session['status'][]
   /** Only these providers (empty = all). */
   providers: readonly string[]
+  workspace?: string
   /** 'all' | 'unread' | 'read'. */
   readState: 'all' | 'unread' | 'read'
   /** Whether archived sessions are included. */
@@ -34,6 +36,7 @@ export type PrimarySection =
   | { kind: 'pinned' }
   | { kind: 'custom'; id: string }
   | { kind: 'quickChats' }
+  | { kind: 'workspace' }
   | { kind: 'date'; section: SessionSection }
   | { kind: 'archived' }
 
@@ -85,6 +88,7 @@ export function sessionMatchesFilters(session: Session, filters: SessionFilters)
   }
   if (filters.statuses.length > 0 && !filters.statuses.includes(session.status)) return false
   if (filters.providers.length > 0 && !filters.providers.includes(sessionProvider(session))) return false
+  if (filters.workspace && session.workspace !== filters.workspace) return false
   if (filters.readState === 'unread' && !session.unread) return false
   if (filters.readState === 'read' && session.unread) return false
   if (!filters.includeArchived && (session.archived || session.section === 'archived')) return false
@@ -115,6 +119,7 @@ export function buildSessionsList(
   activeSessionId: string | undefined,
   customGroupLabels: Readonly<Record<string, string>> = {},
   orderCustomIds?: (presentIds: string[], labelOf: (id: string) => string) => string[],
+  grouping: SessionGrouping = 'date',
 ): SessionGroup[] {
   const primary = sessions.filter((session) => !session.automation)
   const visible = primary.filter(
@@ -182,10 +187,23 @@ export function buildSessionsList(
     groups.push({ id: 'quickChats', label: 'Quick Chats', section: { kind: 'quickChats' }, sessions: sortBucket(quickChats) })
   }
 
-  for (const section of DATE_ORDER) {
-    const bucket = dates.get(section)
-    if (bucket && bucket.length > 0) {
-      groups.push({ id: section, label: DATE_LABELS[section], section: { kind: 'date', section }, sessions: sortBucket(bucket) })
+  if (grouping === 'workspace') {
+    const workspaces = new Map<string, Session[]>()
+    for (const session of visible) {
+      if (placeSession(session).kind !== 'date') continue
+      const bucket = workspaces.get(session.workspace) ?? []
+      bucket.push(session)
+      workspaces.set(session.workspace, bucket)
+    }
+    for (const [label, bucket] of workspaces) {
+      groups.push({ id: `workspace:${label}`, label, section: { kind: 'workspace' }, sessions: sortBucket(bucket) })
+    }
+  } else {
+    for (const section of DATE_ORDER) {
+      const bucket = dates.get(section)
+      if (bucket && bucket.length > 0) {
+        groups.push({ id: section, label: DATE_LABELS[section], section: { kind: 'date', section }, sessions: sortBucket(bucket) })
+      }
     }
   }
 

@@ -8,6 +8,7 @@ export interface ContextMenuItem {
   onSelect: () => void
   /** Item desabilitado (não selecionável). */
   disabled?: boolean
+  checked?: boolean
   /** Estilo destrutivo (ex.: Excluir). */
   danger?: boolean
   /** Renderiza um separador ANTES deste item. */
@@ -119,7 +120,8 @@ export function ContextMenu({ menu, onClose }: ContextMenuProps) {
             {item.separatorBefore && <div className="context-menu-separator" role="separator" />}
             <button
               type="button"
-              role="menuitem"
+              role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+              aria-checked={item.checked}
               className={`context-menu-item${item.danger ? ' is-danger' : ''}${index === active ? ' is-active' : ''}`}
               disabled={item.disabled}
               aria-disabled={item.disabled}

@@ -1911,7 +1911,7 @@ describe('App session flows', () => {
       expect(chamadas.some((url) => url.startsWith('/api/personalizacoes'))).toBe(true)
 
       // v1 = Visão geral + Habilidades + Ferramentas, e nada além disso.
-      expect(within(surface).getByText('Visão geral')).toBeInTheDocument()
+      expect(within(surface).getByRole('button', { name: /^Visão geral$/ })).toBeInTheDocument()
       expect(within(surface).getByText('Habilidades')).toBeInTheDocument()
       expect(within(surface).getByText('Ferramentas')).toBeInTheDocument()
       for (const ausente of ['Configurar Hooks', 'Adicionar servidor MCP', 'Instructions', 'Prompts']) {
