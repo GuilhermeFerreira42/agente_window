@@ -1,3 +1,9 @@
+# Explorer e Monaco antes da primeira mensagem (09/11/2026)
+
+Base `1ebd63e`. A tela de nova sessão começa sem workspace, mesmo quando há outras conversas. A pasta escolhida pertence ao rascunho e habilita o Explorer e o editor antes de enviar mensagem. As abas de arquivo do rascunho são temporárias e o editor exige salvar alterações pendentes antes de sair, trocar de pasta ou enviar a primeira mensagem. A sessão anterior conserva seu workspace e suas abas. Aceite humano pendente.
+
+---
+
 # Altura do diff no editor central — D185 (09/11/2026)
 
 Base `192970d`. A comparação ocupa todo o grupo de edição abaixo das abas e do caminho. A superfície de código fica montada fora do layout enquanto a comparação está ativa. Aceite humano pendente.

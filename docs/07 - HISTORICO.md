@@ -1,3 +1,9 @@
+# 09/11/2026 — Explorer e Monaco na sessão vazia
+
+O rascunho começa sem pasta e abre arquivos no Monaco após selecionar o workspace. Estado em 03 e provas em 09.
+
+---
+
 # 09/11/2026 — D185, altura do diff do Source Control
 
 A comparação do Monaco preenche o grupo de edição ao abrir um diff pelo Source Control. Estado em 03 e prova em 09.

@@ -100,6 +100,16 @@
   color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
   opacity: 0.8;
 }
+.side-bar-open-folder {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+}
+.side-bar-open-folder:hover { background: var(--vscode-button-hoverBackground); }
 
 /* 5.5 (DnD de views): header é a alça de arrasto; Side Bar inteira aceita soltar (feedback só com tokens). */
 .part.sidebar > .composite-title[draggable='true'] { cursor: grab; }

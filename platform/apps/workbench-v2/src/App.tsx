@@ -151,15 +151,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // a pasta escolhida em "Usar esta pasta" já comanda o Explorer — o efeito de boot
   // abaixo reage a esta dependência, então a árvore troca na hora (sem mensagem no
   // chat e sem F5). Com sessão ativa, a pasta continua vindo da sessão (inalterado).
-  const selectedLandingWorkspacePath = newSessionLanding ? selectedWorkspace?.path : undefined
+  const hasSessions = sessions.some((session) => !session.automation)
+  const landingVisible = newSessionLanding || !hasSessions
+  const editorSessionId = landingVisible ? BOOT_SESSION_ID : activeSessionId
   const currentSessionWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
     ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
   // A landing can sit above older sessions. Its selected folder is a pending
   // context for the new session and must drive Explorer before the first chat
   // message; it must not rewrite the older persisted session.
-  const explorerWorkspacePath = selectedLandingWorkspacePath
-    ?? currentSessionWorkspacePath
-    ?? (sessions.length === 0 ? selectedWorkspace?.path : undefined)
+  const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : currentSessionWorkspacePath
+  const explorerEnabled = !landingVisible || !!explorerWorkspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -190,7 +191,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const panelViews = useMemo(() => viewsByIds(layout.state.viewLayout.panel), [layout.state.viewLayout.panel])
   // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
   // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
-  const [explorerModule, setExplorerModule] = useState<IExplorerSearchModule | null>(null)
+  const [loadedExplorer, setLoadedExplorer] = useState<{ module: IExplorerSearchModule; path?: string; landing: boolean } | null>(null)
+  const explorerModule = explorerEnabled && loadedExplorer && loadedExplorer.path === explorerWorkspacePath && loadedExplorer.landing === landingVisible
+    ? loadedExplorer.module : null
   // FATIA-05 5.3: badge do ícone Source Control = `git.count()` do módulo (evento `git.statusChanged`).
   const [scmBadge, setScmBadge] = useState(0)
   const explorerFsRef = useRef<BrowserFsPort | null>(null)
@@ -241,6 +244,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // FATIA-05 5.4 (RF-10): menu "Move Activity Bar …" — segundo host do mesmo menu de contexto do shell.
   const [activityBarMenu, setActivityBarMenu] = useState<ExplorerContextMenuState | null>(null)
   useEffect(() => {
+    setExplorerContextMenu(null)
+    setScmBadge(0)
+    setLoadedExplorer(null)
+    if (!explorerEnabled) return
     let cancelled = false
     let mountedModule: IExplorerSearchModule | undefined
     let watchClient: ExplorerFsWatchClient | undefined
@@ -274,8 +281,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (e.type === 'explorer.fileOpened') handleExplorerFileOpenedRef.current?.(e.uri)
           if (e.type === 'editor.navigationRequested') handleModuleNavigationRef.current?.(e.sessionId, e.uri)
           if (e.type === 'git.statusChanged') setScmBadge(e.isRepo ? e.count : 0)
-          if (e.type === 'editor.splitChanged' || e.type === 'editor.focusGroupChanged' || e.type === 'editor.groupPromoted') snapshotAttachTabs(module, e.sessionId)
-          if (e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' || e.type === 'editor.attachCollapsed' || e.type === 'editor.presentationChanged') snapshotAttachTabs(module, e.sessionId)
+          if (!landingVisible && (e.type === 'editor.splitChanged' || e.type === 'editor.focusGroupChanged' || e.type === 'editor.groupPromoted' ||
+              e.type === 'editor.tabOpened' || e.type === 'editor.tabClosed' || e.type === 'editor.tabPinned' || e.type === 'editor.activeChanged' ||
+              e.type === 'editor.attachCollapsed' || e.type === 'editor.presentationChanged')) snapshotAttachTabs(module, e.sessionId)
           // Onda 2c-i: as abas do módulo passaram a aparecer também na faixa CENTRAL,
           // então os eventos que mudam abas precisam invalidar a projeção. `dirtyChanged`
           // entra aqui e não no snapshot do anexo porque a faixa mostra o ponto de dirty.
@@ -294,10 +302,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           // inútil — é lixo que o próximo leitor vai tentar interpretar. O maximizar do centro é
           // `editorMaximized` (useState + centerEditorMaximized), que segue vivo e persistido.
         })
-        restoreAttachTabs(module) // 5.7 fix: F5 mantém as abas do anexo (eventos acima já marcam attachExpanded)
+        if (!landingVisible) restoreAttachTabs(module)
         mountedModule = module
         explorerModuleRef.current = module
-        setExplorerModule(module)
+        setLoadedExplorer({ module, path: explorerWorkspacePath, landing: landingVisible })
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
         console.warn('[explorer-search] boot: raiz não descoberta', err)
@@ -305,10 +313,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     })()
     return () => {
       cancelled = true
+      if (explorerModuleRef.current === mountedModule) explorerModuleRef.current = null
       mountedModule?.dispose()
       watchClient?.dispose()
     }
-  }, [explorerWorkspacePath])
+  }, [explorerEnabled, explorerWorkspacePath, landingVisible])
   useEffect(() => {
     if (!explorerContextMenu) return
     const onDown = (ev: MouseEvent) => {
@@ -382,7 +391,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
-    ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined} />
+    ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined}
+        onOpenFolder={!explorerEnabled ? () => void handlePickWorkspace() : undefined} />
     : view.id === 'search'
       ? <SearchView slot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined} />
       : view.id === 'scm'
@@ -498,7 +508,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
     reorderNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
-  } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor, activeSessionId)
+  } = useFaixaDeAbasNativas(activateModuleTab, showActivatedEditor, editorSessionId)
 
   // Estado inicial vazio (todas as sessões excluídas). Em vez de trocar por uma
   // tela cheia que esconde as laterais, mantemos o shell montado e usamos uma
@@ -506,8 +516,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // centralizado (landing) enquanto sidebar e barra auxiliar permanecem visíveis.
   // A landing depende da lista primária (visível ao usuário) estar vazia; runs de
   // automação ficam fora da lista e, portanto, não contam para "há sessões".
-  const hasSessions = sessions.some((session) => !session.automation)
-  const landingVisible = newSessionLanding || !hasSessions
   const draftSession = useMemo<Session>(() => ({
     id: 'draft-empty',
     title: 'Nova sessão',
@@ -522,9 +530,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     chats: [{ id: 'draft-empty-main', title: 'Novo chat', status: 'completed', messages: [] }],
     mainChatId: 'draft-empty-main',
   }), [])
-  const activeSession = hasSessions
+  const persistedActiveSession = hasSessions
     ? (sessions.find((session) => session.id === activeSessionId) ?? sessions[0])
     : draftSession
+  const activeSession = landingVisible ? draftSession : persistedActiveSession
   const activeChatId = resolveActiveChatId(activeSession, activeChatBySession)
   // Só contexto de navegação: Search/SCM podem abrir a primeira aba antes do
   // corpo Monaco existir. O módulo continua dono da abertura e dos grupos.
@@ -535,10 +544,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // ativa e o número é atribuído por ordem de primeira aparição (não muda ao
   // reordenar a lista). Espelha o cenário e2e 05-full-workflow.
   const sessionOrdinals = useRef<Map<string, number>>(new Map())
-  if (!sessionOrdinals.current.has(activeSession.id)) {
-    sessionOrdinals.current.set(activeSession.id, sessionOrdinals.current.size + 1)
+  if (!sessionOrdinals.current.has(persistedActiveSession.id)) {
+    sessionOrdinals.current.set(persistedActiveSession.id, sessionOrdinals.current.size + 1)
   }
-  const activeSessionLabel = `session-${sessionOrdinals.current.get(activeSession.id)}`
+  const activeSessionLabel = `session-${sessionOrdinals.current.get(persistedActiveSession.id)}`
   const activeDiffFiles = diffFilesBySession[activeSession.id] ?? []
   const selectedDiffFileId = selectedDiffFileBySession[activeSession.id]
   const checksExpanded = checksExpandedBySession[activeSession.id] ?? true
@@ -547,14 +556,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const selectedMode = modeByChat[chatKey] ?? 'agent'
   // FATIA 15 Onda 2c-i (D148 §1): as abas do módulo, projetadas para a sessão ativa.
   const abasProjetadasDoModulo = useMemo<readonly Aba[]>(() => {
-    if (!hasSessions || !explorerModule) return []
+    if (!explorerModule) return []
     return projetarAbasDoModulo(activeSession.id, explorerModule.attach.getTabs({ sessionId: activeSession.id }))
-  }, [hasSessions, explorerModule, activeSession.id, moduloAbasVersao])
+  }, [explorerModule, activeSession.id, moduloAbasVersao])
   // A FUSÃO ACONTECE NO DERIVADO, NUNCA NO ESTADO: `editorTabs` continua dono só das
   // nativas, e a lista que o App usa para decidir passa a incluir as irmãs do módulo.
   const visibleEditorTabs = useMemo(
-    () => hasSessions ? fundirAbas(getEditorTabsVisibleForSession(editorTabs, activeSession.id), abasProjetadasDoModulo) : [],
-    [hasSessions, editorTabs, activeSession.id, abasProjetadasDoModulo],
+    () => fundirAbas(getEditorTabsVisibleForSession(editorTabs, activeSession.id), abasProjetadasDoModulo),
+    [editorTabs, activeSession.id, abasProjetadasDoModulo],
   )
   // D148 §2/§4: o corpo capaz é fornecido enquanto a sessão tiver abas de ARQUIVO do
   // módulo — não só quando uma delas está ativa. Manter montado é o que dá atendente a
@@ -592,15 +601,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // FATIA 07 (DEBT-09, 15/10): abas GLOBAIS (sem dono de sessão — ex.: Provedores)
   // também abrem o editor central na landing. Abas com dono continuam invisíveis
   // fora da sessão dona (regra do `getEditorTabsVisibleForSession`).
-  const globalEditorTabs = useMemo(() => editorTabs.filter((tab) => !tab.sessionId), [editorTabs])
-  // Sem sessões, o rascunho vazio não tem editor: o chat é a única superfície e
-  // centraliza (landing). Forçamos os inputs do side pane para o estado "closed" —
-  // exceto quando há aba global aberta (DEBT-09): aí o editor abre ao lado da landing.
-  const sidePaneInputs = hasSessions && !landingVisible
-    ? { hasEditorTabs: visibleEditorTabs.length > 0 || moduloTemDivisao, editorHidden, auxVisible: auxiliaryVisible }
-    : globalEditorTabs.length > 0
-      ? { hasEditorTabs: true, editorHidden, auxVisible: false }
-      : { hasEditorTabs: false, editorHidden: true, auxVisible: false }
+  const sidePaneInputs = { hasEditorTabs: visibleEditorTabs.length > 0 || moduloTemDivisao, editorHidden, auxVisible: auxiliaryVisible }
   const sidePaneState = resolveSidePaneState(sidePaneInputs)
   const editorContentVisible = isEditorContentVisible(sidePaneInputs)
   const tabBarVisible = isTabBarVisible(sidePaneInputs)
@@ -704,8 +705,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   useEffect(() => {
     if (skipInvariantCheck.current) return
-    assertWorkbenchInvariants(sessions, browserViews, editorTabs, activeSession.id, activeChatBySession)
-  }, [sessions, browserViews, editorTabs, activeSession.id, activeChatBySession])
+    assertWorkbenchInvariants(
+      sessions,
+      browserViews.filter(view => view.sessionId !== BOOT_SESSION_ID),
+      editorTabs.filter(tab => tab.sessionId !== BOOT_SESSION_ID),
+      persistedActiveSession.id,
+      activeChatBySession,
+    )
+  }, [sessions, browserViews, editorTabs, persistedActiveSession.id, activeChatBySession])
 
   useEffect(() => {
     if (!toast) return
@@ -725,7 +732,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     }
   }
 
+  const editorFilesSaved = () => {
+    if (!explorerModule) return true
+    const groups = explorerModule.attach.groupIds?.({ sessionId: activeSession.id }) ?? [activeSession.id]
+    if (!groups.some(sessionId => explorerModule.attach.getTabs({ sessionId }).some(tab => tab.dirty))) return true
+    notify('Salve as alterações abertas no editor antes de mudar de sessão ou de pasta.')
+    return false
+  }
+
   const selectSession = (id: string) => {
+    if (landingVisible && !editorFilesSaved()) return
+    if (landingVisible) removeSessionResources(BOOT_SESSION_ID)
     setNewSessionLanding(false)
     // (LAYOUT.md) Abrir uma sessão dispensa a custom view ativa e devolve as
     // parts cobertas ao estado que o usuário tinha escolhido.
@@ -1264,12 +1281,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const handleNewSession = () => {
     // FATIA-06.2: o + GLOBAL abre sempre o mesmo SessionLanding validado.
     // O rascunho e o worktree só passam a existir após a primeira mensagem.
+    if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
+    removeSessionResources(BOOT_SESSION_ID)
+    setSelectedWorkspace(undefined)
     setNewSessionLanding(true)
+    layout.showView('explorer')
     setMobilePane('chat')
     notify('Nova sessão pronta para escolher contexto')
   }
 
   const handlePickWorkspace = async () => {
+    if (workspacePickerPending || !editorFilesSaved()) return
     setWorkspacePickerPending(true)
     try {
       const workspace = await pickSessionWorkspace()
@@ -1285,6 +1307,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const handleChangeActiveWorkspace = async (path: string) => {
     if (workspaceChangePending) return
+    if (landingVisible && !editorFilesSaved()) throw new Error('Salve as alterações abertas no editor antes de trocar de pasta.')
     setWorkspaceChangePending(true)
     if (landingVisible) {
       try {
@@ -1344,6 +1367,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
   const handleLandingSubmit = async (text: string) => {
+    if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
     const id = `new-${Date.now()}`
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
@@ -1370,6 +1394,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }
       // F1: registrar sessão/contexto no servidor antes de abrir qualquer execução Agir.
       await persistSession(next)
+      removeSessionResources(BOOT_SESSION_ID)
       setSessions((current) => [next, ...current])
       setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
       setActiveSessionId(id)
@@ -2212,7 +2237,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'workspace-local'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
+        onValidateWorkspacePath={handleChangeActiveWorkspace}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
         onAddContext={() => notify('Adicionar contexto (mock)')}
@@ -2371,9 +2397,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const historyTabs = (sessionId: string) => fundirAbas(getEditorTabsVisibleForSession(editorTabs, sessionId), explorerModule ? projetarAbasDoModulo(sessionId, explorerModule.attach.getTabs({ sessionId })) : [])
   const navigation = useWorkbenchHistory({
-    route: { sessionId: activeSession.id, chatId: activeChatId, tabId: activeTabId, modal: customView.activeView === 'aiCustomizations', section: personalizationsRoute.section, mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
+    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: customView.activeView === 'aiCustomizations', section: personalizationsRoute.section, mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
     valid: route => sessions.some(session => session.id === route.sessionId) && (!route.tabId || historyTabs(route.sessionId).some(tab => tab.id === route.tabId)),
     restore: route => {
+      if (landingVisible && !editorFilesSaved()) return
       selectSession(route.sessionId)
       setActiveChatBySession(current => ({ ...current, [route.sessionId]: route.chatId }))
       setNewSessionLanding(route.landing)
@@ -2406,7 +2433,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
-        workspacePath={landingVisible ? (selectedWorkspace?.path ?? activeSession.workspacePath) : (activeSession.worktreePath ?? activeSession.workspacePath)}
+        workspacePath={landingVisible ? (selectedWorkspace?.path ?? '') : (activeSession.worktreePath ?? activeSession.workspacePath)}
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onFindFile={() => executeEditorCommand('workbench.action.quickOpen')}
@@ -2577,11 +2604,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                 a chave da sessão permanece estável para não desmontar os shells já abertos.
                 Em uma landing sem sessões, o workspace pendente também inicia novos PTYs. */}
             <TerminalPanel
-              key={activeSession.id}
+              key={persistedActiveSession.id}
               visible={terminalVisible && !customViewActive}
-              sessionId={activeSession.id}
+              sessionId={persistedActiveSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (activeSession.worktreePath ?? activeSession.workspacePath)}
+              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (persistedActiveSession.worktreePath ?? persistedActiveSession.workspacePath)}
               onClose={() => setTerminalVisible(false)}
             />
           </div>
