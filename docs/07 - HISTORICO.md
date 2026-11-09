@@ -1,3 +1,9 @@
+# 09/11/2026 — D185, altura do diff do Source Control
+
+A comparação do Monaco preenche o grupo de edição ao abrir um diff pelo Source Control. Estado em 03 e prova em 09.
+
+---
+
 # 09/11/2026 — D185, apresentação do Graph e diff
 
 Revisão em vídeo dos rótulos de branches, atalhos do Graph, caminho do arquivo e quebra de linha no Monaco. Estado em 03 e prova em 09.

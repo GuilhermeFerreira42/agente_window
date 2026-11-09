@@ -1,3 +1,9 @@
+# Evidência D185 — altura do diff (09/11/2026)
+
+Em 1440 × 900, o diff do VS Code 1.135.0 ocupou os 786 px do host. No candidato, o Monaco passou de 356 px para 767,5 px e atingiu a borda inferior do grupo de edição. O Playwright conferiu o preenchimento após redimensionar a janela, a quebra nos dois lados e o retorno a um rascunho sem gravar no disco. Logs `altura-oficial.log`, `altura-antes.log`, `altura-final.log` e `altura-rascunho.log` em `revisao-lateral`.
+
+---
+
 # Evidência D185 — apresentação do Graph e diff (09/11/2026)
 
 Na verificação do Alt+Z com o diff em 378 px, o Playwright confirmou duas colunas de 189 px. As linhas renderizadas passaram de 2 para 19 em cada coluna, e o segundo Alt+Z, acionado na coluna original, restaurou 2 em ambas. Prova em `revisao-lateral/wrap-duplo-final.log`.
