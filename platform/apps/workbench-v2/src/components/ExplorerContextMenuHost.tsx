@@ -42,6 +42,7 @@ export type ExplorerContextMenuState = {
   x: number
   y: number
   items: ExplorerContextMenuItem[]
+  onExecute?: (id: string) => void
 }
 
 type Row = { kind: 'item'; item: ExplorerContextMenuItem } | { kind: 'separator'; key: string }

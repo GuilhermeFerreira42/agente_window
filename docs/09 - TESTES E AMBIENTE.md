@@ -1,3 +1,13 @@
+# Evidência D185 — revisão corretiva da barra lateral direita (09/11/2026)
+
+Operacional externo em `revisao-lateral`. Capturas do workbench padrão do VS Code 1.135.0 (08d4889f9ec4a1685d257b9b95de036c8e1ce1e5) e do candidato em viewport de 1440 × 900, lateral de 289 px e tema escuro. `comparacao.html` reúne as capturas e os logs. Perfil do navegador e repositórios de teste descartáveis na 5198.
+
+- A bateria dirigida Vitest em Windows teve 602 aprovados, 16 falhas e 13 ignorados. As mesmas 16 falhas aparecem na base `3a18790`, em cinco arquivos de teste. O recorte do duplo clique e persistência da divisória aprovou 3/3.
+- Typecheck e build concluídos no Windows. O build mantém os avisos de tamanho de chunks, terminal e CSS da cadeia existente.
+- Playwright cobriu Explorer, Search, atualização externa, diff, staging, commits, branches, conflito e abort, Graph de merge, divisórias, Split Editor e Personalizações. As operações remotas usaram Git HTTPS local. Logs no comparativo.
+
+---
+
 # Evidência D184 — barra lateral direita (09/11/2026)
 
 Operacional externo em `lateral-direita-1.135`. VS Code 1.135.0 Microsoft assinado, tag correspondente a 08d4889f9ec4a1685d257b9b95de036c8e1ce1e5. Comparação em 1440 × 900, tema escuro, com largura de 296 px para as duas barras.

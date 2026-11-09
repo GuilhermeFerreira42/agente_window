@@ -71,7 +71,7 @@
   overflow: hidden;
 }
 
-/* sash: 4 px, centrado na fronteira editor/Side Bar (05_01 §2: x = SideBar.x − 2) */
+/* Keep the hit area inside the sidebar so neighboring panes cannot clip it. */
 .side-bar-sash {
   position: absolute;
   top: 0;
@@ -79,8 +79,11 @@
   z-index: 35;
   outline: none;
 }
-.side-bar-sash.right { left: -2px; }
-.side-bar-sash.left { right: -2px; }
+.side-bar-sash.right {
+  left: -1px;
+  --workbench-sash-indicator-start: calc(var(--workbench-sash-indicator-width) / 2);
+}
+.side-bar-sash.left { right: calc(var(--workbench-sash-hit-width) / -2); }
 
 /* c3 — host de view: ocupa o pane inteiro; o viewlet do módulo (height 100 %) preenche. */
 .side-bar-view {

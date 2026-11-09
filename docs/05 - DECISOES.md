@@ -2081,3 +2081,7 @@ SPEC: lateral mantém donos e ações atuais; busca inline independente do menu 
 ## D184 — Barra lateral direita na régua VS Code 1.135.0 (09/11/2026)
 
 A barra direita usa o mesmo tratamento visual de divisória da barra de sessões. O Explorer e Search reutilizam o watcher do workspace. Preferências de dimensões e seções são persistidas por workspace. A extensão do Source Control usa o Git do host tanto no desenvolvimento quanto no preview integrado, com operações remotas HTTPS em destinos configurados e Pull em avanço rápido. Reutiliza o diff do Monaco com seleção em linha ou lado a lado. As diferenças remanescentes estão em 06 e as provas em 09.
+
+## D185 — Revisão corretiva após inspeção da lateral direita (09/11/2026)
+
+O proprietário confirmou o workbench padrão do VS Code 1.135.0 como referência de Explorer, Search e Source Control da direita. A lateral de sessões e Personalizações seguem D183. Para desenhar relações reais no Graph, a consulta existente de histórico Git passa a retornar pais e autor. Esse acréscimo pontual usa os mesmos caminhos de leitura e validação do repositório. A divisória do editor atua no PanelGroup que hospeda o Monaco e usa a distribuição padrão 50/50.

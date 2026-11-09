@@ -47,7 +47,7 @@ export { SEARCH_STORAGE_KEY } from '../../core/constants';
 export interface PersistedSearchState {
   pattern: string; replacement: string; include: string; exclude: string;
   isCaseSensitive: boolean; isWholeWord: boolean; isRegExp: boolean; preserveCase: boolean; useExcludeSettings: boolean;
-  replaceOpen: boolean; detailsOpen: boolean;
+  replaceOpen: boolean; detailsOpen: boolean; detailsToggled?: boolean;
 }
 function loadPersisted(storageKey = SEARCH_STORAGE_KEY): PersistedSearchState | null {
   try {
@@ -60,7 +60,7 @@ function loadPersisted(storageKey = SEARCH_STORAGE_KEY): PersistedSearchState | 
       include: typeof v.include === 'string' ? v.include : '', exclude: typeof v.exclude === 'string' ? v.exclude : '',
       isCaseSensitive: v.isCaseSensitive === true, isWholeWord: v.isWholeWord === true, isRegExp: v.isRegExp === true,
       preserveCase: v.preserveCase === true, useExcludeSettings: v.useExcludeSettings !== false,
-      replaceOpen: v.replaceOpen === true, detailsOpen: v.detailsOpen === true,
+      replaceOpen: v.replaceOpen === true, detailsOpen: v.detailsOpen === true, detailsToggled: v.detailsToggled === true,
     };
   } catch { return null; }
 }
@@ -210,17 +210,24 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
   const [toggles, setToggles] = useState<SearchToggles>(persisted
     ? { isCaseSensitive: persisted.isCaseSensitive, isWholeWord: persisted.isWholeWord, isRegExp: persisted.isRegExp, preserveCase: persisted.preserveCase, useExcludeSettings: persisted.useExcludeSettings }
     : { isCaseSensitive: false, isWholeWord: false, isRegExp: false, preserveCase: false, useExcludeSettings: true });
-  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? true);
-  const [detailsOpen, setDetailsOpen] = useState(persisted?.detailsOpen ?? true);
+  const [replaceOpen, setReplaceOpen] = useState(persisted?.replaceOpen ?? false);
+  const [detailsToggled, setDetailsToggled] = useState(persisted?.detailsToggled ?? false);
+  const [detailsOpen, setDetailsOpen] = useState(() => persisted?.detailsToggled
+    ? persisted.detailsOpen
+    : Boolean(persisted?.include.trim() || persisted?.exclude.trim() || persisted?.useExcludeSettings === false));
+  const toggleDetails = () => {
+    setDetailsToggled(true);
+    setDetailsOpen(value => !value);
+  };
   // estado restaurado NÃO dispara busca sozinho (só digitação/Enter)
   const armedRef = useRef(autoSearch || !persisted || persisted.pattern.length === 0);
 
   useEffect(() => {
     try {
-      const v: PersistedSearchState = { pattern, replacement, include, exclude, ...toggles, replaceOpen, detailsOpen };
+      const v: PersistedSearchState = { pattern, replacement, include, exclude, ...toggles, replaceOpen, detailsOpen, detailsToggled };
       globalThis.localStorage?.setItem(storageKey, JSON.stringify(v));
     } catch { /* storage indisponível */ }
-  }, [pattern, replacement, include, exclude, toggles, replaceOpen, detailsOpen, storageKey]);
+  }, [pattern, replacement, include, exclude, toggles, replaceOpen, detailsOpen, detailsToggled, storageKey]);
   const [state, setState] = useState<SearchState>(() => {
     // remontagem (troca de aba): reaproveita o último resultado se for da mesma consulta
     const last = search.lastResult;
@@ -244,7 +251,6 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
 
   // foco pedido pelo shell (Ctrl+Shift+F) e no mount
   useEffect(() => {
-    if (focusRequest) { setReplaceOpen(true); setDetailsOpen(true); }
     searchRef.current?.focus();
     searchRef.current?.select();
   }, [focusRequest]);
@@ -283,7 +289,7 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
       if (k === 'r') { e.preventDefault(); flip('isRegExp'); return; }
     }
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'h') { e.preventDefault(); focusReplaceNext.current = true; setReplaceOpen(true); return; }
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') { e.preventDefault(); setDetailsOpen((v) => !v); return; }
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') { e.preventDefault(); toggleDetails(); return; }
     if (e.ctrlKey && e.altKey && e.key === 'Enter' && replaceOpen) { e.preventDefault(); askReplaceAll(); return; }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (pattern) search.query({ root, query }); return; }
     // ↓ no input → foco na lista (searchView.ts: focusNextInputBox/selectNextMatch)
@@ -438,8 +444,8 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
             title="Toggle Search Details"
             aria-label="Toggle Search Details"
             aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((v) => !v)}
-            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setDetailsOpen((v) => !v); } }}
+            onClick={toggleDetails}
+            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleDetails(); } }}
           />
           {detailsOpen && (
             <>
@@ -459,7 +465,11 @@ export function SearchPanel({ search, root, focusRequest, onOpenMatch, onOpenEdi
         </div>
       </div>
       <div className="messages" role="status" aria-live="polite">
-        {message && <div className="message">{message}</div>}
+        {message && <div className="message">{message}
+          {onOpenEditor && state.status === 'done' && visible.length > 0 && !notice && (
+            <> - <button type="button" className="search-open-editor" onClick={onOpenEditor}>Open in editor</button></>
+          )}
+        </div>}
       </div>
       <div className="results" data-testid="explorer-search-results">
         <SearchResults

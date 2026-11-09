@@ -4,6 +4,7 @@
 // bounded. Stable row identities preserve focus/actions while the viewport moves.
 // ============================================================================
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { IExplorerSearchModuleDeps, WorkspaceUri } from '../../../contract';
 import type { GitGroupId, GitResourceGroup, GitResourceItem, GitServiceState } from '../../../core/git/gitService';
 import { fileIconLabelClasses } from '../fileIconClasses';
 import { CHANGES_STRINGS as S } from './changesStrings';
@@ -13,11 +14,14 @@ export type ResourceActionId = 'stage' | 'unstage' | 'discard';
 export type GroupActionId = 'stage-all' | 'unstage-all' | 'discard-all';
 
 export interface ChangesListProps {
+  showProvider?: boolean;
+  contextMenu?: IExplorerSearchModuleDeps['contextMenu'];
   state: GitServiceState;
   repoName: string;
   onRefresh: () => void;
   /** 4.7-c: deletados também abrem (diff com lado modificado vazio). */
   onOpen: (item: GitResourceItem, group: GitGroupId) => void;
+  onOpenFile?: (uri: WorkspaceUri) => void;
   onAction: (action: ResourceActionId, item: GitResourceItem) => void;
   onGroupAction: (action: GroupActionId, group: GitResourceGroup) => void;
 }
@@ -31,10 +35,11 @@ type LogicalRow =
 interface FocusTarget { rowKey: string; actionId?: string }
 interface ViewportMetrics { scrollTop: number; height: number }
 
-function makeRows(groups: GitResourceGroup[], loading: boolean): LogicalRow[] {
-  const rows: LogicalRow[] = [{ kind: 'provider', key: 'provider', index: 0 }];
+function makeRows(groups: GitResourceGroup[], loading: boolean, showProvider: boolean, collapsed: ReadonlySet<GitGroupId>): LogicalRow[] {
+  const rows: LogicalRow[] = showProvider ? [{ kind: 'provider', key: 'provider', index: 0 }] : [];
   groups.forEach((group, groupIndex) => {
     rows.push({ kind: 'group', key: `group:${group.id}`, index: rows.length, group, groupIndex });
+    if (collapsed.has(group.id)) return;
     group.items.forEach((item, itemIndex) => {
       rows.push({
         kind: 'resource', key: `resource:${group.id}:${item.uri}`, index: rows.length,
@@ -144,10 +149,30 @@ function cancelFrame(id: number): void {
   else window.clearTimeout(id);
 }
 
-export function ChangesList({ state, repoName, onRefresh, onOpen, onAction, onGroupAction }: ChangesListProps) {
-  const { groups, loading } = state;
+export function ChangesList({ state, repoName, onRefresh, onOpen, onOpenFile, onAction, onGroupAction, contextMenu, showProvider = true }: ChangesListProps) {
+  const { loading } = state;
+  const groups = useMemo(() => showProvider ? state.groups : state.groups.filter(group => group.items.length > 0), [state.groups, showProvider]);
   const total = groups.reduce((n, group) => n + group.items.length, 0);
-  const rows = useMemo(() => makeRows(groups, loading), [groups, loading]);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<GitGroupId>>(() => new Set());
+  const rows = useMemo(() => makeRows(groups, loading, showProvider, collapsed), [groups, loading, showProvider, collapsed]);
+  const toggleGroup = (id: GitGroupId) => setCollapsed(current => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+  const openMenu = (event: React.MouseEvent<HTMLElement>, actions: { id: string; title: string; run: () => void }[]) => {
+    if (!contextMenu || !actions.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.focus();
+    contextMenu.open({
+      x: event.clientX,
+      y: event.clientY,
+      items: actions.map((action, order) => ({ id: action.id, label: action.title, enabled: true, order })),
+      onExecute: id => actions.find(action => action.id === id)?.run(),
+    });
+  };
   const scrollElementRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState<ViewportMetrics>({ scrollTop: 0, height: 0 });
   const metricsRef = useRef(metrics);
@@ -415,12 +440,22 @@ export function ChangesList({ state, repoName, onRefresh, onOpen, onAction, onGr
     }
     if (row.kind === 'group') {
       const group = row.group;
+      const expanded = !collapsed.has(group.id);
       return (
         <div key={row.key} id={rowDomId(row.key)} className={`monaco-list-row${focusedRowKey === row.key ? ' focused' : ''}`}
-          role="treeitem" aria-level={1} aria-posinset={row.groupIndex + 1} aria-setsize={state.groups.length} aria-expanded="true"
-          aria-label={group.label} data-row-key={row.key} data-group={group.id} tabIndex={0} style={position}>
+          role="treeitem" aria-level={1} aria-posinset={row.groupIndex + 1} aria-setsize={groups.length} aria-expanded={expanded}
+          aria-label={group.label} data-row-key={row.key} data-group={group.id} tabIndex={0} style={position}
+          onClick={() => toggleGroup(group.id)}
+          onContextMenu={event => openMenu(event, groupActions(group, onGroupAction))}
+          onKeyDown={event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === 'Enter' || event.key === ' ' || (expanded ? event.key === 'ArrowLeft' : event.key === 'ArrowRight')) {
+              event.preventDefault();
+              toggleGroup(group.id);
+            }
+          }}>
           <div className="monaco-tl-row">
-            <div className="monaco-tl-twistie codicon codicon-tree-item-expanded collapsible force-twistie" style={{ paddingLeft: 8 }} />
+            <div className={`monaco-tl-twistie codicon codicon-chevron-${expanded ? 'down' : 'right'}`} style={{ paddingLeft: 8 }} />
             <div className="monaco-tl-contents">
               <div className="resource-group">
                 <div className="name">{group.label}</div>
@@ -444,6 +479,11 @@ export function ChangesList({ state, repoName, onRefresh, onOpen, onAction, onGr
         data-row-key={row.key} data-uri={item.uri} data-letter={item.letter} data-in-group={group.id}
         title={`${item.path} • ${item.tooltip}`} tabIndex={0} style={position}
         onClick={() => onOpen(item, group.id)}
+        onContextMenu={event => openMenu(event, [
+          { id: 'open-changes', title: 'Open Changes', run: () => onOpen(item, group.id) },
+          ...(!item.deleted && onOpenFile ? [{ id: 'open-file', title: 'Open File', run: () => onOpenFile(item.uri) }] : []),
+          ...actions,
+        ])}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
           if (event.key === 'Enter') { event.preventDefault(); onOpen(item, group.id); }

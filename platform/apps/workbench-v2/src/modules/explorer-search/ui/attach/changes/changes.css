@@ -126,7 +126,7 @@
 :is(.attach-viewlet, .scm-viewlet) .tab[data-kind="changes"] { padding-right: 10px; }
 
 /* 4.7-c: lista sem alterações (repo limpo) — texto secundário, mesma família do "no repo" */
-:is(.attach-viewlet, .scm-viewlet) .scm-empty { padding: 0 20px; color: var(--vscode-descriptionForeground); font-size: 13px; line-height: 22px; user-select: none; }
+:is(.attach-viewlet, .scm-viewlet) .scm-empty { position: absolute; padding: 0 20px; color: var(--vscode-descriptionForeground); font-size: 13px; line-height: 22px; user-select: none; }
 /* 4.7-c: badge de contagem na aba fixa "Changes" (tokens de badge do tema; some com 0) */
 :is(.attach-viewlet, .scm-viewlet) .tab .tab-badge { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; line-height: 18px; text-align: center; font-weight: 400; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 
@@ -174,14 +174,86 @@
 .center-changes-host .explorer-viewlet.scm-viewlet { position: relative; flex: 1 1 auto; min-height: 0; }
 .center-changes-host .scm-viewlet .scm-view { background: var(--vscode-editor-background); }
 
-.scm-repository-actions {
-  flex: 0 0 auto;
-  max-height: 48%;
-  overflow: auto;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
+.scm-section-header {
+  min-height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 8px;
 }
-.scm-repository-actions summary { cursor: pointer; }
+.scm-section-header button {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.scm-section-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  text-align: start;
+}
+.scm-toolbar-button { width: 22px; height: 22px; padding: 0; border-radius: 4px; }
+.scm-toolbar-button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.scm-toolbar-button:disabled { opacity: .5; cursor: default; }
+.scm-changes-body:not([hidden]) { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
+.scm-view .scm-changes-body .monaco-list { min-height: 0; }
+.scm-view .scm-changes-body .scm-editor { padding: 2px 10px 0 24px; }
+.scm-view .scm-changes-body .resource-group { padding-inline-start: 4px; }
+.scm-history {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  max-height: 48%;
+  min-height: 22px;
+  border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+}
+.scm-history:has(.scm-history-body) { flex-basis: 48%; }
+.scm-changes-body[hidden] + .scm-history:has(.scm-history-body) { flex: 1; max-height: none; min-height: 0; }
+.scm-history-branch {
+  margin-inline-start: auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-inline: 6px;
+  border-radius: 8px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+.scm-history-body { min-height: 0; overflow: auto; }
+.scm-history-body p { margin: 8px 12px; white-space: normal; }
+.scm-history-body ol { margin: 0; padding: 0 10px; list-style: none; }
+.scm-history-body li { display: flex; align-items: center; gap: 6px; height: 22px; }
+.scm-history-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scm-history-author {
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.scm-graph-lanes { flex: none; color: var(--vscode-scmGraph-foreground1, var(--vscode-focusBorder)); }
+.scm-graph-lanes path { stroke: currentColor; fill: none; }
+.scm-graph-lanes circle { fill: currentColor; }
+.scm-graph-lanes .scm-graph-head { fill: var(--vscode-sideBar-background); stroke: currentColor; stroke-width: 2px; }
+.scm-repository-actions {
+  position: absolute;
+  z-index: 3;
+  inset: 22px 8px auto;
+  max-height: calc(100% - 30px);
+  overflow: auto;
+  padding: 6px 8px;
+  background: var(--vscode-menu-background, var(--vscode-sideBar-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border));
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+}
 .scm-repository-actions fieldset { min-width: 0; margin: 4px 0; padding: 4px; border: 1px solid var(--vscode-sideBarSectionHeader-border); }
 .scm-repository-actions :is(input, select, button) {
   max-width: 100%;
@@ -194,5 +266,3 @@
 .scm-repository-actions button:disabled { opacity: .5; }
 .scm-repository-buttons,
 .scm-repository-actions form { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
-.scm-repository-actions ol { padding-left: 18px; }
-.scm-repository-actions li { overflow-wrap: anywhere; }

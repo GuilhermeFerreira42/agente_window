@@ -266,7 +266,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           contextMenu: { open: (input) => setExplorerContextMenu(input) },
           workspaceRoot: root,
           // 5.3: "Open Source Control" (header do Explorer) → view `scm` da Side Bar.
-          openSourceControl: () => layoutRef.current.showView('scm'),
         })
         await module.explorer.openFolder({ uri: root })
         if (cancelled) { module.dispose(); return }
@@ -961,7 +960,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const resetPartSizes = () => {
     // Duplo-clique no sash redistribui igualmente (Sizing.Distribute).
-    setPartSizesBySession((current) => ({ ...current, [activeSession.id]: [50, 50] }))
+    const layout = [50, 50]
+    const group = panelGroupRef.current
+    if (group?.getLayout().length === layout.length) group.setLayout(layout)
+    handlePanelLayout(layout)
     notify('Tamanhos do painel redistribuídos igualmente')
   }
 
@@ -2439,7 +2441,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         />
         {sidebarVisible && (
           <div
-            className="sidebar-resize-handle"
+            className="workbench-column-sash sidebar-resize-handle"
             role="separator"
             aria-orientation="vertical"
             aria-label="Redimensionar barra de sessões"
@@ -2528,7 +2530,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
                   >
                     <Panel defaultSize={activePartSizes[0]} minSize={34} order={1}>{renderChat()}</Panel>
                     <PanelResizeHandle
-                      className="panel-resize-handle"
+                      className="workbench-column-sash panel-resize-handle"
                       onDoubleClick={resetPartSizes}
                       title="Duplo-clique para redistribuir igualmente"
                     />
@@ -2620,7 +2622,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         <ExplorerContextMenuHost
           state={explorerContextMenu}
           onClose={() => setExplorerContextMenu(null)}
-          onExecute={(id) => void explorerMenusRef.current.execute(id)}
+          onExecute={explorerContextMenu.onExecute ?? ((id) => void explorerMenusRef.current.execute(id))}
         />
       )}
       {activityBarMenu && (

@@ -149,11 +149,14 @@
   color: var(--vscode-icon-foreground, inherit);
   cursor: pointer;
 }
+.explorer-title-action.codicon { font-size: 16px; }
+.explorer-title-action.codicon-ellipsis::before { content: '\ea7c'; }
 .explorer-title-action:hover { background: var(--vscode-toolbar-hoverBackground); }
 .part.sidebar .explorer-viewlet .monaco-pane-view {
   box-sizing: border-box;
   padding-inline: var(--vscode-spacing-size80, 8px) var(--vscode-spacing-size40, 4px);
 }
+.part.sidebar.right .explorer-viewlet .monaco-pane-view { --pane-header-size: 22px; }
 .part.sidebar .explorer-viewlet .monaco-pane-view .pane > .pane-header { background: transparent; }
 .part.sidebar .explorer-viewlet .monaco-list-row,
 .part.sidebar .search-view .monaco-list-row,
@@ -216,7 +219,9 @@
 /* tree row */
 .explorer-viewlet .monaco-tl-row { display: flex; height: 100%; align-items: center; position: relative; }
 .explorer-viewlet .monaco-tl-indent { height: 100%; position: absolute; top: 0; left: 16px; pointer-events: none; }
-.explorer-viewlet .monaco-tl-indent > .indent-guide { display: inline-block; box-sizing: border-box; height: 100%; border-left: 1px solid transparent; opacity: 0; transition: opacity .1s linear; }
+.explorer-viewlet .monaco-tl-indent { display: flex; }
+.explorer-viewlet .explorer-folders-view .monaco-tl-indent { left: 8px; }
+.explorer-viewlet .monaco-tl-indent > .indent-guide { flex: none; box-sizing: border-box; height: 100%; border-left: 1px solid transparent; opacity: 0; transition: opacity .1s linear; }
 /* tree.renderIndentGuides = onHover (padrão): guias aparecem quando a árvore é hover/focus */
 .explorer-viewlet .monaco-list:hover .monaco-tl-indent > .indent-guide,
 .explorer-viewlet .monaco-list:focus-within .monaco-tl-indent > .indent-guide { border-color: var(--vscode-tree-inactiveIndentGuidesStroke); opacity: 1; }
@@ -236,6 +241,12 @@
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
 }
 .explorer-viewlet .monaco-tl-twistie.codicon { font-size: 16px; }
+.explorer-viewlet .explorer-folders-view .monaco-tl-twistie.collapsible {
+  box-sizing: content-box;
+  width: 16px;
+  padding-right: 2px;
+  transform: none;
+}
 .explorer-viewlet .monaco-tl-contents { flex: 1; overflow: hidden; }
 .explorer-viewlet .monaco-tl-twistie:before { border-radius: 20px; }
 .explorer-viewlet .monaco-tl-twistie.collapsed:before { transform: rotate(-90deg); }
@@ -271,6 +282,17 @@
 .explorer-viewlet .explorer-folders-view .explorer-item { height: 22px; line-height: 22px; display: flex; flex-wrap: nowrap; flex: 1; }
 .explorer-viewlet .explorer-folders-view .explorer-item > a { text-overflow: ellipsis; overflow: hidden; }
 .explorer-viewlet .explorer-folders-view .explorer-item.cut { opacity: .5; }
+
+/* Keep the icon box from shrinking to the width of the fallback glyph. */
+.explorer-viewlet .explorer-folders-view .monaco-icon-label.file-icon::before {
+  box-sizing: content-box;
+  justify-content: center;
+  padding-right: 2px;
+}
+.explorer-viewlet .monaco-pane-view .pane > .pane-header .action-label.codicon {
+  font-size: 16px;
+  justify-content: center;
+}
 
 /* Ícones de arquivo — tema Seti gera `.show-file-icons .<ext>-ext-file-icon.ext-file-icon.file-icon::before`
  * com fonte seti + cor por linguagem. Sem a fonte aqui: glyph genérico do codicon

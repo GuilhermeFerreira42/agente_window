@@ -1,3 +1,17 @@
+# Inspeção D185 — barra lateral direita e Monaco (09/11/2026)
+
+Use **Sidebar fixture session** em um perfil de validação.
+
+1. Expanda uma pasta no Explorer. Confira a distância entre guia, ícone e nome. Abra o menu de três pontos do cabeçalho e alterne Open Editors. Em uma pasta descartável, experimente copiar e colar logo após selecionar o destino.
+2. Abra Search e confira se o menu de filtros começa fechado. Abra e feche os detalhes. Aplique um filtro e abra um resultado no editor.
+3. Abra Source Control em um repositório descartável. Confira Changes, Staged Changes, o menu de contexto e o Graph com um merge. Abra um diff e volte para a aba do arquivo.
+4. Arraste a lateral direita e restaure com duplo clique. Com um arquivo aberto, repita na divisória entre o chat e o Monaco e confira a divisão 50/50. Faça também com o Split Editor aberto.
+5. Abra e feche Personalizações pela lateral esquerda. Confirme que as abas e o conteúdo aberto continuam disponíveis.
+
+Aceite humano pendente.
+
+---
+
 # Inspeção D184 — barra lateral direita (09/11/2026)
 
 Use a sessão descartável **Sidebar fixture session** no perfil de validação. Salve rascunhos antes de recarregar sua sessão real.

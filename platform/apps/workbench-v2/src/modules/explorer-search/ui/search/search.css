@@ -18,6 +18,16 @@
   user-select: none;
 }
 
+.search-view .search-open-editor {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+.search-view .search-open-editor:hover { text-decoration: underline; }
+
 /* container: margin 0 12px 0 2px; padding-top 6px (medido) */
 .search-view .search-widgets-container {
   margin: 0 12px 0 2px;
@@ -282,7 +292,7 @@
    reaproveita o CSS de linha da 4.4 (explorer.css: .monaco-tl-*, estados de
    foco/hover, .monaco-icon-label:before Seti); aqui só o que difere.
    ------------------------------------------------------------------------- */
-.search-view.explorer-viewlet .results .monaco-list { height: auto; }
+.search-view.explorer-viewlet .results .monaco-list { height: auto; padding-inline-start: 8px; }
 .search-view.explorer-viewlet .results .monaco-list-row {
   position: relative;          /* sem virtualização: fluxo normal */
   height: 22px;
@@ -290,6 +300,12 @@
   font-size: 13px;
 }
 .search-view.explorer-viewlet .results .monaco-tl-contents { display: flex; align-items: center; min-width: 0; }
+.search-view.explorer-viewlet .results .monaco-tl-indent { left: 8px; }
+.search-view.explorer-viewlet .results .monaco-tl-twistie.collapsible {
+  box-sizing: content-box;
+  padding-right: 2px;
+  transform: none;
+}
 .search-view.explorer-viewlet .results .filematch { display: flex; align-items: center; flex: 1; min-width: 0; }
 .search-view.explorer-viewlet .results .filematch .monaco-icon-label { flex: 1; min-width: 0; }
 .search-view.explorer-viewlet .results .monaco-icon-label-container { display: flex; align-items: baseline; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -322,7 +338,7 @@
   flex: 0 0 auto;
 }
 /* linematch */
-.search-view.explorer-viewlet .results .linematch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.search-view.explorer-viewlet .results .linematch { padding-inline-start: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .search-view.explorer-viewlet .results .linematch .matchLineNum { display: none; }
 .search-view.explorer-viewlet .results .linematch a.plain.match { color: inherit; text-decoration: none; white-space: pre; }
 .search-view.explorer-viewlet .results .linematch a.plain.match > span:first-child,
@@ -347,11 +363,11 @@
    ------------------------------------------------------------------------- */
 .search-view.explorer-viewlet .results .linematch { display: flex; align-items: center; }
 .search-view.explorer-viewlet .results .linematch a.plain.match { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.search-view.explorer-viewlet .results .actionBarContainer { flex: 0 0 auto; display: flex; align-items: center; height: 22px; visibility: hidden; margin-left: auto; }
+.search-view.explorer-viewlet .results .actionBarContainer { flex: 0 0 auto; display: none; align-items: center; height: 22px; margin-left: auto; }
 .search-view.explorer-viewlet .results .filematch .actionBarContainer { margin-left: 0; }
 /* como no VS Code: ações no hover ou na linha focada COM a lista focada */
 .search-view.explorer-viewlet .results .monaco-list-row:hover .actionBarContainer,
-.search-view.explorer-viewlet .results .monaco-list:focus-within .monaco-list-row.focused .actionBarContainer { visibility: visible; }
+.search-view.explorer-viewlet .results .monaco-list:focus-within .monaco-list-row.focused .actionBarContainer { display: flex; }
 .search-view.explorer-viewlet .results .monaco-list-row:hover .monaco-count-badge,
 .search-view.explorer-viewlet .results .monaco-list:focus-within .monaco-list-row.focused .monaco-count-badge { display: none; }
 .search-view.explorer-viewlet .results .monaco-toolbar { display: inline-block; height: 22px; }

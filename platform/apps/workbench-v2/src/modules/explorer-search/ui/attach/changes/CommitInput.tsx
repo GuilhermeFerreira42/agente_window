@@ -27,7 +27,7 @@ export const CommitInput = forwardRef<CommitInputHandle, CommitInputProps>(funct
   useEffect(() => {
     const el = taRef.current; if (!el) return;
     el.style.height = '0px';
-    el.style.height = `${Math.min(134, Math.max(26, el.scrollHeight))}px`;
+    el.style.height = value ? `${Math.min(134, Math.max(26, el.scrollHeight))}px` : '26px';
   }, [value]);
   return (
     <div className="scm-editor" data-testid="scm-commit">

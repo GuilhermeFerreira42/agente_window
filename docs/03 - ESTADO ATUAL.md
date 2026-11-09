@@ -1,4 +1,12 @@
-# Estado vigente — barra lateral direita na régua 1.135.0, D184 (09/11/2026)
+# Revisão corretiva da barra lateral direita — D185 (09/11/2026)
+
+Base local `3a18790`. A lateral direita segue o workbench padrão do VS Code 1.135.0. O Explorer corrige guias, cabeçalhos, ações e seleção imediata de pasta. Search abre com filtros recolhidos por padrão. Source Control tem Changes, menu de contexto, operações do repositório e Graph dos commits recentes. As divisórias têm área de captura de 8 px, e a do chat/Monaco redistribui as colunas em 50/50 ao receber duplo clique.
+
+Aceite humano pendente. Roteiro em 08, limites em 06 e provas em 09.
+
+---
+
+# Entrega anterior da barra lateral direita — D184 (09/11/2026)
 
 Base 2adcbc7. Explorer, Search e Source Control foram revisados contra o VS Code oficial 1.135.0 executado com a barra primária à direita. A divisória direita compartilha os estilos da esquerda. O Explorer persiste ordem, altura, visibilidade e expansão de seções. Search acompanha o watcher e protege o disco e rascunhos na substituição. Source Control usa o Git do servidor, com histórico, branches, merge, remoto HTTPS e diff do Monaco.
 

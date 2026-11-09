@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import { clampSideBarWidth, defaultSideBarWidth, maxSideBarWidth, SIDE_BAR_MIN_WIDTH } from '../layoutState'
 import { hasViewDrag, readViewDrag, setViewDrag } from '../dnd'
 import type { ViewContainerSide, ViewDescriptor, ViewId } from '../viewRegistry'
-import { resolveDrag, resolveKeyboard, SIDE_BAR_SASH_SIZE } from './sash'
+import { resolveDrag, resolveKeyboard } from './sash'
 import { SideBarViewPane } from './SideBarViewPane'
 import './sideBar.css'
 
@@ -159,7 +159,7 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
         ))}
       </div>
       <div
-        className={`side-bar-sash ${side}`}
+        className={`workbench-column-sash side-bar-sash ${side}`}
         data-testid="side-bar-sash"
         role="separator"
         aria-orientation="vertical"
@@ -169,7 +169,6 @@ export function SideBar({ side, views, activeViewId, visible, width, onWidthChan
         aria-valuemax={maxSideBarWidth(available)}
         aria-valuenow={effectiveWidth}
         tabIndex={0}
-        style={{ width: SIDE_BAR_SASH_SIZE }}
         onPointerDown={onSashPointerDown}
         onPointerMove={onSashPointerMove}
         onPointerUp={onSashPointerUp}

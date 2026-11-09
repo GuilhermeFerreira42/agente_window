@@ -246,13 +246,15 @@ export class GitHost {
       this.exec(cwd, ['rev-parse', '--verify', 'HEAD']),
       this.exec(cwd, ['rev-parse', '--verify', 'MERGE_HEAD']),
     ]);
-    const log = head.code === 0 ? await this.run(cwd, ['log', '-n', '30', '--format=%H%x00%s']) : '';
+    const log = head.code === 0
+      ? await this.run(cwd, ['log', '--topo-order', '-n', '30', '--format=%H%x00%P%x00%an%x00%s'])
+      : '';
     return {
       branches: branches.trim().split(/\r?\n/).filter(Boolean),
       remotes: remotes.trim().split(/\r?\n/).filter(Boolean),
       history: log.trim().split(/\r?\n/).filter(Boolean).map(line => {
-        const [oid, subject = ''] = line.split('\0');
-        return { oid, subject };
+        const [oid, parents = '', author = '', subject = ''] = line.split('\0');
+        return { oid, subject, parents: parents.split(' ').filter(Boolean), author };
       }),
       merging: merging.code === 0,
     };

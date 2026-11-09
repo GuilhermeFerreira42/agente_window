@@ -325,22 +325,35 @@ svg {
 
 /* Sash de redimensionamento da barra de sessões (V-12). */
 .sidebar-resize-handle {
+  position: relative;
   flex: 0 0 auto;
-  width: 4px;
-  margin-left: -2px;
-  margin-right: -2px;
+  margin-inline: calc(var(--workbench-sash-hit-width) / -2);
   z-index: 5;
 }
 
-:is(.sidebar-resize-handle, .side-bar-sash) {
+/* Keep the pointer target wider than the painted indicator. */
+.workbench-column-sash {
+  --workbench-sash-hit-width: 8px;
+  --workbench-sash-indicator-width: 4px;
+  width: var(--workbench-sash-hit-width);
   cursor: col-resize;
   touch-action: none;
   background: transparent;
-  transition: background 120ms ease;
 }
 
-:is(.sidebar-resize-handle, .side-bar-sash):is(:hover, :active, .active, :focus-visible) {
-  background: var(--vscode-focusBorder);
+.workbench-column-sash::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--workbench-sash-indicator-start, 50%);
+  width: var(--workbench-sash-indicator-width);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: background-color 120ms ease;
+}
+
+.workbench-column-sash:is(:hover, :active, .active, :focus-visible, [data-resize-handle-active])::before {
+  background-color: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
 }
 
 .sessions-sidebar-header {
@@ -1064,13 +1077,15 @@ svg {
 }
 
 .panel-resize-handle {
-  width: 1px;
-  background: var(--vscode-panel-border);
-  cursor: col-resize;
+  position: relative;
+  flex: 0 0 auto;
+  margin-inline: calc((1px - var(--workbench-sash-hit-width)) / 2);
+  z-index: 2;
 }
 
-.panel-resize-handle:hover {
-  background: var(--vscode-focusBorder);
+.panel-resize-handle:not(:is(:hover, :active, :focus-visible, [data-resize-handle-active]))::before {
+  width: 1px;
+  background: var(--vscode-panel-border);
 }
 
 .chat-pane-header,

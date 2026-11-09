@@ -253,7 +253,7 @@ export interface IExplorerSearchModuleDeps {
       keybinding?: string;
       /** 4.5 (aditivo): item com estado marcado (toggles do ViewTitleContext — check na coluna de 26 px). OPCIONAL. */
       checked?: boolean;
-    }> }): void;
+    }>; onExecute?: (id: string) => void }): void;
   };
   workspaceRoot: WorkspaceUri;   // raiz única (Q4: single-root nesta fase)
   /** FATIA-05 5.3 (aditivo): o shell decide onde a Source Control View vive (view `scm`

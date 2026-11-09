@@ -440,7 +440,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // recurso abre o diff read-only NO ANEXO (aba fixa Diff — até a 5.7).
   const scmElement = () => createElement('div', { className: 'explorer-viewlet scm-viewlet', 'data-testid': 'scm-viewlet' },
     createElement(ChangesPane, {
-      git: gitService, root: deps.workspaceRoot, repositoryControls: true,
+      git: gitService, root: deps.workspaceRoot, repositoryControls: true, contextMenu: deps.contextMenu,
       onOpenFile: (uri: WorkspaceUri) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri, kind: 'code' })),
       onOpenDiff: (item, sides) => openInAttachSession((sessionId) => editorService.open({ sessionId, uri: ATTACH_DIFF_URI, kind: 'diff', diff: { resource: item.uri, title: sides.title, original: sides.original, modified: sides.modified } })),
     }));
@@ -561,8 +561,6 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
         createElement(ExplorerView, {
           toolbarTarget: root.closest('.part.sidebar')?.querySelector<HTMLElement>('.title-actions') ?? undefined,
           workspaceRoot: deps.workspaceRoot, service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
-          // 5.3: "Open Source Control" (header Folders) → view `scm` da Side Bar (o shell decide onde ela vive).
-          onOpenChanges: deps.openSourceControl,
           activeFile: activeFileApi, editorList, // EditorService owns the list
         }),
       );

@@ -1,6 +1,6 @@
-# Limites correntes da barra lateral direita — D184 (09/11/2026)
+# Limites correntes da barra lateral direita — D185 (09/11/2026)
 
-Ficam registrados como diferenças da referência o Graph visual do SCM, as opções e os submenus ainda sem paridade, o modelo de um repositório Git raiz por workspace, a exclusão permanente com confirmação no Explorer e as operações remotas restritas a HTTPS. A cobertura de atualização de pastas obedece ao limite de diretórios do watcher. A validação em Debian headless e a matriz completa de fidelidade visual e atalhos seguem pendentes.
+O Graph exibe até 30 commits alcançáveis do HEAD e suas relações. Filtros de referências e ações de commits do Graph oficial, alternância de árvore e lista do Search, o tema Seti e opções de menus avançadas ainda diferem do VS Code. O modelo suporta um repositório Git raiz por workspace, operações remotas HTTPS e Pull em avanço rápido. A cobertura de atualização de pastas obedece ao limite de diretórios do watcher. A validação em Debian headless e a matriz completa de fidelidade visual e atalhos seguem pendentes.
 
 ---
 

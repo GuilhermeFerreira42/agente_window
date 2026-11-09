@@ -1,3 +1,9 @@
+# 09/11/2026 — D185, correções da barra lateral direita
+
+Revisão da homologação D184 no workbench padrão do VS Code 1.135.0. Ajustes em Explorer, Search, Source Control, Graph e divisórias. Estado em 03, roteiro em 08 e provas em 09.
+
+---
+
 # 09/11/2026 — D184, barra lateral direita
 
 Entrega local `feat(workbench): refine and validate the right sidebar`. Ajustes em Explorer, Search, Source Control e divisória com prova funcional em workspace descartável. Estado em 03, roteiro em 08 e provas em 09.

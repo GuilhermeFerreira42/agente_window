@@ -73,7 +73,6 @@ async function montar(arquivo: ExplorerActiveFileApi) {
       menus={{ register: () => () => {}, execute: async () => {}, setContext: () => {}, getContext: () => undefined }}
       contextMenu={{ open: () => {} }}
       fs={fs}
-      onOpenChanges={() => {}}
       activeFile={arquivo}
     />,
   );

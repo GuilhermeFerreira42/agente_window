@@ -8,7 +8,7 @@
 //   • estado vive no GitService (puro); aqui só assinatura + DOM.
 // ============================================================================
 import React, { useEffect, useRef, useState } from 'react';
-import type { WorkspaceUri } from '../../../contract';
+import type { IExplorerSearchModuleDeps, WorkspaceUri } from '../../../contract';
 import type { GitDiffSides, GitGroupId, GitResourceGroup, GitResourceItem, GitService, GitServiceState } from '../../../core/git/gitService';
 import { ConfirmDialog, type DiscardRequest } from './ConfirmDialog';
 import { CommitInput, type CommitInputHandle } from './CommitInput';
@@ -23,13 +23,14 @@ export interface ChangesPaneProps {
   git: GitService;
   root: WorkspaceUri;
   repositoryControls?: boolean;
+  contextMenu?: IExplorerSearchModuleDeps['contextMenu'];
   /** 4.7-b: clique num recurso → abria o arquivo (mantido como fallback quando não há onOpenDiff). */
   onOpenFile: (uri: WorkspaceUri) => void;
   /** 4.7-c c2: clique num recurso (M/A/D/U) → aba fixa Diff com os lados já resolvidos. */
   onOpenDiff?: (item: GitResourceItem, sides: GitDiffSides) => void;
 }
 
-export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenDiff }: ChangesPaneProps) {
+export function ChangesPane({ git, root, repositoryControls, contextMenu, onOpenFile, onOpenDiff }: ChangesPaneProps) {
   const paneRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!repositoryControls) return;
@@ -78,6 +79,7 @@ export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenD
   // sem staged → "There are no staged changes to commit." [Yes = stage all + commit][Cancel];
   // erro do git → diálogo de erro (mensagem do servidor), input preservado; sucesso → input limpa
   // (o VS Code não mostra diálogo de sucesso; a lista se atualiza sozinha).
+  const [commitRevision, setCommitRevision] = useState(0);
   const [message, setMessage] = useState('');
   const [validation, setValidation] = useState<string | null>(null);
   const [askStageAll, setAskStageAll] = useState(false);
@@ -90,6 +92,7 @@ export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenD
       if (stageAllFirst) { await git.refreshNow(); await git.stageAll(); } // estado fresco antes do stage all
       await git.commit(message);
       setMessage('');
+      setCommitRevision(value => value + 1);
     } catch (e) {
       setCommitError((e as Error).message || String(e));
     } finally { setBusy(false); }
@@ -100,6 +103,16 @@ export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenD
     if (!git.hasStaged()) { setAskStageAll(true); return; }
     void doCommit(false);
   };
+
+  const hasRepositoryControls = repositoryControls && state.isRepo && git.supportsRepositoryActions();
+  const changes = (
+    <>
+      <CommitInput ref={inputRef} branch={state.branch} value={message} validation={validation} busy={busy}
+        onChange={(v) => { setMessage(v); if (validation) setValidation(null); }} onCommit={onCommitRequest} />
+      <ChangesListLazy state={state} repoName={repoName} showProvider={!hasRepositoryControls} onRefresh={() => { void git.refreshNow(); }}
+        onOpen={onOpen} onOpenFile={onOpenFile} onAction={onAction} onGroupAction={onGroupAction} contextMenu={contextMenu} />
+    </>
+  );
 
   return (
     <div ref={paneRef} className="scm-view show-file-icons" data-testid="scm-view" data-loading={state.loading} data-is-repo={state.isRepo} role="region" aria-label="Source Control">
@@ -116,12 +129,9 @@ export function ChangesPane({ git, root, repositoryControls, onOpenFile, onOpenD
             </a>
           </div>
         </div>
-      ) : (<>
-        <CommitInput ref={inputRef} branch={state.branch} value={message} validation={validation} busy={busy}
-          onChange={(v) => { setMessage(v); if (validation) setValidation(null); }} onCommit={onCommitRequest} />
-        {repositoryControls && state.isRepo && git.supportsRepositoryActions() && <RepositoryActions git={git} branch={state.branch} />}
-        <ChangesListLazy state={state} repoName={repoName} onRefresh={() => { void git.refreshNow(); }} onOpen={onOpen} onAction={onAction} onGroupAction={onGroupAction} />
-      </>)}
+      ) : hasRepositoryControls ? (
+        <RepositoryActions git={git} branch={state.branch} onCommit={onCommitRequest} commitBusy={busy} commitRevision={commitRevision}>{changes}</RepositoryActions>
+      ) : changes}
       {discard && <ConfirmDialog request={discard} onConfirm={confirmDiscard} onCancel={() => setDiscard(null)} />}
       {askStageAll && (
         <AttachDialog kind="warning" testId="scm-commit-dialog" message={CHANGES_STRINGS.noStagedMessage} detail={CHANGES_STRINGS.noStagedDetail}
