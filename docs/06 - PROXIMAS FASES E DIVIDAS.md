@@ -42,6 +42,12 @@ Base `8c6ec49`. Reutilizar a medição M1, os eventos M2, a autoridade de sessã
 - A primeira superfície de compactação é manual e informa o custo de uma chamada ao provedor selecionado. Os alertas da M1 informam a decisão quando a janela é conhecida. Nenhum erro 413 inicia automaticamente uma nova tentativa de uma execução com possíveis efeitos.
 - Gerar resumo sem ferramentas e rotulá-lo como derivado. Revalidar o prefixo e o checkpoint anterior na publicação. Timeout, resposta vazia, mudança concorrente e falha de armazenamento preservam a versão anterior. Testar recompactação, reinício, isolamento, cauda intacta e redução medida do payload. Validar qualidade de continuidade com um modelo real dentro da autorização de custo.
 
+## M4 — SPEC de execução inicial (10/11/2026)
+
+Base `4cf177d`. Reutilizar o transcript original da M2 e a lista de mensagens do chat. A busca lexical é manual, restrita ao chat ativo validado pela prefeitura e independente dos checkpoints. A primeira estratégia é varredura do JSONL sem índice persistente. O resultado inclui ID, posição, papel, timestamp e trecho literal. O controle de busca do chat leva à mensagem original, mantendo a vizinhança na lista.
+
+Pesquisar texto visível do usuário e do assistente. Eventos brutos, anexos e conteúdo omitido por D188 ficam fora do índice. Busca sem consulta a provedor, com limite de consulta, texto examinado e hits. Testar acentos, pontuação, exclusão, falha de leitura, limite, isolamento por chat e sessão e navegação após compactação. Um índice persistente depende de necessidade demonstrada em volume real.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.

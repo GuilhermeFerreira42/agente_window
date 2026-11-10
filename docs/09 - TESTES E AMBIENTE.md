@@ -1,3 +1,11 @@
+# M4 — busca na fonte do chat (10/11/2026)
+
+Vitest focado **18/18**, com correspondência literal, acentos, pontuação, sequência por chat, exclusão, escopo inexistente, limites de consulta e exclusão de campos de anexos e ferramentas. O Playwright passou no cenário integrado M3–M4 após repetir o spec com os arquivos estáveis. A busca encontrou um trecho anterior à compactação e moveu o foco para a mensagem original. Não houve chamada adicional a provedor para pesquisar. Logs em `m4-focused.log` e `m4-e2e-final.log`.
+
+Typecheck aprovado. A regressão completa teve **1.528 aprovações, 42 falhas e 30 ignorados**. Comparação nominal com M3 confirmou as mesmas 42 falhas preexistentes e nenhuma nova. A fixture de 2 GiB passou. Logs em `m4-typecheck.log` e `m4-regression.log`. A varredura foi validada com fixtures sintéticas de limite. Não foi executado benchmark sobre históricos reais.
+
+---
+
 # M3 — checkpoint e continuidade (10/11/2026)
 
 Vitest focado **50/50**. Foram exercitados a fronteira e a cauda, alterações do prefixo, escopos distintos, corrupção, exclusão derivada, chamada pendente e falha de escrita injetada no SQLite descartável. O checkpoint anterior sobreviveu à falha. O typecheck passou.

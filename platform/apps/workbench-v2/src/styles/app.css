@@ -2136,6 +2136,35 @@ svg {
   bottom: 28px;
 }
 
+.chat-history-search {
+  position: relative;
+}
+
+.chat-history-search-panel {
+  top: 100%;
+  right: 0;
+  width: min(300px, calc(100vw - 28px));
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.chat-history-search-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-history-search-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-history-hit {
+  flex-direction: column;
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+}
+
 .permission-mode-button.is-risky {
   color: var(--vscode-errorForeground);
   font-weight: 600;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { resolveProjectDir } from './paths'
 
@@ -33,10 +33,13 @@ function transcriptPath(slug: string, sessionId: string): string {
   return join(resolveProjectDir(slug), `${safeSessionId}.jsonl`)
 }
 
-export async function readTranscript(slug: string, sessionId: string): Promise<TranscriptEntry[]> {
+export async function readTranscript(slug: string, sessionId: string, maxBytes?: number): Promise<TranscriptEntry[]> {
   const destination = transcriptPath(slug, sessionId)
   return withTranscript(destination, async () => {
     try {
+      if (maxBytes !== undefined && (await stat(destination)).size > maxBytes) {
+        throw Object.assign(new Error('O histórico excede o limite desta operação.'), { code: 'TRANSCRIPT_TOO_LARGE' })
+      }
       const content = await readFile(destination, 'utf8')
       return content.split(/\r?\n/).flatMap((line, index) => {
         if (!line) return []

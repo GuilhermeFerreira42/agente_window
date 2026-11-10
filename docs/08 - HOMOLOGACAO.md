@@ -1,3 +1,11 @@
+# Roteiro de homologação da M4 — aceite pendente (10/11/2026)
+
+1. Abra um chat com uma expressão antiga conhecida. Use **Buscar no histórico** no cabeçalho e pesquise pela expressão.
+2. Abra o resultado. O foco deve ir para a mensagem original e permitir ler as mensagens vizinhas. Repita depois de compactar o contexto.
+3. Troque de chat e pesquise pela mesma expressão. A busca deve exibir somente resultados do chat que está aberto.
+
+---
+
 # Roteiro de homologação da M3 — aceite pendente (10/11/2026)
 
 1. Em uma sessão descartável, complete três turnos. Registre uma decisão clara no primeiro.

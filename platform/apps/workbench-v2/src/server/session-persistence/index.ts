@@ -30,6 +30,8 @@ import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 import { projetarHistoricoAgir, type EventoGravado } from './historicoAgir'
 import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, proporCheckpoint, type Checkpoint } from './checkpoint'
 import { gerarResumo } from './compactacao'
+import { buscarTranscript } from './buscaTranscript'
+import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -208,6 +210,37 @@ async function compactarSessao(request: IncomingMessage, response: ServerRespons
   }
 }
 
+async function buscarHistorico(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  let input: { sessionId?: unknown; chatId?: unknown; query?: unknown } | null
+  try {
+    input = await readJson(request)
+  } catch {
+    input = null
+  }
+  if (!input || typeof input.sessionId !== 'string' || typeof input.chatId !== 'string' ||
+      typeof input.query !== 'string' || !input.query.trim() || input.query.length > LIMITE_CONSULTA_TRANSCRIPT) {
+    sendJson(response, 400, { code: 'invalid_search', message: 'Informe a conversa e um termo de busca válido.' })
+    return
+  }
+  const { sessionId, chatId, query } = input
+  try {
+    const resultado = await withSessionPersistenceQueue(sessionId, async () => {
+      const record = getSessionRecord(sessionId)
+      if (!record) return
+      const session = JSON.parse(record.sessionJson) as Session
+      if (session.id !== sessionId || !session.chats.some((chat) => chat.id === chatId)) return
+      const entries = await readTranscript(record.slug, sessionId, 16 * 1024 * 1024)
+      return buscarTranscript(entries, chatId, query.trim())
+    })
+    if (resultado) sendJson(response, 200, resultado)
+    else sendJson(response, 404, { code: 'chat_not_found', message: 'A conversa não pertence a esta sessão.' })
+  } catch (erro) {
+    const grande = (erro as { code?: unknown })?.code === 'TRANSCRIPT_TOO_LARGE'
+    sendJson(response, grande ? 413 : 409, { code: 'search_unavailable',
+      message: grande ? 'O histórico excede o limite da busca.' : 'Não foi possível consultar o histórico.' })
+  }
+}
+
 function sanarStatusAposF5(session: Session): Session {
   // FATIA 09 (§3.8): mensagens em streaming NÃO são persistidas (decisão da
   // §9.1 — evita bolha vazia eterna), então depois do F5 nunca existe nada
@@ -306,6 +339,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
 
   if (url.pathname === '/api/sessions/checkpoint' && request.method === 'POST') {
     await compactarSessao(request, response)
+    return true
+  }
+  if (url.pathname === '/api/sessions/search' && request.method === 'POST') {
+    await buscarHistorico(request, response)
     return true
   }
 

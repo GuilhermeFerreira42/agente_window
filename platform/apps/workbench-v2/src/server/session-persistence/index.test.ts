@@ -182,6 +182,29 @@ describe('session persistence HTTP contract', () => {
     ])
   })
 
+  it('searches only the requested persisted chat and reflects message deletion', async () => {
+    const id = `search-${randomUUID()}`
+    const session = makeSession(id, id, 'Busca (á)')
+    session.chats.push({ ...session.chats[0], id: 'other', messages: [message('outro-id', 'user', 'Busca (á) de outro chat')] })
+    touched.push({ id, slug: id })
+    expect((await putSession(server, session)).ok).toBe(true)
+    const buscar = (chatId: string, sessionId = id) => fetch(`${server.baseUrl}/api/sessions/search`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, chatId, query: 'BUSCA (Á)' }),
+    })
+    const resultado = await buscar('chat-main')
+    expect(resultado.ok).toBe(true)
+    const corpo = await resultado.json() as { hits: Array<{ messageId: string }> }
+    expect(corpo.hits).toHaveLength(3)
+    expect(corpo.hits.map(({ messageId }) => messageId)).not.toContain('outro-id')
+    expect((await buscar('chat-main', 'outra-sessao')).status).toBe(404)
+    expect((await buscar('chat-inexistente')).status).toBe(404)
+    session.persistenceRevision = (session.persistenceRevision ?? 1) + 1
+    session.chats[0].messages = []
+    expect((await putSession(server, session)).ok).toBe(true)
+    expect(await (await buscar('chat-main')).json()).toEqual({ hits: [], parcial: false })
+  })
+
   it('never loses an acknowledged snapshot when workspace change races with PUT', async () => {
     const { mkdir } = await import('node:fs/promises')
     const { join } = await import('node:path')

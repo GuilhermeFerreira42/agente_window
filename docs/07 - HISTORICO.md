@@ -1,3 +1,9 @@
+# 10/11/2026 — M4 busca o histórico do chat
+
+Commit `feat(memory): search the original active chat transcript`. O controle no cabeçalho consulta o transcript do chat atual e leva à mensagem original. Decisão D191 e evidências em 09.
+
+---
+
 # 10/11/2026 — M3 integra a compactação manual ao chat
 
 Commit `feat(memory): compact completed turns with durable checkpoints`. O checkpoint preserva a cauda recente, recompõe o contexto enviado e mantém o histórico original. Decisão D190 e evidências em 09.

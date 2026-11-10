@@ -2105,3 +2105,7 @@ Os eventos Agir são linhas versionadas com identidade de chat, turno e execuç�
 ## D190 — Compactação manual com checkpoint derivado (10/11/2026)
 
 A M3 usa o modelo selecionado, a Casa Conversa sem ferramentas e a fila de sessão para preparar e publicar. A chamada de sumarização exige confirmação no produto. A fronteira preserva pelo menos dois turnos recentes e só substitui, no pedido ao modelo, um prefixo identificado e validado pelo digest. A recompactação acrescenta o delta ao checkpoint anterior. O SQLite armazena uma versão vigente por conversa. Corrupção, prefixo alterado, resposta vazia e falha de escrita não autorizam apagar o transcript nem disparar retry automático de ferramentas.
+
+## D191 — Busca manual na fonte do chat (10/11/2026)
+
+A busca da M4 lê o JSONL com escopo de sessão e chat conferido no catálogo. Faz correspondência literal sem distinção de caixa e retorna trechos da fonte. A primeira implementação limita arquivo a 16 MiB, examina até dois milhões de caracteres do chat e retorna até 40 mensagens. O transcript atualizado é consultado a cada busca. Isso evita cache ou índice independente e respeita exclusões. Anexos, eventos brutos, erros e mensagens canceladas ficam fora do escopo. A recuperação pelo agente terá contrato próprio na M6.

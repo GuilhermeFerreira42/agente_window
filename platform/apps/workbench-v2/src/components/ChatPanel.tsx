@@ -21,6 +21,7 @@ import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligenc
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
+import { BuscaHistorico } from './BuscaHistorico'
 import type { MedicaoContexto } from '../domain/usoContexto'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
@@ -204,7 +205,7 @@ function MessageRow({
   canRegenerate: boolean
 }) {
   return (
-    <article className={`chat-message ${message.role === 'user' ? 'is-request' : 'is-response'}${message.running ? ' is-running' : ''}${message.cancelled ? ' is-cancelled' : ''}`} tabIndex={0}>
+    <article className={`chat-message ${message.role === 'user' ? 'is-request' : 'is-response'}${message.running ? ' is-running' : ''}${message.cancelled ? ' is-cancelled' : ''}`} data-message-id={message.id} tabIndex={0}>
       <div className="chat-message-header">
         <div className="chat-message-user">
           <span className="chat-avatar" aria-hidden="true">{message.role === 'user' ? 'U' : <Sparkles size={11} />}</span>
@@ -341,6 +342,15 @@ export function ChatPanel({
   const seguir = autoScroll ?? AUTOSCROLL_PADRAO
   const listaRef = useRef<HTMLDivElement>(null)
   const noFimRef = useRef(true)
+  const abrirResultado = (id: string): boolean => {
+    const elemento = Array.from(listaRef.current?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])
+      .find((mensagem) => mensagem.dataset.messageId === id)
+    if (!elemento) return false
+    noFimRef.current = false
+    elemento.scrollIntoView({ block: 'center' })
+    elemento.focus({ preventScroll: true })
+    return true
+  }
   const aoRolar = (): void => {
     const el = listaRef.current
     if (!el) return
@@ -373,6 +383,7 @@ export function ChatPanel({
           )}
         </div>
         <div className="sessions-header-actions">
+          {!session.isDraft && !isEmpty && <BuscaHistorico key={JSON.stringify([session.id, activeChat.id])} sessionId={session.id} chatId={activeChat.id} abrir={abrirResultado} />}
           <button className="toolbar-button" type="button" title="Abrir navegador no editor" aria-label="Abrir navegador" onClick={onOpenBrowser}><Globe2 size={14} /></button>
           <button className="toolbar-button" type="button" title="Revisar alterações" aria-label="Revisar alterações" onClick={onOpenDiff}><GitCompareArrows size={14} /></button>
         </div>
