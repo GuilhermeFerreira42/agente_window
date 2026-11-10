@@ -88,6 +88,37 @@ function IndicadorContexto({ medicao, selecao }: { medicao?: MedicaoContexto; se
   return <span className="context-usage" data-alert={ocupacao?.alerta} role="status" aria-label={detalhes} title={detalhes}>{label}</span>
 }
 
+function CompactarContexto({ sessionId, chatId, model, disabled }: {
+  sessionId: string; chatId: string; model: string; disabled: boolean
+}) {
+  const [estado, setEstado] = useState<{ ativo: boolean; mensagem?: string }>({ ativo: false })
+  const chamada = useRef<AbortController | null>(null)
+  useEffect(() => () => chamada.current?.abort(), [])
+  async function compactar() {
+    if (chamada.current || !window.confirm('A compactação faz uma chamada ao modelo selecionado. As mensagens originais ficam no histórico. Compactar agora?')) return
+    const controle = new AbortController()
+    chamada.current = controle
+    setEstado({ ativo: true })
+    try {
+      const resposta = await fetch('/api/sessions/checkpoint', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controle.signal,
+        body: JSON.stringify({ sessionId, chatId, modelSelection: selecaoDoToken(model) }),
+      })
+      const corpo = await resposta.json() as { message?: string }
+      setEstado({ ativo: false, mensagem: resposta.ok ? 'Contexto compactado.' : corpo.message ?? 'A compactação falhou.' })
+    } catch {
+      if (!controle.signal.aborted) setEstado({ ativo: false, mensagem: 'Não foi possível compactar o contexto.' })
+    } finally {
+      chamada.current = null
+    }
+  }
+  return <>
+    <button className="chat-input-tool-button" type="button" title="Compactar contexto" aria-label="Compactar contexto"
+      disabled={disabled || estado.ativo} onClick={() => void compactar()}><Sparkles size={14} /></button>
+    {(estado.ativo || estado.mensagem) && <span className="context-usage" role="status">{estado.ativo ? 'Compactando…' : estado.mensagem}</span>}
+  </>
+}
+
 interface SpeechRecognitionLike {
   continuous: boolean
   interimResults: boolean
@@ -835,6 +866,8 @@ export function ChatInput({
           <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
           <div className="input-toolbar-spacer" />
           <IndicadorContexto medicao={usoContexto} selecao={selecaoDoToken(model)} />
+          {!session.isDraft && activeChat.messages.filter(({ role }) => role === 'user').length >= 3 &&
+            <CompactarContexto key={draftKey} sessionId={session.id} chatId={activeChat.id} model={model} disabled={isWorking || needsInput} />}
           <div className="model-picker-wrap" ref={modelWrapRef}>
             <button
               ref={modelButtonRef}

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { getDatabasePath } from './paths'
+import type { Checkpoint } from './checkpoint'
 
 export interface SessionRecord {
   id: string
@@ -73,8 +74,40 @@ function getDatabase(): Database.Database {
       granted_at INTEGER NOT NULL,
       PRIMARY KEY (session_id, workspace_path, tool_id)
     );
+    CREATE TABLE IF NOT EXISTS session_checkpoints (
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      chat_id TEXT NOT NULL,
+      checkpoint_json TEXT NOT NULL,
+      PRIMARY KEY (session_id, chat_id)
+    );
   `)
   return database
+}
+
+export function getCheckpoint(sessionId: string, chatId: string): Checkpoint | null | undefined {
+  const row = getDatabase().prepare('SELECT checkpoint_json AS json FROM session_checkpoints WHERE session_id = ? AND chat_id = ?')
+    .get(sessionId, chatId) as { json: string } | undefined
+  if (!row) return
+  try {
+    const valor = JSON.parse(row.json) as Checkpoint | null
+    return valor && typeof valor === 'object' ? valor : null
+  } catch {
+    return null
+  }
+}
+
+export function removerCheckpointsDeChatsAusentes(sessionId: string, chatIds: string[]): void {
+  getDatabase().prepare(`
+    DELETE FROM session_checkpoints WHERE session_id = ?
+    AND NOT EXISTS (SELECT 1 FROM json_each(?) WHERE value = session_checkpoints.chat_id)
+  `).run(sessionId, JSON.stringify(chatIds))
+}
+
+export function saveCheckpoint(sessionId: string, chatId: string, checkpoint: Checkpoint): void {
+  getDatabase().prepare(`
+    INSERT INTO session_checkpoints (session_id, chat_id, checkpoint_json) VALUES (?, ?, ?)
+    ON CONFLICT (session_id, chat_id) DO UPDATE SET checkpoint_json = excluded.checkpoint_json
+  `).run(sessionId, chatId, JSON.stringify(checkpoint))
 }
 
 export function listSessionRecords(): SessionRecord[] {

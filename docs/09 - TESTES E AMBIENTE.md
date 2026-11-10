@@ -1,3 +1,13 @@
+# M3 — checkpoint e continuidade (10/11/2026)
+
+Vitest focado **50/50**. Foram exercitados a fronteira e a cauda, alterações do prefixo, escopos distintos, corrupção, exclusão derivada, chamada pendente e falha de escrita injetada no SQLite descartável. O checkpoint anterior sobreviveu à falha. O typecheck passou.
+
+O fluxo real usou uma sessão sintética e o backend isolado com `openai-compat / meu-pool` via LiteLLM. A compactação respondeu HTTP 200. A chamada subsequente marcou o checkpoint como aplicado e recuperou a decisão de cor registrada apenas no prefixo resumido. Foram duas chamadas curtas autorizadas. A prova determinística mede a redução pelo comprimento do payload serializado e confere a cauda original. O tamanho em caracteres não é apresentado como tokens.
+
+O Playwright aprovou compactação, F5, recompactação com delta, concorrência sem segunda chamada e fallback visível quando o prefixo muda. Uma resposta vazia preservou o checkpoint anterior. A espera do teste foi corrigida para aguardar a resposta gravada na sessão exata. Log final `m3-e2e-adverso.log`. A regressão final teve **1.524 aprovações, 42 falhas preexistentes e 30 ignorados**. Comparação nominal com M2 sem nova falha. Log `m3-regression-stable.log`. Compactação por limiar e retry automático foram excluídos da primeira estratégia D190. O aceite humano continua pendente.
+
+---
+
 # M2 — verificação da base (10/11/2026)
 
 Base `0289b3e`. Passaram **39/39** testes de persistência de sessões, publicação de JSONL e composição de contexto. Log em `../arena-operacional/m2-base-persistencia.log`. Isso valida o reaproveitamento da base, não os critérios ainda não implementados da M2.

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRecords, revokeSessionToolGrants, upsertSessionRecord, type SessionToolGrant } from './database'
+import { deleteSessionRecord, getCheckpoint, getSessionRecord, grantSessionTool, listSessionRecords, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
@@ -13,7 +13,8 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
-import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { conversaEmExecucao, rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { validarSelecaoModelo } from '../../bairros/2-inteligencia/casas/agir/server/protocoloHttp'
 import type { RegistroExecucaoAgir } from '../../bairros/2-inteligencia/casas/agir'
 import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, definirExclusaoAutomaticaAgir, lerExclusaoAutomaticaAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
 import { resolveShell } from '../../../../../services/pty-server/src/shellDetector'
@@ -27,6 +28,8 @@ import { obterAlvoDeConversa } from './chatAlvo'
 import { iniciarChamadaModelo } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 import { sanarCartoesDeSessao } from '../../services/agir/sanar'
 import { projetarHistoricoAgir, type EventoGravado } from './historicoAgir'
+import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, proporCheckpoint, type Checkpoint } from './checkpoint'
+import { gerarResumo } from './compactacao'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -52,6 +55,8 @@ function withSessionPersistenceQueue<T>(sessionId: string, operation: () => Prom
 const WORKSPACES_VALIDATE_ENDPOINT = '/api/workspaces/validate'
 const WORKSPACES_PICK_ENDPOINT = '/api/workspaces/pick'
 const WORKSPACES_RECENT_ENDPOINT = '/api/workspaces/recent'
+const compactacoesEmCurso = new Set<string>()
+const chaveEscopo = (raiz: string) => createHash('sha256').update(raiz).digest('hex')
 
 export interface SessionPersistencePluginOptions {
   repoRoot: string
@@ -118,7 +123,7 @@ async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void>
       ? Math.max(maior, entry.sequence ?? 0) : maior, 0)
     if (!Number.isSafeInteger(sequence + eventos.length)) throw new Error('Sequência do transcript esgotada.')
     const timestamp = Date.now()
-    const escopo = createHash('sha256').update(raiz).digest('hex')
+    const escopo = chaveEscopo(raiz)
     const novos = eventos.flatMap((evento, indice): TranscriptEntry[] => {
       const uuid = `${runId}:${indice + 1}`
       if (ids.has(uuid)) return []
@@ -127,6 +132,80 @@ async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void>
     })
     if (novos.length) await writeTranscript(record.slug, sessionId, [...anteriores, ...novos])
   })
+}
+
+async function compactarSessao(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  let input: { sessionId?: unknown; chatId?: unknown; modelSelection?: unknown } | null
+  try {
+    input = await readJson(request)
+  } catch {
+    input = null
+  }
+  const selecao = validarSelecaoModelo(input?.modelSelection)
+  if (!input || typeof input.sessionId !== 'string' || typeof input.chatId !== 'string' || !selecao) {
+    sendJson(response, 400, { code: 'invalid_checkpoint', message: 'Sessão, conversa ou modelo inválido.' })
+    return
+  }
+  const { sessionId, chatId } = input
+  const chave = JSON.stringify([sessionId, chatId])
+  if (compactacoesEmCurso.has(chave) || conversaEmExecucao(sessionId, chatId)) {
+    sendJson(response, 409, { code: 'checkpoint_busy', message: 'Aguarde o término da execução atual.' })
+    return
+  }
+  compactacoesEmCurso.add(chave)
+  const abort = new AbortController()
+  const fechar = () => { if (!response.writableEnded) abort.abort() }
+  response.on('close', fechar)
+  async function lerFonte() {
+    const sessao = getSessionRecord(sessionId)
+    const contexto = resolverContextoAgir(sessionId, chatId)
+    if (!sessao || !contexto.ok) return
+    const escopo = chaveEscopo(contexto.raiz)
+    return { escopo, entries: await readTranscript(sessao.slug, sessionId), checkpoint: getCheckpoint(sessionId, chatId) }
+  }
+  try {
+    const fonte = await withSessionPersistenceQueue(sessionId, lerFonte)
+    const fronteira = fonte && proporCheckpoint(fonte.entries, chatId, fonte.escopo)
+    if (!fonte || !fronteira) {
+      sendJson(response, 409, { code: 'checkpoint_boundary', message: 'Ainda não há turnos completos suficientes para compactar com segurança.' })
+      return
+    }
+    const anterior = fonte.checkpoint && checkpointCorresponde(fonte.checkpoint, fonte.entries, chatId, fonte.escopo)
+      ? fonte.checkpoint : undefined
+    if (anterior && anterior.quantidade >= fronteira.quantidade) {
+      sendJson(response, 409, { code: 'checkpoint_unchanged', message: 'Nenhum turno adicional está pronto para compactar.' })
+      return
+    }
+    const { alvo } = await obterAlvoDeConversa(selecao)
+    if (!alvo?.providerId || !alvo.modelId) {
+      sendJson(response, 409, { code: 'checkpoint_model', message: 'Escolha um modelo disponível antes de compactar.' })
+      return
+    }
+    const delta = mensagensDoCheckpoint(fonte.entries, chatId).slice(anterior?.quantidade ?? 0, fronteira.quantidade)
+      .map(({ type, uuid, message }) => ({ role: type === 'assistant' ? 'assistant' as const : 'user' as const, id: uuid, content: (message as ChatMessage).content }))
+    const historico = projetarHistoricoAgir(fonte.entries, chatId, fonte.escopo, delta).mensagens
+    const resumo = await gerarResumo(alvo, historico, anterior?.resumo, iniciarChamadaModelo, abort.signal)
+    const checkpoint: Checkpoint = {
+      ...fronteira, version: 1, estrategia: 'manual', escopo: fonte.escopo, resumo,
+      providerId: alvo.providerId, modelId: alvo.modelId, criadoEm: Date.now(),
+    }
+    const gravado = await withSessionPersistenceQueue(sessionId, async () => {
+      const atual = await lerFonte()
+      if (!atual || abort.signal.aborted || conversaEmExecucao(sessionId, chatId) ||
+          !checkpointCorresponde(checkpoint, atual.entries, chatId, atual.escopo) ||
+          JSON.stringify(atual.checkpoint) !== JSON.stringify(fonte.checkpoint)) return false
+      saveCheckpoint(sessionId, chatId, checkpoint)
+      return true
+    })
+    if (abort.signal.aborted) return
+    if (gravado) sendJson(response, 200, { cobertas: fronteira.quantidade })
+    else sendJson(response, 409, { code: 'checkpoint_conflict', message: 'O contexto mudou durante a compactação.' })
+  } catch {
+    if (!abort.signal.aborted) sendJson(response, 502, { code: 'checkpoint_failed', message: 'A compactação falhou. O histórico e o checkpoint anterior foram preservados.' })
+  } finally {
+    response.off('close', fechar)
+    compactacoesEmCurso.delete(chave)
+  }
 }
 
 function sanarStatusAposF5(session: Session): Session {
@@ -212,6 +291,7 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
       updatedAt: now,
       sessionJson: JSON.stringify(metadata),
     })
+    if (existingSession?.chats.some((chat) => !chatIds.has(chat.id))) removerCheckpointsDeChatsAusentes(session.id, [...chatIds])
     return { saved: true, session: committedSession }
   })
 }
@@ -223,6 +303,11 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+
+  if (url.pathname === '/api/sessions/checkpoint' && request.method === 'POST') {
+    await compactarSessao(request, response)
+    return true
+  }
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -295,7 +380,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         const record = getSessionRecord(sessionId)
         const contexto = resolverContextoAgir(sessionId, chatId)
         if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do transcript mudou.')
-        return projetarHistoricoAgir(await readTranscript(record.slug, sessionId), chatId, createHash('sha256').update(raiz).digest('hex'), mensagens)
+        const entries = await readTranscript(record.slug, sessionId)
+        const escopo = chaveEscopo(raiz)
+        const aplicado = aplicarCheckpoint(getCheckpoint(sessionId, chatId), entries, chatId, escopo, mensagens)
+        return { ...projetarHistoricoAgir(entries, chatId, escopo, aplicado.mensagens), checkpoint: aplicado.status }
       }),
     })) return true
   }

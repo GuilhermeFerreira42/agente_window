@@ -7,7 +7,8 @@ A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homo
 - **Barra direita.** Explorer, Search e Source Control seguem o workbench padrão do VS Code 1.135.0 como referência. A barra de sessões e Personalizações seguem a Agents Window. Limites de menus, Graph e busca estão em 06.
 - **M1.** Implementação em `0289b3e`, tecnicamente pronta para homologação. O aceite do proprietário está pendente. Critérios em 06, roteiro em 08 e evidências em 09.
 - **M2.** Projeção segura, eventos no JSONL e reconstrução do próximo turno validados tecnicamente. Aceite humano pendente. D188–D189, critérios em 06, roteiro em 08 e evidências em 09.
-- **M3–M8.** Execução sequencial autorizada. Próxima etapa técnica é a M3, compactação derivada com transcript original preservado.
+- **M3.** Compactação manual integrada e validada tecnicamente, com checkpoint derivado e transcript original preservado. Aceite humano pendente. Evidências em 09 e decisão D190.
+- **M4–M8.** Execução sequencial autorizada. A próxima etapa é a busca manual no transcript do chat ativo.
 - **Outras pautas.** E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
 
 ## Registros anteriores

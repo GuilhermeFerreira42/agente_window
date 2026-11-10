@@ -33,6 +33,15 @@ Base `0289b3e`. A autorização de 10/11/2026 permite executar M2–M8 em sequê
 
 **Fronteira operacional.** O registro é publicado antes de chamadas externas, cartões de aprovação, execução de ferramentas e encerramento. Um encerramento abrupto pode deixar uma chamada sem resultado, inclusive se o efeito no sistema operacional já tiver acontecido. A projeção exclui esse registro incompleto. A decisão de retomar uma operação interrompida pertence à M7. O writer atual continua regravando o JSONL de forma atômica. O custo em conversas longas precisa ser medido antes de adotar append físico.
 
+## M3 — SPEC de execução inicial (10/11/2026)
+
+Base `8c6ec49`. Reutilizar a medição M1, os eventos M2, a autoridade de sessão da prefeitura e a Casa Conversa para a sumarização sem ferramentas. O [estudo M3](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M3_CHECKPOINT_E_COMPACTACAO.md) define as fronteiras e cenários adversos.
+
+- Checkpoint derivado por sessão, chat e workspace, com versão, IDs cobertos, digest de mensagens e eventos, modelo, estratégia e data. O JSONL original permanece fonte. O SQLite existente armazena a versão vigente e sua exclusão acompanha a sessão.
+- A fronteira termina entre turnos completos. Execuções sem encerramento e aprovações pendentes impedem cobrir o turno. A cauda posterior à fronteira permanece integral. Um fingerprint inválido força o contexto original e deve ser reportado.
+- A primeira superfície de compactação é manual e informa o custo de uma chamada ao provedor selecionado. Os alertas da M1 informam a decisão quando a janela é conhecida. Nenhum erro 413 inicia automaticamente uma nova tentativa de uma execução com possíveis efeitos.
+- Gerar resumo sem ferramentas e rotulá-lo como derivado. Revalidar o prefixo e o checkpoint anterior na publicação. Timeout, resposta vazia, mudança concorrente e falha de armazenamento preservam a versão anterior. Testar recompactação, reinício, isolamento, cauda intacta e redução medida do payload. Validar qualidade de continuidade com um modelo real dentro da autorização de custo.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.

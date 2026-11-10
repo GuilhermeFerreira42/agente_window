@@ -2101,3 +2101,7 @@ A autorização para M2–M8 permite decisões técnicas dentro dos contratos e 
 ## D189 — Transcript estruturado no JSONL da sessão (10/11/2026)
 
 Os eventos Agir são linhas versionadas com identidade de chat, turno e execução e sequência monotônica por chat. A prefeitura protege sua publicação e os snapshots com a fila existente da sessão. Conteúdo bruto de ferramentas permanece em memória no turno ativo. Leituras internas ao workspace registram caminho relativo e digest, com intervalo para arquivo. A projeção histórica usa o tradutor nativo já existente em cada protocolo. Registros sem conclusão ou com pares incompletos ficam fora do contexto derivado. A estratégia preserva D188 e mantém uma única fonte durável.
+
+## D190 — Compactação manual com checkpoint derivado (10/11/2026)
+
+A M3 usa o modelo selecionado, a Casa Conversa sem ferramentas e a fila de sessão para preparar e publicar. A chamada de sumarização exige confirmação no produto. A fronteira preserva pelo menos dois turnos recentes e só substitui, no pedido ao modelo, um prefixo identificado e validado pelo digest. A recompactação acrescenta o delta ao checkpoint anterior. O SQLite armazena uma versão vigente por conversa. Corrupção, prefixo alterado, resposta vazia e falha de escrita não autorizam apagar o transcript nem disparar retry automático de ferramentas.

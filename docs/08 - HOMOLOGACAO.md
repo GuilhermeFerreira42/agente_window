@@ -1,3 +1,11 @@
+# Roteiro de homologação da M3 — aceite pendente (10/11/2026)
+
+1. Em uma sessão descartável, complete três turnos. Registre uma decisão clara no primeiro.
+2. Use **Compactar contexto** ao lado do indicador e confirme a chamada ao modelo. Aguarde **Contexto compactado**.
+3. Recarregue e confira se todas as mensagens originais continuam disponíveis. Pergunte qual foi a decisão inicial. Depois de mais um turno completo, repita a compactação para testar a atualização do checkpoint.
+
+---
+
 # Roteiro de homologação da M2 — aceite pendente (10/11/2026)
 
 1. Abra um chat em uma pasta de teste e peça ao agente para ler um arquivo sem dados sensíveis. Confira o cartão e aguarde a resposta.

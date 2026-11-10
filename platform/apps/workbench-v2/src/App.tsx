@@ -1622,6 +1622,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     let acumulado = acumuladoInicial
     return {
       onContextUsage: atualizarUso,
+      onCheckpointInvalido: () => setToast('O checkpoint não corresponde mais ao histórico. O agente usou o contexto original.'),
       onChunk: (pedaco) => {
         acumulado += pedaco
         const conteudo = acumulado

@@ -19,6 +19,7 @@ export interface DetalheErroAgir {
 }
 
 export interface OuvintesAgir {
+  onCheckpointInvalido?: () => void
   onContextUsage?: (medicao: Extract<EventoAgir, { type: 'context_usage' }>['medicao']) => void
   onChunk: (texto: string) => void
   onTool: (pedido: PedidoFerramenta) => void
@@ -229,6 +230,7 @@ function abrirFio(url: string, corpo: unknown, escopo: EscopoRun, ouvintes: Ouvi
     }
     const runId = resposta.headers.get('x-agir-run-id')
     const generation = Number(resposta.headers.get('x-agir-generation'))
+    if (resposta.headers.get('x-agir-checkpoint') === 'invalido') ouvintes.onCheckpointInvalido?.()
     publicarIdentidade(runId && Number.isSafeInteger(generation) && generation > 0 ? { runId, generation } : null)
     await bombearFio(resposta, ouvintes, () => paradaFoiSolicitada)
   })()

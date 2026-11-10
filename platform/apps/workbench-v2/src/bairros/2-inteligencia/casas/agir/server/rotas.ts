@@ -70,7 +70,7 @@ export interface DependenciasAgir {
   lerTeto: () => Promise<number>
   gravarExecucao?: (registro: RegistroExecucaoAgir) => Promise<void>
   restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
-    Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript' }>
+    Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -134,6 +134,9 @@ const execucaoPorId = new Map<string, ExecucaoAgir>()
 const geracaoPorFluxo = new Map<string, number>()
 const continuacoesEmClaim = new Set<string>()
 const MAX_EXECUCOES_MEMORIA = 500
+export function conversaEmExecucao(sessionId: string, chatId: string): boolean {
+  return [...execucaoPorFluxo.values()].some((execucao) => execucao.sessionId === sessionId && execucao.chatId === chatId)
+}
 function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
   geracaoPorFluxo.set(fluxo, generation)
@@ -223,6 +226,7 @@ interface FioAgir {
   execucao: ExecucaoAgir
   anterior?: string
   fonteHistorico?: 'browser' | 'hibrido' | 'transcript'
+  checkpoint?: string
   fluxo: string
   sessionId: string
   chatId: string
@@ -269,6 +273,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   res.setHeader('X-Agir-Generation', String(fio.execucao.generation))
   if (fio.fonteHistorico) res.setHeader('X-Agir-History-Source', fio.fonteHistorico)
   else if (fio.anterior) res.setHeader('X-Agir-History-Source', 'execucao')
+  if (fio.checkpoint) res.setHeader('X-Agir-Checkpoint', fio.checkpoint)
   res.flushHeaders?.()
 
   const abort = fio.execucao.controller
@@ -738,6 +743,7 @@ async function tratarAgir(
     chatId,
     mensagens: historico.mensagens,
     fonteHistorico: historico.fonte,
+    checkpoint: historico.checkpoint,
     raiz: contexto.raiz,
     permissoes: contexto.permissoes,
     alvo,
