@@ -2004,27 +2004,9 @@ svg {
 }
 
 .context-usage {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 0 5px;
   color: var(--vscode-descriptionForeground);
   font-size: var(--vscode-fontSize-label2);
-  font-variant-numeric: tabular-nums;
-}
-
-.context-usage-meter {
-  width: 42px;
-  height: 3px;
-  overflow: hidden;
-  border-radius: var(--vscode-cornerRadius-small);
-  background: var(--vscode-widget-border);
-}
-
-.context-usage-meter span {
-  display: block;
-  height: 100%;
-  background: var(--vscode-charts-blue);
 }
 
 .send-button {

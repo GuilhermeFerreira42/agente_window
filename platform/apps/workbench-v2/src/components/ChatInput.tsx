@@ -176,7 +176,6 @@ export function ChatInput({
     ? 'Aguarde enquanto o agente trabalha…'
     : currentMode?.description ?? `Pergunte a ${session.workspace}…`
   const mentionOpen = /(^|\s)@[^\s]*$/.test(text)
-  const contextPercent = Math.min(92, 18 + Math.round(text.length / 9) + attachments.length * 4)
   const normalizedWorkspaceQuery = workspaceQuery.trim().toLocaleLowerCase()
   const filteredWorkspaceFiles = workspaceFiles.filter((file) => file.toLocaleLowerCase().includes(normalizedWorkspaceQuery)).slice(0, 8)
   const modelOptions = [
@@ -809,10 +808,7 @@ export function ChatInput({
           <button className="chat-input-tool-button" type="button" title="Inserir menção" aria-label="Inserir menção" onClick={() => setDraftText((current) => `${current}${current ? ' ' : ''}@`)}><AtSign size={14} /></button>
           <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
           <div className="input-toolbar-spacer" />
-          <div className="context-usage" title={`${contextPercent}% do contexto utilizado`}>
-            <span>{contextPercent}%</span>
-            <span className="context-usage-meter"><span style={{ width: `${contextPercent}%` }} /></span>
-          </div>
+          <span className="context-usage">Contexto não medido</span>
           <div className="model-picker-wrap" ref={modelWrapRef}>
             <button
               ref={modelButtonRef}

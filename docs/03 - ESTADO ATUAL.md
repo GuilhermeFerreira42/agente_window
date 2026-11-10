@@ -5,7 +5,7 @@ A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homo
 - **Fatia 14, SPEC 2H.** A barra de sessões e o modal de Personalizações estão integrados. Habilidades e ferramentas usam os serviços do produto. Agentes, Hooks, MCP e Plugins ainda têm categorias de navegação com escopo futuro.
 - **Fatia 15, SPEC 2I.** O editor central hospeda as abas de código e diff do Monaco e as superfícies nativas. Abas reconstituíveis voltam após recarregar. As edições salvas ficam no disco. O Explorer abre arquivos no Monaco mesmo antes da primeira mensagem, após selecionar a pasta.
 - **Barra direita.** Explorer, Search e Source Control seguem o workbench padrão do VS Code 1.135.0 como referência. A barra de sessões e Personalizações seguem a Agents Window. Limites de menus, Graph e busca estão em 06.
-- **Retomada.** A ordem D133 coloca M1–M8 antes da Fatia 16. E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
+- **Retomada.** O proprietário autorizou iniciar a sequência D133 após a publicação de `7a78b5a`. M1 está em andamento. O compositor já distingue contexto não medido. A próxima etapa é ligar a medição ao uso reportado por requisição e iteração. E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
 
 ## Registros anteriores
 

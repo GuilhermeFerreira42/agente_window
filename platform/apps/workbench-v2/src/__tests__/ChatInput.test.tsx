@@ -56,6 +56,15 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
 }
 
 describe('ChatInput', () => {
+  it('mantém o contexto não medido enquanto o usuário digita o rascunho', async () => {
+    const user = userEvent.setup()
+    const view = renderInput()
+    const status = screen.getByText('Contexto não medido')
+    await user.type(screen.getByRole('textbox'), 'Um rascunho sem medição do provedor')
+    expect(status).toHaveTextContent('Contexto não medido')
+    expect(view.container.querySelector('.context-usage-meter')).toBeNull()
+  })
+
   it('exclusões automáticas exigem ação explícita adicional, consentimento próprio e são reversíveis', async () => {
     const user=userEvent.setup(), alterar=vi.fn(async()=>undefined)
     const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)

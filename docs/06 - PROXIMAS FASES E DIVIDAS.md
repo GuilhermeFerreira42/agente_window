@@ -1,5 +1,15 @@
 # Retomada após as Fatias 14 e 15 (10/11/2026)
 
+## M1 — medição e orçamento de contexto
+
+O proprietário autorizou iniciar as fatias de memória após a publicação da reconciliação, confirmada em `7a78b5a`. A execução segue a ordem D133. A proposta histórica de M1 fica em [M1, medição e orçamento](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M1_MEDICAO_E_ORCAMENTO.md).
+
+**Primeiro corte.** Em `ChatInput`, trocar a porcentagem baseada em texto e anexos por um estado acessível de contexto ainda não medido. Validar que o rascunho e seus anexos continuam funcionando e que digitar não produz um percentual.
+
+**Corte seguinte.** O servidor identifica o modelo efetivo e emite o uso normalizado por requisição e iteração a partir das respostas de Conversa e Agir. O numerador é a entrada daquela iteração. A saída fica separada. Mostrar percentual apenas com limite do modelo conhecido e origem identificada. Uso ausente ou desconhecido permanece indisponível. Avaliar alertas de 75% e 90% com o mesmo denominador. Testar respostas com e sem uso, mudança de alvo, execução com ferramentas e isolamento por chat.
+
+M1 mantém a composição existente do servidor e o histórico. Compactação, transcript estruturado e busca pertencem às fatias seguintes.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.

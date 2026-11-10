@@ -1,3 +1,9 @@
+# M1 — primeiro corte do compositor (10/11/2026)
+
+O Vitest passou os 29 testes de `ChatInput.test.tsx`, incluindo a proteção contra exibir porcentagem baseada no rascunho. O indicador mostra que o contexto ainda não foi medido. A medição pelo provedor e o orçamento por modelo têm critérios próprios em 06. Log em `../arena-operacional/m1-primeiro-corte-vitest.log`.
+
+---
+
 # Auditoria da branch arena em Windows (10/11/2026)
 
 Base de produto `bf64d30`. O remoto `github/arena` apontava para a mesma revisão no início. `iniciar.cmd` subiu o aplicativo local em 5174 com HTTP 200. Build do workbench, compilação TypeScript e build do serviço PTY passaram. O build informou que o adaptador nativo F2 de exclusão permanece desativado pelo seu limite de contenção.

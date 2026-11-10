@@ -1,3 +1,9 @@
+# 10/11/2026 — Início de M1
+
+Após a publicação de `7a78b5a`, o primeiro corte de M1 substituiu o percentual derivado do rascunho pela indicação de contexto não medido. Escopo e próximos critérios em 06.
+
+---
+
 # 10/11/2026 — Reconciliação dos canônicos com a branch arena
 
 Registro do aceite informado pelo proprietário para as Fatias 14 e 15 e revisão da documentação frente à base `bf64d30`. Estado em 03, homologação em 08 e validação técnica em 09.
