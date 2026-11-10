@@ -16,6 +16,8 @@ O **Agente Window** é construído sob uma proporção clara de fidelidade:
 
 **Referências visuais esclarecidas (D182, 08/11/2026):** mockup do Agent Window e prints orientam a lateral principal e o modal de Personalizações; VS Code/VS Code Server orientam barra superior, Quick Open e Explorer. Reutilizar donos existentes; categoria futura pode informar indisponibilidade, sem simular serviço ou antecipar roadmap.
 
+Os cinco PNGs originais da identidade visual ficam em `platform/apps/workbench-v2/src/assets/branding/`. A variante de nuvem preta com código branco (`cloud-solid-white-code.png`) é o favicon do aplicativo.
+
 ### 1.1 Objetivo final do produto
 O **Agente Window** deverá ser um ambiente de desenvolvimento assistido por inteligência artificial, extensível e independente de provedor, capaz de executar tarefas complexas de engenharia de software com **autonomia controlada**. Deverá auxiliar o usuário ao longo de todo o ciclo de desenvolvimento de projetos de software: investigação, compreensão, planejamento, documentação, implementação, testes, manutenção e evolução.
 

@@ -1,3 +1,9 @@
+# 09/11/2026 — Favicon do Agent Window
+
+A identidade visual enviada pelo proprietário foi incorporada às guias do aplicativo. Referências em 02 e prova em 09.
+
+---
+
 # 09/11/2026 — Explorer e Monaco na sessão vazia
 
 O rascunho começa sem pasta e abre arquivos no Monaco após selecionar o workspace. Estado em 03 e provas em 09.

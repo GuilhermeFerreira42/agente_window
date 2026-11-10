@@ -1,3 +1,9 @@
+# Evidência — favicon nas guias (09/11/2026)
+
+Typecheck e build Vite passaram. O Chromium via Playwright abriu a raiz e um endereço interno em duas guias. Em ambas, o favicon declarado no HTML de produção respondeu com HTTP 200 e tipo `image/png`, foi decodificado em 1254 × 1254 e coincidiu byte a byte com o PNG original. As cinco variantes foram copiadas com verificação de hash.
+
+---
+
 # Evidência — Explorer e Monaco antes da primeira mensagem (09/11/2026)
 
 Playwright na 5198 com workspace descartável. De uma conversa existente com arquivo aberto, o teste abriu um chat novo com Explorer vazio, selecionou outra pasta, abriu, editou e salvou um arquivo no Monaco sem enviar mensagem. Verificou proteção do rascunho sujo e retorno à conversa e à pasta anteriores. Quatro testes dirigidos de landing e criação no primeiro envio passaram. Logs `explorer-rascunho.log` e `explorer-rascunho-vitest.log` em `revisao-lateral`.
