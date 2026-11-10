@@ -1,4 +1,6 @@
-# Revisão vigente de inspeção — D180, 08/11/2026
+# Revisão histórica de inspeção — D180, 08/11/2026
+
+O registro vigente de homologação está no canônico 08.
 
 O cenário antigo limitado a dois grupos foi substituído. Siga o bloco atual do canônico 08: cinco vistas por divisões sucessivas; maximizar/restaurar verifica a caixa efetiva; X principal oculta tudo sem fechar abas; X de um grupo fecha somente esse grupo. Caminho navega por pastas/arquivos e símbolos conforme linguagem. F1 aprovado visualmente e preservado. Sem homologação formal.
 
@@ -353,7 +355,7 @@ fora do sandbox** — dentro dele nao protege contra perda do workspace.
 (que mantém `browserViews`), `closeEditorTab` (que libera recursos de browser)
 e limpeza por sessão ainda são orquestrados no `App`. A meta de linhas melhorou,
 mas a responsabilidade de abas ainda não saiu *inteira*. O contrato de migração
-está em `docs/CONTRATO-MIGRACAO-ESTADO-ABAS.md`; nenhum teste foi afrouxado.
+está em `docs/arquivo_morto/CONTRATO-MIGRACAO-ESTADO-ABAS.md`; nenhum teste foi afrouxado.
 
 **Roteiro humano deste corte:** abra dois arquivos, ative o primeiro; troque de
 sessão e volte, confira a aba lembrada; abra Browser, feche a aba e confira que
@@ -404,7 +406,7 @@ ocultar → F5 → mostrar; split de arquivos se mantém, zero erros JS.
 não salvo não são serializados como aba nativa. O resultado do gate integral
 D175b só deve ser anotado depois de terminar; o navegador de Provedores/
 Configurações ainda precisa reexecução se a máquina sofrer crash do Chromium.
-E15-d tem inventário próprio em `docs/INVENTARIO-E15-D.md`; a retirada da rede
+E15-d tem inventário próprio em `docs/arquivo_morto/INVENTARIO-E15-D.md`; a retirada da rede
 de rollback depende da condição D151/status, não se confunde com UI ativa.
 
 ---
@@ -438,5 +440,5 @@ Os fluxos centrais foram executados em Playwright serial no produto real.
 `AuxiliaryBar`/`AttachArea` ainda existem como rollback; `pendingAttachOpen`
 continua necessário para abertura antes da montagem do centro. A remoção
 física aguarda a condição D151/status (migração validada e homologação da rede
-de rollback). Inventário e procedimento em `docs/INVENTARIO-E15-D.md`.
+de rollback). Inventário e procedimento em `docs/arquivo_morto/INVENTARIO-E15-D.md`.
 **Homologação humana NÃO aprovada.** O Codex deve auditar este candidato antes.

@@ -99,10 +99,11 @@ describe('FATIA 07 — Destravar', () => {
     render(<App initialSessionSnapshot={[]} />)
 
     const before = workspacePosts.length
-    const input = screen.getByRole('combobox', { name: 'Workspace atual' })
-    await user.clear(input)
+    const landing = within(screen.getByRole('region', { name: 'Nova sessão' }))
+    await user.click(landing.getByRole('button', { name: 'Digitar caminho' }))
+    const input = landing.getByRole('combobox', { name: 'Caminho manual do workspace' })
     await user.type(input, '/tmp/pasta-nova')
-    await user.click(screen.getByRole('button', { name: 'Usar esta pasta' }))
+    await user.click(landing.getByRole('button', { name: 'Usar pasta', exact: true }))
 
     // Dois envios: o do próprio clique e o do efeito de boot do Explorer, que
     // reage à pasta nova e recria a árvore na hora.
@@ -117,6 +118,8 @@ describe('FATIA 07 — Destravar', () => {
     const panelBefore = screen.getByTestId('terminal-stub')
     expect(panelBefore).toHaveAttribute('data-workspace', testSessions[0].workspacePath)
 
+    await user.click(screen.getByRole('button', { name: 'Selecionar pasta' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Digitar caminho de pasta' }))
     const input = screen.getByRole('combobox', { name: 'Workspace atual' })
     await user.clear(input)
     await user.type(input, '/tmp/pasta-nova')

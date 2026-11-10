@@ -1,6 +1,6 @@
 # Contrato técnico — migração do ESTADO das abas para fora do `App.tsx`
 
-**Estado corrente (D175b):** o contrato foi escrito ANTES; D174 moveu estado/memória e D175 moveu abertura/fecho/Browser para um único hook do shell. RF15-4/D151 já definem que abas reconstituíveis devem voltar no F5; a pergunta da §6 sobre nativas foi resolvida pela própria SPEC, sem nova autorização. A implementação e os testes estão em `docs/CONTRATO-PERSISTENCIA-NATIVAS-F15.md` e `shell/persistenciaNativas.ts`. As passagens abaixo descrevem o **baseline pré-migração** e não devem ser lidas como situação atual.
+**Estado corrente (D175b):** o contrato foi escrito ANTES; D174 moveu estado/memória e D175 moveu abertura/fecho/Browser para um único hook do shell. RF15-4/D151 já definem que abas reconstituíveis devem voltar no F5; a pergunta da §6 sobre nativas foi resolvida pela própria SPEC, sem nova autorização. A implementação e os testes estão em `docs/arquivo_morto/CONTRATO-PERSISTENCIA-NATIVAS-F15.md` e `shell/persistenciaNativas.ts`. As passagens abaixo descrevem o **baseline pré-migração** e não devem ser lidas como situação atual.
 **Requisito:** RNF15-2 (`docs/06` L1444 — "App.tsx DIMINUI: gestão de abas sai dele").
 **Decisões preservadas:** D140, D151, D160, D171, D172.
 **Autor da regra que trava este documento:** o dono — "cortes que mexem em persistência exigem

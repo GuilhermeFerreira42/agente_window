@@ -1,5 +1,7 @@
 # 04 - ARQUITETURA E REGRAS DURAS
 
+**Aplicação das fronteiras na base de 10/11/2026.** A Fatia 15 mantém o editor central como superfície ativa. O shell possui as abas nativas e o módulo Explorer/Search possui as abas de arquivo, os grupos e os modelos do Monaco. `mountAttach` e a casca anterior permanecem como rede de rollback E15-d. As mudanças pontuais de Explorer, Search, Git e observação de arquivos já integradas em D184 e D185 são exceções específicas do histórico. Novas mudanças no perímetro congelado continuam sujeitas ao protocolo D140.
+
 > **D140 — exceção controlada de execução, não revogação das proteções:** bloqueios históricos de autorização do dono para alterações técnicas necessárias à missão V1.0 passam a ser tratados pelo protocolo D140 (`05`). Alterar casa congelada ou contrato público exige **SPEC mínima, necessidade comprovada, testes de compatibilidade/segurança, plano de reversão e alteração pontual**, nunca reescrita geral; se não houver demonstração segura, não alterar e registrar bloqueio. Arquitetura Monolito Modular, Bairro 1 sem IA, fronteiras de segurança, consentimento do produto e proteção de dados permanecem invioláveis. Publicação/push, mudanças de visão, ações destrutivas fora de fixtures e homologação final continuam exclusivas do dono.
 
 

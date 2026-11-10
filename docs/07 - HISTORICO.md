@@ -1,3 +1,9 @@
+# 10/11/2026 — Reconciliação dos canônicos com a branch arena
+
+Registro do aceite informado pelo proprietário para as Fatias 14 e 15 e revisão da documentação frente à base `bf64d30`. Estado em 03, homologação em 08 e validação técnica em 09.
+
+---
+
 # 09/11/2026 — Pauta de voz após as fatias de memória
 
 O dono testou a conversa por voz no Qwen Audio Agent e pediu para retomar a discussão de integração depois de M1–M8. Evidência e referências em 06.

@@ -1,3 +1,11 @@
+# Retomada após as Fatias 14 e 15 (10/11/2026)
+
+As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
+
+A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.
+
+---
+
 # Pauta após M1–M8 — modo de voz do Agent Window (09/11/2026)
 
 O dono quer discutir a integração de um modo de voz depois de concluir as fatias de memória M1–M8. Esta pauta registra a intenção e a referência para a conversa de arquitetura. A sequência D133 segue vigente, e a especificação e a implementação do modo de voz ficam para decisão posterior.

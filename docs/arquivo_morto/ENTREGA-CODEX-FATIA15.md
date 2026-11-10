@@ -1,5 +1,7 @@
 # Atualização de entrega — 08/11/2026
 
+Registro histórico arquivado em 10/11/2026. O aceite posteriormente informado pelo proprietário está no canônico 08.
+
 A auditoria independente da base `7ab6a22` foi executada e recebeu correções locais até `80be501`. Consultar primeiro o estado vigente em 03 e as medições em 09; o conteúdo anterior abaixo descreve a entrega recebida. O candidato aguarda homologação humana dirigida, com ressalvas explícitas. E15-d não foi removida nem homologada. Relatório e evidências ficam na pasta operacional externa; não avançar o roadmap.
 
 ---
@@ -12,17 +14,17 @@ A auditoria independente da base `7ab6a22` foi executada e recebeu correções l
 
 1. `sh /home/user/arena-operacional/restaurar-ambiente.sh` (reconstitui Node em `.cache`, verifica SHA; dependências/caches não são guardados no snapshot). Depois `sh iniciar.sh typecheck` na raiz do repo. Em ambiente novo, `sh iniciar.sh dev` e backend do projeto via `platform/scripts/` — conferir `README.md` e `arena-operacional/roda-teste-browser.sh` para as portas 5174/8080.
 2. Suite: `sh platform/scripts/gate-unit.sh` (HOME e TMPDIR isolados; quarentena unitária documentada em `src/__tests__/QUARENTENA-UNITARIOS.md`). Alvo: `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/faixaDeAbasProtecao.test.tsx src/shell/persistenciaNativas.test.ts`. E2E isolado: `sh platform/scripts/e2e-isolado.sh e2e/<spec>.spec.ts`.
-3. Roteiro humano corrente: `docs/ROTEIRO-HOMOLOGACAO-FATIA15.md` (ler últimas atualizações, não confundir medições históricas). Histórico de gate/dashboard: `/home/user/arena-operacional/{status.json,EXECUCAO_AUTONOMA.md,dashboard-offline.html}`; evidências em `arena-operacional/evidencias/`.
+3. Roteiro humano corrente: `docs/arquivo_morto/ROTEIRO-HOMOLOGACAO-FATIA15.md` (ler últimas atualizações, não confundir medições históricas). Histórico de gate/dashboard: `/home/user/arena-operacional/{status.json,EXECUCAO_AUTONOMA.md,dashboard-offline.html}`; evidências em `arena-operacional/evidencias/`.
 
 ## Mapa dos contratos
 
 - RF15-1 editar/salvar: módulo `explorer-search` é dono do modelo/Monaco/writeFileAtomic; centro apenas monta slot. Provar no navegador edição + Ctrl+S + bytes no disco, incluindo cancelar fechamento de arquivo sujo.
 - RF15-2/RF15-3: uma faixa do `EditorArea`, `shell/ponteAnexo.ts` projeta abas do módulo sem cópia de estado; `shell/useFaixaDeAbasNativas.ts` possui nativas e recursos Browser. Config/Provedores/Browser/Changes aparecem no contêiner único. DnD entre os painéis **não** é exigido; “Abrir ao lado” atende o fluxo.
-- RF15-4: módulo persiste arquivos `kind: code` em `workbench.attachTabs.v1`; shell persiste nativas reconstituíveis em `workbench.nativeTabs.v1`. Contrato/testes: `docs/CONTRATO-PERSISTENCIA-NATIVAS-F15.md`, `shell/persistenciaNativas.test.ts`, teste App de remount e Playwright com dois painéis/Browser/ocultar. Diff de arquivo, busca transitória e conteúdo não salvo não entram na serialização nativa.
+- RF15-4: módulo persiste arquivos `kind: code` em `workbench.attachTabs.v1`; shell persiste nativas reconstituíveis em `workbench.nativeTabs.v1`. Contrato/testes: `docs/arquivo_morto/CONTRATO-PERSISTENCIA-NATIVAS-F15.md`, `shell/persistenciaNativas.test.ts`, teste App de remount e Playwright com dois painéis/Browser/ocultar. Diff de arquivo, busca transitória e conteúdo não salvo não entram na serialização nativa.
 - RNF15-1: 31 unit/11 E2E antigos repontados ou quarentenados com registro; `e2e/QUARENTENA.md` distingue spec obsoleta de spec que ainda passa. Não executar Playwright cru contra dados do usuário; usar script isolado.
 - RNF15-2: `App.tsx` diminuiu, mas auditar se restam políticas de abas indevidas. D174/D175 removeram estado, abertura/fecho, Browser e limpeza de recursos para um único hook do shell; App retém guardas de UI, porta do módulo e orquestração de sessões/layout. Não criar outro controller nem duplicar coleções.
 - RNF15-3: lateral esquerda da Fatia 14 não foi reescrita.
-- E15-d: `docs/INVENTARIO-E15-D.md` inventaria `AuxiliaryBar`/`AttachArea`/`pendingAttachOpen` e rede de rollback. Não remover `pendingAttachOpen` diretamente: `mountCodeEditor` ainda o consome no boot/F5. Confirmar condição formal da D151/status antes de apagar código de rollback.
+- E15-d: `docs/arquivo_morto/INVENTARIO-E15-D.md` inventaria `AuxiliaryBar`/`AttachArea`/`pendingAttachOpen` e rede de rollback. Não remover `pendingAttachOpen` diretamente: `mountCodeEditor` ainda o consome no boot/F5. Confirmar condição formal da D151/status antes de apagar código de rollback.
 
 ## Evidência e honestidade
 

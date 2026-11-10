@@ -1,3 +1,14 @@
+# Estado vigente — 10/11/2026
+
+A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homologação das **Fatias 14 e 15**, registrada em 08 e na decisão D186. A conferência técnica desta base fica em 09. Os retratos abaixo registram entregas e pendências da época.
+
+- **Fatia 14, SPEC 2H.** A barra de sessões e o modal de Personalizações estão integrados. Habilidades e ferramentas usam os serviços do produto. Agentes, Hooks, MCP e Plugins ainda têm categorias de navegação com escopo futuro.
+- **Fatia 15, SPEC 2I.** O editor central hospeda as abas de código e diff do Monaco e as superfícies nativas. Abas reconstituíveis voltam após recarregar. As edições salvas ficam no disco. O Explorer abre arquivos no Monaco mesmo antes da primeira mensagem, após selecionar a pasta.
+- **Barra direita.** Explorer, Search e Source Control seguem o workbench padrão do VS Code 1.135.0 como referência. A barra de sessões e Personalizações seguem a Agents Window. Limites de menus, Graph e busca estão em 06.
+- **Retomada.** A ordem D133 coloca M1–M8 antes da Fatia 16. E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
+
+## Registros anteriores
+
 **Pauta futura (09/11/2026).** A integração de voz será discutida após M1–M8. Resultado da prova externa e referências em [06, pauta do modo de voz](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#pauta-após-m1m8--modo-de-voz-do-agent-window-09112026).
 
 ---

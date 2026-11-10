@@ -2,7 +2,7 @@
 // faixaDeAbasProtecao.test.tsx — FATIA 15, RNF15-2 (D173).
 //
 // TESTES DE PROTECAO escritos ANTES de mover o ESTADO da faixa de abas para fora
-// do App.tsx. Ver contrato: docs/CONTRATO-MIGRACAO-ESTADO-ABAS.md
+// do App.tsx. Ver contrato: docs/arquivo_morto/CONTRATO-MIGRACAO-ESTADO-ABAS.md
 //
 // Por que estes testes existem e nao bastam os que ja existiam:
 //   O App.test.tsx ja cobre a sucessao ao fechar (P6), a remocao de recursos de

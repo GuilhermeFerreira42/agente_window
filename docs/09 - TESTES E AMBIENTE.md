@@ -1,3 +1,14 @@
+# Auditoria da branch arena em Windows (10/11/2026)
+
+Base de produto `bf64d30`. O remoto `github/arena` apontava para a mesma revisão no início. `iniciar.cmd` subiu o aplicativo local em 5174 com HTTP 200. Build do workbench, compilação TypeScript e build do serviço PTY passaram. O build informou que o adaptador nativo F2 de exclusão permanece desativado pelo seu limite de contenção.
+
+- Suíte Vitest completa antes do ajuste dos testes de navegação da Fatia 07. **1.492 aprovados, 44 falhas e 30 ignorados**, de 1.566 casos. As falhas incluem testes de comandos e caminhos POSIX, quebras de linha de worktree no Windows, contratos de CSS e fronteiras, mocks do Monaco e dois seletores de navegação antigos.
+- Os dois testes da Fatia 07 voltaram a passar após usar o fluxo atual de escolha de pasta. A repetição dirigida passou **171/171** em sete arquivos e cobriu também Personalizações, habilidades, abas e o editor central. O placar da suíte completa acima corresponde à execução anterior ao ajuste.
+- Playwright em perfil descartável na porta 5198. Personalizações abriu Habilidades, o formulário de criação e o catálogo de Ferramentas. O fluxo do editor abriu e salvou arquivo antes da primeira mensagem, preservou a sessão anterior, exibiu o Graph após merge externo e confirmou altura do diff e Alt+Z nos dois lados.
+- Logs da rodada em `../arena-operacional/auditoria-2026-11-10-*.log`. Os resultados medem os cenários executados em Windows. A homologação declarada pelo proprietário fica em 08.
+
+---
+
 # Evidência — favicon nas guias (09/11/2026)
 
 Typecheck e build Vite passaram. O Chromium via Playwright abriu a raiz e um endereço interno em duas guias. Em ambas, o favicon declarado no HTML de produção respondeu com HTTP 200 e tipo `image/png`, foi decodificado em 1254 × 1254 e coincidiu byte a byte com o PNG original. As cinco variantes foram copiadas com verificação de hash.

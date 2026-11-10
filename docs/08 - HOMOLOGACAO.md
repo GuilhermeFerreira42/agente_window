@@ -1,3 +1,9 @@
+# Registro de homologação — Fatias 14 e 15 (10/11/2026)
+
+O proprietário informou a homologação das **Fatias 14 e 15**. A conversa registra o aceite das fatias, sem detalhar um novo placar por cenário ou a revisão exata usada no aceite. Os roteiros datados abaixo servem como referência de revalidação. A retirada física E15-d permanece uma decisão separada. A auditoria técnica da base atual fica em 09.
+
+---
+
 # Inspeção D185 — barra lateral direita e Monaco (09/11/2026)
 
 Use **Sidebar fixture session** em um perfil de validação.

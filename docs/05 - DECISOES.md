@@ -2085,3 +2085,7 @@ A barra direita usa o mesmo tratamento visual de divisória da barra de sessões
 ## D185 — Revisão corretiva após inspeção da lateral direita (09/11/2026)
 
 O proprietário confirmou o workbench padrão do VS Code 1.135.0 como referência de Explorer, Search e Source Control da direita. A lateral de sessões e Personalizações seguem D183. Para desenhar relações reais no Graph, a consulta existente de histórico Git passa a retornar pais e autor. Esse acréscimo pontual usa os mesmos caminhos de leitura e validação do repositório. A divisória do editor atua no PanelGroup que hospeda o Monaco e usa a distribuição padrão 50/50.
+
+## D186 — Registro de homologação das Fatias 14 e 15 (10/11/2026)
+
+O proprietário informou na conversa que marcou as Fatias 14 e 15 como homologadas. Esse aceite substitui os estados anteriores de implementação pendente ou candidata em 01, 02, 03, 06 e 08. O registro confirma o aceite das fatias em seus escopos 2H e 2I. Os resultados técnicos e suas ressalvas seguem em 09. A retirada física E15-d permanece separada, com a rede de rollback ainda presente no código. A ordem D133 permanece vigente.
