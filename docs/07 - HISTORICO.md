@@ -1,3 +1,9 @@
+# 10/11/2026 — M1 integrada ao uso reportado
+
+Commit `feat(memory): measure provider context usage`. Conversa e Agir normalizam o uso do provedor, com um evento por requisição e iteração. O compositor mostra a entrada da última medição, a saída e a reserva separadas nos detalhes e os alertas de 75% e 90% quando a janela é conhecida. Registro técnico em 09 e roteiro de homologação em 08.
+
+---
+
 # 10/11/2026 — Início de M1
 
 Após a publicação de `7a78b5a`, o primeiro corte de M1 substituiu o percentual derivado do rascunho pela indicação de contexto não medido. Escopo e próximos critérios em 06.

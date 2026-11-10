@@ -8,7 +8,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import type { AlvoConversa } from '../../conversa'
-import type { MensagemAgir } from '../contract'
+import type { EventoAgir, MensagemAgir } from '../contract'
+import { rodarAgir } from '../server/agir'
+import { criarExecutoresFalsos } from '../server/ferramentas'
 import { criarVizinhoReal, ErroVizinho } from '../server/vizinho'
 
 interface Captura {
@@ -55,7 +57,7 @@ const HISTORICO: MensagemAgir[] = [
 ]
 
 describe('Missão 2 — erros reais de transporte e resposta', () => {
-  it.each([400,401,403,429,502])('HTTP %s preserva categoria/status sem retentativa automática', async status => {
+  it.each([400,401,403,413,429,502])('HTTP %s preserva categoria/status sem retentativa automática', async status => {
     let chamadas=0
     const servidor=await servidorFalso((_req,res)=>{chamadas++;res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:status===400?'maximum context length exceeded: too many tokens':'fixture failure'}}))})
     try {
@@ -72,6 +74,46 @@ describe('Missão 2 — erros reais de transporte e resposta', () => {
 })
 
 describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
+  it('mede cada iteração com histórico e ferramentas, incluindo o resultado no segundo pedido', async () => {
+    const pedidos: Record<string, unknown>[] = []
+    const servidor = await servidorFalso((_req, res, corpo) => {
+      pedidos.push(corpo)
+      const primeira = pedidos.length === 1
+      const delta = primeira
+        ? { tool_calls: [{ index: 0, id: 'ler-1', function: { name: 'ler', arguments: '{"caminho":"teste.txt"}' } }] }
+        : { content: 'Verificado.' }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`)
+      res.end(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: primeira ? 740 : 920, completion_tokens: 5 } })}\n\n`)
+    })
+    try {
+      const eventos: EventoAgir[] = []
+      const historico: MensagemAgir[] = []
+      for (let i = 0; i < 12; i++) {
+        historico.push({ papel: 'usuario', conteudo: `Pergunta ${i}` }, { papel: 'assistente', conteudo: `Resposta ${i}` })
+      }
+      historico.push({ papel: 'usuario', conteudo: 'Leia teste.txt' })
+      const resultado = await rodarAgir({
+        vizinho: criarVizinhoReal({ ...alvoDe('openai-chat', servidor.baseUrl), providerId: 'p', modelId: 'm', limiteContexto: 1000 }),
+        historico,
+        instrucoesDeProduto: [{ origem: 'skill', id: 'fixture:teste', nome: 'teste', corpo: 'Orientação de teste.' }],
+        executores: criarExecutoresFalsos(),
+        emitir: (evento) => eventos.push(evento),
+      })
+      expect(resultado).toMatchObject({ status: 'respondeu', iteracoes: 2 })
+      expect(pedidos).toHaveLength(2)
+      expect(pedidos[0].messages).toHaveLength(26)
+      expect(pedidos[0].messages).toContainEqual(expect.objectContaining({ role: 'system', content: expect.stringContaining('Orientação de teste.') }))
+      expect(pedidos[1].tools).toHaveLength(7)
+      expect(pedidos[1].messages).toContainEqual(expect.objectContaining({ role: 'tool', tool_call_id: 'ler-1' }))
+      const medicoes = eventos.flatMap((evento) => evento.type === 'context_usage' ? [evento.medicao] : [])
+      expect(medicoes.map(({ iteracao, entrada }) => [iteracao, entrada])).toEqual([[1, 740], [2, 920]])
+      expect(new Set(medicoes.map(({ requestId }) => requestId)).size).toBe(2)
+    } finally {
+      await servidor.fechar()
+    }
+  })
+
   it('monta o tool_call que chega aos pedaços + texto ao vivo + corpo com anúncio', async () => {
     const s = await servidorFalso((req, res, corpo) => {
       expect(corpo.tools).toHaveLength(7)
@@ -89,6 +131,8 @@ describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
           '',
           'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"ola.txt\\",\\"conteudo\\":\\"oi\\"}"}}]}}]}',
           '',
+          'data: {"choices":[],"usage":{"prompt_tokens":755,"completion_tokens":22}}',
+          '',
           'data: [DONE]',
           '',
         ].join('\n'),
@@ -96,7 +140,8 @@ describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
     })
     try {
       const pedacos: string[] = []
-      const resposta = await criarVizinhoReal(alvoDe('openai-chat', s.baseUrl))(HISTORICO, { aoTexto: (t) => pedacos.push(t) })
+      const resposta = await criarVizinhoReal({ ...alvoDe('openai-chat', s.baseUrl), providerId: 'p', modelId: 'm', limiteContexto: 1000 })(HISTORICO, { aoTexto: (t) => pedacos.push(t) })
+      expect(resposta.usoContexto).toMatchObject({ providerId: 'p', modelId: 'm', entrada: 755, saida: 22, janela: { tokens: 1000 } })
       expect(resposta.texto).toBe('Vou criar.')
       expect(pedacos).toEqual(['Vou criar.'])
       expect(resposta.modelo).toBe('gpt-prova')

@@ -157,6 +157,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
     }
 
     // O texto AO VIVO já saiu pelo `aoTexto` (contrato do vizinho — fonte única).
+    if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
+    if (resposta.usoContexto) emitir({ type: 'context_usage', medicao: { ...resposta.usoContexto, iteracao } })
 
     if (resposta.pedidos.length === 0) {
       emitir({ type: 'done', model: resposta.modelo })

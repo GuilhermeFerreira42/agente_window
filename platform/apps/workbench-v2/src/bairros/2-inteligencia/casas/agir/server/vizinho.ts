@@ -23,6 +23,7 @@ import { anunciarFerramentas } from './anuncio'
 import { aplicarInstrucoes, traduzirHistorico } from './dialogo'
 import { extrairFerramentas } from './extracao'
 import { ehFerramentaConhecida } from './ferramentas'
+import { criarLeitorDeUso, metadadosDaChamada, opcaoUsoOpenAI } from '../../../../../domain/usoContexto'
 
 export class ErroVizinho extends Error {
   readonly code: CategoriaErroAgir
@@ -157,6 +158,7 @@ function detalheErro(corpo: string, chave: string | null): string {
 }
 
 function erroPorStatus(status: number, corpoErro = '', chave: string | null = null): ErroVizinho {
+  if (status === 413) return new ErroVizinho('http', 'O serviço rejeitou o tamanho do contexto enviado (erro 413). A conversa permanece disponível.', status)
   const detalhe = detalheErro(corpoErro, chave)
   const complemento = detalhe ? ` Detalhe do serviço: ${detalhe}` : ''
   if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida ou sem autorização (erro ${status}). Confira a chave em Provedores.${complemento}`, status)
@@ -198,7 +200,7 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   if (alvo.protocolo === 'openai-chat') {
     return {
       url: `${baseUrl}/chat/completions`,
-      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...temperatura, ...anuncio, tool_choice: 'auto' },
+      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...temperatura, ...anuncio, tool_choice: 'auto' },
     }
   }
   if (alvo.protocolo === 'anthropic') {
@@ -457,6 +459,13 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
 
     const aoTexto = (pedaco: string): void => opcoes?.aoTexto?.(pedaco)
     const comedor = criarAcumulo(alvo.protocolo, aoTexto)
+    const uso = criarLeitorDeUso(alvo.protocolo)
+    let chamada: ReturnType<typeof metadadosDaChamada>
+    const consumir = (payload: string) => {
+      const quadro = JSON.parse(payload)
+      uso.ler(quadro)
+      comedor.comer(quadro)
+    }
     const framer = alvo.protocolo === 'ollama' ? framerNDJSON() : framerSSE()
     let bruto = ''
 
@@ -472,8 +481,10 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           apiKey: config.apiKey,
           temperatura: config.temperatura,
           maxSaida: config.maxSaida,
+          limiteContexto: config.limiteContexto,
         } : alvo
         const { url, corpo } = corpoDePedido(alvoAtual, mensagens, opcoes)
+        chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens)
         return fetch(url, {
           method: 'POST',
           headers: cabecalhos(alvoAtual),
@@ -506,7 +517,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         bruto += pedaco
         for (const payload of framer.entrar(pedaco)) {
           try {
-            comedor.comer(JSON.parse(payload))
+            consumir(payload)
           } catch {
             // payload não-JSON (ex.: [DONE] do openai): ignorado
           }
@@ -514,7 +525,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
       }
       for (const payload of framer.fechar()) {
         try {
-          comedor.comer(JSON.parse(payload))
+          consumir(payload)
         } catch {
           // idem
         }
@@ -526,6 +537,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         try {
           const inteiro = JSON.parse(bruto) as Record<string, unknown>
           if (inteiro !== null && typeof inteiro === 'object') {
+            uso.ler(inteiro)
             const texto = textoDeCorpoInteiro(alvo.protocolo, inteiro)
             if (texto !== '') aoTexto(texto)
             comedor.acumulo.texto += texto
@@ -541,6 +553,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         texto: comedor.acumulo.texto,
         pedidos: comedor.acumulo.pedidos,
         ...(comedor.acumulo.modelo !== undefined ? { modelo: comedor.acumulo.modelo } : {}),
+        ...(chamada ? { usoContexto: { ...chamada, ...uso.resultado() } } : {}),
       }
     } catch (erro) {
       if (opcoes?.sinal?.aborted) throw erro // Parar do dono: o loop distingue e fica em silêncio

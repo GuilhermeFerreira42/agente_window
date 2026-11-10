@@ -2089,3 +2089,7 @@ O proprietário confirmou o workbench padrão do VS Code 1.135.0 como referênci
 ## D186 — Registro de homologação das Fatias 14 e 15 (10/11/2026)
 
 O proprietário informou na conversa que marcou as Fatias 14 e 15 como homologadas. Esse aceite substitui os estados anteriores de implementação pendente ou candidata em 01, 02, 03, 06 e 08. O registro confirma o aceite das fatias em seus escopos 2H e 2I. Os resultados técnicos e suas ressalvas seguem em 09. A retirada física E15-d permanece separada, com a rede de rollback ainda presente no código. A ordem D133 permanece vigente.
+
+## D187 — Medição de contexto da M1 (10/11/2026)
+
+Aplicação técnica de D99 e D133. A entrada reportada na última iteração é comparada à janela total confirmada manualmente para o par provedor e modelo. A saída reportada e a reserva efetivamente enviada ficam separadas. Quando ambas as configurações existem, os detalhes mostram também o orçamento de entrada após a reserva. A medição é efêmera, e a configuração da janela é persistida. O evento aditivo `context_usage` reutiliza o transporte de Conversa e Agir. A medição não modifica o histórico e não serve como estimativa da próxima chamada. A SPEC fica em 06, a prova técnica em 09 e o aceite humano em 08.

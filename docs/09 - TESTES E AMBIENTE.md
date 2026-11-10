@@ -1,3 +1,23 @@
+# M1 — evidências de medição e orçamento (10/11/2026)
+
+Windows 11, Node 26.13.0 e Chromium Playwright. Os testes usaram perfil, workspace e cadastro de provedores descartáveis. O Vitest focado passou **89/89** em seis arquivos, incluindo a regra de asserções da suíte E2E. O Playwright passou **2/2** em duas rodadas. O typecheck e o build dos workspaces passaram. O build conserva os avisos do adaptador nativo F2, do CSS e do terminal.
+
+| Requisito | Prova |
+|---|---|
+| Contagem reportada por protocolo e ausência honesta | `usoContexto.test.ts` cobre Anthropic com cache, Gemini com raciocínio, Ollama com zero e campos inválidos. `conversar.test.ts` e `vizinho.test.ts` verificam o frame final OpenAI sem texto e os metadados do evento. A integração Anthropic compara a reserva ao `max_tokens` do pedido. |
+| Janela específica, troca de modelo e alertas | `chatAlvo.test.ts` grava e relê a configuração e rejeita o valor antigo sem vínculo. `usoContexto.test.ts` cobre as fronteiras 74/75 e 89/90, inclusive acima de 100%. `ChatInput.test.tsx` verifica janela ausente, troca de par, entrada, saída, reserva e orçamento. |
+| Histórico, instruções e ferramentas | `vizinho.test.ts` usa HTTP local e o loop real de Agir. Confere as mensagens, instruções e schemas enviados, o resultado de ferramenta no segundo pedido e medições de 740 e 920 tokens com identificadores distintos. |
+| Navegação, ausência de uso, recusa e recarga | `m1_contexto.spec.ts` atravessa o compositor e o backend. Valida 90%, isolamento entre sessões, recuperação do transcript após reload, rascunho longo sem contagem fabricada, resposta sem uso e HTTP 413. |
+| Modelo real | O mesmo spec recebe contagens positivas de entrada e saída de `hermes3:3b` via Ollama local em modo Agir, com janela desconhecida. A chamada não depende de crédito nem de credencial. |
+
+A revisão independente verificou a SPEC contra o diff e executou 12 verificações do normalizador. Os pontos levantados sobre raciocínio do Gemini e normalização do nome do modelo têm correção e cobertura no conjunto focado. A suíte de rota mantém as expectativas de ordem e aprovações com o novo evento.
+
+A regressão completa no Windows registrou **1.508 aprovações, 43 falhas e 30 ignorados**. A comparação por nome confirmou 42 falhas da auditoria anterior, incluindo contratos de CSS e fronteiras, mocks do Monaco e cenários POSIX. Os dois casos já corrigidos da Fatia 07 passaram. A falha adicional ocorreu na fixture de exclusão ao reservar um arquivo de 2 GiB (`ENOSPC`), acompanhada de timeout de hook. O arquivo inteiro passou **21/21** na repetição isolada e também passou na primeira execução completa. Os quatro casos de rota revalidados à parte passaram **4/4**. A falha intermediária do verificador E2E foi corrigida ao mover os testes para o bloco esperado pelo repositório.
+
+OpenAI, Anthropic e Gemini foram verificados em testes controlados. Serviços reais desses três protocolos e a execução em Linux headless ficaram fora desta rodada. O teste real do Ollama cobre resposta simples, não execução de ferramentas. O Playwright pode ser reproduzido com `M1_E2E_BASE_URL` e `M1_E2E_WORKSPACE` apontando para servidor e workspace descartáveis. `M1_E2E_OLLAMA` habilita a prova local com o modelo já instalado. Logs em `../arena-operacional/m1-*.log`. Aceite funcional em 08.
+
+---
+
 # M1 — primeiro corte do compositor (10/11/2026)
 
 O Vitest passou os 29 testes de `ChatInput.test.tsx`, incluindo a proteção contra exibir porcentagem baseada no rascunho. O indicador mostra que o contexto ainda não foi medido. A medição pelo provedor e o orçamento por modelo têm critérios próprios em 06. Log em `../arena-operacional/m1-primeiro-corte-vitest.log`.

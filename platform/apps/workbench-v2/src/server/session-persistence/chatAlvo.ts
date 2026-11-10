@@ -52,6 +52,7 @@ export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto
       apiKey: chave,
       temperatura: salvo.temperatura,
       maxSaida: salvo.maxSaida,
+      limiteContexto: salvo.contextoModelo === modelId ? salvo.contexto : undefined,
     },
   }
 }

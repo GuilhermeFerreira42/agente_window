@@ -46,6 +46,8 @@ export interface ProvedorConfig {
   habilitado?: boolean
   apiKey?: string
   contexto?: number
+  /** Modelo cujo limite foi confirmado no campo Contexto. Cadastros antigos não têm vínculo. */
+  contextoModelo?: string
   maxSaida?: number
   temperatura?: number
 }
@@ -66,6 +68,7 @@ export interface ProvedorNaTela {
   modelosHabilitados: string[]
   habilitado: boolean
   contexto: number
+  contextoModelo?: string
   maxSaida: number
   temperatura: number
   /** Ex.: `••••••••a1b2` — ou null quando não há chave. */

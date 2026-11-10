@@ -14,6 +14,7 @@
 import type { AlvoConversa, CategoriaErro, ConfigChamadaModelo, ErroConversa, EventoChat, IniciarChamadaModelo, MensagemChat } from '../contract'
 import { montarPedido } from './requisicao'
 import { criarFramer } from './streaming'
+import { criarLeitorDeUso, metadadosDaChamada } from '../../../../../domain/usoContexto'
 
 /** Sem NENHUM byte do corpo em 60 s → `tempo` (proposta da SPEC §3.6d). */
 export const TIMEOUT_PRIMEIRO_BYTE_MS = 60_000
@@ -179,6 +180,8 @@ export async function executarConversa(
   iniciarModelo?: IniciarChamadaModelo,
 ): Promise<void> {
   const sinal = criarSinalConversa(sinalExterno)
+  const uso = criarLeitorDeUso(alvo.protocolo)
+  let chamada: ReturnType<typeof metadadosDaChamada>
   try {
     const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
       const alvoAtual: AlvoConversa = config ? {
@@ -191,8 +194,10 @@ export async function executarConversa(
         apiKey: config.apiKey,
         temperatura: config.temperatura,
         maxSaida: config.maxSaida,
+        limiteContexto: config.limiteContexto,
       } : alvo
       const pedido = montarPedido(alvoAtual, messages)
+      chamada = metadadosDaChamada(alvoAtual, pedido.reservaSaida)
       return fetch(pedido.url, { ...pedido.init, signal: sinal.signal })
     }
 
@@ -242,7 +247,9 @@ export async function executarConversa(
     const consumirPayloads = (payloads: string[]): void => {
       for (const payload of payloads) {
         try {
-          enviar(extrairTexto(alvo.protocolo, JSON.parse(payload)))
+          const quadro: unknown = JSON.parse(payload)
+          uso.ler(quadro)
+          enviar(extrairTexto(alvo.protocolo, quadro))
         } catch {
           // Quadro que não é JSON de texto (eventos de ciclo de vida, [DONE],
           // ruído de compat) é ignorado — nunca vira erro nem texto falso.
@@ -269,6 +276,7 @@ export async function executarConversa(
     if (!emitiuUtil) {
       throw new ErroChat('resposta', 'O serviço respondeu, mas veio sem texto. Nada foi exibido para não inventar resposta.')
     }
+    if (chamada && !sinal.silenciado()) emitir({ type: 'context_usage', medicao: { ...chamada, iteracao: 1, ...uso.resultado() } })
   } finally {
     sinal.limpar()
   }

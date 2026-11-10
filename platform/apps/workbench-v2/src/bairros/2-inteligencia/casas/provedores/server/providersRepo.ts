@@ -131,6 +131,9 @@ function validarProvedor(id: string, bruto: ProvedorConfig, guardados: ProvedorC
   }
   if (typeof bruto.contexto === 'number' && Number.isFinite(bruto.contexto) && bruto.contexto > 0) {
     limpo.contexto = Math.floor(bruto.contexto)
+    if (limpo.modelo && typeof bruto.contextoModelo === 'string' && bruto.contextoModelo.trim() === limpo.modelo) {
+      limpo.contextoModelo = limpo.modelo
+    }
   }
   if (typeof bruto.maxSaida === 'number' && Number.isFinite(bruto.maxSaida) && bruto.maxSaida > 0) {
     limpo.maxSaida = Math.floor(bruto.maxSaida)
@@ -235,6 +238,7 @@ export interface ConfigChamadaModelo {
   apiKey: string | null
   temperatura?: number
   maxSaida?: number
+  limiteContexto?: number
 }
 
 /**
@@ -275,6 +279,7 @@ export async function iniciarChamadaModelo<T>(
       apiKey: chave,
       temperatura: provedor.temperatura,
       maxSaida: provedor.maxSaida,
+      limiteContexto: provedor.contextoModelo === modelId ? provedor.contexto : undefined,
     }
     // Não usar `await`: iniciar() precisa começar o fetch enquanto o mutex
     // ainda ordena com salvarArquivo, mas a resposta pode terminar depois.
@@ -322,6 +327,7 @@ export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: Proved
       modelosHabilitados: Array.isArray(salvo.modelosHabilitados) ? salvo.modelosHabilitados : [],
       habilitado: salvo.habilitado !== false,
       contexto: salvo.contexto ?? descritor.padroes.contexto,
+      ...(salvo.contextoModelo ? { contextoModelo: salvo.contextoModelo } : {}),
       maxSaida: salvo.maxSaida ?? descritor.padroes.maxSaida,
       temperatura: salvo.temperatura ?? descritor.padroes.temperatura,
       chaveMascarada: chave ? mascararChave(chave) : null,

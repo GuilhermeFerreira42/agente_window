@@ -46,6 +46,19 @@ afterEach(() => {
 })
 
 describe('conversar — resposta única com erros honestos', () => {
+  it('mede o quadro final sem texto e mantém somente metadados no evento', async () => {
+    mockFetch(() => new Response(
+      'data: {"choices":[{"delta":{"content":"Olá"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":920,"completion_tokens":17}}\n\ndata: [DONE]\n\n',
+      { headers: { 'Content-Type': 'text/event-stream' } },
+    ))
+    const { eventos, erro } = await capturar({ ...ALVO, providerId: 'p', modelId: 'm', limiteContexto: 1000 })
+    expect(erro).toBeNull()
+    expect(eventos).toEqual([
+      { type: 'chunk', text: 'Olá' },
+      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'p', modelId: 'm', entrada: 920, saida: 17, janela: { tokens: 1000, origem: 'configuracao' } } },
+    ])
+  })
+
   it('sucesso: emite chunk com o texto; chave só no cabeçalho, nunca na URL', async () => {
     const chamadas = mockFetch(() => json({ choices: [{ message: { content: 'Olá mundo' } }] }))
     const { eventos, erro } = await capturar(ALVO)
@@ -167,21 +180,27 @@ describe('conversar — streaming de verdade (conquista 2)', () => {
     expect(eventos).toEqual([{ type: 'chunk', text: ' Chegou' }])
   })
 
-  it('anthropic: lê content_block_delta e ignora eventos de ciclo de vida', async () => {
-    const alvo: AlvoConversa = { protocolo: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', modelo: 'claude-haiku-4-5', apiKey: 'k' }
-    mockFetch(() =>
+  it('anthropic: lê texto, mede uso e expõe a reserva enviada', async () => {
+    const alvo: AlvoConversa = {
+      protocolo: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', modelo: 'claude-haiku-4-5',
+      apiKey: 'k', providerId: 'anthropic', modelId: 'claude-haiku-4-5', maxSaida: 512, limiteContexto: 2000,
+    }
+    const chamadas = mockFetch(() =>
       respostaStream([
-        `event: message_start\ndata: ${JSON.stringify({ type: 'message_start', message: { usage: {} } })}\n\n`,
+        `event: message_start\ndata: ${JSON.stringify({ type: 'message_start', message: { usage: { input_tokens: 100, cache_read_input_tokens: 500 } } })}\n\n`,
         `event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Oi ' } })}\n\n`,
         `event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'tudo bem?' } })}\n\n`,
+        `event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', usage: { output_tokens: 16 } })}\n\n`,
         `event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`,
       ]),
     )
     const { eventos, erro } = await capturar(alvo)
     expect(erro).toBeNull()
+    expect(JSON.parse(String(chamadas[0].init?.body))).toMatchObject({ max_tokens: 512 })
     expect(eventos).toEqual([
       { type: 'chunk', text: 'Oi ' },
       { type: 'chunk', text: 'tudo bem?' },
+      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'anthropic', modelId: 'claude-haiku-4-5', entrada: 600, saida: 16, reservaSaida: 512, janela: { tokens: 2000, origem: 'configuracao' } } },
     ])
   })
 

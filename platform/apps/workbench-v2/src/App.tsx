@@ -39,6 +39,7 @@ import {
   type CustomViewId,
 } from './domain/customView'
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
+import type { MedicaoContexto } from './domain/usoContexto'
 import {
   assertWorkbenchInvariants,
   resolveActiveChatId,
@@ -437,6 +438,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     try { localStorage.setItem('agente-window:mode-by-chat:v1', JSON.stringify(modeByChat)) } catch { /* a escolha local é best-effort; o servidor valida o enum a cada execução */ }
   }, [modeByChat])
   const [composerDrafts, setComposerDrafts] = useState<Record<string, ComposerDraft>>({})
+  const [usoPorChat, setUsoPorChat] = useState<Record<string, { execucao: symbol; medicao?: MedicaoContexto }>>({})
   const [composerHistoryByChat, setComposerHistoryByChat] = useState<Record<string, ComposerHistoryEntry[]>>({})
   const [approved, setApproved] = useState(false)
   const [toast, setToast] = useState<string | undefined>()
@@ -1612,8 +1614,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     aoConcluir?: () => void,
   ): OuvintesAgir => {
     const runKey = `${sessionId}:${chatId}`
+    const execucao = Symbol()
+    setUsoPorChat(current => ({ ...current, [runKey]: { execucao } }))
+    const atualizarUso = (medicao?: MedicaoContexto) => setUsoPorChat(current =>
+      current[runKey]?.execucao === execucao ? { ...current, [runKey]: { execucao, medicao } } : current)
     let acumulado = acumuladoInicial
     return {
+      onContextUsage: atualizarUso,
       onChunk: (pedaco) => {
         acumulado += pedaco
         const conteudo = acumulado
@@ -1685,6 +1692,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         })
       },
       onIteracao: (iteracao, teto, modelo) => {
+        atualizarUso()
         updateSession(sessionId, (session) => ({
           ...session,
           chats: session.chats.map((chat) => chat.id === chatId ? {
@@ -2213,6 +2221,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onDecidirAguardarComando={(chatId, messageId, ferramentaId, decisao) => decidirAguardarComando(session.id, chatId, messageId, ferramentaId, decisao)}
         onDecidirContinuar={(chatId, messageId, continuarId, decisao) => decidirContinuar(session.id, chatId, messageId, continuarId, decisao)}
         autoScroll={autoScrollChat}
+        usoContexto={usoPorChat[sessionChatKey]?.medicao}
         composerDrafts={composerDrafts}
         onChangeComposerDraft={(key, updater) => setComposerDrafts((current) => ({ ...current, [key]: updater(current[key] ?? { text: '', attachments: [] }) }))}
         composerHistory={composerHistoryByChat}

@@ -1,3 +1,12 @@
+# Roteiro de homologação da M1 — aceite pendente (10/11/2026)
+
+1. Abra um chat novo, escolha a pasta e digite um rascunho. O compositor deve mostrar **Contexto não medido**.
+2. Envie uma mensagem a um provedor que retorne contagens, como o Ollama local. Confira no indicador os tokens de entrada. Passe o mouse sobre ele para ver o modelo efetivo, a iteração e a saída reportada.
+3. Em **Provedores → Ajustes avançados**, selecione o modelo padrão, edite **Contexto (tokens)** para o limite efetivo do modelo e salve. Se o campo já exibir esse número sem vínculo confirmado, apague e redigite o valor. Após outro envio, confira a porcentagem e a origem da janela nos detalhes. Os alertas começam em 75% e 90%.
+4. Abra outro chat ou selecione explicitamente outro modelo. A medição do chat ou modelo anterior deve ficar oculta. Recarregue a página e confirme que as mensagens continuam acessíveis. O indicador volta a **Contexto não medido** até o próximo envio.
+
+---
+
 # Registro de homologação — Fatias 14 e 15 (10/11/2026)
 
 O proprietário informou a homologação das **Fatias 14 e 15**. A conversa registra o aceite das fatias, sem detalhar um novo placar por cenário ou a revisão exata usada no aceite. Os roteiros datados abaixo servem como referência de revalidação. A retirada física E15-d permanece uma decisão separada. A auditoria técnica da base atual fica em 09.

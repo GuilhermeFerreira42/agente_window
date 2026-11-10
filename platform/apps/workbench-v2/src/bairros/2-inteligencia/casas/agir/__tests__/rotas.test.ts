@@ -388,7 +388,7 @@ describe('rotas — POST /api/agir', () => {
     const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
     expect(frames(res)[0]).toMatchObject({ type: 'iteracao', model: 'openai / gpt-fixture' })
-    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
+    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'context_usage', 'tool', 'approval'])
 
     const aprovar = fakeRes()
     const corpoNegar = approvalBody(res, { fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })
@@ -397,8 +397,8 @@ describe('rotas — POST /api/agir', () => {
 
     await fio
     const tipos = frames(res).map((e) => e.type)
-    expect(tipos).toEqual(['iteracao', 'tool', 'approval', 'tool_result', 'iteracao', 'chunk', 'done'])
-    const resultado = frames(res)[3] as Record<string, unknown>
+    expect(tipos).toEqual(['iteracao', 'context_usage', 'tool', 'approval', 'tool_result', 'iteracao', 'chunk', 'context_usage', 'done'])
+    const resultado = frames(res).find((evento) => evento.type === 'tool_result') as Record<string, unknown>
     expect(resultado).toMatchObject({ type: 'tool_result', ok: false })
     expect(String(resultado.resumo)).toContain('dono negou')
     // nada foi escrito: o executor nem roda (a negação é a resposta ao modelo)
@@ -438,7 +438,7 @@ describe('rotas — POST /api/agir', () => {
     })
     const fio = tratarRotasAgir(fakeReq(corpo), res, URL_AGIR, DEPS)
     await esperaFio(res, '"type":"approval"')
-    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'tool', 'approval'])
+    expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'context_usage', 'tool', 'approval'])
     await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-3', id: 'c1', decisao: 'negar' })), fakeRes(), URL_APROVAR, DEPS)
     await fio
     expect(concederPermissaoSessao).not.toHaveBeenCalled()
@@ -477,8 +477,8 @@ describe('FATIA 11 — teto e continuar no fio', () => {
     const res1 = fakeRes()
     expect(await tratarRotasAgir(fakeReq(pedido), res1, URL_AGIR, deps)).toBe(true)
     const f1 = frames(res1)
-    expect(f1.map((f) => f.type)).toEqual(['iteracao', 'tool', 'tool_result', 'teto'])
-    expect(f1[3]).toEqual({ type: 'teto', iteracoes: 1, teto: 1 })
+    expect(f1.map((f) => f.type)).toEqual(['iteracao', 'context_usage', 'tool', 'tool_result', 'teto'])
+    expect(f1.at(-1)).toEqual({ type: 'teto', iteracoes: 1, teto: 1 })
 
     const res2 = fakeRes()
     expect(await tratarRotasAgir(fakeReq(JSON.stringify({ fluxo: 'fluxo-teto-1' })), res2, URL_CONTINUAR, deps)).toBe(true)

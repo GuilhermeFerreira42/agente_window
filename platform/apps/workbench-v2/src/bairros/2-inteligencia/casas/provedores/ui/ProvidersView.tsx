@@ -220,6 +220,7 @@ export function ProvidersView() {
           modelosHabilitados: p.modelosHabilitados,
           habilitado: p.habilitado,
           contexto: p.contexto,
+          contextoModelo: p.contextoModelo,
           maxSaida: p.maxSaida,
           temperatura: p.temperatura,
         }
@@ -542,8 +543,9 @@ export function ProvidersView() {
                   type="number"
                   min={1}
                   value={rascunho.contexto ?? ''}
-                  onChange={(e) => editar({ contexto: Number(e.target.value) })}
+                  onChange={(e) => editar({ contexto: Number(e.target.value), contextoModelo: rascunho.modelo.trim() })}
                 />
+                <small>Edite o valor para confirmar a janela do modelo padrão.</small>
               </label>
               <label className="providers-field">
                 <span className="providers-label">Máximo de saída (tokens)</span>

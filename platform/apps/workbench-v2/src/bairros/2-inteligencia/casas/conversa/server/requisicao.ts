@@ -6,10 +6,12 @@
 // Conquista 2: TODOS os pedidos já pedem streaming (fio aos pedaços).
 // ============================================================================
 import type { AlvoConversa, MensagemChat } from '../contract'
+import { opcaoUsoOpenAI } from '../../../../../domain/usoContexto'
 
 export interface PedidoHttp {
   url: string
   init: RequestInit
+  reservaSaida?: number
 }
 
 function cabecalhosBase(apiKey: string | null, protocolo: AlvoConversa['protocolo']): Record<string, string> {
@@ -42,20 +44,22 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
       init: {
         method: 'POST',
         headers: cabecalhos,
-        body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...temperatura }),
+        body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...opcaoUsoOpenAI(baseUrl), ...temperatura }),
       },
     }
   }
 
   if (alvo.protocolo === 'anthropic') {
+    const reservaSaida = alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : 8192
     return {
       url: `${baseUrl}/messages`,
+      reservaSaida,
       init: {
         method: 'POST',
         headers: cabecalhos,
         body: JSON.stringify({
           model: alvo.modelo,
-          max_tokens: alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : 8192,
+          max_tokens: reservaSaida,
           messages,
           stream: true,
           ...temperatura,

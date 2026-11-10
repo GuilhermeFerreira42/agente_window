@@ -2008,6 +2008,8 @@ svg {
   color: var(--vscode-descriptionForeground);
   font-size: var(--vscode-fontSize-label2);
 }
+.context-usage[data-alert="alto"] { color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground)); }
+.context-usage[data-alert="critico"] { color: var(--vscode-errorForeground); }
 
 .send-button {
   width: 22px;

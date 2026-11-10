@@ -20,6 +20,7 @@ import { DragTypes } from '../domain/dragAndDrop'
 import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
+import { ocupacaoContexto, type MedicaoContexto } from '../domain/usoContexto'
 
 interface ChatInputProps {
   session: Session
@@ -36,6 +37,7 @@ interface ChatInputProps {
   onStop: () => void
   onApprove: (chatId?: string) => void
   composerDrafts?: Record<string, ComposerDraft>
+  usoContexto?: MedicaoContexto
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
@@ -61,6 +63,29 @@ function selecaoDoToken(token: string): SelecaoModelo {
   } catch {
     return { tipo: 'explicita', providerId: '', modelId: '' }
   }
+}
+
+function IndicadorContexto({ medicao, selecao }: { medicao?: MedicaoContexto; selecao: SelecaoModelo }) {
+  if (!medicao || (selecao.tipo === 'explicita' &&
+    (selecao.providerId !== medicao.providerId || selecao.modelId !== medicao.modelId))) {
+    return <span className="context-usage">Contexto não medido</span>
+  }
+  const ocupacao = ocupacaoContexto(medicao)
+  const orcamentoEntrada = medicao.janela && medicao.reservaSaida !== undefined
+    ? Math.max(0, medicao.janela.tokens - medicao.reservaSaida)
+    : undefined
+  const detalhes = [
+    `Última medição reportada por ${medicao.providerId} / ${medicao.modelId}, iteração ${medicao.iteracao}.`,
+    medicao.entrada === undefined ? 'Entrada indisponível.' : `Entrada: ${medicao.entrada} tokens.`,
+    medicao.saida === undefined ? 'Saída indisponível.' : `Saída: ${medicao.saida} tokens.`,
+    medicao.janela ? `Janela configurada: ${medicao.janela.tokens} tokens.` : 'Janela desconhecida.',
+    medicao.reservaSaida === undefined ? 'Reserva de saída desconhecida.' : `Reserva de saída: ${medicao.reservaSaida} tokens.`,
+    orcamentoEntrada === undefined ? '' : `Orçamento de entrada com reserva: ${orcamentoEntrada} tokens.`,
+    ocupacao?.alerta === 'critico' ? 'Contexto próximo do limite.' : ocupacao?.alerta === 'alto' ? 'Uso de contexto elevado.' : '',
+  ].filter(Boolean).join(' ')
+  const label = ocupacao ? `${ocupacao.percentual}% contexto`
+    : medicao.entrada === undefined ? 'Contexto indisponível' : `${medicao.entrada} tokens de contexto`
+  return <span className="context-usage" data-alert={ocupacao?.alerta} role="status" aria-label={detalhes} title={detalhes}>{label}</span>
 }
 
 interface SpeechRecognitionLike {
@@ -120,6 +145,7 @@ export function ChatInput({
   onStop,
   onApprove,
   composerDrafts,
+  usoContexto,
   onChangeComposerDraft,
   composerHistory,
   onAppendComposerHistory,
@@ -808,7 +834,7 @@ export function ChatInput({
           <button className="chat-input-tool-button" type="button" title="Inserir menção" aria-label="Inserir menção" onClick={() => setDraftText((current) => `${current}${current ? ' ' : ''}@`)}><AtSign size={14} /></button>
           <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
           <div className="input-toolbar-spacer" />
-          <span className="context-usage">Contexto não medido</span>
+          <IndicadorContexto medicao={usoContexto} selecao={selecaoDoToken(model)} />
           <div className="model-picker-wrap" ref={modelWrapRef}>
             <button
               ref={modelButtonRef}

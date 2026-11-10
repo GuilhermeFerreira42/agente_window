@@ -56,6 +56,21 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
 }
 
 describe('ChatInput', () => {
+  it('mostra entrada sem percentual quando a janela é desconhecida e oculta medição de outro modelo', () => {
+    const usoContexto = { requestId: 'r1', providerId: 'openai', modelId: 'gpt-4o', iteracao: 2, entrada: 900, saida: 12 }
+    const view = renderInput({ usoContexto })
+    const status = screen.getByRole('status', { name: /gpt-4o/ })
+    expect(status).toHaveTextContent(/900.*tokens/)
+    expect(status).toHaveAttribute('title', expect.stringMatching(/Janela desconhecida/))
+    view.rerender(<ChatInput {...view.props} usoContexto={{ ...usoContexto, janela: { tokens: 1000, origem: 'configuracao' }, reservaSaida: 50 }} />)
+    expect(status).toHaveTextContent('90%')
+    expect(status).toHaveAttribute('data-alert', 'critico')
+    expect(status).toHaveAttribute('title', expect.stringMatching(/Saída: 12.*Reserva de saída: 50/))
+    expect(status).toHaveAttribute('title', expect.stringMatching(/Orçamento de entrada com reserva: 950/))
+    view.rerender(<ChatInput {...view.props} model="pair:openai:gpt-4o-mini" />)
+    expect(screen.getByText('Contexto não medido')).toBeInTheDocument()
+  })
+
   it('mantém o contexto não medido enquanto o usuário digita o rascunho', async () => {
     const user = userEvent.setup()
     const view = renderInput()

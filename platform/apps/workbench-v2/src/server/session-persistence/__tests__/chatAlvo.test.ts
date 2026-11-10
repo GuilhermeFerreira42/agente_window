@@ -36,6 +36,19 @@ async function configurarFixture(): Promise<void> {
 }
 
 describe('alvo de conversa — resolução F5-B', () => {
+  it('recupera a janela confirmada do disco somente para o modelo vinculado', async () => {
+    await configurarFixture()
+    const selecao = { tipo: 'auto' } as const
+    const padrao = { baseUrl: 'https://fixture.invalid/v1', modelo: 'gpt-5', modelosHabilitados: ['gpt-5', 'gpt-5-mini'], apiKey: 'fixture', contexto: 1000 }
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: padrao } })
+    expect((await obterAlvoDeConversa(selecao)).alvo?.limiteContexto).toBeUndefined()
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: { ...padrao, contextoModelo: ' gpt-5 ' } } })
+    expect((await obterAlvoDeConversa(selecao)).alvo?.limiteContexto).toBe(1000)
+    expect((await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5-mini' })).alvo?.limiteContexto).toBeUndefined()
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: { ...padrao, modelo: 'gpt-5-mini', contextoModelo: 'gpt-5' } } })
+    expect((await obterAlvoDeConversa(selecao)).alvo?.limiteContexto).toBeUndefined()
+  })
+
   it('Auto fixa o provedor/modelo padrão atual e explicita respeita o par exato', async () => {
     await configurarFixture()
 

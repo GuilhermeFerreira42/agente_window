@@ -21,6 +21,7 @@ import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligenc
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
+import type { MedicaoContexto } from '../domain/usoContexto'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 
@@ -59,6 +60,7 @@ interface ChatPanelProps {
   onOpenBrowser: () => void
   onOpenDiff: () => void
   composerDrafts?: Record<string, ComposerDraft>
+  usoContexto?: MedicaoContexto
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
@@ -328,6 +330,7 @@ export function ChatPanel({
   onOpenBrowser,
   onOpenDiff,
   composerDrafts,
+  usoContexto,
   onChangeComposerDraft,
   composerHistory,
   onAppendComposerHistory,
@@ -425,6 +428,7 @@ export function ChatPanel({
             onStop={onStop}
             onApprove={onApprove}
             composerDrafts={composerDrafts}
+            usoContexto={usoContexto}
             onChangeComposerDraft={onChangeComposerDraft}
             composerHistory={composerHistory}
             onAppendComposerHistory={onAppendComposerHistory}

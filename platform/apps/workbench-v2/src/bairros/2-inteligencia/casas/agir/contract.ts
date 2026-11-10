@@ -11,6 +11,8 @@
  * ligar o vizinho real: protocolo ganhar/remover variante = erro aqui,
  * obrigando a revisar os extratores de `server/extracao.ts`.
  */
+import type { MedicaoContexto } from '../../../../domain/usoContexto'
+
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 /** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
@@ -104,6 +106,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
  */
 export type EventoAgir =
   | { type: 'chunk'; text: string }
+  | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean }
   | { type: 'approval'; pedido: PedidoFerramenta; previa?: string; allowSession?: boolean }
@@ -121,6 +124,7 @@ export interface RespostaIteracao {
   /** Pedidos de ferramenta extraídos do canal nativo (vazio = resposta comum). */
   pedidos: PedidoFerramenta[]
   modelo?: string
+  usoContexto?: Omit<MedicaoContexto, 'iteracao'>
 }
 
 /**

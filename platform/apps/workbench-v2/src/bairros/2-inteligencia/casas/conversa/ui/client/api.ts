@@ -9,6 +9,7 @@ import type { CategoriaErro, EventoChat, MensagemChat, SelecaoModelo } from '../
 import { criarFramerSSE } from '../../server/streaming'
 
 export interface OuvintesConversa {
+  onContextUsage?: (medicao: Extract<EventoChat, { type: 'context_usage' }>['medicao']) => void
   /** Um pedaço do texto chegou — a bolha cresce na hora. */
   onChunk: (texto: string) => void
   /** Fim confirmado pelo servidor (com o modelo que realmente respondeu). */
@@ -63,6 +64,7 @@ export function enviarConversa(messages: MensagemChat[], ouvintes: OuvintesConve
             continue // ruído de compat nunca vira texto nem erro
           }
           if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
+          else if (evento.type === 'context_usage') ouvintes.onContextUsage?.(evento.medicao)
           else if (evento.type === 'error') {
             encerrou = true
             ouvintes.onError(evento.code, evento.message)
