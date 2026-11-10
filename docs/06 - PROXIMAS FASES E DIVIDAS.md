@@ -16,7 +16,20 @@ O compositor mantém a última medição somente em memória, isolada por sessã
 
 **Aceite técnico.** Testar as quatro formas de uso, frames parciais ou ausentes, limite configurado e desconhecido, 75%/90%, chamadas com ferramentas, troca de chat/modelo, reload e 413. A prova ponta a ponta usa um endpoint descartável e mede o resultado visível. Teste com provedor real depende de acesso seguro existente. Para reverter M1, remover o evento e o consumidor aditivos. O campo opcional do vínculo não altera a leitura dos cadastros antigos.
 
-Para M2, a identidade da requisição e a iteração são metadados transitórios. Qualquer persistência futura desses metadados depende do contrato próprio da próxima fatia. A M2 aguarda autorização do proprietário.
+Para M2, a identidade da requisição e a iteração são metadados transitórios. Qualquer persistência futura desses metadados depende do contrato próprio da próxima fatia.
+
+## M2 — critérios e ponto de decisão (10/11/2026)
+
+Base `0289b3e`. A autorização de 10/11/2026 permite executar M2–M8 em sequência, com avanço condicionado à validação técnica da fatia anterior. A homologação humana permanece separada. Referências de execução em D30, D99, D133, D141 e no [estudo M2](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M2_TRANSCRIPT_E_EVENTOS_DE_FERRAMENTA.md).
+
+- Reutilizar SQLite para o catálogo e o JSONL para o transcript. O writer atual já publica snapshots atomicamente e a rota protege revisões concorrentes. Preservar a leitura de sessões legadas.
+- Rastrear por sessão, chat, turno, mensagem, sequência monotônica e ID de chamada. Preservar chamada, aprovação, negação, resultado, erro e cancelamento. Distinguir cartões de UI, transcript e projeção enviada ao modelo. Após reinício, nenhuma execução é considerada ativa a partir do transcript.
+- Manter a composição no servidor. O código atual envia apenas o histórico de bolhas nos turnos novos, embora Agir já preserve os pares de chamada e resultado em memória durante o run. Testar o próximo turno nos quatro protocolos, recarga e dados inconsistentes, conflito de revisão, falha de publicação e interrupção.
+- DP-03 fixa referências para `ler`, `buscar` e `listar`, sem copiar o conteúdo lido para o perfil. A política de 10/11/2026 restringe a previsão anterior de D141 para `executar`. Saída de comandos, argumentos de escrita, prévias e conteúdo de anexos ficam fora da persistência automática. Eventos, estados e referências permitidas continuam rastreáveis. A restauração deve indicar as omissões. A M2 não cria uma interface de consentimento enquanto nenhuma necessidade de guardar um item específico estiver demonstrada.
+
+**Primeiro corte verificável.** Aplicar a mesma projeção ao JSONL e à recuperação local do navegador. A leitura de registros legados usa a projeção sem reescrever os arquivos só por abrir a sessão. O teste HTTP e o Playwright usam dados sintéticos para conferir que o estado e o alvo permitido sobrevivem, sem stdout, comandos, prévias e campos desconhecidos de anexos. O texto normal das mensagens continua sujeito ao contrato de histórico original. Esse corte protege os campos estruturados que identifica e não classifica segredos arbitrários que apareçam no texto livre.
+
+**Critério para a integração seguinte.** O servidor deve registrar eventos pelo identificador real da execução e alocar a sequência sob a mesma fila de persistência da sessão. Snapshots do navegador não podem substituir eventos produzidos pelo servidor. A reconstrução deve reconhecer referências indisponíveis e pares incompletos sem reenviar conteúdo omitido nem executar ferramentas. O estado de execução nunca deve ser reconstruído como autorização.
 
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 

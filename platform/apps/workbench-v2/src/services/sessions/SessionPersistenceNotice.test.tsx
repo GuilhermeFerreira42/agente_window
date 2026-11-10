@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../types'
 import { SessionPersistenceNotice } from './SessionPersistenceNotice'
 import { useSessionPersistence } from './useSessionPersistence'
-import { readSessionRecoveries, restoreUnsavedSessions } from './sessionRecovery'
+import { readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 let local: Session
@@ -64,6 +64,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('visible persistence conflicts and safe recovery', () => {
+  it('keeps transient command content out of the browser recovery storage', () => {
+    local.chats[0].messages.push({
+      id: 'running-response', role: 'assistant', content: '', time: '10:00', running: true,
+      ferramentas: [{ id: 'cmd', ferramenta: 'executar', alvo: 'FIXTURE_COMMAND', status: 'executando', progresso: 'FIXTURE_STDOUT' }],
+    })
+    expect(storeSessionRecovery({ session: local, message: 'fixture' })).toBe(true)
+    expect(JSON.stringify(Object.values(localStorage))).not.toContain('FIXTURE_')
+    const restored = restoreUnsavedSessions([])[0].chats[0].messages[1]
+    expect(restored).toMatchObject({ running: false, cancelled: true, ferramentas: [{ id: 'cmd', alvo: 'Comando' }] })
+    expect(local.chats[0].messages[1].ferramentas?.[0].progresso).toBe('FIXTURE_STDOUT')
+  })
+
   it('marks UNSAVED_AFTER_409, keeps edits and blocks debounce/pagehide from overwriting the server', async () => {
     render(<Harness />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Unsaved conversation')

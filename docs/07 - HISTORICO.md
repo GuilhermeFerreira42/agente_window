@@ -1,3 +1,9 @@
+# 10/11/2026 — M2 inicia a projeção segura de snapshots
+
+Commit `feat(memory): sanitize persisted conversation snapshots`. JSONL e recuperação local usam a mesma projeção para campos transitórios de ferramentas e anexos. Estado em 03 e provas em 09.
+
+---
+
 # 10/11/2026 — M1 integrada ao uso reportado
 
 Commit `feat(memory): measure provider context usage`. Conversa e Agir normalizam o uso do provedor, com um evento por requisição e iteração. O compositor mostra a entrada da última medição, a saída e a reserva separadas nos detalhes e os alertas de 75% e 90% quando a janela é conhecida. Registro técnico em 09 e roteiro de homologação em 08.

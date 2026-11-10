@@ -5,6 +5,7 @@ import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRec
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
+import { projetarMensagemPersistida } from '../../domain/projecaoTranscript'
 import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
@@ -82,7 +83,7 @@ function transcriptEntries(session: Session): TranscriptEntry[] {
     .map((message) => ({
       type: message.role,
       chatId: chat.id,
-      message,
+      message: projetarMensagemPersistida(message),
       uuid: message.id,
       timestamp: timestamp += 1,
     })))
@@ -92,7 +93,7 @@ function restoreMessages(session: Session, entries: TranscriptEntry[]): Session 
   const byChat = new Map<string, ChatMessage[]>()
   for (const entry of entries) {
     const messages = byChat.get(entry.chatId) ?? []
-    messages.push(entry.message as ChatMessage)
+    messages.push(projetarMensagemPersistida(entry.message as ChatMessage))
     byChat.set(entry.chatId, messages)
   }
   return {

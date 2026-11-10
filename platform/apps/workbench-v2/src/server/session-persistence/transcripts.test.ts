@@ -39,6 +39,12 @@ describe('JSONL transcript persistence', () => {
     await expect(readTranscript(slug, sessionId)).resolves.toEqual(entries)
   })
 
+  it('reports corrupt JSONL without returning the contents of the invalid line', async () => {
+    const [valid] = makeEntries('valid')
+    await writeFile(join(directory, `${sessionId}.jsonl`), `${JSON.stringify(valid)}\nSYNTHETIC_PRIVATE_FRAGMENT\n`)
+    await expect(readTranscript(slug, sessionId)).rejects.toThrow(/^Histórico inválido na linha 2\.$/)
+  })
+
   it('survives two rounds of 16 concurrent snapshots without ENOENT or a mixed transcript', async () => {
     for (let round = 0; round < 2; round += 1) {
       const snapshots = Array.from({ length: 16 }, (_, index) => makeEntries(`r${round}-w${index}`))

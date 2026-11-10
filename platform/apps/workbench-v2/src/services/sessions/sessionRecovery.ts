@@ -1,4 +1,5 @@
 import type { Session } from '../../types'
+import { projetarMensagemPersistida } from '../../domain/projecaoTranscript'
 import { holdSessionPersistence } from './sessionsClient'
 
 const RECOVERY_KEY = 'workbench.sessions.unsaved.v1'
@@ -8,12 +9,19 @@ export interface SessionRecovery {
   message: string
 }
 
+function projetarRecovery({ session, message }: SessionRecovery): SessionRecovery {
+  return { message, session: {
+    ...session,
+    chats: session.chats.map((chat) => ({ ...chat, messages: chat.messages.map(projetarMensagemPersistida) })),
+  } }
+}
+
 export function readSessionRecoveries(): SessionRecovery[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(RECOVERY_KEY) ?? '[]')
     if (!Array.isArray(value)) return []
     return value.filter((item): item is SessionRecovery => typeof item?.session?.id === 'string'
-      && Array.isArray(item.session.chats) && typeof item.message === 'string')
+      && Array.isArray(item.session.chats) && typeof item.message === 'string').map(projetarRecovery)
   } catch { return [] }
 }
 
@@ -21,7 +29,7 @@ export function readSessionRecoveries(): SessionRecovery[] {
 export function storeSessionRecovery(recovery: SessionRecovery): boolean {
   try {
     const records = readSessionRecoveries().filter((item) => item.session.id !== recovery.session.id)
-    localStorage.setItem(RECOVERY_KEY, JSON.stringify([...records, recovery]))
+    localStorage.setItem(RECOVERY_KEY, JSON.stringify([...records, projetarRecovery(recovery)]))
     return true
   } catch { return false }
 }

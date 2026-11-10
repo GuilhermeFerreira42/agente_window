@@ -2093,3 +2093,7 @@ O proprietário informou na conversa que marcou as Fatias 14 e 15 como homologad
 ## D187 — Medição de contexto da M1 (10/11/2026)
 
 Aplicação técnica de D99 e D133. A entrada reportada na última iteração é comparada à janela total confirmada manualmente para o par provedor e modelo. A saída reportada e a reserva efetivamente enviada ficam separadas. Quando ambas as configurações existem, os detalhes mostram também o orçamento de entrada após a reserva. A medição é efêmera, e a configuração da janela é persistida. O evento aditivo `context_usage` reutiliza o transporte de Conversa e Agir. A medição não modifica o histórico e não serve como estimativa da próxima chamada. A SPEC fica em 06, a prova técnica em 09 e o aceite humano em 08.
+
+## D188 — Persistência segura na M2 e execução sequencial (10/11/2026)
+
+A autorização para M2–M8 permite decisões técnicas dentro dos contratos e exige validação de cada fatia antes da seguinte. A política de privacidade substitui a previsão de D141 para persistência automática de saída de comandos. A projeção durável preserva eventos, estados e referências aplicáveis. Comandos, suas saídas, prévias, argumentos de escrita e conteúdo de anexos permanecem transitórios. Autorizar o desenvolvimento não concede consentimento para armazenar conteúdo sensível. Eventual persistência de item específico exige uma necessidade demonstrada e consentimento no produto. O aceite humano da M1 continua pendente.

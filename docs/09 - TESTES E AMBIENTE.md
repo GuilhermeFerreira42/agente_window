@@ -1,3 +1,17 @@
+# M2 — verificação da base (10/11/2026)
+
+Base `0289b3e`. Passaram **39/39** testes de persistência de sessões, publicação de JSONL e composição de contexto. Log em `../arena-operacional/m2-base-persistencia.log`. Isso valida o reaproveitamento da base, não os critérios ainda não implementados da M2.
+
+A comparação nominal entre os logs da auditoria Windows e da M1 confirmou **42 falhas em comum**. A falha extra de espaço em disco da M1 continua separada e passou na repetição isolada. A unidade C tinha aproximadamente 15,2 GiB livres na abertura desta etapa.
+
+Uma chamada curta autorizada pelo backend do Agent Window retornou **OK** e terminou com o alvo efetivo `openai-compat / meu-pool` no LiteLLM. Esse endpoint não enviou contagens de tokens no stream da chamada. A prova cobre conectividade e geração de texto no gateway.
+
+Após aplicar D188, o Vitest focado passou **48/48**, incluindo gravação HTTP, recuperação local, publicação atômica e rejeição de JSONL inválido sem ecoar seu conteúdo. O contrato de asserções E2E passou **6/6**. O Playwright passou **1/1** no servidor descartável da porta 5202, com preservação da conversa e do cartão após F5, sem o conteúdo transitório. O typecheck passou. Logs em `../arena-operacional/m2-privacy-final.log`, `m2-e2e.log`, `m2-e2e-contract.log` e `m2-typecheck-final.log`.
+
+A regressão final do corte registrou **1.512 aprovações, 42 falhas e 30 ignorados**. As 42 falhas coincidem nominalmente com a linha de base classificada da M1. O caso extra de espaço em disco da M1 passou nesta rodada. A primeira execução da regressão carregou uma versão anterior do parser junto com o teste novo. A repetição foi executada com os arquivos estáveis e aprovou o caso. Log final em `../arena-operacional/m2-privacy-regression-final.log`. Essa validação cobre a projeção segura dos snapshots, enquanto a M2 permanece em implementação.
+
+---
+
 # M1 — evidências de medição e orçamento (10/11/2026)
 
 Windows 11, Node 26.13.0 e Chromium Playwright. Os testes usaram perfil, workspace e cadastro de provedores descartáveis. O Vitest focado passou **89/89** em seis arquivos, incluindo a regra de asserções da suíte E2E. O Playwright passou **2/2** em duas rodadas. O typecheck e o build dos workspaces passaram. O build conserva os avisos do adaptador nativo F2, do CSS e do terminal.

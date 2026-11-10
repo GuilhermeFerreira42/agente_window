@@ -160,6 +160,28 @@ describe('session persistence HTTP contract', () => {
     }
   })
 
+  it('persists tool states and references without storing transient content', async () => {
+    const id = `memory-privacy-${randomUUID()}`
+    const session = makeSession(id, id, 'privacy')
+    touched.push({ id, slug: id })
+    const messages = session.chats[0].messages
+    const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytes: 'PRIVATE_ATTACHMENT' }
+    messages[0].attachments = [local]
+    messages[1].ferramentas = [
+      { id: 'cmd', ferramenta: 'executar', alvo: 'PRIVATE_COMMAND', status: 'ok', progresso: 'PRIVATE_STDOUT', resumo: 'PRIVATE_RESULT' },
+      { id: 'write', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado', previa: 'PRIVATE_WRITE' },
+    ]
+    expect((await putSession(server, session)).ok).toBe(true)
+    const entries = await readTranscript(id, id)
+    expect(JSON.stringify(entries)).not.toContain('PRIVATE_')
+    const restored = (await loadSessions(server)).find((entry) => entry.id === id)!
+    expect(restored.chats[0].messages[0].attachments).toEqual([{ id: 'attachment-1', name: 'example.txt', kind: 'local' }])
+    expect(restored.chats[0].messages[1].ferramentas).toMatchObject([
+      { id: 'cmd', ferramenta: 'executar', status: 'ok' },
+      { id: 'write', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado' },
+    ])
+  })
+
   it('never loses an acknowledged snapshot when workspace change races with PUT', async () => {
     const { mkdir } = await import('node:fs/promises')
     const { join } = await import('node:path')
@@ -312,7 +334,12 @@ describe('session persistence HTTP contract', () => {
     const restored = await loadSessions(server)
     const restoredFirst = restored.find((session) => session.id === firstId)!
     const restoredSecond = restored.find((session) => session.id === secondId)!
-    expect(restoredFirst.chats[0].messages).toEqual(first.chats[0].messages)
+    expect(restoredFirst.chats[0].messages.map(({ id, content }) => ({ id, content })))
+      .toEqual(first.chats[0].messages.map(({ id, content }) => ({ id, content })))
+    expect(restoredFirst.chats[0].messages[1]).toMatchObject({
+      ferramentas: [{ id: 'tool-call-1', status: 'ok' }, { id: 'tool-call-2', status: 'erro' }],
+      continuar: [{ id: 'continue-card-1', status: 'parado' }],
+    })
     expect(restoredSecond.chats[0].messages).toEqual(second.chats[0].messages)
     expect(await readTranscript(slug, firstId)).not.toEqual(await readTranscript(slug, secondId))
   })

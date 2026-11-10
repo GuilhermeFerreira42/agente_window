@@ -37,7 +37,15 @@ export async function readTranscript(slug: string, sessionId: string): Promise<T
   return withTranscript(destination, async () => {
     try {
       const content = await readFile(destination, 'utf8')
-      return content.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as TranscriptEntry)
+      return content.split(/\r?\n/).flatMap((line, index) => {
+        if (!line) return []
+        try {
+          return [JSON.parse(line) as TranscriptEntry]
+        } catch {
+          // The parser's error can quote arbitrary transcript content.
+          throw new Error(`Histórico inválido na linha ${index + 1}.`)
+        }
+      })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw error
