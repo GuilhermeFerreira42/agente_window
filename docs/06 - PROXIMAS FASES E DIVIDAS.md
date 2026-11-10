@@ -56,6 +56,14 @@ A gravação só ocorre por ação humana explícita. O histórico de revisões 
 
 Validar gravação, consulta, revisão concorrente, expurgo, ausência da fonte original, exportação, isolamento entre projetos e ausência de dados sensíveis reconhecíveis. O chat deve continuar disponível se a memória estiver indisponível.
 
+## M6 — SPEC de execução inicial (10/11/2026)
+
+Base `233d2cb`. O [estudo M6](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M6_RECUPERACAO_PELO_AGENTE.md) usa o transcript original da M2 e a busca lexical da M4. O comando explícito **/historico** autoriza uma execução de consulta ao chat atual. Nessa execução só a ferramenta de histórico é anunciada e autorizada. Ferramentas de arquivo e comando são bloqueadas, assim como skills injetadas. Outros chats, projetos e memória persistente ficam fora desta autorização.
+
+O agente pode buscar trechos literais e pedir a vizinhança de uma referência encontrada na mesma execução. O servidor fixa sessão, chat e pasta. Limitar operações, tamanho e quantidade de resultados. Identificar os trechos como dados históricos e manter ID, sequência e origem. O resultado transita pelo fio do modelo e participa da medição M1 se o provedor reportar uso. Não gravar outra cópia dos trechos nem carregar histórico adicional automaticamente.
+
+Validar opt-in, escopo, referência inventada, cancelamento, texto histórico tentando induzir efeitos, limites e provedor indisponível. A evidência com modelo real deve mostrar recuperação de um fato fora do contexto normal, com uma chamada curta de recuperação.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.

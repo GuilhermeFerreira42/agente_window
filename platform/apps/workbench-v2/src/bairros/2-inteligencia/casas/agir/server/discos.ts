@@ -207,7 +207,7 @@ export async function descreverAlvoExcluir(raiz: string, entrada: unknown): Prom
   return `Pasta "${alvo.real}": a pasta e TODO o seu conteúdo serão enviados à Lixeira do sistema. Para restaurar, use a Lixeira; não há desfazer direto no app.`
 }
 
-export type FerramentasDeDisco = Exclude<FerramentaId, 'executar'>
+export type FerramentasDeDisco = Exclude<FerramentaId, 'executar' | 'historico'>
 export type ExecutoresDisco = Record<FerramentasDeDisco, ExecutorFerramenta> & {
   fechar: () => void
   prepararExclusao: (pedido: PedidoFerramenta, sinal?: AbortSignal) => Promise<string>

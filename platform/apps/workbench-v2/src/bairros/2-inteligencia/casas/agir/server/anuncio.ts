@@ -5,12 +5,20 @@
 // nada). Um jeito por protocolo (Q4=(b), D93), sempre com o MESMO catálogo.
 // ============================================================================
 import type { ProtocoloAgir } from '../contract'
-import { catalogoFerramentas } from './ferramentas'
+import { catalogoFerramentas, ferramentaHistorico } from './ferramentas'
 
 /** JSON Schema dos argumentos, ferramenta a ferramenta. */
 function esquemaDe(id: string): Record<string, unknown> {
   const caminho = { type: 'string', description: 'Caminho do arquivo/pasta DENTRO da pasta de trabalho (relativo ou absoluto).' }
   switch (id) {
+    case 'historico':
+      return {
+        type: 'object', properties: {
+          acao: { type: 'string', enum: ['buscar', 'ler'] },
+          consulta: { type: 'string', maxLength: 120 },
+          messageId: { type: 'string', maxLength: 200 },
+        }, required: ['acao'], additionalProperties: false,
+      }
     case 'ler':
       return { type: 'object', properties: { caminho }, required: ['caminho'], additionalProperties: false }
     case 'listar':
@@ -49,6 +57,7 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir, permitidas?: reado
   const ferramentas = permitidas
     ? catalogoFerramentas.filter((f) => permitidas.includes(f.id))
     : catalogoFerramentas
+  if (permitidas?.includes('historico')) ferramentas.push(ferramentaHistorico)
   if (protocolo === 'anthropic') {
     return {
       tools: ferramentas.map((f) => ({

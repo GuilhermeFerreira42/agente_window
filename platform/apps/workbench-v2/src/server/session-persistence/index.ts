@@ -31,6 +31,7 @@ import { projetarHistoricoAgir, type EventoGravado } from './historicoAgir'
 import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, proporCheckpoint, type Checkpoint } from './checkpoint'
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
+import { recuperarHistorico } from './recuperarHistorico'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
 
@@ -519,6 +520,12 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         const escopo = chaveEscopo(raiz)
         const aplicado = aplicarCheckpoint(getCheckpoint(sessionId, chatId), entries, chatId, escopo, mensagens)
         return { ...projetarHistoricoAgir(entries, chatId, escopo, aplicado.mensagens), checkpoint: aplicado.status }
+      }),
+      recuperarHistorico: ({ sessionId, chatId, raiz }, pedido) => withSessionPersistenceQueue(sessionId, async () => {
+        const record = getSessionRecord(sessionId)
+        const contexto = resolverContextoAgir(sessionId, chatId)
+        if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do histórico mudou.')
+        return recuperarHistorico(await readTranscript(record.slug, sessionId, 16 * 1024 * 1024), chatId, pedido)
       }),
     })) return true
   }

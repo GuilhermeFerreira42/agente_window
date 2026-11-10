@@ -9,6 +9,7 @@ import {
   Paperclip,
   Plus,
   Send,
+  Search,
   ShieldAlert,
   Square,
   Sparkles,
@@ -866,6 +867,13 @@ export function ChatInput({
           <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
           <div className="input-toolbar-spacer" />
           <IndicadorContexto medicao={usoContexto} selecao={selecaoDoToken(model)} />
+          {!session.isDraft && activeChat.messages.length > 0 &&
+            <button type="button" className="chat-input-tool-button" aria-label="Recuperar com o agente"
+              title="Recuperar somente neste chat, sem acesso a arquivos" disabled={isWorking || needsInput}
+              onClick={() => {
+                setDraftText((atual) => /^\/historico\s/iu.test(atual) ? atual : `/historico ${atual}`)
+                textareaRef.current?.focus()
+              }}><Search size={14} /></button>}
           {!session.isDraft && activeChat.messages.filter(({ role }) => role === 'user').length >= 3 &&
             <CompactarContexto key={draftKey} sessionId={session.id} chatId={activeChat.id} model={model} disabled={isWorking || needsInput} />}
           <div className="model-picker-wrap" ref={modelWrapRef}>

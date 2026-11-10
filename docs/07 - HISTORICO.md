@@ -1,3 +1,9 @@
+# 10/11/2026 — M6 integra recuperação histórica explícita
+
+Commit `feat(memory): recover cited history within an authorized chat`. O agente consulta e cita o transcript do chat atual por execução explícita sem ferramentas externas. Decisão D193 e evidências em 09.
+
+---
+
 # 10/11/2026 — M5 integra memória confirmada de projeto
 
 Commit `feat(memory): manage confirmed project memories`. Guarda fatos, decisões e preferências com proveniência, revisão e escopo de projeto. O controle do chat permite inspecionar, revisar, exportar e excluir. Decisão D192 e evidências em 09.

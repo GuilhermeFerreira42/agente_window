@@ -16,7 +16,7 @@ import type { MedicaoContexto } from '../../../../domain/usoContexto'
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 /** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar'
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico'
 
 /** Nível de aprovação separado do modo de trabalho. O servidor é autoridade. */
 export type NivelPermissaoAgir = 'manual' | 'allow-all'
@@ -30,6 +30,9 @@ export type ModoAgir = 'agent' | 'edit' | 'ask' | 'plan'
  * no formato que o modelo devolveu.
  */
 export interface ArgumentosFerramenta {
+  acao?: unknown
+  consulta?: unknown
+  messageId?: unknown
   caminho?: unknown
   padrao?: unknown
   conteudo?: unknown
@@ -212,6 +215,16 @@ export interface LocalizadorFerramenta {
   arquivo: string
   digest: string
   intervalo?: { inicioByte: number; fimByteExclusivo: number }
+}
+
+export interface PedidoRecuperacao {
+  acao: 'buscar' | 'ler'
+  valor: string
+}
+
+export interface ResultadoRecuperacao {
+  conteudo: string
+  fontes: string[]
 }
 
 /** Quem executa um pedido. O loop e a rota continuam sendo donos de cancelamento e grants. */

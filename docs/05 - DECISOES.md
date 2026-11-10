@@ -2113,3 +2113,7 @@ A busca da M4 lê o JSONL com escopo de sessão e chat conferido no catálogo. F
 ## D192 — Memória explícita de projeto com revisões (10/11/2026)
 
 A memória usa SQLite e a chave derivada da pasta canônica em NFC. O servidor revalida a pasta antes de toda ação e recusa edição com revisão antiga ou escopo desatualizado. Gravação e exclusão exigem confirmação no produto. Exportação local inclui revisões e origem. O limite inicial é 250 revisões por projeto e 1.600 caracteres por registro. Só há memórias confirmadas e substituídas nesta estratégia. Nenhuma memória é carregada automaticamente. A filtragem rejeita formatos reconhecíveis de credencial e não classifica segredos arbitrários em texto livre.
+
+## D193 — Recuperação histórica explícita em execução isolada (10/11/2026)
+
+O comando `/historico` abre um turno de consulta somente ao chat atual. O provedor recebe a pergunta atual e somente a ferramenta de recuperação. O servidor rejeita chamadas de arquivo e comando mesmo que sejam emitidas pelo provedor. O limite é três consultas por execução, com cinco hits por busca e vizinhança de até três mensagens. A leitura exige uma referência já obtida na execução. A recuperação exclui formatos reconhecíveis de credencial, reporta ausência e registra operações e IDs no transcript sem duplicar os trechos. Contagens reportadas pelo provedor já incluem esses trechos pela M1. Busca entre chats permanece fora da autorização desta superfície.

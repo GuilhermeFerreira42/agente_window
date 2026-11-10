@@ -25,9 +25,11 @@ export type {
   NivelPermissaoAgir,
   OpcoesVizinho,
   PedidoFerramenta,
+  PedidoRecuperacao,
   ProtocoloAgir,
   RespostaIteracao,
   ResultadoFerramenta,
+  ResultadoRecuperacao,
   VizinhoProvedor,
 } from './contract'
 

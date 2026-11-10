@@ -1,3 +1,13 @@
+# M6 — recuperação explícita e escopo (10/11/2026)
+
+Vitest focado **30/30** e autorização direta **1/1**. Exercitados ausência, referência de outro chat, credencial sintética e vizinhança limitada. A rota recusou uma chamada de histórico iniciada pelo modelo sem consentimento do usuário. O Playwright confirmou consulta e leitura de fonte no chat ativo, ausência de um canário de outro chat, bloqueio de criação de arquivo e trilha de IDs sem duplicar trechos. Logs `m6-focused.log`, `m6-authorization.log` e `m6-e2e-final.log`.
+
+Um turno real pelo LiteLLM em perfil descartável, com teto de duas chamadas, consultou uma vez, recuperou a etiqueta sintética ausente do prompt inicial e citou o ID correto. A recuperação terminou normalmente. O uso de tokens depende de o endpoint retornar contagens na resposta.
+
+Typecheck aprovado. Regressão completa **1.531 aprovações, 42 falhas preexistentes e 30 ignorados**, com comparação nominal sem nova falha contra M5. O teste adicional de autorização executado separadamente também passou. Logs `m6-typecheck-final.log` e `m6-regression.log`. O aceite humano continua pendente.
+
+---
+
 # M5 — memória confirmada de projeto (10/11/2026)
 
 Typecheck aprovado. Vitest focado **19/19** e repetição de armazenamento **4/4**. A falha de gravação injetada preservou a revisão anterior. Os testes conferiram proveniência, versão desatualizada, isolamento e expurgo. Playwright **1/1** com pastas e sessões descartáveis. Confirmou rejeição de credencial sintética, compartilhamento na mesma pasta, isolamento de outra pasta, revisão, origem indisponível após exclusão da sessão fonte, exportação e exclusão das revisões. O teste encerra o navegador da sessão fonte antes da exclusão para evitar o flush de um snapshot antigo.

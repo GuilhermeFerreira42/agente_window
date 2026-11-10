@@ -1,3 +1,11 @@
+# Roteiro de homologação da M6 — aceite pendente (10/11/2026)
+
+1. Registre um fato sintético em um chat. No compositor, use **Recuperar com o agente** e complete a pergunta após **/historico**.
+2. Confira o cartão de consulta e a referência à mensagem original. Repita com um fato presente somente em outro chat e confirme que ele não aparece.
+3. Confira que uma consulta histórica não abre aprovação de arquivo nem executa comando. Para sair do modo de consulta, envie um novo turno sem o prefixo.
+
+---
+
 # Roteiro de homologação da M5 — aceite pendente (10/11/2026)
 
 1. Em uma pasta de teste, abra **Memória do projeto** e grave uma decisão sem dados sensíveis. Confira a pasta, a origem e o estado vigente.

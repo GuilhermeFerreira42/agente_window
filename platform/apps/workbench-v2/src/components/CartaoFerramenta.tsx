@@ -15,6 +15,7 @@ const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   escrever: 'Escrever arquivo',
   excluir: 'Excluir (lixeira)',
   executar: 'Executar comando',
+  historico: 'Recuperar histórico do chat',
 }
 
 const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {

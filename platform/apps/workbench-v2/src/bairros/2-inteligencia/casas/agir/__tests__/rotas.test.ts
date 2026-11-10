@@ -421,6 +421,20 @@ describe('rotas — POST /api/agir', () => {
     expect(res.corpo()).not.toContain('synthetic disk failure')
   })
 
+  it('bloqueia recuperação pedida pelo modelo sem o comando explícito do usuário', async () => {
+    const chamada = { choices: [{ delta: { tool_calls: [{ index: 0, id: 'h1',
+      function: { name: 'historico', arguments: '{"acao":"buscar","consulta":"fixture"}' } }] } }] }
+    stubProvedor([`data: ${JSON.stringify(chamada)}\n\n`, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const recuperarHistorico = vi.fn(async () => ({ fontes: ['privada'], conteudo: 'PRIVATE_HISTORY_FIXTURE' }))
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, { ...DEPS, recuperarHistorico })
+    expect(recuperarHistorico).not.toHaveBeenCalled()
+    expect(frames(res)).toContainEqual(expect.objectContaining({
+      type: 'tool_result', ferramenta: 'historico', ok: false, resumo: expect.stringContaining('/historico'),
+    }))
+    expect(res.corpo()).not.toContain('PRIVATE_HISTORY_FIXTURE')
+  })
+
   it('"Permitir na Sessão" na 1.ª mexida: a 2.ª não faz cartão (Q2a, dentro do fluxo)', async () => {
     stubProvedor([SSE_DUAS_FERRAMENTAS, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()

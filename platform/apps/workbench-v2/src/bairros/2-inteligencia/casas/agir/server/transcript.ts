@@ -7,6 +7,7 @@ export type EventoTranscriptAgir =
   | { tipo: 'chamada' | 'aprovacao_solicitada'; chamadaId: string; ferramenta: FerramentaId }
   | { tipo: 'aprovacao_decidida'; chamadaId: string; permitido: boolean }
   | { tipo: 'referencia'; chamadaId: string; localizador: LocalizadorFerramenta }
+  | { tipo: 'recuperacao'; chamadaId: string; acao: 'buscar' | 'ler'; fontes: string[] }
   | { tipo: 'resultado'; chamadaId: string; ferramenta: FerramentaId; ok: boolean; efeitoIniciado: boolean }
   | { tipo: 'encerramento'; status: ResultadoAgir['status'] }
 
@@ -59,6 +60,10 @@ export function registrarExecucao(runId: string) {
     localizar(id: string, localizador: LocalizadorFerramenta): void {
       const chamadaId = chamadas.get(id)
       if (chamadaId) eventos.push({ tipo: 'referencia', chamadaId, localizador })
+    },
+    recuperar(id: string, acao: 'buscar' | 'ler', fontes: string[]): void {
+      const chamadaId = chamadas.get(id)
+      if (chamadaId) eventos.push({ tipo: 'recuperacao', chamadaId, acao, fontes })
     },
   }
 }

@@ -10,7 +10,8 @@ A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homo
 - **M3.** Compactação manual integrada e validada tecnicamente, com checkpoint derivado e transcript original preservado. Aceite humano pendente. Evidências em 09 e decisão D190.
 - **M4.** Busca manual no transcript do chat ativo integrada e validada tecnicamente, incluindo navegação para mensagem anterior à compactação. Aceite humano pendente. D191 e evidências em 09.
 - **M5.** Memória persistente de projeto com confirmação, histórico de revisões, exportação e exclusão integrada e validada tecnicamente. Aceite humano pendente. D192 e evidências em 09.
-- **M6–M8.** Execução sequencial autorizada. A próxima etapa é a recuperação histórica pelo agente.
+- **M6.** Recuperação histórica explícita validada no chat ativo. Aceite humano pendente. D193 e evidências em 09.
+- **M7–M8.** Execução sequencial autorizada. A próxima etapa é a reconstrução operacional após interrupção.
 - **Outras pautas.** E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
 
 ## Registros anteriores

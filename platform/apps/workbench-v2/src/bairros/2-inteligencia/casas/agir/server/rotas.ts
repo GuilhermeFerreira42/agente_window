@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto'
 import * as nodePath from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } from '../../conversa'
-import type { EventoAgir, ExecutorFerramenta, FerramentaId, InstrucaoDeProduto, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, ResultadoFerramenta } from '../contract'
+import type { EventoAgir, ExecutorFerramenta, FerramentaId, InstrucaoDeProduto, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, PedidoRecuperacao, ResultadoFerramenta, ResultadoRecuperacao } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, type ExecutoresDisco } from './discos'
 import { permiteSessao } from './ferramentas'
@@ -71,6 +71,7 @@ export interface DependenciasAgir {
   gravarExecucao?: (registro: RegistroExecucaoAgir) => Promise<void>
   restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
+  recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -102,6 +103,7 @@ interface ContextoFluxo {
   escopoExclusao?: string[]
   exclusoesTentadas?: Set<string>
   instrucaoAtual?: string
+  recuperacao?: { restantes: number; fontes: Set<string> }
 }
 
 interface InstrucaoHumana {
@@ -291,6 +293,28 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
+    historico: async (pedido) => {
+      const estado = fio.execucao.recuperacao
+      if (!estado || !deps.recuperarHistorico || estado.restantes <= 0 || abort.signal.aborted) {
+        return { ok: false, resumo: 'A recuperação não está autorizada ou atingiu o limite desta consulta.' }
+      }
+      estado.restantes -= 1
+      const { acao, consulta, messageId } = pedido.argumentos
+      const valor = acao === 'buscar' ? consulta : messageId
+      if ((acao !== 'buscar' && acao !== 'ler') || typeof valor !== 'string' || !valor.trim() ||
+          valor.length > (acao === 'buscar' ? 120 : 200) || (acao === 'ler' && !estado.fontes.has(valor))) {
+        return { ok: false, resumo: 'Use uma consulta válida ou uma referência retornada nesta execução.' }
+      }
+      try {
+        const recuperado = await deps.recuperarHistorico(fio, { acao, valor: valor.trim() })
+        if (abort.signal.aborted || !validarContexto()) return { ok: false, resumo: 'A consulta foi interrompida.' }
+        for (const fonte of recuperado.fontes) estado.fontes.add(fonte)
+        registro?.recuperar(pedido.id, acao, recuperado.fontes)
+        return { ok: true, resumo: `Histórico deste chat: ${recuperado.fontes.length} fonte(s).`, conteudo: recuperado.conteudo }
+      } catch {
+        return { ok: false, resumo: 'Não foi possível consultar o histórico deste chat.' }
+      }
+    },
     executar: async (pedido, contexto) => {
       if (abort.signal.aborted || fio.execucao.estado !== 'running') return { ok: false, resumo: 'Cancelado antes de iniciar; nenhum processo foi iniciado.' }
       const operacao = executorComandoBase(pedido, contexto).then((resultado) => {
@@ -362,7 +386,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     // já vai ao modelo — não existe segunda fonte de texto, então não há como a
     // invocação detectada divergir do que o modelo vai ver.
     const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
-    const composicao = deps.comporContexto
+    const composicao = !fio.execucao.recuperacao && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
     const vizinho = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
@@ -381,7 +405,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: composicao?.ferramentasPermitidas,
+      ferramentasPermitidas: fio.execucao.recuperacao ? ['historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
@@ -462,6 +486,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (fio.execucao.recuperacao && pedido.ferramenta !== 'historico') return 'A consulta histórica não autoriza acesso a arquivos nem execução de comandos.'
+        if (!fio.execucao.recuperacao && pedido.ferramenta === 'historico') return 'A recuperação histórica exige o comando explícito /historico.'
+        if (pedido.ferramenta === 'historico') return null
         if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
@@ -723,11 +750,17 @@ async function tratarAgir(
     return true
   }
   instrucoes.delete(token)
-  const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto }
+  const textoAtual = validacao.pedido.mensagens.at(-1)
+  const consultaHistorica = deps.recuperarHistorico && textoAtual?.role === 'user'
+    ? /^\/historico\s+([\s\S]+)$/iu.exec(textoAtual.content.trim())?.[1].trim() : undefined
+  const contextoFluxo: ContextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto,
+    recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>
   try {
-    historico = deps.restaurarHistorico
+    historico = consultaHistorica
+      ? { fonte: 'browser', mensagens: [{ papel: 'usuario', conteudo: consultaHistorica }] }
+      : deps.restaurarHistorico
       ? await deps.restaurarHistorico(contextoFluxo, validacao.pedido.mensagens)
       : { fonte: 'browser', mensagens: validacao.pedido.mensagens.map(({ role, content }) => ({ papel: role === 'user' ? 'usuario' : 'assistente', conteudo: content })) }
   } catch {

@@ -149,6 +149,7 @@ describe('rodarAgir — o loop apenas REPASSA o que o servidor compôs', () => {
     escrever: naoUsado,
     excluir: naoUsado,
     executar: naoUsado,
+    historico: naoUsado,
   }
 
   function vizinhoEspiao(vistos: OpcoesVizinho[]): VizinhoProvedor {
