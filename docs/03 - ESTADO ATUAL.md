@@ -1,3 +1,7 @@
+**Pauta futura (09/11/2026).** A integração de voz será discutida após M1–M8. Resultado da prova externa e referências em [06, pauta do modo de voz](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#pauta-após-m1m8--modo-de-voz-do-agent-window-09112026).
+
+---
+
 **Identidade visual (09/11/2026).** O favicon está integrado à página do aplicativo. Os PNGs de referência estão no local indicado em 02.
 
 # Explorer e Monaco antes da primeira mensagem (09/11/2026)

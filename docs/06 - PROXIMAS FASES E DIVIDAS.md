@@ -1,3 +1,17 @@
+# Pauta após M1–M8 — modo de voz do Agent Window (09/11/2026)
+
+O dono quer discutir a integração de um modo de voz depois de concluir as fatias de memória M1–M8. Esta pauta registra a intenção e a referência para a conversa de arquitetura. A sequência D133 segue vigente, e a especificação e a implementação do modo de voz ficam para decisão posterior.
+
+**Prova externa.** Na conversa com o Codex, o dono experimentou o Qwen Audio Agent no Windows com Gemini 3.8 Live. A edição distribuída falhou ao abrir a conexão com o Gemini. O Codex montou uma cópia de teste com a correção oficial, verificou uma resposta com áudio e o dono confirmou que a conversa por voz funcionou e que gostou da experiência. Essa avaliação se refere ao aplicativo externo.
+
+**Pontos para a futura SPEC.** Estudar como adaptar ao Condomínio a separação entre a chamada de voz, a coordenação e o harness do Agent Window. A chamada deve continuar enquanto o harness trabalha, permitir consultar progresso e distinguir interromper a fala, redirecionar a tarefa e cancelar a execução. Preservar a sessão, o controle de ferramentas e aprovações do harness e a separação de provedores. Avaliar os pontos de integração e adaptar a lógica pertinente à arquitetura própria do projeto.
+
+- [Repositório e código do Qwen Audio Agent](https://github.com/QwenAudio/qwen-audio-agent)
+- [Arquitetura de conversa e tarefas em segundo plano](https://github.com/QwenAudio/qwen-audio-agent/blob/main/docs/architecture/deep-dive.md)
+- [Correção oficial do Gemini Live usada na prova](https://github.com/QwenAudio/qwen-audio-agent/pull/575)
+
+---
+
 # Limites correntes da barra lateral direita — D185 (09/11/2026)
 
 O Graph exibe até 30 commits alcançáveis do HEAD e suas relações. Filtros de referências e ações de commits do Graph oficial, alternância de árvore e lista do Search, o tema Seti e opções de menus avançadas ainda diferem do VS Code. O modelo suporta um repositório Git raiz por workspace, operações remotas HTTPS e Pull em avanço rápido. A cobertura de atualização de pastas obedece ao limite de diretórios do watcher. A validação em Debian headless e a matriz completa de fidelidade visual e atalhos seguem pendentes.

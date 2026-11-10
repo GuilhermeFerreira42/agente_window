@@ -1,3 +1,9 @@
+# 09/11/2026 — Pauta de voz após as fatias de memória
+
+O dono testou a conversa por voz no Qwen Audio Agent e pediu para retomar a discussão de integração depois de M1–M8. Evidência e referências em 06.
+
+---
+
 # 09/11/2026 — Favicon do Agent Window
 
 A identidade visual enviada pelo proprietário foi incorporada às guias do aplicativo. Referências em 02 e prova em 09.
