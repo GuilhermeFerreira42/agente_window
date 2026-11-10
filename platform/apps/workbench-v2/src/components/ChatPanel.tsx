@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
 import { ChatInput } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
+import { MemoriaProjeto } from './MemoriaProjeto'
 import type { MedicaoContexto } from '../domain/usoContexto'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
@@ -384,6 +385,8 @@ export function ChatPanel({
         </div>
         <div className="sessions-header-actions">
           {!session.isDraft && !isEmpty && <BuscaHistorico key={JSON.stringify([session.id, activeChat.id])} sessionId={session.id} chatId={activeChat.id} abrir={abrirResultado} />}
+          {!session.isDraft && session.workspacePath && <MemoriaProjeto key={JSON.stringify([session.id, activeChat.id, session.workspacePath, session.worktreePath])}
+            sessionId={session.id} chatId={activeChat.id} messages={activeChat.messages} />}
           <button className="toolbar-button" type="button" title="Abrir navegador no editor" aria-label="Abrir navegador" onClick={onOpenBrowser}><Globe2 size={14} /></button>
           <button className="toolbar-button" type="button" title="Revisar alterações" aria-label="Revisar alterações" onClick={onOpenDiff}><GitCompareArrows size={14} /></button>
         </div>

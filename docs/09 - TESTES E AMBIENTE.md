@@ -1,3 +1,11 @@
+# M5 — memória confirmada de projeto (10/11/2026)
+
+Typecheck aprovado. Vitest focado **19/19** e repetição de armazenamento **4/4**. A falha de gravação injetada preservou a revisão anterior. Os testes conferiram proveniência, versão desatualizada, isolamento e expurgo. Playwright **1/1** com pastas e sessões descartáveis. Confirmou rejeição de credencial sintética, compartilhamento na mesma pasta, isolamento de outra pasta, revisão, origem indisponível após exclusão da sessão fonte, exportação e exclusão das revisões. O teste encerra o navegador da sessão fonte antes da exclusão para evitar o flush de um snapshot antigo.
+
+A regressão completa teve **1.529 aprovações, 42 falhas preexistentes e 30 ignorados**. Comparação nominal com M4 sem nova falha. Sem chamadas a provedor. Logs `m5-focused.log`, `m5-storage.log`, `m5-e2e-stable.log`, `m5-typecheck-stable.log` e `m5-regression.log`.
+
+---
+
 # M4 — busca na fonte do chat (10/11/2026)
 
 Vitest focado **18/18**, com correspondência literal, acentos, pontuação, sequência por chat, exclusão, escopo inexistente, limites de consulta e exclusão de campos de anexos e ferramentas. O Playwright passou no cenário integrado M3–M4 após repetir o spec com os arquivos estáveis. A busca encontrou um trecho anterior à compactação e moveu o foco para a mensagem original. Não houve chamada adicional a provedor para pesquisar. Logs em `m4-focused.log` e `m4-e2e-final.log`.

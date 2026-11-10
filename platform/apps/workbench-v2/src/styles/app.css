@@ -2165,6 +2165,25 @@ svg {
   overflow-wrap: anywhere;
 }
 
+.project-memory-panel {
+  padding: 8px;
+  overflow-wrap: anywhere;
+}
+
+.project-memory-panel form,
+.project-memory-panel label,
+.project-memory-record {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block: 6px;
+}
+
+.project-memory-record {
+  border-top: var(--vscode-strokeThickness) solid var(--vscode-menu-border);
+  padding-top: 6px;
+}
+
 .permission-mode-button.is-risky {
   color: var(--vscode-errorForeground);
   font-weight: 600;

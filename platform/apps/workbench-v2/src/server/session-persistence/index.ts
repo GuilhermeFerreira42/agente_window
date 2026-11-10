@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, getCheckpoint, getSessionRecord, grantSessionTool, listSessionRecords, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
+import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
@@ -32,6 +32,7 @@ import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, propor
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
+import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -241,6 +242,99 @@ async function buscarHistorico(request: IncomingMessage, response: ServerRespons
   }
 }
 
+async function gerirMemoriaProjeto(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  let input: Record<string, unknown> | null
+  try { input = await readJson(request) } catch { input = null }
+  if (!input || typeof input.sessionId !== 'string' || typeof input.chatId !== 'string') {
+    sendJson(response, 400, { message: 'Informe a sessão e a conversa atuais.' })
+    return
+  }
+  const { sessionId, chatId, operacao, revisao } = input
+  try {
+    await withSessionPersistenceQueue(sessionId, async () => {
+      const contexto = resolverContextoAgir(sessionId, chatId)
+      if (!contexto.ok) {
+        sendJson(response, 409, { message: 'O projeto da conversa não está disponível.' })
+        return
+      }
+      const projeto = chaveEscopo(contexto.raiz.normalize('NFC'))
+      if (operacao === 'listar') {
+        const fontes = new Map<string, Promise<Set<string>>>()
+        let leiturasDeFonte = 0
+        function origemDe(id: string, checarMensagens: boolean): Promise<Set<string>> {
+          const chave = JSON.stringify([id, checarMensagens])
+          const atual = fontes.get(chave)
+          if (atual) return atual
+          const resolver = async (): Promise<Set<string>> => {
+            const record = getSessionRecord(id)
+            if (!record) return new Set()
+            const pasta = validateWorkspacePath(record.worktreePath || record.workspacePath)
+            if (!pasta.valid || !pasta.exists || !pasta.isDir || chaveEscopo(pasta.realpath.normalize('NFC')) !== projeto) return new Set()
+            if (!checarMensagens) {
+              const sessao = JSON.parse(record.sessionJson) as Session
+              return new Set(sessao.chats.map((chat) => chat.id))
+            }
+            const entradas = await readTranscript(record.slug, id, 4 * 1024 * 1024)
+            return new Set(entradas.filter((entry) => entry.type !== 'agir_event').map((entry) => JSON.stringify([entry.chatId, entry.uuid])))
+          }
+          const consulta = resolver().catch(() => new Set<string>())
+          fontes.set(chave, consulta)
+          return consulta
+        }
+        const memorias = listarMemoriasProjeto(projeto)
+        for (const memoria of memorias) {
+          const { sessionId: fonte, chatId: chat, messageId: mensagem } = memoria.origem
+          const chave = JSON.stringify([fonte, Boolean(mensagem)])
+          if (mensagem && !fontes.has(chave) && ++leiturasDeFonte > 16) continue
+          const origens = await origemDe(fonte, Boolean(mensagem))
+          memoria.origemDisponivel = origens.has(mensagem ? JSON.stringify([chat, mensagem]) : chat)
+        }
+        sendJson(response, 200, { projeto: contexto.raiz, projetoId: projeto, memorias })
+        return
+      }
+      if (input.projetoId !== projeto) {
+        sendJson(response, 409, { message: 'O projeto mudou. Abra a memória do projeto atual antes de gravar.' })
+        return
+      }
+      const id = typeof input.id === 'string' && /^[a-f0-9-]{36}$/i.test(input.id) ? input.id : undefined
+      if (input.confirmado !== true || typeof revisao !== 'number' || !Number.isSafeInteger(revisao) || revisao < 0 ||
+          (id ? revisao === 0 : revisao !== 0)) {
+        sendJson(response, 400, { message: 'Confirme a ação e informe uma revisão válida.' })
+        return
+      }
+      if (operacao === 'excluir' && id) {
+        const apagou = excluirMemoriaProjeto(projeto, id, revisao)
+        sendJson(response, apagou ? 200 : 409, { message: apagou ? 'Memória excluída.' : 'A memória mudou ou já foi removida.' })
+        return
+      }
+      const conteudo = typeof input.conteudo === 'string' ? input.conteudo.trim() : ''
+      const motivo = typeof input.motivo === 'string' ? input.motivo.trim() : ''
+      const tipo = input.tipo as TipoMemoria
+      if (operacao !== 'gravar' || !TIPOS_MEMORIA.includes(tipo) || !conteudo || conteudo.length > LIMITE_CONTEUDO_MEMORIA ||
+          motivo.length > LIMITE_MOTIVO_MEMORIA || (revisao > 0 && !motivo) || pareceCredencial(conteudo) || pareceCredencial(motivo)) {
+        sendJson(response, 400, { message: 'Revise o tipo, os limites e o conteúdo. Credenciais não podem ser salvas.' })
+        return
+      }
+      const messageId = typeof input.messageId === 'string' && input.messageId ? input.messageId : undefined
+      if (messageId) {
+        const record = getSessionRecord(sessionId)
+        const entries = record ? await readTranscript(record.slug, sessionId) : []
+        if (!entries.some((entry) => entry.chatId === chatId && entry.type !== 'agir_event' && entry.uuid === messageId)) {
+          sendJson(response, 409, { message: 'A mensagem de origem não pertence ao histórico atual.' })
+          return
+        }
+      }
+      const resultado = publicarMemoriaProjeto(projeto, {
+        id: id ?? randomUUID(), tipo, conteudo, motivo, criadaEm: Date.now(), origem: { sessionId, chatId, messageId },
+      }, revisao)
+      sendJson(response, resultado === 'ok' ? 200 : 409, { message: resultado === 'ok' ? 'Memória gravada.' :
+        resultado === 'limite' ? 'O projeto atingiu o limite de revisões.' : 'A memória mudou. Recarregue antes de editar.' })
+    })
+  } catch {
+    sendJson(response, 409, { message: 'A memória do projeto está indisponível.' })
+  }
+}
+
 function sanarStatusAposF5(session: Session): Session {
   // FATIA 09 (§3.8): mensagens em streaming NÃO são persistidas (decisão da
   // §9.1 — evita bolha vazia eterna), então depois do F5 nunca existe nada
@@ -343,6 +437,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
   if (url.pathname === '/api/sessions/search' && request.method === 'POST') {
     await buscarHistorico(request, response)
+    return true
+  }
+  if (url.pathname === '/api/sessions/project-memory' && request.method === 'POST') {
+    await gerirMemoriaProjeto(request, response)
     return true
   }
 

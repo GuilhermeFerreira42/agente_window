@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { getDatabasePath } from './paths'
 import type { Checkpoint } from './checkpoint'
+import type { MemoriaProjeto } from '../../domain/memoriaProjeto'
 
 export interface SessionRecord {
   id: string
@@ -80,8 +81,56 @@ function getDatabase(): Database.Database {
       checkpoint_json TEXT NOT NULL,
       PRIMARY KEY (session_id, chat_id)
     );
+    CREATE TABLE IF NOT EXISTS project_memories (
+      project_key TEXT NOT NULL,
+      memory_id TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      current INTEGER NOT NULL CHECK (current IN (0, 1)),
+      record_json TEXT NOT NULL,
+      PRIMARY KEY (project_key, memory_id, revision)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS project_memory_current_idx
+      ON project_memories (project_key, memory_id) WHERE current = 1;
   `)
   return database
+}
+
+export function listarMemoriasProjeto(projeto: string): MemoriaProjeto[] {
+  const rows = getDatabase().prepare(`
+    SELECT current, record_json AS json FROM project_memories WHERE project_key = ?
+    ORDER BY current DESC, rowid DESC
+  `).all(projeto) as Array<{ current: number; json: string }>
+  return rows.map(({ current, json }) => ({ ...JSON.parse(json) as MemoriaProjeto, vigente: current === 1 }))
+}
+
+export function publicarMemoriaProjeto(
+  projeto: string, registro: Omit<MemoriaProjeto, 'revisao' | 'vigente'>, esperada: number,
+): 'ok' | 'conflito' | 'limite' {
+  const db = getDatabase()
+  return db.transaction(() => {
+    const atual = db.prepare('SELECT revision FROM project_memories WHERE project_key = ? AND memory_id = ? AND current = 1')
+      .get(projeto, registro.id) as { revision: number } | undefined
+    if ((atual?.revision ?? 0) !== esperada) return 'conflito' as const
+    const { quantidade } = db.prepare('SELECT COUNT(*) AS quantidade FROM project_memories WHERE project_key = ?')
+      .get(projeto) as { quantidade: number }
+    if (quantidade >= 250) return 'limite' as const
+    if (atual) db.prepare('UPDATE project_memories SET current = 0 WHERE project_key = ? AND memory_id = ? AND current = 1')
+      .run(projeto, registro.id)
+    const memoria: MemoriaProjeto = { ...registro, revisao: esperada + 1, vigente: true }
+    db.prepare('INSERT INTO project_memories VALUES (?, ?, ?, 1, ?)')
+      .run(projeto, memoria.id, memoria.revisao, JSON.stringify(memoria))
+    return 'ok' as const
+  }).immediate()
+}
+
+export function excluirMemoriaProjeto(projeto: string, id: string, revisao: number): boolean {
+  const db = getDatabase()
+  return db.transaction(() => {
+    const existe = db.prepare('SELECT 1 FROM project_memories WHERE project_key = ? AND memory_id = ? AND current = 1 AND revision = ?')
+      .get(projeto, id, revisao)
+    return !!existe && db.prepare('DELETE FROM project_memories WHERE project_key = ? AND memory_id = ?')
+      .run(projeto, id).changes > 0
+  }).immediate()
 }
 
 export function getCheckpoint(sessionId: string, chatId: string): Checkpoint | null | undefined {

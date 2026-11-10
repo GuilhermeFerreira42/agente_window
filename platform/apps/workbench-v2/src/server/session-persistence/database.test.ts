@@ -4,9 +4,12 @@ import { getDatabasePath } from './paths'
 import type { Checkpoint } from './checkpoint'
 import {
   deleteSessionRecord,
+  excluirMemoriaProjeto,
   getCheckpoint,
   grantSessionTool,
   listSessionToolGrants,
+  listarMemoriasProjeto,
+  publicarMemoriaProjeto,
   revokeSessionToolGrants,
   removerCheckpointsDeChatsAusentes,
   saveCheckpoint,
@@ -89,5 +92,33 @@ run('server-side session tool grants (runs only with AGENTE_WINDOW_TEST_HOME set
       db.exec('DROP TRIGGER IF EXISTS fixture_checkpoint_failure')
       db.close()
     }
+  })
+
+  it('isolates project memories, preserves provenance and rejects stale edits and deletion', () => {
+    const projeto = 'fixture-projeto-a'
+    const id = 'fixture-memory'
+    const registro = { id, tipo: 'decisao' as const, conteudo: 'Inicial', motivo: '', criadaEm: 1,
+      origem: { sessionId, chatId: 'a', messageId: 'm1' } }
+    expect(publicarMemoriaProjeto(projeto, registro, 0)).toBe('ok')
+    expect(listarMemoriasProjeto('fixture-projeto-b')).toEqual([])
+    const db = new Database(getDatabasePath(), { fileMustExist: true })
+    try {
+      db.exec(`CREATE TRIGGER fixture_memory_failure BEFORE INSERT ON project_memories
+        WHEN NEW.project_key = 'fixture-projeto-a' BEGIN SELECT RAISE(ABORT, 'synthetic'); END;`)
+      expect(() => publicarMemoriaProjeto(projeto, { ...registro, conteudo: 'Não publicada' }, 1)).toThrow()
+      expect(listarMemoriasProjeto(projeto)).toMatchObject([{ revisao: 1, vigente: true, conteudo: 'Inicial' }])
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS fixture_memory_failure')
+      db.close()
+    }
+    expect(publicarMemoriaProjeto(projeto, { ...registro, conteudo: 'Revisada', motivo: 'Motivo', criadaEm: 2 }, 1)).toBe('ok')
+    expect(publicarMemoriaProjeto(projeto, { ...registro, conteudo: 'Perdida' }, 1)).toBe('conflito')
+    expect(excluirMemoriaProjeto(projeto, id, 1)).toBe(false)
+    expect(listarMemoriasProjeto(projeto)).toMatchObject([
+      { revisao: 2, vigente: true, conteudo: 'Revisada', origem: registro.origem },
+      { revisao: 1, vigente: false, conteudo: 'Inicial', origem: registro.origem },
+    ])
+    expect(excluirMemoriaProjeto(projeto, id, 2)).toBe(true)
+    expect(listarMemoriasProjeto(projeto)).toEqual([])
   })
 })

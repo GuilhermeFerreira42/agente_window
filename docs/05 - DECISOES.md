@@ -2109,3 +2109,7 @@ A M3 usa o modelo selecionado, a Casa Conversa sem ferramentas e a fila de sess�
 ## D191 — Busca manual na fonte do chat (10/11/2026)
 
 A busca da M4 lê o JSONL com escopo de sessão e chat conferido no catálogo. Faz correspondência literal sem distinção de caixa e retorna trechos da fonte. A primeira implementação limita arquivo a 16 MiB, examina até dois milhões de caracteres do chat e retorna até 40 mensagens. O transcript atualizado é consultado a cada busca. Isso evita cache ou índice independente e respeita exclusões. Anexos, eventos brutos, erros e mensagens canceladas ficam fora do escopo. A recuperação pelo agente terá contrato próprio na M6.
+
+## D192 — Memória explícita de projeto com revisões (10/11/2026)
+
+A memória usa SQLite e a chave derivada da pasta canônica em NFC. O servidor revalida a pasta antes de toda ação e recusa edição com revisão antiga ou escopo desatualizado. Gravação e exclusão exigem confirmação no produto. Exportação local inclui revisões e origem. O limite inicial é 250 revisões por projeto e 1.600 caracteres por registro. Só há memórias confirmadas e substituídas nesta estratégia. Nenhuma memória é carregada automaticamente. A filtragem rejeita formatos reconhecíveis de credencial e não classifica segredos arbitrários em texto livre.

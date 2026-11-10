@@ -48,6 +48,14 @@ Base `4cf177d`. Reutilizar o transcript original da M2 e a lista de mensagens do
 
 Pesquisar texto visível do usuário e do assistente. Eventos brutos, anexos e conteúdo omitido por D188 ficam fora do índice. Busca sem consulta a provedor, com limite de consulta, texto examinado e hits. Testar acentos, pontuação, exclusão, falha de leitura, limite, isolamento por chat e sessão e navegação após compactação. Um índice persistente depende de necessidade demonstrada em volume real.
 
+## M5 — SPEC de execução inicial (10/11/2026)
+
+Base `48b4b80`. O [estudo M5](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M5_MEMORIA_DE_PROJETO.md) usa a proveniência da M2 e separa memórias confirmadas de checkpoints da M3. A prefeitura resolve a pasta canônica do projeto por sessão ativa, aplicando realpath e NFC conforme D130. O SQLite guarda revisões de decisões, fatos e preferências sob essa identidade. Projetos com caminhos distintos permanecem isolados.
+
+A gravação só ocorre por ação humana explícita. O histórico de revisões mantém origem, data, estado e motivo de substituição. A revisão corrente é a única retornada como vigente. Excluir uma memória remove suas revisões. Exportação é local e explícita. O produto rejeita credenciais reconhecíveis antes de gravar. Limites por item e projeto evitam crescimento silencioso. Nenhuma memória é injetada automaticamente no prompt nesta etapa.
+
+Validar gravação, consulta, revisão concorrente, expurgo, ausência da fonte original, exportação, isolamento entre projetos e ausência de dados sensíveis reconhecíveis. O chat deve continuar disponível se a memória estiver indisponível.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.

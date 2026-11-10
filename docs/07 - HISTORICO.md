@@ -1,3 +1,9 @@
+# 10/11/2026 — M5 integra memória confirmada de projeto
+
+Commit `feat(memory): manage confirmed project memories`. Guarda fatos, decisões e preferências com proveniência, revisão e escopo de projeto. O controle do chat permite inspecionar, revisar, exportar e excluir. Decisão D192 e evidências em 09.
+
+---
+
 # 10/11/2026 — M4 busca o histórico do chat
 
 Commit `feat(memory): search the original active chat transcript`. O controle no cabeçalho consulta o transcript do chat atual e leva à mensagem original. Decisão D191 e evidências em 09.

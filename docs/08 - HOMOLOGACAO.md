@@ -1,3 +1,11 @@
+# Roteiro de homologação da M5 — aceite pendente (10/11/2026)
+
+1. Em uma pasta de teste, abra **Memória do projeto** e grave uma decisão sem dados sensíveis. Confira a pasta, a origem e o estado vigente.
+2. Abra outro chat na mesma pasta e confira a decisão. Revise o texto com um motivo. A revisão anterior deve aparecer como substituída.
+3. Abra um chat de outra pasta e confira o isolamento. Volte ao projeto original, exporte a memória e exclua a entrada sintética. Reabra o painel e confirme que as duas revisões sumiram.
+
+---
+
 # Roteiro de homologação da M4 — aceite pendente (10/11/2026)
 
 1. Abra um chat com uma expressão antiga conhecida. Use **Buscar no histórico** no cabeçalho e pesquise pela expressão.
