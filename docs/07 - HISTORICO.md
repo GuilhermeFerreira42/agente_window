@@ -1,3 +1,9 @@
+# 10/11/2026 — M2 integra eventos ao histórico de Agir
+
+Commit `feat(memory): persist and restore structured agent turns`. Registra eventos com sequência e referências no JSONL e recompõe pares de ferramenta nos turnos subsequentes. Decisão D189 e provas em 09.
+
+---
+
 # 10/11/2026 — M2 inicia a projeção segura de snapshots
 
 Commit `feat(memory): sanitize persisted conversation snapshots`. JSONL e recuperação local usam a mesma projeção para campos transitórios de ferramentas e anexos. Estado em 03 e provas em 09.

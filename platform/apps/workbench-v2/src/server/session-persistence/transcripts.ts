@@ -20,11 +20,12 @@ function withTranscript<T>(destination: string, operation: () => Promise<T>): Pr
 }
 
 export interface TranscriptEntry {
-  type: 'user' | 'assistant'
+  type: 'user' | 'assistant' | 'agir_event'
   chatId: string
   message: unknown
   uuid: string
   timestamp: number
+  sequence?: number
 }
 
 function transcriptPath(slug: string, sessionId: string): string {

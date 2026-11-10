@@ -32,6 +32,8 @@ export const TETO_PADRAO = 25
 export type EmitirAgir = (evento: EventoAgir) => void
 
 export interface OpcoesAgir {
+  /** Barreira opcional de publicação do transcript antes de iniciar efeitos. */
+  antesDeExecutar?: () => Promise<void>
   /** Fala com o provedor numa iteração (C2 = HTTP real; testes = falso). */
   vizinho: VizinhoProvedor
   /** Histórico da conversa (a mensagem nova do dono já entra aqui). */
@@ -216,6 +218,12 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       if (foiInterrompido(sinal)) return { status: 'interrompido', textoFinal: '', iteracoes: iteracao - 1 }
       let pedidoExecucao = pedido
       const executarPedido = async (): Promise<ResultadoFerramenta> => {
+        if (opcoes.antesDeExecutar) {
+          await opcoes.antesDeExecutar()
+          if (foiInterrompido(sinal) || (opcoes.validarContexto && !opcoes.validarContexto(pedidoExecucao))) {
+            return { ok: false, resumo: 'O contexto mudou antes da execução; a ferramenta não foi iniciada.' }
+          }
+        }
         try { return await executores[pedido.ferramenta](pedidoExecucao, {
         sinal,
         aoProgresso: (text: string) => emitir({ type: 'tool_progress', id: pedidoExecucao.id, text }),

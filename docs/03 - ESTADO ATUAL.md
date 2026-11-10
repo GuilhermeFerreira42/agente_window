@@ -6,7 +6,8 @@ A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homo
 - **Fatia 15, SPEC 2I.** O editor central hospeda as abas de código e diff do Monaco e as superfícies nativas. Abas reconstituíveis voltam após recarregar. As edições salvas ficam no disco. O Explorer abre arquivos no Monaco mesmo antes da primeira mensagem, após selecionar a pasta.
 - **Barra direita.** Explorer, Search e Source Control seguem o workbench padrão do VS Code 1.135.0 como referência. A barra de sessões e Personalizações seguem a Agents Window. Limites de menus, Graph e busca estão em 06.
 - **M1.** Implementação em `0289b3e`, tecnicamente pronta para homologação. O aceite do proprietário está pendente. Critérios em 06, roteiro em 08 e evidências em 09.
-- **M2–M8.** Execução sequencial autorizada em 10/11/2026 (D188). O primeiro corte da M2 aplica a projeção segura ao JSONL e à recuperação local. O registro de eventos pelo servidor e a reconstrução de turnos continuam em aberto. Critérios em 06. A M3 depende da validação técnica da M2.
+- **M2.** Projeção segura, eventos no JSONL e reconstrução do próximo turno validados tecnicamente. Aceite humano pendente. D188–D189, critérios em 06, roteiro em 08 e evidências em 09.
+- **M3–M8.** Execução sequencial autorizada. Próxima etapa técnica é a M3, compactação derivada com transcript original preservado.
 - **Outras pautas.** E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
 
 ## Registros anteriores

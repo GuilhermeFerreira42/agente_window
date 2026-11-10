@@ -1,3 +1,11 @@
+# Roteiro de homologação da M2 — aceite pendente (10/11/2026)
+
+1. Abra um chat em uma pasta de teste e peça ao agente para ler um arquivo sem dados sensíveis. Confira o cartão e aguarde a resposta.
+2. Recarregue o Agent Window. Confirme que a conversa e o estado do cartão voltaram. Pergunte o que foi feito no turno anterior e confira que a ferramenta anterior não é executada automaticamente pela recuperação do histórico.
+3. Em modo Manual e em uma pasta de teste, negue uma ferramenta que apresente um cartão de aprovação. Confira o estado do cartão depois de recarregar. Uma decisão antiga não concede permissão a um novo pedido.
+
+---
+
 # Roteiro de homologação da M1 — aceite pendente (10/11/2026)
 
 1. Abra um chat novo, escolha a pasta e digite um rascunho. O compositor deve mostrar **Contexto não medido**.

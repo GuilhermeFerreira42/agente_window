@@ -34,6 +34,7 @@ export type {
 /** O loop do agente (motor da casa — puro, sem node:*). */
 export { TETO_PADRAO, rodarAgir } from './server/agir'
 export type { EmitirAgir, OpcoesAgir, ResultadoAgir, StatusAgir } from './server/agir'
+export type { EventoTranscriptAgir, RegistroExecucaoAgir } from './server/transcript'
 
 /** Catálogo + peças puras (ferramentas falsas e extração não tocam node:*). */
 export {

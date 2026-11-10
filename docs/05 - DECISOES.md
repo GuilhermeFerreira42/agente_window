@@ -2097,3 +2097,7 @@ Aplicação técnica de D99 e D133. A entrada reportada na última iteração é
 ## D188 — Persistência segura na M2 e execução sequencial (10/11/2026)
 
 A autorização para M2–M8 permite decisões técnicas dentro dos contratos e exige validação de cada fatia antes da seguinte. A política de privacidade substitui a previsão de D141 para persistência automática de saída de comandos. A projeção durável preserva eventos, estados e referências aplicáveis. Comandos, suas saídas, prévias, argumentos de escrita e conteúdo de anexos permanecem transitórios. Autorizar o desenvolvimento não concede consentimento para armazenar conteúdo sensível. Eventual persistência de item específico exige uma necessidade demonstrada e consentimento no produto. O aceite humano da M1 continua pendente.
+
+## D189 — Transcript estruturado no JSONL da sessão (10/11/2026)
+
+Os eventos Agir são linhas versionadas com identidade de chat, turno e execução e sequência monotônica por chat. A prefeitura protege sua publicação e os snapshots com a fila existente da sessão. Conteúdo bruto de ferramentas permanece em memória no turno ativo. Leituras internas ao workspace registram caminho relativo e digest, com intervalo para arquivo. A projeção histórica usa o tradutor nativo já existente em cada protocolo. Registros sem conclusão ou com pares incompletos ficam fora do contexto derivado. A estratégia preserva D188 e mantém uma única fonte durável.

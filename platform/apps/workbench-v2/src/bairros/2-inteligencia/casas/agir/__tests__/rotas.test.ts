@@ -11,7 +11,7 @@ import * as path from 'node:path'
 import { Readable } from 'node:stream'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type { AlvoConversa, ObterAlvo } from '../../conversa'
-import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../server/rotas'
+import { rotaPertenceAoModuloAgir, tratarRotasAgir, type DependenciasAgir } from '../server/rotas'
 import { criarExecutoresReais, type ExecutoresDisco } from '../server/discos'
 
 type ResFalsa = ServerResponse & {
@@ -385,7 +385,8 @@ describe('rotas — POST /api/agir', () => {
   it('ciclo completo: tool → approval → NEGAR → tool_result "dono negou" → resposta em texto', async () => {
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()
-    const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, DEPS)
+    const gravarExecucao = vi.fn<NonNullable<DependenciasAgir['gravarExecucao']>>(async () => undefined)
+    const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, { ...DEPS, gravarExecucao })
     await esperaFio(res, '"type":"approval"')
     expect(frames(res)[0]).toMatchObject({ type: 'iteracao', model: 'openai / gpt-fixture' })
     expect(frames(res).map((e) => e.type)).toEqual(['iteracao', 'context_usage', 'tool', 'approval'])
@@ -401,7 +402,23 @@ describe('rotas — POST /api/agir', () => {
     const resultado = frames(res).find((evento) => evento.type === 'tool_result') as Record<string, unknown>
     expect(resultado).toMatchObject({ type: 'tool_result', ok: false })
     expect(String(resultado.resumo)).toContain('dono negou')
+    const registro = gravarExecucao.mock.calls.at(-1)![0]
+    expect(registro.eventos.map(({ tipo }) => tipo)).toEqual(['iteracao', 'chamada', 'aprovacao_solicitada', 'aprovacao_decidida', 'resultado', 'iteracao', 'encerramento'])
+    expect(registro.eventos).toContainEqual(expect.objectContaining({ tipo: 'aprovacao_decidida', permitido: false }))
+    expect(JSON.stringify(registro.eventos)).not.toContain('ola.txt')
     // nada foi escrito: o executor nem roda (a negação é a resposta ao modelo)
+  })
+
+  it('não confirma conclusão quando a gravação do transcript falha', async () => {
+    stubProvedor([SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, {
+      ...DEPS,
+      gravarExecucao: async () => { throw new Error('synthetic disk failure') },
+    })
+    expect(frames(res).at(-1)).toMatchObject({ type: 'error', code: 'fluxo', message: expect.stringContaining('Não foi possível gravar') })
+    expect(frames(res).some(({ type }) => type === 'done')).toBe(false)
+    expect(res.corpo()).not.toContain('synthetic disk failure')
   })
 
   it('"Permitir na Sessão" na 1.ª mexida: a 2.ª não faz cartão (Q2a, dentro do fluxo)', async () => {

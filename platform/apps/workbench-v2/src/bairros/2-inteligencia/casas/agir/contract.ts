@@ -87,6 +87,7 @@ export interface MensagemAgir {
  * da conversa — mesma forma do `/api/chat` da casa vizinha, G5).
  */
 export interface MensagemSimples {
+  id?: string
   role: 'user' | 'assistant'
   content: string
 }
@@ -202,8 +203,15 @@ export interface ResultadoFerramenta {
 export interface ContextoExecucaoFerramenta {
   sinal?: AbortSignal
   aoProgresso?: (texto: string) => void
+  aoLocalizador?: (localizador: LocalizadorFerramenta) => void
   /** Pergunta se deve continuar aguardando após cada janela de timeout. */
   aguardarContinuacao?: () => Promise<boolean>
+}
+
+export interface LocalizadorFerramenta {
+  arquivo: string
+  digest: string
+  intervalo?: { inicioByte: number; fimByteExclusivo: number }
 }
 
 /** Quem executa um pedido. O loop e a rota continuam sendo donos de cancelamento e grants. */

@@ -10,6 +10,14 @@ Após aplicar D188, o Vitest focado passou **48/48**, incluindo gravação HTTP,
 
 A regressão final do corte registrou **1.512 aprovações, 42 falhas e 30 ignorados**. As 42 falhas coincidem nominalmente com a linha de base classificada da M1. O caso extra de espaço em disco da M1 passou nesta rodada. A primeira execução da regressão carregou uma versão anterior do parser junto com o teste novo. A repetição foi executada com os arquivos estáveis e aprovou o caso. Log final em `../arena-operacional/m2-privacy-regression-final.log`. Essa validação cobre a projeção segura dos snapshots, enquanto a M2 permanece em implementação.
 
+### M2 — eventos e reconstrução
+
+O typecheck passou. O Playwright passou **2/2** com dois processos Vite em perfil e workspace descartáveis. O primeiro executou uma leitura real da fixture e gravou uma sequência de seis eventos. A segunda chamada, em outro processo com o mesmo perfil, restaurou o par de ferramenta e reportou fonte híbrida. O teste verificou o JSONL e o corpo do provedor. Os bytes lidos e o ID fornecido pelo provedor não foram persistidos. Nenhuma ferramenta antiga foi executada de novo. Reproduzir com `M2_E2E_BASE_URL`, `M2_E2E_RESTART_BASE_URL` e `M2_E2E_WORKSPACE`. Log `m2-events-e2e-restart.log`.
+
+Os testes da prefeitura exercitam o tradutor existente nos quatro protocolos, ordenação com timestamps iguais, isolamento entre chats e pastas, par incompleto, cancelamento, referência e ciclo inválido de continuação. Os testes de rota registram a negação de aprovação e simulam falha de gravação antes da confirmação de conclusão. A prova ponta a ponta usa um provedor simulado. A reconstrução da M2 é determinística, enquanto qualidade de resumo e continuidade semântica com modelo real ficam nas validações pertinentes de M3 e das fatias seguintes.
+
+A regressão final registrou **1.520 aprovações, 42 falhas e 30 ignorados**. As 42 falhas coincidem nominalmente com a linha de base do primeiro corte da M2 e da M1. A fixture de disco de 2 GiB passou. Log `m2-events-regression-final.log`. A validação de leitura em outro processo comprova reabertura a partir do disco. Não comprova a retomada segura de um processo que caiu durante um efeito externo, que pertence à M7.
+
 ---
 
 # M1 — evidências de medição e orçamento (10/11/2026)

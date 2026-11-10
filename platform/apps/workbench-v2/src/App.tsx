@@ -1552,8 +1552,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   /** Histórico limpo do chat atual (G5): sem bolhas de erro, canceladas ou em voo. */
   const montarHistorico = (mensagens: ChatMessage[]): MensagemSimples[] =>
     mensagens
-      .filter((mensagem) => !mensagem.running && !mensagem.cancelled && !mensagem.erro && mensagem.content.trim().length > 0)
-      .map((mensagem) => ({ role: mensagem.role, content: mensagem.content }))
+      .filter((mensagem) => !mensagem.running && !mensagem.cancelled && !mensagem.erro &&
+        (mensagem.content.trim().length > 0 || (mensagem.role === 'assistant' && Boolean(mensagem.ferramentas?.length))))
+      .map((mensagem) => ({ id: mensagem.id, role: mensagem.role, content: mensagem.content }))
 
   /** Atualiza os cartões de ferramenta da resposta em voo (fonte única da verdade). */
   const mexerFerramentas = (

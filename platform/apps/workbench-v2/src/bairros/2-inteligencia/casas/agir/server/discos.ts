@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import type { BigIntStats } from 'node:fs'
 import * as nodePath from 'node:path'
-import type { ArgumentosFerramenta, ExecutorFerramenta, FerramentaId, ResultadoFerramenta, PedidoFerramenta } from '../contract'
+import type { ArgumentosFerramenta, ExecutorFerramenta, FerramentaId, LocalizadorFerramenta, ResultadoFerramenta, PedidoFerramenta } from '../contract'
 import { catalogoFerramentas } from './ferramentas'
 import { moverParaLixeira, type OpcoesLixeira } from './lixeira'
 import { verificarTerritorio } from './territorio'
@@ -306,7 +306,13 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
     return nodePath.join(await fs.realpath(pai), nodePath.basename(caminho))
   }
 
-  const ler: ExecutorFerramenta = async (pedido) => {
+  function localizador(caminho: string, digest: string, intervalo?: LocalizadorFerramenta['intervalo']): LocalizadorFerramenta | undefined {
+    const relativo = nodePath.relative(raizResolvida, caminho)
+    if (relativo === '..' || relativo.startsWith('..' + nodePath.sep) || nodePath.isAbsolute(relativo)) return
+    return { arquivo: relativo || '.', digest, intervalo }
+  }
+
+  const ler: ExecutorFerramenta = async (pedido, contexto) => {
     const motivo = faltando('ler', pedido.argumentos)
     if (motivo) return falha(motivo)
     const porta = prepararPorta(raizResolvida, pedido.argumentos.caminho)
@@ -316,6 +322,8 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
       const { versao, conteudo } = await lerVersao(caminhoReal)
       versoesLidas.set(caminhoReal, versao)
       const texto = conteudo.toString('utf8')
+      const referencia = localizador(caminhoReal, versao.hash, { inicioByte: 0, fimByteExclusivo: conteudo.byteLength })
+      if (referencia) contexto?.aoLocalizador?.(referencia)
       return { ok: true, resumo: `Lido "${String(pedido.argumentos.caminho)}" (${texto.length} caracteres).`, conteudo: texto }
     } catch (erro) {
       const detalhe = (erro as Error).message === 'NOT_FILE' ? 'o destino não é um arquivo comum' : mensagemErro(erro)
@@ -323,7 +331,7 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
     }
   }
 
-  const listar: ExecutorFerramenta = async (pedido) => {
+  const listar: ExecutorFerramenta = async (pedido, contexto) => {
     const motivo = faltando('listar', pedido.argumentos)
     if (motivo) return falha(motivo)
     const entrada = String(pedido.argumentos.caminho ?? '.')
@@ -335,13 +343,16 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
       if (!st.isDirectory()) return falha(`"${entrada}" não é uma pasta.`)
       const itens = await fs.readdir(caminhoReal, { withFileTypes: true })
       const nomes = itens.map((item) => `${item.name}${item.isDirectory() ? '/' : item.isSymbolicLink() ? ' [link]' : ''}`).sort((a, b) => a.localeCompare(b))
-      return { ok: true, resumo: nomes.length === 0 ? `"${entrada}" está vazia.` : `"${entrada}": ${nomes.length} itens.`, conteudo: nomes.join('\n') }
+      const conteudo = nomes.join('\n')
+      const referencia = contexto?.aoLocalizador && localizador(caminhoReal, createHash('sha256').update(conteudo).digest('hex'))
+      if (referencia) contexto.aoLocalizador?.(referencia)
+      return { ok: true, resumo: nomes.length === 0 ? `"${entrada}" está vazia.` : `"${entrada}": ${nomes.length} itens.`, conteudo }
     } catch (erro) {
       return falha(`Não deu para listar "${entrada}": ${mensagemErro(erro)}.`)
     }
   }
 
-  const buscar: ExecutorFerramenta = async (pedido) => {
+  const buscar: ExecutorFerramenta = async (pedido, contexto) => {
     const motivo = faltando('buscar', pedido.argumentos)
     if (motivo) return falha(motivo)
     const padraoOriginal = String(pedido.argumentos.padrao)
@@ -367,18 +378,22 @@ export function criarExecutoresReais(raiz: string, opcoesLixeira: OpcoesLixeira 
         }
       }
     }
+    let inicio: string
     try {
-      const inicio = await caminhoRealExistente(porta.caminho)
+      inicio = await caminhoRealExistente(porta.caminho)
       if (!(await fs.stat(inicio)).isDirectory()) return falha(`"${entrada}" não é uma pasta.`)
       await varrer(inicio, '', 0)
     } catch (erro) {
       return falha(`Não deu para buscar "${padraoOriginal}" em "${entrada}": ${mensagemErro(erro)}.`)
     }
     const notaLimite = limitado ? ` (busca limitada a ${LIMITE_BUSCA} resultados ou ${LIMITE_ARQUIVOS_BUSCA} arquivos)` : ''
+    const conteudo = achados.join('\n')
+    const referencia = contexto?.aoLocalizador && localizador(inicio, createHash('sha256').update(conteudo).digest('hex'))
+    if (referencia) contexto.aoLocalizador?.(referencia)
     return {
       ok: true,
       resumo: achados.length === 0 ? `Nenhum arquivo com "${padraoOriginal}" no nome (${varridos} arquivos varridos)${notaLimite}.` : `${achados.length} arquivo(s) com "${padraoOriginal}" no nome${notaLimite}.`,
-      conteudo: achados.join('\n'),
+      conteudo,
     }
   }
 

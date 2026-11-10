@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
 import { deleteSessionRecord, getSessionRecord, grantSessionTool, listSessionRecords, revokeSessionToolGrants, upsertSessionRecord, type SessionToolGrant } from './database'
@@ -13,6 +14,7 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
 import { rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import type { RegistroExecucaoAgir } from '../../bairros/2-inteligencia/casas/agir'
 import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, definirExclusaoAutomaticaAgir, lerExclusaoAutomaticaAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
 import { resolveShell } from '../../../../../services/pty-server/src/shellDetector'
 import { rotaPertenceAoModuloConfig, tratarRotasConfig } from '../../bairros/2-inteligencia/casas/config/server/rotas'
@@ -24,6 +26,7 @@ import { comporContexto as comporContextoDePersonalizacoes } from './composicaoC
 import { obterAlvoDeConversa } from './chatAlvo'
 import { iniciarChamadaModelo } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 import { sanarCartoesDeSessao } from '../../services/agir/sanar'
+import { projetarHistoricoAgir, type EventoGravado } from './historicoAgir'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -92,6 +95,7 @@ function transcriptEntries(session: Session): TranscriptEntry[] {
 function restoreMessages(session: Session, entries: TranscriptEntry[]): Session {
   const byChat = new Map<string, ChatMessage[]>()
   for (const entry of entries) {
+    if (entry.type === 'agir_event') continue
     const messages = byChat.get(entry.chatId) ?? []
     messages.push(projetarMensagemPersistida(entry.message as ChatMessage))
     byChat.set(entry.chatId, messages)
@@ -100,6 +104,29 @@ function restoreMessages(session: Session, entries: TranscriptEntry[]): Session 
     ...session,
     chats: session.chats.map((chat) => ({ ...chat, messages: byChat.get(chat.id) ?? [] })),
   }
+}
+
+async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void> {
+  const { sessionId, chatId, runId, anterior, turnoId, raiz, alvo, eventos } = registro
+  await withSessionPersistenceQueue(sessionId, async () => {
+    const record = getSessionRecord(sessionId)
+    const contexto = resolverContextoAgir(sessionId, chatId)
+    if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do transcript mudou.')
+    const anteriores = await readTranscript(record.slug, sessionId)
+    const ids = new Set(anteriores.filter((entry) => entry.type === 'agir_event').map(({ uuid }) => uuid))
+    let sequence = anteriores.reduce((maior, entry) => entry.type === 'agir_event' && entry.chatId === chatId
+      ? Math.max(maior, entry.sequence ?? 0) : maior, 0)
+    if (!Number.isSafeInteger(sequence + eventos.length)) throw new Error('Sequência do transcript esgotada.')
+    const timestamp = Date.now()
+    const escopo = createHash('sha256').update(raiz).digest('hex')
+    const novos = eventos.flatMap((evento, indice): TranscriptEntry[] => {
+      const uuid = `${runId}:${indice + 1}`
+      if (ids.has(uuid)) return []
+      return [{ type: 'agir_event', chatId, uuid, timestamp, sequence: ++sequence,
+        message: { version: 1, runId, anterior, turnoId, escopo, alvo, evento } satisfies EventoGravado }]
+    })
+    if (novos.length) await writeTranscript(record.slug, sessionId, [...anteriores, ...novos])
+  })
 }
 
 function sanarStatusAposF5(session: Session): Session {
@@ -159,6 +186,9 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
     const slug = session.slug || sanitizePath(session.workspacePath)
     const now = Date.now()
     const entries = transcriptEntries(session)
+    const chatIds = new Set(session.chats.map((chat) => chat.id))
+    const eventos = existing ? (await readTranscript(existing.slug, session.id))
+      .filter((entry) => entry.type === 'agir_event' && chatIds.has(entry.chatId)) : []
     const committedSession: Session = { ...session, slug, persistenceRevision }
     const metadata: Session = {
       ...committedSession,
@@ -169,7 +199,7 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
     // JSONL is the message source of truth. Commit it atomically before moving
     // the catalog pointer/count, so a failed transcript write leaves SQLite's
     // prior record intact. The queue commits saves in admission order.
-    await writeTranscript(slug, session.id, entries)
+    await writeTranscript(slug, session.id, [...entries, ...eventos])
     if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
     upsertSessionRecord({
       id: session.id,
@@ -260,6 +290,13 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       // é execução. A prefeitura é o endereço onde os dois fatos se encontram — e
       // é ela, não o browser, quem diz qual raiz de projeto vale (F1/D113).
       comporContexto: comporContextoDePersonalizacoes,
+      gravarExecucao: gravarExecucaoAgir,
+      restaurarHistorico: ({ sessionId, chatId, raiz }, mensagens) => withSessionPersistenceQueue(sessionId, async () => {
+        const record = getSessionRecord(sessionId)
+        const contexto = resolverContextoAgir(sessionId, chatId)
+        if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do transcript mudou.')
+        return projetarHistoricoAgir(await readTranscript(record.slug, sessionId), chatId, createHash('sha256').update(raiz).digest('hex'), mensagens)
+      }),
     })) return true
   }
 

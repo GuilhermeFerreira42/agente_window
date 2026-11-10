@@ -32,6 +32,7 @@ import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } f
 // `protocoloHttp.ts`. Mesmas funções, mesmas mensagens — o arquivo só parou de
 // acumular três responsabilidades.
 import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, type PedidoValidado } from './protocoloHttp'
+import { registrarExecucao, type RegistroExecucaoAgir } from './transcript'
 
 const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
@@ -67,6 +68,9 @@ export interface DependenciasAgir {
   criarExecutores?: (raiz: string) => ExecutoresDisco
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
+  gravarExecucao?: (registro: RegistroExecucaoAgir) => Promise<void>
+  restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
+    Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript' }>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -190,7 +194,7 @@ async function concluirCancelamento(execucao: ExecucaoAgir): Promise<'cancelled'
  * MESMO fluxo com orçamento cheio. Teto de mapa (não de iterações!): as mais
  * velhas caem fora para a memória não crescer sem limite.
  */
-const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa }>()
+const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa; runId: string }>()
 const MAX_RETOMADAS = 20
 
 function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string): NivelPermissaoAgir {
@@ -199,14 +203,14 @@ function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: 
 
 /** Guarda a retomada quando o teto pausou OU um erro transitório
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
-function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa): void {
+function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa, runId: string): void {
   retomarPorFluxo.delete(fluxo)
   const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
     (resultado.codigoErro === 'tempo' || resultado.codigoErro === 'endereco' || resultado.codigoErro === 'http')
   if ((pausouNoTeto || caiuTransitorio) && resultado.mensagensParaRetomar) {
-    retomarPorFluxo.set(fluxo, { mensagens: resultado.mensagensParaRetomar, contexto, alvo })
+    retomarPorFluxo.set(fluxo, { mensagens: resultado.mensagensParaRetomar, contexto, alvo, runId })
     while (retomarPorFluxo.size > MAX_RETOMADAS) {
       const maisAntigo = retomarPorFluxo.keys().next()
       if (maisAntigo.done) break
@@ -217,6 +221,8 @@ function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: Cont
 
 interface FioAgir {
   execucao: ExecucaoAgir
+  anterior?: string
+  fonteHistorico?: 'browser' | 'hibrido' | 'transcript'
   fluxo: string
   sessionId: string
   chatId: string
@@ -233,12 +239,36 @@ interface FioAgir {
  * mesmos cartões, mesmo Parar silencioso, mesma faxina no fim.
  */
 async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: DependenciasAgir): Promise<ResultadoAgir> {
+  const registro = deps.gravarExecucao ? registrarExecucao(fio.execucao.runId) : undefined
+  let falhaRegistro = false
+  let eventosPublicados = 0
+  const prefixoTurno = `${fio.sessionId}:${fio.chatId}:`
+  const turnoId = fio.fluxo.startsWith(prefixoTurno) ? fio.fluxo.slice(prefixoTurno.length) : ''
+  async function gravarRegistro(): Promise<void> {
+    if (!registro || !deps.gravarExecucao || registro.eventos.length === eventosPublicados) return
+    const eventos = [...registro.eventos]
+    try {
+      await deps.gravarExecucao({
+        sessionId: fio.sessionId, chatId: fio.chatId, runId: fio.execucao.runId, anterior: fio.anterior, raiz: fio.raiz,
+        turnoId: /^[\w-]{1,200}$/.test(turnoId) ? turnoId : undefined,
+        alvo: fio.alvo.providerId && fio.alvo.modelId ? { providerId: fio.alvo.providerId, modelId: fio.alvo.modelId } : undefined,
+        eventos,
+      })
+      eventosPublicados = eventos.length
+    } catch {
+      falhaRegistro = true
+      throw Object.assign(new Error('Não foi possível gravar os eventos desta execução.'), { code: 'fluxo' })
+    }
+  }
+  let concluido: EventoAgir | undefined
   res.statusCode = 200
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
   res.setHeader('X-Agir-Run-Id', fio.execucao.runId)
   res.setHeader('X-Agir-Generation', String(fio.execucao.generation))
+  if (fio.fonteHistorico) res.setHeader('X-Agir-History-Source', fio.fonteHistorico)
+  else if (fio.anterior) res.setHeader('X-Agir-History-Source', 'execucao')
   res.flushHeaders?.()
 
   const abort = fio.execucao.controller
@@ -300,11 +330,27 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const modeloEfetivo = fio.alvo.providerId && fio.alvo.modelId
     ? `${fio.alvo.providerId} / ${fio.alvo.modelId}`
     : fio.alvo.modelo
+  if (registro) {
+    for (const ferramenta of ['ler', 'listar', 'buscar'] as const) {
+      executores[ferramenta] = (pedido, contexto) => executoresDisco[ferramenta](pedido, {
+        ...contexto, aoLocalizador: (localizador) => registro.localizar(pedido.id, localizador),
+      })
+    }
+  }
   const autorizacoesAutomaticas = new WeakSet<PedidoFerramenta>()
   const automaticaAtiva = (): boolean => lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all' && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
   let instrucaoConsumida = false
   const reconfirmacoes = fio.execucao.exclusoesTentadas ?? new Set<string>()
   fio.execucao.exclusoesTentadas = reconfirmacoes
+  function validarContexto(pedido?: PedidoFerramenta): boolean {
+    const permissoesAtuais = permissoesPorFluxo.get(fluxo)
+    const usouGrantDeSessao = pedido && permiteSessao(pedido.ferramenta) && permissoesAtuais?.has(pedido.ferramenta)
+    const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
+    if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
+    if (pedido && usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido.ferramenta)) return false
+    permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
+    return true
+  }
   try {
     // FATIA 14 / DP-06: a instrução de produto é composta pelo SERVIDOR, a partir
     // da raiz da SESSÃO. O texto lido é a última mensagem do DONO no histórico que
@@ -314,23 +360,35 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     const composicao = deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
+    const vizinho = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
     resultado = await rodarAgir({
-      vizinho: criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo),
+      vizinho: registro ? async (historico, opcoes) => {
+        await gravarRegistro()
+        if (abort.signal.aborted || !validarContexto()) {
+          throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
+        }
+        return vizinho(historico, opcoes)
+      } : vizinho,
       historico: fio.mensagens,
       executores,
+      antesDeExecutar: registro ? gravarRegistro : undefined,
       teto: fio.teto,
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
       ferramentasPermitidas: composicao?.ferramentasPermitidas,
       emitir: (evento) => {
+        registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
         // mas não envie novas respostas, cartões ou continuações após a terminalização.
         // A tela recebe o par resolvido já na primeira iteração (antes da
         // chamada externa), além de no evento terminal; Auto nunca fica
         // visualmente ambíguo durante o run.
-        if (evento.type === 'done') escreverEvento(res, { type: 'done', model: modeloEfetivo })
+        if (evento.type === 'done') {
+          concluido = { type: 'done', model: modeloEfetivo }
+          if (!registro) escreverEvento(res, concluido)
+        }
         else if (evento.type === 'iteracao') escreverEvento(res, { ...evento, model: modeloEfetivo })
         else escreverEvento(res, evento)
       },
@@ -381,23 +439,23 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
             : undefined
         if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
         const allowSession = permiteSessao(pedido.ferramenta) && !(pedido.ferramenta === 'executar' && comandoExigeAprovacaoIndividual(String(pedido.argumentos.comando ?? '')))
+        const evento = { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}), allowSession } as const
+        registro?.observar(evento)
+        await gravarRegistro()
+        if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
         const liberado = await new Promise<boolean>((resolve) => {
           fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
-          escreverEvento(res, { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}), allowSession })
+          escreverEvento(res, evento)
         })
+        if (!abort.signal.aborted) {
+          registro?.decisao(pedido.id, liberado)
+          await gravarRegistro()
+        }
         fio.execucao.pendentes.delete(pedido.id)
         if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
         return liberado
       },
-      validarContexto: (pedido) => {
-        const permissoesAtuais = permissoesPorFluxo.get(fluxo)
-        const usouGrantDeSessao = !!pedido && permiteSessao(pedido.ferramenta) && !!permissoesAtuais?.has(pedido.ferramenta)
-        const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
-        if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
-        if (usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido!.ferramenta)) return false
-        permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
-        return true
-      },
+      validarContexto,
       bloquearFerramenta: (pedido) => {
         if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
@@ -436,6 +494,17 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     executoresDisco.fechar()
     for (const pendente of fio.execucao.pendentes.values()) pendente.resolver(false)
     fio.execucao.pendentes.clear()
+    if (registro) {
+      registro.eventos.push({ tipo: 'encerramento', status: resultado.status })
+      try {
+        await gravarRegistro()
+        if (falhaRegistro) throw new Error('Falha de gravação nesta execução.')
+        if (concluido && !abort.signal.aborted && !res.writableEnded) escreverEvento(res, concluido)
+      } catch {
+        resultado = { status: 'erro', textoFinal: resultado.textoFinal, iteracoes: resultado.iteracoes, codigoErro: 'fluxo' }
+        if (!abort.signal.aborted && !res.writableEnded) escreverEvento(res, { type: 'error', code: 'fluxo', message: 'Não foi possível gravar os eventos desta execução. Confira os resultados antes de tentar novamente.' })
+      }
+    }
     if (fio.execucao.estado !== 'cancelled') {
       fio.execucao.estado = resultado.status === 'interrompido'
         ? 'cancelled'
@@ -651,19 +720,31 @@ async function tratarAgir(
   instrucoes.delete(token)
   const contextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto }
   const execucao = criarExecucao(fluxo, contextoFluxo)
+  let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>
+  try {
+    historico = deps.restaurarHistorico
+      ? await deps.restaurarHistorico(contextoFluxo, validacao.pedido.mensagens)
+      : { fonte: 'browser', mensagens: validacao.pedido.mensagens.map(({ role, content }) => ({ papel: role === 'user' ? 'usuario' : 'assistente', conteudo: content })) }
+  } catch {
+    solicitarCancelamento(execucao, 'requested')
+    if (execucaoPorFluxo.get(fluxo) === execucao) execucaoPorFluxo.delete(fluxo)
+    sendErro(res, 409, 'fluxo', 'Não foi possível recuperar o histórico. Nenhuma ferramenta foi iniciada.')
+    return true
+  }
   const resultado = await executarFioAgir(res, {
     execucao,
     fluxo,
     sessionId,
     chatId,
-    mensagens: validacao.pedido.mensagens.map((mensagem) => ({ papel: mensagem.role === 'user' ? ('usuario' as const) : ('assistente' as const), conteudo: mensagem.content })),
+    mensagens: historico.mensagens,
+    fonteHistorico: historico.fonte,
     raiz: contexto.raiz,
     permissoes: contexto.permissoes,
     alvo,
     teto,
     instrucao,
   }, deps)
-  guardarRetomada(fluxo, resultado, contextoFluxo, alvo)
+  guardarRetomada(fluxo, resultado, contextoFluxo, alvo, execucao.runId)
   return true
 }
 
@@ -734,13 +815,14 @@ async function tratarContinuar(
     fluxo,
     sessionId,
     chatId,
+    anterior: retomada.runId,
     mensagens: retomada.mensagens,
     raiz: contexto.raiz,
     permissoes: contexto.permissoes,
     alvo,
     teto,
   }, deps)
-  guardarRetomada(fluxo, resultado, retomada.contexto, retomada.alvo)
+  guardarRetomada(fluxo, resultado, retomada.contexto, retomada.alvo, execucao.runId)
   return true
 }
 
