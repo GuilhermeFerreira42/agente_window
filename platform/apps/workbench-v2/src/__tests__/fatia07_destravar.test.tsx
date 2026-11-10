@@ -103,7 +103,7 @@ describe('FATIA 07 — Destravar', () => {
     await user.click(landing.getByRole('button', { name: 'Digitar caminho' }))
     const input = landing.getByRole('combobox', { name: 'Caminho manual do workspace' })
     await user.type(input, '/tmp/pasta-nova')
-    await user.click(landing.getByRole('button', { name: 'Usar pasta', exact: true }))
+    await user.click(landing.getByRole('button', { name: 'Usar pasta' }))
 
     // Dois envios: o do próprio clique e o do efeito de boot do Explorer, que
     // reage à pasta nova e recria a árvore na hora.
