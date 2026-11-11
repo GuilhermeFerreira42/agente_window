@@ -1,4 +1,6 @@
-# Retomada após as Fatias 14 e 15 (10/11/2026)
+# Programa M1–M8 — SPECs de execução e rastreabilidade (11/11/2026)
+
+As SPECs abaixo registram o escopo utilizado nas entregas técnicas. O estado atual é mantido em 03, o relatório consolidado em 09 e o aceite humano pendente em 08. A autorização de execução não foi convertida em homologação. A próxima fatia funcional fora deste programa continua subordinada à sequência e aos gates vigentes.
 
 ## M1 — medição e orçamento de contexto
 
@@ -63,6 +65,12 @@ Base `233d2cb`. O [estudo M6](arquivo_morto/estudo_memoria_contexto_2026-10-22/f
 O agente pode buscar trechos literais e pedir a vizinhança de uma referência encontrada na mesma execução. O servidor fixa sessão, chat e pasta. Limitar operações, tamanho e quantidade de resultados. Identificar os trechos como dados históricos e manter ID, sequência e origem. O resultado transita pelo fio do modelo e participa da medição M1 se o provedor reportar uso. Não gravar outra cópia dos trechos nem carregar histórico adicional automaticamente.
 
 Validar opt-in, escopo, referência inventada, cancelamento, texto histórico tentando induzir efeitos, limites e provedor indisponível. A evidência com modelo real deve mostrar recuperação de um fato fora do contexto normal, com uma chamada curta de recuperação.
+
+## M8 — SPEC de execução final (11/11/2026)
+
+Base `a2dc8af`. Reutilizar os stores, filas, projeções e testes de M1–M7. Conferir os contratos separadamente do código, sem chamar esta revisão de auditoria independente. Restringir metadados duráveis à lista de campos do contrato, remover conteúdo livre de aprovações e mensagens internas de recovery e limitar os corpos de persistência com erro 413 explícito. Preservar o transcript original permitido e a recuperação de snapshots rejeitados.
+
+Validar canários em JSONL, catálogo e recovery do navegador; legado, corrupção, concorrência, isolamento, exclusão e retomada sem efeitos. Medir leitura/gravação/busca de histórico sintético grande, registrando volume e latência para decidir sobre o writer atual. Repetir typecheck, build, regressão nominal e os E2E integrados das memórias em perfil descartável. Consolidar evidências reais já coletadas em M3/M6 e limitações de ambiente. Nenhuma migração destrutiva, telemetria nova ou alteração de aceite humano.
 
 ## M7 — SPEC de execução inicial (10/11/2026)
 

@@ -1,5 +1,5 @@
 import type { Session } from '../../types'
-import { projetarMensagemPersistida } from '../../domain/projecaoTranscript'
+import { projetarSessaoPersistida } from '../../domain/projecaoTranscript'
 import { holdSessionPersistence } from './sessionsClient'
 
 const RECOVERY_KEY = 'workbench.sessions.unsaved.v1'
@@ -9,11 +9,8 @@ export interface SessionRecovery {
   message: string
 }
 
-function projetarRecovery({ session, message }: SessionRecovery): SessionRecovery {
-  return { message, session: {
-    ...session,
-    chats: session.chats.map((chat) => ({ ...chat, messages: chat.messages.map(projetarMensagemPersistida) })),
-  } }
+function projetarRecovery({ session }: SessionRecovery): SessionRecovery {
+  return { message: 'A conversa possui alterações locais não salvas.', session: projetarSessaoPersistida(session) }
 }
 
 export function readSessionRecoveries(): SessionRecovery[] {

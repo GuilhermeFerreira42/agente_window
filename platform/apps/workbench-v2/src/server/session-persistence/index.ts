@@ -6,7 +6,7 @@ import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRe
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
-import { projetarMensagemPersistida } from '../../domain/projecaoTranscript'
+import { projetarMensagemPersistida, projetarSessaoPersistida } from '../../domain/projecaoTranscript'
 import { createWorktree, observarGit, removeWorktree, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
@@ -75,9 +75,20 @@ function validPersistenceRevision(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
+class SnapshotGrandeError extends Error {}
+const LIMITE_CORPO_SESSAO = 16 * 1024 * 1024
+
 async function readJson<T>(request: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = []
-  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  let bytes = 0
+  let excedido = false
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    bytes += buffer.length
+    if (bytes > LIMITE_CORPO_SESSAO) excedido = true
+    if (!excedido) chunks.push(buffer)
+  }
+  if (excedido) throw new SnapshotGrandeError('A solicitação excede o limite de 16 MiB.')
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T
 }
 
@@ -103,6 +114,7 @@ function transcriptEntries(session: Session): TranscriptEntry[] {
 }
 
 function restoreMessages(session: Session, entries: TranscriptEntry[]): Session {
+  session = projetarSessaoPersistida(session)
   const byChat = new Map<string, ChatMessage[]>()
   for (const entry of entries) {
     if (entry.type === 'agir_event') continue
@@ -397,6 +409,7 @@ async function listSessions(): Promise<Session[]> {
 }
 
 async function saveSession(session: Session, clientSnapshot = false): Promise<{ saved: boolean; session: Session }> {
+  session = projetarSessaoPersistida(session)
   return withSessionPersistenceQueue(session.id, async () => {
     const existing = getSessionRecord(session.id)
     const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
@@ -686,9 +699,10 @@ export function sessionPersistencePlugin(options: SessionPersistencePluginOption
       server.middlewares.use((request, response, next) => {
         void handleRequest(request, response, options.repoRoot)
           .then((handled) => { if (!handled) next() })
-          .catch((error: unknown) => sendJson(response, error instanceof WorktreeRequiresGitError ? 400 : 500, {
-            code: error instanceof WorktreeRequiresGitError ? error.code : 'session_persistence_error',
-            message: error instanceof Error ? error.message : String(error),
+          .catch((error: unknown) => sendJson(response, error instanceof SnapshotGrandeError ? 413 : error instanceof WorktreeRequiresGitError ? 400 : 500, {
+            code: error instanceof SnapshotGrandeError ? 'session_payload_too_large' : error instanceof WorktreeRequiresGitError ? error.code : 'session_persistence_error',
+            message: error instanceof SnapshotGrandeError ? error.message : error instanceof WorktreeRequiresGitError
+              ? 'A pasta precisa ser um repositório Git para usar worktree.' : 'Não foi possível acessar a persistência da sessão.',
           }))
       })
     },

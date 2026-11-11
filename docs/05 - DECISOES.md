@@ -2121,3 +2121,11 @@ O comando `/historico` abre um turno de consulta somente ao chat atual. O proved
 ## D194 — Revisão operacional e nova execução de planejamento (11/11/2026)
 
 A M7 deriva o estado dos recibos duráveis e não restaura processos. Compara pasta, Git disponível e digest das referências de leitura limitadas a 1 MiB. Resultado mutável ausente ou parcial é incerto. Aprovação anterior é evidência expirada. Uma nova execução de planejamento exige ação explícita no painel e revalidação server-side. Nessa execução todas as ferramentas são bloqueadas. Divergência de pasta, Git ou referência, pausa viva e resultado incerto exigem inspeção antes de nova tarefa.
+
+## D195 — Endurecimento dos stores e limites medidos (11/11/2026)
+
+A M8 compartilha a projeção explícita de campos de sessão/chat entre catálogo e recovery local. Extensões desconhecidas, texto livre de aprovações antigas e detalhes de erro de recovery não são gravados. Consultas de busca em cartões são substituídas por metadado genérico; referências com formatos reconhecíveis de credencial são omitidas. O transcript continua sendo a fonte dos textos normais de conversa. Não há classificador universal de segredos em texto livre.
+
+Corpos de persistência têm teto de 16 MiB, com 413 e preservação da versão anterior. JSONL rejeita estrutura inválida sem citar conteúdo nem reescrever a fonte. O writer atômico atual permanece: o benchmark sintético de 10 mil mensagens/6.346.199 bytes mediu 17–36 ms de gravação, 23–27 ms de leitura e menos de 2 ms de busca limitada. Esses números locais não garantem desempenho para volumes maiores. FTS, writer incremental e coordenação entre múltiplos processos escritores não foram introduzidos; o contrato continua de um servidor por perfil, com fila por sessão e revisão para múltiplas abas.
+
+Não há telemetria de memória adicionada, prazo automático ou coleta de payloads. Transcripts/eventos/checkpoints seguem a exclusão explícita da sessão; memórias confirmadas de projeto seguem seu próprio expurgo explícito. Recovery local termina ao resolver ou descartar o conflito. Stores legados são filtrados na leitura e em novos saves; nenhum saneamento destrutivo de dados pessoais existentes foi executado.

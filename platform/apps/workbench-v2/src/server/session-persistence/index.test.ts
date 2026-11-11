@@ -163,6 +163,8 @@ describe('session persistence HTTP contract', () => {
   it('persists tool states and references without storing transient content', async () => {
     const id = `memory-privacy-${randomUUID()}`
     const session = makeSession(id, id, 'privacy')
+    Object.assign(session, { rawArgs: 'PRIVATE_SESSION_EXTENSION', approval: 'PRIVATE_APPROVAL' })
+    Object.assign(session.chats[0], { rawOutput: 'PRIVATE_CHAT_EXTENSION', approval: 'PRIVATE_CHAT_APPROVAL' })
     touched.push({ id, slug: id })
     const messages = session.chats[0].messages
     const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytes: 'PRIVATE_ATTACHMENT' }
@@ -170,16 +172,42 @@ describe('session persistence HTTP contract', () => {
     messages[1].ferramentas = [
       { id: 'cmd', ferramenta: 'executar', alvo: 'PRIVATE_COMMAND', status: 'ok', progresso: 'PRIVATE_STDOUT', resumo: 'PRIVATE_RESULT' },
       { id: 'write', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado', previa: 'PRIVATE_WRITE' },
+      { id: 'search', ferramenta: 'buscar', alvo: 'PRIVATE_SEARCH_QUERY', status: 'ok' },
     ]
     expect((await putSession(server, session)).ok).toBe(true)
     const entries = await readTranscript(id, id)
     expect(JSON.stringify(entries)).not.toContain('PRIVATE_')
+    expect(getSessionRecord(id)?.sessionJson).not.toContain('PRIVATE_')
     const restored = (await loadSessions(server)).find((entry) => entry.id === id)!
     expect(restored.chats[0].messages[0].attachments).toEqual([{ id: 'attachment-1', name: 'example.txt', kind: 'local' }])
     expect(restored.chats[0].messages[1].ferramentas).toMatchObject([
       { id: 'cmd', ferramenta: 'executar', status: 'ok' },
       { id: 'write', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado' },
+      { id: 'search', ferramenta: 'buscar', alvo: 'Consulta', status: 'ok' },
     ])
+  })
+
+  it('rejects an oversized snapshot with 413 and keeps its previous source', async () => {
+    const id = `memory-limit-${randomUUID()}`
+    const session = makeSession(id, id, 'previous')
+    touched.push({ id, slug: id })
+    expect((await putSession(server, session)).ok).toBe(true)
+    const previous = await readTranscript(id, id)
+    session.persistenceRevision = 2
+    session.chats[0].messages[0].content = 'x'.repeat(16 * 1024 * 1024)
+    const response = await putSession(server, session)
+    expect(response.status).toBe(413)
+    expect(await response.json()).toMatchObject({ code: 'session_payload_too_large' })
+    expect(await readTranscript(id, id)).toEqual(previous)
+    expect(JSON.parse(getSessionRecord(id)!.sessionJson).persistenceRevision).toBe(1)
+  })
+
+  it('does not echo fragments of an invalid JSON payload', async () => {
+    const response = await fetch(`${server.baseUrl}/api/sessions`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"PRIVATE_INVALID_JSON":',
+    })
+    expect(response.status).toBe(500)
+    expect(await response.text()).not.toContain('PRIVATE_')
   })
 
   it('searches only the requested persisted chat and reflects message deletion', async () => {

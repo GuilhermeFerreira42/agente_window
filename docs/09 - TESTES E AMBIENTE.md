@@ -1,3 +1,48 @@
+# M8 — validação integrada e revisão dos contratos (11/11/2026)
+
+Base de entrada `a2dc8af`. A revisão abaixo confronta contratos e testes depois da implementação; é autorrevisão técnica, sem alegação de auditoria independente.
+
+**Resultado técnico consolidado.** M1–M8 integradas e tecnicamente validadas nos contratos e limites registrados. **85/85** testes focados de memória em 13 arquivos, log `m8-memory-final.log`. Regressão completa **1.543 aprovações, 42 falhas preexistentes e 30 ignorados**, em 159,70 s, log `m8-regression-final.log`. Comparação nominal com M7: **42 contra 42, zero diferenças**, em `m8-baseline-comparison.json`. A migração adicional, criada após a coleta dessa suíte, passou separadamente e está incluída nos 85 focados. Não se apresenta a suíte global como inteiramente verde.
+
+| Fatia | Commits locais identificáveis | Decisão |
+|---|---|---|
+| M1 | `30f7e61`, `0289b3e` — compositor e medição do contexto reportado | SPEC M1 em 06 |
+| M2 | `b440c3d`, `8c6ec49` — projeção segura e transcript estruturado | D188–D189 |
+| M3 | `4cf177d` — compactação manual e checkpoint durável | D190 |
+| M4 | `48b4b80` — busca lexical na fonte do chat ativo | D191 |
+| M5 | `233d2cb` — memórias confirmadas e revisadas por projeto | D192 |
+| M6 | `d7067ef` — recuperação explícita com referências | D193 |
+| M7 | `a2dc8af` — revisão operacional sem repetir efeitos | D194 |
+| M8 | `fix(memory): harden durable metadata and validate integrated flows` — commit desta entrega | D195 |
+
+As evidências operacionais ficam em `C:/Users/Usuario/Desktop/arena/arena-operacional`, fora do repositório. A reprodução usa o Node fixado pelo inicializador e perfis descartáveis. Para a bateria integrada, executar os specs `m1_contexto`, `m2_privacidade`, `m3_checkpoint`, `m5_memoria_projeto`, `m6_recuperacao`, `m7_retomada` e `m7_restart` com Playwright `--workers=1`. Definir `M{1,2,3,5,6,7}_E2E_BASE_URL`/`_WORKSPACE`, o segundo leitor por `M2_E2E_RESTART_BASE_URL` e `M7_CRASH_FIXTURE=1`. Os servidores precisam usar o mesmo perfil descartável autorizado; nunca apontar estas fixtures para 5174 ou para o workspace pessoal.
+
+O monitoramento de armazenamento encerrou com **11,27 GiB livres em C:**. Não houve ENOSPC nesta bateria. A ocorrência anterior da fixture de 2 GiB permanece no registro M1; o cenário voltou a passar na regressão atual. O aplicativo pessoal respondeu HTTP 200 em 5174, sem alteração de suas credenciais pelo teste.
+
+| Contrato | Evidência reproduzível |
+|---|---|
+| M1: uso reportado, ausência, limite desconhecido e 413 | `m1_contexto.spec.ts`, normalizadores e testes da Casa Agir/Conversa; a integração final não habilitou o teste opcional Ollama |
+| M2: nenhuma saída/argumento bruto de ferramenta, anexo ou extensão em store | `index.test.ts` e `SessionPersistenceNotice.test.tsx` com canários em JSONL, catálogo e localStorage; `m2_privacidade.spec.ts` em dois processos leitores |
+| M3: fonte preservada, falha, concorrência e checkpoint inválido | `checkpoint.test.ts`, `database.test.ts` e `m3_checkpoint.spec.ts`; a mesma jornada cobre a navegação M4 até texto anterior ao resumo |
+| M4/M6: isolamento, limites, IDs e conteúdo não confiável | `buscaTranscript.test.ts`, `recuperarHistorico.test.ts`, teste de opt-in da rota e `m6_recuperacao.spec.ts`, que bloqueia tentativa de escrita |
+| M5: autorização específica, versões, projeto, exportação e expurgo | `database.test.ts`, `index.test.ts` e `m5_memoria_projeto.spec.ts`, incluindo fonte excluída e falha de gravação |
+| M7: estados incertos, ambiente alterado e autorizações expiradas | `retomadaOperacional.test.ts`, `m7_retomada.spec.ts` e `m7_restart.spec.ts`; kill real do processo descartável durante um turno após escrita registrada |
+| M8: dados legados, corrupção, tamanho e concorrência | `databaseMigration.test.ts`, `transcripts.test.ts`, `index.test.ts` e `memoriaVolume.test.ts`; schema anterior, canários estruturais, 413 e comparação da fonte antes/depois |
+
+O modelo de ameaça usa as portas locais existentes para autorização HTTP e a prefeitura para escopo. Caminhos são resolvidos pelo território existente. Busca/recuperação fixam chat no servidor e não usam índice independente. Memória confirmada não é carregada automaticamente. Dados históricos são apresentados como fonte, com limites e ferramentas de efeito bloqueadas na recuperação e na retomada. O teste adversarial inclui provedor emitindo escrita mesmo assim. As evidências não equivalem a um teste de penetração geral do produto.
+
+**Benchmark.** `M8_BENCHMARK=1 iniciar.cmd test src/server/session-persistence/__tests__/memoriaVolume.test.ts --maxWorkers=1 --minWorkers=1`: 10.000 mensagens, 6.346.199 bytes. Três amostras: gravação **36,19 / 17,50 / 18,68 ms**, leitura **27,33 / 22,87 / 26,51 ms**, busca **1,32 / 0,62 / 1,19 ms**. Validados IDs, contagem integral, outro chat vazio, teto de leitura e sinalização de busca parcial acima de dois milhões de caracteres. A busca mede esse limite, não a varredura integral dos 6,3 MB. Custo externo zero. D195 mantém o writer por esses dados; log `m8-benchmark.log`.
+
+**Integração.** Playwright final **8 aprovados, 1 ignorado opcional**, em 1,2 minuto, log `m8-integrated-final.log`. A primeira rodada revelou dependência do teste M2 da ordem dos workspaces: a lista limita pastas visíveis e o segundo processo selecionava outra pasta. A API continha a sessão. O teste passou a usar a busca pública de sessões e repetiu todas as verificações de privacidade e pares nativos. Nenhuma regra do produto foi reduzida.
+
+**Migração.** O teste separado recriou somente um catálogo descartável anterior às memórias, preservou sessão/contagem, aceitou worktree nulo após upgrade e comprovou cascade do checkpoint. **1/1**, log `m8-migration.log`. Não tocou dados pessoais. Typecheck final e build completos aprovados, logs `m8-typecheck-final.log` e `m8-build.log`. Build manteve os avisos existentes de CSS/chunks e da fronteira nativa F2 desabilitada por contenção; nenhuma dessas superfícies foi alterada.
+
+**Provas reais.** M1 tem o Ollama local registrado na própria seção; M3 validou resumo e recuperação sintética com duas chamadas LiteLLM; M6 validou uma consulta de histórico com teto de duas chamadas. As provas reais não foram repetidas desnecessariamente na M8. Protocolos restantes foram exercitados com respostas simuladas; não se presume execução real adicional nem paridade de qualidade entre modelos.
+
+**Limites.** Windows nesta rodada; Debian não executado. Não há busca entre chats, injeção automática de memória, compactação automática, reexecução automática de tarefa interrompida ou suporte de escrita simultânea por dois servidores no mesmo perfil. Aprovações antigas expiram; a retomada só planeja sem ferramentas. Retenção e stores legados seguem D195. Formatos reconhecíveis de segredo são filtrados onde especificado, sem promessa de detectar informação arbitrária em conversa livre. O aceite humano de todas as M permanece pendente.
+
+---
+
 # M7 — revisão operacional e interrupção (11/11/2026)
 
 Regressão final estável: **1.536 aprovações, 42 falhas preexistentes e 30 ignorados**, em 154,85 s. Comparação nominal com M6 sem falha nova. Log `m7-regression-stable.log` no operacional externo.

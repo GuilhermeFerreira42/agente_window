@@ -1,3 +1,9 @@
+# 11/11/2026 — M8 conclui validação técnica integrada das memórias
+
+Commit `fix(memory): harden durable metadata and validate integrated flows`. A projeção compartilhada restringe metadados duráveis, preserva recovery seguro e limita corpos de persistência. As provas incluem catálogo legado, fonte corrompida, volume e jornadas M1–M7 integradas. D195 registra as decisões; 09 consolida commits, evidências, limites e comparação nominal das 42 falhas preexistentes. A homologação humana permanece pendente em 08.
+
+---
+
 # 11/11/2026 — M7 integra revisão operacional após interrupção
 
 Commit `feat(memory): review interrupted tasks without replaying effects`. O painel relaciona estado a recibos, verifica o ambiente e permite confirmar um novo planejamento. Decisão D194 e evidências em 09.

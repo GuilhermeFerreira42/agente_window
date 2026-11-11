@@ -12,7 +12,7 @@ A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homo
 - **M5.** Memória persistente de projeto com confirmação, histórico de revisões, exportação e exclusão integrada e validada tecnicamente. Aceite humano pendente. D192 e evidências em 09.
 - **M6.** Recuperação histórica explícita validada no chat ativo. Aceite humano pendente. D193 e evidências em 09.
 - **M7.** Revisão de execuções interrompidas e novo planejamento sem ferramentas validados tecnicamente. Aceite humano pendente. D194 e evidências em 09.
-- **M8.** Próxima etapa: endurecimento, benchmark e validação integrada do programa.
+- **M8.** Endurecimento, migração legada, benchmark e validação integrada M1–M8 concluídos tecnicamente na entrega `fix(memory): harden durable metadata and validate integrated flows`. Sem novas falhas contra a linha de base Windows. Relatório consolidado, commits, limites e evidências em 09; roteiro em 08. O próximo passo do programa é a homologação humana, ainda pendente para todas as M. A suíte global continua com as 42 falhas preexistentes identificadas, sem alegação de aprovação integral.
 - **Outras pautas.** E15-d segue como retirada física separada da rede de rollback. O modo de voz permanece como pauta posterior a M1–M8.
 
 ## Registros anteriores

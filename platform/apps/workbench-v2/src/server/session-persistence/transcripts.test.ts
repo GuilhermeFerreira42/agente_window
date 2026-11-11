@@ -45,6 +45,15 @@ describe('JSONL transcript persistence', () => {
     await expect(readTranscript(slug, sessionId)).rejects.toThrow(/^Histórico inválido na linha 2\.$/)
   })
 
+  it.each(['null', '[]', '"PRIVATE_SCHEMA"', '{"type":"unknown","private":"PRIVATE_SCHEMA"}'])
+  ('rejects a malformed record without rewriting its original bytes (%s)', async (source) => {
+    const destination = join(directory, `${sessionId}.jsonl`)
+    await writeFile(destination, `${source}\n`)
+    await expect(readTranscript(slug, sessionId)).rejects.toThrow(/^Histórico inválido na linha 1\.$/)
+    const { readFile } = await import('node:fs/promises')
+    expect(await readFile(destination, 'utf8')).toBe(`${source}\n`)
+  })
+
   it('survives two rounds of 16 concurrent snapshots without ENOENT or a mixed transcript', async () => {
     for (let round = 0; round < 2; round += 1) {
       const snapshots = Array.from({ length: 16 }, (_, index) => makeEntries(`r${round}-w${index}`))

@@ -1,3 +1,16 @@
+# Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
+
+A entrega técnica está consolidada em 09. A M1 continua tecnicamente pronta para homologação, sem aceite humano formal. O mesmo vale para M2–M8. Os aceites anteriores das Fatias 14 e 15 permanecem preservados.
+
+1. Use uma pasta de teste sem dados sensíveis. Escolha seu provedor e conclua três turnos, registrando uma decisão sintética no primeiro. Confira a medição de contexto quando o provedor reportar uso.
+2. Peça uma leitura e negue uma escrita em modo Manual. Recarregue. Confira a conversa, os cartões e a ausência de repetição automática ou permissão antiga.
+3. Compacte com confirmação. Confira a preservação das mensagens e use **Buscar no histórico** para chegar ao texto anterior ao resumo. Use **/historico** para recuperar a decisão com referência. Outro chat não deve revelar esse fato.
+4. Em **Memória do projeto**, confirme uma decisão, abra outro chat na mesma pasta, revise, exporte e exclua a memória sintética. Outra pasta deve permanecer isolada.
+5. Em uma tarefa de teste interrompida, abra a revisão operacional. Resultado incerto deve bloquear a retomada. Quando permitida, confirme o planejamento e confira que ele não executa ferramentas. Novas ações exigem uma tarefa nova e a autorização atual.
+6. Registre o aceite ou os ajustes encontrados por fatia. Os roteiros específicos abaixo detalham cada etapa. Não use dados reais para simular corrupção ou interrupção destrutiva.
+
+---
+
 # Roteiro de homologação da M7 — aceite pendente (11/11/2026)
 
 1. Em uma tarefa sintética interrompida, abra **Execução interrompida: revisar tarefa**. Confira resultados conhecidos e incertos, aprovações históricas, pasta, Git e referências.

@@ -44,7 +44,13 @@ export async function readTranscript(slug: string, sessionId: string, maxBytes?:
       return content.split(/\r?\n/).flatMap((line, index) => {
         if (!line) return []
         try {
-          return [JSON.parse(line) as TranscriptEntry]
+          const entry = JSON.parse(line) as TranscriptEntry | null
+          if (!entry || !['user', 'assistant', 'agir_event'].includes(entry.type)
+            || typeof entry.chatId !== 'string' || typeof entry.uuid !== 'string'
+            || !Number.isFinite(entry.timestamp) || !entry.message || typeof entry.message !== 'object') {
+            throw new Error('invalid entry')
+          }
+          return [entry]
         } catch {
           // The parser's error can quote arbitrary transcript content.
           throw new Error(`Histórico inválido na linha ${index + 1}.`)

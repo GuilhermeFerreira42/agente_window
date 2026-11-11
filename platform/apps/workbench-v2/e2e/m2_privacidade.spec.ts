@@ -65,6 +65,10 @@ test.describe('M2 — privacidade de snapshots', () => {
       expect(eventos[2].message.evento.localizador).toMatchObject({ arquivo, digest: expect.stringMatching(/^[a-f0-9]{64}$/) })
       if (segundoServidor) await page.goto(segundoServidor)
       else await page.reload()
+      // Um perfil acumulado pode ocultar o workspace pelo limite normal da lista.
+      // Buscar a sessão exercita a navegação pública sem depender da ordenação.
+      await page.getByRole('button', { name: 'Buscar sessões', exact: true }).click()
+      await page.getByRole('textbox', { name: 'Filtrar sessões', exact: true }).fill(id)
       await linha.click()
       const fio = page.waitForResponse((res) => res.url().endsWith('/api/agir') && res.request().method() === 'POST')
       await enviar('O que aconteceu no turno anterior?')
