@@ -122,7 +122,7 @@
   - `platform/apps/workbench-v2/src/services/sessions/sessionsClient.test.ts`
   - `platform/apps/workbench-v2/src/types.ts`
 - **Arquivos não rastreados (untracked):**
-  - `investigacao_memoria_fatias_m/` (contendo este relatório e notas técnicas)
+  - `docs/arquivo_morto/investigacao_memoria_fatias_m/` (contendo este relatório e notas técnicas)
   - `platform/apps/workbench-v2/src/server/session-persistence/index.test.ts`
   - `platform/apps/workbench-v2/src/server/session-persistence/transcripts.test.ts`
   - `platform/apps/workbench-v2/src/services/sessions/SessionPersistenceNotice.test.tsx`

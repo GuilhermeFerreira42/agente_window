@@ -54,7 +54,7 @@ test.describe('M1 — medição e orçamento', () => {
       await semear(page, segunda)
       await page.goto('/')
       const abrir = (titulo: string) => page.locator('.session-row').filter({ hasText: titulo }).click()
-      const indicador = page.locator('.context-usage')
+      const indicador = page.locator('.context-usage').first()
       await abrir(primeira)
       await expect(indicador).toHaveText('Contexto não medido')
       await enviar(page, 'Uma pergunta curta')
@@ -70,7 +70,8 @@ test.describe('M1 — medição e orçamento', () => {
       await expect(indicador).toHaveText('Contexto não medido')
       await expect(page.locator('.chat-message').last()).toContainText('Resposta M1 da fixture.')
       await enviar(page, 'Um conteúdo longo. '.repeat(500))
-      await expect(indicador).toHaveText('Contexto indisponível')
+      await expect(indicador).toContainText('≈')
+      await expect(indicador).toHaveAttribute('title', /Entrada estimada.*Faixa heurística/)
       expect(chamadas[1].messages).toEqual(expect.arrayContaining([
         expect.objectContaining({ role: 'user', content: 'Uma pergunta curta' }),
         expect.objectContaining({ role: 'assistant', content: 'Resposta M1 da fixture.' }),

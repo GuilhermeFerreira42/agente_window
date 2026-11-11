@@ -49,8 +49,8 @@ Quadro-síntese da comparabilidade entre projetos: **2.4** (identidade, 15 crit�
 | Remote | **nenhum** |
 | Commits nesta missão | **nenhum** |
 | Push | **nenhum** |
-| Working tree no início desta missão | 3 alterações herdadas da Task 02/03, todas dentro de `investigacao_memoria_fatias_m/` |
-| Working tree ao final | 4 alterações, todas dentro de `investigacao_memoria_fatias_m/` (este arquivo novo + `00_INDICE.md` aditivo + os dois da missão anterior) |
+| Working tree no início desta missão | 3 alterações herdadas da Task 02/03, todas dentro de `docs/arquivo_morto/investigacao_memoria_fatias_m/` |
+| Working tree ao final | 4 alterações, todas dentro de `docs/arquivo_morto/investigacao_memoria_fatias_m/` (este arquivo novo + `00_INDICE.md` aditivo + os dois da missão anterior) |
 | Código-fonte, testes, `docs/01`–`09`, roadmap, dependências | **inalterados** |
 | Áreas congeladas (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, `explorer-search/{core,server}/**`, `EditorArea.tsx`, specs `sessao_11*`) | **não tocadas** |
 
@@ -1419,14 +1419,14 @@ Canonicalização antes de derivar a chave · tabela `projeto_diretorio` e a esc
 
 | Arquivo | Conteúdo | Status |
 |---|---|---|
-| `investigacao_memoria_fatias_m/13_INVESTIGACAO_COMPLEMENTAR_DP01_A_DP06.md` | **Este relatório.** §0 estado/fontes · §1 seis correções ao trabalho anterior · §2–§7 as seis decisões com os 10 itens exigidos cada · §8 suficiência de evidências · §9 resumo executivo · §10 conformidade | **Novo.** Temporário até aprovação |
-| `investigacao_memoria_fatias_m/00_INDICE.md` | Entrada 13 + registro das fontes novas e das seis correções | **Atualizado** (aditivo) |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/13_INVESTIGACAO_COMPLEMENTAR_DP01_A_DP06.md` | **Este relatório.** §0 estado/fontes · §1 seis correções ao trabalho anterior · §2–§7 as seis decisões com os 10 itens exigidos cada · §8 suficiência de evidências · §9 resumo executivo · §10 conformidade | **Novo.** Temporário até aprovação |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/00_INDICE.md` | Entrada 13 + registro das fontes novas e das seis correções | **Atualizado** (aditivo) |
 
 **Nenhum outro arquivo foi criado, alterado, movido ou apagado.** Em particular: `11_TASK02_…` e `12_TASK03_…` **não foram reescritos** — as correções vivem aqui, em §1, com vínculo explícito, no padrão de supersessão que §5.5 recomenda adotar.
 
 ### 10.3 Arquivos apenas lidos
 
-- **Agente Window:** `docs/01`–`09`; `platform/apps/workbench-v2/src/{types.ts, App.tsx, components/ChatInput.tsx}`; `server/session-persistence/{index,transcripts,database,paths,chatAlvo}.ts`; `services/sessions/*`; `bairros/2-inteligencia/casas/{conversa,agir,provedores,config}/**`; `package.json`; `investigacao_memoria_fatias_m/00`–`12`.
+- **Agente Window:** `docs/01`–`09`; `platform/apps/workbench-v2/src/{types.ts, App.tsx, components/ChatInput.tsx}`; `server/session-persistence/{index,transcripts,database,paths,chatAlvo}.ts`; `services/sessions/*`; `bairros/2-inteligencia/casas/{conversa,agir,provedores,config}/**`; `package.json`; `docs/arquivo_morto/investigacao_memoria_fatias_m/00`–`12`.
 - **OpenCode** `45898d0f`: 6 arquivos (§0.3).
 - **OpenClaude** `3a8e12b`: 11 arquivos (§0.3), em clone raso fora do workspace.
 - **DeepSeek Harness** `22ddee3`: 27 fontes baixadas por `raw` com SHA fixo (§0.3).
@@ -1441,7 +1441,7 @@ Canonicalização antes de derivar a chave · tabela `projeto_diretorio` e a esc
 | Remote | **nenhum** |
 | Commits nesta missão | **nenhum** |
 | Push | **nenhum** |
-| Working tree | **4 alterações, todas dentro de `investigacao_memoria_fatias_m/`**: `00_INDICE.md` (M) · `11_TASK02_…` (??) · `12_TASK03_…` (??) · `13_INVESTIGACAO_COMPLEMENTAR_…` (??) |
+| Working tree | **4 alterações, todas dentro de `docs/arquivo_morto/investigacao_memoria_fatias_m/`**: `00_INDICE.md` (M) · `11_TASK02_…` (??) · `12_TASK03_…` (??) · `13_INVESTIGACAO_COMPLEMENTAR_…` (??) |
 | Código-fonte / testes | **inalterados** |
 | `docs/01`–`09` | **inalterados** |
 | Roadmap / numeração oficial | **inalterados** |

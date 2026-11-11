@@ -126,6 +126,7 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
     try {
       resposta = await vizinho(mensagens, {
         aoTexto: (pedaco) => emitir({ type: 'chunk', text: pedaco }),
+        aoContexto: (medicao) => emitir({ type: 'context_usage', medicao: { ...medicao, iteracao } }),
         sinal,
         // D141: repassa o que o servidor compôs. Continua valendo que o
         // `historico` de entrada NUNCA é alterado — instrução não é mensagem.

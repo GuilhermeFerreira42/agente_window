@@ -14,7 +14,7 @@
 import type { AlvoConversa, CategoriaErro, ConfigChamadaModelo, ErroConversa, EventoChat, IniciarChamadaModelo, MensagemChat } from '../contract'
 import { montarPedido } from './requisicao'
 import { criarFramer } from './streaming'
-import { criarLeitorDeUso, metadadosDaChamada } from '../../../../../domain/usoContexto'
+import { criarLeitorDeUso, metadadosDaChamada, completarMedicao, removerOpcaoRecusada } from '../../../../../domain/usoContexto'
 
 /** Sem NENHUM byte do corpo em 60 s → `tempo` (proposta da SPEC §3.6d). */
 export const TIMEOUT_PRIMEIRO_BYTE_MS = 60_000
@@ -35,6 +35,21 @@ export function ehErroChat(erro: unknown): erro is ErroChat {
 }
 
 export type Emitir = (evento: EventoChat) => void
+
+async function lerRecusa(resposta: Response): Promise<string> {
+  if (!resposta.body) return ''
+  const leitor = resposta.body.getReader(), decoder = new TextDecoder()
+  let texto = '', bytes = 0
+  try {
+    while (bytes < 16_384) {
+      const { done, value } = await leitor.read()
+      if (done) break
+      const parte = value.subarray(0, 16_384 - bytes)
+      texto += decoder.decode(parte, { stream: true }); bytes += parte.length
+    }
+    return texto + decoder.decode()
+  } finally { await leitor.cancel().catch(() => undefined) }
+}
 
 function erroPorStatus(status: number): ErroChat {
   if (status === 401 || status === 403) {
@@ -178,10 +193,12 @@ export async function executarConversa(
   emitir: Emitir,
   sinalExterno?: AbortSignal,
   iniciarModelo?: IniciarChamadaModelo,
+  exigirConclusao = false,
 ): Promise<void> {
   const sinal = criarSinalConversa(sinalExterno)
   const uso = criarLeitorDeUso(alvo.protocolo)
   let chamada: ReturnType<typeof metadadosDaChamada>
+  let payloadMedido: unknown
   try {
     const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
       const alvoAtual: AlvoConversa = config ? {
@@ -198,7 +215,17 @@ export async function executarConversa(
       } : alvo
       const pedido = montarPedido(alvoAtual, messages)
       chamada = metadadosDaChamada(alvoAtual, pedido.reservaSaida)
-      return fetch(pedido.url, { ...pedido.init, signal: sinal.signal })
+      const corpo = JSON.parse(String(pedido.init.body)) as Record<string, unknown>
+      payloadMedido = corpo
+      if (chamada) emitir({ type: 'context_usage', medicao: { ...completarMedicao(chamada, corpo, {}, 'enviado'), iteracao: 1 } })
+      return (async () => {
+        for (let tentativa = 0; ; tentativa++) {
+          const resposta = await fetch(pedido.url, { ...pedido.init, body: JSON.stringify(corpo), signal: sinal.signal })
+          if (tentativa >= 2 || (resposta.status !== 400 && resposta.status !== 422)) return resposta
+          const detalhe = await lerRecusa(resposta)
+          if (!removerOpcaoRecusada(corpo, resposta.status, detalhe)) return new Response(detalhe, { status: resposta.status })
+        }
+      })()
     }
 
     let resposta: Response
@@ -231,6 +258,9 @@ export async function executarConversa(
     const framer = criarFramer(alvo.protocolo)
     let pendente = '' // só espaço que espera conteúdo de verdade
     let emitiuUtil = false
+    let truncado = false
+    let terminoAnormal = false
+    let conclusaoConfirmada = false
 
     const enviar = (texto: string): void => {
       if (texto.length === 0) return
@@ -246,8 +276,20 @@ export async function executarConversa(
 
     const consumirPayloads = (payloads: string[]): void => {
       for (const payload of payloads) {
+        if (payload.trim() === '[DONE]') { conclusaoConfirmada = true; continue }
         try {
           const quadro: unknown = JSON.parse(payload)
+          if (quadro && typeof quadro === 'object') {
+            const q = quadro as { choices?: Array<{ finish_reason?: string }>; delta?: { stop_reason?: string }; stop_reason?: string;
+              candidates?: Array<{ finishReason?: string }>; done_reason?: string; done?: boolean; type?: string }
+            const motivos = [...(q.choices ?? []).map((c) => c.finish_reason), q.delta?.stop_reason, q.stop_reason,
+              ...(q.candidates ?? []).map((c) => c.finishReason), q.done_reason].filter(Boolean)
+            terminoAnormal ||= motivos.some((m) => !['stop', 'end_turn', 'STOP'].includes(m!)) || q.type === 'error'
+            truncado ||= !!q.choices?.some((c) => c.finish_reason === 'length') || q.delta?.stop_reason === 'max_tokens' ||
+              !!q.candidates?.some((c) => c.finishReason === 'MAX_TOKENS') || q.done_reason === 'length'
+            conclusaoConfirmada ||= !!q.choices?.some((c) => c.finish_reason === 'stop') || q.delta?.stop_reason === 'end_turn' ||
+              !!q.candidates?.some((c) => c.finishReason === 'STOP') || q.type === 'message_stop' || q.done === true
+          }
           uso.ler(quadro)
           enviar(extrairTexto(alvo.protocolo, quadro))
         } catch {
@@ -273,10 +315,14 @@ export async function executarConversa(
       throw erroInterrompida()
     }
 
+    if (exigirConclusao && (truncado || terminoAnormal || !conclusaoConfirmada)) throw new ErroChat('resposta', truncado
+      ? 'O resumo atingiu o limite de saída e ficou incompleto. O checkpoint anterior foi preservado.'
+      : terminoAnormal ? 'O resumo teve um encerramento anormal e pode estar incompleto. O checkpoint anterior foi preservado.'
+      : 'O resumo terminou sem confirmação de conclusão e pode estar incompleto. O checkpoint anterior foi preservado.')
     if (!emitiuUtil) {
       throw new ErroChat('resposta', 'O serviço respondeu, mas veio sem texto. Nada foi exibido para não inventar resposta.')
     }
-    if (chamada && !sinal.silenciado()) emitir({ type: 'context_usage', medicao: { ...chamada, iteracao: 1, ...uso.resultado() } })
+    if (chamada && !sinal.silenciado()) emitir({ type: 'context_usage', medicao: { ...completarMedicao(chamada, payloadMedido, uso.resultado(), 'respondido'), iteracao: 1 } })
   } finally {
     sinal.limpar()
   }

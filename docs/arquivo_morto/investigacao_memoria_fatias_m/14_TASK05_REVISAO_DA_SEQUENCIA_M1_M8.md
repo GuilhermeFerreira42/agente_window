@@ -520,8 +520,8 @@ Ou seja: para a Fatia 14 funcionar, alguém vai ter que inventar um lugar para a
 
 | Arquivo | Conteúdo |
 |---|---|
-| `investigacao_memoria_fatias_m/14_TASK05_REVISAO_DA_SEQUENCIA_M1_M8.md` | **Este relatório.** §0 escopo e posição verificada · §1 o fato que invalida a premissa · §2 as três sequências · §3 dependências nos dois sentidos · §4 o achado do ponto de composição · §5 comparação · §6 recomendação · §7 confronto com as seis preferências · §8 o que não mexer · §9 suficiência · §10 resumo simples · §11 conformidade |
-| `investigacao_memoria_fatias_m/00_INDICE.md` | **Atualizado aditivamente** — entrada 14 + registro desta missão |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/14_TASK05_REVISAO_DA_SEQUENCIA_M1_M8.md` | **Este relatório.** §0 escopo e posição verificada · §1 o fato que invalida a premissa · §2 as três sequências · §3 dependências nos dois sentidos · §4 o achado do ponto de composição · §5 comparação · §6 recomendação · §7 confronto com as seis preferências · §8 o que não mexer · §9 suficiência · §10 resumo simples · §11 conformidade |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/00_INDICE.md` | **Atualizado aditivamente** — entrada 14 + registro desta missão |
 
 **Relatórios anteriores NÃO foram reescritos.** A correção a DP-01 (§7.1) fica registrada **aqui**, com vínculo explícito a `13_…` §2.6, no padrão de supersessão que `13_…` §5.5 recomenda adotar.
 
@@ -541,7 +541,7 @@ Ou seja: para a Fatia 14 funcionar, alguém vai ter que inventar um lugar para a
 | Remote | **nenhum** |
 | Commits nesta missão | **nenhum** |
 | Push nesta missão | **nenhum** |
-| Working tree | **5 alterações, todas dentro de `investigacao_memoria_fatias_m/`**: `00_INDICE.md` (M) · `11_TASK02_…` (??) · `12_TASK03_…` (??) · `13_INVESTIGACAO_…` (??) · **`14_TASK05_…` (??)** |
+| Working tree | **5 alterações, todas dentro de `docs/arquivo_morto/investigacao_memoria_fatias_m/`**: `00_INDICE.md` (M) · `11_TASK02_…` (??) · `12_TASK03_…` (??) · `13_INVESTIGACAO_…` (??) · **`14_TASK05_…` (??)** |
 | Fora dessa pasta | **nenhuma alteração** (verificado com `git status --porcelain`) |
 | Código-fonte, testes, `docs/01`–`09`, roadmap, dependências | **inalterados** |
 | Áreas congeladas (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, specs `sessao_11*`, `explorer-search/{core,server}/**`, `EditorArea.tsx`) | **não tocadas** |

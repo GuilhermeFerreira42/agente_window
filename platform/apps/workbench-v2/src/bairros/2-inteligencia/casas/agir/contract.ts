@@ -62,6 +62,7 @@ export type CategoriaErroAgir =
   | 'endereco' // não alcançou o serviço
   | 'tempo' // serviço lento/parado
   | 'http' // outro erro do serviço (429, 5xx, 400…)
+  | 'limite' // rejeição inequívoca por capacidade de contexto
   | 'resposta' // resposta sem nada aproveitável
   | 'iteracoes' // (legado da 10 — o teto agora é o evento `teto`, sem erro)
   | 'loop' // guardião: 3 chamadas idênticas seguidas (anti-loop, C4)
@@ -75,6 +76,9 @@ export interface ErroAgir {
 
 /** Mensagem do histórico do loop: o dono, a IA e as ferramentas falam. */
 export interface MensagemAgir {
+  derivado?: 'checkpoint' | 'memoria-projeto'
+  /** Referência à mensagem fonte; não vira argumento nem autorização. */
+  origemId?: string
   papel: 'usuario' | 'assistente' | 'ferramenta'
   conteudo: string
   /** Preenchido quando papel = 'assistente' e a IA pediu ferramentas — o eco
@@ -109,6 +113,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
  * iteracoes+teto: a rota guardou o diálogo e a tela oferece continuar de onde parou.
  */
 export type EventoAgir =
+  | { type: 'memory_status'; estado: 'compactando' | 'compactado' | 'falhou'; ultimaEm?: number }
   | { type: 'chunk'; text: string }
   | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'tool'; pedido: PedidoFerramenta }
@@ -171,6 +176,8 @@ export interface InstrucaoDeProduto {
  * ausentes, o comportamento é idêntico ao anterior.
  */
 export interface OpcoesVizinho {
+  validarAntesDaChamada?: () => boolean
+  aoContexto?: (medicao: Omit<MedicaoContexto, 'iteracao'>) => void
   aoTexto?: (pedaco: string) => void
   sinal?: AbortSignal
   /** Instruções de produto compostas pelo SERVIDOR (DP-06). */

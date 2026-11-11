@@ -37,14 +37,16 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
   const baseUrl = alvo.baseUrl.replace(/\/+$/, '')
   const cabecalhos = cabecalhosBase(alvo.apiKey, alvo.protocolo)
   const temperatura = typeof alvo.temperatura === 'number' ? { temperature: alvo.temperatura } : {}
+  const reserva = alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : undefined
 
   if (alvo.protocolo === 'openai-chat') {
     return {
       url: `${baseUrl}/chat/completions`,
+      reservaSaida: reserva,
       init: {
         method: 'POST',
         headers: cabecalhos,
-        body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...opcaoUsoOpenAI(baseUrl), ...temperatura }),
+        body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...(alvo.esforcoResumo ? { reasoning_effort: alvo.esforcoResumo } : {}), ...temperatura }),
       },
     }
   }
@@ -71,10 +73,11 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
   if (alvo.protocolo === 'gemini') {
     return {
       url: `${baseUrl}/models/${encodeURIComponent(alvo.modelo)}:streamGenerateContent?alt=sse`,
+      reservaSaida: reserva,
       init: {
         method: 'POST',
         headers: cabecalhos,
-        body: JSON.stringify({ contents: conteudoGemini(messages), generationConfig: temperatura }),
+        body: JSON.stringify({ contents: conteudoGemini(messages), generationConfig: { ...temperatura, ...(reserva ? { maxOutputTokens: reserva } : {}), ...(alvo.esforcoResumo ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } }),
       },
     }
   }
@@ -82,10 +85,11 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
   // ollama (API nativa): sem chave; NDJSON de resposta — aqui ainda sem stream.
   return {
     url: `${baseUrl}/api/chat`,
+    reservaSaida: reserva,
     init: {
       method: 'POST',
       headers: cabecalhos,
-      body: JSON.stringify({ model: alvo.modelo, messages, stream: true, ...(alvo.temperatura !== undefined ? { options: temperatura } : {}) }),
+      body: JSON.stringify({ model: alvo.modelo, messages, stream: true, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}) } }),
     },
   }
 }

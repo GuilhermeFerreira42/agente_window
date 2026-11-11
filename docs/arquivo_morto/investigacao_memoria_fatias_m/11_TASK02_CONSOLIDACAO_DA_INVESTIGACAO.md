@@ -37,7 +37,7 @@ Evidência de que **a homologação oficial NÃO foi registrada**:
 - `docs/03 - ESTADO ATUAL.md:3` ainda diz: *"**PRONTA PARA NOVA HOMOLOGAÇÃO INDEPENDENTE**, sem homologação oficial"* e *"correções não commitadas, sem push"*.
 - `docs/07 - HISTORICO.md:6` ainda diz: *"Sem commit/push e sem homologação oficial."*
 - `docs/09 - TESTES E AMBIENTE.md:915` ainda diz: *"Sem commit/push [...] não declara homologação oficial."*
-- `investigacao_memoria_fatias_m/CORRECAO_PERSISTENCIA.md:3` idem.
+- `docs/arquivo_morto/investigacao_memoria_fatias_m/CORRECAO_PERSISTENCIA.md:3` idem.
 
 **Divergência documental registrada (não corrigida, por ordem da missão):** os quatro trechos acima descrevem o estado da **máquina do dono em 30/10** (HEAD `0dfe3c2`, árvore suja). O clone do GitHub já contém o código, logo ele foi commitado e pushado depois disso. Os canônicos estão **desatualizados em relação ao GitHub**. Corrigir isso é tarefa do dono (ou de uma missão com autorização para mexer em `docs/`), não desta.
 
@@ -470,7 +470,7 @@ Fontes: `src/memdir/memorySecurity.ts`, `src/services/teamMemorySync/teamMemSecr
 
 ### 3.5 Meta AI / Meta Muse — **grau de evidência BAIXO** (só secundário)
 
-**Registro de lacuna prévia:** não existe **nenhuma** investigação anterior de Meta AI neste repositório (`grep -rni "meta ai" docs/ investigacao_memoria_fatias_m/` → zero ocorrências). O que segue vem de fontes de **terceira parte** (blogs técnicos e imprensa), não de documentação oficial da Meta nem de código. **Não usar como base de decisão técnica.**
+**Registro de lacuna prévia:** não existe **nenhuma** investigação anterior de Meta AI neste repositório (`grep -rni "meta ai" docs/ docs/arquivo_morto/investigacao_memoria_fatias_m/` → zero ocorrências). O que segue vem de fontes de **terceira parte** (blogs técnicos e imprensa), não de documentação oficial da Meta nem de código. **Não usar como base de decisão técnica.**
 
 | Achado | Fonte | Utilidade para nós |
 |---|---|---|
@@ -758,7 +758,7 @@ R1 (índice descartável) · R2 (corte por pareamento) · R3 (âncora + delta) �
 |---|---|
 | Conferir o estado real do repositório e registrar se a correção da Task 01 foi homologada/commitada | ✅ §0 e §0.1 |
 | Não alterar o estado da correção | ✅ nada tocado |
-| Investigar `investigacao_memoria_fatias_m/` | ✅ os 13 arquivos lidos |
+| Investigar `docs/arquivo_morto/investigacao_memoria_fatias_m/` | ✅ os 13 arquivos lidos |
 | Investigar relatórios anteriores de memória e persistência | ✅ `arquivo_morto/estudo_memoria_contexto_2026-10-22/` (10 arquivos + 8 propostas de fatia) |
 | Documentação atual das Fatias M1 a M8 | ✅ `08_ANALISE_FATIAS_M1_M8.md` + as 8 propostas de 22/10 + D99/D102/D109 em `docs/05`/`06` |
 | Roadmap e contratos existentes | ✅ `docs/06` (Partes 1–4), `docs/04` (§1, §1.5–§1.8), `docs/05` (D1–D126) |

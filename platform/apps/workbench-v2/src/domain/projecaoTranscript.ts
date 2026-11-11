@@ -3,13 +3,13 @@ import { pareceCredencial } from './memoriaProjeto'
 
 const CONTEUDO_TEMPORARIO = 'Conteúdo disponível somente durante a execução.'
 
-function ferramentaPersistida(ferramenta: FerramentaNoChat): FerramentaNoChat {
-  const { id, status, ordem, allowSession } = ferramenta
+function ferramentaPersistida(ferramenta: FerramentaNoChat, indice: number): FerramentaNoChat {
+  const { status, ordem, allowSession } = ferramenta
   const omitirAlvo = ferramenta.ferramenta === 'executar'
   const omitirDetalhes = omitirAlvo || ferramenta.previa !== undefined ||
     ferramenta.progresso !== undefined || ferramenta.resumo !== undefined
   return {
-    id, ferramenta: ferramenta.ferramenta, status, ordem, allowSession,
+    id: `persistida-${indice}`, ferramenta: ferramenta.ferramenta, status, ordem, allowSession,
     alvo: omitirAlvo ? 'Comando' : ferramenta.ferramenta === 'buscar' || ferramenta.ferramenta === 'historico'
       ? 'Consulta' : pareceCredencial(ferramenta.alvo) ? 'Referência omitida' : ferramenta.alvo,
     resumo: omitirDetalhes ? CONTEUDO_TEMPORARIO : undefined,

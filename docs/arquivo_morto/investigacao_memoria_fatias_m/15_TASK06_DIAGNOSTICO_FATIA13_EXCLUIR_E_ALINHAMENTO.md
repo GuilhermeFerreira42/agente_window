@@ -498,8 +498,8 @@ Todos os seis são **contradições entre documentos canônicos, ou entre docume
 
 | Arquivo | Conteúdo |
 |---|---|
-| `investigacao_memoria_fatias_m/15_TASK06_DIAGNOSTICO_FATIA13_EXCLUIR_E_ALINHAMENTO.md` | **Este relatório.** §0 método · §1 diagnóstico da Fatia 13 · §2 cadeia de evidências da regressão · §3 as cinco perguntas respondidas · §4 menor regularização contratual · §5 sequência, gate D129 e preferências · §6 adiamento metodológico · §7 seis conflitos documentais · §8 nove pendências · §9 limitações · §10 resumo simples · §11 conformidade |
-| `investigacao_memoria_fatias_m/00_INDICE.md` | **Atualizado aditivamente** — entrada 15 + registro da Task 06 |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/15_TASK06_DIAGNOSTICO_FATIA13_EXCLUIR_E_ALINHAMENTO.md` | **Este relatório.** §0 método · §1 diagnóstico da Fatia 13 · §2 cadeia de evidências da regressão · §3 as cinco perguntas respondidas · §4 menor regularização contratual · §5 sequência, gate D129 e preferências · §6 adiamento metodológico · §7 seis conflitos documentais · §8 nove pendências · §9 limitações · §10 resumo simples · §11 conformidade |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/00_INDICE.md` | **Atualizado aditivamente** — entrada 15 + registro da Task 06 |
 
 **Canônicos alterados nesta missão (autorizado pela carta §7) — todos aditivos:**
 
@@ -532,7 +532,7 @@ Todos os seis são **contradições entre documentos canônicos, ou entre docume
 | Remote | **nenhum** nesta cópia |
 | Commits nesta missão | **nenhum** |
 | Push nesta missão | **nenhum** |
-| Working tree | alterações em **`investigacao_memoria_fatias_m/`** (`00_INDICE.md` + `11_…`, `12_…`, `13_…`, `14_…`, **`15_…`**) **e em `docs/`** (`03`, `04`, `05`, `06`, `08`, `09`) — estas últimas **autorizadas pela carta §7** |
+| Working tree | alterações em **`docs/arquivo_morto/investigacao_memoria_fatias_m/`** (`00_INDICE.md` + `11_…`, `12_…`, `13_…`, `14_…`, **`15_…`**) **e em `docs/`** (`03`, `04`, `05`, `06`, `08`, `09`) — estas últimas **autorizadas pela carta §7** |
 | Código-fonte, testes, dependências | **inalterados** |
 | Áreas congeladas (`components/terminal/**`, `vite-plugin-pty.ts`, `singlePort.ts`, `pty-server/**`, specs `sessao_11*`, `explorer-search/{core,server}/**`, `EditorArea.tsx`) | **não tocadas** |
 

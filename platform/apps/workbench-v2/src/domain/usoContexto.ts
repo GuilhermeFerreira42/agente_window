@@ -1,5 +1,7 @@
 type Protocolo = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
+export interface EstadoCompactacao { estado: 'compactando' | 'compactado' | 'falhou'; ultimaEm?: number }
+
 export interface MedicaoContexto {
   requestId: string
   iteracao: number
@@ -9,6 +11,9 @@ export interface MedicaoContexto {
   saida?: number
   janela?: { tokens: number; origem: 'configuracao' }
   reservaSaida?: number
+  origemEntrada?: 'provedor' | 'estimativa'
+  estimativa?: { minimo: number; maximo: number; metodo: 'bytes-utf8' }
+  fase?: 'enviado' | 'respondido'
 }
 
 type Contagens = Pick<MedicaoContexto, 'entrada' | 'saida'>
@@ -80,7 +85,38 @@ export function metadadosDaChamada(
 }
 
 export function opcaoUsoOpenAI(baseUrl: string): { stream_options?: { include_usage: true } } {
-  return /^https:\/\/api\.openai\.com\/v1\/?$/i.test(baseUrl) ? { stream_options: { include_usage: true } } : {}
+  return /^https?:\/\//i.test(baseUrl) ? { stream_options: { include_usage: true } } : {}
+}
+
+/** Faixa heurística, sem tokenizador/modelo conhecido; o teto guia o orçamento. */
+export function estimarEntrada(payload: unknown): { minimo: number; maximo: number; metodo: 'bytes-utf8' } {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload)).length
+  return { minimo: Math.ceil(bytes / 6), maximo: bytes + 128, metodo: 'bytes-utf8' }
+}
+
+export function completarMedicao(
+  chamada: Omit<MedicaoContexto, 'iteracao'>, payload: unknown, contagens: Contagens, fase: 'enviado' | 'respondido',
+): Omit<MedicaoContexto, 'iteracao'> {
+  if (tokensValidos(contagens.entrada)) return { ...chamada, ...contagens, origemEntrada: 'provedor', fase }
+  const estimativa = estimarEntrada(payload)
+  return { ...chamada, ...contagens, entrada: estimativa.maximo, origemEntrada: 'estimativa', estimativa, fase }
+}
+
+/** Somente recusa explícita do parâmetro; nunca retry de erro genérico. */
+export function recusouOpcaoUso(status: number, detalhe: string): boolean {
+  return (status === 400 || status === 422) && /stream_options|include_usage/iu.test(detalhe) &&
+    /unsupported|unknown|unrecognized|not supported|not permitted|unexpected|extra inputs/iu.test(detalhe)
+}
+
+export function removerOpcaoRecusada(corpo: Record<string, unknown>, status: number, detalhe: string): boolean {
+  if (corpo.stream_options && recusouOpcaoUso(status, detalhe)) { delete corpo.stream_options; return true }
+  if ((status === 400 || status === 422) && /reasoning_effort|thinkingConfig|thinkingBudget/iu.test(detalhe) &&
+      /unsupported|unknown|unrecognized|not supported|not permitted|unexpected|extra inputs|invalid/iu.test(detalhe)) {
+    if (corpo.reasoning_effort) { delete corpo.reasoning_effort; return true }
+    const config = corpo.generationConfig as { thinkingConfig?: unknown } | undefined
+    if (config?.thinkingConfig) { delete config.thinkingConfig; return true }
+  }
+  return false
 }
 
 export function ocupacaoContexto(medicao: MedicaoContexto) {

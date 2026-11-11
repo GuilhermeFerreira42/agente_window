@@ -61,6 +61,8 @@ export type IniciarChamadaModelo = <T>(
 ) => Promise<T>
 
 export interface AlvoConversa {
+  /** D196: sumarização sem raciocínio adicional quando o endpoint suporta. */
+  esforcoResumo?: 'none'
   /** Identidade exata e imutável do par para toda a execução. */
   /** Obrigatórios para alvos reais; opcionais somente em fixtures legadas de teste. */
   providerId?: string

@@ -23,7 +23,7 @@ import { anunciarFerramentas } from './anuncio'
 import { aplicarInstrucoes, traduzirHistorico } from './dialogo'
 import { extrairFerramentas } from './extracao'
 import { ehFerramentaConhecida } from './ferramentas'
-import { criarLeitorDeUso, metadadosDaChamada, opcaoUsoOpenAI } from '../../../../../domain/usoContexto'
+import { criarLeitorDeUso, metadadosDaChamada, opcaoUsoOpenAI, completarMedicao, recusouOpcaoUso, estimarEntrada } from '../../../../../domain/usoContexto'
 
 export class ErroVizinho extends Error {
   readonly code: CategoriaErroAgir
@@ -158,13 +158,13 @@ function detalheErro(corpo: string, chave: string | null): string {
 }
 
 function erroPorStatus(status: number, corpoErro = '', chave: string | null = null): ErroVizinho {
-  if (status === 413) return new ErroVizinho('http', 'O serviço rejeitou o tamanho do contexto enviado (erro 413). A conversa permanece disponível.', status)
+  if (status === 413) return new ErroVizinho('limite', 'O serviço rejeitou o tamanho do contexto enviado (erro 413). A conversa permanece disponível.', status)
   const detalhe = detalheErro(corpoErro, chave)
   const complemento = detalhe ? ` Detalhe do serviço: ${detalhe}` : ''
   if (status === 401 || status === 403) return new ErroVizinho('chave', `Chave inválida ou sem autorização (erro ${status}). Confira a chave em Provedores.${complemento}`, status)
   if (status === 400) {
     if (/context.{0,35}(?:length|window|limit)|too many tokens|token.{0,30}(?:limit|exceed)|exceed.{0,30}(?:context|token)/i.test(detalhe)) {
-      return new ErroVizinho('http', `O contexto enviado ultrapassou o limite do modelo (erro 400). Reduza o histórico ou comece outra conversa. Nada será repetido automaticamente.${complemento}`, status)
+      return new ErroVizinho('limite', `O contexto enviado ultrapassou o limite do modelo (erro 400).${complemento}`, status)
     }
     return new ErroVizinho(
       'http',
@@ -189,6 +189,10 @@ function corpoDePedido(alvo: AlvoConversa, mensagens: MensagemAgir[], opcoes?: O
   return { url, corpo: aplicarInstrucoes(alvo.protocolo, corpo, opcoes?.instrucoesDeProduto ?? []) }
 }
 
+export function estimativaDoPedido(alvo: AlvoConversa, mensagens: MensagemAgir[], opcoes?: OpcoesVizinho): number {
+  return estimarEntrada(corpoDePedido(alvo, mensagens, opcoes).corpo).maximo
+}
+
 function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permitidas?: readonly string[]): { url: string; corpo: Record<string, unknown> } {
   const baseUrl = alvo.baseUrl.replace(/\/+$/, '')
   // RF14-4: ferramenta desligada some do anúncio. `undefined` = catálogo inteiro,
@@ -196,11 +200,12 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   const anuncio = anunciarFerramentas(alvo.protocolo, permitidas)
   const traduzido = traduzirHistorico(alvo.protocolo, mensagens)
   const temperatura = typeof alvo.temperatura === 'number' ? { temperature: alvo.temperatura } : {}
+  const reserva = alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : undefined
 
   if (alvo.protocolo === 'openai-chat') {
     return {
       url: `${baseUrl}/chat/completions`,
-      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...temperatura, ...anuncio, tool_choice: 'auto' },
+      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...temperatura, ...anuncio, tool_choice: 'auto' },
     }
   }
   if (alvo.protocolo === 'anthropic') {
@@ -219,12 +224,12 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   if (alvo.protocolo === 'gemini') {
     return {
       url: `${baseUrl}/models/${encodeURIComponent(alvo.modelo)}:streamGenerateContent?alt=sse`,
-      corpo: { contents: traduzido, generationConfig: temperatura, ...anuncio },
+      corpo: { contents: traduzido, generationConfig: { ...temperatura, ...(reserva ? { maxOutputTokens: reserva } : {}) }, ...anuncio },
     }
   }
   return {
     url: `${baseUrl}/api/chat`,
-    corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...anuncio, ...(alvo.temperatura !== undefined ? { options: temperatura } : {}) },
+    corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...anuncio, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}) } },
   }
 }
 
@@ -461,6 +466,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
     const comedor = criarAcumulo(alvo.protocolo, aoTexto)
     const uso = criarLeitorDeUso(alvo.protocolo)
     let chamada: ReturnType<typeof metadadosDaChamada>
+    let payloadMedido: unknown
     const consumir = (payload: string) => {
       const quadro = JSON.parse(payload)
       uso.ler(quadro)
@@ -471,6 +477,9 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
 
     try {
       const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
+        if (controlador.signal.aborted || (opcoes?.validarAntesDaChamada && !opcoes.validarAntesDaChamada())) {
+          throw new ErroVizinho('fluxo', 'A sessão ou o projeto mudou antes da chamada ao modelo.')
+        }
         const alvoAtual: AlvoConversa = config ? {
           ...alvo,
           providerId: config.providerId,
@@ -484,12 +493,26 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           limiteContexto: config.limiteContexto,
         } : alvo
         const { url, corpo } = corpoDePedido(alvoAtual, mensagens, opcoes)
-        chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens)
-        return fetch(url, {
+        chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens ??
+          (corpo.generationConfig as { maxOutputTokens?: number } | undefined)?.maxOutputTokens ??
+          (corpo.options as { num_predict?: number } | undefined)?.num_predict)
+        payloadMedido = corpo
+        if (chamada) opcoes?.aoContexto?.(completarMedicao(chamada, corpo, {}, 'enviado'))
+        const init = {
           method: 'POST',
           headers: cabecalhos(alvoAtual),
           body: JSON.stringify(corpo),
           signal: controlador.signal,
+        }
+        return fetch(url, init).then(async (resposta) => {
+          if (!corpo.stream_options || (resposta.status !== 400 && resposta.status !== 422)) return resposta
+          const detalhe = await lerErroLimitado(resposta)
+          if (!recusouOpcaoUso(resposta.status, detalhe)) return new Response(detalhe, { status: resposta.status })
+          delete corpo.stream_options
+          if (controlador.signal.aborted || (opcoes?.validarAntesDaChamada && !opcoes.validarAntesDaChamada())) {
+            throw new ErroVizinho('fluxo', 'A sessão ou o projeto mudou antes da chamada ao modelo.')
+          }
+          return fetch(url, { ...init, body: JSON.stringify(corpo) })
         })
       }
       let resposta: Response
@@ -553,7 +576,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         texto: comedor.acumulo.texto,
         pedidos: comedor.acumulo.pedidos,
         ...(comedor.acumulo.modelo !== undefined ? { modelo: comedor.acumulo.modelo } : {}),
-        ...(chamada ? { usoContexto: { ...chamada, ...uso.resultado() } } : {}),
+        ...(chamada ? { usoContexto: completarMedicao(chamada, payloadMedido, uso.resultado(), 'respondido') } : {}),
       }
     } catch (erro) {
       if (opcoes?.sinal?.aborted) throw erro // Parar do dono: o loop distingue e fica em silêncio

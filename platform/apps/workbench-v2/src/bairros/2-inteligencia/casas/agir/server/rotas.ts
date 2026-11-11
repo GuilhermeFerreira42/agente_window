@@ -24,9 +24,9 @@ import type { AlvoConversa, IniciarChamadaModelo, ObterAlvo, SelecaoModelo } fro
 import type { EventoAgir, ExecutorFerramenta, FerramentaId, InstrucaoDeProduto, MensagemAgir, MensagemSimples, ModoAgir, NivelPermissaoAgir, PedidoFerramenta, PedidoRecuperacao, ResultadoFerramenta, ResultadoRecuperacao } from '../contract'
 import { rodarAgir, type ResultadoAgir } from './agir'
 import { criarExecutoresReais, type ExecutoresDisco } from './discos'
-import { permiteSessao } from './ferramentas'
+import { permiteSessao, catalogoFerramentas, ehMexida } from './ferramentas'
 import { comandoExigeAprovacaoIndividual, criarExecutorComando, type ResolverShellComando } from './executorComando'
-import { criarVizinhoReal } from './vizinho'
+import { criarVizinhoReal, estimativaDoPedido } from './vizinho'
 import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } from './autorizacaoExclusao'
 // D170-c (RNF15-2): protocolo HTTP e validação do pedido saíram daqui para
 // `protocoloHttp.ts`. Mesmas funções, mesmas mensagens — o arquivo só parou de
@@ -72,6 +72,9 @@ export interface DependenciasAgir {
   restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
   recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
+  recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string }, consulta: string) => Promise<ResultadoRecuperacao>
+  prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemAgir[], alvo: AlvoConversa,
+    sinal: AbortSignal, emitir: (evento: EventoAgir) => void, forcar?: boolean, medir?: (mensagens: MensagemAgir[]) => number) => Promise<MensagemAgir[]>
   planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string }, runId: string) => Promise<string>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
@@ -105,6 +108,7 @@ interface ContextoFluxo {
   exclusoesTentadas?: Set<string>
   instrucaoAtual?: string
   recuperacao?: { restantes: number; fontes: Set<string> }
+  recuperacaoAutomatica?: { restantes: number; fontes: Set<string> }
   planejamentoRetomada?: boolean
   pedidoId?: string
 }
@@ -297,27 +301,39 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   contextoPorFluxo.set(fluxo, { sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz, modo: fio.execucao.modo, modoSelecionadoNoServidor: fio.execucao.modoSelecionadoNoServidor, permissao: fio.execucao.permissao })
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
+  let recuperouLimite = false
+  const assinaturaEfeito = (pedido: PedidoFerramenta) => {
+    const args = { ...pedido.argumentos }
+    if (typeof args.caminho === 'string') {
+      const path = nodePath.resolve(fio.raiz, args.caminho).normalize('NFC')
+      args.caminho = process.platform === 'win32' ? path.toLowerCase() : path
+    }
+    return `${pedido.ferramenta}:${JSON.stringify(Object.keys(args).sort().map((chave) => [chave, args[chave as keyof typeof args]]))}`
+  }
+  const efeitosTentados = new Set(fio.mensagens.flatMap((m) => m.pedidos ?? []).filter((p) => ehMexida(p.ferramenta)).map(assinaturaEfeito))
   const executoresDisco = fio.instrucao?.executores ?? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
   const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
     historico: async (pedido) => {
-      const estado = fio.execucao.recuperacao
+      const estado = fio.execucao.recuperacao ?? fio.execucao.recuperacaoAutomatica
       if (!estado || !deps.recuperarHistorico || estado.restantes <= 0 || abort.signal.aborted) {
         return { ok: false, resumo: 'A recuperação não está autorizada ou atingiu o limite desta consulta.' }
       }
       estado.restantes -= 1
       const { acao, consulta, messageId } = pedido.argumentos
-      const valor = acao === 'buscar' ? consulta : messageId
-      if ((acao !== 'buscar' && acao !== 'ler') || typeof valor !== 'string' || !valor.trim() ||
-          valor.length > (acao === 'buscar' ? 120 : 200) || (acao === 'ler' && !estado.fontes.has(valor))) {
+      const valor = acao === 'buscar' || acao === 'projeto' ? consulta : messageId
+      if ((acao !== 'buscar' && acao !== 'ler' && acao !== 'projeto') || typeof valor !== 'string' || !valor.trim() ||
+          valor.length > (acao === 'ler' ? 200 : 120) || (acao === 'ler' && !estado.fontes.has(valor)) ||
+          (acao === 'projeto' && (!deps.recuperarMemoriaProjeto || !!fio.execucao.recuperacao))) {
         return { ok: false, resumo: 'Use uma consulta válida ou uma referência retornada nesta execução.' }
       }
       try {
-        const recuperado = await deps.recuperarHistorico(fio, { acao, valor: valor.trim() })
+        const recuperado = acao === 'projeto' ? await deps.recuperarMemoriaProjeto!(fio, valor.trim())
+          : await deps.recuperarHistorico(fio, { acao, valor: valor.trim() })
         if (abort.signal.aborted || !validarContexto()) return { ok: false, resumo: 'A consulta foi interrompida.' }
-        for (const fonte of recuperado.fontes) estado.fontes.add(fonte)
-        registro?.recuperar(pedido.id, acao, recuperado.fontes)
+        if (acao !== 'projeto') for (const fonte of recuperado.fontes) estado.fontes.add(fonte)
+        registro?.recuperar(pedido.id, acao === 'projeto' ? 'buscar' : acao, recuperado.fontes)
         return { ok: true, resumo: `Histórico deste chat: ${recuperado.fontes.length} fonte(s).`, conteudo: recuperado.conteudo }
       } catch {
         return { ok: false, resumo: 'Não foi possível consultar o histórico deste chat.' }
@@ -325,6 +341,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     },
     executar: async (pedido, contexto) => {
       if (abort.signal.aborted || fio.execucao.estado !== 'running') return { ok: false, resumo: 'Cancelado antes de iniciar; nenhum processo foi iniciado.' }
+      efeitosTentados.add(assinaturaEfeito(pedido))
       const operacao = executorComandoBase(pedido, contexto).then((resultado) => {
         if (resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
         return resultado
@@ -349,6 +366,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       }
       // Registra a operação antes de ceder o event loop. O cancel endpoint
       // aguarda esta Promise e só então confirma se houve publicação.
+      efeitosTentados.add(assinaturaEfeito(pedido))
       const operacao = Promise.resolve().then(() => executar(pedido, contexto)).then((resultado) => {
         if (resultado.ok || resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
         return resultado
@@ -398,14 +416,33 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
     const vizinho = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
+    const emitirMemoria = (evento: EventoAgir) => { if (!abort.signal.aborted && !res.writableEnded) escreverEvento(res, evento) }
     resultado = await rodarAgir({
-      vizinho: registro ? async (historico, opcoes) => {
-        await gravarRegistro()
+      vizinho: async (historico, opcoes) => {
+        if (registro) await gravarRegistro()
         if (abort.signal.aborted || !validarContexto()) {
           throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
         }
-        return vizinho(historico, opcoes)
-      } : vizinho,
+        const preparar = deps.prepararChamada && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
+          ? (forcar: boolean) => deps.prepararChamada!(fio, historico, fio.alvo, abort.signal, emitirMemoria, forcar,
+              (mensagens) => estimativaDoPedido(fio.alvo, mensagens, opcoes)) : undefined
+        let contexto = preparar ? await preparar(false) : historico
+        if (abort.signal.aborted || !validarContexto()) throw Object.assign(new Error('O projeto mudou durante a preparação do contexto.'), { code: 'fluxo' })
+        let saiuTexto = false
+        const observadores = { ...opcoes, validarAntesDaChamada: validarContexto, aoTexto: (texto: string) => { if (texto.length) saiuTexto = true; opcoes?.aoTexto?.(texto) } }
+        try { return await vizinho(contexto, observadores) } catch (erro) {
+          if (!preparar || recuperouLimite || saiuTexto || abort.signal.aborted ||
+              (erro as { code?: string })?.code !== 'limite') throw erro
+          recuperouLimite = true
+          let reduzido: MensagemAgir[]
+          try { reduzido = await preparar(true) } catch {
+            throw Object.assign(new Error(`${(erro as Error).message} Não foi possível compactar com segurança; nenhuma ferramenta foi repetida.`), { code: 'limite' })
+          }
+          if (JSON.stringify(reduzido).length >= JSON.stringify(contexto).length || !validarContexto()) throw erro
+          contexto = reduzido
+          return vizinho(contexto, observadores)
+        }
+      },
       historico: fio.mensagens,
       executores,
       antesDeExecutar: registro ? gravarRegistro : undefined,
@@ -413,7 +450,8 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] : composicao?.ferramentasPermitidas,
+      ferramentasPermitidas: fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+        deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
@@ -430,10 +468,11 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         else escreverEvento(res, evento)
       },
       pedirAprovacao: async (pedido) => {
+        const exigeReconfirmacao = recuperouLimite && efeitosTentados.size > 0
         const concedidas = permissoesPorFluxo.get(fluxo)
         const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
         // Reconflito nunca reutiliza opt-in/instrução: exige cartão atualizado.
-        if (pedido.ferramenta === 'excluir') {
+        if (!exigeReconfirmacao && pedido.ferramenta === 'excluir') {
           if (!instrucaoConsumida && fio.instrucao?.pedido) {
             const original = fio.instrucao.pedido
             if (alvoDentroDoEscopo(fio.raiz, pedido.argumentos.caminho, [String(original.argumentos.caminho)]) &&
@@ -456,15 +495,15 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
             return true
           }
         }
-        if (nivelPermissao === 'allow-all' && pedido.ferramenta !== 'excluir') return true
+        if (!exigeReconfirmacao && nivelPermissao === 'allow-all' && pedido.ferramenta !== 'excluir') return true
         // D121: Agent/Edit já dispensam prompts repetitivos de criar/escrever;
         // isto não altera o contrato histórico dessas operações.
-        if (fio.execucao.modoSelecionadoNoServidor && (fio.execucao.modo === 'agent' || fio.execucao.modo === 'edit') && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever')) return true
-        if (pedido.ferramenta === 'executar') {
+        if (!exigeReconfirmacao && fio.execucao.modoSelecionadoNoServidor && (fio.execucao.modo === 'agent' || fio.execucao.modo === 'edit') && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever')) return true
+        if (!exigeReconfirmacao && pedido.ferramenta === 'executar') {
           const comando = typeof pedido.argumentos.comando === 'string' ? pedido.argumentos.comando : ''
           const exigeAceiteIndividual = comandoExigeAprovacaoIndividual(comando)
           if (!exigeAceiteIndividual && concedidas?.has('executar')) return true
-        } else if (permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) {
+        } else if (!exigeReconfirmacao && permiteSessao(pedido.ferramenta) && concedidas?.has(pedido.ferramenta)) {
           return true
         }
         if (abort.signal.aborted || fio.execucao.estado !== 'running') return false
@@ -475,7 +514,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
             ? `Diretório inicial: ${fio.raiz}\\nShell: detectado pelo aplicativo\\nComando: ${String(pedido.argumentos.comando ?? '').slice(0, 400)}`
             : undefined
         if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
-        const allowSession = permiteSessao(pedido.ferramenta) && !(pedido.ferramenta === 'executar' && comandoExigeAprovacaoIndividual(String(pedido.argumentos.comando ?? '')))
+        const allowSession = !exigeReconfirmacao && permiteSessao(pedido.ferramenta) && !(pedido.ferramenta === 'executar' && comandoExigeAprovacaoIndividual(String(pedido.argumentos.comando ?? '')))
         const evento = { type: 'approval', pedido, ...(previa !== undefined ? { previa } : {}), allowSession } as const
         registro?.observar(evento)
         await gravarRegistro()
@@ -494,9 +533,12 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (recuperouLimite && ehMexida(pedido.ferramenta) && efeitosTentados.has(assinaturaEfeito(pedido))) {
+          return 'Ação já tentada antes da recuperação de contexto; não será repetida. Confira o resultado e peça nova autorização em uma tarefa nova se precisar repeti-la.'
+        }
         if (fio.execucao.planejamentoRetomada) return 'A retomada de planejamento exige uma nova tarefa e novas autorizações antes de executar ferramentas.'
         if (fio.execucao.recuperacao && pedido.ferramenta !== 'historico') return 'A consulta histórica não autoriza acesso a arquivos nem execução de comandos.'
-        if (!fio.execucao.recuperacao && pedido.ferramenta === 'historico') return 'A recuperação histórica exige o comando explícito /historico.'
+        if (!fio.execucao.recuperacao && !fio.execucao.recuperacaoAutomatica && pedido.ferramenta === 'historico') return 'A recuperação histórica não está disponível nesta execução.'
         if (pedido.ferramenta === 'historico') return null
         if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
@@ -772,6 +814,7 @@ async function tratarAgir(
   }
   const contextoFluxo: ContextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto,
     recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined,
+    recuperacaoAutomatica: !consultaHistorica && !retomadaId && deps.recuperarHistorico ? { restantes: 3, fontes: new Set() } : undefined,
     planejamentoRetomada: Boolean(retomadaId), pedidoId: typeof textoAtual?.id === 'string' && /^[\w-]{1,200}$/.test(textoAtual.id) ? textoAtual.id : undefined }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>

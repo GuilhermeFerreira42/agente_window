@@ -1,5 +1,7 @@
 # Investigação técnica da arquitetura de memória — Fatias M1–M8
 
+> **ARQUIVADO em 11/11/2026, revisão sobre a base `2ac978d`.** Este conjunto preserva os estudos anteriores; seu status abaixo é histórico. Não é documentação canônica vigente. A implementação e sua evolução são regidas pelos nove documentos ativos em `docs/`, especialmente a decisão D196. A mudança de endereço preservou os 19 arquivos; apenas referências e este aviso foram atualizados.
+
 **Status:** investigação M1–M8 continua sem implementação de memória; correção localizada da persistência executada na Task 01, sem alteração de roadmap ou documentos canônicos.  
 **Início:** 2026-10-30 (America/Sao_Paulo).  
 **Projeto auditado:** `/home/user/agente_window`, HEAD `971a59f5d2a5118e8526d2829ba26039a344b796`, branch `main`, árvore limpa no início da investigação.  
@@ -219,7 +221,7 @@ O dono citou *"sequência de 14 etapas, posição atual na etapa 3"*. **Não loc
 
 ### Estado do Git ao final da Task 05 (somente leitura)
 
-`main` / `fe218b8` · **sem remote** · **nenhum commit, nenhum push** · working tree com **5 alterações, todas dentro desta pasta** (`00_INDICE.md` M; `11_…`, `12_…`, `13_…`, **`14_…`** ??) · **nenhuma alteração fora de `investigacao_memoria_fatias_m/`** (verificado) · código-fonte, testes, `docs/01`–`09`, roadmap e dependências **inalterados** · áreas congeladas **não tocadas**.
+`main` / `fe218b8` · **sem remote** · **nenhum commit, nenhum push** · working tree com **5 alterações, todas dentro desta pasta** (`00_INDICE.md` M; `11_…`, `12_…`, `13_…`, **`14_…`** ??) · **nenhuma alteração fora de `docs/arquivo_morto/investigacao_memoria_fatias_m/`** (verificado) · código-fonte, testes, `docs/01`–`09`, roadmap e dependências **inalterados** · áreas congeladas **não tocadas**.
 
 **Nenhuma decisão homologada. Nenhum roadmap, SPEC, contrato oficial ou código alterado. Parado, aguardando a decisão do dono sobre o gate DP-03/DP-06 antes da Fatia 14.**
 

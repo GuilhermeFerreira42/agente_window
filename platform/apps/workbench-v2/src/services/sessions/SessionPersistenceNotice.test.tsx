@@ -69,12 +69,12 @@ describe('visible persistence conflicts and safe recovery', () => {
     Object.assign(local.chats[0], { unknown: 'FIXTURE_CHAT_FIELD', approval: 'FIXTURE_CHAT_APPROVAL' })
     local.chats[0].messages.push({
       id: 'running-response', role: 'assistant', content: '', time: '10:00', running: true,
-      ferramentas: [{ id: 'cmd', ferramenta: 'executar', alvo: 'FIXTURE_COMMAND', status: 'executando', progresso: 'FIXTURE_STDOUT' }],
+      ferramentas: [{ id: 'FIXTURE_PROVIDER_ID', ferramenta: 'executar', alvo: 'FIXTURE_COMMAND', status: 'executando', progresso: 'FIXTURE_STDOUT' }],
     })
     expect(storeSessionRecovery({ session: local, message: 'FIXTURE_ERROR_DETAILS' })).toBe(true)
     expect(JSON.stringify(Object.values(localStorage))).not.toContain('FIXTURE_')
     const restored = restoreUnsavedSessions([])[0].chats[0].messages[1]
-    expect(restored).toMatchObject({ running: false, cancelled: true, ferramentas: [{ id: 'cmd', alvo: 'Comando' }] })
+    expect(restored).toMatchObject({ running: false, cancelled: true, ferramentas: [{ id: 'persistida-0', alvo: 'Comando' }] })
     expect(local.chats[0].messages[1].ferramentas?.[0].progresso).toBe('FIXTURE_STDOUT')
   })
 

@@ -447,7 +447,8 @@ describe('ChatInput', () => {
     const fetchCatalogo = vi.fn()
       .mockResolvedValueOnce(resposta('modelo-antigo', 'Fixture — modelo-antigo'))
       .mockResolvedValueOnce(resposta('modelo-novo', 'Fixture — modelo-novo'))
-    vi.stubGlobal('fetch', fetchCatalogo)
+    vi.stubGlobal('fetch', (url: string) => url.startsWith('/api/sessions/checkpoint')
+      ? Promise.resolve(new Response(JSON.stringify({ compactacao: null }), { status: 200 })) : fetchCatalogo(url))
     renderInput()
 
     await waitFor(() => expect(fetchCatalogo).toHaveBeenCalledTimes(1))

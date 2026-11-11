@@ -1,7 +1,7 @@
 # 01 — Estado atual do Agente Window
 
 **Baseline:** `/home/user/agente_window`, `main`, HEAD `971a59f5d2a5118e8526d2829ba26039a344b796`.  
-**Baseline desta investigação:** HEAD `971a59f5d2a5118e8526d2829ba26039a344b796`; antes da Task 01, sem alterações rastreadas e somente `investigacao_memoria_fatias_m/` não rastreada. **Estado após Task 01:** alterações locais limitadas a `session-persistence/index.ts`, `transcripts.ts`, testes dessas duas áreas e relatório investigativo; sem edição de banco real, docs canônicos ou roadmap.
+**Baseline desta investigação:** HEAD `971a59f5d2a5118e8526d2829ba26039a344b796`; antes da Task 01, sem alterações rastreadas e somente `docs/arquivo_morto/investigacao_memoria_fatias_m/` não rastreada. **Estado após Task 01:** alterações locais limitadas a `session-persistence/index.ts`, `transcripts.ts`, testes dessas duas áreas e relatório investigativo; sem edição de banco real, docs canônicos ou roadmap.
 
 ## Persistência localizada no código atual
 

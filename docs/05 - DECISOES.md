@@ -230,7 +230,7 @@ D120 ajusta a aceitação operacional de F5-B sem remover proteção e sem ampli
 
 ## 17. Alinhamento de sequência, regressão da exclusão e gate arquitetural pré-Fatia 14 (2026-10-31)
 
-> **Origem:** carta do dono de 2026-10-31 (alinhamento das Fatias 13/14/15 e memória), confrontada com o código pela Arena antes de registrar. Diagnóstico completo, evidência linha a linha e propostas detalhadas em `investigacao_memoria_fatias_m/15_TASK06_DIAGNOSTICO_FATIA13_EXCLUIR_E_ALINHAMENTO.md`. **Nenhum código foi alterado nesta missão. Nenhuma homologação foi declarada.**
+> **Origem:** carta do dono de 2026-10-31 (alinhamento das Fatias 13/14/15 e memória), confrontada com o código pela Arena antes de registrar. Diagnóstico completo, evidência linha a linha e propostas detalhadas em `docs/arquivo_morto/investigacao_memoria_fatias_m/15_TASK06_DIAGNOSTICO_FATIA13_EXCLUIR_E_ALINHAMENTO.md`. **Nenhum código foi alterado nesta missão. Nenhuma homologação foi declarada.**
 
 | ID | Decisão | Regra vigente |
 |---|---|---|
@@ -246,7 +246,7 @@ D120 ajusta a aceitação operacional de F5-B sem remover proteção e sem ampli
 
 ## 18. MICRO-FATIA DELETE implementada e nova sequência oficial (2026-10-31, Carta 2)
 
-> **Origem:** carta do dono de 2026-10-31 — *"AUTORIZAÇÃO DA MICRO-FATIA DELETE E CONSOLIDAÇÃO DO ROADMAP"*. O dono aprovou a opção **R1** do relatório `15_…` §4 e autorizou a implementação. **Não foi aberta investigação nova**: o diagnóstico e as evidências da Task 06 bastaram. Relatório desta missão: `investigacao_memoria_fatias_m/16_TASK07_MICRO_FATIA_DELETE_IMPLEMENTACAO_E_SEQUENCIA.md`.
+> **Origem:** carta do dono de 2026-10-31 — *"AUTORIZAÇÃO DA MICRO-FATIA DELETE E CONSOLIDAÇÃO DO ROADMAP"*. O dono aprovou a opção **R1** do relatório `15_…` §4 e autorizou a implementação. **Não foi aberta investigação nova**: o diagnóstico e as evidências da Task 06 bastaram. Relatório desta missão: `docs/arquivo_morto/investigacao_memoria_fatias_m/16_TASK07_MICRO_FATIA_DELETE_IMPLEMENTACAO_E_SEQUENCIA.md`.
 
 | ID | Decisão | Regra vigente |
 |---|---|---|
@@ -2124,8 +2124,24 @@ A M7 deriva o estado dos recibos duráveis e não restaura processos. Compara pa
 
 ## D195 — Endurecimento dos stores e limites medidos (11/11/2026)
 
+**Atualização posterior:** a revisão autorizada está em D196; a proibição de automação e a ausência de carga contextual nos contratos anteriores deixam de reger os novos fluxos descritos ali.
+
 A M8 compartilha a projeção explícita de campos de sessão/chat entre catálogo e recovery local. Extensões desconhecidas, texto livre de aprovações antigas e detalhes de erro de recovery não são gravados. Consultas de busca em cartões são substituídas por metadado genérico; referências com formatos reconhecíveis de credencial são omitidas. O transcript continua sendo a fonte dos textos normais de conversa. Não há classificador universal de segredos em texto livre.
 
 Corpos de persistência têm teto de 16 MiB, com 413 e preservação da versão anterior. JSONL rejeita estrutura inválida sem citar conteúdo nem reescrever a fonte. O writer atômico atual permanece: o benchmark sintético de 10 mil mensagens/6.346.199 bytes mediu 17–36 ms de gravação, 23–27 ms de leitura e menos de 2 ms de busca limitada. Esses números locais não garantem desempenho para volumes maiores. FTS, writer incremental e coordenação entre múltiplos processos escritores não foram introduzidos; o contrato continua de um servidor por perfil, com fila por sessão e revisão para múltiplas abas.
 
 Não há telemetria de memória adicionada, prazo automático ou coleta de payloads. Transcripts/eventos/checkpoints seguem a exclusão explícita da sessão; memórias confirmadas de projeto seguem seu próprio expurgo explícito. Recovery local termina ao resolver ou descartar o conflito. Stores legados são filtrados na leitura e em novos saves; nenhum saneamento destrutivo de dados pessoais existentes foi executado.
+
+## D196 — Continuidade automática e medição explícita (11/11/2026)
+
+Decisão expressa do proprietário nesta conversa. Substitui a exclusividade manual de D190, o opt-in por comando como única recuperação de D193 e a ausência de recuperação contextual de memórias confirmadas em D192. Compactar pode ocorrer automaticamente sem confirmação por operação, preservando fonte e CAS. O controle manual permanece. Recuperação histórica fica disponível ao agente no chat atual; memórias confirmadas do projeto podem ser selecionadas por relevância sob limite de conteúdo. Dados recuperados nunca são instruções de autorização. Gravação/expurgo de memórias continuam com consentimento específico.
+
+Medição real tem precedência. Ausência de contagem recebe estimativa identificada, com faixa e método, ou desconhecido quando não há base. Janelas de aliases não são deduzidas pelo nome. Um orçamento operacional conservador não é apresentado como limite do modelo. A mesma chamada de modelo rejeitada por contexto pode ser repetida uma única vez após compactação segura, sem reexecutar ferramentas. Falhas de armazenamento/escopo ou resultados incertos não autorizam replay. Evidências reais são exigidas; a homologação humana permanece pendente. SPEC e critérios em 06.
+
+**Política implementada.** A estimativa usa bytes UTF-8 do corpo nativo completo: faixa heurística de `ceil(bytes/6)` até `bytes+128`. Não é tokenização comprovada nem intervalo estatístico. O valor superior orienta prevenção; a UI distingue estimativa enviada e uso respondido pelo provedor. O orçamento com janela configurada é 75% de `(janela − reserva de saída)`; sem janela, 24.000 unidades estimadas de entrada constituem apenas um orçamento operacional. Se o corpo fixo, o pedido atual ou os dois turnos recentes excederem a capacidade, compactação não garante acomodação: o erro permanece explícito. Reserva não configurada usa 2.048 somente no cálculo preventivo, sem alegar que foi enviada ao provedor.
+
+Resumos reutilizam Conversa sem ferramentas: até oito lotes, fonte de até 160.000 caracteres, lotes de até 20.000 bytes e saída de até 1.024 tokens por lote. Solicita-se raciocínio desligado exclusivamente para sumarização; incompatibilidades explicitamente identificadas permitem retirar somente a opção recusada, no máximo duas vezes. Resumo vazio, truncado, término anormal explícito, EOF sem conclusão ou credencial reconhecível não é publicado. O transcript original continua recuperável; fidelidade semântica do resumo depende do modelo. Fila, digest, CAS, escopo e cancelamento são rechecados na publicação. Dois turnos recentes e a cauda ativa com pares de ferramentas são preservados. Uma compactação por chat pode estar em curso; chats distintos são independentes.
+
+O erro inequívoco de limite permite **uma** recuperação por execução, apenas sem texto já emitido nessa chamada. Repete-se o pedido ao modelo, nunca o loop de ferramentas. Efeitos equivalentes reconhecidos são bloqueados; tendo ocorrido tentativa de efeito antes da recuperação, qualquer nova mutação exige aprovação individual nova, sem herdar grants, `allow-all` ou opt-ins automáticos. Planejamento da M7 continua sem ferramentas. Escopo é validado antes da chamada e de seu fallback de compatibilidade.
+
+A recuperação nativa usa o catálogo existente: `historico` no chat atual, até três consultas por execução, referências obtidas na própria execução para leituras. O agente decide quando consultar; não há garantia de lembrança semântica perfeita. `/historico` permanece modo isolado somente leitura. Memórias confirmadas vigentes do mesmo projeto canônico NFC são selecionadas por relevância lexical, até quatro registros e 2.400 bytes de conteúdo, antes da chamada; a ação `projeto` permite consulta contextual adicional no mesmo orçamento de recuperação. Revogações são relidas, não há índice paralelo, embeddings, criação automática de memórias ou autorização derivada de dados recuperados.

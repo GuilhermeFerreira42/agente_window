@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { criarLeitorDeUso, ocupacaoContexto, opcaoUsoOpenAI } from '../domain/usoContexto'
+import { criarLeitorDeUso, ocupacaoContexto, opcaoUsoOpenAI, estimarEntrada, completarMedicao, recusouOpcaoUso } from '../domain/usoContexto'
 
 describe('M1 — contagens de contexto', () => {
   it('combina cache de entrada Anthropic e substitui totais cumulativos', () => {
@@ -35,9 +35,25 @@ describe('M1 — contagens de contexto', () => {
     },
   )
 
-  it('solicita quadro de uso extra somente no endpoint oficial OpenAI', () => {
+  it('solicita uso também em endpoints compatíveis, sem inferir capacidades pelo domínio', () => {
     expect(opcaoUsoOpenAI('https://api.openai.com/v1')).toEqual({ stream_options: { include_usage: true } })
-    expect(opcaoUsoOpenAI('https://api.openai.com.example/v1')).toEqual({})
-    expect(opcaoUsoOpenAI('http://localhost:1234/v1')).toEqual({})
+    expect(opcaoUsoOpenAI('https://api.openai.com.example/v1')).toEqual({ stream_options: { include_usage: true } })
+    expect(opcaoUsoOpenAI('http://localhost:1234/v1')).toEqual({ stream_options: { include_usage: true } })
+  })
+
+  it('identifica estimativas, inclui dados UTF-8 e dá precedência ao uso real', () => {
+    const payload = { messages: [{ content: 'CANARIO_PRIVADO_漢字'.repeat(20) }], tools: [{ description: 'schema' }] }
+    const faixa = estimarEntrada(payload)
+    expect(faixa.maximo).toBeGreaterThan(faixa.minimo)
+    expect(faixa.maximo).toBeGreaterThan(JSON.stringify(payload).length)
+    const chamada = { requestId: 'r', providerId: 'p', modelId: 'm' }
+    const estimada = completarMedicao(chamada, payload, {}, 'enviado')
+    expect(estimada).toMatchObject({ origemEntrada: 'estimativa', fase: 'enviado', estimativa: faixa })
+    expect(JSON.stringify(estimada)).not.toContain('CANARIO_PRIVADO')
+    expect(completarMedicao(chamada, payload, { entrada: 15, saida: 3 }, 'respondido'))
+      .toEqual({ ...chamada, entrada: 15, saida: 3, origemEntrada: 'provedor', fase: 'respondido' })
+    expect(recusouOpcaoUso(400, 'Unsupported stream_options')).toBe(true)
+    expect(recusouOpcaoUso(400, 'maximum context length exceeded')).toBe(false)
+    expect(recusouOpcaoUso(500, 'Unsupported stream_options')).toBe(false)
   })
 })

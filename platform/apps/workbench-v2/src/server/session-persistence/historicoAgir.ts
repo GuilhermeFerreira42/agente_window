@@ -76,6 +76,7 @@ export function projetarHistoricoAgir(
     const persistida = !atual && mensagem.id ? persistidas.get(mensagem.id) : undefined
     const textoPersistido = persistida?.role === mensagem.role ? persistida.content : undefined
     const visivel: MensagemAgir = {
+      ...(mensagem.id ? { origemId: mensagem.id } : {}),
       papel: mensagem.role === 'user' ? 'usuario' : 'assistente',
       conteudo: textoPersistido ?? mensagem.content,
     }
@@ -101,7 +102,7 @@ export function projetarHistoricoAgir(
     }
     const pares = cadeia.reverse().flatMap((lote) => projetarExecucao(lote.map(({ evento }) => evento)))
     if (pares.length) usouDisco = true
-    return [...pares, ...texto]
+    return [...pares.map((par) => ({ ...par, origemId: mensagem.id })), ...texto]
   })
   return { mensagens: projetadas, fonte: usouDisco ? (usouBrowser ? 'hibrido' : 'transcript') : 'browser' }
 }

@@ -14,7 +14,7 @@ export interface Checkpoint extends FronteiraCheckpoint {
   version: 1
   escopo: string
   resumo: string
-  estrategia: 'manual'
+  estrategia: 'manual' | 'automatica'
   providerId: string
   modelId: string
   criadoEm: number
@@ -73,7 +73,7 @@ export function proporCheckpoint(entries: TranscriptEntry[], chatId: string, esc
 export function checkpointCorresponde(
   checkpoint: Checkpoint, entries: TranscriptEntry[], chatId: string, escopo: string,
 ): boolean {
-  if (checkpoint.version !== 1 || checkpoint.estrategia !== 'manual' || checkpoint.escopo !== escopo ||
+  if (checkpoint.version !== 1 || !['manual', 'automatica'].includes(checkpoint.estrategia) || checkpoint.escopo !== escopo ||
       typeof checkpoint.resumo !== 'string' || !checkpoint.resumo.trim() || checkpoint.resumo.length > 12_000) return false
   const atual = fronteiraCheckpoint(entries, chatId, escopo, checkpoint.quantidade)
   return atual?.digest === checkpoint.digest && atual?.ultimoId === checkpoint.ultimoId

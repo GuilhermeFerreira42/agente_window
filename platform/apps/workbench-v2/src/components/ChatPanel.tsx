@@ -24,7 +24,7 @@ import { ChatInput, selecaoDoToken } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
 import { MemoriaProjeto } from './MemoriaProjeto'
 import { RevisaoOperacional } from './RevisaoOperacional'
-import type { MedicaoContexto } from '../domain/usoContexto'
+import type { MedicaoContexto, EstadoCompactacao } from '../domain/usoContexto'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 
@@ -64,6 +64,8 @@ interface ChatPanelProps {
   onOpenDiff: () => void
   composerDrafts?: Record<string, ComposerDraft>
   usoContexto?: MedicaoContexto
+  estadoCompactacao?: EstadoCompactacao
+  onEstadoCompactacao?: (estado: EstadoCompactacao) => void
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
@@ -334,6 +336,8 @@ export function ChatPanel({
   onOpenDiff,
   composerDrafts,
   usoContexto,
+  estadoCompactacao,
+  onEstadoCompactacao,
   onChangeComposerDraft,
   composerHistory,
   onAppendComposerHistory,
@@ -447,6 +451,8 @@ export function ChatPanel({
             onApprove={onApprove}
             composerDrafts={composerDrafts}
             usoContexto={usoContexto}
+            estadoCompactacao={estadoCompactacao}
+            onEstadoCompactacao={onEstadoCompactacao}
             onChangeComposerDraft={onChangeComposerDraft}
             composerHistory={composerHistory}
             onAppendComposerHistory={onAppendComposerHistory}

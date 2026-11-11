@@ -1431,7 +1431,7 @@ Reabrir Task 01 (P3/P4) · reabrir D122/D125/D126 · reabrir homologações hist
 | Analisar relação com Fatia 13, 14, 15, MCP, skills e demais | ✅ C.3 |
 | **Não alterar a sequência canônica** | ✅ C.2 verifica item por item contra D109/D102/`docs/06`/`docs/02 §4`; divergências registradas **sem** renumeração |
 | Produzir **apenas proposta** de dependências e ordem | ✅ C.4, marcada como proposta para aprovação |
-| Usar a pasta de investigação existente | ✅ `investigacao_memoria_fatias_m/` |
+| Usar a pasta de investigação existente | ✅ `docs/arquivo_morto/investigacao_memoria_fatias_m/` |
 | Manter Task 02 e Task 03 **separadas**, com índices e referências cruzadas | ✅ `11_…` e `12_…`, com referência explícita no cabeçalho de cada uma e índice atualizado em `00_INDICE.md` |
 | Não criar documentos desnecessários | ✅ **2 arquivos novos** no total (um por tarefa) + atualização do índice existente |
 | Não alterar documentação canônica | ✅ `docs/01`–`09` intactos |
@@ -1451,15 +1451,15 @@ Reabrir Task 01 (P3/P4) · reabrir D122/D125/D126 · reabrir homologações hist
 
 | Arquivo | Conteúdo | Status |
 |---|---|---|
-| `investigacao_memoria_fatias_m/11_TASK02_CONSOLIDACAO_DA_INVESTIGACAO.md` | **Task 02** — consolidação: estado real do repo, o que existe no Agente Window (com arquivo/linha), o que foi encontrado nas 6 referências (2 delas investigadas agora), matriz comparativa, mecanismos comprovados (P1–P10, R1–R25), redundâncias (RD-1…RD-10), hipóteses (H1–H10), decisões pendentes (DP-01…DP-06), tecnologias aproveitáveis e não necessárias, riscos (R-1…R-15), 12 conclusões técnicas | **Novo.** Temporário até aprovação |
-| `investigacao_memoria_fatias_m/12_TASK03_PROPOSTA_FATIAS_M1_M8.md` | **Task 03** — proposta: revisão do desenho (S1–S12), sobreposições e o que não foi fundido, 8 contratos com 15 itens cada, grafo de dependências, compatibilidade com a sequência canônica, relação com Fatias 13/14/15/MCP/skills/DEBTs/F1–F5-B/CAPs, ordem de execução proposta, pendências consolidadas, resumo executivo em 6 pontos | **Novo.** Temporário até aprovação |
-| `investigacao_memoria_fatias_m/00_INDICE.md` | Índice da pasta, com entradas e referências cruzadas para `11` e `12` | **Atualizado** (aditivo) |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/11_TASK02_CONSOLIDACAO_DA_INVESTIGACAO.md` | **Task 02** — consolidação: estado real do repo, o que existe no Agente Window (com arquivo/linha), o que foi encontrado nas 6 referências (2 delas investigadas agora), matriz comparativa, mecanismos comprovados (P1–P10, R1–R25), redundâncias (RD-1…RD-10), hipóteses (H1–H10), decisões pendentes (DP-01…DP-06), tecnologias aproveitáveis e não necessárias, riscos (R-1…R-15), 12 conclusões técnicas | **Novo.** Temporário até aprovação |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/12_TASK03_PROPOSTA_FATIAS_M1_M8.md` | **Task 03** — proposta: revisão do desenho (S1–S12), sobreposições e o que não foi fundido, 8 contratos com 15 itens cada, grafo de dependências, compatibilidade com a sequência canônica, relação com Fatias 13/14/15/MCP/skills/DEBTs/F1–F5-B/CAPs, ordem de execução proposta, pendências consolidadas, resumo executivo em 6 pontos | **Novo.** Temporário até aprovação |
+| `docs/arquivo_morto/investigacao_memoria_fatias_m/00_INDICE.md` | Índice da pasta, com entradas e referências cruzadas para `11` e `12` | **Atualizado** (aditivo) |
 
 **Nenhum outro arquivo foi criado, alterado, movido ou apagado.**
 
 ### G.2 Arquivos apenas lidos (não alterados)
 
-- `investigacao_memoria_fatias_m/`: `00`–`10`, `CORRECAO_PERSISTENCIA.md`, `HOMOLOGACAO_INDEPENDENTE_TASK_01.md`
+- `docs/arquivo_morto/investigacao_memoria_fatias_m/`: `00`–`10`, `CORRECAO_PERSISTENCIA.md`, `HOMOLOGACAO_INDEPENDENTE_TASK_01.md`
 - `docs/`: `01`–`09` (canônicos) e `arquivo_morto/estudo_memoria_contexto_2026-10-22/` (`00`–`09` + `fatias/M1`–`M8`), `arquivo_morto/referencias/00_INDICE.md`
 - `platform/apps/workbench-v2/src/`: `types.ts`, `App.tsx`, `components/ChatInput.tsx`, `server/session-persistence/{index,transcripts,database,paths,chatAlvo}.ts`, `services/sessions/{sessionsClient,SessionPersistenceNotice}.ts(x)`, `bairros/2-inteligencia/casas/{conversa,agir,provedores,config}/**`, `package.json`
 - Referências externas (somente leitura, fora do projeto): DeepSeek Harness `22ddee3` (6 docs de subsistema + `checkpoint.ts` + `tool-pairing.ts` + `schema.ts`), OpenClaude `3a8e12b` (clone raso em `/home/user/.cache/refs/openclaude`, **fora** do snapshot do workspace, conforme `docs/01 §3.B.6`)
@@ -1473,7 +1473,7 @@ Reabrir Task 01 (P3/P4) · reabrir D122/D125/D126 · reabrir homologações hist
 | Remote | **nenhum** |
 | Commits nesta missão | **nenhum** |
 | Push nesta missão | **nenhum** |
-| Working tree | **3 alterações, todas dentro de `investigacao_memoria_fatias_m/`**: `11_TASK02_…` (novo), `12_TASK03_…` (novo), `00_INDICE.md` (modificado) |
+| Working tree | **3 alterações, todas dentro de `docs/arquivo_morto/investigacao_memoria_fatias_m/`**: `11_TASK02_…` (novo), `12_TASK03_…` (novo), `00_INDICE.md` (modificado) |
 | Código-fonte | **inalterado** |
 | Documentação canônica `docs/01`–`09` | **inalterada** |
 | Roadmap / numeração oficial | **inalterados** |

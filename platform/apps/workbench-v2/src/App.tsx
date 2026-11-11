@@ -39,7 +39,7 @@ import {
   type CustomViewId,
 } from './domain/customView'
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
-import type { MedicaoContexto } from './domain/usoContexto'
+import type { MedicaoContexto, EstadoCompactacao } from './domain/usoContexto'
 import {
   assertWorkbenchInvariants,
   resolveActiveChatId,
@@ -438,7 +438,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     try { localStorage.setItem('agente-window:mode-by-chat:v1', JSON.stringify(modeByChat)) } catch { /* a escolha local é best-effort; o servidor valida o enum a cada execução */ }
   }, [modeByChat])
   const [composerDrafts, setComposerDrafts] = useState<Record<string, ComposerDraft>>({})
-  const [usoPorChat, setUsoPorChat] = useState<Record<string, { execucao: symbol; medicao?: MedicaoContexto }>>({})
+  const [usoPorChat, setUsoPorChat] = useState<Record<string, { execucao: symbol; medicao?: MedicaoContexto; memoria?: EstadoCompactacao }>>({})
   const [composerHistoryByChat, setComposerHistoryByChat] = useState<Record<string, ComposerHistoryEntry[]>>({})
   const [approved, setApproved] = useState(false)
   const [toast, setToast] = useState<string | undefined>()
@@ -1618,10 +1618,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const execucao = Symbol()
     setUsoPorChat(current => ({ ...current, [runKey]: { execucao } }))
     const atualizarUso = (medicao?: MedicaoContexto) => setUsoPorChat(current =>
-      current[runKey]?.execucao === execucao ? { ...current, [runKey]: { execucao, medicao } } : current)
+      current[runKey]?.execucao === execucao ? { ...current, [runKey]: { ...current[runKey], execucao, medicao } } : current)
     let acumulado = acumuladoInicial
     return {
       onContextUsage: atualizarUso,
+      onMemoryStatus: (memoria) => setUsoPorChat(current => current[runKey]?.execucao === execucao
+        ? { ...current, [runKey]: { ...current[runKey], memoria } } : current),
       onCheckpointInvalido: () => setToast('O checkpoint não corresponde mais ao histórico. O agente usou o contexto original.'),
       onChunk: (pedaco) => {
         acumulado += pedaco
@@ -1725,6 +1727,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         aoConcluir?.()
       },
       onError: (code, mensagemErro, detalhe) => {
+        if (code === 'limite') atualizarUso()
         if (code === 'fluxo' && aoFluxoMorto) {
           aoFluxoMorto()
           // Expirar o cartão também precisa encerrar o estado de trabalho.
@@ -2216,7 +2219,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           setPermissionByChat((current) => ({ ...current, [permissionKey]: nextPermission }))
           if (nextPermission === 'manual') setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: false }))
         }}
-        onSend={(text, attachments, modelSelection) => handleSend(text, attachments, undefined, modelSelection)}
+        onSend={(text, attachments, modelSelection) => handleSend(text, attachments, { sessionId: session.id, chatId: sessionChatId }, modelSelection)}
         onStop={handleStop}
         onApprove={(chatId) => handleApprove(session.id, chatId)}
         onDecidirFerramenta={(chatId, messageId, ferramentaId, decisao) => decidirFerramenta(session.id, chatId, messageId, ferramentaId, decisao)}
@@ -2224,6 +2227,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onDecidirContinuar={(chatId, messageId, continuarId, decisao) => decidirContinuar(session.id, chatId, messageId, continuarId, decisao)}
         autoScroll={autoScrollChat}
         usoContexto={usoPorChat[sessionChatKey]?.medicao}
+        estadoCompactacao={usoPorChat[sessionChatKey]?.memoria}
+        onEstadoCompactacao={(memoria) => setUsoPorChat(current => ({ ...current, [sessionChatKey]: {
+          ...current[sessionChatKey], execucao: current[sessionChatKey]?.execucao ?? Symbol(), memoria,
+        } }))}
         composerDrafts={composerDrafts}
         onChangeComposerDraft={(key, updater) => setComposerDrafts((current) => ({ ...current, [key]: updater(current[key] ?? { text: '', attachments: [] }) }))}
         composerHistory={composerHistoryByChat}

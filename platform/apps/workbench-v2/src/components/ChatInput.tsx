@@ -21,7 +21,7 @@ import { DragTypes } from '../domain/dragAndDrop'
 import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
-import { ocupacaoContexto, type MedicaoContexto } from '../domain/usoContexto'
+import { ocupacaoContexto, type MedicaoContexto, type EstadoCompactacao } from '../domain/usoContexto'
 
 interface ChatInputProps {
   session: Session
@@ -39,6 +39,8 @@ interface ChatInputProps {
   onApprove: (chatId?: string) => void
   composerDrafts?: Record<string, ComposerDraft>
   usoContexto?: MedicaoContexto
+  estadoCompactacao?: EstadoCompactacao
+  onEstadoCompactacao?: (estado: EstadoCompactacao) => void
   onChangeComposerDraft?: (key: string, updater: (current: ComposerDraft) => ComposerDraft) => void
   composerHistory?: Record<string, ComposerHistoryEntry[]>
   onAppendComposerHistory?: (key: string, entry: ComposerHistoryEntry) => void
@@ -77,20 +79,22 @@ function IndicadorContexto({ medicao, selecao }: { medicao?: MedicaoContexto; se
     : undefined
   const detalhes = [
     `Última medição reportada por ${medicao.providerId} / ${medicao.modelId}, iteração ${medicao.iteracao}.`,
-    medicao.entrada === undefined ? 'Entrada indisponível.' : `Entrada: ${medicao.entrada} tokens.`,
+    medicao.estimativa ? `Entrada estimada: ${medicao.estimativa.minimo}–${medicao.estimativa.maximo} tokens. Faixa heurística por bytes UTF-8; não é contagem exata do modelo.` : medicao.entrada === undefined ? 'Entrada indisponível.' : `Entrada: ${medicao.entrada} tokens.`,
+    medicao.fase === 'enviado' ? 'Solicitação enviada; processamento ainda não confirmado.' : '',
     medicao.saida === undefined ? 'Saída indisponível.' : `Saída: ${medicao.saida} tokens.`,
     medicao.janela ? `Janela configurada: ${medicao.janela.tokens} tokens.` : 'Janela desconhecida.',
     medicao.reservaSaida === undefined ? 'Reserva de saída desconhecida.' : `Reserva de saída: ${medicao.reservaSaida} tokens.`,
     orcamentoEntrada === undefined ? '' : `Orçamento de entrada com reserva: ${orcamentoEntrada} tokens.`,
+    orcamentoEntrada !== undefined && medicao.entrada !== undefined ? `Capacidade disponível${medicao.estimativa ? ' estimada pelo teto da faixa' : ''}: ${Math.max(0, orcamentoEntrada - medicao.entrada)} tokens.` : 'Capacidade disponível desconhecida.',
     ocupacao?.alerta === 'critico' ? 'Contexto próximo do limite.' : ocupacao?.alerta === 'alto' ? 'Uso de contexto elevado.' : '',
   ].filter(Boolean).join(' ')
-  const label = ocupacao ? `${ocupacao.percentual}% contexto`
+  const label = medicao.estimativa ? `≈ ${medicao.estimativa.minimo}–${medicao.estimativa.maximo} tokens${medicao.janela ? ` / ${medicao.janela.tokens}` : ' · janela desconhecida'}` : ocupacao ? `${ocupacao.percentual}% contexto`
     : medicao.entrada === undefined ? 'Contexto indisponível' : `${medicao.entrada} tokens de contexto`
   return <span className="context-usage" data-alert={ocupacao?.alerta} role="status" aria-label={detalhes} title={detalhes}>{label}</span>
 }
 
-function CompactarContexto({ sessionId, chatId, model, disabled }: {
-  sessionId: string; chatId: string; model: string; disabled: boolean
+function CompactarContexto({ sessionId, chatId, model, disabled, onEstado }: {
+  sessionId: string; chatId: string; model: string; disabled: boolean; onEstado?: (estado: EstadoCompactacao) => void
 }) {
   const [estado, setEstado] = useState<{ ativo: boolean; mensagem?: string }>({ ativo: false })
   const chamada = useRef<AbortController | null>(null)
@@ -100,15 +104,17 @@ function CompactarContexto({ sessionId, chatId, model, disabled }: {
     const controle = new AbortController()
     chamada.current = controle
     setEstado({ ativo: true })
+    onEstado?.({ estado: 'compactando' })
     try {
       const resposta = await fetch('/api/sessions/checkpoint', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controle.signal,
         body: JSON.stringify({ sessionId, chatId, modelSelection: selecaoDoToken(model) }),
       })
-      const corpo = await resposta.json() as { message?: string }
+      const corpo = await resposta.json() as { message?: string; ultimaEm?: number }
       setEstado({ ativo: false, mensagem: resposta.ok ? 'Contexto compactado.' : corpo.message ?? 'A compactação falhou.' })
+      onEstado?.(resposta.ok ? { estado: 'compactado', ultimaEm: corpo.ultimaEm ?? Date.now() } : { estado: 'falhou' })
     } catch {
-      if (!controle.signal.aborted) setEstado({ ativo: false, mensagem: 'Não foi possível compactar o contexto.' })
+      if (!controle.signal.aborted) { setEstado({ ativo: false, mensagem: 'Não foi possível compactar o contexto.' }); onEstado?.({ estado: 'falhou' }) }
     } finally {
       chamada.current = null
     }
@@ -178,6 +184,8 @@ export function ChatInput({
   onApprove,
   composerDrafts,
   usoContexto,
+  estadoCompactacao,
+  onEstadoCompactacao,
   onChangeComposerDraft,
   composerHistory,
   onAppendComposerHistory,
@@ -186,6 +194,20 @@ export function ChatInput({
   // when the user briefly changes chat, without leaking attachments to another
   // session or chat.
   const draftKey = `${session.id}:${activeChat.id}`
+  const [compactacaoPersistida, setCompactacaoPersistida] = useState<{ chave: string; valor: EstadoCompactacao }>()
+  const estadoDaCompactacao = estadoCompactacao ?? (compactacaoPersistida?.chave === draftKey ? compactacaoPersistida.valor : undefined)
+  useEffect(() => {
+    const abort = new AbortController()
+    const parametros = new URLSearchParams({ sessionId: session.id, chatId: activeChat.id })
+    void fetch(`/api/sessions/checkpoint?${parametros}`, { signal: abort.signal }).then(async (resposta) => {
+      if (!resposta.ok) return
+      const corpo = await resposta.json() as { compactacao?: EstadoCompactacao }
+      if (!abort.signal.aborted && corpo.compactacao?.estado === 'compactado' && Number.isFinite(corpo.compactacao.ultimaEm)) {
+        setCompactacaoPersistida({ chave: draftKey, valor: corpo.compactacao })
+      }
+    }).catch(() => undefined)
+    return () => abort.abort()
+  }, [session.id, activeChat.id, draftKey])
   const [localDrafts, setLocalDrafts] = useState<Record<string, ComposerDraft>>({})
   const drafts = composerDrafts ?? localDrafts
   const draft = drafts[draftKey] ?? createEmptyDraft()
@@ -867,6 +889,10 @@ export function ChatInput({
           <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
           <div className="input-toolbar-spacer" />
           <IndicadorContexto medicao={usoContexto} selecao={selecaoDoToken(model)} />
+          {estadoDaCompactacao && <span className="context-usage" role="status"
+            title={estadoDaCompactacao.ultimaEm ? `Última compactação: ${new Date(estadoDaCompactacao.ultimaEm).toLocaleString()}` : undefined}>
+            {estadoDaCompactacao.estado === 'compactando' ? 'Compactando contexto…' : estadoDaCompactacao.estado === 'compactado'
+              ? 'Contexto compactado' : 'Compactação indisponível'}</span>}
           {!session.isDraft && activeChat.messages.length > 0 &&
             <button type="button" className="chat-input-tool-button" aria-label="Recuperar com o agente"
               title="Recuperar somente neste chat, sem acesso a arquivos" disabled={isWorking || needsInput}
@@ -875,7 +901,7 @@ export function ChatInput({
                 textareaRef.current?.focus()
               }}><Search size={14} /></button>}
           {!session.isDraft && activeChat.messages.filter(({ role }) => role === 'user').length >= 3 &&
-            <CompactarContexto key={draftKey} sessionId={session.id} chatId={activeChat.id} model={model} disabled={isWorking || needsInput} />}
+            <CompactarContexto key={draftKey} sessionId={session.id} chatId={activeChat.id} model={model} disabled={isWorking || needsInput} onEstado={onEstadoCompactacao} />}
           <div className="model-picker-wrap" ref={modelWrapRef}>
             <button
               ref={modelButtonRef}

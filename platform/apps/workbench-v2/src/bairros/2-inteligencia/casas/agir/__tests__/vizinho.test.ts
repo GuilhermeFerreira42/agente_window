@@ -57,12 +57,27 @@ const HISTORICO: MensagemAgir[] = [
 ]
 
 describe('Missão 2 — erros reais de transporte e resposta', () => {
+  it('retira include_usage somente após recusa explícita e preserva estimativa', async () => {
+    const corpos: Record<string, unknown>[] = []
+    const s = await servidorFalso((_req, res, corpo) => {
+      corpos.push(corpo)
+      if (corpos.length === 1) { res.writeHead(400).end('Unsupported stream_options include_usage'); return }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' }).end('data: {"choices":[{"delta":{"content":"OK"}}]}\n\ndata: [DONE]\n\n')
+    })
+    try {
+      const resultado = await criarVizinhoReal({ ...alvoDe('openai-chat', s.baseUrl), providerId: 'fixture', modelId: 'm' })(HISTORICO)
+      expect(corpos).toHaveLength(2)
+      expect(corpos[0]).toHaveProperty('stream_options.include_usage', true)
+      expect(corpos[1]).not.toHaveProperty('stream_options')
+      expect(resultado.usoContexto).toMatchObject({ origemEntrada: 'estimativa' })
+    } finally { await s.fechar() }
+  })
   it.each([400,401,403,413,429,502])('HTTP %s preserva categoria/status sem retentativa automática', async status => {
     let chamadas=0
     const servidor=await servidorFalso((_req,res)=>{chamadas++;res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:status===400?'maximum context length exceeded: too many tokens':'fixture failure'}}))})
     try {
       const vizinho=criarVizinhoReal(alvoDe('openai-chat',servidor.baseUrl))
-      await expect(vizinho(HISTORICO)).rejects.toMatchObject({code:status===401||status===403?'chave':'http',httpStatus:status})
+      await expect(vizinho(HISTORICO)).rejects.toMatchObject({code:status===401||status===403?'chave':status===400||status===413?'limite':'http',httpStatus:status})
       expect(chamadas).toBe(1)
     } finally {await servidor.fechar()}
   })
@@ -107,7 +122,8 @@ describe('Vizinho real — openai-chat (SSE com pedidos PARTIDOS)', () => {
       expect(pedidos[1].tools).toHaveLength(7)
       expect(pedidos[1].messages).toContainEqual(expect.objectContaining({ role: 'tool', tool_call_id: 'ler-1' }))
       const medicoes = eventos.flatMap((evento) => evento.type === 'context_usage' ? [evento.medicao] : [])
-      expect(medicoes.map(({ iteracao, entrada }) => [iteracao, entrada])).toEqual([[1, 740], [2, 920]])
+      expect(medicoes.filter(({ fase }) => fase === 'enviado')).toHaveLength(2)
+      expect(medicoes.filter(({ fase }) => fase === 'respondido').map(({ iteracao, entrada }) => [iteracao, entrada])).toEqual([[1, 740], [2, 920]])
       expect(new Set(medicoes.map(({ requestId }) => requestId)).size).toBe(2)
     } finally {
       await servidor.fechar()

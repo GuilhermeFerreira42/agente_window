@@ -14,7 +14,7 @@ function esquemaDe(id: string): Record<string, unknown> {
     case 'historico':
       return {
         type: 'object', properties: {
-          acao: { type: 'string', enum: ['buscar', 'ler'] },
+          acao: { type: 'string', enum: ['buscar', 'ler', 'projeto'] },
           consulta: { type: 'string', maxLength: 120 },
           messageId: { type: 'string', maxLength: 200 },
         }, required: ['acao'], additionalProperties: false,

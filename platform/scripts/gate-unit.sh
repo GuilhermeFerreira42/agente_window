@@ -20,7 +20,7 @@
 #      "The path argument must be of type string. Received undefined".
 #      Outros dois arquivos da mesma pasta se AUTO-PULAM sem esta variavel
 #      (agirContext/database) — ou seja, sem ela o gate tambem conta menos
-#      testes. Isto ja estava documentado no repo (investigacao_memoria_fatias_m
+#      testes. Isto ja estava documentado no repo (docs/arquivo_morto/investigacao_memoria_fatias_m
 #      e docs/06) e mesmo assim se perdeu no meio da rodada.
 #
 # Uso:
@@ -48,7 +48,7 @@ mkdir -p "$AGENTE_WINDOW_TEST_HOME"
 # existia um ~/.agente_window/skills/commit de uma execucao anterior e as rotas de
 # personalizacoes respondiam com ele, quebrando 3 testes que esperam visao limpa.
 # Com HOME isolado: 30/30 no arquivo. Isolar o HOME e' o que a documentacao de
-# teste do proprio repo ja mandava fazer (investigacao_memoria_fatias_m/06).
+# teste do proprio repo ja mandava fazer (docs/arquivo_morto/investigacao_memoria_fatias_m/06).
 export HOME="$TMPDIR_BOM/home-isolado"
 mkdir -p "$HOME"
 export PATH="$NR:$PATH"

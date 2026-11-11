@@ -54,8 +54,9 @@ describe('conversar — resposta única com erros honestos', () => {
     const { eventos, erro } = await capturar({ ...ALVO, providerId: 'p', modelId: 'm', limiteContexto: 1000 })
     expect(erro).toBeNull()
     expect(eventos).toEqual([
+      { type: 'context_usage', medicao: expect.objectContaining({ origemEntrada: 'estimativa', fase: 'enviado' }) },
       { type: 'chunk', text: 'Olá' },
-      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'p', modelId: 'm', entrada: 920, saida: 17, janela: { tokens: 1000, origem: 'configuracao' } } },
+      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'p', modelId: 'm', entrada: 920, saida: 17, janela: { tokens: 1000, origem: 'configuracao' }, origemEntrada: 'provedor', fase: 'respondido' } },
     ])
   })
 
@@ -198,9 +199,10 @@ describe('conversar — streaming de verdade (conquista 2)', () => {
     expect(erro).toBeNull()
     expect(JSON.parse(String(chamadas[0].init?.body))).toMatchObject({ max_tokens: 512 })
     expect(eventos).toEqual([
+      { type: 'context_usage', medicao: expect.objectContaining({ origemEntrada: 'estimativa', fase: 'enviado', reservaSaida: 512 }) },
       { type: 'chunk', text: 'Oi ' },
       { type: 'chunk', text: 'tudo bem?' },
-      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'anthropic', modelId: 'claude-haiku-4-5', entrada: 600, saida: 16, reservaSaida: 512, janela: { tokens: 2000, origem: 'configuracao' } } },
+      { type: 'context_usage', medicao: { requestId: expect.any(String), iteracao: 1, providerId: 'anthropic', modelId: 'claude-haiku-4-5', entrada: 600, saida: 16, reservaSaida: 512, janela: { tokens: 2000, origem: 'configuracao' }, origemEntrada: 'provedor', fase: 'respondido' } },
     ])
   })
 

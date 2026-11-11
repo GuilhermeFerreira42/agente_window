@@ -181,9 +181,9 @@ describe('session persistence HTTP contract', () => {
     const restored = (await loadSessions(server)).find((entry) => entry.id === id)!
     expect(restored.chats[0].messages[0].attachments).toEqual([{ id: 'attachment-1', name: 'example.txt', kind: 'local' }])
     expect(restored.chats[0].messages[1].ferramentas).toMatchObject([
-      { id: 'cmd', ferramenta: 'executar', status: 'ok' },
-      { id: 'write', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado' },
-      { id: 'search', ferramenta: 'buscar', alvo: 'Consulta', status: 'ok' },
+      { id: 'persistida-0', ferramenta: 'executar', status: 'ok' },
+      { id: 'persistida-1', ferramenta: 'escrever', alvo: 'example.txt', status: 'negado' },
+      { id: 'persistida-2', ferramenta: 'buscar', alvo: 'Consulta', status: 'ok' },
     ])
   })
 
@@ -388,7 +388,7 @@ describe('session persistence HTTP contract', () => {
     expect(restoredFirst.chats[0].messages.map(({ id, content }) => ({ id, content })))
       .toEqual(first.chats[0].messages.map(({ id, content }) => ({ id, content })))
     expect(restoredFirst.chats[0].messages[1]).toMatchObject({
-      ferramentas: [{ id: 'tool-call-1', status: 'ok' }, { id: 'tool-call-2', status: 'erro' }],
+      ferramentas: [{ id: 'persistida-0', status: 'ok' }, { id: 'persistida-1', status: 'erro' }],
       continuar: [{ id: 'continue-card-1', status: 'parado' }],
     })
     expect(restoredSecond.chats[0].messages).toEqual(second.chats[0].messages)
