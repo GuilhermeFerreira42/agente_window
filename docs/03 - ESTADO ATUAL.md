@@ -1,5 +1,7 @@
 # Estado vigente — 11/11/2026
 
+**Incidente do provedor atual (11/11, após a entrega M8).** O chat com `openai-compat / meu-pool` não está recebendo resposta. A reprodução direta fora do produto atingiu 130 s sem cabeçalhos. A API de catálogo do LiteLLM e da NVIDIA respondeu. O pool encaminha para Nemotron; a alternativa DeepSeek configurada retornou 410. A validação de resposta com esse serviço atual permanece bloqueada externamente. Diagnóstico em 09. Nenhuma troca de modelo ou credencial foi aplicada.
+
 A base auditada é `bf64d30`, da branch `arena`. O proprietário informou a homologação das **Fatias 14 e 15**, registrada em 08 e na decisão D186. A conferência técnica desta base fica em 09. Os retratos abaixo registram entregas e pendências da época.
 
 - **Fatia 14, SPEC 2H.** A barra de sessões e o modal de Personalizações estão integrados. Habilidades e ferramentas usam os serviços do produto. Agentes, Hooks, MCP e Plugins ainda têm categorias de navegação com escopo futuro.

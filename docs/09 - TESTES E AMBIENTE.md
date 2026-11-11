@@ -1,3 +1,13 @@
+# Incidente — timeout do pool real após a entrega M8 (11/11/2026)
+
+O proprietário reportou o chat sem resposta, com timeout de 60 s. Diagnóstico sem escrever na configuração pessoal: GET `/models` do LiteLLM respondeu 200 tanto em `0.0.0.0:4000` quanto em `127.0.0.1:4000`. O destino com endereço curinga não foi a causa comprovada. A configuração local mapeia as quatro entradas de `meu-pool` para `openai/nvidia/nemotron-3-ultra-550b-a55b` em `integrate.api.nvidia.com`.
+
+Chamadas diretas fora do Agent Window, com pergunta sintética curta, streaming e saída limitada a 16 tokens, atingiram 20 s, 65 s e finalmente **130,017 s sem receber cabeçalhos**, inclusive usando loopback explícito. Uma chamada direta à inferência NVIDIA atingiu read timeout de 20,469 s. O catálogo NVIDIA respondeu 200 em 546 ms e incluiu o modelo Nemotron configurado. A alternativa `deepseek-ai/deepseek-v4-pro` encontrada no arquivo retornou **410** na inferência e não constava no catálogo atual. Ollama local não respondeu à consulta de disponibilidade.
+
+Isso reproduz a indisponibilidade da geração sem passar pelo histórico, ferramentas, interface ou parser SSE do produto. Não determina se a NVIDIA está em fila, com falha específica do modelo ou com outra limitação interna; nenhum corpo privado ou credencial foi impresso. O HTTP 200 mostrado nos logs do proxy não prova recebimento de uma resposta válida pelo cliente. Não há correção de código demonstrada nesta investigação, e aumentar o timeout não foi tratado como solução. Os testes anteriores com IA real continuam datados; a prova funcional com o pool atual permanece pendente. Nenhuma configuração de pool, credencial ou modelo do usuário foi alterada.
+
+---
+
 # M8 — validação integrada e revisão dos contratos (11/11/2026)
 
 Base de entrada `a2dc8af`. A revisão abaixo confronta contratos e testes depois da implementação; é autorrevisão técnica, sem alegação de auditoria independente.
