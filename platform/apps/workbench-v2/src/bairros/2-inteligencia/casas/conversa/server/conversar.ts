@@ -14,7 +14,12 @@
 import type { AlvoConversa, CategoriaErro, ConfigChamadaModelo, ErroConversa, EventoChat, IniciarChamadaModelo, MensagemChat } from '../contract'
 import { montarPedido } from './requisicao'
 import { criarFramer } from './streaming'
-import { criarLeitorDeUso, metadadosDaChamada, completarMedicao, removerOpcaoRecusada } from '../../../../../domain/usoContexto'
+import { criarLeitorDeUso, metadadosDaChamada, completarMedicao, removerOpcaoRecusada, estimarEntrada } from '../../../../../domain/usoContexto'
+
+export function estimarPedidoConversa(alvo: AlvoConversa, messages: MensagemChat[]) {
+  const pedido = montarPedido(alvo, messages)
+  return { estimativa: estimarEntrada(JSON.parse(String(pedido.init.body))), reserva: pedido.reservaSaida }
+}
 
 /** Sem NENHUM byte do corpo em 60 s → `tempo` (proposta da SPEC §3.6d). */
 export const TIMEOUT_PRIMEIRO_BYTE_MS = 60_000
@@ -201,6 +206,10 @@ export async function executarConversa(
   let payloadMedido: unknown
   try {
     const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
+      if (alvo.capacidade && config && (JSON.stringify(alvo.capacidade.limites) !== JSON.stringify(config.capacidade?.limites) ||
+        alvo.baseUrl !== config.baseUrl || alvo.apiKey !== config.apiKey || alvo.maxSaida !== config.maxSaida)) {
+        throw new ErroChat('selection_unavailable', 'Os limites mudaram durante a preparação do resumo. Nenhum checkpoint foi publicado.')
+      }
       const alvoAtual: AlvoConversa = config ? {
         ...alvo,
         providerId: config.providerId,
@@ -212,6 +221,7 @@ export async function executarConversa(
         temperatura: config.temperatura,
         maxSaida: config.maxSaida,
         limiteContexto: config.limiteContexto,
+        capacidade: config.capacidade,
       } : alvo
       const pedido = montarPedido(alvoAtual, messages)
       chamada = metadadosDaChamada(alvoAtual, pedido.reservaSaida)

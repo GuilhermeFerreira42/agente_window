@@ -101,6 +101,7 @@ export async function tratarRotasConversa(
     return true
   }
   const { alvo, erro } = await obterAlvo(selecao)
+  if (res.destroyed || res.writableEnded) return true
   if (!alvo) {
     sendErro(
       res,

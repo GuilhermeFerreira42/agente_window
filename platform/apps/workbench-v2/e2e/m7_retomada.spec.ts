@@ -21,6 +21,7 @@ test.describe('M7 — revisão operacional', () => {
     await writeFile(join(workspace!, arquivo), 'PRESERVAR')
     const pedidos: Array<{ tools: unknown[] }> = []
     const provedor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const partes: Buffer[] = []
       for await (const chunk of req) partes.push(chunk)
       pedidos.push(JSON.parse(Buffer.concat(partes).toString('utf8')))

@@ -415,10 +415,14 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     const composicao = !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
-    const vizinho = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
     const emitirMemoria = (evento: EventoAgir) => { if (!abort.signal.aborted && !res.writableEnded) escreverEvento(res, evento) }
     resultado = await rodarAgir({
       vizinho: async (historico, opcoes) => {
+        if (deps.prepararChamada && fio.alvo.providerId && fio.alvo.modelId) {
+          const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
+          if (!atual.alvo) throw Object.assign(new Error('A seleção ficou indisponível antes de preparar o contexto.'), { code: 'selection_unavailable' })
+          fio.alvo = atual.alvo
+        }
         if (registro) await gravarRegistro()
         if (abort.signal.aborted || !validarContexto()) {
           throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
@@ -430,7 +434,8 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || !validarContexto()) throw Object.assign(new Error('O projeto mudou durante a preparação do contexto.'), { code: 'fluxo' })
         let saiuTexto = false
         const observadores = { ...opcoes, validarAntesDaChamada: validarContexto, aoTexto: (texto: string) => { if (texto.length) saiuTexto = true; opcoes?.aoTexto?.(texto) } }
-        try { return await vizinho(contexto, observadores) } catch (erro) {
+        const atual = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
+        try { return await atual(contexto, observadores) } catch (erro) {
           if (!preparar || recuperouLimite || saiuTexto || abort.signal.aborted ||
               (erro as { code?: string })?.code !== 'limite') throw erro
           recuperouLimite = true
@@ -440,7 +445,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
           }
           if (JSON.stringify(reduzido).length >= JSON.stringify(contexto).length || !validarContexto()) throw erro
           contexto = reduzido
-          return vizinho(contexto, observadores)
+          return atual(contexto, observadores)
         }
       },
       historico: fio.mensagens,
@@ -775,6 +780,7 @@ async function tratarAgir(
   const permissaoEfetiva = lerPermissaoEfetiva(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
 
   const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
+  if (res.destroyed || res.writableEnded) return true
   if (!alvo) {
     sendErro(res, 409, erro?.code ?? 'sem_provedor', erro?.message ?? 'Nenhum provedor está ativo. Abra Provedores e escolha quem vai responder.')
     return true
@@ -816,6 +822,7 @@ async function tratarAgir(
     recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined,
     recuperacaoAutomatica: !consultaHistorica && !retomadaId && deps.recuperarHistorico ? { restantes: 3, fontes: new Set() } : undefined,
     planejamentoRetomada: Boolean(retomadaId), pedidoId: typeof textoAtual?.id === 'string' && /^[\w-]{1,200}$/.test(textoAtual.id) ? textoAtual.id : undefined }
+  if (res.destroyed || res.writableEnded) return true
   const execucao = criarExecucao(fluxo, contextoFluxo)
   let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>
   try {

@@ -66,6 +66,13 @@ afterEach(() => {
 })
 
 describe('rotas — POST /api/chat', () => {
+  it('não inicia geração se a conexão foi cancelada durante a descoberta', async () => {
+    const res = fakeRes(), fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    const obter: ObterAlvo = async () => { Object.assign(res, { destroyed: true }); return alvoOk() }
+    await tratarRotasConversa(fakeReq(BODY), res, URL_CHAT, obter)
+    expect(fetcher).not.toHaveBeenCalled(); expect(res.corpo()).toBe('')
+  })
   it('reconhece só o caminho e o método certos', async () => {
     expect(rotaPertenceAoModuloConversa('/api/chat')).toBe(true)
     expect(rotaPertenceAoModuloConversa('/api/chatx')).toBe(false)

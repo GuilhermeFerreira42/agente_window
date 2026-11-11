@@ -24,30 +24,37 @@ async function semear(page: Page, id: string) {
 
 async function enviar(page: Page, texto: string) {
   await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill(texto)
+  const fio = page.waitForResponse((r) => r.url().endsWith('/api/agir') && r.request().method() === 'POST')
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await (await fio).finished()
 }
 
 test.describe('M1 — medição e orçamento', () => {
   test('M1 mede a resposta no navegador, isola sessões e volta a medir após recarregar', async ({ page }) => {
     const chamadas: Record<string, unknown>[] = []
+    let geracoes = 0
     const servidor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const partes: Buffer[] = []
       for await (const parte of req) partes.push(parte)
       chamadas.push(JSON.parse(Buffer.concat(partes).toString('utf8')))
-      if (chamadas.length === 3) {
+      const mensagens = chamadas.at(-1)!.messages as Array<{ content?: string }>
+      const resumo = mensagens.some((m) => m.content?.includes('Produza um resumo de continuidade'))
+      if (!resumo) geracoes++
+      if (!resumo && geracoes >= 3) {
         res.writeHead(413).end()
         return
       }
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
       res.write('data: {"choices":[{"delta":{"content":"Resposta M1 da fixture."}}]}\n\n')
-      if (chamadas.length === 1) res.write('data: {"choices":[],"usage":{"prompt_tokens":900,"completion_tokens":14}}\n\n')
+      if (chamadas.length === 1) res.write('data: {"choices":[],"usage":{"prompt_tokens":115200,"completion_tokens":14}}\n\n')
       res.end('data: [DONE]\n\n')
     })
     await new Promise<void>((resolve) => servidor.listen(0, '127.0.0.1', resolve))
     try {
       const endereco = servidor.address()
       if (typeof endereco !== 'object' || !endereco) throw new Error('Fixture HTTP indisponível')
-      await configurar(page, 'openai-compat', { nome: 'M1 fixture', baseUrl: `http://127.0.0.1:${endereco.port}/v1`, modelo: 'm1-fixture', apiKey: 'fixture', contexto: 1000, contextoModelo: 'm1-fixture' })
+      await configurar(page, 'openai-compat', { nome: 'M1 fixture', baseUrl: `http://127.0.0.1:${endereco.port}/v1`, modelo: 'm1-fixture', apiKey: 'fixture', contexto: 128000, contextoModelo: 'm1-fixture', maxSaida: 4096 })
       const primeira = `M1 primeira ${Date.now()}`
       const segunda = `M1 segunda ${Date.now()}`
       await semear(page, primeira)
@@ -59,7 +66,7 @@ test.describe('M1 — medição e orçamento', () => {
       await expect(indicador).toHaveText('Contexto não medido')
       await enviar(page, 'Uma pergunta curta')
       await expect(indicador).toHaveText('90% contexto')
-      await expect(indicador).toHaveAttribute('title', /m1-fixture.*Entrada: 900.*Saída: 14/)
+      await expect(indicador).toHaveAttribute('title', /m1-fixture.*Entrada: 115200.*Saída: 14/)
       await expect(page.locator('.chat-message').last()).toContainText('Resposta M1 da fixture.')
       await abrir(segunda)
       await expect(indicador).toHaveText('Contexto não medido')
@@ -77,10 +84,15 @@ test.describe('M1 — medição e orçamento', () => {
         expect.objectContaining({ role: 'assistant', content: 'Resposta M1 da fixture.' }),
       ]))
       expect(chamadas[1].tools).toEqual(expect.any(Array))
+      // Conversa vazia: não existe prefixo seguro para recuperação de 413.
+      await abrir(segunda)
       await enviar(page, 'Caso 413')
       await expect(page.getByText(/rejeitou o tamanho do contexto enviado/i)).toBeVisible()
       await expect(indicador).toHaveText('Contexto não medido')
       expect(chamadas).toHaveLength(3)
+      expect(geracoes).toBe(3)
+      await abrir(primeira)
+      await expect(indicador).toContainText('≈')
     } finally {
       await new Promise<void>((resolve) => servidor.close(() => resolve()))
     }

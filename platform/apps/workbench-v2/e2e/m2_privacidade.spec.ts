@@ -17,6 +17,7 @@ test.describe('M2 — privacidade de snapshots', () => {
     await writeFile(join(workspace!, arquivo), privado)
     const pedidos: Array<{ messages: Array<Record<string, unknown>> }> = []
     const provedor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const buffers: Buffer[] = []
       for await (const chunk of req) buffers.push(chunk)
       pedidos.push(JSON.parse(Buffer.concat(buffers).toString('utf8')))

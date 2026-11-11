@@ -22,6 +22,7 @@ import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligenc
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 import { ocupacaoContexto, type MedicaoContexto, type EstadoCompactacao } from '../domain/usoContexto'
+import { orcamentoContexto } from '../domain/capacidadeContexto'
 
 interface ChatInputProps {
   session: Session
@@ -74,15 +75,26 @@ function IndicadorContexto({ medicao, selecao }: { medicao?: MedicaoContexto; se
     return <span className="context-usage">Contexto não medido</span>
   }
   const ocupacao = ocupacaoContexto(medicao)
-  const orcamentoEntrada = medicao.janela && medicao.reservaSaida !== undefined
+  const preventivo = orcamentoContexto(medicao.capacidade, medicao.reservaSaida ?? 2048, medicao.janela?.tokens)
+  const orcamentoEntrada = preventivo?.entrada ?? (medicao.janela && medicao.reservaSaida !== undefined
     ? Math.max(0, medicao.janela.tokens - medicao.reservaSaida)
-    : undefined
+    : undefined)
+  const capacidade = medicao.capacidade
   const detalhes = [
     `Última medição reportada por ${medicao.providerId} / ${medicao.modelId}, iteração ${medicao.iteracao}.`,
+    medicao.modeloRespondido ? `Modelo informado na resposta: ${medicao.modeloRespondido}. Não garante o próximo destino de um pool.` : '',
+    capacidade ? `Identidade do destino: ${capacidade.identidade.estado}; destinos anunciados: ${capacidade.identidade.destinos.join(', ') || 'indisponíveis'}.` : '',
+    capacidade ? `Origem dos limites: ${capacidade.fontes.map((f) => `${f.origem} (${f.versao})`).join(', ') || 'desconhecida'}. Consulta: ${new Date(capacidade.consultadaEm).toLocaleString()}.` : '',
+    capacidade?.limites.entrada ? `Limite de entrada identificado: ${capacidade.limites.entrada} tokens.` : '',
+    capacidade?.limites.saida ? `Limite de saída identificado: ${capacidade.limites.saida} tokens.` : '',
+    capacidade?.avisos.length ? `Ressalvas da descoberta: ${capacidade.avisos.join(', ')}.` : '',
     medicao.estimativa ? `Entrada estimada: ${medicao.estimativa.minimo}–${medicao.estimativa.maximo} tokens. Faixa heurística por bytes UTF-8; não é contagem exata do modelo.` : medicao.entrada === undefined ? 'Entrada indisponível.' : `Entrada: ${medicao.entrada} tokens.`,
     medicao.fase === 'enviado' ? 'Solicitação enviada; processamento ainda não confirmado.' : '',
     medicao.saida === undefined ? 'Saída indisponível.' : `Saída: ${medicao.saida} tokens.`,
-    medicao.janela ? `Janela configurada: ${medicao.janela.tokens} tokens.` : 'Janela desconhecida.',
+    medicao.janela ? `${medicao.janela.origem !== 'configuracao' ? 'Janela identificada' : 'Janela configurada'}: ${medicao.janela.tokens} tokens.` : 'Janela desconhecida.',
+    capacidade?.limites.entrada ? 'Percentual relativo ao menor teto conhecido de entrada/total; a reserva é considerada separadamente no orçamento.' : '',
+    preventivo ? `Orçamento preventivo (75%): ${preventivo.preventivo} tokens de entrada. Reserva considerada no cálculo: ${medicao.reservaSaida ?? 2048}.` : 'Orçamento operacional interno; capacidade do modelo desconhecida.',
+    preventivo && medicao.entrada !== undefined ? `Margem até compactação${medicao.estimativa ? ' estimada pelo teto da faixa' : ''}: ${Math.max(0, preventivo.preventivo - medicao.entrada)} tokens.` : '',
     medicao.reservaSaida === undefined ? 'Reserva de saída desconhecida.' : `Reserva de saída: ${medicao.reservaSaida} tokens.`,
     orcamentoEntrada === undefined ? '' : `Orçamento de entrada com reserva: ${orcamentoEntrada} tokens.`,
     orcamentoEntrada !== undefined && medicao.entrada !== undefined ? `Capacidade disponível${medicao.estimativa ? ' estimada pelo teto da faixa' : ''}: ${Math.max(0, orcamentoEntrada - medicao.entrada)} tokens.` : 'Capacidade disponível desconhecida.',

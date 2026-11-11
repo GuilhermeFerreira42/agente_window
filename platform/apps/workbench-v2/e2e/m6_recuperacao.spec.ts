@@ -17,6 +17,7 @@ test.describe('M6 — consulta explícita pelo agente', () => {
       index, id: `call${index}`, function: { name, arguments: JSON.stringify(argumentos) },
     })
     const provedor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const buffers: Buffer[] = []
       for await (const chunk of req) buffers.push(chunk)
       pedidos.push(JSON.parse(Buffer.concat(buffers).toString('utf8')))

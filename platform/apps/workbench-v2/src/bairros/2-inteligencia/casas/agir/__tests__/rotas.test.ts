@@ -301,6 +301,13 @@ afterEach(() => {
 })
 
 describe('rotas — POST /api/agir', () => {
+  it('não inicia geração se a conexão foi cancelada durante a descoberta', async () => {
+    const res = fakeRes(), fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    const obterAlvo: ObterAlvo = async () => { Object.assign(res, { destroyed: true }); return alvoOk() }
+    await tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, { ...DEPS, obterAlvo })
+    expect(fetcher).not.toHaveBeenCalled(); expect(res.corpo()).toBe('')
+  })
   it('reconhece só o caminho e o método certos', async () => {
     expect(rotaPertenceAoModuloAgir('/api/agir')).toBe(true)
     expect(rotaPertenceAoModuloAgir('/api/agir/aprovar')).toBe(true)

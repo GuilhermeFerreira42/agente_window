@@ -17,6 +17,7 @@ const chamada = (id: string, ferramenta: string, args: object) => ({ choices: [{
 async function provedor(page: Page, janela: number, responder: (pedido: Pedido, indice: number) => object | number) {
   const pedidos: Pedido[] = []
   const server = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
     const partes: Buffer[] = []; for await (const p of req) partes.push(p)
     const pedido = JSON.parse(Buffer.concat(partes).toString()) as Pedido
     pedidos.push(pedido)
@@ -234,8 +235,12 @@ test.describe('memórias automáticas integradas', () => {
       await semear(page, a, 8, 160); await semear(page, b, 8, 160)
       await Promise.all([abrir(page, a), abrir(segunda, b)])
       await Promise.all([enviar(page, 'CONSULTA_A'), enviar(segunda, 'CONSULTA_B')])
-      await expect(page.getByText('Resposta exclusiva A.', { exact: true })).toBeVisible()
-      await expect(segunda.getByText('Resposta exclusiva B.', { exact: true })).toBeVisible()
+      // Duas páginas compactam/renderizam simultaneamente; esperar a conclusão
+      // observável, sem impor o prazo padrão de 5 s como SLA do produto.
+      await Promise.all([
+        expect(page.getByText('Resposta exclusiva A.', { exact: true })).toBeVisible({ timeout: 20_000 }),
+        expect(segunda.getByText('Resposta exclusiva B.', { exact: true })).toBeVisible({ timeout: 20_000 }),
+      ])
       await expect(page.locator('.context-usage[title*="Entrada: 1000"]')).toBeVisible()
       await expect(segunda.locator('.context-usage[title*="Entrada: 2000"]')).toBeVisible()
       await expect(page.getByText('Contexto compactado', { exact: true })).toBeVisible()

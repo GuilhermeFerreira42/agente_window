@@ -106,6 +106,8 @@ export function ProvidersView() {
     modelosHabilitados: daTela?.modelosHabilitados ?? [],
     habilitado: daTela?.habilitado ?? true,
     contexto: daTela?.contexto ?? descritor?.padroes.contexto,
+    contextoModelo: daTela?.contextoModelo,
+    modoContexto: daTela?.modoContexto ?? (daTela?.contextoModelo ? 'manual' : 'auto'),
     maxSaida: daTela?.maxSaida ?? descritor?.padroes.maxSaida,
     temperatura: daTela?.temperatura ?? descritor?.padroes.temperatura,
     ...rascunhos[selecionado],
@@ -221,6 +223,7 @@ export function ProvidersView() {
           habilitado: p.habilitado,
           contexto: p.contexto,
           contextoModelo: p.contextoModelo,
+          modoContexto: p.modoContexto,
           maxSaida: p.maxSaida,
           temperatura: p.temperatura,
         }
@@ -538,14 +541,20 @@ export function ProvidersView() {
             <div className="providers-adv-grid">
               <label className="providers-field">
                 <span className="providers-label">Contexto (tokens)</span>
+                <select className="providers-input" aria-label="Modo da janela de contexto" value={rascunho.modoContexto}
+                  onChange={(e) => editar({ modoContexto: e.target.value as 'auto' | 'manual',
+                    ...(e.target.value === 'manual' ? { contextoModelo: rascunho.modelo.trim() } : {}) })}>
+                  <option value="auto">Descobrir automaticamente</option><option value="manual">Limite manual deste modelo</option>
+                </select>
                 <input
                   className="providers-input is-mono"
                   type="number"
                   min={1}
                   value={rascunho.contexto ?? ''}
-                  onChange={(e) => editar({ contexto: Number(e.target.value), contextoModelo: rascunho.modelo.trim() })}
+                  max={4294967295}
+                  onChange={(e) => editar({ contexto: Number(e.target.value), contextoModelo: rascunho.modelo.trim(), modoContexto: 'manual' })}
                 />
-                <small>Edite o valor para confirmar a janela do modelo padrão.</small>
+                <small>{rascunho.modoContexto === 'auto' ? 'Descoberta antes da chamada; o número abaixo só vale no modo manual. Origem e limites aparecem no indicador do chat.' : 'Limite declarado para este modelo; restrições menores conhecidas do serviço prevalecem.'}</small>
               </label>
               <label className="providers-field">
                 <span className="providers-label">Máximo de saída (tokens)</span>

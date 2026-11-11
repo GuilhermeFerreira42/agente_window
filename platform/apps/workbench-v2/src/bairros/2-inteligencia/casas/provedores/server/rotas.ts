@@ -14,9 +14,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { SalvarProvedoresInput } from '../contract'
 import { descritorPorId } from '../descritores/registro'
 import { listarModelos, testarConexao, type AlvoConexao } from './probe'
-import { armazenamentoAtual, caminhoDoArquivo, estadoParaTela, lerArquivo, resolverChave, revelarChave, salvarArquivo } from './providersRepo'
+import { armazenamentoAtual, caminhoDoArquivo, estadoParaTela, lerArquivo, resolverChave, revelarChave, salvarArquivo, descobrirCapacidade } from './providersRepo'
 
-const ROTAS_CONHECIDAS = ['/api/providers', '/api/providers/test', '/api/providers/models', '/api/providers/reveal']
+const ROTAS_CONHECIDAS = ['/api/providers', '/api/providers/test', '/api/providers/models', '/api/providers/reveal', '/api/providers/capabilities']
 
 export function rotaPertenceAoModulo(pathname: string): boolean {
   return ROTAS_CONHECIDAS.includes(pathname)
@@ -66,6 +66,26 @@ async function alvoEfetivo(corpo: Record<string, unknown>): Promise<AlvoConexao>
 
 export async function tratarRotasProvedores(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
   const metodo = req.method ?? 'GET'
+  if (url.pathname === '/api/providers/capabilities' && metodo === 'POST') {
+    try {
+      const corpo = await lerCorpo(req), arquivo = await lerArquivo()
+      const id = typeof corpo.providerId === 'string' ? corpo.providerId : arquivo.ativo
+      const salvo = id ? arquivo.provedores[id] : undefined, descritor = id ? descritorPorId(id) : undefined
+      const modelId = typeof corpo.modelId === 'string' ? corpo.modelId : salvo?.modelo
+      if (!id || !salvo || !descritor || salvo.habilitado === false || !modelId || !salvo.modelosHabilitados?.includes(modelId)) {
+        sendErro(res, 400, 'Seleção de modelo indisponível.'); return true
+      }
+      const chave = resolverChave(id, arquivo).chave
+      const capacidade = await descobrirCapacidade({ providerId: id, modelId, protocolo: descritor.protocolo,
+        baseUrl: salvo.baseUrl || descritor.baseUrlPadrao, apiKey: chave }, salvo, corpo.atualizar === true)
+      const atual = await lerArquivo()
+      if (JSON.stringify(atual.provedores[id]) !== JSON.stringify(salvo) || resolverChave(id, atual).chave !== chave) {
+        sendJson(res, 409, { code: 'selection_changed', message: 'A configuração mudou durante a descoberta; consulte novamente.' }); return true
+      }
+      sendJson(res, 200, capacidade, { 'Cache-Control': 'no-store' })
+    } catch { sendErro(res, 400, 'Não foi possível consultar as capacidades desta seleção.') }
+    return true
+  }
 
   if (url.pathname === '/api/providers' && metodo === 'GET') {
     const arquivo = await lerArquivo()

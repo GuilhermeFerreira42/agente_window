@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../types'
 import { SessionPersistenceNotice } from './SessionPersistenceNotice'
 import { useSessionPersistence } from './useSessionPersistence'
-import { readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
+import { readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery, createRecoveryCopy } from './sessionRecovery'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 let local: Session
@@ -64,6 +64,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('visible persistence conflicts and safe recovery', () => {
+  it('preserves authoritative operational review when recovering unsaved local content', () => {
+    remote.chats[0].revisaoOperacional = true
+    expect(storeSessionRecovery({ session: local, message: 'Local unsaved content' })).toBe(true)
+    const restored = restoreUnsavedSessions([remote])[0]
+    expect(restored.chats[0].messages[0].content).toBe('UNSAVED_AFTER_409')
+    expect(restored.chats[0].revisaoOperacional).toBe(true)
+    expect(createRecoveryCopy(restored).chats[0].revisaoOperacional).not.toBe(true)
+    remote.chats[0].revisaoOperacional = undefined
+    expect(restoreUnsavedSessions([remote])[0].chats[0].revisaoOperacional).not.toBe(true)
+  })
   it('keeps transient command content out of the browser recovery storage', () => {
     Object.assign(local, { unknown: 'FIXTURE_SESSION_FIELD', approval: 'FIXTURE_APPROVAL' })
     Object.assign(local.chats[0], { unknown: 'FIXTURE_CHAT_FIELD', approval: 'FIXTURE_CHAT_APPROVAL' })

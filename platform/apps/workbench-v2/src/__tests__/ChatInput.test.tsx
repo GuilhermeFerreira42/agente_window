@@ -56,6 +56,17 @@ function renderInput(overrides: Partial<React.ComponentProps<typeof ChatInput>> 
 }
 
 describe('ChatInput', () => {
+  it('explica capacidade só de entrada, origem, orçamento e margem restante', () => {
+    renderInput({ usoContexto: { requestId: 'r-cap', providerId: 'fixture', modelId: 'alias', iteracao: 1,
+      entrada: 1000, reservaSaida: 4096, modeloRespondido: 'backend-real', capacidade: {
+        limites: { entrada: 32768 }, fontes: [{ origem: 'gateway', versao: 'fixture', limites: { entrada: 32768 } }],
+        consultadaEm: Date.now(), identidade: { solicitada: 'alias', destinos: ['backend-real'], estado: 'modelo' }, estado: 'identificada', avisos: [],
+      } } })
+    const status = screen.getByRole('status', { name: /r-cap|alias/ })
+    expect(status).toHaveAttribute('title', expect.stringMatching(/backend-real.*gateway.*Limite de entrada identificado: 32768/))
+    expect(status).toHaveAttribute('title', expect.stringMatching(/Orçamento preventivo \(75%\): 24576.*Margem até compactação: 23576/))
+    expect(status).toHaveAttribute('title', expect.stringMatching(/Janela desconhecida/))
+  })
   it('mostra entrada sem percentual quando a janela é desconhecida e oculta medição de outro modelo', () => {
     const usoContexto = { requestId: 'r1', providerId: 'openai', modelId: 'gpt-4o', iteracao: 2, entrada: 900, saida: 12 }
     const view = renderInput({ usoContexto })

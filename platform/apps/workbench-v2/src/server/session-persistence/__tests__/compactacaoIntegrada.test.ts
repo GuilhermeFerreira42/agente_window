@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { gerarResumo } from '../compactacao'
+import { gerarResumo, limitesDeResumo } from '../compactacao'
 import type { AlvoConversa, IniciarChamadaModelo } from '../../../bairros/2-inteligencia/casas/conversa'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -9,10 +9,34 @@ function alvo(protocolo: AlvoConversa['protocolo']): AlvoConversa {
   return { protocolo, providerId: 'fixture', modelId: 'm', modelo: 'm', apiKey: null, baseUrl: 'https://fixture.invalid', maxSaida: 1024 }
 }
 function iniciar(a: AlvoConversa): IniciarChamadaModelo {
-  return (_p, _m, chamar) => chamar({ providerId: 'fixture', modelId: 'm', protocolo: a.protocolo, apiKey: null, baseUrl: a.baseUrl, maxSaida: 1024 })
+  return (_p, _m, chamar) => chamar({ providerId: 'fixture', modelId: 'm', protocolo: a.protocolo, apiKey: null, baseUrl: a.baseUrl, maxSaida: 1024, capacidade: a.capacidade, limiteContexto: a.limiteContexto })
 }
 
 describe('compactação — transporte real com respostas controladas', () => {
+  it.each(['中', '😀'])('respeita oito lotes perto do limite UTF-8 com %s', async (caractere) => {
+    const a = alvo('openai-chat'); a.limiteContexto = 1_000_000
+    let chamadas = 0, n = caractere === '中' ? 53300 : 39975
+    const historico = () => [{ papel: 'usuario' as const, conteudo: caractere.repeat(n) }, { papel: 'assistente' as const, conteudo: 'ok' }]
+    while (new TextEncoder().encode(JSON.stringify({ historico: historico() })).length > limitesDeResumo(a).maxFonteBytes) n--
+    vi.stubGlobal('fetch', vi.fn(async () => { chamadas++; return new Response('data: {"choices":[{"delta":{"content":"Resumo UTF-8 seguro."},"finish_reason":"stop"}]}\n\n') }))
+    await expect(gerarResumo(a, historico(), undefined, iniciar(a), new AbortController().signal)).resolves.toBe('Resumo UTF-8 seguro.')
+    expect(chamadas).toBeLessThanOrEqual(8)
+  })
+  it.each([4096, 1_000_000])('dimensiona lotes pela capacidade somente de entrada %s', async (entrada) => {
+    const a = alvo('openai-chat')
+    a.capacidade = { limites: { entrada }, fontes: [{ origem: 'api', versao: 'fixture', limites: { entrada } }],
+      consultadaEm: Date.now(), identidade: { solicitada: 'm', destinos: ['m'], estado: 'modelo' }, estado: 'identificada', avisos: [] }
+    const corpos: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      corpos.push(String(init.body))
+      return new Response('data: {"choices":[{"delta":{"content":"Resumo seguro."},"finish_reason":"stop"}]}\n\n')
+    }))
+    const conteudo = 'INICIO ' + 'dado '.repeat(entrada === 4096 ? 600 : 24000) + ' FIM'
+    await expect(gerarResumo(a, [{ papel: 'usuario', conteudo }], undefined, iniciar(a), new AbortController().signal)).resolves.toBe('Resumo seguro.')
+    expect(corpos.length).toBeGreaterThan(1); expect(corpos.length).toBeLessThanOrEqual(8)
+    expect(corpos.every((c) => new TextEncoder().encode(c).length + 128 <= entrada * 0.9)).toBe(true)
+    expect(corpos.join('')).toContain('INICIO'); expect(corpos.join('')).toContain('FIM')
+  })
   it('não aceita EOF parcial nem credencial reconhecível como checkpoint', async () => {
     const a = alvo('openai-chat')
     vi.stubGlobal('fetch', vi.fn(async () => new Response('data: {"choices":[{"delta":{"content":"Resumo pela metade"}}]}\n\n')))

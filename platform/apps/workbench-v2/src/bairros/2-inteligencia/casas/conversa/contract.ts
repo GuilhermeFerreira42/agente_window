@@ -6,6 +6,7 @@
 /** * Mesmos 4 protocolos da casa Provedores — espelho de TIPO (a casa vizinha não * é importada: o grafo do vite.config não pode alcançar arquivos .tsx). * A sincronia é FORÇADA no typecheck: `chatAlvo.ts` atribui * `descritor.protocolo` num `AlvoConversa` — provedor ganhar protocolo novo = * erro de tipo aqui, obrigando a atualizar este espelho. */export type ProtocoloConversa = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 import type { MedicaoContexto } from '../../../../domain/usoContexto'
+import type { CapacidadeContexto } from '../../../../domain/capacidadeContexto'
 
 /** Categorias HONESTAS de falha (nada de "erro genérico"). */
 export type CategoriaErro =
@@ -45,6 +46,7 @@ export type SelecaoModelo =
 
 /** Configuração atual usada apenas pelo servidor para admitir/iniciar um fetch. */
 export interface ConfigChamadaModelo {
+  capacidade?: CapacidadeContexto
   providerId: string
   modelId: string
   protocolo: ProtocoloConversa
@@ -61,6 +63,7 @@ export type IniciarChamadaModelo = <T>(
 ) => Promise<T>
 
 export interface AlvoConversa {
+  capacidade?: CapacidadeContexto
   /** D196: sumarização sem raciocínio adicional quando o endpoint suporta. */
   esforcoResumo?: 'none'
   /** Identidade exata e imutável do par para toda a execução. */

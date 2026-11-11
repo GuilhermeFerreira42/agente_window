@@ -3,8 +3,9 @@ import type { EventoAgir, MensagemAgir } from '../../bairros/2-inteligencia/casa
 import type { MemoriaProjeto } from '../../domain/memoriaProjeto'
 import { pareceCredencial } from '../../domain/memoriaProjeto'
 import { estimarEntrada } from '../../domain/usoContexto'
-import { checkpointCorresponde, mensagensDoCheckpoint, proporCheckpoint, type Checkpoint } from './checkpoint'
-import { gerarResumo } from './compactacao'
+import { orcamentoContexto } from '../../domain/capacidadeContexto'
+import { checkpointCorresponde, mensagensDoCheckpoint, proporCheckpoint, fronteiraCheckpoint, type Checkpoint } from './checkpoint'
+import { gerarResumo, limitesDeResumo } from './compactacao'
 import type { TranscriptEntry } from './transcripts'
 import type { ChatMessage } from '../../types'
 
@@ -66,7 +67,8 @@ export function criarMemoriaAutomatica(portas: PortasMemoria) {
     let ativas = acrescentarMemorias(aplicarNoLoop(fonte, escopo.chatId, mensagens))
     const reserva = alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : 2048
     // O orçamento operacional é interno, não uma janela inferida do alias.
-    const orcamento = alvo.limiteContexto ? Math.max(256, Math.floor((alvo.limiteContexto - reserva) * 0.75)) : 24_000
+    const orcamento = orcamentoContexto(alvo.capacidade, reserva, alvo.limiteContexto)?.preventivo ?? 24_000
+    if (orcamento === 0) throw new Error('A reserva de saída esgota a capacidade de entrada conhecida. Reduza o máximo de saída ou confira os limites do modelo.')
     const volume = medir ? medir(ativas) : estimarEntrada(ativas).maximo + 4096
     if (forcar || volume >= orcamento) {
       let operacao = emCurso.get(chave)
@@ -74,8 +76,23 @@ export function criarMemoriaAutomatica(portas: PortasMemoria) {
         if (portas.bloqueios.has(chave)) throw new Error('Outra compactação está em andamento nesta conversa.')
         portas.bloqueios.add(chave)
         operacao = (async () => {
-          const fronteira = proporCheckpoint(fonte.entries, escopo.chatId, fonte.escopo)
           const anterior = fonte.checkpoint && checkpointCorresponde(fonte.checkpoint, fonte.entries, escopo.chatId, fonte.escopo) ? fonte.checkpoint : undefined
+          let fronteira = proporCheckpoint(fonte.entries, escopo.chatId, fonte.escopo)
+          // Avança por turnos completos que caibam em uma única compactação limitada.
+          // Não aumentar custo/teto para acompanhar uma janela de modelo maior.
+          if (fronteira) {
+            const mensagensFonte = mensagensDoCheckpoint(fonte.entries, escopo.chatId)
+            const limite = limitesDeResumo(alvo).maxFonteBytes
+            let bytes = new TextEncoder().encode(JSON.stringify({ resumoAnterior: anterior?.resumo, historico: [] })).length
+            let quantidade = anterior?.quantidade ?? 0
+            for (let i = quantidade; i < fronteira.quantidade; i++) {
+              const m = mensagensFonte[i]
+              bytes += new TextEncoder().encode(JSON.stringify({ papel: m.type === 'user' ? 'usuario' : 'assistente', conteudo: (m.message as ChatMessage).content })).length + 1
+              if (bytes > limite) break
+              if (m.type === 'assistant' && mensagensFonte[i + 1]?.type === 'user') quantidade = i + 1
+            }
+            fronteira = quantidade > (anterior?.quantidade ?? 0) ? fronteiraCheckpoint(fonte.entries, escopo.chatId, fonte.escopo, quantidade) : undefined
+          }
           if (!fronteira || (anterior && anterior.quantidade >= fronteira.quantidade)) {
             if (forcar) throw new Error('Não há prefixo novo seguro para recuperar o contexto. Reduza o pedido atual ou use um modelo com maior capacidade.')
             return

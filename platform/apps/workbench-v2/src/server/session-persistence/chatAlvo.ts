@@ -3,7 +3,7 @@
 // Só aqui as casas Provedores e Conversa se encontram; segredo nunca vai ao browser.
 // ============================================================================
 import type { AlvoOuErro, SelecaoModelo } from '../../bairros/2-inteligencia/casas/conversa'
-import { descritorPorId, lerArquivo, resolverChave } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { descritorPorId, lerArquivo, resolverChave, descobrirCapacidade, saidaEfetiva } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 
 export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto' }): Promise<AlvoOuErro> {
   const arquivo = await lerArquivo()
@@ -42,6 +42,7 @@ export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto
     return { alvo: null, erro: { code: 'chave', message: `A credencial do provedor ${id} está indisponível. Confira-a em Provedores.` } }
   }
 
+  const capacidade = await descobrirCapacidade({ providerId: id, modelId, protocolo: descritor.protocolo, baseUrl, apiKey: chave }, salvo)
   return {
     alvo: {
       providerId: id,
@@ -51,8 +52,9 @@ export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto
       modelo: modelId,
       apiKey: chave,
       temperatura: salvo.temperatura,
-      maxSaida: salvo.maxSaida,
-      limiteContexto: salvo.contextoModelo === modelId ? salvo.contexto : undefined,
+      maxSaida: saidaEfetiva(salvo.maxSaida, capacidade),
+      limiteContexto: capacidade.limites.total,
+      capacidade,
     },
   }
 }

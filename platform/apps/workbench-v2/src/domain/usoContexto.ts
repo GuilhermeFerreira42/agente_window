@@ -1,15 +1,18 @@
 type Protocolo = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
+import type { CapacidadeContexto } from './capacidadeContexto'
 
 export interface EstadoCompactacao { estado: 'compactando' | 'compactado' | 'falhou'; ultimaEm?: number }
 
 export interface MedicaoContexto {
+  capacidade?: CapacidadeContexto
+  modeloRespondido?: string
   requestId: string
   iteracao: number
   providerId: string
   modelId: string
   entrada?: number
   saida?: number
-  janela?: { tokens: number; origem: 'configuracao' }
+  janela?: { tokens: number; origem: 'configuracao' | 'api' | 'gateway' | 'catalogo' }
   reservaSaida?: number
   origemEntrada?: 'provedor' | 'estimativa'
   estimativa?: { minimo: number; maximo: number; metodo: 'bytes-utf8' }
@@ -30,9 +33,12 @@ export function criarLeitorDeUso(protocolo: Protocolo) {
   let cacheCriado = 0
   let cacheLido = 0
   let raciocinio = 0
+  let modeloRespondido: string | undefined
   return {
     ler(quadro: unknown): void {
       const dados = registro(quadro)
+      const nome = dados.model ?? dados.modelVersion
+      if (typeof nome === 'string' && /^[\w./:@+-]{1,180}$/.test(nome) && !/sk-|nvapi-|AIza/.test(nome)) modeloRespondido = nome
       let input: unknown
       let output: unknown
       if (protocolo === 'anthropic') {
@@ -61,6 +67,7 @@ export function criarLeitorDeUso(protocolo: Protocolo) {
       const total = entrada === undefined ? undefined : entrada + cacheCriado + cacheLido
       const totalSaida = saida === undefined ? undefined : saida + raciocinio
       return {
+        ...(modeloRespondido ? { modeloRespondido } : {}),
         ...(tokensValidos(total) ? { entrada: total } : {}),
         ...(tokensValidos(totalSaida) ? { saida: totalSaida } : {}),
       }
@@ -69,7 +76,7 @@ export function criarLeitorDeUso(protocolo: Protocolo) {
 }
 
 export function metadadosDaChamada(
-  alvo: { providerId?: string; modelId?: string; limiteContexto?: number },
+  alvo: { providerId?: string; modelId?: string; limiteContexto?: number; capacidade?: CapacidadeContexto },
   reserva: unknown,
 ): Omit<MedicaoContexto, 'iteracao' | 'entrada' | 'saida'> | undefined {
   if (!alvo.providerId || !alvo.modelId) return
@@ -77,8 +84,12 @@ export function metadadosDaChamada(
     requestId: globalThis.crypto.randomUUID(),
     providerId: alvo.providerId,
     modelId: alvo.modelId,
+    ...(alvo.capacidade ? { capacidade: alvo.capacidade } : {}),
     ...(tokensValidos(alvo.limiteContexto) && alvo.limiteContexto > 0
-      ? { janela: { tokens: alvo.limiteContexto, origem: 'configuracao' } }
+      ? { janela: { tokens: alvo.limiteContexto, origem: (() => {
+        const origem = alvo.capacidade?.fontes.find((f) => f.limites.total === alvo.limiteContexto)?.origem
+        return origem === 'manual' || !origem ? 'configuracao' as const : origem
+      })() } }
       : {}),
     ...(tokensValidos(reserva) && reserva > 0 ? { reservaSaida: reserva } : {}),
   }
@@ -120,7 +131,8 @@ export function removerOpcaoRecusada(corpo: Record<string, unknown>, status: num
 }
 
 export function ocupacaoContexto(medicao: MedicaoContexto) {
-  if (!tokensValidos(medicao.entrada) || !medicao.janela?.tokens) return
-  const razao = medicao.entrada / medicao.janela.tokens
+  const tetos = [medicao.janela?.tokens, medicao.capacidade?.limites.total, medicao.capacidade?.limites.entrada].filter((n): n is number => tokensValidos(n) && n > 0)
+  if (!tokensValidos(medicao.entrada) || !tetos.length) return
+  const razao = medicao.entrada / Math.min(...tetos)
   return { percentual: Math.floor(razao * 100), alerta: razao >= 0.9 ? 'critico' : razao >= 0.75 ? 'alto' : null }
 }

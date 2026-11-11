@@ -1,3 +1,9 @@
+# 11/11/2026 — DEBT-25 integra descoberta de limites ao sistema de memória
+
+Base `ca99af4`, branch `arena`. D198 implementa metadados de API/gateway/Ollama, catálogo exato versionado com validade, restrição manual vinculada ao modelo, cache e identidade de destino. O mesmo orçamento alimenta indicador, compactação automática e recuperação limitada; limites de entrada não descontam saída duas vezes. Prefixos grandes avançam por checkpoints limitados, sem apagar fonte ou ampliar chamadas por gatilho. Corrigida a perda do sinal remoto de revisão operacional no recovery local, com teste vermelho/verde e interrupção real.
+
+Tipos/build aprovados; regressão 1.594/42 falhas preexistentes/30 ignorados, sem diferença nominal; Playwright integrado 21 aprovados/um opcional ignorado. NVIDIA/LiteLLM real 1/1 e metadados Ollama verificados separadamente das simulações. Revisão independente estática, resultados, falhas intermediárias e limitações em 09. DEBT-25 tecnicamente encerrada; homologação humana das memórias permanece pendente conforme D197. Sem extensibilidade, alteração de credenciais ou novo push nesta microfatia.
+
 # 11/11/2026 — Avaliação de M1–M8 pelo uso e publicação autorizada
 
 Registrada D197: o proprietário mantém os aceites humanos M1–M8 pendentes e os avaliará ao utilizar o Agent Window no desenvolvimento das próximas fatias. Atualizados estado e roteiro, sem modificar código ou critérios de segurança. Autorizados commit da documentação pendente (incluindo DEBT-25) e push da branch `arena`, abrangendo a implementação `3aeb912` e a consolidação `62c55bf`. Nenhuma homologação humana foi atribuída.

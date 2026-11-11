@@ -1,5 +1,18 @@
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
+## Microfatia DEBT-25 — roteiro de homologação, aceite humano pendente
+
+1. Em Provedores, escolha **Descobrir automaticamente** e salve. Converse com o modelo. No indicador, confira origem dos limites, modelo solicitado, destinos anunciados e modelo informado na resposta, quando disponível. Passe o mouse para ver entrada, saída, capacidade e orçamento preventivo.
+2. Com o LiteLLM/Nemotron atual, o alias deve ser distinguido do backend NVIDIA. Se o gateway não fornecer limites e o backend estiver no catálogo, a origem deve ser **catálogo**, sem alegar confirmação da configuração do servidor. Um nome comercial diferente não pode mudar a capacidade por si só.
+3. Troque para outro modelo habilitado ou mude o padrão usado por Auto. A próxima execução deve usar os limites do novo alvo; não pode reutilizar a janela manual de outro modelo.
+4. Escolha **Limite manual deste modelo**, confirme um valor menor e salve. A reserva e o orçamento devem refletir a restrição; um limite maior não pode ampliar um teto menor conhecido do serviço. Valores absurdos devem ser recusados com explicação.
+5. Em conversa sintética longa, acompanhe a compactação preventiva, a preservação das mensagens originais e a continuidade após recarregar. Capacidade maior conhecida deve evitar o gatilho operacional genérico usado quando a janela é desconhecida.
+6. Para modelo personalizado sem metadados nem catálogo, confira o estado desconhecido e a alternativa manual. Para Ollama, arquitetura máxima e configuração local não devem ser confundidas. Testes de falhas/concorrência/pools usam ambientes descartáveis conforme 09.
+
+Este roteiro acrescenta a DEBT-25 sem conceder aceite humano às memórias ou alterar a avaliação por uso definida em D197.
+
+## Programa M1–M8
+
 **Decisão do proprietário — D197, 11/11/2026:** não conceder aceite formal de M1–M8 neste momento. A avaliação humana ocorrerá durante o uso do Agent Window para desenvolver as próximas fatias. Os roteiros abaixo são referências para essa observação, sem exigir uma rodada formal imediata antes desse uso. Uso continuado, avanço de outras fatias, commits ou publicação no GitHub não constituem homologação implícita. Registrar por módulo o aceite explícito futuro ou os problemas encontrados; preservar os resultados técnicos já obtidos.
 
 **Roteiro vigente após D196.** Use uma pasta e arquivos de teste. Todos os aceites M1–M8 permanecem pendentes; aprovação técnica não é aceite humano. Os roteiros antigos abaixo são retratos da entrega manual inicial e devem ser lidos com esta atualização.

@@ -13,6 +13,7 @@ test.describe('M3 — compactação manual', () => {
     let liberarPrimeira!: () => void
     const esperaPrimeira = new Promise<void>((resolve) => { liberarPrimeira = resolve })
     const provedor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const chunks: Buffer[] = []
       for await (const chunk of req) chunks.push(chunk)
       pedidos.push(JSON.parse(Buffer.concat(chunks).toString('utf8')))

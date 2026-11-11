@@ -48,7 +48,15 @@ export function restoreUnsavedSessions(saved: Session[]): Session[] {
   } }))
   for (const { session } of recoveries) holdSessionPersistence(session.id)
   const local = new Map(recoveries.map(({ session }) => [session.id, session]))
-  return [...saved.map((session) => local.get(session.id) ?? session),
+  return [...saved.map((session) => {
+    const recovery = local.get(session.id)
+    if (!recovery) return session
+    // Recibos/revisão são autoridade do servidor; a cópia local preserva os edits,
+    // sem esconder uma tarefa interrompida nem restaurar aprovações históricas.
+    return { ...recovery, chats: recovery.chats.map((chat) => ({ ...chat,
+      revisaoOperacional: session.chats.find((remote) => remote.id === chat.id)?.revisaoOperacional,
+    })) }
+  }),
     ...recoveries.filter(({ session }) => !saved.some((item) => item.id === session.id)).map(({ session }) => session)]
 }
 
@@ -56,6 +64,7 @@ export function createRecoveryCopy(session: Session): Session {
   const now = Date.now()
   return {
     ...session, id: `recovered-${crypto.randomUUID()}`,
+    chats: session.chats.map(({ revisaoOperacional: _historica, ...chat }) => chat),
     title: `${session.title} (recovered copy)`, persistenceRevision: 0,
     // A recovery never acquires ownership of the original managed worktree.
     worktreePath: null, branch: null, isDraft: false, status: 'completed',

@@ -13,6 +13,9 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { ArquivoProvedores, ItemCatalogoModelo, ProvedorConfig, ProvedorNaTela, Protocolo, SalvarProvedoresInput } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
+import { descobrirCapacidade, invalidarCapacidades } from './capacidades'
+import { limiteValido, type CapacidadeContexto } from '../../../../../domain/capacidadeContexto'
+export { descobrirCapacidade } from './capacidades'
 
 // Re-export MÍNIMO (glicose da prefeitura): quem monta o alvo da conversa
 // precisa do descritor sem furar a fronteira LEGO (só `server/**` é permitido
@@ -115,6 +118,10 @@ function validarProvedor(id: string, bruto: ProvedorConfig, guardados: ProvedorC
   if (!baseUrl) throw new Error(`${id}: informe o endereço do serviço (ex.: https://api.groq.com/openai/v1).`)
   if (!/^https?:\/\//.test(baseUrl)) throw new Error(`${id}: o endereço deve começar com http:// ou https://`)
   const limpo: ProvedorConfig = { baseUrl: baseUrl.replace(/\/+$/, ''), modelo: bruto.modelo.trim() }
+  for (const campo of ['contexto', 'maxSaida'] as const) if (bruto[campo] !== undefined && !limiteValido(bruto[campo])) throw new Error(`${id}: ${campo} deve ser um inteiro entre 1 e 4294967295.`)
+  if (bruto.modoContexto !== undefined && bruto.modoContexto !== 'auto' && bruto.modoContexto !== 'manual') throw new Error('Modo de contexto inválido.')
+  if (bruto.modoContexto) limpo.modoContexto = bruto.modoContexto
+  if (bruto.modoContexto === 'manual' && (bruto.contextoModelo !== limpo.modelo || !limiteValido(bruto.contexto))) throw new Error('Confirme a janela manual para o modelo atual ou escolha descoberta automática.')
   if (bruto.modelosHabilitados !== undefined && (!Array.isArray(bruto.modelosHabilitados) || bruto.modelosHabilitados.some((modelo) => typeof modelo !== 'string' || modelo.trim() === ''))) {
     throw new Error(`${id}: modelosHabilitados deve conter apenas identificadores de modelo não vazios.`)
   }
@@ -226,11 +233,13 @@ export async function salvarArquivo(input: SalvarProvedoresInput, caminho = cami
     await mkdir(dirname(caminho), { recursive: true })
     await backupSeExistir(caminho)
     await publicarArquivo(caminho, `${JSON.stringify(validado, null, 2)}\n`)
+    invalidarCapacidades()
     return validado
   })
 }
 
 export interface ConfigChamadaModelo {
+  capacidade?: CapacidadeContexto
   providerId: string
   modelId: string
   protocolo: Protocolo
@@ -239,6 +248,12 @@ export interface ConfigChamadaModelo {
   temperatura?: number
   maxSaida?: number
   limiteContexto?: number
+}
+
+export function saidaEfetiva(configurada: number | undefined, capacidade?: CapacidadeContexto): number | undefined {
+  const teto = capacidade?.limites.saida
+  if (limiteValido(configurada)) return teto ? Math.min(configurada, teto) : configurada
+  return teto ? Math.min(4096, teto) : undefined
 }
 
 /**
@@ -254,6 +269,14 @@ export async function iniciarChamadaModelo<T>(
   iniciar: (config: ConfigChamadaModelo) => Promise<T>,
   caminho = caminhoDoArquivo(),
 ): Promise<T> {
+  const antes = await lerArquivo(caminho)
+  const provedorAntes = antes.provedores[providerId], descritorAntes = descritorPorId(providerId)
+  const chaveAntes = resolverChave(providerId, antes).chave
+  const podeConsultar = provedorAntes && descritorAntes && provedorAntes.habilitado !== false &&
+    provedorAntes.modelosHabilitados?.includes(modelId) && (descritorAntes.chaveOpcional || chaveAntes)
+  const capacidade = podeConsultar ? await descobrirCapacidade({ providerId, modelId,
+    protocolo: descritorAntes.protocolo, baseUrl: (provedorAntes.baseUrl || descritorAntes.baseUrlPadrao).replace(/\/+$/, ''),
+    apiKey: chaveAntes }, provedorAntes) : undefined
   const liberar = await adquirirMutex()
   let resposta: Promise<T>
   try {
@@ -271,6 +294,7 @@ export async function iniciarChamadaModelo<T>(
     if (!descritor.chaveOpcional && !chave) {
       throw Object.assign(new Error(`A credencial de ${providerId} foi removida ou está indisponível.`), { code: 'credential_unavailable' })
     }
+    if (chave !== chaveAntes || JSON.stringify(provedor) !== JSON.stringify(provedorAntes)) throw Object.assign(new Error('A configuração mudou durante a descoberta. Inicie uma nova execução.'), { code: 'selection_unavailable' })
     const config: ConfigChamadaModelo = {
       providerId,
       modelId,
@@ -278,8 +302,9 @@ export async function iniciarChamadaModelo<T>(
       baseUrl: (provedor.baseUrl || descritor.baseUrlPadrao).replace(/\/+$/, ''),
       apiKey: chave,
       temperatura: provedor.temperatura,
-      maxSaida: provedor.maxSaida,
-      limiteContexto: provedor.contextoModelo === modelId ? provedor.contexto : undefined,
+      maxSaida: saidaEfetiva(provedor.maxSaida, capacidade),
+      limiteContexto: capacidade?.limites.total,
+      capacidade,
     }
     // Não usar `await`: iniciar() precisa começar o fetch enquanto o mutex
     // ainda ordena com salvarArquivo, mas a resposta pode terminar depois.
@@ -328,6 +353,7 @@ export function estadoParaTela(arquivo: ArquivoProvedores): { provedores: Proved
       habilitado: salvo.habilitado !== false,
       contexto: salvo.contexto ?? descritor.padroes.contexto,
       ...(salvo.contextoModelo ? { contextoModelo: salvo.contextoModelo } : {}),
+      ...(salvo.modoContexto ? { modoContexto: salvo.modoContexto } : {}),
       maxSaida: salvo.maxSaida ?? descritor.padroes.maxSaida,
       temperatura: salvo.temperatura ?? descritor.padroes.temperatura,
       chaveMascarada: chave ? mascararChave(chave) : null,

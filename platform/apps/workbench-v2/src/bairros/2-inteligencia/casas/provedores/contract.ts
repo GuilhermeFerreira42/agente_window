@@ -48,6 +48,8 @@ export interface ProvedorConfig {
   contexto?: number
   /** Modelo cujo limite foi confirmado no campo Contexto. Cadastros antigos não têm vínculo. */
   contextoModelo?: string
+  /** Ausente preserva confirmação manual legada; auto não apaga o valor salvo. */
+  modoContexto?: 'auto' | 'manual'
   maxSaida?: number
   temperatura?: number
 }
@@ -69,6 +71,7 @@ export interface ProvedorNaTela {
   habilitado: boolean
   contexto: number
   contextoModelo?: string
+  modoContexto?: 'auto' | 'manual'
   maxSaida: number
   temperatura: number
   /** Ex.: `••••••••a1b2` — ou null quando não há chave. */

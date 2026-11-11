@@ -18,6 +18,7 @@ test.describe('M7 — interrupção real de servidor', () => {
     const mensagens: unknown[] = []
     const bloqueados = new Set<import('node:http').ServerResponse>()
     const provedor = createServer(async (req, res) => {
+      if (req.method !== 'POST') { res.writeHead(404).end(); return }
       const partes: Buffer[] = []
       for await (const chunk of req) partes.push(chunk)
       mensagens.push(JSON.parse(Buffer.concat(partes).toString('utf8')))
@@ -74,6 +75,8 @@ test.describe('M7 — interrupção real de servidor', () => {
       await page.goto('about:blank')
       for (const res of bloqueados) res.destroy()
       await iniciar()
+      const restauradas = (await (await page.request.get(base + '/api/sessions', { headers })).json()).sessions
+      expect(restauradas.find((s: { id: string }) => s.id === id)?.chats[0].revisaoOperacional).toBe(true)
       await page.goto(base)
       await page.locator('.session-row').filter({ hasText: id }).click()
       await page.getByRole('button', { name: 'Execução interrompida: revisar tarefa' }).click()

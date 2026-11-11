@@ -229,7 +229,8 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   }
   return {
     url: `${baseUrl}/api/chat`,
-    corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...anuncio, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}) } },
+    corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...anuncio, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}),
+      ...(alvo.capacidade?.limites.total ? { num_ctx: alvo.capacidade.limites.total } : {}) } },
   }
 }
 
@@ -477,6 +478,10 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
 
     try {
       const iniciarFetch = (config?: ConfigChamadaModelo): Promise<Response> => {
+        if (alvo.capacidade && config && (JSON.stringify(alvo.capacidade.limites) !== JSON.stringify(config.capacidade?.limites) ||
+          alvo.baseUrl !== config.baseUrl || alvo.apiKey !== config.apiKey || alvo.maxSaida !== config.maxSaida)) {
+          throw new ErroVizinho('selection_unavailable', 'Os limites do modelo mudaram durante a preparação. Inicie uma nova execução para recalcular o contexto.')
+        }
         if (controlador.signal.aborted || (opcoes?.validarAntesDaChamada && !opcoes.validarAntesDaChamada())) {
           throw new ErroVizinho('fluxo', 'A sessão ou o projeto mudou antes da chamada ao modelo.')
         }
@@ -491,6 +496,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           temperatura: config.temperatura,
           maxSaida: config.maxSaida,
           limiteContexto: config.limiteContexto,
+          capacidade: config.capacidade,
         } : alvo
         const { url, corpo } = corpoDePedido(alvoAtual, mensagens, opcoes)
         chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens ??

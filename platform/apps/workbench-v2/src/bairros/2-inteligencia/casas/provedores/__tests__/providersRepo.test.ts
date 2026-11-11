@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   armazenamentoAtual,
   caminhoDoArquivo,
@@ -26,11 +26,21 @@ async function arquivoTemporario(): Promise<string> {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   delete process.env.OPENAI_API_KEY
   delete process.env.AGENTE_WINDOW_PROVIDERS_PATH
 })
 
 describe('provedoresRepo — arquivo, máscara e precedência', () => {
+  it.each(['provedor', 'modelo'])('não descobre nem inicia fetch para %s desabilitado', async (qual) => {
+    const caminho = await arquivoTemporario(), fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    await salvarArquivo({ provedores: { 'openai-compat': { nome: 'Fixture', baseUrl: 'https://fixture.invalid/v1',
+      modelo: 'm', modelosHabilitados: qual === 'modelo' ? [] : ['m'], habilitado: qual !== 'provedor', apiKey: 'fixture' } } }, caminho)
+    const iniciar = vi.fn()
+    await expect(iniciarChamadaModelo('openai-compat', 'm', iniciar, caminho)).rejects.toHaveProperty('code', qual === 'modelo' ? 'model_disabled' : 'selection_unavailable')
+    expect(fetcher).not.toHaveBeenCalled(); expect(iniciar).not.toHaveBeenCalled()
+  })
   it('ignora avaliações canary legadas em v4 e não as grava de novo', async () => {
     const caminho = await arquivoTemporario()
     await writeFile(caminho, JSON.stringify({

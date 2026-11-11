@@ -4,8 +4,8 @@ import type { MensagemAgir } from '../../../bairros/2-inteligencia/casas/agir'
 import { aplicarNoLoop, criarMemoriaAutomatica, selecionarMemorias, type FonteMemoria, type PortasMemoria } from '../memoriaAutomatica'
 import { proporCheckpoint } from '../checkpoint'
 
-const mock = vi.hoisted(() => ({ resumir: vi.fn(async () => 'Decisão preservada: usar SQLite. Não repetir efeitos.') }))
-vi.mock('../compactacao', () => ({ gerarResumo: mock.resumir }))
+const mock = vi.hoisted(() => ({ resumir: vi.fn(async (_alvo?: AlvoConversa, _historico?: MensagemAgir[], _anterior?: string) => 'Decisão preservada: usar SQLite. Não repetir efeitos.') }))
+vi.mock('../compactacao', async (importOriginal) => ({ ...await importOriginal<typeof import('../compactacao')>(), gerarResumo: mock.resumir }))
 const escopo = { sessionId: 's', chatId: 'c', raiz: '/synthetic' }
 const alvo: AlvoConversa = { protocolo: 'openai-chat', baseUrl: 'http://synthetic', modelo: 'm', apiKey: null,
   providerId: 'p', modelId: 'm', maxSaida: 512, limiteContexto: 9000 }
@@ -29,6 +29,21 @@ function fixture() {
 beforeEach(() => { mock.resumir.mockReset(); mock.resumir.mockResolvedValue('Decisão preservada: usar SQLite. Não repetir efeitos.') })
 
 describe('continuidade automática — contratos', () => {
+  it('avança por prefixos completos limitados em conversa maior que uma compactação', async () => {
+    const f = fixture()
+    f.fonte.entries = Array.from({ length: 40 }, (_, i) => ({ type: i % 2 ? 'assistant' : 'user', chatId: 'c', uuid: `grande${i}`, timestamp: i,
+      message: { id: `grande${i}`, role: i % 2 ? 'assistant' : 'user', content: 'dado '.repeat(2000) } }))
+    const mensagens = f.fonte.entries.map((e): MensagemAgir => ({ papel: e.type === 'user' ? 'usuario' : 'assistente', origemId: e.uuid, conteudo: (e.message as { content: string }).content }))
+    mensagens.push({ papel: 'usuario', conteudo: 'Continue.' })
+    const a = { ...alvo, limiteContexto: 1_000_000 }
+    await f.preparar(escopo, mensagens, a, new AbortController().signal, vi.fn(), true)
+    const primeiro = f.fonte.checkpoint!.quantidade
+    expect(primeiro).toBeGreaterThan(0); expect(primeiro).toBeLessThan(36)
+    expect(new TextEncoder().encode(JSON.stringify(mock.resumir.mock.calls[0][1])).length).toBeLessThan(160000)
+    await f.preparar(escopo, mensagens, a, new AbortController().signal, vi.fn(), true)
+    expect(f.fonte.checkpoint!.quantidade).toBeGreaterThan(primeiro)
+    expect(f.fonte.entries).toHaveLength(40)
+  })
   it('publica prefixo consistente, mantém dois turnos recentes, fonte e efeitos ativos intactos', async () => {
     const f = fixture(), original = structuredClone(f.fonte.entries), eventos = vi.fn()
     const resultado = await f.preparar(escopo, f.mensagens, alvo, new AbortController().signal, eventos)

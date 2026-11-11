@@ -89,7 +89,8 @@ export function montarPedido(alvo: AlvoConversa, messages: MensagemChat[]): Pedi
     init: {
       method: 'POST',
       headers: cabecalhos,
-      body: JSON.stringify({ model: alvo.modelo, messages, stream: true, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}) } }),
+      body: JSON.stringify({ model: alvo.modelo, messages, stream: true, options: { ...temperatura, ...(reserva ? { num_predict: reserva } : {}),
+        ...(alvo.capacidade?.limites.total ? { num_ctx: alvo.capacidade.limites.total } : {}) } }),
     },
   }
 }
