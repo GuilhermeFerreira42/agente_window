@@ -84,6 +84,7 @@ export interface ComposerHistoryEntry {
 }
 
 export interface NestedChat {
+  revisaoOperacional?: boolean
   id: string
   title: string
   status: ChatStatus

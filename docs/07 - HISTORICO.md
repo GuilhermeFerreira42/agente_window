@@ -1,3 +1,9 @@
+# 11/11/2026 — M7 integra revisão operacional após interrupção
+
+Commit `feat(memory): review interrupted tasks without replaying effects`. O painel relaciona estado a recibos, verifica o ambiente e permite confirmar um novo planejamento. Decisão D194 e evidências em 09.
+
+---
+
 # 10/11/2026 — M6 integra recuperação histórica explícita
 
 Commit `feat(memory): recover cited history within an authorized chat`. O agente consulta e cita o transcript do chat atual por execução explícita sem ferramentas externas. Decisão D193 e evidências em 09.

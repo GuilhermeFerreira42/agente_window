@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { access, mkdir, realpath, rm } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
@@ -22,12 +23,28 @@ function resolveWorktreePath(slug: string, sessionId: string): string {
   return destination
 }
 
-async function git(repoRoot: string, args: string[]): Promise<string> {
+async function git(repoRoot: string, args: string[], somenteLeitura = false): Promise<string> {
   const { stdout } = await execFileAsync('git', ['-C', repoRoot, ...args], {
     windowsHide: true,
     maxBuffer: 1024 * 1024,
+    ...(somenteLeitura ? { timeout: 1500, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } } : {}),
   })
   return stdout.trim()
+}
+
+/** Observação Git para comparação. Os nomes e o conteúdo não saem do processo. */
+export async function observarGit(raiz: string): Promise<string | null> {
+  const base = ['-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false']
+  try {
+    const [head, status, diff] = await Promise.all([
+      git(raiz, [...base, 'rev-parse', '--verify', 'HEAD'], true),
+      git(raiz, [...base, 'status', '--porcelain=v1', '-z', '--untracked-files=normal', '--', '.'], true),
+      git(raiz, [...base, 'diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--', '.'], true),
+    ])
+    return createHash('sha256').update(JSON.stringify([head, status, diff])).digest('hex')
+  } catch {
+    return null
+  }
 }
 
 export async function createWorktree(repoRootInput: string, slugInput: string, sessionId: string): Promise<WorktreeDescriptor> {

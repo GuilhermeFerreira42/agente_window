@@ -20,9 +20,10 @@ import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
-import { ChatInput } from './ChatInput'
+import { ChatInput, selecaoDoToken } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
 import { MemoriaProjeto } from './MemoriaProjeto'
+import { RevisaoOperacional } from './RevisaoOperacional'
 import type { MedicaoContexto } from '../domain/usoContexto'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
@@ -364,7 +365,7 @@ export function ChatPanel({
     if (seguir && noFimRef.current && el) el.scrollTop = el.scrollHeight
   }, [activeChat.messages, seguir])
   return (
-    <section className="chat-pane" aria-label="Chat da sessão">
+    <section className="chat-pane" aria-label="Chat da sessão" data-session-id={session.id}>
       <div className="chat-pane-header">
         <div className="pane-title">
           <Sparkles size={14} /><span>Chat</span><span className="pane-title-subtle">· {session.workspace}</span>
@@ -384,7 +385,10 @@ export function ChatPanel({
           )}
         </div>
         <div className="sessions-header-actions">
-          {!session.isDraft && !isEmpty && <BuscaHistorico key={JSON.stringify([session.id, activeChat.id])} sessionId={session.id} chatId={activeChat.id} abrir={abrirResultado} />}
+          {!session.isDraft && <RevisaoOperacional key={JSON.stringify(['operacional', session.id, activeChat.id])} sessionId={session.id}
+            chatId={activeChat.id} interrompida={activeChat.revisaoOperacional} ocupada={activeChat.status === 'working'}
+            planejar={(runId) => onSend(`/retomar ${runId}`, [], selecaoDoToken(model))} />}
+          {!session.isDraft && !isEmpty && <BuscaHistorico key={JSON.stringify(['busca', session.id, activeChat.id])} sessionId={session.id} chatId={activeChat.id} abrir={abrirResultado} />}
           {!session.isDraft && session.workspacePath && <MemoriaProjeto key={JSON.stringify([session.id, activeChat.id, session.workspacePath, session.worktreePath])}
             sessionId={session.id} chatId={activeChat.id} messages={activeChat.messages} />}
           <button className="toolbar-button" type="button" title="Abrir navegador no editor" aria-label="Abrir navegador" onClick={onOpenBrowser}><Globe2 size={14} /></button>

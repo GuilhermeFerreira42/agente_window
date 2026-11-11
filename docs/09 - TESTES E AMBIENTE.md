@@ -1,3 +1,13 @@
+# M7 — revisão operacional e interrupção (11/11/2026)
+
+Regressão final estável: **1.536 aprovações, 42 falhas preexistentes e 30 ignorados**, em 154,85 s. Comparação nominal com M6 sem falha nova. Log `m7-regression-stable.log` no operacional externo.
+
+Typecheck aprovado. Vitest focado **47/47**. Os testes exercitaram efeitos incertos, aprovação pendente, negação, divergências de pasta/Git, isolamento, pausa viva e referência de leitura alterada. Playwright **2/2**. Um spec encerrou à força um Vite descartável depois da escrita e durante o pedido seguinte, reiniciou o processo e conferiu recibo, ausência de chamadas espontâneas e arquivo intacto. Uma aprovação antiga foi recusada. O segundo spec simulou recibos sem encerramento, bloqueou resultado incerto e confirmou que o planejamento novo rejeita uma tentativa de escrita emitida pelo provedor.
+
+A navegação encontrou uma colisão de chaves entre controles do cabeçalho, corrigida antes da repetição aprovada. A primeira tentativa de recarga do processo colidiu com a reconexão do Vite. A prova final reabre a página depois do reinício. Logs `m7-focused-complete.log`, `m7-typecheck-complete.log` e `m7-e2e-complete.log`. Para o spec de processo, executar `M7_CRASH_FIXTURE=1`. A continuação operacional usa novo planejamento sem ferramentas. Ações posteriores exigem uma tarefa nova e as regras de autorização vigentes.
+
+---
+
 # M6 — recuperação explícita e escopo (10/11/2026)
 
 Vitest focado **30/30** e autorização direta **1/1**. Exercitados ausência, referência de outro chat, credencial sintética e vizinhança limitada. A rota recusou uma chamada de histórico iniciada pelo modelo sem consentimento do usuário. O Playwright confirmou consulta e leitura de fonte no chat ativo, ausência de um canário de outro chat, bloqueio de criação de arquivo e trilha de IDs sem duplicar trechos. Logs `m6-focused.log`, `m6-authorization.log` e `m6-e2e-final.log`.

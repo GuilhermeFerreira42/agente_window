@@ -1953,7 +1953,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
     const historico: MensagemSimples[] = [
       ...montarHistorico(chatOrigem?.messages ?? []),
-      { role: 'user', content: messageContent },
+      { id: userMessage.id, role: 'user', content: messageContent },
     ]
 
     updateSession(sessionId, (session) => {

@@ -1,3 +1,11 @@
+# Roteiro de homologação da M7 — aceite pendente (11/11/2026)
+
+1. Em uma tarefa sintética interrompida, abra **Execução interrompida: revisar tarefa**. Confira resultados conhecidos e incertos, aprovações históricas, pasta, Git e referências.
+2. Um resultado mutável incerto deve impedir **Retomar planejamento**. Inspecione os efeitos antes de pedir uma tarefa nova.
+3. Quando a revisão permitir, confirme **Retomar planejamento**. A resposta deve planejar a continuidade. A revisão e a abertura da conversa não devem executar ferramentas nem recuperar autorização antiga.
+
+---
+
 # Roteiro de homologação da M6 — aceite pendente (10/11/2026)
 
 1. Registre um fato sintético em um chat. No compositor, use **Recuperar com o agente** e complete a pergunta após **/historico**.

@@ -9,6 +9,9 @@ export interface EventoGravado {
   anterior?: string
   escopo: string
   alvo?: { providerId: string; modelId: string }
+  git?: string | null
+  pedidoId?: string
+  categoria?: 'historico' | 'retomada'
   evento: EventoTranscriptAgir
 }
 
@@ -68,8 +71,9 @@ export function projetarHistoricoAgir(
   const vistas = new Set<string>()
   let usouDisco = false
   let usouBrowser = false
-  const projetadas = mensagens.flatMap((mensagem): MensagemAgir[] => {
-    const persistida = mensagem.id ? persistidas.get(mensagem.id) : undefined
+  const projetadas = mensagens.flatMap((mensagem, indice): MensagemAgir[] => {
+    const atual = indice === mensagens.length - 1 && mensagem.role === 'user'
+    const persistida = !atual && mensagem.id ? persistidas.get(mensagem.id) : undefined
     const textoPersistido = persistida?.role === mensagem.role ? persistida.content : undefined
     const visivel: MensagemAgir = {
       papel: mensagem.role === 'user' ? 'usuario' : 'assistente',

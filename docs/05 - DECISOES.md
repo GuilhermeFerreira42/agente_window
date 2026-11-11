@@ -2117,3 +2117,7 @@ A memória usa SQLite e a chave derivada da pasta canônica em NFC. O servidor r
 ## D193 — Recuperação histórica explícita em execução isolada (10/11/2026)
 
 O comando `/historico` abre um turno de consulta somente ao chat atual. O provedor recebe a pergunta atual e somente a ferramenta de recuperação. O servidor rejeita chamadas de arquivo e comando mesmo que sejam emitidas pelo provedor. O limite é três consultas por execução, com cinco hits por busca e vizinhança de até três mensagens. A leitura exige uma referência já obtida na execução. A recuperação exclui formatos reconhecíveis de credencial, reporta ausência e registra operações e IDs no transcript sem duplicar os trechos. Contagens reportadas pelo provedor já incluem esses trechos pela M1. Busca entre chats permanece fora da autorização desta superfície.
+
+## D194 — Revisão operacional e nova execução de planejamento (11/11/2026)
+
+A M7 deriva o estado dos recibos duráveis e não restaura processos. Compara pasta, Git disponível e digest das referências de leitura limitadas a 1 MiB. Resultado mutável ausente ou parcial é incerto. Aprovação anterior é evidência expirada. Uma nova execução de planejamento exige ação explícita no painel e revalidação server-side. Nessa execução todas as ferramentas são bloqueadas. Divergência de pasta, Git ou referência, pausa viva e resultado incerto exigem inspeção antes de nova tarefa.

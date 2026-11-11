@@ -17,6 +17,8 @@ export interface RegistroExecucaoAgir {
   runId: string
   anterior?: string
   turnoId?: string
+  pedidoId?: string
+  categoria?: 'historico' | 'retomada'
   raiz: string
   alvo?: { providerId: string; modelId: string }
   eventos: readonly EventoTranscriptAgir[]

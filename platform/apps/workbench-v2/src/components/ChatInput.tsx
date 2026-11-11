@@ -55,7 +55,7 @@ const MODEL_AUTO = 'Auto'
 function tokenDoPar(providerId: string, modelId: string): string {
   return `pair:${encodeURIComponent(providerId)}:${encodeURIComponent(modelId)}`
 }
-function selecaoDoToken(token: string): SelecaoModelo {
+export function selecaoDoToken(token: string): SelecaoModelo {
   if (token === MODEL_AUTO) return { tipo: 'auto' }
   const partes = token.startsWith('pair:') ? token.slice(5).split(':') : []
   if (partes.length !== 2) return { tipo: 'explicita', providerId: '', modelId: '' }

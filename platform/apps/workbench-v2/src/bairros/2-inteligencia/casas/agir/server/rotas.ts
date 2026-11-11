@@ -72,6 +72,7 @@ export interface DependenciasAgir {
   restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
   recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
+  planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string }, runId: string) => Promise<string>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -104,6 +105,8 @@ interface ContextoFluxo {
   exclusoesTentadas?: Set<string>
   instrucaoAtual?: string
   recuperacao?: { restantes: number; fontes: Set<string> }
+  planejamentoRetomada?: boolean
+  pedidoId?: string
 }
 
 interface InstrucaoHumana {
@@ -138,6 +141,9 @@ const continuacoesEmClaim = new Set<string>()
 const MAX_EXECUCOES_MEMORIA = 500
 export function conversaEmExecucao(sessionId: string, chatId: string): boolean {
   return [...execucaoPorFluxo.values()].some((execucao) => execucao.sessionId === sessionId && execucao.chatId === chatId)
+}
+export function conversaTemPausa(sessionId: string, chatId: string): boolean {
+  return [...retomarPorFluxo.values()].some(({ contexto }) => contexto.sessionId === sessionId && contexto.chatId === chatId)
 }
 function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
@@ -257,6 +263,8 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       await deps.gravarExecucao({
         sessionId: fio.sessionId, chatId: fio.chatId, runId: fio.execucao.runId, anterior: fio.anterior, raiz: fio.raiz,
         turnoId: /^[\w-]{1,200}$/.test(turnoId) ? turnoId : undefined,
+        pedidoId: fio.execucao.pedidoId,
+        categoria: fio.execucao.recuperacao ? 'historico' : fio.execucao.planejamentoRetomada ? 'retomada' : undefined,
         alvo: fio.alvo.providerId && fio.alvo.modelId ? { providerId: fio.alvo.providerId, modelId: fio.alvo.modelId } : undefined,
         eventos,
       })
@@ -386,7 +394,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     // já vai ao modelo — não existe segunda fonte de texto, então não há como a
     // invocação detectada divergir do que o modelo vai ver.
     const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
-    const composicao = !fio.execucao.recuperacao && deps.comporContexto
+    const composicao = !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
     const vizinho = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
@@ -405,7 +413,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: fio.execucao.recuperacao ? ['historico'] : composicao?.ferramentasPermitidas,
+      ferramentasPermitidas: fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
@@ -486,6 +494,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (fio.execucao.planejamentoRetomada) return 'A retomada de planejamento exige uma nova tarefa e novas autorizações antes de executar ferramentas.'
         if (fio.execucao.recuperacao && pedido.ferramenta !== 'historico') return 'A consulta histórica não autoriza acesso a arquivos nem execução de comandos.'
         if (!fio.execucao.recuperacao && pedido.ferramenta === 'historico') return 'A recuperação histórica exige o comando explícito /historico.'
         if (pedido.ferramenta === 'historico') return null
@@ -753,12 +762,23 @@ async function tratarAgir(
   const textoAtual = validacao.pedido.mensagens.at(-1)
   const consultaHistorica = deps.recuperarHistorico && textoAtual?.role === 'user'
     ? /^\/historico\s+([\s\S]+)$/iu.exec(textoAtual.content.trim())?.[1].trim() : undefined
+  const retomadaId = deps.planejarRetomada && textoAtual?.role === 'user'
+    ? /^\/retomar\s+([a-f0-9-]{36})$/iu.exec(textoAtual.content.trim())?.[1] : undefined
+  if (textoAtual?.role === 'user' &&
+      ((/^\/retomar(?:\s|$)/iu.test(textoAtual.content.trim()) && !retomadaId) ||
+       (/^\/historico(?:\s|$)/iu.test(textoAtual.content.trim()) && !consultaHistorica))) {
+    sendErro(res, 400, 'configuracao', 'O comando de memória está incompleto ou indisponível.')
+    return true
+  }
   const contextoFluxo: ContextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto,
-    recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined }
+    recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined,
+    planejamentoRetomada: Boolean(retomadaId), pedidoId: typeof textoAtual?.id === 'string' && /^[\w-]{1,200}$/.test(textoAtual.id) ? textoAtual.id : undefined }
   const execucao = criarExecucao(fluxo, contextoFluxo)
   let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>
   try {
-    historico = consultaHistorica
+    historico = retomadaId && deps.planejarRetomada
+      ? { fonte: 'transcript', mensagens: [{ papel: 'usuario', conteudo: await deps.planejarRetomada(contextoFluxo, retomadaId) }] }
+      : consultaHistorica
       ? { fonte: 'browser', mensagens: [{ papel: 'usuario', conteudo: consultaHistorica }] }
       : deps.restaurarHistorico
       ? await deps.restaurarHistorico(contextoFluxo, validacao.pedido.mensagens)

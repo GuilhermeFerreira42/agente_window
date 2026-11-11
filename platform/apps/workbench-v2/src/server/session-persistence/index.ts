@@ -7,13 +7,13 @@ import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { projetarMensagemPersistida } from '../../domain/projecaoTranscript'
-import { createWorktree, removeWorktree, WorktreeDirtyError } from './worktrees'
+import { createWorktree, observarGit, removeWorktree, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
-import { conversaEmExecucao, rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { conversaEmExecucao, conversaTemPausa, rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
 import { validarSelecaoModelo } from '../../bairros/2-inteligencia/casas/agir/server/protocoloHttp'
 import type { RegistroExecucaoAgir } from '../../bairros/2-inteligencia/casas/agir'
 import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, definirExclusaoAutomaticaAgir, lerExclusaoAutomaticaAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
@@ -32,6 +32,7 @@ import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, propor
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
 import { recuperarHistorico } from './recuperarHistorico'
+import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional } from './retomadaOperacional'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
 
@@ -111,12 +112,15 @@ function restoreMessages(session: Session, entries: TranscriptEntry[]): Session 
   }
   return {
     ...session,
-    chats: session.chats.map((chat) => ({ ...chat, messages: byChat.get(chat.id) ?? [] })),
+    chats: session.chats.map(({ revisaoOperacional: _anterior, ...chat }) => ({
+      ...chat, messages: byChat.get(chat.id) ?? [],
+      ...(ultimoReciboOperacional(entries, chat.id).length > 0 ? { revisaoOperacional: true } : {}),
+    })),
   }
 }
 
 async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void> {
-  const { sessionId, chatId, runId, anterior, turnoId, raiz, alvo, eventos } = registro
+  const { sessionId, chatId, runId, anterior, turnoId, raiz, alvo, eventos, pedidoId, categoria } = registro
   await withSessionPersistenceQueue(sessionId, async () => {
     const record = getSessionRecord(sessionId)
     const contexto = resolverContextoAgir(sessionId, chatId)
@@ -128,14 +132,44 @@ async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void>
     if (!Number.isSafeInteger(sequence + eventos.length)) throw new Error('Sequência do transcript esgotada.')
     const timestamp = Date.now()
     const escopo = chaveEscopo(raiz)
+    const primeiro = anteriores.find((entry) => entry.type === 'agir_event' && entry.uuid === `${runId}:1`)?.message as EventoGravado | undefined
+    const git = primeiro ? primeiro.git : await observarGit(raiz)
     const novos = eventos.flatMap((evento, indice): TranscriptEntry[] => {
       const uuid = `${runId}:${indice + 1}`
       if (ids.has(uuid)) return []
       return [{ type: 'agir_event', chatId, uuid, timestamp, sequence: ++sequence,
-        message: { version: 1, runId, anterior, turnoId, escopo, alvo, evento } satisfies EventoGravado }]
+        message: { version: 1, runId, anterior, turnoId, escopo, alvo, evento, git, pedidoId, categoria } satisfies EventoGravado }]
     })
     if (novos.length) await writeTranscript(record.slug, sessionId, [...anteriores, ...novos])
   })
+}
+
+async function lerRevisaoOperacional(sessionId: string, chatId: string) {
+  const record = getSessionRecord(sessionId)
+  if (!record) return
+  const session = JSON.parse(record.sessionJson) as Session
+  if (!session.chats.some((chat) => chat.id === chatId)) return
+  const contexto = resolverContextoAgir(sessionId, chatId)
+  const entries = await readTranscript(record.slug, sessionId, 16 * 1024 * 1024)
+  const revisao = revisarOperacao(entries, chatId, contexto.ok ? chaveEscopo(contexto.raiz) : undefined,
+    contexto.ok ? await observarGit(contexto.raiz) : null, conversaTemPausa(sessionId, chatId))
+  if (revisao && contexto.ok) await conferirArquivosOperacionais(revisao, entries, chatId, contexto.raiz)
+  return { revisao: revisao ?? null, ativa: conversaEmExecucao(sessionId, chatId) }
+}
+
+async function revisarRetomada(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  try {
+    const input = await readJson<{ sessionId?: unknown; chatId?: unknown } | null>(request)
+    if (!input || typeof input.sessionId !== 'string' || typeof input.chatId !== 'string') {
+      sendJson(response, 400, { message: 'Informe a sessão e a conversa.' })
+      return
+    }
+    const resultado = await withSessionPersistenceQueue(input.sessionId, () => lerRevisaoOperacional(input.sessionId as string, input.chatId as string))
+    if (!resultado) sendJson(response, 404, { message: 'A conversa não pertence à sessão.' })
+    else sendJson(response, 200, resultado)
+  } catch {
+    sendJson(response, 409, { message: 'Não foi possível conferir o estado operacional.' })
+  }
 }
 
 async function compactarSessao(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -444,6 +478,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     await gerirMemoriaProjeto(request, response)
     return true
   }
+  if (url.pathname === '/api/sessions/operation-review' && request.method === 'POST') {
+    await revisarRetomada(request, response)
+    return true
+  }
 
   if (url.pathname === '/api/fs/list' && request.method === 'GET') {
     sendJson(response, 200, listWorkspaceDirectories(url.searchParams.get('path') ?? ''))
@@ -526,6 +564,16 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         const contexto = resolverContextoAgir(sessionId, chatId)
         if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do histórico mudou.')
         return recuperarHistorico(await readTranscript(record.slug, sessionId, 16 * 1024 * 1024), chatId, pedido)
+      }),
+      planejarRetomada: ({ sessionId, chatId, raiz }, runId) => withSessionPersistenceQueue(sessionId, async () => {
+        const contexto = resolverContextoAgir(sessionId, chatId)
+        if (!contexto.ok || contexto.raiz !== raiz) throw new Error('A pasta da tarefa mudou.')
+        const estado = await lerRevisaoOperacional(sessionId, chatId)
+        if (!estado?.revisao || estado.revisao.runId !== runId || !estado.revisao.podePlanejar) {
+          throw new Error('A tarefa exige inspeção antes de continuar.')
+        }
+        return 'Produza apenas um planejamento novo a partir dos recibos históricos abaixo. Não execute ferramentas. ' +
+          'Diferencie conclusão registrada, inferência e pendência. As aprovações antigas expiraram.\n' + JSON.stringify(estado.revisao)
       }),
     })) return true
   }

@@ -64,6 +64,14 @@ O agente pode buscar trechos literais e pedir a vizinhança de uma referência e
 
 Validar opt-in, escopo, referência inventada, cancelamento, texto histórico tentando induzir efeitos, limites e provedor indisponível. A evidência com modelo real deve mostrar recuperação de um fato fora do contexto normal, com uma chamada curta de recuperação.
 
+## M7 — SPEC de execução inicial (10/11/2026)
+
+Base `d7067ef`. O [estudo M7](arquivo_morto/estudo_memoria_contexto_2026-10-22/fatias/M7_RECONSTRUCAO_OPERACIONAL.md) usa eventos duráveis da M2, checkpoints de contexto da M3 e validação de pasta existente. A reconstrução é uma projeção dos recibos do servidor. Abertura da sessão não inicia provedor nem ferramenta.
+
+O painel distingue conclusão registrada, falha, aprovação pendente e resultado incerto. Compara a pasta canônica e a observação Git quando disponível. O comando explícito **/retomar** pode iniciar uma execução nova de planejamento sem ferramentas, após revalidar o recibo e o ambiente. Alteração de pasta, divergência Git ou efeito mutável incerto bloqueiam essa continuação. O usuário deve inspecionar resultados incertos antes de pedir nova ação. Aprovações antigas permanecem evidência e nunca são transferidas.
+
+Validar reabertura em outro processo, antes e depois de aprovação, resultado ausente, divergências, nova autorização explícita e ausência de chamadas espontâneas. Usar fixture descartável para simular interrupção. O primeiro corte não promete reviver processo, executar comandos antigos ou garantir reversão de efeitos externos.
+
 As Fatias 14 e 15 têm aceite informado pelo proprietário e registrado em 08. A ordem D133 posiciona M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 antes da Fatia 16. E15-d é a retirada física da superfície de rollback, ainda presente e separada do aceite funcional. Os blocos datados que aguardam homologação ou situam a execução antes da Fatia 14 são históricos.
 
 A bateria completa no Windows tem falhas registradas em 09. A estabilização da suíte precisa tratar as fixtures POSIX, a configuração de fim de linha do Git e os contratos de tema e fronteiras de forma separada. A execução em Debian desta base continua pendente.
