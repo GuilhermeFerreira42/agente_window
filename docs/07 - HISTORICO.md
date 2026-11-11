@@ -1,3 +1,11 @@
+# 11/11/2026 — Avaliação de M1–M8 pelo uso e publicação autorizada
+
+Registrada D197: o proprietário mantém os aceites humanos M1–M8 pendentes e os avaliará ao utilizar o Agent Window no desenvolvimento das próximas fatias. Atualizados estado e roteiro, sem modificar código ou critérios de segurança. Autorizados commit da documentação pendente (incluindo DEBT-25) e push da branch `arena`, abrangendo a implementação `3aeb912` e a consolidação `62c55bf`. Nenhuma homologação humana foi atribuída.
+
+# 11/11/2026 — Registrada dívida de descoberta automática de limites
+
+Sobre `62c55bf`, registrada a DEBT-25 em 06 por solicitação do proprietário, para evolução futura. Sem alteração de código, configuração de provedores ou aceites humanos.
+
 # 11/11/2026 — Revisão D196 integra continuidade automática e uso explícito
 
 Commit de implementação, contratos, arquivo e testes: **`3aeb912` — `feat(memory): integrate automatic continuity and honest context usage`**. Consolidação verificável da entrega: `docs(memory): consolidate validated handoff and acceptance guide`. Sem novo push nesta rodada.

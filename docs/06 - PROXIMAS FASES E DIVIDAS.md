@@ -1,5 +1,13 @@
 # Programa M1–M8 — SPECs de execução e rastreabilidade (11/11/2026)
 
+## DEBT-25 — Descoberta automática da capacidade de contexto (11/11/2026)
+
+**Estado: aberta, melhoria futura; sem implementação nesta tarefa.** Base `62c55bf`. Por solicitação do proprietário, registrar para depois a descoberta automática da janela de contexto e dos limites de saída. Hoje o consumo pode vir do provedor, mas a capacidade total depende da configuração manual no Agent Window; a compactação automática de D196 já existe e não se confunde com esta dívida.
+
+Escopo proposto para futura SPEC: consultar metadados confiáveis do serviço/gateway (incluindo LiteLLM), recorrer a catálogo conhecido quando aplicável e identificar origem/atualidade do limite. Preservar ajuste manual e estado desconhecido quando faltar informação confiável, sem deduzir capacidade pelo nome de um alias. Tratar pools com modelos de capacidades diferentes e distinguir janela total, limite de entrada e limite de saída. Validar valores incompatíveis ou excessivos antes da chamada e manter a estimativa de uso separada da capacidade anunciada.
+
+Aceite futuro: modelos reconhecidos dispensam preenchimento manual quando houver metadados suficientes; troca de modelo/provedor atualiza os limites sem reutilizar dados de outro par; alias/pool ambíguo, catálogo ausente/desatualizado e falha de descoberta recebem tratamento explícito e seguro. Testar integração com o indicador e o orçamento de compactação, sem inventar precisão ou ampliar a capacidade real do endpoint. O registro não autoriza iniciar a implementação agora nem modifica o aceite humano pendente de M1–M8.
+
 ## Revisão integrada autorizada — SPEC R-Memória (11/11/2026)
 
 Base `2ac978d`. O proprietário autoriza corrigir e evoluir o programa inteiro sem aprovações técnicas intermediárias. Substituir as restrições exclusivamente manuais de D190/D193 e a ausência de recuperação contextual de D192 pela decisão D196. O aceite humano continua pendente. Reutilizar stores, fila de sessão, checkpoints com CAS, tradutores de protocolos, busca lexical e grants existentes.

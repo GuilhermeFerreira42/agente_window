@@ -1,8 +1,12 @@
 # Estado vigente — 11/11/2026
 
+**Forma de avaliação definida pelo proprietário — D197:** M1–M8 permanecem sem aceite humano. O proprietário usará o Agent Window no desenvolvimento das próximas fatias e avaliará as memórias durante esse uso, registrando depois o aceite ou os ajustes necessários. Não exigir homologação formal imediata de M como condição para esse uso nas próximas fatias. Critérios técnicos e de segurança permanecem vigentes; detalhes da decisão em 05 e registro de homologação em 08.
+
+**Pendência futura registrada:** DEBT-25 em 06, descoberta automática dos limites de contexto/saída por modelo ou pool. Apenas documentação por solicitação do proprietário; funcionamento atual e aceites M1–M8 preservados.
+
 **Revisão integrada D196 — tecnicamente pronta para homologação.** Base de partida `2ac978d`, branch `arena`. Medição com origem explícita e reserva, compactação automática, consulta histórica sem comando, seleção de memórias confirmadas e recuperação limitada de erro de contexto estão integradas aos componentes existentes. Não há homologação humana de M1–M8. Contratos vigentes em D196; evidências da rodada em 09 e roteiro atualizado em 08.
 
-Entrega versionada em **`3aeb912` — `feat(memory): integrate automatic continuity and honest context usage`**; consolidação documental em `docs(memory): consolidate validated handoff and acceptance guide`. Commits locais nesta rodada; nenhum push novo executado. O aplicativo principal permanece em 5174 e o LiteLLM em 4000; somente servidores descartáveis de teste foram encerrados.
+Entrega versionada em **`3aeb912` — `feat(memory): integrate automatic continuity and honest context usage`**; consolidação documental em `62c55bf` — `docs(memory): consolidate validated handoff and acceptance guide`. O proprietário autorizou agora commit da documentação pendente e publicação da branch `arena` no GitHub, incluindo esses commits. O encerramento da validação técnica preservou o aplicativo principal em 5174 e o LiteLLM em 4000; somente servidores descartáveis de teste foram encerrados.
 
 O provedor informado pelo proprietário agora é **Google Gemini 2.5 Flash pelo LiteLLM já em execução**, alias `meu-pool`. A prova real descartável respondeu TOPÁZIO após compactação e exibiu 3.444 tokens de contexto. O processo e as credenciais pessoais não foram alterados. Os incidentes NVIDIA abaixo são históricos e não são o estado do provedor Google atual.
 

@@ -1,5 +1,7 @@
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
+**Decisão do proprietário — D197, 11/11/2026:** não conceder aceite formal de M1–M8 neste momento. A avaliação humana ocorrerá durante o uso do Agent Window para desenvolver as próximas fatias. Os roteiros abaixo são referências para essa observação, sem exigir uma rodada formal imediata antes desse uso. Uso continuado, avanço de outras fatias, commits ou publicação no GitHub não constituem homologação implícita. Registrar por módulo o aceite explícito futuro ou os problemas encontrados; preservar os resultados técnicos já obtidos.
+
 **Roteiro vigente após D196.** Use uma pasta e arquivos de teste. Todos os aceites M1–M8 permanecem pendentes; aprovação técnica não é aceite humano. Os roteiros antigos abaixo são retratos da entrega manual inicial e devem ser lidos com esta atualização.
 
 1. **M1:** envie uma pergunta com o provedor desejado. Confira tokens de entrada, reserva de saída e janela, quando configurada para aquele modelo. Sem contagem, deve aparecer uma faixa com `≈`; janela desconhecida deve continuar desconhecida. Troque o modelo: números de outro modelo não devem aparecer como atuais. Após F5, a medição volta a não medida até a próxima chamada.
