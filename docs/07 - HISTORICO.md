@@ -1,5 +1,7 @@
 # 11/11/2026 — Revisão D196 integra continuidade automática e uso explícito
 
+Commit de implementação, contratos, arquivo e testes: **`3aeb912` — `feat(memory): integrate automatic continuity and honest context usage`**. Consolidação verificável da entrega: `docs(memory): consolidate validated handoff and acceptance guide`. Sem novo push nesta rodada.
+
 Base `2ac978d`. Evoluídos os componentes existentes M1–M8: medição/estimativa identificadas no compositor, compactação automática e manual com resumo validado, recuperação histórica nativa e memórias confirmadas selecionadas, uma recuperação de limite sem replay de ferramentas e nova aprovação individual após efeitos. Mantida a arquitetura modular; estudos da raiz arquivados integralmente. Typecheck/build aprovados, regressão nominal sem falha nova, bateria integrada e prova real Google/LiteLLM executadas. Decisão em D196, resultados e limites em 09, estado em 03, roteiro humano em 08. Nenhum aceite humano foi atribuído.
 
 # 11/11/2026 — M8 conclui validação técnica integrada das memórias

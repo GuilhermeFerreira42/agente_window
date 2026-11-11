@@ -41,6 +41,8 @@ Os 19 arquivos da investigação foram conferidos por SHA-256 antes/depois do mo
 
 ## Resultados finais da rodada
 
+Árvore técnica validada e versionada em **`3aeb912`**, mensagem `feat(memory): integrate automatic continuity and honest context usage`; os commits iniciais por M permanecem identificados no relatório histórico abaixo. Esta consolidação documental não altera o código testado. Perfil pessoal 5174 e gateway LiteLLM 4000 responderam HTTP 200 ao encerrar; servidores descartáveis 5202/5204 foram encerrados, sem desligar o serviço do usuário.
+
 | Gate | Resultado verificado | Evidência externa |
 |---|---|---|
 | Typecheck | **aprovado, exit 0**, após as últimas alterações | `memory-revision-typecheck-final.log` |
