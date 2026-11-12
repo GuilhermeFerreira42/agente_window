@@ -9,13 +9,13 @@ test.skip(!baseURL || !workspace, 'Exige servidor, perfil e workspace descartáv
 const headers = { Origin: baseURL ?? '', 'Sec-Fetch-Site': 'same-origin' }
 type Pedido = { messages: Array<{ role: string; content: string }>; max_tokens?: number }
 
-async function fixture(page: Page, janela: number) {
+async function fixture(page: Page, janela: number, saida = 4096) {
   const pedidos: Pedido[] = []; let limite = janela
   const server = createServer(async (req, res) => {
     if (req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ data: [{ model_name: 'alias', litellm_params: { model: 'openai/backend-real' },
-        model_info: { context_window: limite, max_output_tokens: 4096 } },
+        model_info: { context_window: limite, ...(saida > 0 ? { max_output_tokens: saida } : {}) } },
       { model_name: 'small', litellm_params: { model: 'openai/backend-small' }, model_info: { context_window: 32768, max_output_tokens: 4096 } }] })); return
     }
     const partes: Buffer[] = []; for await (const chunk of req) partes.push(chunk)
@@ -56,6 +56,46 @@ async function enviar(page: Page, texto = 'Continue o trabalho.') {
 }
 
 test.describe('DEBT25 — descoberta até memória e compositor', () => {
+  for (const [janela, legado] of [[128000, false], [0, false], [0, true]] as const) test(`formulário e resposta funcionam nos dois modos com metadados ${janela ? 'conhecidos' : 'ausentes'}${legado ? ' e perfil legado' : ''}`, async ({ page }) => {
+    const f = await fixture(page, janela, 0), id = `modos-${janela}-${Date.now()}`
+    test.setTimeout(60_000)
+    try {
+      await f.salvar({ contexto: 1500, contextoModelo: legado ? undefined : 'alias', maxSaida: 204800, modoContexto: legado ? undefined : 'auto' })
+      await semear(page, id, false)
+      await page.getByRole('button', { name: 'Conta', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Provedores', exact: true }).click()
+      const campo = page.getByLabel('Janela de contexto em tokens')
+      await expect(campo).toHaveAttribute('readonly', '')
+      if (janela) {
+        await expect(campo).toHaveValue('128000')
+        await expect(page.getByText(/Capacidade identificada.*Origem: gateway/)).toBeVisible()
+      } else {
+        await expect(campo).toHaveValue('')
+        await expect(page.getByText(/Não conseguimos identificar a janela/)).toBeVisible()
+      }
+      await expect(page.getByLabel('Limite de saída em tokens')).toHaveValue('4096')
+      await page.getByRole('button', { name: 'Fechar Provedores', exact: true }).click()
+      await enviar(page, 'Resposta no modo automático.')
+      expect(f.pedidos.at(-1)?.max_tokens).toBe(4096)
+      await page.getByRole('button', { name: 'Conta', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Provedores', exact: true }).click()
+      await page.getByLabel('Modo da janela de contexto').selectOption('manual')
+      await campo.fill('128000')
+      await page.getByLabel('Limite de saída em tokens').fill('204800')
+      await expect(page.getByText(/A chamada usará no máximo 4096/)).toBeVisible()
+      await page.getByRole('button', { name: 'Salvar provedores', exact: true }).click()
+      await expect(page.getByText('Configuração salva', { exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'Fechar Provedores', exact: true }).click()
+      await enviar(page, 'Resposta no modo manual.')
+      expect(f.pedidos.at(-1)?.max_tokens).toBe(4096)
+      await expect(page.locator('.context-usage')).toContainText('%')
+      await expect(page.getByText(/A resposta não terminou a tempo/)).toHaveCount(0)
+      const respostaSalvos = await page.request.get('/api/providers', { headers })
+      expect(respostaSalvos.ok()).toBe(true)
+      const salvos = await respostaSalvos.json()
+      expect(salvos.provedores.find((p: { id: string }) => p.id === 'openai-compat')).toMatchObject({ modoContexto: 'manual', contexto: 128000, maxSaida: 204800 })
+    } finally { await f.fechar() }
+  })
   test('compacta conversa longa de 1M por trecho limitado sem perder a fonte', async ({ page }) => {
     test.setTimeout(60_000)
     const f = await fixture(page, 1_000_000), id = `debt25-grande-${Date.now()}`

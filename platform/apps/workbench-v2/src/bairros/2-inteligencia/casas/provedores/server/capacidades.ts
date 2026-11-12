@@ -9,7 +9,7 @@ const cache = new Map<string, { expira: number; pedido: Promise<CapacidadeContex
 export function invalidarCapacidades() { cache.clear() }
 
 // Catálogo pequeno, exato e revisável; não identifica deployments pelo apelido.
-export const VERSAO_CATALOGO = '2026-11-11.1'
+export const VERSAO_CATALOGO = '2026-11-11.2'
 export const VALIDADE_CATALOGO = '2027-02-11T00:00:00Z'
 const catalogo: Record<string, LimitesContexto> = {
   'gemini-2.5-flash': { entrada: 1_048_576, saida: 65_536 },
@@ -19,6 +19,7 @@ const catalogo: Record<string, LimitesContexto> = {
   'gpt-4o': { total: 128_000, saida: 16_384 },
   'claude-sonnet-4-20250514': { total: 200_000, saida: 64_000 },
   'nvidia/nemotron-3.5-lightning-30b-a3b': { total: 1_000_000 },
+  'nvidia/nemotron-3-ultra-550b-a55b': { total: 1_000_000 },
 }
 function doCatalogo(modelo: string, protocolo: Protocolo, base: string): LimitesContexto | undefined {
   if (Date.now() > Date.parse(VALIDADE_CATALOGO)) return

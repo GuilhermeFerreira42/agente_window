@@ -1,5 +1,11 @@
 # Programa M1–M8 — SPECs de execução e rastreabilidade (11/11/2026)
 
+## Correção autorizada dos modos de contexto — D199
+
+**Tecnicamente encerrada, sem aceite humano.** Gates finais aprovados conforme 09: tipos/build, regressão nominal sem novas falhas, 24 cenários integrados e duas respostas reais pelo LiteLLM nos dois modos. Catálogo `.2` inclui o backend Ultra anunciado atualmente, com origem nominal explícita. Preserve as limitações e a homologação pendente de D197.
+
+Base `6881090`. O uso humano revelou que os campos manuais permaneciam editáveis no automático e uma reserva de 204.800 esgotava uma janela manual de 128.000. Reutilizar descoberta/cache, formulário e cálculo de saída; não mexer na outra cópia `arena_agente_window`. Automático exibe limites somente leitura, origem/ausência e saída operacional automática. Sem descoberta, sugerir 128K para escolha manual explícita, sem alegar capacidade confirmada. Manual mantém os valores escolhidos como tetos; uma reserva incompatível com a janela é limitada na chamada, com explicação visível, sem regravar a preferência. Erros locais de configuração não oferecem continuação como se fossem timeout. Provar os dois modos no formulário, pedido real enviado a provedor controlado, ausência de metadados, restrições menores, persistência e regressões; preservar M1–M8, aprovações e perfil pessoal. Evidências em 09. Homologação humana permanece pendente.
+
 ## DEBT-25 — Descoberta automática da capacidade de contexto (11/11/2026)
 
 **Estado vigente: tecnicamente encerrada, pronta para homologação; aceite humano pendente.** Implementação D198 integrada ao programa M1–M8, validada por tipos/build, regressão nominal sem falha nova, 21 cenários Playwright e prova limitada real NVIDIA/LiteLLM, além de metadados Ollama. Matriz e limitações em 09, roteiro em 08. O catálogo nominal, o estado desconhecido e o manual são alternativas explícitas; descoberta universal não é requisito prometido. A autorização desta microfatia não inicia extensibilidade nem concede aceite M1–M8.

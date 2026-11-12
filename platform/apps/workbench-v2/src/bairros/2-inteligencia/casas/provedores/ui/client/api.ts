@@ -1,6 +1,11 @@
 // Casa Provedores — cliente HTTP da tela (browser → servidor da casa).
 // A chave só trafega INTEIRA pela rota de reveal (D83); o resto é máscara.
 import type { EstadoProvedores, ResultadoModelos, ResultadoTeste, SalvarProvedoresInput } from '../../contract'
+import type { CapacidadeContexto } from '../../../../../../domain/capacidadeContexto'
+
+export function consultarCapacidade(providerId: string, modelId: string): Promise<CapacidadeContexto> {
+  return pedir<CapacidadeContexto>('/api/providers/capabilities', { method: 'POST', body: JSON.stringify({ providerId, modelId }) })
+}
 
 async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
   const resposta = await fetch(url, {

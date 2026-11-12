@@ -9,6 +9,17 @@ import { TETO_PADRAO, rodarAgir } from '../server/agir'
 import { criarExecutoresFalsos, ehMexida } from '../server/ferramentas'
 import { enviarAgir } from '../ui/client/api'
 
+it('não oferece continuação por timeout para configuração local inválida', async () => {
+  const eventos: EventoAgir[] = []
+  const resultado = await rodarAgir({ historico: [{ papel: 'usuario', conteudo: 'oi' }],
+    vizinho: async () => { throw Object.assign(new Error('Capacidade insuficiente.'), { code: 'configuracao' }) },
+    executores: criarExecutoresFalsos(), emitir: evento => eventos.push(evento) })
+  expect(resultado).toMatchObject({ status: 'erro', codigoErro: 'configuracao' })
+  expect(resultado.mensagensParaRetomar).toBeUndefined()
+  expect(eventos.find(e => e.type === 'error')).toMatchObject({ code: 'configuracao', message: 'Capacidade insuficiente.' })
+  expect(eventos.find(e => e.type === 'error')).not.toHaveProperty('retomavel')
+})
+
 /** Vizinho falso que segue um roteiro (uma resposta por chamada, na ordem) —
  * e cumpre o contrato do fio: texto sai AO VIVO pelo `aoTexto`. */
 function vizinhoRoteado(roteiro: RespostaIteracao[]) {

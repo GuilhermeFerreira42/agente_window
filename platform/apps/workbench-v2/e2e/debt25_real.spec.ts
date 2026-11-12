@@ -5,6 +5,32 @@ test.use({ baseURL })
 test.skip(!baseURL || !workspace || !gateway, 'Opt-in: gateway existente, perfil descartável e inferência limitada')
 
 test.describe('DEBT25 — provedor real disponível', () => {
+  test('responde nos dois modos sem enviar reserva manual incompatível', async ({ page }) => {
+    test.setTimeout(180_000)
+    const headers = { Origin: baseURL!, 'Sec-Fetch-Site': 'same-origin' }
+    for (const modoContexto of ['auto', 'manual'] as const) {
+      expect((await page.request.put('/api/providers', { headers, data: { ativo: 'openai-compat', provedores: {
+        'openai-compat': { nome: 'Prova real isolada', baseUrl: gateway, modelo: 'meu-pool', modoContexto,
+          contexto: 128000, contextoModelo: 'meu-pool', maxSaida: 204800, apiKey: 'fixture' },
+      } } })).ok()).toBe(true)
+      const id = `modos-real-${modoContexto}-${Date.now()}`
+      expect((await page.request.put('/api/sessions', { headers, data: { session: {
+        id, slug: id, title: id, workspace: 'Prova isolada dos modos', workspacePath: workspace, section: 'today', status: 'completed',
+        updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: 'main', persistenceRevision: Date.now(),
+        chats: [{ id: 'main', title: 'Main', status: 'completed', messages: [] }],
+      } } })).ok()).toBe(true)
+      await page.goto('/')
+      await page.getByRole('button', { name: 'Buscar sessões', exact: true }).click()
+      await page.getByRole('textbox', { name: 'Filtrar sessões', exact: true }).fill(id)
+      await page.getByRole('button', { name: `Sessão ${id}`, exact: true }).click()
+      await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Responda somente OK. Não leia arquivos nem execute ferramentas.')
+      await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click()
+      await expect(page.locator('.chat-message').last().getByText(/^OK[.!]?$/)).toBeVisible({ timeout: 85_000 })
+      await expect(page.locator('.context-usage[title*="Entrada:"]')).toHaveAttribute('title', /Reserva de saída: 4096/)
+      await expect(page.getByText(/A resposta não terminou a tempo/)).toHaveCount(0)
+      await expect(page.locator('.context-usage')).toContainText('%')
+    }
+  })
   test('DEBT25 real — identifica backend do alias e mostra limites antes de responder', async ({ page }) => {
   test.setTimeout(100_000)
   const headers = { Origin: baseURL!, 'Sec-Fetch-Site': 'same-origin' }, id = `debt25-real-${Date.now()}`

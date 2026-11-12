@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { descobrirCapacidade, invalidarCapacidades } from '../server/capacidades'
-import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
+import { orcamentoContexto, saidaEfetiva } from '../../../../../domain/capacidadeContexto'
 import type { Protocolo, ProvedorConfig } from '../contract'
 
 const config = (protocolo: Protocolo = 'openai-chat', modelId = 'alias') => ({ providerId: 'fixture', modelId, protocolo, baseUrl: 'http://fixture.invalid/v1', apiKey: 'SEGREDO_FIXTURE' })
@@ -11,6 +11,16 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 const json = (dados: unknown) => new Response(JSON.stringify(dados))
 
 describe('DEBT-25 — descoberta e orçamento por contrato', () => {
+  it('usa saída automática limitada e recupera reserva manual incompatível sem ampliar a janela', () => {
+    const cap = { limites: { total: 128000 } }
+    expect(saidaEfetiva(204800, cap, 'auto')).toBe(4096)
+    expect(saidaEfetiva(204800, cap, 'manual')).toBe(4096)
+    expect(saidaEfetiva(8192, cap, 'manual')).toBe(8192)
+    expect(saidaEfetiva(204800, { limites: { total: 128000, saida: 512 } }, 'manual')).toBe(512)
+    expect(saidaEfetiva(204800, { limites: { total: 2048 } }, 'auto')).toBe(512)
+    expect(saidaEfetiva(204800, undefined, 'auto')).toBe(4096)
+    expect(cap.limites.total).toBe(128000)
+  })
   it.each([32768, 131072, 1_000_000])('descobre janela %s anunciada pelo endpoint sem geração', async total => {
     const fetcher = vi.fn(async (url: string, init: RequestInit) => {
       expect(init.body).toBeUndefined(); expect(init.redirect).toBe('error')
@@ -61,9 +71,9 @@ describe('DEBT-25 — descoberta e orçamento por contrato', () => {
     expect(cap.limites).toMatchObject({ total: 128000, entrada: 32768 })
     expect(orcamentoContexto(cap, 4096)?.preventivo).toBe(24576)
   })
-  it('resolve catálogo pelo backend e endpoint anunciados, nunca pelo alias comercial', async () => {
+  it.each(['nvidia/nemotron-3.5-lightning-30b-a3b', 'nvidia/nemotron-3-ultra-550b-a55b'])('resolve catálogo do backend %s anunciado, nunca pelo alias comercial', async (modelo) => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ data: [{ model_name: 'alias', litellm_params: {
-      model: 'openai/nvidia/nemotron-3.5-lightning-30b-a3b', api_base: 'https://integrate.api.nvidia.com/v1', api_key: 'SEGREDO_BACKEND',
+      model: `openai/${modelo}`, api_base: 'https://integrate.api.nvidia.com/v1', api_key: 'SEGREDO_BACKEND',
     }, model_info: {} }] })))
     const cap = await descobrirCapacidade(config(), salvo)
     expect(cap.limites.total).toBe(1_000_000)

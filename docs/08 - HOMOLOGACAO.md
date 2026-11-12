@@ -1,5 +1,14 @@
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
+## Correção dos modos — D199
+
+1. Em **Descobrir automaticamente**, confira os campos somente leitura: janela com origem ou aviso de ausência, saída operacional automática distinta do máximo conhecido do modelo. Um número manual antigo não deve aparecer como descoberta. Salve alterações de alvo antes de consultar seus limites.
+2. Envie uma pergunta. Sem janela identificada, consumo pode aparecer em tokens sem percentual; o aviso sugere 128.000 apenas para escolha manual explícita, sem afirmar suporte do serviço.
+3. Escolha **Limite manual deste modelo**, informe 128.000 de contexto e 204.800 de máximo de saída. Confira a explicação de redução da reserva e envie outra pergunta: a configuração incompatível não deve impedir a chamada. A preferência continua guardada, mas a saída efetiva respeita o teto seguro.
+4. Escolha uma saída menor utilizável e confirme que ela continua valendo no manual. Ao trocar modelo, confirme sua janela novamente. Perfis antigos sem modo explícito devem ter o mesmo comportamento na tela e no envio.
+
+Falhas reais do provedor continuam possíveis e devem ser informadas corretamente; configuração local não deve ser apresentada como timeout. Nenhum aceite humano é atribuído por este roteiro.
+
 ## Microfatia DEBT-25 — roteiro de homologação, aceite humano pendente
 
 1. Em Provedores, escolha **Descobrir automaticamente** e salve. Converse com o modelo. No indicador, confira origem dos limites, modelo solicitado, destinos anunciados e modelo informado na resposta, quando disponível. Passe o mouse para ver entrada, saída, capacidade e orçamento preventivo.

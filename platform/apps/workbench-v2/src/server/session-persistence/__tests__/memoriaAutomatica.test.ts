@@ -29,6 +29,13 @@ function fixture() {
 beforeEach(() => { mock.resumir.mockReset(); mock.resumir.mockResolvedValue('Decisão preservada: usar SQLite. Não repetir efeitos.') })
 
 describe('continuidade automática — contratos', () => {
+  it('classifica orçamento local impossível como configuração, sem iniciar resumo', async () => {
+    const f = fixture()
+    await expect(f.preparar(escopo, f.mensagens, { ...alvo, limiteContexto: 1, maxSaida: 1 }, new AbortController().signal, vi.fn()))
+      .rejects.toMatchObject({ code: 'configuracao' })
+    expect(mock.resumir).not.toHaveBeenCalled()
+    expect(f.publicar).not.toHaveBeenCalled()
+  })
   it('avança por prefixos completos limitados em conversa maior que uma compactação', async () => {
     const f = fixture()
     f.fonte.entries = Array.from({ length: 40 }, (_, i) => ({ type: i % 2 ? 'assistant' : 'user', chatId: 'c', uuid: `grande${i}`, timestamp: i,

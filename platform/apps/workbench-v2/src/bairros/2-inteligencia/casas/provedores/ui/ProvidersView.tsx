@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, CircleAlert, Eye, EyeOff, Gauge, LoaderCircle, Save, Search, Settings2, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
 import type { EstadoProvedores, ProvedorConfig, ProvedorNaTela, ResultadoTeste } from '../contract'
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
-import { buscarModelos, carregarEstado, revelarChave, salvar, testar } from './client/api'
+import { buscarModelos, carregarEstado, consultarCapacidade, revelarChave, salvar, testar } from './client/api'
+import { modoContextoEfetivo, saidaEfetiva, type CapacidadeContexto } from '../../../../../domain/capacidadeContexto'
 import '../providers.css'
 
 type Grupo = { titulo: string; itens: { id: string; nome: string; tag?: string }[] }
@@ -47,6 +48,7 @@ export function ProvidersView() {
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
   const [erro, setErro] = useState('')
+  const [descoberta, setDescoberta] = useState<{ chave: string; dados?: CapacidadeContexto; falhou?: boolean }>()
 
   useEffect(() => {
     let ativo = true
@@ -107,12 +109,31 @@ export function ProvidersView() {
     habilitado: daTela?.habilitado ?? true,
     contexto: daTela?.contexto ?? descritor?.padroes.contexto,
     contextoModelo: daTela?.contextoModelo,
-    modoContexto: daTela?.modoContexto ?? (daTela?.contextoModelo ? 'manual' : 'auto'),
+    modoContexto: modoContextoEfetivo(daTela ?? {}),
     maxSaida: daTela?.maxSaida ?? descritor?.padroes.maxSaida,
     temperatura: daTela?.temperatura ?? descritor?.padroes.temperatura,
     ...rascunhos[selecionado],
   }
   const chaveDigitada = chaveEditada[selecionado]
+  const automatico = rascunho.modoContexto === 'auto'
+  const chaveCapacidade = JSON.stringify([selecionado, rascunho.baseUrl, rascunho.modelo, rascunho.modoContexto])
+  const podeDescobrir = estadoCarregado && automatico && !!daTela && daTela.habilitado !== false &&
+    modoContextoEfetivo(daTela) === 'auto' &&
+    daTela.modelo === rascunho.modelo && daTela.baseUrl === rascunho.baseUrl && chaveDigitada === undefined
+  const capacidade = descoberta?.chave === chaveCapacidade ? descoberta.dados : undefined
+  const fonteCapacidade = capacidade?.fontes.map(f => ({ api: 'API', gateway: 'gateway', catalogo: 'catálogo', manual: 'manual' }[f.origem])).join(', ')
+  const saidaAutomatica = saidaEfetiva(undefined, capacidade, 'auto')
+  const saidaManual = saidaEfetiva(rascunho.maxSaida, rascunho.contexto ? { limites: { total: rascunho.contexto } } : undefined, 'manual')
+
+  useEffect(() => {
+    let atual = true
+    if (!podeDescobrir) return
+    setDescoberta({ chave: chaveCapacidade })
+    consultarCapacidade(selecionado, rascunho.modelo).then(dados => {
+      if (atual) setDescoberta({ chave: chaveCapacidade, dados })
+    }).catch(() => { if (atual) setDescoberta({ chave: chaveCapacidade, falhou: true }) })
+    return () => { atual = false }
+  }, [podeDescobrir, chaveCapacidade, selecionado, rascunho.modelo, estado])
   const chaveVisivel = revelada[selecionado] === true
   const consultaModelos = consultasModelos[selecionado]
   const modelosDescobertos = consultaModelos?.estado === 'atualizado' ? consultaModelos.modelos : []
@@ -123,7 +144,10 @@ export function ProvidersView() {
 
   function editar(mudanca: Partial<ProvedorConfig>) {
     selecaoInteragida.current = true
-    setRascunhos((atual) => ({ ...atual, [selecionado]: { ...atual[selecionado], ...mudanca } }))
+    const trocaModeloManual = !automatico && mudanca.modelo !== undefined && mudanca.modelo !== rascunho.modelo
+    setRascunhos((atual) => ({ ...atual, [selecionado]: { ...atual[selecionado], ...mudanca,
+      ...(trocaModeloManual ? { contexto: undefined, contextoModelo: undefined } : {}),
+    } }))
     setSalvo(false)
   }
 
@@ -548,23 +572,35 @@ export function ProvidersView() {
                 </select>
                 <input
                   className="providers-input is-mono"
-                  type="number"
+                    aria-label="Janela de contexto em tokens"
+                    type={automatico ? 'text' : 'number'}
                   min={1}
-                  value={rascunho.contexto ?? ''}
+                    readOnly={automatico}
+                    placeholder={automatico ? 'Não identificada' : ''}
+                    value={automatico ? capacidade?.limites.total ?? capacidade?.limites.entrada ?? '' : rascunho.contexto ?? ''}
                   max={4294967295}
                   onChange={(e) => editar({ contexto: Number(e.target.value), contextoModelo: rascunho.modelo.trim(), modoContexto: 'manual' })}
                 />
-                <small>{rascunho.modoContexto === 'auto' ? 'Descoberta antes da chamada; o número abaixo só vale no modo manual. Origem e limites aparecem no indicador do chat.' : 'Limite declarado para este modelo; restrições menores conhecidas do serviço prevalecem.'}</small>
+                  <small>{automatico ? !podeDescobrir ? 'Salve a configuração para descobrir os limites deste modelo.' :
+                    capacidade?.limites.total || capacidade?.limites.entrada ? `Capacidade identificada (${capacidade.limites.total ? 'janela total' : 'limite de entrada'}). Origem: ${fonteCapacidade}.` :
+                    capacidade || descoberta?.falhou ? 'Não conseguimos identificar a janela. Você pode escolher o modo manual e informar 128000 como orçamento inicial sugerido, sem confirmação do serviço. A conversa continua com proteção operacional enquanto a janela for desconhecida.' :
+                    'Consultando os limites do modelo…' : rascunho.contextoModelo !== rascunho.modelo.trim() ? 'Informe e confirme a janela para este modelo antes de salvar.' : 'Limite declarado para este modelo; restrições menores conhecidas do serviço prevalecem.'}</small>
               </label>
               <label className="providers-field">
-                <span className="providers-label">Máximo de saída (tokens)</span>
+                  <span className="providers-label">{automatico ? 'Limite automático de resposta (tokens)' : 'Máximo de saída (tokens)'}</span>
                 <input
                   className="providers-input is-mono"
+                    aria-label="Limite de saída em tokens"
                   type="number"
                   min={1}
-                  value={rascunho.maxSaida ?? ''}
+                    max={4294967295}
+                    readOnly={automatico}
+                    value={automatico ? saidaAutomatica : rascunho.maxSaida ?? ''}
                   onChange={(e) => editar({ maxSaida: Number(e.target.value) })}
                 />
+                  <small>{automatico ? `Padrão operacional limitado à capacidade conhecida; não é o máximo garantido do modelo. Máximo informado pelo serviço/catálogo: ${capacidade?.limites.saida ?? 'não identificado'}.` :
+                    saidaManual !== rascunho.maxSaida && rascunho.maxSaida ? `Essa reserva ocuparia toda a janela. A chamada usará no máximo ${saidaManual} tokens de saída, preservando espaço para a entrada. Sua preferência não será apagada.` :
+                    'Teto por resposta; a chamada respeita os limites menores conhecidos do modelo.'}</small>
               </label>
             </div>
             <label className="providers-field">

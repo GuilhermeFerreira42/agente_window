@@ -15,6 +15,8 @@ import type { ArquivoProvedores, ItemCatalogoModelo, ProvedorConfig, ProvedorNaT
 import { DESCRITORES, descritorPorId } from '../descritores/registro'
 import { descobrirCapacidade, invalidarCapacidades } from './capacidades'
 import { limiteValido, type CapacidadeContexto } from '../../../../../domain/capacidadeContexto'
+import { saidaEfetiva, modoContextoEfetivo } from '../../../../../domain/capacidadeContexto'
+export { saidaEfetiva } from '../../../../../domain/capacidadeContexto'
 export { descobrirCapacidade } from './capacidades'
 
 // Re-export MÍNIMO (glicose da prefeitura): quem monta o alvo da conversa
@@ -250,12 +252,6 @@ export interface ConfigChamadaModelo {
   limiteContexto?: number
 }
 
-export function saidaEfetiva(configurada: number | undefined, capacidade?: CapacidadeContexto): number | undefined {
-  const teto = capacidade?.limites.saida
-  if (limiteValido(configurada)) return teto ? Math.min(configurada, teto) : configurada
-  return teto ? Math.min(4096, teto) : undefined
-}
-
 /**
  * Lineariza validação do par habilitado com o início do fetch.
  * O callback deve iniciar o request sincronamente e devolver sua Promise; o
@@ -302,7 +298,7 @@ export async function iniciarChamadaModelo<T>(
       baseUrl: (provedor.baseUrl || descritor.baseUrlPadrao).replace(/\/+$/, ''),
       apiKey: chave,
       temperatura: provedor.temperatura,
-      maxSaida: saidaEfetiva(provedor.maxSaida, capacidade),
+      maxSaida: saidaEfetiva(provedor.maxSaida, capacidade, modoContextoEfetivo(provedor)),
       limiteContexto: capacidade?.limites.total,
       capacidade,
     }

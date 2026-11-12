@@ -21,7 +21,7 @@ export async function gerarResumo(
   const fonte = JSON.stringify({ resumoAnterior: anterior, historico })
   if (fonte.length > MAX_ENTRADA) throw new Error('O trecho excede o limite de entrada da compactação.')
   const { entrada, limiteLote } = limitesDeResumo(alvo)
-  if (limiteLote < 1200) throw new Error('A capacidade conhecida é insuficiente para compactar com margem segura.')
+  if (limiteLote < 1200) throw Object.assign(new Error('A capacidade conhecida é insuficiente para compactar com margem segura. Confira a janela em Provedores.'), { code: 'configuracao' })
   const lotes: string[] = []
   let lote = '', bytes = 0
   for (const caractere of fonte) {
@@ -52,7 +52,7 @@ export async function gerarResumo(
   }]
   const pedido = estimarPedidoConversa(alvoResumo, mensagens)
   const capacidadeEntrada = orcamentoContexto(alvo.capacidade, pedido.reserva ?? saidaMaxima, alvo.limiteContexto)?.entrada
-  if (capacidadeEntrada !== undefined && pedido.estimativa.maximo > capacidadeEntrada * 0.9) throw new Error('O lote e o resumo acumulado excedem o orçamento seguro da compactação.')
+  if (capacidadeEntrada !== undefined && pedido.estimativa.maximo > capacidadeEntrada * 0.9) throw Object.assign(new Error('O lote e o resumo acumulado excedem o orçamento seguro da compactação.'), { code: 'configuracao' })
   await executarConversa(alvoResumo, mensagens, (evento) => {
     if (evento.type !== 'chunk') return
     resumo += evento.text

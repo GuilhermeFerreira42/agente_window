@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   revelarChave: vi.fn(),
   salvar: vi.fn(),
   testar: vi.fn(),
+  consultarCapacidade: vi.fn(),
 }))
 
 vi.mock('../client/api', () => mocks)
@@ -43,9 +44,37 @@ describe('ProvidersView · provedor sem requisito de canary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.carregarEstado.mockResolvedValue(structuredClone(estadoFixture))
+    mocks.consultarCapacidade.mockResolvedValue({ limites: {}, fontes: [], identidade: { solicitada: 'fixture-model', destinos: [], estado: 'desconhecida' } })
   })
 
   afterEach(() => vi.useRealTimers())
+
+  it('mostra descoberta somente leitura, ignora números manuais no automático e explica ausência', async () => {
+    mocks.carregarEstado.mockResolvedValue({ ...estadoFixture, provedores: [{ ...estadoFixture.provedores[0], modoContexto: 'auto', contexto: 1500, maxSaida: 204800 }] })
+    render(<ProvidersView />)
+    const janela = await screen.findByLabelText('Janela de contexto em tokens') as HTMLInputElement
+    await screen.findByText(/Não conseguimos identificar a janela/)
+    expect(janela.readOnly).toBe(true)
+    expect(janela.value).toBe('')
+    expect((screen.getByLabelText('Limite de saída em tokens') as HTMLInputElement).value).toBe('4096')
+    expect((screen.getByLabelText('Limite de saída em tokens') as HTMLInputElement).readOnly).toBe(true)
+  })
+
+  it('exibe o limite descoberto com origem e libera os valores somente no manual', async () => {
+    mocks.consultarCapacidade.mockResolvedValue({ limites: { total: 128000, saida: 8192 }, fontes: [{ origem: 'gateway' }] })
+    mocks.carregarEstado.mockResolvedValue({ ...estadoFixture, provedores: [{ ...estadoFixture.provedores[0], modoContexto: 'auto', contexto: 128000, maxSaida: 204800 }] })
+    render(<ProvidersView />)
+    await screen.findByText(/Capacidade identificada.*Origem: gateway/)
+    expect((screen.getByLabelText('Janela de contexto em tokens') as HTMLInputElement).value).toBe('128000')
+    fireEvent.change(screen.getByLabelText('Modo da janela de contexto'), { target: { value: 'manual' } })
+    expect((screen.getByLabelText('Janela de contexto em tokens') as HTMLInputElement).readOnly).toBe(false)
+    expect((screen.getByLabelText('Limite de saída em tokens') as HTMLInputElement).readOnly).toBe(false)
+    expect(screen.getByText(/A chamada usará no máximo 4096/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Modelo OpenAI'), { target: { value: 'outro-modelo' } })
+    expect((screen.getByLabelText('Janela de contexto em tokens') as HTMLInputElement).value).toBe('')
+    expect(screen.getByText(/Informe e confirme a janela para este modelo/)).toBeTruthy()
+    expect(screen.queryByText(/A chamada usará no máximo 4096/)).toBeNull()
+  })
 
   it('mantém a configuração e seleção de provedor sem apresentar fluxo de prova', async () => {
     render(<ProvidersView />)

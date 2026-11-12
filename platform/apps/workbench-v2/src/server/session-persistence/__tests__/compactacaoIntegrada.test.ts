@@ -13,6 +13,13 @@ function iniciar(a: AlvoConversa): IniciarChamadaModelo {
 }
 
 describe('compactação — transporte real com respostas controladas', () => {
+  it('explica capacidade insuficiente como configuração antes de chamar o modelo', async () => {
+    const a = { ...alvo('openai-chat'), limiteContexto: 1500 }
+    const iniciarModelo = vi.fn()
+    await expect(gerarResumo(a, [{ papel: 'usuario', conteudo: 'oi' }], undefined, iniciarModelo, new AbortController().signal))
+      .rejects.toMatchObject({ code: 'configuracao' })
+    expect(iniciarModelo).not.toHaveBeenCalled()
+  })
   it.each(['中', '😀'])('respeita oito lotes perto do limite UTF-8 com %s', async (caractere) => {
     const a = alvo('openai-chat'); a.limiteContexto = 1_000_000
     let chamadas = 0, n = caractere === '中' ? 53300 : 39975

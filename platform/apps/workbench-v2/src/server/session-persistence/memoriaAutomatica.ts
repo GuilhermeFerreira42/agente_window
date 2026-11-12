@@ -68,7 +68,7 @@ export function criarMemoriaAutomatica(portas: PortasMemoria) {
     const reserva = alvo.maxSaida && alvo.maxSaida > 0 ? alvo.maxSaida : 2048
     // O orçamento operacional é interno, não uma janela inferida do alias.
     const orcamento = orcamentoContexto(alvo.capacidade, reserva, alvo.limiteContexto)?.preventivo ?? 24_000
-    if (orcamento === 0) throw new Error('A reserva de saída esgota a capacidade de entrada conhecida. Reduza o máximo de saída ou confira os limites do modelo.')
+    if (orcamento === 0) throw Object.assign(new Error('A capacidade configurada é insuficiente para uma chamada. Confira os limites do modelo em Provedores.'), { code: 'configuracao' })
     const volume = medir ? medir(ativas) : estimarEntrada(ativas).maximo + 4096
     if (forcar || volume >= orcamento) {
       let operacao = emCurso.get(chave)

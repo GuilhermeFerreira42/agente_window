@@ -1,3 +1,34 @@
+# Correção D199 — modos de contexto (11/11/2026)
+
+Base `6881090`, branch `arena`, somente cópia `agente_window`. A imagem do uso humano expôs a reserva 204.800 maior que a janela manual 128.000, a ambiguidade de um campo manual editável em Auto e classificação local como HTTP/timeout. Solução/contratos em D199, SPEC em 06, roteiro em 08. Evidências externas com prefixo `modes-`, sem alterações em credenciais/configuração pessoais ou na cópia `arena_agente_window`.
+
+O gateway em execução foi consultado apenas para derivar alias/backend/host/limites seguros: quatro deployments Ultra no host oficial, nenhum limite numérico anunciado. A [ficha oficial Ultra](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-ultra-550b-a55b) fornece até 1M; catálogo `2026-11-11.2` acrescenta esse ID exato como nominal, não confirmado pelo deployment. Validade anterior preservada. A [FAQ NVIDIA](https://docs.api.nvidia.com/nim/docs/product) descreve acesso gratuito para prototipagem, sem fornecer uma janela universal para todos os endpoints gratuitos. O [changelog oficial Cline SDK](https://github.com/cline/cline/blob/main/sdk/CHANGELOG.md) registra fallback 128K; aqui esse valor aparece somente como sugestão para escolha manual quando não há capacidade identificada, sem precisão fictícia.
+
+Testes novos cobrem saída efetiva nos dois modos, configuração local sem retomada de timeout, limite insuficiente sem chamada de resumo, metadados conhecidos/ausentes, legado antes de salvar e mudança de modelo manual. A revisão estática independente encontrou a divergência de legado UI/fetch e o preview de janela de outro modelo; ambos corrigidos e retestados. Não é auditoria independente da execução dos testes.
+
+Os três novos E2E exercitam o formulário real e duas respostas por cenário: Auto não reutiliza 1.500 manuais/204.800 de saída; manual 128.000/204.800 envia reserva utilizável, mostra percentual e conserva a preferência original. O primeiro teste focado tinha nome de argumento incorreto na fixture (`mensagens` em vez de `historico`), corrigido. A primeira prova de persistência E2E omitia os headers same-origin no GET protegido; a aplicação já tinha respondido nos dois modos, e a prova foi corrigida sem relaxar a proteção.
+
+Uma rodada integrada teve 23 aprovados e uma falha durante navegação/reload enquanto o executor alterava o código do servidor. O trace foi preservado em `modes-reload-failure/`; essa rodada não é apresentada como aprovação. A repetição final com a árvore congelada aprovou os 24 cenários aplicáveis, inclusive o mesmo caso de F5/múltiplas compactações.
+
+| Gate D199 | Resultado verificado | Evidência externa |
+|---|---|---|
+| Typecheck | Aprovado, exit 0 | `modes-typecheck-frozen.log` |
+| Regressão completa | **1.601 aprovados, 42 falhas preexistentes, 30 ignorados**, 174 arquivos, 174,09 s | `modes-regression-frozen.log` |
+| Comparação nominal | Nenhuma diferença entre os 42 nomes de falhas da base e desta rodada | `modes-baseline.json`, base `debt25-regression-final-tree.log` |
+| Playwright integrado | **24 aprovados, 1 ignorado**, 2,8 min; os três cenários novos já estão incluídos nesse total | `modes-e2e-frozen.log` |
+| Modelo real via LiteLLM/NVIDIA | **1 cenário aprovado em 11,4 s, duas inferências reais**: resposta OK em Auto e Manual, reserva efetiva 4.096 e percentual em ambos | `modes-real.log` |
+| Build | **Aprovado, exit 0**, Vite 3.098 módulos em 45,96 s e compilação PTY existente | `modes-build.log` |
+
+Os adaptadores com metadados ausentes/alterados usam provedores controlados; isso não é inferência real. O teste opcional Ollama permanece ignorado. A suíte global conserva 42 falhas identificadas e não está totalmente verde. Não ocorreu ENOSPC nesta rodada; C: tinha cerca de 12,11 GiB livres após a primeira regressão. Nenhum teste de recuperação alterou dados reais.
+
+A prova real usou o gateway já aberto em 4000 com credencial sintética de cliente e perfil separado em 5205. As chaves backend não foram copiadas. O mapa seguro do LiteLLM apontava para Ultra; duas respostas curtas não comprovam o teto de 1M do deployment nem estabilidade futura da NVIDIA. Os valores do catálogo permanecem nominais e rotulados. Nenhuma configuração pessoal foi gravada e nenhuma ferramenta de efeito foi solicitada.
+
+Build conserva os avisos existentes de CSS, chunks grandes e boundary F2 desativada; não foram removidos ou contornados. O aplicativo principal continua na porta 5174 da cópia correta. Somente o processo descartável 5205 é encerrado após conferir sua identidade; perfis, logs e trace da falha intermediária ficam preservados no operacional externo. Árvore de código congelada durante a rodada final de E2E e inferência real.
+
+Reprodução: runtime oficial e `iniciar.cmd typecheck`, `iniciar.cmd test --maxWorkers=3 --minWorkers=2`, `iniciar.cmd build`. Playwright usa o mesmo perfil/servidor descartável e variáveis da matriz DEBT-25 abaixo; rodar os nove specs integrados, incluindo `debt25_capacidades.spec.ts`, com `--workers=1` e `M7_CRASH_FIXTURE=1`. O novo teste de `debt25_real.spec.ts`, filtro `responde nos dois modos`, exige opt-in `DEBT25_REAL_GATEWAY`, perfil isolado e o alias atual `meu-pool` com janela identificável para conferir percentual; faz duas chamadas curtas, sem ferramentas solicitadas. Não executar esses PUTs no aplicativo pessoal. Catálogo nominal não garante o teto real do deployment; indisponibilidade/recusa real do provedor continua possível e deve ser informada como tal. Nenhum aceite humano foi atribuído.
+
+---
+
 # DEBT-25 — descoberta de capacidades e orçamento (11/11/2026)
 
 Base `ca99af4`, branch `arena`; árvore técnica validada em **`455efe7` — `feat(providers): discover model limits and budget memory safely`**. Consolidação posterior somente documental, sem novo push. SPEC em 06; D198 rege a hierarquia, preservando D196 e os aceites pendentes/D197. A execução desta microfatia não inclui extensibilidade. Evidências externas em `C:/Users/Usuario/Desktop/arena/arena-operacional`, com prefixo `debt25-`; painel derivado `debt25-dashboard.html`, nunca fonte canônica.

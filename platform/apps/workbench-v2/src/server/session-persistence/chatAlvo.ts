@@ -4,6 +4,7 @@
 // ============================================================================
 import type { AlvoOuErro, SelecaoModelo } from '../../bairros/2-inteligencia/casas/conversa'
 import { descritorPorId, lerArquivo, resolverChave, descobrirCapacidade, saidaEfetiva } from '../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { modoContextoEfetivo } from '../../domain/capacidadeContexto'
 
 export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto' }): Promise<AlvoOuErro> {
   const arquivo = await lerArquivo()
@@ -52,7 +53,7 @@ export async function obterAlvoDeConversa(selecao: SelecaoModelo = { tipo: 'auto
       modelo: modelId,
       apiKey: chave,
       temperatura: salvo.temperatura,
-      maxSaida: saidaEfetiva(salvo.maxSaida, capacidade),
+      maxSaida: saidaEfetiva(salvo.maxSaida, capacidade, modoContextoEfetivo(salvo)),
       limiteContexto: capacidade.limites.total,
       capacidade,
     },

@@ -1,3 +1,9 @@
+# 11/11/2026 — D199 corrige o uso dos modos de contexto
+
+Base `6881090`, somente cópia `agente_window`, branch `arena`. Automático exibe limites somente leitura, origem/ausência e reserva operacional, sem usar campos manuais antigos como descoberta. Manual 128.000/saída 204.800 funciona com reserva reduzida e explicada, preservando a preferência. Regra de modo legado compartilhada por UI/preparação/fetch; troca de modelo exige confirmar janela. Limites locais impossíveis recebem erro de configuração, sem falsa continuação de timeout. O LiteLLM atual anunciou Ultra, não Lightning; catálogo `.2` acrescenta seu ID oficial exato com 1M nominal, sem afirmar teto confirmado do deployment.
+
+Tipos/build aprovados, regressão 1.601/42 preexistentes/30 ignorados sem diferença nominal, Playwright integrado 24 aprovados/um opcional ignorado, duas inferências reais nos dois modos em perfil separado. Revisão estática independente e limitações registradas em 09. Nenhuma alteração em credenciais/conversas reais, nenhuma nova branch ou modificação na outra cópia. Aceite humano permanece pendente.
+
 # 11/11/2026 — DEBT-25 integra descoberta de limites ao sistema de memória
 
 Implementação/contratos/testes em **`455efe7` — `feat(providers): discover model limits and budget memory safely`**, base `ca99af4`, branch `arena`. D198 implementa metadados de API/gateway/Ollama, catálogo exato versionado com validade, restrição manual vinculada ao modelo, cache e identidade de destino. O mesmo orçamento alimenta indicador, compactação automática e recuperação limitada; limites de entrada não descontam saída duas vezes. Prefixos grandes avançam por checkpoints limitados, sem apagar fonte ou ampliar chamadas por gatilho. Corrigida a perda do sinal remoto de revisão operacional no recovery local, com teste vermelho/verde e interrupção real.
