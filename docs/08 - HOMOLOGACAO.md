@@ -2,6 +2,8 @@
 
 ## MC1 — consultar outro chat, aceite humano pendente
 
+**Retorno do proprietário em 12/11:** sucesso inicial relatado ao repetir em chat limpo, ainda sem aceite formal. A avaliação continuará durante o desenvolvimento com o próprio Agent Window, incluindo as memórias anteriores. No print da tentativa “tente novamente”, a ferramenta consultou o chat atual; continuidade desse pedido entre turnos permanece pendente de correção/validação. Para avaliar a consulta entregue, formule novamente o pedido explícito com o nome do outro chat.
+
 1. No aplicativo da pasta `agente_window`, crie uma conversa nova em um projeto de teste. Dê a ela um nome reconhecível, por exemplo **Investigação de plugins**, e registre uma decisão simples. Renomear depois deve manter o conteúdo e o vínculo. Para um legado sem origem comprovada, clique com o botão direito na sessão/chat → **Gerenciar acesso histórico** e confirme **somente a conversa e pasta desejadas**. Nenhum outro legado deve ser liberado. Se o vínculo conhecido for de outro projeto/pasta, a confirmação não deve transferi-lo.
 2. Em outra conversa do **mesmo projeto**, peça: “No chat Investigação de plugins, o que decidimos sobre SQLite?”. Alternativa explícita: `/chats Investigação de plugins: SQLite`. Confira as atividades de localizar/buscar/ler e a resposta fundamentada. Clique na fonte para abrir a mensagem original.
 3. Crie duas conversas com o mesmo nome. A consulta deve pedir escolha; clique no candidato correto ou envie outra mensagem com título/data. O clique cria uma nova consulta somente leitura. O agente não deve selecionar sozinho uma conversa ambígua.

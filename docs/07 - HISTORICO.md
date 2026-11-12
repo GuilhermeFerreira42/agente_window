@@ -1,3 +1,7 @@
+# 12/11/2026 — Autorizada publicação da correção MC1, sem aceite humano
+
+Correção em `8c5ffa2`; o proprietário autorizou push na branch existente `arena`. Relatou sucesso inicial em chat limpo e manteve expressamente os aceites pendentes, avaliando as memórias durante o uso nas próximas alterações/fatias conforme D197. Print da tentativa anterior “tente novamente” mostrou consulta ao histórico do chat atual; esse caso fica registrado como limitação de continuidade ainda não corrigida/validada, sem invalidar ou ampliar o escopo dos testes executados. Nenhuma alteração funcional adicional nesta consolidação documental.
+
 # 12/11/2026 — MC1 corrige renomeação, recusa e autorização específica de legado
 
 Base `c4dbff6`, somente `agente_window`, branch `arena`. O primeiro uso humano revelou conversa anterior à MC1, corretamente renomeada `memoria`, sem identidade histórica comprovada. Corrigidos acentos e o encerramento que permitia ao modelo dizer “não encontrei” diante de recusa. D201 acrescenta consentimento humano separado da proveniência, revogável por chat/projeto e protegido contra recibos antigos, troca de raiz, digest e incarnação. A ação reutiliza o menu e a persistência existentes; não altera permissões de ferramentas nem libera outros legados.
