@@ -66,6 +66,7 @@ interface SessionSidebarProps {
   onToggleArchived: (id: string) => void
   onDelete: (id: string) => void
   onRename: (id: string, title: string) => void
+  onManageHistoryAccess?: (sessionId: string, chatId: string) => void
   onApprove: (sessionId: string, chatId?: string) => void
   onOpenDiff: (sessionId: string) => void
   onReorderSessions: (fromId: string, toId: string) => void
@@ -315,6 +316,7 @@ export function SessionSidebar({
   onToggleArchived,
   onDelete,
   onRename,
+  onManageHistoryAccess,
   onApprove,
   onOpenDiff,
   onReorderSessions,
@@ -407,6 +409,7 @@ export function SessionSidebar({
         { id: 'pin', label: session.pinned ? 'Desafixar' : 'Fixar', icon: session.pinned ? <PinOff size={14} /> : <Pin size={14} />, onSelect: () => onTogglePinned(session.id) },
         { id: 'archive', label: session.archived ? 'Restaurar' : 'Arquivar', icon: session.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />, onSelect: () => onToggleArchived(session.id) },
         { id: 'rename', label: 'Renomear', icon: <FilePlus2 size={14} />, onSelect: () => { setEditingId(session.id); setExpanded((current) => ({ ...current, [session.id]: true })) } },
+        ...(onManageHistoryAccess ? [{ id: 'history-access', label: 'Gerenciar acesso histórico', icon: <MessageCircle size={14} />, onSelect: () => onManageHistoryAccess(session.id, session.mainChatId) }] : []),
         { id: 'diff', label: 'Revisar alterações', icon: <GitBranch size={14} />, onSelect: () => onOpenDiff(session.id) },
         // (R-012) Custom Groups: mover para grupo, criar grupo, remover do grupo.
         ...(existingGroups.length > 0 ? [{
@@ -460,6 +463,7 @@ export function SessionSidebar({
       label: `Ações do chat ${chat.title}`,
       items: [
         { id: 'open', label: 'Abrir chat', icon: <MessageCircle size={14} />, onSelect: () => { onSelectSession(sessionId); onSelectChat(sessionId, chatId) } },
+        ...(onManageHistoryAccess ? [{ id: 'history-access', label: 'Gerenciar acesso histórico', icon: <MessageCircle size={14} />, onSelect: () => onManageHistoryAccess(sessionId, chatId) }] : []),
         ...(chat.approval ? [{ id: 'approve', label: 'Permitir ação', icon: <Wrench size={14} />, onSelect: () => onApprove(sessionId, chatId) }] : []),
         { id: 'diff', label: 'Revisar alterações', icon: <GitBranch size={14} />, separatorBefore: true, onSelect: () => onOpenDiff(sessionId) },
       ],

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
 import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
+import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
@@ -511,6 +512,20 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
+  if (url.pathname === '/api/sessions/history-access' && request.method === 'POST') {
+    try {
+      const input = await readJson<{ acao?: unknown; sessionId?: unknown; chatId?: unknown; token?: unknown } | null>(request)
+      if (!input || typeof input !== 'object' || Array.isArray(input)) { sendJson(response, 400, { code: 'invalid_request', message: 'Pedido de confirmação inválido.' }); return true }
+      if (input.acao === 'preparar' && typeof input.sessionId === 'string' && typeof input.chatId === 'string') {
+        sendJson(response, 200, await prepararAcessoHistorico(input.sessionId, input.chatId, withSessionPersistenceQueue))
+      } else if (input.acao === 'confirmar' && typeof input.token === 'string' && input.token.length <= 80) {
+        sendJson(response, 200, await confirmarAcessoHistorico(input.token, withSessionPersistenceQueue))
+      } else sendJson(response, 400, { code: 'invalid_request', message: 'Pedido de confirmação inválido.' })
+    } catch {
+      sendJson(response, 409, { code: 'history_access_unavailable', message: 'Não foi possível aplicar a confirmação: conversa, histórico ou projeto mudou, está indisponível ou a confirmação expirou. Abra novamente o menu.' })
+    }
+    return true
+  }
   if (url.pathname === '/api/sessions/other-chat-source' && request.method === 'POST') {
     const input = await readJson<{ sessionId: string; chatId: string; referencia: string }>(request)
     const contexto = resolverContextoAgir(input.sessionId, input.chatId)

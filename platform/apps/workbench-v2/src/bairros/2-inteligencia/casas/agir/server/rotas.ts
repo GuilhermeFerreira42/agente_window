@@ -310,7 +310,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const orcamentoMC1 = Math.min(24_000, Math.floor((orcamentoContexto(fio.alvo.capacidade, fio.alvo.maxSaida || 2048, fio.alvo.limiteContexto)?.preventivo ?? 24_000) / 4))
   let consultarOutroChat: ReturnType<NonNullable<DependenciasAgir['criarConsultaEntreChats']>> | undefined
   try { consultarOutroChat = fio.execucao.entreChats ? deps.criarConsultaEntreChats?.(fio, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
-  catch { consultarOutroChat = async () => ({ status: 'scope_unverifiable', results: [], partial: true, sources: [], aviso: 'O catálogo histórico não está acessível.' }) }
+  catch { consultarOutroChat = async () => ({ status: 'scope_unverifiable', reason: 'catalog_unavailable', results: [], partial: true, sources: [], aviso: 'O catálogo histórico não está acessível.' }) }
   let consultasOutros = 0
   const executarConsultaOutroChat: ExecutorFerramenta = async pedido => {
     if (!consultarOutroChat || !fio.execucao.entreChats || consultasOutros++ >= 8 || abort.signal.aborted || !validarContexto()) return { ok: false, resumo: 'Consulta entre chats não autorizada ou limite atingido.' }
@@ -319,7 +319,12 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     registro?.recuperar(pedido.id, pedido.ferramenta === 'ler_trecho_chat' ? 'ler' : 'buscar', resultado.sources.map(s => `${s.sessionId}:${s.chatId}:${s.messageId}`))
     const rotulo = { ok: 'concluída', partial: 'busca parcial', not_found: 'nenhuma conversa encontrada no projeto acessível', ambiguous: 'há mais de uma conversa; informe título e data',
       forbidden: 'não autorizada', scope_unverifiable: 'origem histórica não comprovada', source_deleted: 'fonte removida ou recriada', too_large: 'histórico maior que o limite de leitura' }[resultado.status]
-    return { ok: ['ok', 'partial', 'ambiguous', 'not_found'].includes(resultado.status), resumo: `Consulta entre chats: ${rotulo}; ${resultado.results.length} resultado(s)${resultado.partial ? ' — parcial' : ''}.`,
+    const origemBloqueada = resultado.status === 'scope_unverifiable'
+    const orientacao = resultado.reason === 'legacy_authorization_required'
+      ? ' Renomear não comprova a origem. Para uma conversa antiga, use Gerenciar acesso histórico no menu e autorize somente a conversa desejada.'
+      : ' A origem ou o estado do catálogo não pôde ser validado. Confira o estado da conversa e consulte novamente.'
+    return { ok: ['ok', 'partial', 'ambiguous', 'not_found'].includes(resultado.status), resumo: `Consulta entre chats: ${rotulo}; ${resultado.results.length} resultado(s)${resultado.partial ? ' — parcial' : ''}.${origemBloqueada ? ' A consulta foi bloqueada; isso não significa que o chat não exista.' + orientacao : ''}`,
+      ...(origemBloqueada ? { erroTerminal: true } : {}),
       conteudo: JSON.stringify(resultado), fontesHistoricas: resultado.sources, escolhasHistoricas: resultado.escolhas }
   }
   const assinaturaEfeito = (pedido: PedidoFerramenta) => {

@@ -1,5 +1,13 @@
 # Estado vigente — 12/11/2026
 
+**Correção MC1 / D201 tecnicamente validada, base `c4dbff6`, branch `arena`.** O chat `memoria` tinha título salvo corretamente, mas era anterior à proveniência MC1. Renomear não comprovava sua origem; a interface confundia a recusa com ausência. Busca agora tolera `memória`/`memoria`, renomeação preserva vínculos e uma recusa encerra a consulta com explicação fiel. O menu existente “Gerenciar acesso histórico” permite autorizar/revogar somente o chat selecionado neste projeto, com recibo de confirmação e validação de raiz, perfil, incarnação e digest. Não há transferência entre projetos nem permissão de comandos.
+
+O proprietário autorizou **somente `memoria`**. A concessão real foi aplicada pelo fluxo humano: exatamente um novo consentimento, nenhum anterior alterado, metadados de proveniência e bytes do transcript preservados. Outros legados continuam bloqueados. Pode repetir “Recupere o contexto do chat memória.” no aplicativo em `http://127.0.0.1:5174`. A consulta real aos dados pessoais não foi disparada como teste; a prova de modelo usou somente dados sintéticos.
+
+Gates desta correção: **90/90** focados e benchmark; **11/11** Playwright MC1, incluindo NVIDIA real; integração M1–M8/DEBT-25 **24 aprovados/um Ollama opcional ignorado**; regressão **1.673 aprovados/mesmas 42 falhas preexistentes/31 ignorados**, nenhuma diferença nominal. Tipos/build aprovados; nenhuma nova ocorrência de lint contra as 350 existentes. Revisão independente estática sem bloqueio concreto, sem alegar auditoria da execução. Decisão D201 em 05, escopo encerrado em 06, roteiro em 08, provas e limites em 09. **Aceites humanos de M1–M8, DEBT-25 e MC1 permanecem pendentes.**
+
+## Registro da entrega MC1 anterior à correção
+
 **MC1 / D200 tecnicamente validada, sem aceite humano.** Base `49692ef`, branch `arena`, somente pasta `agente_window`. Consulta explícita a outros chats do mesmo projeto integra proveniência imutável, três ferramentas somente leitura, seleção humana de ambiguidades e fontes navegáveis. M6 permanece no chat atual. Legado sem origem comprovada não é reatribuído à pasta atual. Timestamp M2 preservado em autosaves; MC1 não renova orçamento/escolha por Continuar.
 
 Código, contratos, testes e documentação versionados em **`9a86353` — `feat(memory): MC1 scoped retrieval across project chats`**. Commit local na branch existente, sem publicação GitHub nesta microfatia. A árvore de implementação foi validada antes do commit; a consolidação posterior registra apenas este identificador e o encerramento. Aplicativo do usuário permanece disponível em `http://127.0.0.1:5174`.

@@ -1,5 +1,15 @@
 # Programa M1–M8 — SPECs de execução e rastreabilidade (11/11/2026)
 
+## MC1 corretiva — renomeação, legado e autorização específica (12/11/2026)
+
+**Execução técnica encerrada.** Contrato D201, implementação e provas consolidadas em 03/09; autorização real específica aplicada sem modificar o histórico. Roteiro de homologação em 08. Nenhum aceite humano atribuído; não iniciar outra fatia automaticamente.
+
+Base `c4dbff6`. O primeiro teste humano encontrou `memoria`, criada em 11/11 antes da proveniência MC1 e renomeada agora; inspeção somente leitura confirmou título correto, digest consistente, estado `unverifiable` e identidade física histórica ausente. Não presumir que renomear causou a perda. Corrigir resposta que transformou recusa por origem em “não encontrei”, provar renomeação e tolerância de acento (`memória`/`memoria`). O proprietário autorizou expressamente **somente essa conversa** para consultas no projeto `agente_window`; isso não autoriza os demais legados.
+
+Implementar autorização humana separada da proveniência imutável: registro SQLite do consentimento por chat/incarnação/perfil/raiz física, revogável e invalidado por relink/recriação; não reclassificar origem histórica como observada. A leitura efetiva reutiliza catálogo/fila/digest/filtros/limites MC1. Porta humana preparar→confirmar com token curto de uma utilização, vínculo/digest revalidados antes de conceder; nenhum tool do modelo concede permissão. Integrar ação no menu existente de sessão/chat, com confirmação compreensível de leitura neste projeto e revogação. Aplicar a autorização real somente ao alvo nomeado após validar o mecanismo em perfis isolados; não alterar transcript, comandos, grants ou outros chats reais.
+
+Arquivos: repositório de origens/consentimentos, domínio de normalização, adaptador de consulta/erro terminal, rota humana de persistência, cliente e wiring aditivo/menu existente. Testes vermelhos/verdes de rename/acentos/recusa honesta, consentimento específico/revogado/expirado/forjado, mudança de raiz/digest/incarnação, persistência e Playwright por menu. Regressões contra 42 falhas nominais, tipos/build e prova real limitada quando pertinente. Nada de liberação global, inferência retroativa, nova permissão de filesystem, alteração de histórico ou nova branch. Aceite humano MC1/M permanece pendente.
+
 ## MC1 — consulta controlada de outros chats (execução autorizada em 12/11/2026)
 
 **Implementação encerrada; consolidação dos gates em 03/09.** Contrato final D200, roteiro humano em 08. Nenhuma homologação é automática. A consulta real NVIDIA foi autorizada pelo proprietário após a interrupção Google; provas e limites estão diferenciados em 09. Não antecipar extensibilidade.

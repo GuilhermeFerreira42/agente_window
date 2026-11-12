@@ -30,6 +30,8 @@ export const LIMITES_ENTRE_CHATS = { consulta: 120, candidatos: 10, hits: 5, tre
   chamadas: 8, respostaBytes: 12 * 1024, totalBytes: 24 * 1024, sessoes: 200, fonteBytes: 16 * 1024 * 1024,
   leituraAgregadaBytes: 8 * 1024 * 1024, tempoMs: 750 } as const
 export const normalizarTitulo = (s: string) => s.normalize('NFC').toLocaleLowerCase('pt-BR').trim().replace(/\s+/gu, ' ')
+/** Accent-tolerant fallback for titles; preserves the displayed title and the strict first match. */
+export const normalizarBuscaHistorica = (s: string) => normalizarTitulo(s).normalize('NFD').replace(/\p{M}/gu, '')
 /** Lexical only: exact phrase first, then meaningful literal terms; never invent synonyms. */
 export function correspondenciaHistorica(texto: string, consulta: string): { score: number; pos: number } {
   const corpo = normalizarTitulo(texto), query = normalizarTitulo(consulta), exata = corpo.indexOf(query)

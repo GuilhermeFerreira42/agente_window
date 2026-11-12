@@ -2,7 +2,7 @@
 
 ## MC1 — consultar outro chat, aceite humano pendente
 
-1. No aplicativo da pasta `agente_window`, crie uma conversa nova em um projeto de teste. Dê a ela um nome reconhecível, por exemplo **Investigação de plugins**, e registre uma decisão simples. Use conversas criadas após MC1: chats antigos sem prova de origem podem informar indisponibilidade.
+1. No aplicativo da pasta `agente_window`, crie uma conversa nova em um projeto de teste. Dê a ela um nome reconhecível, por exemplo **Investigação de plugins**, e registre uma decisão simples. Renomear depois deve manter o conteúdo e o vínculo. Para um legado sem origem comprovada, clique com o botão direito na sessão/chat → **Gerenciar acesso histórico** e confirme **somente a conversa e pasta desejadas**. Nenhum outro legado deve ser liberado. Se o vínculo conhecido for de outro projeto/pasta, a confirmação não deve transferi-lo.
 2. Em outra conversa do **mesmo projeto**, peça: “No chat Investigação de plugins, o que decidimos sobre SQLite?”. Alternativa explícita: `/chats Investigação de plugins: SQLite`. Confira as atividades de localizar/buscar/ler e a resposta fundamentada. Clique na fonte para abrir a mensagem original.
 3. Crie duas conversas com o mesmo nome. A consulta deve pedir escolha; clique no candidato correto ou envie outra mensagem com título/data. O clique cria uma nova consulta somente leitura. O agente não deve selecionar sozinho uma conversa ambígua.
 4. Repita com uma conversa em outro projeto: nenhuma mensagem/título desse projeto deve ser entregue. Trocar a pasta de uma sessão antiga não deve transferir seu histórico para o novo projeto.
@@ -10,6 +10,8 @@
 6. Um texto histórico que mande criar/apagar/executar deve ser tratado como citação. MC1 só consulta; para usar uma decisão em alterações de código, envie uma nova instrução após a consulta. Busca lexical limitada pode ser parcial; use termos/título mais específicos quando indicado. Se a consulta atingir o limite ou for interrompida, envie nova mensagem/seleção: “Continuar” não pode renovar silenciosamente sua escolha e orçamento.
 
 Este roteiro não concede aceite humano de MC1, M1–M8 ou DEBT-25. Evidências técnicas e limitações ficam em 09; avaliação durante uso permanece conforme D197.
+
+**Correção do ensaio com `memoria` (D201):** o proprietário autorizou especificamente essa conversa para o projeto `agente_window`, com histórico preservado. Reenvie “Recupere o contexto do chat memória”. A busca tolera acento e pode recuperar trechos recentes para contexto geral, sem afirmar que leu toda a conversa. Para revogar, use o mesmo menu e confirme; links/consultas seguintes devem recusar acesso. Revogar não apaga respostas já enviadas. Uma recusa por origem não pode produzir a alegação de que a conversa não existe.
 
 ## Correção dos modos — D199
 

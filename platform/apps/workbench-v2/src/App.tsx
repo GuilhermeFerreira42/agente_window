@@ -19,6 +19,7 @@ import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessio
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
+import { manageHistoryAccess } from './services/sessions/historyAccessClient'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
 import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
@@ -2489,6 +2490,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           onToggleArchived={handleToggleArchived}
           onDelete={handleDelete}
           onRename={(id, title) => updateSession(id, (session) => ({ ...session, title }))}
+          onManageHistoryAccess={(id, chatId) => { void manageHistoryAccess(id, chatId, { confirm: text => window.confirm(text), notify: text => window.alert(text) }) }}
           onApprove={handleApprove}
           onOpenDiff={openDiff}
           onReorderSessions={handleReorderSessions}

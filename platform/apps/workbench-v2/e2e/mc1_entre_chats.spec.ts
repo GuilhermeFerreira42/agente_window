@@ -5,6 +5,7 @@ import { mkdtemp, readFile, stat, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import Database from 'better-sqlite3'
 
 test.skip(process.env.MC1_E2E !== '1', 'Exige opt-in: cria servidor e dados descartáveis próprios em 5211')
 const app = resolve(dirname(fileURLToPath(import.meta.url)), '..'), base = 'http://127.0.0.1:5211'
@@ -15,7 +16,7 @@ type Resultado = { status: string; results: Array<{ referencia: string; trecho?:
 async function ambiente(page: Page, real = false, janela = 128000) {
   const raiz = await mkdtemp(join(tmpdir(), 'mc1-e2e-')), externo = join(raiz, 'projeto-B')
   await mkdir(externo)
-  let processo: ChildProcess | undefined, seq = 0
+  let processo: ChildProcess | undefined, seq = 0, tituloBuscado = 'Investigação de plugins'
   const pedidos: Pedido[] = []
   let falhaReal = '', chamadasReais = 0
   let mutacao: (() => Promise<void>) | undefined
@@ -44,7 +45,7 @@ async function ambiente(page: Page, real = false, janela = 128000) {
     const busca = resultados.find(r => r.results?.some(h => h.referencia) && ['ok', 'ambiguous'].includes(r.status))
     const hits = resultados.find(r => r.sources?.length)
     let delta: object
-    if (!resultados.length) delta = tool('buscar_chats', { consulta: 'Investigação de plugins' })
+    if (!resultados.length) delta = tool('buscar_chats', { consulta: tituloBuscado })
     else if (busca?.status === 'ambiguous') delta = { content: 'Há mais de uma conversa; selecione a origem abaixo.' }
     else if (!busca) delta = { content: 'Sem fonte acessível no projeto; consulta encerrada.' }
     else if (!hits) {
@@ -89,13 +90,74 @@ async function ambiente(page: Page, real = false, janela = 128000) {
     await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill(texto)
     await page.getByRole('button', { name: 'Enviar mensagem' }).click()
   }
-  return { raiz, externo, pedidos, semear, selecionar, enviar, iniciar, parar, estadoReal: () => ({ falhaReal, chamadasReais }), mutacao: (fn: () => Promise<void>) => { mutacao = fn }, fechar: async () => {
+  return { raiz, externo, pedidos, semear, selecionar, enviar, iniciar, parar, buscarTitulo: (value: string) => { tituloBuscado = value }, estadoReal: () => ({ falhaReal, chamadasReais }), mutacao: (fn: () => Promise<void>) => { mutacao = fn }, fechar: async () => {
     await parar(); provedor.closeAllConnections(); await new Promise<void>(ok => provedor.close(() => ok()))
   } }
 }
 
 
 test.describe('MC1 — histórico entre chats', () => {
+  test('renomeação real da sessão preserva origem e busca memória encontra memoria', async ({ page }) => {
+    test.setTimeout(90000); const f = await ambiente(page)
+    try {
+      await f.semear('nome-anterior', 'nome-anterior', 'Decisão SQLite preservada após renomear.')
+      const arquivo = join(f.raiz, 'data', 'projects', 'nome-anterior', 'nome-anterior.jsonl'), original = await readFile(arquivo, 'utf8')
+      await f.selecionar('nome-anterior')
+      await page.getByRole('button', { name: 'Sessão nome-anterior', exact: true }).hover()
+      await page.getByRole('button', { name: 'Renomear sessão', exact: true }).click()
+      await page.getByRole('textbox', { name: 'Renomear sessão', exact: true }).fill('memoria')
+      await page.getByRole('textbox', { name: 'Renomear sessão', exact: true }).press('Enter')
+      await expect.poll(async () => (await (await page.request.get(base + '/api/sessions', { headers })).json()).sessions.find((s: { id: string }) => s.id === 'nome-anterior')?.title).toBe('memoria')
+      expect(await readFile(arquivo, 'utf8')).toBe(original)
+      await f.semear('consulta-renomeada', 'consulta-renomeada'); await f.selecionar('consulta-renomeada'); f.buscarTitulo('memória')
+      await f.enviar('Recupere o contexto do chat memória.')
+      await expect(page.getByText('Decisão confirmada na fonte: SQLite com WAL. Consulte a mensagem origem-mc1.')).toBeVisible({ timeout: 25000 })
+      await expect(page.getByRole('button', { name: 'Abrir fonte memoria, mensagem origem-mc1', exact: true }).first()).toBeVisible()
+      expect(await readFile(arquivo, 'utf8')).toBe(original)
+    } finally { await f.fechar() }
+  })
+
+  test('legado renomeado: recusa honesta, consentimento no menu e revogação imediata', async ({ page }) => {
+    test.setTimeout(90000); const f = await ambiente(page)
+    try {
+      await f.semear('legado-anterior', 'legado-anterior', 'Decisão SQLite do chat legado.')
+      const arquivo = join(f.raiz, 'data', 'projects', 'legado-anterior', 'legado-anterior.jsonl'), original = await readFile(arquivo, 'utf8')
+      const db = new Database(join(f.raiz, 'data', 'agente_window.db'))
+      db.prepare("UPDATE chat_history_origins SET state='unverifiable',root_identity=NULL WHERE session_id=?").run('legado-anterior'); db.close()
+      await f.selecionar('legado-anterior')
+      await page.getByRole('button', { name: 'Sessão legado-anterior', exact: true }).hover()
+      await page.getByRole('button', { name: 'Renomear sessão', exact: true }).click()
+      await page.getByRole('textbox', { name: 'Renomear sessão', exact: true }).fill('memoria')
+      await page.getByRole('textbox', { name: 'Renomear sessão', exact: true }).press('Enter')
+      await expect.poll(async () => (await (await page.request.get(base + '/api/sessions', { headers })).json()).sessions.find((s: { id: string }) => s.id === 'legado-anterior')?.title).toBe('memoria')
+      await f.semear('consulta-legada', 'consulta-legada'); await f.selecionar('consulta-legada'); f.buscarTitulo('memória')
+      await f.enviar('Recupere o contexto do chat memória.')
+      await expect(page.locator('.chat-message').last()).toContainText('isso não significa que o chat não exista', { timeout: 25000 })
+      expect(f.pedidos).toHaveLength(1)
+      const dialogs: string[] = []
+      page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.accept() })
+      const gerenciar = async () => {
+        await page.getByRole('textbox', { name: 'Filtrar sessões', exact: true }).fill('memoria')
+        await page.getByRole('button', { name: 'Sessão memoria', exact: true }).click({ button: 'right' })
+        await page.getByRole('menuitem', { name: 'Gerenciar acesso histórico', exact: true }).click()
+      }
+      await gerenciar()
+      await expect.poll(() => dialogs.some(s => s.includes('Consulta desta conversa autorizada'))).toBe(true)
+      expect(dialogs.some(s => s.includes('SOMENTE deste projeto') && s.includes(f.raiz))).toBe(true)
+      await f.parar(); await page.goto('about:blank'); await f.iniciar(); await f.selecionar('consulta-legada')
+      await f.enviar('Recupere o contexto do chat memória.')
+      await expect(page.getByText('Decisão confirmada na fonte: SQLite com WAL. Consulte a mensagem origem-mc1.')).toBeVisible({ timeout: 25000 })
+      const fonte = page.getByRole('button', { name: 'Abrir fonte memoria, mensagem origem-mc1', exact: true }).first()
+      await expect(fonte).toBeVisible()
+      await gerenciar()
+      await expect.poll(() => dialogs.some(s => s.includes('Autorização histórica revogada'))).toBe(true)
+      await fonte.click(); await expect(page.getByRole('alert')).toContainText('A fonte expirou')
+      await f.enviar('Recupere o contexto do chat memória.')
+      await expect(page.locator('.chat-message').last()).toContainText('isso não significa que o chat não exista', { timeout: 25000 })
+      expect(await readFile(arquivo, 'utf8')).toBe(original)
+    } finally { await f.fechar() }
+  })
+
   test('MC01/02/04/08/09/13/20: consulta ponta a ponta, fonte navegável e zero efeitos', async ({ page }) => {
     test.setTimeout(90000)
     const f = await ambiente(page)
@@ -231,17 +293,25 @@ test.describe('MC1 — histórico entre chats', () => {
     test.skip(process.env.MC1_REAL !== '1', 'Opt-in com cota autorizada; para no primeiro erro sem trocar provedor')
     test.setTimeout(150000); const f = await ambiente(page, true)
     try {
-      await f.semear('fonte-real', 'Investigação de plugins', 'Decisão do projeto sintético: SQLite com WAL. A palavra de validação desta decisão é TOPAZIO_MC1.')
+      await f.semear('fonte-real', 'memoria', 'Contexto do projeto sintético: banco SQLite com WAL. Codinome registrado: TOPAZIO_MC1.')
+      const db = new Database(join(f.raiz, 'data', 'agente_window.db'))
+      db.prepare("UPDATE chat_history_origins SET state='unverifiable',root_identity=NULL WHERE session_id=?").run('fonte-real'); db.close()
       await f.semear('atual-real', 'atual-real'); await f.selecionar('atual-real')
+      const dialogs: string[] = []
+      page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.accept() })
+      await page.getByRole('textbox', { name: 'Filtrar sessões', exact: true }).fill('memoria')
+      await page.getByRole('button', { name: 'Sessão memoria', exact: true }).click({ button: 'right' })
+      await page.getByRole('menuitem', { name: 'Gerenciar acesso histórico', exact: true }).click()
+      await expect.poll(() => dialogs.some(s => s.includes('Consulta desta conversa autorizada'))).toBe(true)
       const respostaAgir = page.waitForResponse(r => r.url().endsWith('/api/agir') && r.request().method() === 'POST', { timeout: 120000 })
-      await f.enviar('No chat Investigação de plugins, qual foi a decisão de banco e sua palavra de validação? Consulte as ferramentas de outros chats disponíveis; cite a mensagem de origem. Não leia arquivos nem execute comandos.')
+      await f.enviar('Recupere o contexto do chat memória. Resuma a decisão e informe o codinome registrado.')
       await (await respostaAgir).finished()
       expect(f.estadoReal().falhaReal).toBe('')
       await expect(page.locator('.chat-message').last()).toContainText('TOPAZIO_MC1')
-      await expect(page.getByRole('button', { name: /Abrir fonte Investigação de plugins, mensagem origem-mc1/u }).first()).toBeVisible()
+      await expect(page.getByRole('button', { name: /Abrir fonte memoria, mensagem origem-mc1/u }).first()).toBeVisible()
       await expect(page.locator('.context-usage')).toContainText('%')
       console.info('MC1_REAL_RESULTADO ' + JSON.stringify({ ...f.estadoReal(), backend: process.env.MC1_REAL_BACKEND ?? 'identidade não confirmada', gateway: 'LiteLLM local', fonte: 'fonte-real/main/origem-mc1' }))
-      await page.screenshot({ path: resolve(app, '../../../../arena-operacional/mc1-modelo-real.png') })
+      await page.screenshot({ path: resolve(app, '../../../../arena-operacional/mc1-consent-nvidia.png') })
     } finally { await f.fechar() }
   })
 })

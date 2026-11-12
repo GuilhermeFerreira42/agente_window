@@ -131,6 +131,12 @@ describe('MC1 serviço de leitura delimitada', () => {
     const f = fixture(); f.origens.delete('fonte'); f.legado()
     expect((await f.criar()(buscar())).status).toBe('scope_unverifiable')
   })
+  it('contexto geral usa somente as últimas cinco mensagens seguras, sem retornar histórico inteiro', async () => {
+    const f = fixture(); f.add('fonte', 'Investigação de plugins', Array.from({ length: 9 }, (_, i) => linha(`m${i}`, i === 7 ? 'senha=NAO_EXIBIR' : `Contexto seguro ${i}`)))
+    const a = f.criar(), r = await a(buscar()), hits = await a(mensagens(r.results[0].referencia as string, '*'))
+    expect(hits.sources.map(s => s.messageId)).toEqual(['m3', 'm4', 'm5', 'm6', 'm8'])
+    expect(hits.partial).toBe(true); expect(JSON.stringify(hits)).not.toContain('NAO_EXIBIR')
+  })
   it('MC03: nova seleção humana autoriza somente a conversa escolhida e preserva a pergunta', async () => {
     const f = fixture(); f.add('segunda', 'Investigação de plugins')
     const pergunta = '/chats Investigação de plugins: decidimos SQLite?', a = f.criar(undefined, pergunta)

@@ -85,10 +85,12 @@ describe('MC1 rota real do loop, com provedor simulado', () => {
   it('falha de armazenamento encerra a chamada sem erro bruto ou execução lateral', async () => {
     const f = deps(), fluxo = 'mc1-factory-fail', texto = '/chats plugins', instructionToken = await token(f.d, fluxo, texto)
     f.d.criarConsultaEntreChats = () => { throw new Error('senha=CANARIO_NAO_EXIBIR') }
-    provedor([tool('buscar_chats', { consulta: 'plugins' }), final]); const r = res()
+    const fetch = provedor([tool('buscar_chats', { consulta: 'plugins' }), final]); const r = res()
     await tratarRotasAgir(req({ fluxo, instructionToken, messages: [{ role: 'user', content: texto }] }), r, new URL('http://localhost/api/agir'), f.d)
     expect(r.ended).toBe(true); expect(r.corpo()).not.toContain('CANARIO_NAO_EXIBIR')
     expect(eventos(r)).toContainEqual(expect.objectContaining({ type: 'tool_result', ok: false, resumo: expect.stringContaining('origem histórica não comprovada') }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(eventos(r)).toContainEqual(expect.objectContaining({ type: 'error', message: expect.stringContaining('isso não significa que o chat não exista') }))
   })
   it('MC13: janela pequena recusa envelope antes do fetch e reduz orçamento da porta', async () => {
     const f = deps(), alvo = await f.d.obterAlvo({ tipo: 'auto' })
