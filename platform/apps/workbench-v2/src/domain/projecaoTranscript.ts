@@ -1,5 +1,6 @@
 import type { ChatMessage, FerramentaNoChat, Session } from '../types'
 import { pareceCredencial } from './memoriaProjeto'
+import { FERRAMENTAS_ENTRE_CHATS } from './consultaEntreChats'
 
 const CONTEUDO_TEMPORARIO = 'Conteúdo disponível somente durante a execução.'
 
@@ -10,7 +11,7 @@ function ferramentaPersistida(ferramenta: FerramentaNoChat, indice: number): Fer
     ferramenta.progresso !== undefined || ferramenta.resumo !== undefined
   return {
     id: `persistida-${indice}`, ferramenta: ferramenta.ferramenta, status, ordem, allowSession,
-    alvo: omitirAlvo ? 'Comando' : ferramenta.ferramenta === 'buscar' || ferramenta.ferramenta === 'historico'
+    alvo: omitirAlvo ? 'Comando' : ferramenta.ferramenta === 'buscar' || ferramenta.ferramenta === 'historico' || (FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(ferramenta.ferramenta)
       ? 'Consulta' : pareceCredencial(ferramenta.alvo) ? 'Referência omitida' : ferramenta.alvo,
     resumo: omitirDetalhes ? CONTEUDO_TEMPORARIO : undefined,
   }

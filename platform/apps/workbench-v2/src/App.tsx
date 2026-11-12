@@ -17,6 +17,8 @@ import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, p
 import { useSessionPersistence } from './services/sessions/useSessionPersistence'
 import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
+import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
+import type { FonteEntreChats } from './domain/consultaEntreChats'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
 import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
@@ -137,6 +139,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
+  const [fonteHistorica, setFonteHistorica] = useState<FonteEntreChats>()
   const [newSessionLanding, setNewSessionLanding] = useState(false)
   // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
   // a primeira da lista e a conversa "parecia" perdida.
@@ -1657,11 +1660,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onCommandWaiting: (id) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? { ...carta, status: 'aguardando_continuacao' } : carta))
       },
-      onToolResult: (id, ferramenta, ok, resumo, efeitoIniciado) => {
+      onToolResult: (id, ferramenta, ok, resumo, efeitoIniciado, fontesHistoricas, escolhasHistoricas) => {
         mexerFerramentas(sessionId, chatId, responseId, (cartoes) => cartoes.map((carta) => carta.id === id ? {
           ...carta,
           status: ok ? 'ok' : resumo.includes('dono negou') ? 'negado' : 'erro',
           resumo,
+          ...(fontesHistoricas?.length ? { fontesHistoricas } : {}),
+          ...(escolhasHistoricas?.length ? { escolhasHistoricas } : {}),
         } : carta))
         // O agente escreveu/apagou no disco: o Explorer mostra sem precisar resselecionar.
         if ((ok || efeitoIniciado) && (ferramenta === 'criar' || ferramenta === 'escrever' || ferramenta === 'excluir')) {
@@ -2200,6 +2205,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     return (
       <ChatPanel
         session={session}
+        mensagemHistorica={fonteHistorica?.sessionId === session.id && fonteHistorica.chatId === sessionChatId ? fonteHistorica : undefined}
+        onAbrirFonteHistorica={async referencia => {
+          const fonte = await validarFonteEntreChats(session.id, sessionChatId, referencia)
+          if (!sessions.some(s => s.id === fonte.sessionId && s.chats.some(c => c.id === fonte.chatId && c.messages.some(m => m.id === fonte.messageId)))) throw new Error('Fonte não carregada nesta janela. Recarregue a aplicação e consulte novamente.')
+          selectSession(fonte.sessionId)
+          setActiveChatBySession(current => ({ ...current, [fonte.sessionId]: fonte.chatId }))
+          setFonteHistorica(fonte)
+        }}
         activeChatId={sessionChatId}
         model={modelByChat[sessionChatKey] ?? selectedModel}
         mode={modeByChat[sessionChatKey] ?? selectedMode}

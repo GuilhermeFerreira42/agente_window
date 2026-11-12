@@ -1,3 +1,4 @@
+import type { FerramentaEntreChats, FonteEntreChats, EscolhaEntreChats } from './domain/consultaEntreChats'
 export type SessionStatus = 'untitled' | 'working' | 'needs-input' | 'completed' | 'error'
 export type SessionSection = 'pinned' | 'today' | 'yesterday' | 'lastWeek' | 'older' | 'archived'
 export type ChatStatus = SessionStatus
@@ -14,8 +15,10 @@ export type BrowserStatus = 'loading' | 'ready' | 'error'
 
 /** Cartão de ferramenta do agente (FATIA 10) preso a uma resposta do chat. */
 export interface FerramentaNoChat {
+  fontesHistoricas?: FonteEntreChats[]
+  escolhasHistoricas?: EscolhaEntreChats[]
   id: string
-  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico'
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | FerramentaEntreChats
   /** Caminho (ou padrão de busca) mostrado no cartão. */
   alvo: string
   /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */

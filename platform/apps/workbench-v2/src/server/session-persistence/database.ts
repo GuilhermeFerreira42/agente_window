@@ -19,7 +19,8 @@ export interface SessionRecord {
 
 let database: Database.Database | undefined
 
-function getDatabase(): Database.Database {
+/** Internal persistence connection; repositories in this module share one owner/transaction. */
+export function getDatabase(): Database.Database {
   if (database) return database
   const databasePath = getDatabasePath()
   mkdirSync(dirname(databasePath), { recursive: true })

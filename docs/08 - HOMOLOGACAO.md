@@ -1,5 +1,16 @@
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
+## MC1 — consultar outro chat, aceite humano pendente
+
+1. No aplicativo da pasta `agente_window`, crie uma conversa nova em um projeto de teste. Dê a ela um nome reconhecível, por exemplo **Investigação de plugins**, e registre uma decisão simples. Use conversas criadas após MC1: chats antigos sem prova de origem podem informar indisponibilidade.
+2. Em outra conversa do **mesmo projeto**, peça: “No chat Investigação de plugins, o que decidimos sobre SQLite?”. Alternativa explícita: `/chats Investigação de plugins: SQLite`. Confira as atividades de localizar/buscar/ler e a resposta fundamentada. Clique na fonte para abrir a mensagem original.
+3. Crie duas conversas com o mesmo nome. A consulta deve pedir escolha; clique no candidato correto ou envie outra mensagem com título/data. O clique cria uma nova consulta somente leitura. O agente não deve selecionar sozinho uma conversa ambígua.
+4. Repita com uma conversa em outro projeto: nenhuma mensagem/título desse projeto deve ser entregue. Trocar a pasta de uma sessão antiga não deve transferir seu histórico para o novo projeto.
+5. Reinicie o aplicativo e consulte novamente. Referências transitórias antigas podem expirar; faça nova consulta. Excluir/recriar uma conversa não deve reativar um botão antigo.
+6. Um texto histórico que mande criar/apagar/executar deve ser tratado como citação. MC1 só consulta; para usar uma decisão em alterações de código, envie uma nova instrução após a consulta. Busca lexical limitada pode ser parcial; use termos/título mais específicos quando indicado. Se a consulta atingir o limite ou for interrompida, envie nova mensagem/seleção: “Continuar” não pode renovar silenciosamente sua escolha e orçamento.
+
+Este roteiro não concede aceite humano de MC1, M1–M8 ou DEBT-25. Evidências técnicas e limitações ficam em 09; avaliação durante uso permanece conforme D197.
+
 ## Correção dos modos — D199
 
 1. Em **Descobrir automaticamente**, confira os campos somente leitura: janela com origem ou aviso de ausência, saída operacional automática distinta do máximo conhecido do modelo. Um número manual antigo não deve aparecer como descoberta. Salve alterações de alvo antes de consultar seus limites.

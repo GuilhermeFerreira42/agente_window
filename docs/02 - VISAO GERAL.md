@@ -59,6 +59,8 @@ As capacidades abaixo descrevem o que o produto deverá permitir ao usuário. S�
 | CAP-19 | Verificação técnica e testes | Apoiar a escolha e a execução de verificações pertinentes e relatar com clareza o que passou, falhou, não foi executado ou permanece inconclusivo. |
 | CAP-20 | Assistência integral ao ciclo de desenvolvimento de software | Auxiliar no ciclo completo de desenvolvimento de **qualquer projeto de software**. Isso inclui o próprio repositório do Agente Window como um exemplo, não como função especial de autodesenvolvimento. |
 
+**CAP-08 / MC1 / D200:** consulta sob pedido humano a outros chats do mesmo projeto, por título/conteúdo e trechos com fontes verificáveis. É leitura histórica transitória; não cria memória de projeto nem concede ações. M6 continua restrita ao chat atual. Legado sem origem comprovada permanece indisponível; estado técnico e limites em 03/09, roteiro humano em 08.
+
 ### 1.4 Cenários de aceitação da visão V1.0
 Estes cenários descrevem resultados observáveis esperados da visão final. São referências para avaliar a cobertura da V1.0; não declaram que os cenários já tenham sido implementados, testados ou homologados.
 

@@ -5,12 +5,18 @@
 // nada). Um jeito por protocolo (Q4=(b), D93), sempre com o MESMO catálogo.
 // ============================================================================
 import type { ProtocoloAgir } from '../contract'
-import { catalogoFerramentas, ferramentaHistorico } from './ferramentas'
+import { catalogoFerramentas, ferramentaHistorico, ferramentasEntreChats } from './ferramentas'
 
 /** JSON Schema dos argumentos, ferramenta a ferramenta. */
 function esquemaDe(id: string): Record<string, unknown> {
   const caminho = { type: 'string', description: 'Caminho do arquivo/pasta DENTRO da pasta de trabalho (relativo ou absoluto).' }
   switch (id) {
+    case 'buscar_chats':
+      return { type: 'object', properties: { consulta: { type: 'string', maxLength: 120 }, apos: { type: 'integer', minimum: 0 }, ate: { type: 'integer', minimum: 0 } }, required: ['consulta'], additionalProperties: false }
+    case 'buscar_mensagens_chat':
+      return { type: 'object', properties: { referencia: { type: 'string', maxLength: 80 }, consulta: { type: 'string', maxLength: 120 } }, required: ['referencia', 'consulta'], additionalProperties: false }
+    case 'ler_trecho_chat':
+      return { type: 'object', properties: { referencia: { type: 'string', maxLength: 80 }, antes: { type: 'integer', minimum: 0, maximum: 3 }, depois: { type: 'integer', minimum: 0, maximum: 3 } }, required: ['referencia'], additionalProperties: false }
     case 'historico':
       return {
         type: 'object', properties: {
@@ -58,6 +64,7 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir, permitidas?: reado
     ? catalogoFerramentas.filter((f) => permitidas.includes(f.id))
     : catalogoFerramentas
   if (permitidas?.includes('historico')) ferramentas.push(ferramentaHistorico)
+  if (permitidas) ferramentas.push(...ferramentasEntreChats.filter(f => permitidas.includes(f.id)))
   if (protocolo === 'anthropic') {
     return {
       tools: ferramentas.map((f) => ({

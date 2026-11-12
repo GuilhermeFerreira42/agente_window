@@ -258,6 +258,8 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
         ferramenta: pedido.ferramenta,
         ok: resultado.ok,
         resumo: resultado.resumo,
+        ...(resultado.fontesHistoricas?.length ? { fontesHistoricas: resultado.fontesHistoricas } : {}),
+        ...(resultado.escolhasHistoricas?.length ? { escolhasHistoricas: resultado.escolhasHistoricas } : {}),
         ...(resultado.efeitoIniciado ? { efeitoIniciado: true } : {}),
       })
 

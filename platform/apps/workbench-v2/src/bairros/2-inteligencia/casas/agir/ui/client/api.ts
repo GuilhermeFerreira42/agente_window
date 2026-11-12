@@ -11,6 +11,7 @@ import type {
   NivelPermissaoAgir,
 } from '../../contract'
 import { criarFramerSSE } from '../../server/vizinho'
+import type { FonteEntreChats, EscolhaEntreChats } from '../../../../../../domain/consultaEntreChats'
 
 export interface DetalheErroAgir {
   retomavel?: boolean
@@ -24,7 +25,7 @@ export interface OuvintesAgir {
   onContextUsage?: (medicao: Extract<EventoAgir, { type: 'context_usage' }>['medicao']) => void
   onChunk: (texto: string) => void
   onTool: (pedido: PedidoFerramenta) => void
-  onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string, efeitoIniciado?: boolean) => void
+  onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string, efeitoIniciado?: boolean, fontesHistoricas?: FonteEntreChats[], escolhasHistoricas?: EscolhaEntreChats[]) => void
   onApproval: (pedido: PedidoFerramenta, previa?: string, allowSession?: boolean) => void
   onToolProgress?: (id: string, text: string) => void
   onCommandWaiting?: (id: string) => void
@@ -118,7 +119,10 @@ async function bombearFio(
         else if (evento.type === 'context_usage') ouvintes.onContextUsage?.(evento.medicao)
         else if (evento.type === 'memory_status') ouvintes.onMemoryStatus?.(evento)
         else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
-        else if (evento.type === 'tool_result') ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo, evento.efeitoIniciado)
+        else if (evento.type === 'tool_result') {
+          if (evento.fontesHistoricas?.length || evento.escolhasHistoricas?.length) ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo, evento.efeitoIniciado, evento.fontesHistoricas, evento.escolhasHistoricas)
+          else ouvintes.onToolResult(evento.id, evento.ferramenta, evento.ok, evento.resumo, evento.efeitoIniciado)
+        }
         else if (evento.type === 'approval') ouvintes.onApproval(evento.pedido, evento.previa, evento.allowSession)
         else if (evento.type === 'tool_progress') ouvintes.onToolProgress?.(evento.id, evento.text)
         else if (evento.type === 'command_waiting') ouvintes.onCommandWaiting?.(evento.id)

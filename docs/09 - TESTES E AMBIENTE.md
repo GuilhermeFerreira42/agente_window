@@ -1,3 +1,74 @@
+# MC1 — consulta entre chats, validação em 12/11/2026
+
+Base reproduzível `49692ef`, branch `arena`, somente pasta `agente_window`. Requisitos da proposta externa adaptados em 06/D200 antes da entrega. Logs/artefatos desta rodada ficam fora do repositório, em `C:/Users/Usuario/Desktop/arena/arena-operacional`, prefixo `mc1-`; nenhuma fixture usa dados pessoais. Código/testes no repositório permitem repetir os cenários. Homologação humana permanece pendente.
+
+**Inventário e arquitetura.** O catálogo anterior guardava pasta mutável e JSONL por sessão com múltiplos chats, sem prova imutável da origem. MC1 acrescenta proveniência no SQLite existente; M6, busca manual, memórias confirmadas e checkpoints mantêm seus donos. Declarações de “mesmo projeto” são verificadas no servidor por raiz canônica/física, perfil local, incarnação e digest. Caso legado sem prova não é migrado por conveniência. Um perfil continua tendo um servidor escritor; não foi implementada autenticação multiusuário ou escrita multiprocesso.
+
+**Referências consultadas, sem copiar código:** [Open WebUI: busca de histórico](https://docs.openwebui.com/features/chat-conversations/chat-features/history-search/), [ferramentas oficiais no repositório](https://github.com/open-webui/open-webui/blob/main/backend/open_webui/tools/builtin.py) e [LibreChat: search](https://www.librechat.ai/docs/features/search). A consulta em 12/11/2026 fundamentou localizar→selecionar→ler e checagem de titularidade. Não é teste dessas aplicações nem importação de seus mecanismos/licenças. Meilisearch/embeddings foram rejeitados nesta V1 diante do benchmark limitado abaixo.
+
+### Matriz executada
+
+| Grupo | Provas e resultado | Evidência operacional |
+|---|---|---|
+| MC01/02 | Título/conteúdo lexical, fonte→mensagem→vizinhança, ranking literal e whitespace | serviço/domínio + Playwright MC1 |
+| MC03/14 | Títulos duplicados, referência ambígua bloqueada, filtro inventado recusado, nova seleção humana | serviço/rota + Playwright MC1 |
+| MC04/05/07/17 | Outro projeto, ID/caminho/handle inventado, requester/fonte/perfil/raiz física, legado e relink A→B→A | serviço/origens/rota |
+| MC06/18 | Exclusão/recriação fonte e solicitante; escolha expirada/forjada; digest alterado depois da busca | serviço/origens + exclusão durante E2E |
+| MC08/09 | Segredos/títulos, eventos/ferramentas/anexos/parciais omitidos; prompt injection sem efeitos mesmo allow-all | serviço/rota, projeção M2, E2E não cria sentinela |
+| MC10 | Arquivo inválido, fonte grande, falha JSONL→SQLite e catálogo indisponível | origens/rota + JSONL inválido e 17 MiB em E2E isolado |
+| MC11/15 | Concorrência sob fila, alteração após await, abort/deadline, reinício real e interrupção de consulta | serviço + processos descartáveis E2E |
+| MC12 | Chat atual excluído sem simular memória de outra conversa | serviço |
+| MC13 | Corte de bytes, janela 512 recusa envelope antes do fetch, janela 32K com trechos truncados e uso no compositor; teto/HTTP não renovam consulta por Continuar | serviço/rota + E2E MC1 |
+| MC16 | 100/1.000/10.000 chats, 12 rodadas por tipo, p50/p95, leituras/bytes/RSS | `entreChatsBenchmark.test.ts`, log `mc1-benchmark*` |
+| MC19 | Regressão nominal M1–M8/DEBT-25, tipos/build/lint, Playwright antigo integrado | gates consolidados abaixo |
+| MC20 | NVIDIA real via LiteLLM: decisão e TOPAZIO_MC1, fontes no cartão e uso reportado | `mc1-nvidia-real.log`, `mc1-modelo-real.png` |
+
+### Modelo real e falhas intermediárias
+
+O proprietário inicialmente autorizou Google pelo LiteLLM existente. Metadados seguros anunciaram Gemini 2.5 Flash no alias `meu-pool`, sem ler/copiar credenciais. As primeiras provas revelaram: negativa sobre arquivos confundida com negativa sobre chats; pergunta longa usada como substring literal, sem encontrar decisão presente. Ambos foram corrigidos e ganharam testes. A terceira prova terminou sem texto/ferramenta com reserva de 512; não se atribui causalidade comprovada ao raciocínio. No ensaio com 2.048, a resposta não terminou em 45 segundos. As chamadas reais foram suspensas e o dono avisado; não houve HTTP 429 nem troca automática de provedor. Esses ensaios Google **não foram aprovados**.
+
+Depois, o proprietário trocou explicitamente o gateway para NVIDIA e autorizou retomar. `/model/info` anunciou `openai/nvidia/nemotron-3.5-lightning-30b-a3b` no host oficial para `meu-pool` e outros aliases; o nome comercial do alias não foi tratado como identidade. A prova pela interface passou em 36,3 s, **cinco chamadas ao modelo**, máximo 2.048 por chamada e no máximo seis chamadas permitidas pelo proxy de teste. Última chamada: entrada 1.814, saída 379 tokens; soma de uso reportado nos cinco pedidos: 7.555 tokens, incluindo entradas repetidas e raciocínio reportado. Fonte `fonte-real/main/origem-mc1` e palavra TOPAZIO_MC1 verificadas. Nenhum segredo foi transmitido a outro serviço, nenhuma configuração pessoal foi alterada. Isto comprova esse fluxo curto; não promete paridade de todos os modelos ou busca semântica perfeita.
+
+Na inspeção visual dessa imagem, o botão de fonte herdava a largura de 24 px dos botões de ícone. Corrigiram-se somente fontes/escolhas dentro do cartão existente, com largura/altura pelo conteúdo e quebra adequada. O E2E passou a verificar largura utilizável, conteúdo contido no cartão e clique funcional. A bateria MC1 completa depois desse ajuste e do bloqueio de Continuar passou **9/9**, incluindo oito cenários determinísticos e nova prova NVIDIA real: quatro chamadas, 18,3 s; última entrada 1.657/saída 461; total reportado 5.846 tokens. Logs `mc1-complete-e2e.log` e imagem final `mc1-modelo-real.png`. As duas provas NVIDIA somam nove chamadas e 13.401 tokens reportados; não confundir soma faturável de chamadas com ocupação da janela atual. O cartão de fonte validado no servidor é a autoridade de navegação, não um identificador que o modelo escreva livremente no texto.
+
+A revisão independente estática detectou e levou à correção de vazamento da pergunta em escolha inválida/TOCTOU, filtro de data que contornava ambiguidade, emissão de referências sem registro, incarnação/ausência de origem do solicitante, varredura incompleta e reset por `/continuar`. Foi inspeção independente de contratos/código/testes, **não auditoria independente da execução**. O último desvio teve dois testes vermelhos (Continuação retornava 200), verdes após recusar retomada MC1 e orientar nova mensagem, sem alterar as continuações normais. A lacuna MC13 motivou o teste integrado de janela pequena/contabilização.
+
+O teste de interrupção mostrou uma diferença real no JSONL de origem: autosaves normais recalculavam timestamps. `mc1-stable-source-red.log` reproduz a falha; `mc1-stable-source-green.log` prova a preservação das datas já publicadas, reutilizando a leitura existente sob fila. A primeira regressão também encontrou 43 falhas: as 42 históricas mais o contrato de indentação da nova spec E2E; organizou-se a spec no padrão existente, sem enfraquecer o teste contratual. Outras falhas das primeiras fixtures foram parser de resultado negado no provedor simulado e DELETE sem JSON/same-origin completo; foram corrigidas nas fixtures, preservando as proteções do produto.
+
+### Limites que o teste não elimina
+
+Busca de conteúdo é lexical, local e limitada a candidatos/bytes/tempo; pode omitir conversas antigas e deve sinalizar parcialidade. Títulos têm prioridade no índice de metadados; não há FTS ou busca semântica global. Histórico legado sem proveniência comprovada permanece indisponível. Mudança física de diretório/perfil não importa autoridade. Referências e escolhas expiram em dez minutos e desaparecem no reinício; é necessário consultar novamente. M2 omite os dados recuperados/tickets; a resposta normal do assistente pode preservar a decisão citada. A navegação depende de a fonte ainda existir e estar carregada; não sobrescreve estado local para forçar abertura. Testes adversos ocorreram somente em repositórios/perfis descartáveis. A aprovação técnica não substitui o uso/homologação humana D197.
+
+### Gates finais e reprodução
+
+| Gate | Resultado observado | Log/artefato em arena-operacional |
+|---|---|---|
+| Tipos | Aprovado, exit 0, após ajuste visual | `mc1-types-final.log` |
+| Build completo | Aprovado, exit 0, após ajuste visual; avisos existentes CSS/chunks e boundary nativa deliberadamente desativada preservados | `mc1-build-final.log` |
+| Focados + benchmark | **77/77**, oito arquivos, 26,99 s; inclui 76 testes de domínio/serviço/rota/UI/persistência/contrato e um benchmark | `mc1-focused-benchmark-delivery.log` |
+| Regressão completa após ajuste visual final | **1.660 aprovados, 42 falhas preexistentes, 31 ignorados**, 180 arquivos, 165,05 s | `mc1-regression-ui-final.log` |
+| Comparação nominal | **42 × 42, zero novas/ausentes**, contra `49692ef` e o registro D199 | `mc1-regression-comparison.json`, baseline `modes-baseline.json` |
+| Playwright MC1 final | **9 aprovados, nenhum ignorado**, oito determinísticos + um real NVIDIA, 1,4 min | `mc1-complete-e2e.log` |
+| Playwright existente M1–M8/DEBT-25 | **24 aprovados, 1 Ollama opcional ignorado**, 1,6 min; inclui crash real M7 e duas conversas simultâneas | `mc1-integrated-e2e.log` |
+| NVIDIA via LiteLLM | **Duas provas aprovadas**, cinco e quatro chamadas respectivamente; a segunda integra o 9/9 final | `mc1-nvidia-real.log`, `mc1-complete-e2e.log`, `mc1-modelo-real.png` |
+| Lint | 350 ocorrências globais preexistentes, nenhuma nova por comparação dos arquivos alterados contra HEAD; inclui artefatos gerados. Não é lint global verde | `mc1-lint-comparison.json`, `mc1-lint-final.log` |
+
+Fingerprint SHA-256 dos 42 nomes normalizados/ordenados de falhas: `21125c95eedad4b8de521fc05992eecba4093950f8491db45d771230cb5d406d`. A suíte global não está inteiramente verde: falhas de fixtures Windows/POSIX, Git/caminhos, fronteiras e estados visuais seguem identificadas nominalmente, sem reclassificar erro novo como legado. O 31.º ignorado é o benchmark opt-in, executado com aprovação na bateria focada; os 30 anteriores permanecem. Não houve ENOSPC nesta rodada; C: tinha 9,39 GiB livres na conferência após o build. Os perfis dos três runs globais foram removidos pelo executor oficial, verificados como ausentes; nenhum dado pessoal foi apagado.
+
+O aplicativo principal em 5174 foi preservado. Sonda somente leitura da nova rota de fontes com IDs inexistentes retornou 403, confirmando rota carregada e recusa segura, sem ler conversas reais. Servidores descartáveis próprios de 5205/5210/5211 foram encerrados pelos respectivos executores; LiteLLM e Ollama não foram reiniciados nem reconfigurados por esta implementação.
+
+Benchmark final, com JSONLs sintéticos curtos e cache de filesystem normal, 12 amostras por modo/tamanho:
+
+| Chats | Título exato p50/p95 (ms) | Conteúdo com hits p50/p95 (ms) | Ausente p50/p95 (ms) | Resultado ausente |
+|---|---|---|---|---|
+| 100 | 1,07 / 3,10 | 11,53 / 14,63 | 93,15 / 99,92 | `not_found`, todo catálogo examinado |
+| 1.000 | 1,09 / 1,22 | 12,55 / 16,40 | 187,44 / 200,59 | `partial`, até 200 candidatos |
+| 10.000 | 3,43 / 3,75 | 23,61 / 37,81 | 193,24 / 209,48 | `partial`, até 200 candidatos |
+
+Título não leu JSONL. Nas 12 consultas de conteúdo em 10.000 chats foram 132 leituras/22.800 bytes; no cenário ausente, 2.400 leituras/421.056 bytes agregados. São bytes lógicos de `readFile`, não medição de tráfego físico de disco. RSS observado no processo de teste ficou entre 77,6 e 160,9 MiB, incluindo geração da fixture e conexão SQLite; não é custo líquido por consulta nem promessa para conversas grandes. Esses dados sustentam índice de metadados + varredura limitada nesta V1, preservando parcialidade em vez de varredura ilimitada. Arquivos grandes têm provas próprias de recusa.
+
+Receita oficial: Node fixado em `platform/.runtime`, `project.mjs test/typecheck/build`. Para testes MC1, selecionar arquivos `consultaEntreChats`, `origensChats`, `CartaoHistorico`, `consultaEntreChatsRotas`, `session-persistence/index.test.ts` e `e2eAssertionContract`. Benchmark é opt-in `MC1_BENCH=1` com o executor oficial, que exige perfil descartável; nunca apontar dados pessoais. Playwright novo: `MC1_E2E=1`, `MC1_REAL=0`, CLI Playwright com `e2e/mc1_entre_chats.spec.ts --workers=1`; cria seus próprios perfis/processos em 5211 e preserva o servidor do usuário em 5174. A bateria 9/9 e a regressão final sucedem o fix M2, o bloqueio de Continuar MC1 e a correção visual de fontes/escolhas. Prova real exige também `MC1_REAL=1`, gateway local em 4000 sem chave mestre e backend autorizado confirmado; interromper no primeiro erro sem trocar o backend. Não há credencial real no spec. Identificadores livres no texto do modelo não concedem acesso; o cartão/navegação revalidado no servidor é a referência verificável.
+
 # Correção D199 — modos de contexto (11/11/2026)
 
 Base `6881090`, branch `arena`, somente cópia `agente_window`. A imagem do uso humano expôs a reserva 204.800 maior que a janela manual 128.000, a ambiguidade de um campo manual editável em Auto e classificação local como HTTP/timeout. Solução/contratos em D199, SPEC em 06, roteiro em 08. Evidências externas com prefixo `modes-`, sem alterações em credenciais/configuração pessoais ou na cópia `arena_agente_window`.

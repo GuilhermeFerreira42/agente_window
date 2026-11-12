@@ -32,6 +32,8 @@ import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, propor
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
 import { recuperarHistorico } from './recuperarHistorico'
+import { prepararOrigens, publicarCatalogoComOrigens, invalidarOrigensForaDaRaiz } from './origensChats'
+import { criarConsultaEntreChats, abrirFonteEntreChats } from './consultaEntreChats'
 import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional } from './retomadaOperacional'
 import { criarMemoriaAutomatica, selecionarMemorias, type EscopoMemoria, type FonteMemoria } from './memoriaAutomatica'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
@@ -123,7 +125,9 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
   response.end(JSON.stringify(value))
 }
 
-function transcriptEntries(session: Session): TranscriptEntry[] {
+function transcriptEntries(session: Session, anteriores: TranscriptEntry[]): TranscriptEntry[] {
+  const publicados = new Map(anteriores.filter(e => e.type !== 'agir_event')
+    .map(e => [JSON.stringify([e.chatId, e.uuid, e.type]), e.timestamp]))
   let timestamp = Date.now() - session.chats.reduce((total, chat) => total + chat.messages.length, 0)
   return session.chats.flatMap((chat) => chat.messages
     // Respostas ainda em streaming são estado transitório de UI. Persisti-las
@@ -134,7 +138,7 @@ function transcriptEntries(session: Session): TranscriptEntry[] {
       chatId: chat.id,
       message: projetarMensagemPersistida(message),
       uuid: message.id,
-      timestamp: timestamp += 1,
+      timestamp: publicados.get(JSON.stringify([chat.id, message.id, message.role])) ?? (timestamp += 1),
     })))
 }
 
@@ -464,10 +468,13 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
     const nextActivePath = session.worktreePath || session.workspacePath
     const slug = session.slug || sanitizePath(session.workspacePath)
     const now = Date.now()
-    const entries = transcriptEntries(session)
     const chatIds = new Set(session.chats.map((chat) => chat.id))
-    const eventos = existing ? (await readTranscript(existing.slug, session.id))
-      .filter((entry) => entry.type === 'agir_event' && chatIds.has(entry.chatId)) : []
+    const anteriores = existing ? await readTranscript(existing.slug, session.id) : []
+    const entries = transcriptEntries(session, anteriores)
+    const eventos = anteriores.filter((entry) => entry.type === 'agir_event' && chatIds.has(entry.chatId))
+    const pastaOrigem = validateWorkspacePath(nextActivePath)
+    const planosOrigem = prepararOrigens(session, existingSession, anteriores,
+      pastaOrigem.valid && pastaOrigem.exists && pastaOrigem.isDir ? pastaOrigem.realpath : null)
     const committedSession: Session = { ...session, slug, persistenceRevision }
     const metadata: Session = {
       ...committedSession,
@@ -480,7 +487,7 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
     // prior record intact. The queue commits saves in admission order.
     await writeTranscript(slug, session.id, [...entries, ...eventos])
     if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
-    upsertSessionRecord({
+    publicarCatalogoComOrigens({
       id: session.id,
       slug,
       title: session.title,
@@ -490,7 +497,7 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
       createdAt: session.createdSeq ?? now,
       updatedAt: now,
       sessionJson: JSON.stringify(metadata),
-    })
+    }, planosOrigem, entries)
     if (existingSession?.chats.some((chat) => !chatIds.has(chat.id))) removerCheckpointsDeChatsAusentes(session.id, [...chatIds])
     return { saved: true, session: committedSession }
   })
@@ -503,6 +510,18 @@ async function saveSession(session: Session, clientSnapshot = false): Promise<{ 
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+
+  if (url.pathname === '/api/sessions/other-chat-source' && request.method === 'POST') {
+    const input = await readJson<{ sessionId: string; chatId: string; referencia: string }>(request)
+    const contexto = resolverContextoAgir(input.sessionId, input.chatId)
+    if (!contexto.ok || typeof input.referencia !== 'string' || input.referencia.length > 80) {
+      sendJson(response, 403, { message: 'Fonte histórica indisponível neste contexto.' }); return true
+    }
+    const fonte = await abrirFonteEntreChats({ sessionId: input.sessionId, chatId: input.chatId, raiz: contexto.raiz }, input.referencia, withSessionPersistenceQueue)
+    if (!fonte) sendJson(response, 403, { message: 'A fonte expirou, mudou ou não pertence mais ao projeto acessível. Consulte novamente.' })
+    else sendJson(response, 200, { fonte })
+    return true
+  }
 
   if (url.pathname === '/api/sessions/checkpoint' && request.method === 'GET') {
     const sessionId = url.searchParams.get('sessionId') ?? '', chatId = url.searchParams.get('chatId') ?? ''
@@ -564,6 +583,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         worktreePath: null, branch: null, persistenceRevision: revision,
       }
       revokeSessionToolGrants(record.id)
+      const pastaOrigem = validateWorkspacePath(workspace.path)
+      invalidarOrigensForaDaRaiz(record.id, pastaOrigem.valid && pastaOrigem.exists && pastaOrigem.isDir ? pastaOrigem.realpath : null)
       upsertSessionRecord({
         ...record, workspacePath: workspace.path, worktreePath: null,
         updatedAt: Date.now(), sessionJson: JSON.stringify(metadata),
@@ -604,6 +625,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       comporContexto: comporContextoDePersonalizacoes,
       gravarExecucao: gravarExecucaoAgir,
       prepararChamada: prepararChamadaAutomatica,
+      criarConsultaEntreChats: (contexto, sinal, orcamentoBytes, textoHumano) => criarConsultaEntreChats(contexto, { sinal, orcamentoBytes, textoHumano, serializar: withSessionPersistenceQueue }),
       recuperarMemoriaProjeto: (contexto, consulta) => withSessionPersistenceQueue(contexto.sessionId, async () => {
         await lerFonteMemoria(contexto)
         const hits = selecionarMemorias(listarMemoriasProjeto(chaveEscopo(contexto.raiz.normalize('NFC'))), consulta)

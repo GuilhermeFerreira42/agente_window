@@ -160,6 +160,17 @@ describe('session persistence HTTP contract', () => {
     }
   })
 
+  it('MC1: resalvar snapshot não muda datas das mensagens já publicadas', async () => {
+    const id = `mc1-stable-date-${randomUUID()}`, session = makeSession(id, id, 'stable-date')
+    touched.push({ id, slug: id })
+    expect((await putSession(server, session)).ok).toBe(true)
+    const antes = await readTranscript(id, id)
+    await new Promise<void>(ok => setTimeout(ok, 5))
+    session.title = 'Título atualizado'; session.persistenceRevision = 2
+    expect((await putSession(server, session)).ok).toBe(true)
+    expect(await readTranscript(id, id)).toEqual(antes)
+  })
+
   it('persists tool states and references without storing transient content', async () => {
     const id = `memory-privacy-${randomUUID()}`
     const session = makeSession(id, id, 'privacy')

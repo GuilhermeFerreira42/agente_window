@@ -20,6 +20,7 @@ import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
+import type { FonteEntreChats } from '../domain/consultaEntreChats'
 import { ChatInput, selecaoDoToken } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
 import { MemoriaProjeto } from './MemoriaProjeto'
@@ -36,6 +37,8 @@ const modeLabels: Record<string, string> = {
 }
 
 interface ChatPanelProps {
+  onAbrirFonteHistorica?: (referencia: string) => Promise<void>
+  mensagemHistorica?: FonteEntreChats
   session: Session
   activeChatId: string
   model: string
@@ -184,6 +187,8 @@ function createMarkdownComponents(onCopy: () => void): Components {
 }
 
 function MessageRow({
+  onAbrirFonteHistorica,
+  onEscolherHistorico,
   message,
   onCopy,
   onCopyAll,
@@ -196,6 +201,8 @@ function MessageRow({
   onDecidirContinuar,
   canRegenerate,
 }: {
+  onAbrirFonteHistorica?: (referencia: string) => Promise<void>
+  onEscolherHistorico?: (referencia: string) => void
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onDecidirAguardarComando: (ferramentaId: string, decisao: 'continuar' | 'parar') => void
@@ -245,6 +252,8 @@ function MessageRow({
                   <CartaoFerramenta
                     key={carta.id}
                     carta={carta}
+                    onAbrirFonte={onAbrirFonteHistorica}
+                    onEscolherHistorico={onEscolherHistorico}
                     onDecidir={carta.status === 'aguardando' ? (decisao) => onDecidirFerramenta(carta.id, decisao) : undefined}
                     onDecidirContinuacao={carta.status === 'aguardando_continuacao' ? (decisao) => onDecidirAguardarComando(carta.id, decisao) : undefined}
                   />
@@ -308,6 +317,8 @@ function ChatWelcome({ onPrompt }: { onPrompt: (prompt: string) => void }) {
 }
 
 export function ChatPanel({
+  onAbrirFonteHistorica,
+  mensagemHistorica,
   session,
   activeChatId,
   model,
@@ -357,6 +368,9 @@ export function ChatPanel({
     elemento.focus({ preventScroll: true })
     return true
   }
+  useEffect(() => {
+    if (mensagemHistorica) abrirResultado(mensagemHistorica.messageId)
+  }, [mensagemHistorica, activeChat.id])
   const aoRolar = (): void => {
     const el = listaRef.current
     if (!el) return
@@ -414,6 +428,8 @@ export function ChatPanel({
             <MessageRow
               key={message.id}
               message={message}
+              onAbrirFonteHistorica={onAbrirFonteHistorica}
+              onEscolherHistorico={activeChat.status === 'working' ? undefined : referencia => onSend(`/chats selecionar ${referencia}`, [], selecaoDoToken(model))}
               onCopy={(messageId, kind) => onCopy(activeChat.id, messageId, kind)}
               onCopyAll={() => onCopyAll(activeChat.id)}
               onCopyFinalResponse={() => onCopyFinalResponse(activeChat.id, message.id)}

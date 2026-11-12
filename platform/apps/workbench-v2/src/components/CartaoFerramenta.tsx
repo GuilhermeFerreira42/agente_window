@@ -6,6 +6,10 @@
 // cartão é cirúrgico e não inventa token novo.
 // ============================================================================
 import type { FerramentaNoChat } from '../types'
+import { useState } from 'react'
+
+const historyButtonStyle = { width: 'auto', height: 'auto', maxWidth: '100%', minWidth: 0, padding: '4px 6px',
+  whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'left', justifyContent: 'flex-start', lineHeight: 1.4 } as const
 
 const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   ler: 'Ler arquivo',
@@ -16,6 +20,9 @@ const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   excluir: 'Excluir (lixeira)',
   executar: 'Executar comando',
   historico: 'Recuperar histórico do chat',
+  buscar_chats: 'Localizar outros chats',
+  buscar_mensagens_chat: 'Buscar mensagens em outro chat',
+  ler_trecho_chat: 'Ler trecho de outro chat',
 }
 
 const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {
@@ -39,12 +46,15 @@ const COR_STATUS: Record<FerramentaNoChat['status'], string> = {
 }
 
 export interface CartaoFerramentaProps {
+  onAbrirFonte?: (referencia: string) => Promise<void>
+  onEscolherHistorico?: (referencia: string) => void
   carta: FerramentaNoChat
   onDecidir?: (decisao: 'permitir' | 'negar' | 'sessao') => void
   onDecidirContinuacao?: (decisao: 'continuar' | 'parar') => void
 }
 
-export function CartaoFerramenta({ carta, onDecidir, onDecidirContinuacao }: CartaoFerramentaProps) {
+export function CartaoFerramenta({ carta, onDecidir, onDecidirContinuacao, onAbrirFonte, onEscolherHistorico }: CartaoFerramentaProps) {
+  const [erroFonte, setErroFonte] = useState('')
   const cor = COR_STATUS[carta.status]
   return (
     <div
@@ -101,6 +111,24 @@ export function CartaoFerramenta({ carta, onDecidir, onDecidirContinuacao }: Car
       {carta.resumo && carta.status !== 'aguardando' && carta.status !== 'aguardando_continuacao' && (
         <div style={{ marginTop: 4, opacity: 0.85 }}>{carta.resumo}</div>
       )}
+      {!!carta.fontesHistoricas?.length && <div role="list" aria-label="Fontes de outros chats">
+        {carta.fontesHistoricas.map(fonte => <div role="listitem" key={fonte.referencia}>
+          <button type="button" className="toolbar-button" style={historyButtonStyle} disabled={!onAbrirFonte}
+            aria-label={`Abrir fonte ${fonte.title}, mensagem ${fonte.messageId}`}
+            onClick={() => { setErroFonte(''); void onAbrirFonte?.(fonte.referencia).catch(() => setErroFonte('A fonte expirou, mudou ou não está acessível. Consulte novamente.')) }}>
+            {fonte.title} · {new Date(fonte.timestamp).toLocaleDateString()} · {fonte.messageId}
+          </button>
+        </div>)}
+      </div>}
+      {erroFonte && <div role="alert">{erroFonte}</div>}
+      {!!carta.escolhasHistoricas?.length && <div role="group" aria-label="Escolher conversa histórica">
+        <p>Há mais de uma conversa. Selecione a origem para iniciar uma nova consulta somente leitura.</p>
+        {carta.escolhasHistoricas.map((escolha, indice) => <button type="button" key={escolha.referencia} className="toolbar-button" style={historyButtonStyle}
+          disabled={!onEscolherHistorico} aria-label={`Consultar conversa ${indice + 1}: ${escolha.title}`}
+          onClick={() => onEscolherHistorico?.(escolha.referencia)}>
+          {indice + 1}. {escolha.title} · {new Date(escolha.updatedAt).toLocaleString()}
+        </button>)}
+      </div>}
 
       {carta.status === 'aguardando_continuacao' && onDecidirContinuacao && (
         <div style={{ marginTop: 8 }}>

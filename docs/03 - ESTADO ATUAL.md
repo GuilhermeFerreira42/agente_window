@@ -1,4 +1,12 @@
-# Estado vigente — 11/11/2026
+# Estado vigente — 12/11/2026
+
+**MC1 / D200 tecnicamente validada, sem aceite humano.** Base `49692ef`, branch `arena`, somente pasta `agente_window`. Consulta explícita a outros chats do mesmo projeto integra proveniência imutável, três ferramentas somente leitura, seleção humana de ambiguidades e fontes navegáveis. M6 permanece no chat atual. Legado sem origem comprovada não é reatribuído à pasta atual. Timestamp M2 preservado em autosaves; MC1 não renova orçamento/escolha por Continuar.
+
+Provas consolidadas: **9/9 E2E MC1**, incluindo oito determinísticos e uma prova real NVIDIA; 24 E2E existentes aprovados/um Ollama opcional ignorado; **77/77** focados+benchmark; regressão final **1.660 aprovados/42 falhas preexistentes/31 ignorados**, zero diferenças nominais. Tipos/build aprovados; lint conserva 350 ocorrências globais preexistentes, nenhuma nova nos arquivos alterados. Duas provas NVIDIA aprovadas, cinco e quatro chamadas; a última já inclui correções de retomada e legibilidade das fontes. O proprietário trocou o gateway e autorizou NVIDIA depois de interrupção da prova Google; nenhuma troca foi automática. Evidências, benchmark, limites e reprodução em 09. Nenhuma homologação humana de M1–M8, DEBT-25 ou MC1 é atribuída.
+
+Limites, decisões e critérios: D200 em 05, SPEC em 06, evidências/receitas em 09 e roteiro de uso/homologação em 08. Não iniciar extensibilidade automaticamente. Não alterar a outra cópia do projeto. Aplicativo do usuário preservado em 5174; testes usam perfis/processos próprios.
+
+## Registro de base — 11/11/2026
 
 **Correção D199 dos modos de contexto tecnicamente pronta, base `6881090`.** Auto mostra descoberta somente leitura e saída operacional automática; manual limita reserva incompatível sem apagar preferência. Regra de legado unificada, janela confirmada novamente ao trocar modelo e erro local não tratado como timeout. Tipos/build aprovados; regressão final 1.601 aprovados/42 falhas preexistentes/30 ignorados, sem diferença nominal; Playwright integrado 24 aprovados/um opcional ignorado; duas respostas reais pelo LiteLLM atual, uma em cada modo, com percentual e reserva 4.096. Backend anunciado atual Ultra incluído no catálogo nominal `.2`; janela de 1M não foi validada por inferência até o teto. Revisão independente estática sem bloqueio concreto. Evidências/reprodução em 09, roteiro em 08; aceite humano continua pendente.
 

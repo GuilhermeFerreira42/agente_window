@@ -33,7 +33,7 @@ function transcriptPath(slug: string, sessionId: string): string {
   return join(resolveProjectDir(slug), `${safeSessionId}.jsonl`)
 }
 
-export async function readTranscript(slug: string, sessionId: string, maxBytes?: number): Promise<TranscriptEntry[]> {
+export async function readTranscript(slug: string, sessionId: string, maxBytes?: number, aoLerBytes?: (bytes: number) => void): Promise<TranscriptEntry[]> {
   const destination = transcriptPath(slug, sessionId)
   return withTranscript(destination, async () => {
     try {
@@ -41,6 +41,11 @@ export async function readTranscript(slug: string, sessionId: string, maxBytes?:
         throw Object.assign(new Error('O histórico excede o limite desta operação.'), { code: 'TRANSCRIPT_TOO_LARGE' })
       }
       const content = await readFile(destination, 'utf8')
+      if (maxBytes !== undefined || aoLerBytes) {
+        const bytes = Buffer.byteLength(content, 'utf8')
+        aoLerBytes?.(bytes)
+        if (maxBytes !== undefined && bytes > maxBytes) throw Object.assign(new Error('O histórico excede o limite desta operação.'), { code: 'TRANSCRIPT_TOO_LARGE' })
+      }
       return content.split(/\r?\n/).flatMap((line, index) => {
         if (!line) return []
         try {

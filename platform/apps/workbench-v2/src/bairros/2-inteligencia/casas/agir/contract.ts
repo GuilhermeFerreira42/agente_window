@@ -16,7 +16,8 @@ import type { MedicaoContexto } from '../../../../domain/usoContexto'
 export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 /** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico'
+import type { FerramentaEntreChats, FonteEntreChats, EscolhaEntreChats } from '../../../../domain/consultaEntreChats'
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | FerramentaEntreChats
 
 /** Nível de aprovação separado do modo de trabalho. O servidor é autoridade. */
 export type NivelPermissaoAgir = 'manual' | 'allow-all'
@@ -30,6 +31,11 @@ export type ModoAgir = 'agent' | 'edit' | 'ask' | 'plan'
  * no formato que o modelo devolveu.
  */
 export interface ArgumentosFerramenta {
+  referencia?: unknown
+  antes?: unknown
+  depois?: unknown
+  apos?: unknown
+  ate?: unknown
   acao?: unknown
   consulta?: unknown
   messageId?: unknown
@@ -117,7 +123,7 @@ export type EventoAgir =
   | { type: 'chunk'; text: string }
   | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'tool'; pedido: PedidoFerramenta }
-  | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean }
+  | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean; fontesHistoricas?: FonteEntreChats[]; escolhasHistoricas?: EscolhaEntreChats[] }
   | { type: 'approval'; pedido: PedidoFerramenta; previa?: string; allowSession?: boolean }
   | { type: 'tool_progress'; id: string; text: string }
   | { type: 'command_waiting'; id: string }
@@ -196,6 +202,8 @@ export type VizinhoProvedor = (
 
 /** Resultado de executar uma ferramenta. */
 export interface ResultadoFerramenta {
+  fontesHistoricas?: FonteEntreChats[]
+  escolhasHistoricas?: EscolhaEntreChats[]
   /** Exceção inesperada: parar sem repetir ferramenta com efeitos incertos. */
   erroTerminal?: boolean
   ok: boolean

@@ -33,6 +33,8 @@ import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } f
 // acumular três responsabilidades.
 import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, type PedidoValidado } from './protocoloHttp'
 import { registrarExecucao, type RegistroExecucaoAgir } from './transcript'
+import { FERRAMENTAS_ENTRE_CHATS, pedidoHumanoEntreChats, type ContextoEntreChats, type PedidoEntreChats, type ResultadoEntreChats } from '../../../../../domain/consultaEntreChats'
+import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
 
 const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
@@ -73,6 +75,7 @@ export interface DependenciasAgir {
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
   recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
   recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string }, consulta: string) => Promise<ResultadoRecuperacao>
+  criarConsultaEntreChats?: (contexto: ContextoEntreChats, sinal: AbortSignal, orcamentoBytes: number, textoHumano: string) => (pedido: PedidoEntreChats) => Promise<ResultadoEntreChats>
   prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemAgir[], alvo: AlvoConversa,
     sinal: AbortSignal, emitir: (evento: EventoAgir) => void, forcar?: boolean, medir?: (mensagens: MensagemAgir[]) => number) => Promise<MensagemAgir[]>
   planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string }, runId: string) => Promise<string>
@@ -109,6 +112,7 @@ interface ContextoFluxo {
   instrucaoAtual?: string
   recuperacao?: { restantes: number; fontes: Set<string> }
   recuperacaoAutomatica?: { restantes: number; fontes: Set<string> }
+  entreChats?: boolean
   planejamentoRetomada?: boolean
   pedidoId?: string
 }
@@ -220,6 +224,7 @@ function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: 
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
 function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa, runId: string): void {
   retomarPorFluxo.delete(fluxo)
+  if (contexto.entreChats) return // A fresh human message must own every MC1 budget and ambiguity decision.
   const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
@@ -268,7 +273,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         sessionId: fio.sessionId, chatId: fio.chatId, runId: fio.execucao.runId, anterior: fio.anterior, raiz: fio.raiz,
         turnoId: /^[\w-]{1,200}$/.test(turnoId) ? turnoId : undefined,
         pedidoId: fio.execucao.pedidoId,
-        categoria: fio.execucao.recuperacao ? 'historico' : fio.execucao.planejamentoRetomada ? 'retomada' : undefined,
+        categoria: fio.execucao.recuperacao || fio.execucao.entreChats ? 'historico' : fio.execucao.planejamentoRetomada ? 'retomada' : undefined,
         alvo: fio.alvo.providerId && fio.alvo.modelId ? { providerId: fio.alvo.providerId, modelId: fio.alvo.modelId } : undefined,
         eventos,
       })
@@ -302,6 +307,21 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
 
   let resultado: ResultadoAgir = { status: 'interrompido', textoFinal: '', iteracoes: 0 }
   let recuperouLimite = false
+  const orcamentoMC1 = Math.min(24_000, Math.floor((orcamentoContexto(fio.alvo.capacidade, fio.alvo.maxSaida || 2048, fio.alvo.limiteContexto)?.preventivo ?? 24_000) / 4))
+  let consultarOutroChat: ReturnType<NonNullable<DependenciasAgir['criarConsultaEntreChats']>> | undefined
+  try { consultarOutroChat = fio.execucao.entreChats ? deps.criarConsultaEntreChats?.(fio, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
+  catch { consultarOutroChat = async () => ({ status: 'scope_unverifiable', results: [], partial: true, sources: [], aviso: 'O catálogo histórico não está acessível.' }) }
+  let consultasOutros = 0
+  const executarConsultaOutroChat: ExecutorFerramenta = async pedido => {
+    if (!consultarOutroChat || !fio.execucao.entreChats || consultasOutros++ >= 8 || abort.signal.aborted || !validarContexto()) return { ok: false, resumo: 'Consulta entre chats não autorizada ou limite atingido.' }
+    const resultado = await consultarOutroChat({ ferramenta: pedido.ferramenta as PedidoEntreChats['ferramenta'], argumentos: pedido.argumentos })
+    if (abort.signal.aborted || !validarContexto()) return { ok: false, resumo: 'Consulta interrompida; nenhum trecho foi entregue.' }
+    registro?.recuperar(pedido.id, pedido.ferramenta === 'ler_trecho_chat' ? 'ler' : 'buscar', resultado.sources.map(s => `${s.sessionId}:${s.chatId}:${s.messageId}`))
+    const rotulo = { ok: 'concluída', partial: 'busca parcial', not_found: 'nenhuma conversa encontrada no projeto acessível', ambiguous: 'há mais de uma conversa; informe título e data',
+      forbidden: 'não autorizada', scope_unverifiable: 'origem histórica não comprovada', source_deleted: 'fonte removida ou recriada', too_large: 'histórico maior que o limite de leitura' }[resultado.status]
+    return { ok: ['ok', 'partial', 'ambiguous', 'not_found'].includes(resultado.status), resumo: `Consulta entre chats: ${rotulo}; ${resultado.results.length} resultado(s)${resultado.partial ? ' — parcial' : ''}.`,
+      conteudo: JSON.stringify(resultado), fontesHistoricas: resultado.sources, escolhasHistoricas: resultado.escolhas }
+  }
   const assinaturaEfeito = (pedido: PedidoFerramenta) => {
     const args = { ...pedido.argumentos }
     if (typeof args.caminho === 'string') {
@@ -315,6 +335,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
+    buscar_chats: executarConsultaOutroChat,
+    buscar_mensagens_chat: executarConsultaOutroChat,
+    ler_trecho_chat: executarConsultaOutroChat,
     historico: async (pedido) => {
       const estado = fio.execucao.recuperacao ?? fio.execucao.recuperacaoAutomatica
       if (!estado || !deps.recuperarHistorico || estado.restantes <= 0 || abort.signal.aborted) {
@@ -412,12 +435,13 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     // já vai ao modelo — não existe segunda fonte de texto, então não há como a
     // invocação detectada divergir do que o modelo vai ver.
     const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
-    const composicao = !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
+    const composicao = !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
     const emitirMemoria = (evento: EventoAgir) => { if (!abort.signal.aborted && !res.writableEnded) escreverEvento(res, evento) }
     resultado = await rodarAgir({
       vizinho: async (historico, opcoes) => {
+        if (fio.execucao.entreChats && consultasOutros > 8) throw Object.assign(new Error('Limite desta consulta entre chats atingido. Refine a pergunta em uma nova mensagem.'), { code: 'limite' })
         if (deps.prepararChamada && fio.alvo.providerId && fio.alvo.modelId) {
           const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
           if (!atual.alvo) throw Object.assign(new Error('A seleção ficou indisponível antes de preparar o contexto.'), { code: 'selection_unavailable' })
@@ -427,10 +451,14 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || !validarContexto()) {
           throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
         }
-        const preparar = deps.prepararChamada && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
+        const preparar = deps.prepararChamada && !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
           ? (forcar: boolean) => deps.prepararChamada!(fio, historico, fio.alvo, abort.signal, emitirMemoria, forcar,
               (mensagens) => estimativaDoPedido(fio.alvo, mensagens, opcoes)) : undefined
         let contexto = preparar ? await preparar(false) : historico
+        if (fio.execucao.entreChats) {
+          const teto = orcamentoContexto(fio.alvo.capacidade, fio.alvo.maxSaida || 2048, fio.alvo.limiteContexto)?.preventivo ?? 24_000
+          if (estimativaDoPedido(fio.alvo, contexto, opcoes) > teto) throw Object.assign(new Error('A consulta entre chats excede o orçamento atual. Reduza a pergunta ou aumente a janela validada do modelo.'), { code: 'configuracao' })
+        }
         if (abort.signal.aborted || !validarContexto()) throw Object.assign(new Error('O projeto mudou durante a preparação do contexto.'), { code: 'fluxo' })
         let saiuTexto = false
         const observadores = { ...opcoes, validarAntesDaChamada: validarContexto, aoTexto: (texto: string) => { if (texto.length) saiuTexto = true; opcoes?.aoTexto?.(texto) } }
@@ -455,11 +483,16 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+      ferramentasPermitidas: fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
         deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
+        if (fio.execucao.entreChats && (evento.type === 'teto' ||
+          (evento.type === 'error' && ['tempo', 'endereco', 'http'].includes(evento.code)))) {
+          escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta entre chats foi interrompida ou atingiu seu limite. Envie uma nova mensagem ou selecione novamente a conversa; nenhuma ferramenta será repetida automaticamente.' })
+          return
+        }
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
         // mas não envie novas respostas, cartões ou continuações após a terminalização.
         // A tela recebe o par resolvido já na primeira iteração (antes da
@@ -538,6 +571,8 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (fio.execucao.entreChats) return (FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta) ? null : 'Esta consulta é somente de outros chats: não autoriza arquivos, comandos, memórias de projeto ou outras ferramentas.'
+        if ((FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta)) return 'Consulte outros chats somente mediante pedido humano explícito atual; use /chats seguido da consulta se necessário.'
         if (recuperouLimite && ehMexida(pedido.ferramenta) && efeitosTentados.has(assinaturaEfeito(pedido))) {
           return 'Ação já tentada antes da recuperação de contexto; não será repetida. Confira o resultado e peça nova autorização em uma tarefa nova se precisar repeti-la.'
         }
@@ -596,7 +631,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     if (fio.execucao.estado !== 'cancelled') {
       fio.execucao.estado = resultado.status === 'interrompido'
         ? 'cancelled'
-        : resultado.status === 'iteracoes_excedidas' || (resultado.status === 'erro' && ['tempo', 'endereco', 'http'].includes(resultado.codigoErro ?? ''))
+        : !fio.execucao.entreChats && (resultado.status === 'iteracoes_excedidas' || (resultado.status === 'erro' && ['tempo', 'endereco', 'http'].includes(resultado.codigoErro ?? '')))
           ? 'paused'
           : 'completed'
     }
@@ -808,6 +843,11 @@ async function tratarAgir(
   }
   instrucoes.delete(token)
   const textoAtual = validacao.pedido.mensagens.at(-1)
+  const consultaEntreChats = !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
+    instrucao.texto === textoAtual.content && pedidoHumanoEntreChats(instrucao.texto)
+  if (textoAtual?.role === 'user' && /^\/chats(?:\s|$)/iu.test(textoAtual.content.trim()) && !consultaEntreChats) {
+    sendErro(res, 400, 'configuracao', 'Envie /chats seguido da consulta por uma nova mensagem humana. Nenhuma consulta foi iniciada.'); return true
+  }
   const consultaHistorica = deps.recuperarHistorico && textoAtual?.role === 'user'
     ? /^\/historico\s+([\s\S]+)$/iu.exec(textoAtual.content.trim())?.[1].trim() : undefined
   const retomadaId = deps.planejarRetomada && textoAtual?.role === 'user'
@@ -819,14 +859,17 @@ async function tratarAgir(
     return true
   }
   const contextoFluxo: ContextoFluxo = { sessionId, chatId, raiz: contexto.raiz, modo: modoEfetivo, modoSelecionadoNoServidor: modoSelecionado !== null, permissao: permissaoEfetiva, escopoExclusao: instrucao?.escopo ?? [], exclusoesTentadas: new Set<string>(), instrucaoAtual: instrucao?.texto,
+    entreChats: consultaEntreChats,
     recuperacao: consultaHistorica ? { restantes: 3, fontes: new Set() } : undefined,
-    recuperacaoAutomatica: !consultaHistorica && !retomadaId && deps.recuperarHistorico ? { restantes: 3, fontes: new Set() } : undefined,
+    recuperacaoAutomatica: !consultaEntreChats && !consultaHistorica && !retomadaId && deps.recuperarHistorico ? { restantes: 3, fontes: new Set() } : undefined,
     planejamentoRetomada: Boolean(retomadaId), pedidoId: typeof textoAtual?.id === 'string' && /^[\w-]{1,200}$/.test(textoAtual.id) ? textoAtual.id : undefined }
   if (res.destroyed || res.writableEnded) return true
   const execucao = criarExecucao(fluxo, contextoFluxo)
   let historico: Awaited<ReturnType<NonNullable<DependenciasAgir['restaurarHistorico']>>>
   try {
-    historico = retomadaId && deps.planejarRetomada
+    historico = consultaEntreChats
+      ? { fonte: 'browser', mensagens: [{ papel: 'usuario', conteudo: instrucao!.texto }] }
+      : retomadaId && deps.planejarRetomada
       ? { fonte: 'transcript', mensagens: [{ papel: 'usuario', conteudo: await deps.planejarRetomada(contextoFluxo, retomadaId) }] }
       : consultaHistorica
       ? { fonte: 'browser', mensagens: [{ papel: 'usuario', conteudo: consultaHistorica }] }
@@ -878,6 +921,11 @@ async function tratarContinuar(
   const retomada = retomarPorFluxo.get(fluxo)
   if (!retomada) {
     sendErro(res, 409, 'fluxo', 'Nada para retomar aqui (esta execução já terminou ou o servidor reiniciou). Envie a mensagem de novo.')
+    return true
+  }
+  if (retomada.contexto.entreChats) {
+    retomarPorFluxo.delete(fluxo)
+    sendErro(res, 409, 'configuracao', 'Consulta entre chats exige uma nova mensagem humana; a escolha e o orçamento anteriores não são renovados por Continuar.')
     return true
   }
   if (execucaoPorFluxo.has(fluxo) || continuacoesEmClaim.has(fluxo)) {
