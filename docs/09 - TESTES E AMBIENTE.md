@@ -1,6 +1,6 @@
 # MC1 — consulta entre chats, validação em 12/11/2026
 
-Base reproduzível `49692ef`, branch `arena`, somente pasta `agente_window`. Requisitos da proposta externa adaptados em 06/D200 antes da entrega. Logs/artefatos desta rodada ficam fora do repositório, em `C:/Users/Usuario/Desktop/arena/arena-operacional`, prefixo `mc1-`; nenhuma fixture usa dados pessoais. Código/testes no repositório permitem repetir os cenários. Homologação humana permanece pendente.
+Base reproduzível `49692ef`, entrega de código **`9a86353` — `feat(memory): MC1 scoped retrieval across project chats`**, branch `arena`, somente pasta `agente_window`. Requisitos da proposta externa adaptados em 06/D200 antes da entrega. Logs/artefatos desta rodada ficam fora do repositório, em `C:/Users/Usuario/Desktop/arena/arena-operacional`, prefixo `mc1-`; nenhuma fixture usa dados pessoais. Código/testes no repositório permitem repetir os cenários. Homologação humana permanece pendente.
 
 **Inventário e arquitetura.** O catálogo anterior guardava pasta mutável e JSONL por sessão com múltiplos chats, sem prova imutável da origem. MC1 acrescenta proveniência no SQLite existente; M6, busca manual, memórias confirmadas e checkpoints mantêm seus donos. Declarações de “mesmo projeto” são verificadas no servidor por raiz canônica/física, perfil local, incarnação e digest. Caso legado sem prova não é migrado por conveniência. Um perfil continua tendo um servidor escritor; não foi implementada autenticação multiusuário ou escrita multiprocesso.
 
