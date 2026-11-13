@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { getDatabasePath } from './paths'
 import type { Checkpoint } from './checkpoint'
 import type { MemoriaProjeto } from '../../domain/memoriaProjeto'
+import { PersistenceProblem } from './persistenceErrors'
 
 export interface SessionRecord {
   id: string
@@ -191,12 +192,22 @@ export function upsertSessionRecord(record: SessionRecord): void {
 }
 
 export function getSessionRecord(id: string): SessionRecord | undefined {
+  assertSessionPublicationReadable(id)
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions WHERE id = ?
   `).get(id) as SessionRecord | undefined
+}
+
+/** Shared read boundary also protects runtime consumers of the existing catalog. */
+export function assertSessionPublicationReadable(sessionId: string): void {
+  const connection = getDatabase()
+  if (connection.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_write_intents'").get()
+    && connection.prepare('SELECT 1 FROM session_write_intents WHERE session_id=?').get(sessionId)) {
+    throw new PersistenceProblem(503, 'session_publication_pending', 'Esta conversa possui uma publicação pendente. Os arquivos foram preservados; é necessária revisão antes de continuar.')
+  }
 }
 
 export type SessionToolGrant = 'criar' | 'escrever' | 'executar'
@@ -239,4 +250,10 @@ export function deleteSessionRecord(id: string): SessionRecord | undefined {
   const existing = getSessionRecord(id)
   if (existing) getDatabase().prepare('DELETE FROM sessions WHERE id = ?').run(id)
   return existing
+}
+
+/** Close the connection; disposing a synthetic profile is the test owner's job. */
+export function resetDatabase(): void {
+  database?.close()
+  database = undefined
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, renameSync } from 'node:fs'
 import { mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -104,5 +105,44 @@ describe('JSONL transcript persistence', () => {
     await expect(readTranscript(slug, sessionId)).resolves.toEqual(previous)
     await writeTranscript(slug, sessionId, makeEntries('after-failure'))
     await expect(readTranscript(slug, sessionId)).resolves.toEqual(makeEntries('after-failure'))
+  })
+
+  it('P-A: refuses an external transcript change instead of replacing an unrecognized base', async () => {
+    const previous = makeEntries('old'), external = makeEntries('external')
+    await writeTranscript(slug, sessionId, previous)
+    await writeTranscript(slug, sessionId, external)
+    let committed = false
+    await expect(writeTranscript(slug, sessionId, makeEntries('candidate'), { expectedEntries: previous, commit: () => { committed = true } })).rejects.toMatchObject({ status: 409, code: 'transcript_changed' })
+    expect(committed).toBe(false)
+    expect(await readTranscript(slug, sessionId)).toEqual(external)
+  })
+
+  it('P-A: restores the exact original bytes after a live catalog error', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const previous = makeEntries('old'), destination = join(directory, `${sessionId}.jsonl`)
+    const bytes = previous.map(entry => JSON.stringify(entry)).join('\r\n') + '\r\n'
+    await writeFile(destination, bytes)
+    await expect(writeTranscript(slug, sessionId, makeEntries('candidate'), { expectedEntries: previous, commit: () => { throw new Error('catalog fixture') } })).rejects.toThrow('catalog fixture')
+    expect(await readFile(destination, 'utf8')).toBe(bytes)
+    expect((await readdir(directory)).filter(name => name.endsWith('.rollback'))).toEqual([])
+  })
+
+  it('P-A: a failed compensation preserves the prior file and blocks further live publication', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const previous = makeEntries('old'), candidate = makeEntries('candidate')
+    const destination = join(directory, `${sessionId}.jsonl`), published = `${destination}.published`
+    await writeTranscript(slug, sessionId, previous)
+    await expect(writeTranscript(slug, sessionId, candidate, { expectedEntries: previous, commit: () => {
+      // Move only this fixture's file, then obstruct rollback with a directory.
+      expect(published.startsWith(directory)).toBe(true)
+      renameSync(destination, published); mkdirSync(destination)
+      throw new Error('catalog failure followed by filesystem failure')
+    } })).rejects.toMatchObject({ status: 503, code: 'session_publication_unavailable' })
+    const rollback = (await readdir(directory)).find(name => name.endsWith('.rollback'))!
+    expect(rollback).toBeDefined()
+    expect((await readFile(join(directory, rollback), 'utf8')).trim().split('\n').map(line => JSON.parse(line))).toEqual(previous)
+    expect((await readFile(published, 'utf8')).trim().split('\n').map(line => JSON.parse(line))).toEqual(candidate)
+    await expect(readTranscript(slug, sessionId)).rejects.toMatchObject({ status: 503 })
+    await expect(writeTranscript(slug, sessionId, candidate)).rejects.toMatchObject({ status: 503 })
   })
 })
