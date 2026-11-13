@@ -1,8 +1,9 @@
+import { PersistenceProblem, assertNoPendingPublication, receipt, confirmMutation, mutationOwner } from './sessionMutations'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
+import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant, getDatabase } from './database'
 import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
@@ -430,77 +431,88 @@ async function listSessions(): Promise<Session[]> {
   const sessions = await Promise.all(records.map((record) => withSessionPersistenceQueue(record.id, async () => {
     // Re-read inside the queue: the record may have changed or been deleted
     // while this GET waited for an in-flight save.
+    assertNoPendingPublication(record.id)
     const current = getSessionRecord(record.id)
     if (!current) return undefined
     const session = JSON.parse(current.sessionJson) as Session
-    return sanarStatusAposF5(restoreMessages(session, await readTranscript(current.slug, current.id)))
+    const entries = await readTranscript(current.slug, current.id)
+    if (current.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
+    return sanarStatusAposF5(restoreMessages(session, entries))
   })))
   return sessions.filter((session): session is Session => session !== undefined)
 }
 
-async function saveSession(session: Session, clientSnapshot = false): Promise<{ saved: boolean; session: Session }> {
-  session = projetarSessaoPersistida(session)
+async function saveSession(input: PersistedSessionPayload & { expectedRevision?: number; mutationId?: string; creationId?: string }, create: boolean): Promise<{ session: Session; mutationId: string; revision: number }> {
+  const raw = input.session
+  if (!raw || typeof raw.id !== 'string' || !raw.id.trim() || raw.id.length > 512
+    || !Array.isArray(raw.chats) || !raw.chats.length || raw.chats.some(c => !c) || typeof raw.mainChatId !== 'string'
+    || !raw.chats.some(c => c.id === raw.mainChatId) || new Set(raw.chats.map(c => c.id)).size !== raw.chats.length
+    || raw.chats.some(c => !c || typeof c.id !== 'string' || !c.id || !Array.isArray(c.messages)
+      || c.messages.some(m => !m || typeof m.id !== 'string' || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string'))
+    || typeof raw.workspacePath !== 'string' || typeof raw.title !== 'string') {
+    throw new PersistenceProblem(400, 'invalid_session', 'A conversa enviada é inválida.')
+  }
+  if (create && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(raw.id)) {
+    throw new PersistenceProblem(400, 'invalid_session_identity', 'Novas conversas precisam de uma identidade UUID. Identidades legadas existentes são preservadas.')
+  }
+  const expectedRevision = input.expectedRevision
+  const mutationId = create ? input.creationId : input.mutationId
+  if (typeof mutationId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(mutationId)
+    || (!create && !validPersistenceRevision(expectedRevision))) {
+    throw new PersistenceProblem(400, 'invalid_session_mutation', 'Informe a identidade da tentativa e a revisão de base válidas.')
+  }
+  let session = projetarSessaoPersistida(raw)
+  // Ignore browser counters. The request digest proves identity of a retried operation.
+  const digest = createHash('sha256').update(JSON.stringify({ session: { ...session, persistenceRevision: undefined }, baseRevision: create ? null : expectedRevision })).digest('hex')
   return withSessionPersistenceQueue(session.id, async () => {
+    assertNoPendingPublication(session.id)
     const existing = getSessionRecord(session.id)
     const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
-    const storedRevision = validPersistenceRevision(existingSession?.persistenceRevision)
-      ? existingSession.persistenceRevision
-      : 0
-    const incomingRevision = validPersistenceRevision(session.persistenceRevision)
-      ? session.persistenceRevision
-      : undefined
-
-    // Browser snapshots carry an increasing token. A delayed lower/equal token
-    // must never replace a newer transcript; unversioned legacy writes are
-    // accepted only until that session has entered the versioned protocol.
-    if (clientSnapshot && existing) {
-      if ((incomingRevision === undefined && storedRevision > 0)
-        || (incomingRevision !== undefined && incomingRevision <= storedRevision)) {
-        return { saved: false, session: existingSession ?? session }
-      }
+    const storedRevision = existingSession?.persistenceRevision ?? 0
+    const ack = receipt(session.id)
+    if (mutationOwner(mutationId) && mutationOwner(mutationId) !== session.id) throw new PersistenceProblem(409, 'mutation_identity_conflict', 'A tentativa pertence a outra conversa.')
+    if (create && ack?.creationId === mutationId) {
+      if (ack.creationDigest !== digest) throw new PersistenceProblem(409, 'mutation_payload_conflict', 'Esta tentativa já confirmou outro conteúdo.')
+      const revision = ack.creationRevision!
+      return { session: { ...session, persistenceRevision: revision }, revision, mutationId }
     }
-
-    const persistenceRevision = clientSnapshot && incomingRevision !== undefined
-      ? incomingRevision
-      : Math.max(storedRevision, incomingRevision ?? 0) + 1
-    if (!Number.isSafeInteger(persistenceRevision)) throw new Error(`Persistence revision exhausted for session ${session.id}`)
-
-    const oldActivePath = existing?.worktreePath || existing?.workspacePath
-    const nextActivePath = session.worktreePath || session.workspacePath
-    const slug = session.slug || sanitizePath(session.workspacePath)
-    const now = Date.now()
-    const chatIds = new Set(session.chats.map((chat) => chat.id))
+    if (!create && ack?.mutationId === mutationId) {
+      if (ack.digest !== digest) throw new PersistenceProblem(409, 'mutation_payload_conflict', 'Esta tentativa já confirmou outro conteúdo.')
+      return { session: { ...session, persistenceRevision: ack.revision }, revision: ack.revision, mutationId }
+    }
+    if (create && existing) throw new PersistenceProblem(409, 'session_exists', 'Já existe uma conversa com esta identidade.')
+    // Existing legacy IDs are looked up exactly; only the legacy file adapter
+    // sanitizes their already-established path. Unknown IDs never create files.
+    if (!create && !existing) throw new PersistenceProblem(404, 'session_not_found', 'Esta conversa não existe. Preserve as edições e salve uma cópia se necessário.')
+    if (!create && expectedRevision !== storedRevision) throw new PersistenceProblem(409, 'stale_session_snapshot', 'Uma versão diferente desta conversa está salva. Suas alterações locais foram preservadas.')
+    // Existing identities retain their server-owned location. Workspace changes use their own route.
+    if (existingSession) session = { ...session, slug: existing!.slug, workspacePath: existing!.workspacePath,
+      worktreePath: existing!.worktreePath, branch: existingSession.branch }
+    const revision = storedRevision + 1
+    if (!Number.isSafeInteger(revision)) throw new PersistenceProblem(409, 'session_revision_exhausted', 'A revisão desta conversa atingiu o limite.')
+    const slug = existing?.slug ?? session.slug ?? sanitizePath(session.workspacePath)
+    const now = Date.now(), chatIds = new Set(session.chats.map(c => c.id))
     const anteriores = existing ? await readTranscript(existing.slug, session.id) : []
+    if (existing && existing.messageCount > 0 && !anteriores.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível. Os dados foram preservados.')
     const entries = transcriptEntries(session, anteriores)
-    const eventos = anteriores.filter((entry) => entry.type === 'agir_event' && chatIds.has(entry.chatId))
-    const pastaOrigem = validateWorkspacePath(nextActivePath)
-    const planosOrigem = prepararOrigens(session, existingSession, anteriores,
-      pastaOrigem.valid && pastaOrigem.exists && pastaOrigem.isDir ? pastaOrigem.realpath : null)
-    const committedSession: Session = { ...session, slug, persistenceRevision }
-    const metadata: Session = {
-      ...committedSession,
-      worktreePath: session.worktreePath ?? null,
-      chats: session.chats.map((chat) => ({ ...chat, messages: [] })),
-    }
-
-    // JSONL is the message source of truth. Commit it atomically before moving
-    // the catalog pointer/count, so a failed transcript write leaves SQLite's
-    // prior record intact. The queue commits saves in admission order.
-    await writeTranscript(slug, session.id, [...entries, ...eventos])
-    if (existing && oldActivePath !== nextActivePath) revokeSessionToolGrants(session.id)
-    publicarCatalogoComOrigens({
-      id: session.id,
-      slug,
-      title: session.title,
-      workspacePath: session.workspacePath,
-      worktreePath: metadata.worktreePath ?? null,
-      messageCount: entries.length,
-      createdAt: session.createdSeq ?? now,
-      updatedAt: now,
-      sessionJson: JSON.stringify(metadata),
-    }, planosOrigem, entries)
-    if (existingSession?.chats.some((chat) => !chatIds.has(chat.id))) removerCheckpointsDeChatsAusentes(session.id, [...chatIds])
-    return { saved: true, session: committedSession }
+    const eventos = anteriores.filter(entry => entry.type === 'agir_event' && chatIds.has(entry.chatId))
+    const pasta = validateWorkspacePath(session.worktreePath || session.workspacePath)
+    const planos = prepararOrigens(session, existingSession, anteriores, pasta.valid && pasta.exists && pasta.isDir ? pasta.realpath : null)
+    const committed = { ...session, slug, persistenceRevision: revision }
+    const metadata = { ...committed, worktreePath: session.worktreePath ?? null, chats: session.chats.map(c => ({ ...c, messages: [] })) }
+    // Existing atomic writer also rolls back a live catalog failure. Crash recovery remains P-B.
+    await writeTranscript(slug, session.id, [...entries, ...eventos], {
+      expectedEntries: anteriores,
+      commit: () => getDatabase().transaction(() => {
+        publicarCatalogoComOrigens({ id: session.id, slug, title: session.title, workspacePath: session.workspacePath,
+          worktreePath: metadata.worktreePath, messageCount: entries.length, createdAt: existing?.createdAt ?? session.createdSeq ?? now,
+          updatedAt: now, sessionJson: JSON.stringify(metadata) }, planos, entries)
+        confirmMutation({ sessionId: session.id, mutationId, revision, digest, creationId: create ? mutationId : null,
+          creationDigest: create ? digest : null, creationRevision: create ? revision : null })
+        if (existingSession?.chats.some(c => !chatIds.has(c.id))) removerCheckpointsDeChatsAusentes(session.id, [...chatIds])
+      })(),
+    })
+    return { session: committed, revision, mutationId }
   })
 }
 
@@ -729,22 +741,27 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     return true
   }
 
-  if (url.pathname === API_PREFIX && request.method === 'PUT') {
-    const { session } = await readJson<PersistedSessionPayload>(request)
-    if (session.persistenceRevision !== undefined && !validPersistenceRevision(session.persistenceRevision)) {
-      sendJson(response, 400, { code: 'invalid_session_revision', message: 'persistenceRevision must be a non-negative safe integer' })
-      return true
-    }
-    const result = await saveSession(session, true)
-    if (!result.saved) {
-      sendJson(response, 409, {
-        code: 'stale_session_snapshot',
-        message: 'A newer session snapshot is already persisted',
-        currentRevision: result.session.persistenceRevision ?? 0,
-      })
-      return true
-    }
-    sendJson(response, 200, { ok: true, persistenceRevision: result.session.persistenceRevision })
+  if (url.pathname === API_PREFIX && (request.method === 'POST' || request.method === 'PUT')) {
+    const input = await readJson<PersistedSessionPayload>(request)
+    const result = await saveSession(input, request.method === 'POST')
+    sendJson(response, request.method === 'POST' ? 201 : 200, { ok: true, sessionId: result.session.id,
+      mutationId: result.mutationId, revision: result.revision, persistenceRevision: result.revision, session: result.session })
+    return true
+  }
+
+  const byId = url.pathname.match(/^\/api\/sessions\/([^/]+)$/)
+  if (byId && request.method === 'GET') {
+    const id = decodeURIComponent(byId[1])
+    const result = await withSessionPersistenceQueue(id, async () => {
+      assertNoPendingPublication(id)
+      const record = getSessionRecord(id)
+      if (!record) return undefined
+      const entries = await readTranscript(record.slug, id)
+      if (record.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
+      return { session: sanarStatusAposF5(restoreMessages(JSON.parse(record.sessionJson), entries)), ack: receipt(id) }
+    })
+    if (!result) sendJson(response, 404, { code: 'session_not_found', message: 'A conversa não existe.' })
+    else sendJson(response, 200, result)
     return true
   }
 
@@ -786,11 +803,13 @@ export function sessionPersistencePlugin(options: SessionPersistencePluginOption
       server.middlewares.use((request, response, next) => {
         void handleRequest(request, response, options.repoRoot)
           .then((handled) => { if (!handled) next() })
-          .catch((error: unknown) => sendJson(response, error instanceof SnapshotGrandeError ? 413 : error instanceof WorktreeRequiresGitError ? 400 : 500, {
-            code: error instanceof SnapshotGrandeError ? 'session_payload_too_large' : error instanceof WorktreeRequiresGitError ? error.code : 'session_persistence_error',
-            message: error instanceof SnapshotGrandeError ? error.message : error instanceof WorktreeRequiresGitError
-              ? 'A pasta precisa ser um repositório Git para usar worktree.' : 'Não foi possível acessar a persistência da sessão.',
-          }))
+          .catch((error: unknown) => {
+            sendJson(response, error instanceof PersistenceProblem ? error.status : error instanceof SnapshotGrandeError ? 413 : error instanceof WorktreeRequiresGitError ? 400 : 500, {
+              code: error instanceof PersistenceProblem ? error.code : error instanceof SnapshotGrandeError ? 'session_payload_too_large' : error instanceof WorktreeRequiresGitError ? error.code : 'session_persistence_error',
+              message: error instanceof PersistenceProblem ? error.message : error instanceof SnapshotGrandeError ? error.message : error instanceof WorktreeRequiresGitError
+                ? 'A pasta precisa ser um repositório Git para usar worktree.' : 'Não foi possível acessar a persistência da sessão.',
+            })
+          })
       })
     },
   }

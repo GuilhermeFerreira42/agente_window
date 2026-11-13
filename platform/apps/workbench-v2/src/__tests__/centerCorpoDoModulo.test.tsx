@@ -1,3 +1,4 @@
+import type * as SessionsClientModule from '../services/sessions/sessionsClient'
 // ============================================================================
 // src/__tests__/centerCorpoDoModulo.test.tsx — Fatia 15, Onda 2c-ii (D152).
 //
@@ -64,7 +65,8 @@ vi.mock('monaco-editor', () => {
   }
 })
 
-vi.mock('../services/sessions/sessionsClient', () => ({
+vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
+  ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),

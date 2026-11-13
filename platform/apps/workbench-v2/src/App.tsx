@@ -15,7 +15,7 @@ import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
 import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { useSessionPersistence } from './services/sessions/useSessionPersistence'
-import { removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
+import { mergeRecoveredSessions, mergeHydratedSessions, removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
@@ -133,6 +133,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const initialSnapshotFirst = initialSnapshot.current[0]
   const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
   const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
+  const [sessionLoadError, setSessionLoadError] = useState<string>()
+  const [hydrationAttempt, setHydrationAttempt] = useState(0)
   const persistedLayout = useRef(loadLayoutState())
   const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? window.localStorage.getItem(ACTIVE_SESSION_KEY) ?? BOOT_SESSION_ID)
   // (E14/R-022/R-026) Sessions Part grid: ids das sessões visíveis lado a lado.
@@ -140,13 +142,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // "ao lado" anexa um peer; o grid renderiza uma view por sessão visível.
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>(initialSnapshotFirst ? [initialSnapshotFirst.id] : [])
   const [activeChatBySession, setActiveChatBySession] = useState<Record<string, string>>(() => Object.fromEntries(initialSnapshot.current.map((session) => [session.id, session.mainChatId])))
+  const hydrationView = useRef({ sessions, activeSessionId })
+  hydrationView.current = { sessions, activeSessionId }
   const [fonteHistorica, setFonteHistorica] = useState<FonteEntreChats>()
   const [newSessionLanding, setNewSessionLanding] = useState(false)
   // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
   // a primeira da lista e a conversa "parecia" perdida.
   useEffect(() => {
     if (!activeSessionId) return
-    window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId)
+    try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId) } catch { /* Selection storage must not invalidate a confirmed save/copy. */ }
   }, [activeSessionId])
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
@@ -211,35 +215,43 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   useEffect(() => {
     if (initialSessionSnapshot) return
     const controller = new AbortController()
+    const install = (restored: Session[]) => {
+      const sanadas = sanarCartoesAposF5(restoreUnsavedSessions(restored))
+      const merged = mergeHydratedSessions(hydrationView.current.sessions, sanadas)
+      setSessions(current => mergeHydratedSessions(current, sanadas))
+      const preferred = hydrationView.current.activeSessionId
+      const stored = window.localStorage.getItem(ACTIVE_SESSION_KEY)
+      const active = merged.find(s => s.id === preferred) ?? merged.find(s => s.id === stored) ?? merged[0]
+      setActiveSessionId(active?.id ?? BOOT_SESSION_ID)
+      setVisibleSessionIds(current => {
+        const visible = current.filter(id => merged.some(s => s.id === id))
+        return visible.length ? visible : active ? [active.id] : []
+      })
+      setActiveChatBySession(current => Object.fromEntries(merged.map(s => [s.id,
+        s.chats.some(c => c.id === current[s.id]) ? current[s.id] : s.mainChatId])))
+    }
     void loadPersistedSessions(controller.signal)
       .then((restored) => {
         if (controller.signal.aborted) return
         // FATIA 10 (C4): cartão 'aguardando' que sobreviveu ao F5 vira 'expirado'.
-        const sanadas = sanarCartoesAposF5(restoreUnsavedSessions(restored))
-        setSessions(sanadas)
-        const first = restored[0]
-        // FATIA 09 (§3.8): o F5 volta para a MESMA sessão que estava aberta.
-        const salva = window.localStorage.getItem(ACTIVE_SESSION_KEY)
-        const recuperada = salva ? sanadas.find((session) => session.id === salva) : undefined
-        const primeiraSanada = sanadas[0]
-        setActiveSessionId(recuperada?.id ?? primeiraSanada?.id ?? BOOT_SESSION_ID)
-        setVisibleSessionIds(recuperada ? [recuperada.id] : primeiraSanada ? [primeiraSanada.id] : [])
-        setActiveChatBySession(Object.fromEntries(sanadas.map((session) => [session.id, session.mainChatId])))
+        install(restored)
+        setSessionLoadError(undefined)
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) console.error('[sessions] hydration failed', error)
+        if (!controller.signal.aborted) {
+          install([])
+          setSessionLoadError('Não foi possível carregar as conversas salvas. As conversas locais foram preservadas; a lista do servidor está indisponível.')
+          console.error('[sessions] hydration failed', error)
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setSessionsHydrated(true)
       })
     return () => controller.abort()
-  }, [])
+  }, [hydrationAttempt, initialSessionSnapshot])
 
   const persistence = useSessionPersistence(sessions, sessionsHydrated, (copy, source, savedSource) => {
-    setSessions((current) => [copy, ...current.flatMap((candidate) => {
-      if (candidate.id !== source.id || JSON.stringify(candidate) !== JSON.stringify(source)) return [candidate]
-      return savedSource ? [savedSource] : []
-    })])
+    setSessions(current => mergeRecoveredSessions(current, copy, source, savedSource))
     setActiveSessionId(copy.id)
     setVisibleSessionIds([copy.id])
     setActiveChatBySession((current) => ({ ...current, [copy.id]: copy.mainChatId }))
@@ -1374,7 +1386,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // digitada na landing, derivando o título do texto (paridade com o original).
   const handleLandingSubmit = async (text: string) => {
     if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
-    const id = `new-${Date.now()}`
+    const id = crypto.randomUUID()
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
     try {
@@ -2474,7 +2486,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
-      <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} />
+      <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} />
+      {sessionLoadError && <div role="alert" className="session-persistence-notice"><p>{sessionLoadError}</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
       {editorSurface.portal}
       {explorerModule && <EditorCommandsSlot module={explorerModule} />}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>

@@ -1,104 +1,80 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../types'
-import { persistSession, persistSessionNoUnload, pickSessionWorkspace, removePersistedSession } from './sessionsClient'
-
-const jsonResponse = (value: unknown) => new Response(JSON.stringify(value), {
-  status: 200,
-  headers: { 'Content-Type': 'application/json' },
-})
-
+import { persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, retrySessionPersistence, loadPersistedSessions, pickSessionWorkspace, removePersistedSession } from './sessionsClient'
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const fetchMock = vi.fn<typeof fetch>()
-
-beforeEach(() => {
-  fetchMock.mockReset()
-  vi.stubGlobal('fetch', fetchMock)
-})
-
+const make = (): Session => ({ id: randomUUID(), title: 'Fixture', workspace: 'synthetic', workspacePath: 'C:/synthetic', section: 'today', status: 'completed', updated: 'now', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: 'main', chats: [{ id: 'main', title: 'Main', status: 'completed', messages: [] }] })
+function ack(init?: RequestInit, revision = 1) {
+  const body = JSON.parse(String(init?.body)); return json({ sessionId: body.session.id, mutationId: body.mutationId ?? body.creationId, revision, session: { ...body.session, persistenceRevision: revision } })
+}
+beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
 afterEach(() => vi.unstubAllGlobals())
 
-describe('sessions client — mutations that cross the local JSON boundary', () => {
-  it('holds a conflicting session instead of retrying above the remote revision, including pagehide', async () => {
-    const id = `conflict-${randomUUID()}`
-    const session = { id, persistenceRevision: 1 } as Session
-    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ code: 'stale_session_snapshot', currentRevision: 50 }), { status: 409 }))
-    await expect(persistSession(session)).rejects.toMatchObject({ status: 409, code: 'stale_session_snapshot' })
-    await expect(persistSession(session)).rejects.toMatchObject({ status: 409 })
-    persistSessionNoUnload(session)
-    await Promise.resolve()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+describe('session write queue and HTTP boundary', () => {
+  it('hydrates the confirmed base and never substitutes a remote conflict revision', async () => {
+    const session = { ...make(), persistenceRevision: 12 }
+    fetchMock.mockResolvedValueOnce(json({ sessions: [session] })).mockResolvedValue(json({ code: 'stale_session_snapshot', currentRevision: 50 }, 409))
+    await loadPersistedSessions()
+    await expect(persistSession({ ...session, title: 'edit' })).rejects.toMatchObject({ status: 409 })
+    const sent = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)); expect(sent.expectedRevision).toBe(12)
+    await expect(persistSession({ ...session, title: 'later' })).rejects.toMatchObject({ status: 409 })
+    persistSessionNoUnload(session); await Promise.resolve(); expect(fetchMock).toHaveBeenCalledTimes(2)
   })
-
-  it('does not let a delayed obsolete response block an already acknowledged newer local save', async () => {
-    const session = { id: `delayed-${randomUUID()}` } as Session
-    let rejectOld!: (response: Response) => void
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { rejectOld = resolve }))
-      .mockResolvedValueOnce(jsonResponse({ persistenceRevision: 2 }))
-      .mockResolvedValueOnce(jsonResponse({ persistenceRevision: 3 }))
-    const older = persistSession(session)
-    await persistSession(session)
-    rejectOld(new Response(JSON.stringify({ code: 'stale_session_snapshot', currentRevision: 2 }), { status: 409 }))
-    await expect(older).resolves.toBeUndefined()
-    await expect(persistSession(session)).resolves.toBeUndefined()
+  it('serializes saves, coalesces the next snapshot, and marks a clean snapshot without another PUT', async () => {
+    const session = { ...make(), persistenceRevision: 1 }; resumeSessionPersistence(session)
+    let release!: (response: Response) => void
+    fetchMock.mockImplementationOnce(() => new Promise(resolve => { release = resolve })).mockImplementation(async (_url, init) => ack(init, 3))
+    const first = persistSession({ ...session, title: 'one' }); await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const second = persistSession({ ...session, title: 'two' }); const third = persistSession({ ...session, title: 'three' })
+    persistSessionNoUnload({ ...session, title: 'three' }); expect(fetchMock).toHaveBeenCalledTimes(1)
+    release(ack(fetchMock.mock.calls[0][1], 2)); await Promise.all([first, second, third])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const sent = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)); expect(sent.expectedRevision).toBe(2); expect(sent.session.title).toBe('three')
+    await persistSession({ ...session, title: 'three' }); expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  it('queries an uncertain ACK before retrying and reuses its mutation identity if it was not committed', async () => {
+    const session = { ...make(), persistenceRevision: 1 }; resumeSessionPersistence(session)
+    fetchMock.mockRejectedValueOnce(new TypeError('network')).mockResolvedValueOnce(json({ session })).mockImplementationOnce(async (_url, init) => ack(init, 2))
+    await expect(persistSession({ ...session, title: 'edit' })).rejects.toThrow('network')
+    await retrySessionPersistence({ ...session, title: 'edit' })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/sessions/' + session.id)
+    const initial = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)), retried = JSON.parse(String(fetchMock.mock.calls[2][1]?.body))
+    expect(retried.mutationId).toBe(initial.mutationId); expect(retried.expectedRevision).toBe(1)
+  })
+  it('recognizes a committed ACK after transport loss without writing again', async () => {
+    const session = make(); let creationId: string
+    fetchMock.mockImplementationOnce(async (_url, init) => { creationId = JSON.parse(String(init?.body)).creationId; throw new TypeError('ACK lost') })
+      .mockImplementationOnce(async () => json({ session: { ...session, persistenceRevision: 1 }, ack: { mutationId: creationId, revision: 1 } }))
+    await expect(persistSession(session)).rejects.toThrow('ACK lost')
+    await expect(retrySessionPersistence(session)).resolves.toMatchObject({ id: session.id, persistenceRevision: 1 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  it('rejects an invalid successful response instead of marking data saved', async () => {
+    fetchMock.mockResolvedValue(json({ ok: true })); await expect(persistSession(make())).rejects.toThrow('confirmação')
   })
   it('sends an empty JSON object to the native workspace picker route', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ workspace: null }))
-
-    await expect(pickSessionWorkspace()).resolves.toBeUndefined()
-    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/pick', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    })
+    fetchMock.mockResolvedValueOnce(json({ workspace: null })); await expect(pickSessionWorkspace()).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
   })
-
-  it('increments persistence revisions for normal and keepalive saves of the same session', async () => {
-    fetchMock.mockImplementation(async (_input, init) => {
-      const body = JSON.parse(String(init?.body)) as { session: Session }
-      return jsonResponse({ ok: true, persistenceRevision: body.session.persistenceRevision })
-    })
-    const session: Session = {
-      id: `revision-client-${randomUUID()}`,
-      title: 'Revision client test',
-      workspace: 'synthetic',
-      workspacePath: '/tmp/synthetic',
-      section: 'today',
-      status: 'completed',
-      updated: 'now',
-      diffAdded: 0,
-      diffRemoved: 0,
-      branch: null,
-      chats: [],
-      mainChatId: 'main',
-    }
-
-    await persistSession(session)
-    persistSessionNoUnload(session)
-    persistSessionNoUnload(session)
-
-    const revisions = fetchMock.mock.calls.map(([, init]) => {
-      const body = JSON.parse(String(init?.body)) as { session: Session }
-      return body.session.persistenceRevision
-    })
-    expect(revisions).toEqual([1, 2, 3])
-    expect(fetchMock.mock.calls.slice(1).every(([, init]) => init?.keepalive === true)).toBe(true)
+  it('preserves normal and forced deletion URL contracts', async () => {
+    fetchMock.mockResolvedValue(json({ ok: true })); await removePersistedSession('session / one'); await removePersistedSession('session-2', true)
+    expect(fetchMock.mock.calls.map(c => c[0])).toEqual(['/api/sessions/session%20%2F%20one', '/api/sessions/session-2?force=true'])
+    expect(fetchMock.mock.calls.every(c => c[1]?.method === 'DELETE' && c[1]?.body === '{}')).toBe(true)
   })
-
-  it('sends JSON for normal and forced conversation deletion without changing the URL contract', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ ok: true }))
-
-    await removePersistedSession('session / one')
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/sessions/session%20%2F%20one', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    })
-
-    await removePersistedSession('session-2', true)
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/sessions/session-2?force=true', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    })
+  it('never updates a previously created recovery copy with an older local snapshot after hydration', async () => {
+    const copy = make(), creationId = randomUUID(), remote = { ...copy, title: 'edited elsewhere', persistenceRevision: 2 }
+    resumeSessionPersistence(remote)
+    fetchMock.mockResolvedValue(json({ session: remote, ack: { creationId, mutationId: randomUUID(), revision: 2 } }))
+    await expect(persistRecoveryCopy(copy, creationId)).rejects.toMatchObject({ code: 'recovery_copy_changed' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1]?.method).toBeUndefined()
+  })
+  it('does not turn a stale queued snapshot into creation after deletion in this client', async () => {
+    const session = make()
+    fetchMock.mockResolvedValue(json({ ok: true }))
+    await removePersistedSession(session.id)
+    await expect(persistSession(session)).rejects.toMatchObject({ status: 410 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

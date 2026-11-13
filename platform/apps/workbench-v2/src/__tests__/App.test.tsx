@@ -1,10 +1,12 @@
+import type * as SessionsClientModule from '../services/sessions/sessionsClient'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
 
-vi.mock('../services/sessions/sessionsClient', () => ({
+vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
+  ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),

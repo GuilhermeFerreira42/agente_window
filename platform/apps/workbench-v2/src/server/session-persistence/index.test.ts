@@ -1,5 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ViteDevServer } from 'vite'
 import type { ChatMessage, Session } from '../../types'
@@ -32,8 +35,9 @@ vi.mock('./transcripts', async (importOriginal) => {
     },
   }
 })
-import { deleteSessionRecord, getSessionRecord } from './database'
-import { deleteTranscript, readTranscript } from './transcripts'
+import { deleteSessionRecord, getSessionRecord, getDatabase, resetDatabase, upsertSessionRecord } from './database'
+import { deleteTranscript, readTranscript, writeTranscript } from './transcripts'
+import { loadPersistedSessions, persistSession } from '../../services/sessions/sessionsClient'
 import { sessionPersistencePlugin } from './index'
 
 interface HttpServerHandle {
@@ -109,12 +113,27 @@ function makeSession(id: string, slug: string, marker: string, persistenceRevisi
   }
 }
 
+const revisionCache = new Map<string, number>()
+
 async function putSession(server: HttpServerHandle, session: Session): Promise<Response> {
-  return fetch(`${server.baseUrl}/api/sessions`, {
-    method: 'PUT',
+  const isUpdate = revisionCache.has(session.id)
+  const body = { session, ...(isUpdate ? { expectedRevision: revisionCache.get(session.id)!, mutationId: randomUUID() } : { creationId: randomUUID() }) }
+  const response = await fetch(`${server.baseUrl}/api/sessions`, {
+    method: isUpdate ? 'PUT' : 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ session }),
+    body: JSON.stringify(body),
   })
+  const text = await response.text()
+  if (!response.ok) {
+    console.error(`PUT failed with status ${response.status}:`, text)
+  }
+  if (response.ok) {
+    const data = JSON.parse(text)
+    if (data.persistenceRevision !== undefined) {
+      revisionCache.set(session.id, data.persistenceRevision)
+    }
+  }
+  return new Response(text, { status: response.status === 201 ? 200 : response.status, statusText: response.statusText, headers: response.headers })
 }
 
 async function loadSessions(server: HttpServerHandle): Promise<Session[]> {
@@ -145,7 +164,15 @@ describe('session persistence HTTP contract', () => {
 
   beforeEach(async () => {
     touched.length = 0
+    revisionCache.clear()
     persistenceFault.failNextRename = false
+    resetDatabase()
+    const profile = mkdtempSync(join(tmpdir(), 'agent-pa-'))
+    vi.stubEnv('AGENTE_WINDOW_DATA_DIR', join(profile, 'data'))
+    vi.stubEnv('AGENTE_WINDOW_TEST_HOME', profile)
+    vi.stubEnv('AGENTE_WINDOW_PROVIDERS_PATH', join(profile, 'providers.json'))
+    vi.stubEnv('AGENTE_WINDOW_SETTINGS_PATH', join(profile, 'settings.json'))
+    vi.stubEnv('AGENTE_WINDOW_PERSONALIZACOES_PATH', join(profile, 'personalizacoes.json'))
     server = await listen()
   })
 
@@ -158,10 +185,13 @@ describe('session persistence HTTP contract', () => {
       await deleteTranscript(slug, id)
       deleteSessionRecord(id)
     }
+    resetDatabase()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   it('MC1: resalvar snapshot não muda datas das mensagens já publicadas', async () => {
-    const id = `mc1-stable-date-${randomUUID()}`, session = makeSession(id, id, 'stable-date')
+    const id = randomUUID(), session = makeSession(id, id, 'stable-date')
     touched.push({ id, slug: id })
     expect((await putSession(server, session)).ok).toBe(true)
     const antes = await readTranscript(id, id)
@@ -172,7 +202,7 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('persists tool states and references without storing transient content', async () => {
-    const id = `memory-privacy-${randomUUID()}`
+    const id = randomUUID()
     const session = makeSession(id, id, 'privacy')
     Object.assign(session, { rawArgs: 'PRIVATE_SESSION_EXTENSION', approval: 'PRIVATE_APPROVAL' })
     Object.assign(session.chats[0], { rawOutput: 'PRIVATE_CHAT_EXTENSION', approval: 'PRIVATE_CHAT_APPROVAL' })
@@ -199,7 +229,7 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('rejects an oversized snapshot with 413 and keeps its previous source', async () => {
-    const id = `memory-limit-${randomUUID()}`
+    const id = randomUUID()
     const session = makeSession(id, id, 'previous')
     touched.push({ id, slug: id })
     expect((await putSession(server, session)).ok).toBe(true)
@@ -222,12 +252,12 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('searches only the requested persisted chat and reflects message deletion', async () => {
-    const id = `search-${randomUUID()}`
+    const id = randomUUID()
     const session = makeSession(id, id, 'Busca (á)')
     session.chats.push({ ...session.chats[0], id: 'other', messages: [message('outro-id', 'user', 'Busca (á) de outro chat')] })
     touched.push({ id, slug: id })
     expect((await putSession(server, session)).ok).toBe(true)
-    const buscar = (chatId: string, sessionId = id) => fetch(`${server.baseUrl}/api/sessions/search`, {
+    const buscar = (chatId: string, sessionId: string = id) => fetch(`${server.baseUrl}/api/sessions/search`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, chatId, query: 'BUSCA (Á)' }),
     })
@@ -249,7 +279,7 @@ describe('session persistence HTTP contract', () => {
     const { join } = await import('node:path')
     const workspace = join(process.env.AGENTE_WINDOW_TEST_HOME!, 'workspace-race')
     await mkdir(workspace, { recursive: true })
-    const id = `workspace-race-${randomUUID()}`
+    const id = randomUUID()
     const slug = id
     touched.push({ id, slug })
     expect((await putSession(server, makeSession(id, slug, 'old-content', 1))).status).toBe(200)
@@ -280,7 +310,7 @@ describe('session persistence HTTP contract', () => {
     const { join } = await import('node:path')
     const workspace = join(process.env.AGENTE_WINDOW_TEST_HOME!, 'workspace-metadata')
     await mkdir(workspace, { recursive: true })
-    const id = `workspace-current-${randomUUID()}`
+    const id = randomUUID()
     const slug = id
     touched.push({ id, slug })
     const latest = makeSession(id, slug, 'latest-accepted', 12)
@@ -293,7 +323,7 @@ describe('session persistence HTTP contract', () => {
     })
     expect(changed.status).toBe(200)
     const body = await changed.json() as { session: Session }
-    expect(body.session.persistenceRevision).toBe(13)
+    expect(body.session.persistenceRevision).toBe(2)
     expect(body.session.chats[0].messages).toEqual(latest.chats[0].messages)
     expect(body.session.workspacePath).toBe(workspace)
     expect(await readTranscript(slug, id)).toEqual(before)
@@ -301,9 +331,11 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('serializes two rounds of 16 PUTs and restores one whole, ordered snapshot after HTTP server restart', async () => {
-    const id = `persistence-race-${randomUUID()}`
+    const id = randomUUID()
     const slug = `persistence-race-${randomUUID()}`
     touched.push({ id, slug })
+
+    expect((await putSession(server, makeSession(id, slug, 'initial'))).status).toBe(200)
 
     for (let round = 0; round < 2; round += 1) {
       const sessions = Array.from({ length: 16 }, (_, index) => makeSession(
@@ -318,8 +350,9 @@ describe('session persistence HTTP contract', () => {
       const restored = (await loadSessions(server)).find((session) => session.id === id)
       expect(restored).toBeDefined()
       const marker = restored!.title
-      expect(marker).toBe(`round-${round}-write-15`)
-      expect(restored?.persistenceRevision).toBe(round * 16 + 16)
+      expect(responses.filter(r => r.status === 200)).toHaveLength(1)
+      expect(marker).toMatch(new RegExp(`^round-${round}-write-\\d+$`))
+      expect(restored?.persistenceRevision).toBe(round + 2)
       const messages = restored!.chats[0].messages
       expect(messages.map((item) => item.id)).toEqual([`${marker}-1`, `${marker}-2`, `${marker}-3`])
       expect(messages.map((item) => item.content)).toEqual([`${marker}:one`, `${marker}:two`, `${marker}:three`])
@@ -337,7 +370,7 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('rejects an older snapshot that arrives after a newer one', async () => {
-    const id = `persistence-revision-${randomUUID()}`
+    const id = randomUUID()
     const slug = `persistence-revision-${randomUUID()}`
     touched.push({ id, slug })
     const newer = makeSession(id, slug, 'newer-snapshot')
@@ -346,7 +379,10 @@ describe('session persistence HTTP contract', () => {
     older.persistenceRevision = 11
 
     expect((await putSession(server, newer)).status).toBe(200)
-    const staleResponse = await putSession(server, older)
+    const staleResponse = await fetch(`${server.baseUrl}/api/sessions`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session: older, expectedRevision: 0, mutationId: randomUUID() }),
+    })
     expect(staleResponse.status).toBe(409)
     expect(await staleResponse.json()).toMatchObject({ code: 'stale_session_snapshot' })
     const restored = (await loadSessions(server)).find((session) => session.id === id)
@@ -357,7 +393,7 @@ describe('session persistence HTTP contract', () => {
   })
 
   it('does not advance SQLite metadata when transcript publication fails', async () => {
-    const id = `persistence-failure-${randomUUID()}`
+    const id = randomUUID()
     const slug = `persistence-failure-${randomUUID()}`
     touched.push({ id, slug })
     const previous = makeSession(id, slug, 'previous-complete-state', 1)
@@ -377,8 +413,8 @@ describe('session persistence HTTP contract', () => {
 
   it('preserves tool cards, results, errors, IDs, and isolates separate session files', async () => {
     const slug = `persistence-isolation-${randomUUID()}`
-    const firstId = `session-a-${randomUUID()}`
-    const secondId = `session-b-${randomUUID()}`
+    const firstId = randomUUID()
+    const secondId = randomUUID()
     touched.push({ id: firstId, slug }, { id: secondId, slug })
 
     const first = makeSession(firstId, slug, 'project-a')
@@ -404,5 +440,107 @@ describe('session persistence HTTP contract', () => {
     })
     expect(restoredSecond.chats[0].messages).toEqual(second.chats[0].messages)
     expect(await readTranscript(slug, firstId)).not.toEqual(await readTranscript(slug, secondId))
+  })
+
+  const mutation = (session: Session, expectedRevision?: number, mutationId = randomUUID(), method = 'PUT') => fetch(`${server.baseUrl}/api/sessions`, {
+    method, headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ session, ...(method === 'POST' ? { creationId: mutationId } : { expectedRevision, mutationId }) }),
+  })
+
+  it('P-A: creation is distinct and idempotent; PUT never creates and invalid CAS returns 400', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'created', 9000), creationId = randomUUID()
+    touched.push({ id, slug: id })
+    expect((await mutation(session, 0)).status).toBe(404)
+    const created = await mutation(session, undefined, creationId, 'POST')
+    expect(created.status).toBe(201); expect(await created.json()).toMatchObject({ sessionId: id, mutationId: creationId, revision: 1 })
+    persistenceFault.failNextRename = true
+    expect((await mutation(session, undefined, creationId, 'POST')).status).toBe(201)
+    expect(persistenceFault.failNextRename).toBe(true); persistenceFault.failNextRename = false
+    expect((await mutation({ ...session, title: 'different' }, undefined, creationId, 'POST')).status).toBe(409)
+    expect((await mutation(session)).status).toBe(400)
+  })
+
+  it('P-A: mutation ACK survives connection restart and rejects changed payload/base', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'old'), operation = randomUUID()
+    touched.push({ id, slug: id }); await putSession(server, session)
+    const next = { ...session, title: 'new', persistenceRevision: 9000 }
+    const saved = await mutation(next, 1, operation)
+    expect(saved.status).toBe(200); expect(await saved.json()).toMatchObject({ revision: 2, mutationId: operation })
+    const entries = await readTranscript(id, id); resetDatabase()
+    persistenceFault.failNextRename = true
+    const replay = await mutation(next, 1, operation)
+    expect(replay.status).toBe(200); expect(await replay.json()).toMatchObject({ revision: 2, mutationId: operation })
+    expect(persistenceFault.failNextRename).toBe(true); persistenceFault.failNextRename = false
+    expect(await readTranscript(id, id)).toEqual(entries)
+    expect((await mutation({ ...next, title: 'changed' }, 1, operation)).status).toBe(409)
+    expect((await mutation(next, 2, operation)).status).toBe(409)
+    expect((await mutation({ ...next, persistenceRevision: 99999 }, 0)).status).toBe(409)
+    const lookup = await fetch(`${server.baseUrl}/api/sessions/${id}`)
+    expect(await lookup.json()).toMatchObject({ session: { id, persistenceRevision: 2 }, ack: { mutationId: operation, revision: 2 } })
+  })
+
+  it('P-A: save preserves confirmed server events and ignores browser location changes', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'old')
+    touched.push({ id, slug: id }); await putSession(server, session)
+    const previous = await readTranscript(id, id)
+    const event = { type: 'agir_event' as const, chatId: 'chat-main', uuid: 'synthetic-server-event', timestamp: 1, sequence: 1, message: { version: 1, evento: { tipo: 'synthetic' } } }
+    await writeTranscript(id, id, [...previous, event])
+    expect((await mutation({ ...session, title: 'edit', slug: 'other-slug', workspacePath: '/untrusted', persistenceRevision: 2 }, 1)).status).toBe(200)
+    expect(await readTranscript(id, id)).toContainEqual(event)
+    expect(getSessionRecord(id)).toMatchObject({ slug: id, workspacePath: session.workspacePath })
+  })
+
+  it('P-A: live SQL publication failure restores prior JSONL/catalog and retry is safe', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'old'), operation = randomUUID()
+    touched.push({ id, slug: id }); await putSession(server, session)
+    const previous = await readTranscript(id, id)
+    getDatabase().exec(`CREATE TRIGGER fail_pa_catalog BEFORE UPDATE ON sessions WHEN NEW.id='${id}' BEGIN SELECT RAISE(ABORT,'fixture failure'); END`)
+    try {
+      expect((await mutation(makeSession(id, id, 'new'), 1, operation)).status).toBe(500)
+      expect(getSessionRecord(id)?.title).toBe('old')
+      expect(await readTranscript(id, id)).toEqual(previous)
+      expect((await loadSessions(server)).find(s => s.id === id)?.chats[0].messages).toEqual(session.chats[0].messages)
+    } finally { getDatabase().exec('DROP TRIGGER fail_pa_catalog') }
+    expect((await mutation(makeSession(id, id, 'new'), 1, operation)).status).toBe(200)
+    expect(getSessionRecord(id)?.title).toBe('new')
+  })
+
+  it('P-A: earlier P-B intent with FK is preserved and blocks reads/writes without destructive migration', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'old')
+    touched.push({ id, slug: id }); await putSession(server, session)
+    getDatabase().exec(`CREATE TABLE session_write_intents(session_id TEXT PRIMARY KEY REFERENCES sessions(id), marker TEXT);
+      INSERT INTO session_write_intents VALUES('${id}','preserve-fixture')`)
+    resetDatabase()
+    try {
+      expect((await mutation({ ...session, title: 'blocked' }, 1)).status).toBe(503)
+      expect((await fetch(`${server.baseUrl}/api/sessions/${id}`)).status).toBe(503)
+      expect(getDatabase().prepare('SELECT marker FROM session_write_intents WHERE session_id=?').get(id)).toEqual({ marker: 'preserve-fixture' })
+      expect(() => getSessionRecord(id)).toThrow('publicação pendente')
+      expect(getDatabase().prepare('SELECT title FROM sessions WHERE id=?').get(id)).toEqual({ title: 'old' })
+    } finally { getDatabase().prepare('DELETE FROM session_write_intents WHERE session_id=?').run(id) }
+  })
+
+  it('P-A: hydrate and edit through the real client uses the confirmed base without artificial conflict', async () => {
+    const id = randomUUID(), session = makeSession(id, id, 'old')
+    touched.push({ id, slug: id }); await putSession(server, session)
+    const native = globalThis.fetch
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => native(typeof input === 'string' && input.startsWith('/') ? server.baseUrl + input : input, init))
+    const hydrated = (await loadPersistedSessions()).find(s => s.id === id)!
+    await expect(persistSession({ ...hydrated, title: 'after reload' })).resolves.toMatchObject({ id, title: 'after reload', persistenceRevision: 2 })
+    expect(getSessionRecord(id)?.title).toBe('after reload')
+  })
+
+  it('P-A: adapts an existing unversioned legacy identity without creating a sanitized alias', async () => {
+    const id = 'legacy:ação/01', slug = randomUUID(), session = makeSession(id, slug, 'legacy', 0)
+    touched.push({ id, slug })
+    await writeTranscript(slug, id, session.chats[0].messages.map(m => ({ type: m.role, chatId: 'chat-main', message: m, uuid: m.id, timestamp: 1 })))
+    upsertSessionRecord({ id, slug, title: session.title, workspacePath: session.workspacePath, worktreePath: null,
+      messageCount: 3, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ ...session, persistenceRevision: undefined, chats: session.chats.map(c => ({ ...c, messages: [] })) }) })
+    const response = await mutation({ ...session, title: 'legacy edited', persistenceRevision: 9999 }, 0)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ sessionId: id, revision: 1 })
+    expect((await fetch(`${server.baseUrl}/api/sessions/${encodeURIComponent(id)}`)).status).toBe(200)
+    expect(getSessionRecord(id)?.title).toBe('legacy edited')
+    expect(getSessionRecord(id.replace(/[^a-zA-Z0-9_-]/g, '-'))).toBeUndefined()
   })
 })

@@ -1,3 +1,4 @@
+import type * as SessionsClientModule from '../services/sessions/sessionsClient'
 // ============================================================================
 // faixaDeAbasProtecao.test.tsx — FATIA 15, RNF15-2 (D173).
 //
@@ -24,7 +25,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
 
-vi.mock('../services/sessions/sessionsClient', () => ({
+vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
+  ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
   loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
   persistSession: vi.fn(async () => undefined),
