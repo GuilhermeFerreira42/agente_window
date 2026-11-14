@@ -62,6 +62,12 @@ const COLUNAS: Array<[string, string]> = [
 ]
 
 const schemaPronto = new WeakSet<object>()
+/**
+ * B2 — conexões em que a unicidade de `mutation_id` NÃO pôde ser comprovada
+ * (tabela legada com duplicatas já gravadas). Os registros são preservados e
+ * novas identidades ficam explicitamente bloqueadas até revisão manual.
+ */
+const semUnicidadeConfirmada = new WeakSet<object>()
 
 /** CREATE on fresh profiles; additive ALTER on any pre-existing attempt table. Never DROP. */
 function ensureWriteIntentSchema(): void {
@@ -88,16 +94,22 @@ function ensureWriteIntentSchema(): void {
       registered_at INTEGER NOT NULL
     );
   `)
-  try {
-    connection.exec('CREATE UNIQUE INDEX IF NOT EXISTS session_write_intents_mutation_uq ON session_write_intents(mutation_id)')
-  } catch {
-    // A legacy attempt table may already contain conflicting values. The primary
-    // key still allows a single publication per session; never fail startup here.
-  }
+  // B2: colunas ANTES do índice — numa tabela legada sem mutation_id, criar o
+  // índice primeiro falhava e o catch engolia o erro, marcando a conexão pronta
+  // SEM a unicidade do journal.
   const existing = new Set((connection.prepare('PRAGMA table_info(session_write_intents)').all() as Array<{ name: string }>).map(column => column.name))
   for (const [name, type] of COLUNAS) {
     if (!existing.has(name)) connection.exec(`ALTER TABLE session_write_intents ADD COLUMN ${name} ${type}`)
   }
+  try {
+    connection.exec('CREATE UNIQUE INDEX IF NOT EXISTS session_write_intents_mutation_uq ON session_write_intents(mutation_id)')
+  } catch {
+    // Duplicatas legadas: preservar TODOS os registros — nunca apagar dados
+    // para conseguir migrar. O bloqueio explícito é registrado abaixo.
+  }
+  const indiceConfirmado = !!connection.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='index' AND name='session_write_intents_mutation_uq'").get()
+  if (!indiceConfirmado) semUnicidadeConfirmada.add(connection)
   schemaPronto.add(connection)
 }
 
@@ -180,6 +192,25 @@ export function hasPendingWriteIntent(sessionId: string): boolean {
 export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registeredAt' | 'placeholder'> & { criacao: boolean }): void {
   ensureWriteIntentSchema()
   const connection = getDatabase()
+  if (semUnicidadeConfirmada.has(connection)) {
+    // B2: unicidade não comprovada (duplicatas legadas preservadas) → novas
+    // identidades bloqueadas explicitamente; nada é apagado para migrar.
+    throw new PersistenceProblem(503, 'session_journal_migration',
+      'O diário de publicação contém identidades duplicadas legadas preservadas; novas escritas estão bloqueadas até revisão manual da migração.')
+  }
+  try {
+    registrarTransacao(connection, intent)
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed: session_write_intents.mutation_id')) {
+      // Rejeição explícita da identidade duplicada em vez de erro cru de SQL.
+      throw new PersistenceProblem(409, 'mutation_identity_conflict',
+        'Esta identidade de mutação já está registrada em outra conversa; a duplicata foi rejeitada.')
+    }
+    throw error
+  }
+}
+
+function registrarTransacao(connection: ReturnType<typeof getDatabase>, intent: Omit<WriteIntent, 'state' | 'registeredAt' | 'placeholder'> & { criacao: boolean }): void {
   connection.transaction(() => {
     const currentRow = connection.prepare('SELECT session_json FROM sessions WHERE id=?').get(intent.record.id) as { session_json: string } | undefined
     const currentRevision = currentRow ? (JSON.parse(currentRow.session_json).persistenceRevision ?? 0) : 0
