@@ -44,10 +44,15 @@ export async function createSessionWorktree(workspacePath: string, slug: string,
   return ((await response.json()) as { worktree: CreatedWorktree }).worktree
 }
 
-export async function removePersistedSession(sessionId: string, force = false): Promise<void> {
-  const query = force ? '?force=true' : ''
-  await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, {
-    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+/** P-C §6 — exclusão idempotente com identidade da tentativa e revisão
+ * esperada. `force` conserva a confirmação específica de worktree sujo. */
+export async function removePersistedSession(sessionId: string, options: { force?: boolean; expectedRevision: number }): Promise<'concluido' | 'limpeza_pendente'> {
+  const query = options.force ? '?force=true' : ''
+  const response = await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deletionId: crypto.randomUUID(), expectedRevision: options.expectedRevision }),
   }))
+  const body = await response.json() as { estado?: unknown }
   forgetSessionPersistence(sessionId)
+  return body.estado === 'limpeza_pendente' ? 'limpeza_pendente' : 'concluido'
 }

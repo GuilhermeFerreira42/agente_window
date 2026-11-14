@@ -92,3 +92,19 @@ export function mergeRecoveredSessions(current: Session[], copy: Session, source
 export function mergeHydratedSessions(current: Session[], saved: Session[]): Session[] {
   return [...current, ...saved.filter(s => !current.some(local => local.id === s.id))]
 }
+
+/** P-C §5 — na restauração, o status server-side da identidade decide: 410
+ * (excluída) descarta a cópia local para não ressuscitar o original; 404
+ * continua sendo rascunho nunca confirmado e legítimo. */
+export async function descartarRecuperacoesExcluidas(servidor: readonly { id: string }[]): Promise<void> {
+  const conhecidas = new Set(servidor.map((s) => s.id))
+  for (const { session } of readSessionRecoveries()) {
+    if (conhecidas.has(session.id)) continue
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`)
+      if (response.status === 410) removeSessionRecovery(session.id)
+    } catch {
+      /* Sem rede não se apaga nada: higiene local nunca destrói conteúdo. */
+    }
+  }
+}

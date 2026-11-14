@@ -3,15 +3,22 @@ import type { Session } from '../../types'
 import { isSessionDirty, loadPersistedSession, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, retrySessionPersistence, sessionFingerprint, SessionPersistenceError } from './sessionsClient'
 import { createRecoveryCopy, readSessionRecoveries, removeSessionRecovery, storeSessionRecovery } from './sessionRecovery'
 
-type Kind = 'unavailable' | 'conflict' | 'local'
+type Kind = 'unavailable' | 'conflict' | 'local' | 'excluindo' | 'falha_exclusao'
 interface PersistenceIssue { message: string; backupAvailable: boolean; kind?: Kind }
+/** Só os kinds persistíveis entram no backup local; `excluindo`/`falha_exclusao`
+ * são estados de UI da exclusão (P-C) e nunca são gravados. */
+const kindDeBackup = (kind?: Kind): 'unavailable' | 'conflict' | 'local' | undefined =>
+  kind === 'excluindo' || kind === 'falha_exclusao' ? 'unavailable' : kind
 export interface SessionPersistenceIssue extends PersistenceIssue { session: Session }
 type Recovered = (copy: Session, source: Session, savedSource: Session | undefined) => void
 type Task = { copy: Session; creationId: string; source: string; saved?: Session; diverged?: boolean }
 
-export function useSessionPersistence(sessions: Session[], hydrated: boolean, onRecovered: Recovered) {
+/** `excluindo` (P-C §2): enquanto a identidade está em exclusão, os autosaves
+ * dessa sessão são suspensos — os demais fluxos seguem intactos. */
+export function useSessionPersistence(sessions: Session[], hydrated: boolean, onRecovered: Recovered, excluindo?: ReadonlySet<string>) {
   const latest = useRef(sessions); latest.current = sessions
   const callback = useRef(onRecovered); callback.current = onRecovered
+  const excluindoRef = useRef(excluindo); excluindoRef.current = excluindo
   const [issues, setIssues] = useState<Record<string, PersistenceIssue>>(() => Object.fromEntries(readSessionRecoveries()
     .map(({ session, message, kind }) => [session.id, { message, kind: kind ?? 'conflict', backupAvailable: true }])))
   const issuesRef = useRef(issues)
@@ -42,24 +49,25 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
   useEffect(() => {
     if (!hydrated) return
     for (const session of sessions) {
+      if (excluindoRef.current?.has(session.id)) continue
       if (session.isDraft || (!isSessionDirty(session) && !issuesRef.current[session.id])) continue
       let issue = issuesRef.current[session.id]
       if (issue?.kind === 'local' && isSessionDirty(session)) {
         issue = { ...issue, kind: 'unavailable', message: 'Existem novas edições ainda não confirmadas. Tente salvar novamente.' }
         updateIssue(session.id, issue)
       }
-      storeSessionRecovery({ session, message: issue?.message ?? 'Gravação em andamento.', kind: issue?.kind ?? 'unavailable' })
+      storeSessionRecovery({ session, message: issue?.message ?? 'Gravação em andamento.', kind: kindDeBackup(issue?.kind) ?? 'unavailable' })
     }
     const timer = window.setTimeout(() => {
-      for (const session of sessions.filter(s => !s.isDraft && !issuesRef.current[s.id] && isSessionDirty(s))) {
+      for (const session of sessions.filter(s => !excluindoRef.current?.has(s.id) && !s.isDraft && !issuesRef.current[s.id] && isSessionDirty(s))) {
         void persistSession(session).then(() => clean(session)).catch(error => {
           const current = latest.current.find(s => s.id === session.id); if (current) failure(current, error)
         })
       }
     }, 150)
     const unload = () => {
-      for (const session of latest.current.filter(s => !s.isDraft && isSessionDirty(s))) {
-        storeSessionRecovery({ session, message: 'Gravação não confirmada.', kind: issuesRef.current[session.id]?.kind ?? 'unavailable' })
+      for (const session of latest.current.filter(s => !excluindoRef.current?.has(s.id) && !s.isDraft && isSessionDirty(s))) {
+        storeSessionRecovery({ session, message: 'Gravação não confirmada.', kind: kindDeBackup(issuesRef.current[session.id]?.kind) ?? 'unavailable' })
         if (!issuesRef.current[session.id]) persistSessionNoUnload(session)
       }
     }
@@ -111,7 +119,7 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
       tasks.current.set(id, task)
     }
     try {
-      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: issuesRef.current[id]?.kind, recovery: task })
+      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: kindDeBackup(issuesRef.current[id]?.kind), recovery: task })
       if (!task.saved) task.saved = await persistRecoveryCopy(task.copy, task.creationId)
       // The copy ACK becomes visible before either origin lookup or local cleanup.
       callback.current(task.saved, source, undefined)
