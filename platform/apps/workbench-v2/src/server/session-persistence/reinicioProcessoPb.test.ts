@@ -67,6 +67,54 @@ function sessaoSintetica(id: string, slug: string, marker: string): Session {
 
 const esperar = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+/**
+ * B1 — confirmação de encerramento forçado POR PLATAFORMA.
+ *
+ * POSIX: o evento `exit` registra `signal='SIGKILL'`. Windows não tem sinais
+ * POSIX — o observado é `{code: 1, signal: null}`; exigir SIGKILL reprova o
+ * teste injustamente. Um exit genérico NUNCA basta sozinho: a saída precisa
+ * estar confirmada e, no teste E4, as provas de fronteira assinada, estado
+ * congelado pré/pós-kill e reconciliação em processo novo completam a
+ * comprovação do encerramento forçado.
+ */
+function verificarEncerramentoForcado(
+  plataforma: NodeJS.Platform,
+  filho: { exitCode: number | null; signalCode: string | null },
+  morte: { code: number | null; signal: string | null },
+  fronteira: string,
+): void {
+  // Saída CONFIRMADA (ambas plataformas): o evento ocorreu e há registro.
+  expect(filho.exitCode !== null || filho.signalCode !== null,
+    `saída não confirmada após o pedido de encerramento (${fronteira})`).toBe(true)
+  expect(morte.code !== null || morte.signal !== null,
+    `o processo ${fronteira} não registrou nenhuma saída: ${JSON.stringify(morte)}`).toBe(true)
+  if (plataforma === 'win32') {
+    expect(morte.code, `Windows sem code de saída (${fronteira}): ${JSON.stringify(morte)}`).not.toBeNull()
+  } else {
+    expect(morte.signal, `filho ${fronteira} não morreu com SIGKILL: ${JSON.stringify(morte)}`).toBe('SIGKILL')
+  }
+}
+
+// B1 — regressão da interpretação de encerramento por plataforma (escrita
+// ANTES do helper): Windows observado devolve {code:1, signal:null}; um exit
+// genérico nunca comprova sozinho, e POSIX continua exigindo SIGKILL.
+describe('B1 interpretação de encerramento por plataforma', () => {
+  const filhoSaiu = { exitCode: 1, signalCode: null }
+
+  it('aceita a saída do Windows observada {code:1, signal:null} com a saída confirmada', () => {
+    expect(() => verificarEncerramentoForcado('win32', filhoSaiu, { code: 1, signal: null }, 'pre-rename')).not.toThrow()
+  })
+
+  it('NÃO aceita exit 1 genérico como encerramento forçado em POSIX (exige SIGKILL)', () => {
+    expect(() => verificarEncerramentoForcado('linux', filhoSaiu, { code: 1, signal: null }, 'pre-rename')).toThrow(/SIGKILL/)
+  })
+
+  it('NÃO aceita saída não confirmada nem no Windows', () => {
+    expect(() => verificarEncerramentoForcado('win32', { exitCode: null, signalCode: null }, { code: 1, signal: null }, 'pre-rename')).toThrow(/saída/)
+    expect(() => verificarEncerramentoForcado('win32', filhoSaiu, { code: null, signal: null }, 'pre-rename')).toThrow(/nenhuma saída/)
+  })
+})
+
 describe('P-B reinício de processo com SIGKILL real', () => {
   let server: HttpServerHandle
   const touched: Array<{ id: string; slug: string }> = []
@@ -176,11 +224,13 @@ describe('P-B reinício de processo com SIGKILL real', () => {
         // 2) o estado durável corresponde à fronteira declarada, ANTES do kill.
         const antes = await conferirFronteira('pré-kill')
 
-        // 3) encerramento garantido: SIGKILL (compatível Windows) do processo próprio.
-        process.kill(filho.pid!, 'SIGKILL')
+        // 3) encerramento garantido: pedido efetivo + confirmação de saída
+        //    interpretada por plataforma (B1 — Windows: {code, signal:null}).
+        const pedido = filho.kill('SIGKILL')
         matou = true
+        expect(pedido, `pedido de encerramento não aceito (${fronteira})`).toBe(true)
         const morte = await saidaFilho
-        expect(morte.signal, `filho ${fronteira} não morreu com SIGKILL: ${JSON.stringify(morte)}`).toBe('SIGKILL')
+        verificarEncerramentoForcado(process.platform, filho, morte, fronteira)
         filhos.delete(filho.pid!)
 
         // 4) o estado congelado sobrevive à morte (reconferência pós-kill).

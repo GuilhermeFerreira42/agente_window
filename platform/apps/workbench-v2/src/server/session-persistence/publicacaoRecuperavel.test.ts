@@ -13,7 +13,7 @@ import { digestChat, prepararOrigens } from './origensChats'
 import { getDatabase, getSessionRecord, resetDatabase, deleteSessionRecord, type SessionRecord } from './database'
 import { getDatabasePath, resolveProjectDir } from './paths'
 import { deleteTranscript, readTranscript, transcriptPath } from './transcripts'
-import { registerWriteIntent } from './writeIntents'
+import { pendingWriteIntent, registerWriteIntent } from './writeIntents'
 import { sessionPersistencePlugin, transcriptEntries } from './index'
 import type * as IoModule from './io'
 
@@ -607,5 +607,115 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       .toBe(JSON.stringify({ ...sessionJson, persistenceRevision: 99 }))
     expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(id)).toEqual({ n: 1 })
     expect((await readdir(resolveProjectDir(slug))).some(name => name.endsWith('.tmp'))).toBe(true)
+  })
+
+  // ── Revisão B2 — unicidade de mutation_id na migração do journal legado ──
+
+  it('B2: a primeira conexão após a migração legada adiciona as colunas E cria/verifica o índice de unicidade', async () => {
+    // Cenário reproduzido: tabela legada SEM mutation_id (e sem placeholder).
+    getDatabase().exec(`CREATE TABLE session_write_intents (
+      session_id TEXT PRIMARY KEY,
+      base_revision INTEGER NOT NULL, next_revision INTEGER NOT NULL,
+      target_path TEXT NOT NULL, staged_path TEXT NOT NULL, old_digest TEXT, new_digest TEXT NOT NULL,
+      record_json TEXT NOT NULL, origins_json TEXT NOT NULL, request_digest TEXT NOT NULL,
+      creation_id TEXT, creation_digest TEXT, creation_revision INTEGER,
+      checkpoint_cleanup_json TEXT, state TEXT NOT NULL, registered_at INTEGER NOT NULL)`)
+    // Primeira gravação da conexão força a migração.
+    const id = randomUUID(), slug = `pb-b2-mig-${id.slice(0, 8)}`
+    touched.push({ id, slug })
+    const sessao = { id, slug, title: 'b2-migracao', workspace: 'x', workspacePath: `/tmp/${slug}`,
+      section: 'today', status: 'completed', updated: new Date(0).toISOString(), diffAdded: 0, diffRemoved: 0,
+      branch: null, mainChatId: 'chat-main', chats: [{ id: 'chat-main', title: 'Main', status: 'completed', messages: [] }] }
+    getDatabase().prepare(`INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, message_count, created_at, updated_at, session_json)
+      VALUES (?,?,?,?,NULL,0,1,1,?)`).run(id, slug, 'b2-migracao', `/tmp/${slug}`, JSON.stringify({ ...sessao, persistenceRevision: 1 }))
+    registerWriteIntent({
+      sessionId: id, mutationId: randomUUID(), criacao: false, baseRevision: 1, nextRevision: 2,
+      targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.b2.tmp`,
+      oldDigest: 'antigo', newDigest: 'novo',
+      record: { id, slug, title: 'b2-migracao', workspacePath: `/tmp/${slug}`, worktreePath: null,
+        messageCount: 1, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(sessao) },
+      planos: [], checkpointCleanup: null,
+      receipt: { sessionId: id, mutationId: 'm', revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
+    })
+    const colunas = new Set((getDatabase().prepare('PRAGMA table_info(session_write_intents)').all() as Array<{ name: string }>).map(c => c.name))
+    expect(colunas.has('mutation_id'), 'a migração não adicionou mutation_id').toBe(true)
+    expect(colunas.has('placeholder')).toBe(true)
+    const indice = getDatabase().prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='index' AND name='session_write_intents_mutation_uq'").get()
+    expect(indice, 'a conexão ficou marcada como pronta SEM o índice único de mutation_id').toBeDefined()
+    const ehUnico = (getDatabase().prepare('PRAGMA index_list(session_write_intents)').all() as Array<{ name: string; unique: number }>)
+      .find(i => i.name === 'session_write_intents_mutation_uq')
+    expect(ehUnico?.unique, 'o índice de mutation_id não é único').toBe(1)
+  })
+
+  it('B2: rejeita identidade de mutação duplicada entre sessões (rejeição explícita, não erro cru de SQL)', async () => {
+    const a = await novaSessao('b2-dup-a')
+    const b = await novaSessao('b2-dup-b')
+    const mut = randomUUID()
+    const intento = (id: string, slug: string, titulo: string) => ({
+      sessionId: id, mutationId: mut, criacao: false, baseRevision: 1, nextRevision: 2,
+      targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.dup.tmp`,
+      oldDigest: 'antigo', newDigest: 'novo',
+      record: { id, slug, title: titulo, workspacePath: `/tmp/${slug}`, worktreePath: null,
+        messageCount: 1, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ persistenceRevision: 1 }) },
+      planos: [], checkpointCleanup: null,
+      receipt: { sessionId: id, mutationId: mut, revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
+    })
+    registerWriteIntent(intento(a.id, a.slug, 'b2-dup-a'))
+    let erro: unknown
+    try {
+      registerWriteIntent(intento(b.id, b.slug, 'b2-dup-b'))
+    } catch (capturado) { erro = capturado }
+    expect(erro, 'duas sessões receberam a MESMA identidade de mutação').toBeDefined()
+    expect(erro).toMatchObject({ status: 409, code: 'mutation_identity_conflict' })
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(a.id)).toEqual({ n: 1 })
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(b.id)).toEqual({ n: 0 })
+  })
+
+  it('B2: duplicatas legadas preservam os registros e bloqueiam explicitamente novas identidades (sem descarte silencioso)', async () => {
+    // Tentativa antiga COM mutation_id, SEM índice, já gravada com duplicatas.
+    getDatabase().exec(`CREATE TABLE session_write_intents (
+      session_id TEXT PRIMARY KEY, mutation_id TEXT NOT NULL,
+      base_revision INTEGER NOT NULL, next_revision INTEGER NOT NULL,
+      target_path TEXT NOT NULL, staged_path TEXT NOT NULL, old_digest TEXT, new_digest TEXT NOT NULL,
+      record_json TEXT NOT NULL, origins_json TEXT NOT NULL, request_digest TEXT NOT NULL,
+      creation_id TEXT, creation_digest TEXT, creation_revision INTEGER,
+      checkpoint_cleanup_json TEXT, state TEXT NOT NULL, registered_at INTEGER NOT NULL)`)
+    const linha = (sid: string) => `('${sid}', 'mut-antigo', 1, 2, '/tmp/t.jsonl', '/tmp/t.jsonl.tmp', NULL, 'digest',
+      '{}', '[]', 'req', NULL, NULL, NULL, NULL, 'preparado', 1)`
+    getDatabase().exec(`INSERT INTO session_write_intents VALUES ${linha('pb-b2-antiga-x')}, ${linha('pb-b2-antiga-y')}`)
+    // Primeira conexão: as colunas faltantes entram, o índice falha pelas duplicatas
+    // e o estado incompatível é BLOQUEADO explicitamente — nada é apagado.
+    const id = randomUUID(), slug = `pb-b2-bloq-${id.slice(0, 8)}`
+    touched.push({ id, slug })
+    // Linha de catálogo existente (base 1) para que o registro chegue ao journal.
+    getDatabase().prepare(`INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, message_count, created_at, updated_at, session_json)
+      VALUES (?,?,?,?,NULL,0,1,1,?)`).run(id, slug, 'b2-bloqueio', `/tmp/${slug}`,
+      JSON.stringify({ id, slug, persistenceRevision: 1 }))
+    let erro: unknown
+    try {
+      registerWriteIntent({
+        sessionId: id, mutationId: randomUUID(), criacao: false, baseRevision: 1, nextRevision: 2,
+        targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.b2.tmp`,
+        oldDigest: 'antigo', newDigest: 'novo',
+        record: { id, slug, title: 'b2-bloqueio', workspacePath: `/tmp/${slug}`, worktreePath: null,
+          messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: '{}' },
+        planos: [], checkpointCleanup: null,
+        receipt: { sessionId: id, mutationId: 'm', revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
+      })
+    } catch (capturado) { erro = capturado }
+    expect(erro, 'novo journal aceito enquanto a unicidade não está comprovada').toBeDefined()
+    expect(erro).toMatchObject({ status: 503, code: 'session_journal_migration' })
+    // Registros legados intactos: contagem e valores originais, sem DELETE.
+    const antigas = getDatabase().prepare("SELECT session_id, mutation_id FROM session_write_intents WHERE mutation_id='mut-antigo' ORDER BY session_id").all() as Array<{ session_id: string; mutation_id: string }>
+    expect(antigas).toEqual([
+      { session_id: 'pb-b2-antiga-x', mutation_id: 'mut-antigo' },
+      { session_id: 'pb-b2-antiga-y', mutation_id: 'mut-antigo' },
+    ])
+    // Índice continua ausente (nada foi forjado para "conseguir" migrar).
+    expect(getDatabase().prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='index' AND name='session_write_intents_mutation_uq'").get()).toBeUndefined()
+    // A leitura das intenções antigas continua funcionando com diagnóstico explícito.
+    expect(pendingWriteIntent('pb-b2-antiga-x')).toMatchObject({ sessionId: 'pb-b2-antiga-x', mutationId: 'mut-antigo' })
   })
 })
