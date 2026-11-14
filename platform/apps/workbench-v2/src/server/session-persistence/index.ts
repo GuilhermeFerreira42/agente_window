@@ -1,13 +1,15 @@
-import { PersistenceProblem, assertNoPendingPublication, receipt, confirmMutation, mutationOwner } from './sessionMutations'
+import { PersistenceProblem, receipt, mutationOwner } from './sessionMutations'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, removerCheckpointsDeChatsAusentes, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant, getDatabase } from './database'
+import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
 import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
-import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
+import { deleteTranscript, readTranscript, transcriptPath, writeTranscript, type TranscriptEntry } from './transcripts'
+import { reconciliarPublicacao } from './publicacaoRecuperavel'
+import { clearWriteIntent, finalizarPublicacao, pendingOrphanIntentIds, registerWriteIntent, tituloDaIntencao } from './writeIntents'
 import { projetarMensagemPersistida, projetarSessaoPersistida } from '../../domain/projecaoTranscript'
 import { createWorktree, observarGit, removeWorktree, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
@@ -34,7 +36,7 @@ import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, propor
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
 import { recuperarHistorico } from './recuperarHistorico'
-import { prepararOrigens, publicarCatalogoComOrigens, invalidarOrigensForaDaRaiz } from './origensChats'
+import { digestChat, prepararOrigens, invalidarOrigensForaDaRaiz } from './origensChats'
 import { criarConsultaEntreChats, abrirFonteEntreChats } from './consultaEntreChats'
 import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional } from './retomadaOperacional'
 import { criarMemoriaAutomatica, selecionarMemorias, type EscopoMemoria, type FonteMemoria } from './memoriaAutomatica'
@@ -127,7 +129,8 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
   response.end(JSON.stringify(value))
 }
 
-function transcriptEntries(session: Session, anteriores: TranscriptEntry[]): TranscriptEntry[] {
+/** Exported so crash-state fixtures can build byte-identical P-B payloads. */
+export function transcriptEntries(session: Session, anteriores: TranscriptEntry[]): TranscriptEntry[] {
   const publicados = new Map(anteriores.filter(e => e.type !== 'agir_event')
     .map(e => [JSON.stringify([e.chatId, e.uuid, e.type]), e.timestamp]))
   let timestamp = Date.now() - session.chats.reduce((total, chat) => total + chat.messages.length, 0)
@@ -426,20 +429,63 @@ function sanarStatusAposF5(session: Session): Session {
   })
 }
 
-async function listSessions(): Promise<Session[]> {
-  const records = listSessionRecords()
-  const sessions = await Promise.all(records.map((record) => withSessionPersistenceQueue(record.id, async () => {
+export interface SessionUnavailable { sessionId: string; code: string; titulo?: string }
+export interface SessionIndex { sessions: Session[]; unavailable: SessionUnavailable[]; state: 'ok' | 'partial' }
+
+/** Stable diagnostics only — never transcript content or raw parser output. */
+function codigoDeIndisponivel(error: unknown): string {
+  if (error instanceof PersistenceProblem) return error.code
+  if (error instanceof Error && /^Histórico inválido na linha \d+\.$/.test(error.message)) return 'transcript_invalid'
+  return 'session_unavailable'
+}
+
+async function listSessions(): Promise<SessionIndex> {
+  let records: ReturnType<typeof listSessionRecords>
+  // H1: a criação interrompida não tem linha de catálogo — descoberta e
+  // reconciliação das intenções órfãs ANTES de listar o catálogo.
+  let orfaos: string[]
+  try {
+    orfaos = pendingOrphanIntentIds()
+  } catch {
+    orfaos = []
+  }
+  const diagnosticoOrfaos = await Promise.all(orfaos.map((sessionId) => withSessionPersistenceQueue(sessionId, async () => {
+    try {
+      await reconciliarPublicacao(sessionId)
+      return undefined
+    } catch (error: unknown) {
+      return { sessionId, code: codigoDeIndisponivel(error), titulo: tituloDaIntencao(sessionId) }
+    }
+  })))
+  try {
+    // Fetched AFTER the orphan pass so a creation finalized there is listed.
+    records = listSessionRecords()
+  } catch {
+    // SPEC §4: total catalog failure is an explicit 503, never an empty list.
+    throw new PersistenceProblem(503, 'sessions_unavailable',
+      'Não foi possível carregar as conversas salvas. O catálogo do servidor está indisponível; tente novamente.')
+  }
+  const resultados = await Promise.all(records.map((record) => withSessionPersistenceQueue(record.id, async () => {
     // Re-read inside the queue: the record may have changed or been deleted
-    // while this GET waited for an in-flight save.
-    assertNoPendingPublication(record.id)
+    // while this GET waited for an in-flight save. A pending P-B journal is
+    // reconciled first; one unrecoverable item must not drop the healthy ones.
+    await reconciliarPublicacao(record.id)
     const current = getSessionRecord(record.id)
     if (!current) return undefined
     const session = JSON.parse(current.sessionJson) as Session
     const entries = await readTranscript(current.slug, current.id)
     if (current.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
     return sanarStatusAposF5(restoreMessages(session, entries))
-  })))
-  return sessions.filter((session): session is Session => session !== undefined)
+  }).then((session) => ({ session }))
+    .catch((error: unknown) => ({ unavailable: { sessionId: record.id, code: codigoDeIndisponivel(error), titulo: record.title } }))))
+  const sessions: Session[] = []
+  const unavailable: SessionUnavailable[] = []
+  for (const diagnostico of diagnosticoOrfaos) if (diagnostico) unavailable.push(diagnostico)
+  for (const resultado of resultados) {
+    if ('unavailable' in resultado) unavailable.push(resultado.unavailable)
+    else if (resultado.session) sessions.push(resultado.session)
+  }
+  return { sessions, unavailable, state: unavailable.length ? 'partial' : 'ok' }
 }
 
 async function saveSession(input: PersistedSessionPayload & { expectedRevision?: number; mutationId?: string; creationId?: string }, create: boolean): Promise<{ session: Session; mutationId: string; revision: number }> {
@@ -465,7 +511,9 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
   // Ignore browser counters. The request digest proves identity of a retried operation.
   const digest = createHash('sha256').update(JSON.stringify({ session: { ...session, persistenceRevision: undefined }, baseRevision: create ? null : expectedRevision })).digest('hex')
   return withSessionPersistenceQueue(session.id, async () => {
-    assertNoPendingPublication(session.id)
+    // P-B step 6: resolve a journal left by an interrupted publication BEFORE
+    // anything else, so CAS/receipt decisions see the reconciled truth.
+    await reconciliarPublicacao(session.id)
     const existing = getSessionRecord(session.id)
     const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
     const storedRevision = existingSession?.persistenceRevision ?? 0
@@ -498,20 +546,52 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     const eventos = anteriores.filter(entry => entry.type === 'agir_event' && chatIds.has(entry.chatId))
     const pasta = validateWorkspacePath(session.worktreePath || session.workspacePath)
     const planos = prepararOrigens(session, existingSession, anteriores, pasta.valid && pasta.exists && pasta.isDir ? pasta.realpath : null)
+    // The journal carries per-chat digests so finalization never needs the message bodies.
+    for (const plano of planos) plano.digest = digestChat(entries, plano.chatId)
     const committed = { ...session, slug, persistenceRevision: revision }
     const metadata = { ...committed, worktreePath: session.worktreePath ?? null, chats: session.chats.map(c => ({ ...c, messages: [] })) }
-    // Existing atomic writer also rolls back a live catalog failure. Crash recovery remains P-B.
-    await writeTranscript(slug, session.id, [...entries, ...eventos], {
-      expectedEntries: anteriores,
-      commit: () => getDatabase().transaction(() => {
-        publicarCatalogoComOrigens({ id: session.id, slug, title: session.title, workspacePath: session.workspacePath,
-          worktreePath: metadata.worktreePath, messageCount: entries.length, createdAt: existing?.createdAt ?? session.createdSeq ?? now,
-          updatedAt: now, sessionJson: JSON.stringify(metadata) }, planos, entries)
-        confirmMutation({ sessionId: session.id, mutationId, revision, digest, creationId: create ? mutationId : null,
-          creationDigest: create ? digest : null, creationRevision: create ? revision : null })
-        if (existingSession?.chats.some(c => !chatIds.has(c.id))) removerCheckpointsDeChatsAusentes(session.id, [...chatIds])
-      })(),
-    })
+    const record = {
+      id: session.id, slug, title: session.title, workspacePath: session.workspacePath,
+      worktreePath: session.worktreePath ?? null, messageCount: entries.length,
+      createdAt: existing?.createdAt ?? session.createdSeq ?? now, updatedAt: now,
+      sessionJson: JSON.stringify(metadata),
+    }
+    const checkpointCleanup = existingSession?.chats.some(c => !chatIds.has(c.id)) ? [...chatIds] : null
+    const receiptDaOperacao = {
+      sessionId: session.id, mutationId, revision, digest,
+      creationId: create ? mutationId : null, creationDigest: create ? digest : null,
+      creationRevision: create ? revision : null,
+    }
+    try {
+      // The existing coordinated writer runs the P-B protocol: stage (wx) →
+      // durable intent (short tx) → destination re-verification → rename →
+      // catalog+origins+revision+ACK+intent finalization in ONE transaction,
+      // with live compensation for a failed commit (SPEC §3 steps 2–5).
+      await writeTranscript(slug, session.id, [...entries, ...eventos], {
+        expectedEntries: anteriores,
+        prepararIntencao: ({ stagedPath, newDigest, oldDigest }) => registerWriteIntent({
+          sessionId: session.id, mutationId, criacao: create, baseRevision: create ? 0 : expectedRevision!,
+          nextRevision: revision, targetPath: transcriptPath(slug, session.id), stagedPath,
+          oldDigest, newDigest, record, planos, receipt: receiptDaOperacao, checkpointCleanup,
+        }),
+        commit: () => finalizarPublicacao({ record, planos, receipt: receiptDaOperacao, checkpointCleanup }),
+      })
+    } catch (error) {
+      if (error instanceof PersistenceProblem && error.status === 409 && error.code === 'transcript_changed') {
+        // The writer proved the destination no longer holds the recorded base
+        // (external change). Nothing of this operation was published; release
+        // only our own journal entry and surface the conflict — never overwrite.
+        clearWriteIntent(session.id, mutationId)
+        throw error
+      }
+      // Divergent or unprovable state: the explicit pending diagnosis wins.
+      const resultado = await reconciliarPublicacao(session.id, { mutationEsperada: mutationId })
+      // A rename that landed while the commit failed is finalized here — the
+      // content is complete and identical to this attempt. Otherwise the prior
+      // state is provably intact and the original failure stands.
+      if (resultado === 'finalizado') return { session: committed, revision, mutationId }
+      throw error
+    }
     return { session: committed, revision, mutationId }
   })
 }
@@ -599,6 +679,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     const session = await withSessionPersistenceQueue(input.sessionId, async () => {
       // Read/patch the CURRENT catalog under one gate. A workspace operation
       // never republishes messages from a snapshot obtained before this gate.
+      await reconciliarPublicacao(input.sessionId)
       const record = getSessionRecord(input.sessionId)
       if (!record) return undefined
       const current = JSON.parse(record.sessionJson) as Session
@@ -737,7 +818,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   if (url.pathname === API_PREFIX && request.method === 'GET') {
-    sendJson(response, 200, { sessions: await listSessions() })
+    sendJson(response, 200, await listSessions())
     return true
   }
 
@@ -753,7 +834,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (byId && request.method === 'GET') {
     const id = decodeURIComponent(byId[1])
     const result = await withSessionPersistenceQueue(id, async () => {
-      assertNoPendingPublication(id)
+      await reconciliarPublicacao(id)
       const record = getSessionRecord(id)
       if (!record) return undefined
       const entries = await readTranscript(record.slug, id)

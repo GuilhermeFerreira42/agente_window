@@ -154,8 +154,10 @@ export function prepararOrigens(session: Session, anterior: Session | undefined,
   })
 }
 
-/** SQLite metadata + provenance are one commit, after the existing atomic JSONL writer. */
-export function publicarCatalogoComOrigens(record: SessionRecord, planos: OrigemChat[], entries: TranscriptEntry[]): void {
+/** SQLite metadata + provenance are one commit, after the existing atomic JSONL writer.
+ *  Digests arrive precomputed inside the P-B journal (no message bodies there);
+ *  `entries` remains supported for direct callers. */
+export function publicarCatalogoComOrigens(record: SessionRecord, planos: OrigemChat[], entries?: TranscriptEntry[]): void {
   const connection = db()
   connection.transaction(() => {
     upsertSessionRecord(record)
@@ -167,7 +169,7 @@ export function publicarCatalogoComOrigens(record: SessionRecord, planos: Origem
       ON CONFLICT(session_id,chat_id) DO UPDATE SET epoch=excluded.epoch,operator_id=excluded.operator_id,
       project_key=excluded.project_key,root_identity=excluded.root_identity,state=excluded.state,digest=excluded.digest,title=excluded.title,
       title_norm=excluded.title_norm,session_title=excluded.session_title,chat_title=excluded.chat_title,updated_at=excluded.updated_at`)
-    for (const plano of planos) inserir.run({ ...plano, digest: digestChat(entries, plano.chatId) })
+    for (const plano of planos) inserir.run({ ...plano, digest: plano.digest || (entries ? digestChat(entries, plano.chatId) : '') })
   })()
 }
 

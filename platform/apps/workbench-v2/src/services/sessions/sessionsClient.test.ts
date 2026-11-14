@@ -78,3 +78,24 @@ describe('session write queue and HTTP boundary', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('P-B hydration diagnostics (SPEC §4)', () => {
+  it('consumes partial hydration diagnostics without losing the confirmed base', async () => {
+    const session = { ...make(), persistenceRevision: 4 }
+    fetchMock.mockResolvedValueOnce(json({ sessions: [session], unavailable: [{ sessionId: 'outra-conversa', code: 'transcript_invalid', titulo: 'Conversa com problema' }], state: 'partial' }))
+    const resultado = await loadPersistedSessions()
+    expect(resultado.state).toBe('partial')
+    expect(resultado.unavailable).toEqual([{ sessionId: 'outra-conversa', code: 'transcript_invalid', titulo: 'Conversa com problema' }])
+    expect(resultado.sessions.map(item => item.id)).toEqual([session.id])
+    // a base confirmada continua governando o esperado do próximo PUT
+    fetchMock.mockImplementation((_url, init) => Promise.resolve(ack(init, 5)))
+    await expect(persistSession({ ...session, title: 'editada' })).resolves.toMatchObject({ persistenceRevision: 5 })
+    const enviado = JSON.parse(String(fetchMock.mock.calls[1][1]?.body))
+    expect(enviado.expectedRevision).toBe(4)
+  })
+
+  it('surfaces a total catalog failure as an error — never an empty success', async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: 'sessions_unavailable', message: 'Lista indisponível.' }, 503))
+    await expect(loadPersistedSessions()).rejects.toMatchObject({ status: 503, code: 'sessions_unavailable' })
+  })
+})

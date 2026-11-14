@@ -8,7 +8,7 @@ import { testSessions } from './fixtures/sessions'
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
-  loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
+  loadPersistedSessions: vi.fn(async () => ({ sessions: (await import('./fixtures/sessions')).testSessions, unavailable: [], state: 'ok' as const })),
   persistSession: vi.fn(async () => undefined),
   pickSessionWorkspace: vi.fn(async () => undefined),
   createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
@@ -1937,3 +1937,98 @@ describe('App session flows', () => {
 
 })
 
+describe('P-B hidratação parcial (SPEC §4)', () => {
+  it('mostra o banner parcial distinto do erro total e mantém as conversas saudáveis na lista', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'conversa-quebrada', code: 'transcript_missing' }],
+      state: 'partial',
+    })
+    render(<App />)
+    // diagnóstico parcial visível e explícito (indisponível ≠ vazia)
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText(/não é uma conversa vazia ou inexistente/)).toBeInTheDocument()
+    // as conversas saudáveis seguem listadas — indisponível não esvazia a lista
+    expect(await screen.findByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+    // distinto do estado de falha total
+    expect(screen.queryByText(/a lista do servidor está indisponível/)).not.toBeInTheDocument()
+  })
+
+  // H5 — abertura SEM cache local: cada item indisponível aparece por título
+  // (quando o servidor envia) ou por identidade — nunca como conversa vazia.
+  it('H5: identifica cada conversa indisponível por título ou identidade, sem cache local', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [
+        { sessionId: 'conversa-xyz', code: 'transcript_missing', titulo: 'Conversa com problema' },
+        { sessionId: 'outra-sem-titulo', code: 'session_publication_pending' },
+      ],
+      state: 'partial',
+    })
+    render(<App />)
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent('Não foi possível carregar 2 conversas salvas.')
+    // título identifica a primeira; sem título, a própria identidade identifica a segunda
+    expect(banner).toHaveTextContent('Conversa com problema')
+    expect(banner).toHaveTextContent('outra-sem-titulo')
+    // a lista NÃO recebe uma conversa vazia para o item indisponível
+    expect(screen.queryByText('conversa-xyz')).not.toBeInTheDocument()
+    expect(screen.getByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+  })
+
+  // H5 — retentativa no fluxo existente + retorno após recuperação no servidor.
+  it('H5: retentativa remove o banner e restaura a conversa recuperada no servidor', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    const user = userEvent.setup()
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'conversa-recuperavel', code: 'transcript_missing', titulo: 'Conversa recuperável' }],
+      state: 'partial',
+    })
+    render(<App />)
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText('Conversa recuperável')).toBeInTheDocument()
+
+    // Retentativa (botão do fluxo existente) → servidor já reconciliou → retorno íntegro.
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: [...testSessions, { ...testSessions[0], id: 'conversa-recuperavel', title: 'Conversa recuperável' }],
+      unavailable: [],
+      state: 'ok',
+    })
+    await user.click(screen.getByRole('button', { name: 'Tentar carregar conversas novamente' }))
+    await screen.findByText('Conversa recuperável')
+    expect(screen.queryByText(/Não foi possível carregar/)).not.toBeInTheDocument()
+    expect(screen.getByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+  })
+
+  // H5 — edições locais: a cópia de recuperação local sobrevive à hidratação
+  // parcial e vira a conversa ativa com o conteúdo editado visível.
+  it('H5: preserva edições locais durante a hidratação parcial', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    const local: typeof testSessions[number] = {
+      ...testSessions[0],
+      id: 'local-edições-1',
+      title: 'Rascunho local',
+      chats: testSessions[0].chats.map((chat, index) => index === 0
+        ? { ...chat, messages: [{ ...chat.messages[0], content: 'rascunho local editado' }] }
+        : chat),
+    }
+    window.localStorage.setItem('workbench.sessions.unsaved.v1', JSON.stringify([
+      { session: local, message: 'A conversa possui alterações locais não salvas.', kind: 'local' },
+    ]))
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: [],
+      unavailable: [{ sessionId: 'outra-indisponivel', code: 'session_publication_pending', titulo: 'Outra conversa' }],
+      state: 'partial',
+    })
+    render(<App />)
+    // a edição local está visível (a cópia local foi restaurada, não apagada)
+    expect(await screen.findByText('Rascunho local')).toBeInTheDocument()
+    expect(await screen.findByText('rascunho local editado')).toBeInTheDocument()
+    // e o banner continua identificando a indisponível do servidor
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText('Outra conversa')).toBeInTheDocument()
+  })
+})
