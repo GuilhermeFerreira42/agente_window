@@ -3,15 +3,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { deleteSessionRecord, excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
+import { excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
 import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
+import { consultarDelecao, deletionsPendentes, executarLimpezaDelecao, iniciarOuConsultarDelecao, problemaSessaoExcluida, sessaoExcluida } from './deletions'
 import { sanitizePath } from './paths'
-import { deleteTranscript, readTranscript, transcriptPath, writeTranscript, type TranscriptEntry } from './transcripts'
+import { readTranscript, transcriptPath, writeTranscript, type TranscriptEntry } from './transcripts'
 import { reconciliarPublicacao } from './publicacaoRecuperavel'
-import { clearWriteIntent, finalizarPublicacao, pendingOrphanIntentIds, registerWriteIntent, tituloDaIntencao } from './writeIntents'
+import { clearWriteIntent, finalizarPublicacao, hasPendingWriteIntent, pendingOrphanIntentIds, registerWriteIntent, tituloDaIntencao } from './writeIntents'
 import { projetarMensagemPersistida, projetarSessaoPersistida } from '../../domain/projecaoTranscript'
-import { createWorktree, observarGit, removeWorktree, WorktreeDirtyError } from './worktrees'
+import { createWorktree, observarGit, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
 // FATIA 08 (D69): Provedores é a primeira CASA (bairro 2). A "prefeitura" só
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
@@ -457,6 +458,25 @@ async function listSessions(): Promise<SessionIndex> {
       return { sessionId, code: codigoDeIndisponivel(error), titulo: tituloDaIntencao(sessionId) }
     }
   })))
+  // P-C §6 — retomada de limpeza pendente ANTES do catálogo: uma exclusão
+  // interrompida por reinício continua da fronteira gravada; um rollback de
+  // primeira tentativa recusada devolve o registro vivo à mesma listagem.
+  // Catálogo inacessível não vira 500 aqui: a passagem 503 abaixo continua
+  // sendo a resposta honesta (SPEC §4 — nunca 200 com lista vazia).
+  let pendentes: ReturnType<typeof deletionsPendentes> = []
+  try { pendentes = deletionsPendentes() } catch { pendentes = [] }
+  const retomadas = await Promise.all(pendentes.map((tombstone) => withSessionPersistenceQueue(tombstone.sessionId, async () => {
+    try {
+      await executarLimpezaDelecao(tombstone.sessionId, false)
+      return undefined
+    } catch (error: unknown) {
+      if (!consultarDelecao(tombstone.sessionId)) return undefined
+      const code = error instanceof WorktreeDirtyError ? 'worktree_dirty'
+        : error instanceof PersistenceProblem ? error.code
+        : 'session_cleanup_failed'
+      return { sessionId: tombstone.sessionId, code } satisfies SessionUnavailable
+    }
+  })))
   try {
     // Fetched AFTER the orphan pass so a creation finalized there is listed.
     records = listSessionRecords()
@@ -466,6 +486,9 @@ async function listSessions(): Promise<SessionIndex> {
       'Não foi possível carregar as conversas salvas. O catálogo do servidor está indisponível; tente novamente.')
   }
   const resultados = await Promise.all(records.map((record) => withSessionPersistenceQueue(record.id, async () => {
+    // P-C §6 — o tombstone tira a sessão da projeção ativa; a retomada e o
+    // diagnóstico honesto já foram resolvidos na passagem `pendentes`.
+    if (sessaoExcluida(record.id)) return undefined
     // Re-read inside the queue: the record may have changed or been deleted
     // while this GET waited for an in-flight save. A pending P-B journal is
     // reconciled first; one unrecoverable item must not drop the healthy ones.
@@ -481,6 +504,7 @@ async function listSessions(): Promise<SessionIndex> {
   const sessions: Session[] = []
   const unavailable: SessionUnavailable[] = []
   for (const diagnostico of diagnosticoOrfaos) if (diagnostico) unavailable.push(diagnostico)
+  for (const retomada of retomadas) if (retomada) unavailable.push(retomada)
   for (const resultado of resultados) {
     if ('unavailable' in resultado) unavailable.push(resultado.unavailable)
     else if (resultado.session) sessions.push(resultado.session)
@@ -514,6 +538,9 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     // P-B step 6: resolve a journal left by an interrupted publication BEFORE
     // anything else, so CAS/receipt decisions see the reconciled truth.
     await reconciliarPublicacao(session.id)
+    // P-C §2 — estado durável de exclusão recusa PUT e POST tardios: nem a
+    // gravação pendente nem um reenvio de criação reabrem a conversa.
+    if (sessaoExcluida(session.id)) throw problemaSessaoExcluida()
     const existing = getSessionRecord(session.id)
     const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
     const storedRevision = existingSession?.persistenceRevision ?? 0
@@ -834,6 +861,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (byId && request.method === 'GET') {
     const id = decodeURIComponent(byId[1])
     const result = await withSessionPersistenceQueue(id, async () => {
+      // P-C §2 — leitura por identidade distingue excluído (410) de inexistente (404).
+      if (sessaoExcluida(id)) throw problemaSessaoExcluida()
       await reconciliarPublicacao(id)
       const record = getSessionRecord(id)
       if (!record) return undefined
@@ -849,27 +878,46 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   const match = url.pathname.match(/^\/api\/sessions\/([^/]+)$/)
   if (match && request.method === 'DELETE') {
     const id = decodeURIComponent(match[1])
-    const result = await withSessionPersistenceQueue(id, async () => {
-      const record = getSessionRecord(id)
-      if (!record) return { dirtyWorktree: undefined }
-      if (record.worktreePath) {
-        try {
-          await removeWorktree(record.workspacePath, record.worktreePath, id, url.searchParams.get('force') === 'true')
-        } catch (error) {
-          if (error instanceof WorktreeDirtyError) return { dirtyWorktree: error.message }
-          throw error
-        }
-      }
-      await deleteTranscript(record.slug, id)
-      deleteSessionRecord(id)
-      return { dirtyWorktree: undefined }
-    })
-    if (result.dirtyWorktree) {
-      sendJson(response, 409, { code: 'worktree_dirty', message: result.dirtyWorktree })
+    const force = url.searchParams.get('force') === 'true'
+    // P-C §6 — o DELETE exige identidade da tentativa e revisão esperada.
+    let body: { deletionId?: unknown; expectedRevision?: unknown }
+    try {
+      body = await readJson<{ deletionId?: unknown; expectedRevision?: unknown }>(request)
+    } catch {
+      body = {}
+    }
+    const { deletionId, expectedRevision } = body
+    if (typeof deletionId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deletionId)
+      || !validPersistenceRevision(expectedRevision)) {
+      sendJson(response, 400, { code: 'invalid_deletion_request',
+        message: 'Informe a identidade da tentativa e a revisão esperada desta exclusão.' })
       return true
     }
-    sendJson(response, 200, { ok: true })
-    return true
+    try {
+      const resultado = await withSessionPersistenceQueue(id, async () => {
+        // Conflito com a fila P-B: nenhuma exclusão sob intenção pendente de
+        // publicação — os dois protocolos seguem íntegros.
+        if (hasPendingWriteIntent(id)) throw new PersistenceProblem(409, 'session_publication_pending',
+          'Há uma gravação desta conversa ainda em publicação. Aguarde a conclusão e tente novamente.')
+        iniciarOuConsultarDelecao({ sessionId: id, deletionId, expectedRevision })
+        const tombstone = await executarLimpezaDelecao(id, force)
+        // O eco é a identidade QUE VENCE no tombstone: um reenvio com outra
+        // identidade consulta o estado sem trocar o alvo registrado.
+        return { estado: tombstone.cleanupState, deletionId: tombstone.deletionId }
+      })
+      // `estado` nunca é `concluido` só porque a remoção começou: o retorno
+      // reflete o escopo realmente executado nesta chamada.
+      sendJson(response, 200, { ok: true, estado: resultado.estado, deletionId: resultado.deletionId })
+      return true
+    } catch (error) {
+      if (error instanceof WorktreeDirtyError) {
+        sendJson(response, 409, { code: 'worktree_dirty',
+          message: 'Este worktree possui alterações locais não commitadas.' })
+        return true
+      }
+      throw error
+    }
   }
 
   sendJson(response, 404, { code: 'not_found', message: 'Session endpoint not found' })

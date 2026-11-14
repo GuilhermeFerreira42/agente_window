@@ -94,6 +94,18 @@ export function getDatabase(): Database.Database {
     CREATE UNIQUE INDEX IF NOT EXISTS project_memory_current_idx
       ON project_memories (project_key, memory_id) WHERE current = 1;
   `)
+  // P-C §6 — tombstone mínimo da exclusão no MESMO SQLite (sem FK: tem de
+  // sobreviver ao próprio registro). Criado na PRIMEIRA conexão, inclusive
+  // em bases legadas já existentes; nenhum banco/fila paralelo.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS session_deletions (
+      session_id TEXT PRIMARY KEY,
+      deletion_id TEXT NOT NULL UNIQUE,
+      revision INTEGER NOT NULL,
+      requested_at INTEGER NOT NULL,
+      cleanup_state TEXT NOT NULL CHECK (cleanup_state IN ('preparado', 'limpeza_pendente', 'concluido'))
+    );
+  `)
   return database
 }
 
@@ -191,8 +203,44 @@ export function upsertSessionRecord(record: SessionRecord): void {
   `).run(record)
 }
 
+/** P-C §6 — identidade durável da exclusão no MESMO SQLite (sem FK: sobrevive
+ * ao próprio registro; não é um segundo catálogo). */
+export interface TombstoneDelecao {
+  sessionId: string
+  deletionId: string
+  revision: number
+  requestedAt: number
+  cleanupState: 'preparado' | 'limpeza_pendente' | 'concluido'
+}
+
+const SELECT_TOMBSTONE = `
+  SELECT session_id AS sessionId, deletion_id AS deletionId, revision,
+    requested_at AS requestedAt, cleanup_state AS cleanupState
+  FROM session_deletions WHERE session_id = ?`
+
+export function consultarDelecao(sessionId: string): TombstoneDelecao | undefined {
+  return getDatabase().prepare(SELECT_TOMBSTONE).get(sessionId) as TombstoneDelecao | undefined
+}
+
+/** 410 estável: registro excluído não reabre nem aceita gravação/execução. */
+export function problemaSessaoExcluida(): PersistenceProblem {
+  return new PersistenceProblem(410, 'session_deleted',
+    'Esta conversa foi excluída. Gravações, execuções e reaberturas não são mais aceitas.')
+}
+
 export function getSessionRecord(id: string): SessionRecord | undefined {
   assertSessionPublicationReadable(id)
+  // P-C §2 — o leitor de contrato único confere o ciclo de vida: nenhum
+  // callback/rota que passe por aqui serve conteúdo de conversa excluída.
+  if (consultarDelecao(id)) throw problemaSessaoExcluida()
+  return getSessionRecordRaw(id)
+}
+
+/** P-C — leitura interna do catálogo usada pelo fluxo de exclusão/limpeza:
+ * sem fronteiras de publicação nem de vida, porque o próprio tombstone é o
+ * estado que esta operação grava. Os consumidores de contrato continuam em
+ * `getSessionRecord`. */
+export function getSessionRecordRaw(id: string): SessionRecord | undefined {
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
       worktree_path AS worktreePath, message_count AS messageCount,
@@ -247,7 +295,7 @@ export function revokeSessionToolGrants(sessionId: string): void {
 }
 
 export function deleteSessionRecord(id: string): SessionRecord | undefined {
-  const existing = getSessionRecord(id)
+  const existing = getSessionRecordRaw(id)
   if (existing) getDatabase().prepare('DELETE FROM sessions WHERE id = ?').run(id)
   return existing
 }

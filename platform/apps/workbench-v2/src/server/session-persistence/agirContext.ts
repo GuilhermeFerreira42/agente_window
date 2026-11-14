@@ -1,5 +1,6 @@
 import type { Session } from '../../types'
 import { getSessionRecord, listSessionToolGrants } from './database'
+import { sessaoExcluida } from './deletions'
 import { validateWorkspacePath } from './workspaces'
 
 export interface ContextoAgirPersistido {
@@ -14,6 +15,11 @@ export function resolverContextoAgir(sessionId: string, chatId: string):
   | { ok: false; message: string } {
   if (!sessionId || sessionId.length > 200 || !chatId || chatId.length > 200) {
     return { ok: false, message: 'Contexto da sessão ou conversa inválido.' }
+  }
+  // P-C §2 — todos os leitores/callbacks conferem o ciclo de vida: um run
+  // (início, instrução, aprovação, stream) não nasce em conversa excluída.
+  if (sessaoExcluida(sessionId)) {
+    return { ok: false, message: 'A conversa foi excluída; nenhuma ação foi iniciada.' }
   }
   const record = getSessionRecord(sessionId)
   if (!record) {
