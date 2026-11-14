@@ -8,7 +8,7 @@ import { testSessions } from './fixtures/sessions'
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
-  loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
+  loadPersistedSessions: vi.fn(async () => ({ sessions: (await import('./fixtures/sessions')).testSessions, unavailable: [], state: 'ok' as const })),
   persistSession: vi.fn(async () => undefined),
   pickSessionWorkspace: vi.fn(async () => undefined),
   createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
@@ -1937,3 +1937,21 @@ describe('App session flows', () => {
 
 })
 
+describe('P-B hidratação parcial (SPEC §4)', () => {
+  it('mostra o banner parcial distinto do erro total e mantém as conversas saudáveis na lista', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'conversa-quebrada', code: 'transcript_missing' }],
+      state: 'partial',
+    })
+    render(<App />)
+    // diagnóstico parcial visível e explícito (indisponível ≠ vazia)
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText(/não é uma conversa vazia ou inexistente/)).toBeInTheDocument()
+    // as conversas saudáveis seguem listadas — indisponível não esvazia a lista
+    expect(await screen.findByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+    // distinto do estado de falha total
+    expect(screen.queryByText(/a lista do servidor está indisponível/)).not.toBeInTheDocument()
+  })
+})

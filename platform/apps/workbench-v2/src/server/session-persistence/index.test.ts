@@ -507,9 +507,12 @@ describe('session persistence HTTP contract', () => {
 
   it('P-A: earlier P-B intent with FK is preserved and blocks reads/writes without destructive migration', async () => {
     const id = randomUUID(), session = makeSession(id, id, 'old')
-    touched.push({ id, slug: id }); await putSession(server, session)
-    getDatabase().exec(`CREATE TABLE session_write_intents(session_id TEXT PRIMARY KEY REFERENCES sessions(id), marker TEXT);
-      INSERT INTO session_write_intents VALUES('${id}','preserve-fixture')`)
+    touched.push({ id, slug: id })
+    // The FK'd minimal journal of the earlier (non-homologated) attempt must
+    // pre-date this product's first touch of the profile: migration is additive.
+    getDatabase().exec(`CREATE TABLE session_write_intents(session_id TEXT PRIMARY KEY REFERENCES sessions(id), marker TEXT)`)
+    expect((await putSession(server, session)).status).toBe(200)
+    getDatabase().prepare(`INSERT INTO session_write_intents(session_id, marker) VALUES(?, 'preserve-fixture')`).run(id)
     resetDatabase()
     try {
       expect((await mutation({ ...session, title: 'blocked' }, 1)).status).toBe(503)
@@ -525,7 +528,7 @@ describe('session persistence HTTP contract', () => {
     touched.push({ id, slug: id }); await putSession(server, session)
     const native = globalThis.fetch
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => native(typeof input === 'string' && input.startsWith('/') ? server.baseUrl + input : input, init))
-    const hydrated = (await loadPersistedSessions()).find(s => s.id === id)!
+    const hydrated = (await loadPersistedSessions()).sessions.find(s => s.id === id)!
     await expect(persistSession({ ...hydrated, title: 'after reload' })).resolves.toMatchObject({ id, title: 'after reload', persistenceRevision: 2 })
     expect(getSessionRecord(id)?.title).toBe('after reload')
   })
