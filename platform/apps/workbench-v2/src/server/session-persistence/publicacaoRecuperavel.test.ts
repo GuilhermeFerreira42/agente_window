@@ -30,25 +30,27 @@ vi.mock('./io', async (importOriginal) => {
   const actual = await importOriginal<typeof IoModule>()
   const stagePattern = /\.\d+\.[0-9a-f-]{36}\.tmp$/
   return {
-    ...actual,
-    writeFile: async (path: Parameters<typeof actual.writeFile>[0], data: Parameters<typeof actual.writeFile>[1], options?: Parameters<typeof actual.writeFile>[2]) => {
+    io: {
+      ...actual.io,
+      writeFile: async (path: Parameters<typeof actual.io.writeFile>[0], data: Parameters<typeof actual.io.writeFile>[1], options?: Parameters<typeof actual.io.writeFile>[2]) => {
       if (fsFault.failStageWrite && typeof path === 'string' && stagePattern.test(path)) {
         fsFault.failStageWrite = false
         throw Object.assign(new Error('injected stage failure'), { code: 'EIO' })
       }
-      const result = await actual.writeFile(path, data, options)
+      const result = await actual.io.writeFile(path, data, options)
       if (fsFault.mutateDestAfterStage && typeof path === 'string' && stagePattern.test(path)) {
         fsFault.mutateDestAfterStage = false
-        await actual.writeFile(String(path).replace(stagePattern, ''), 'EXTERNAL CHANGE\n', 'utf8')
+        await actual.io.writeFile(String(path).replace(stagePattern, ''), 'EXTERNAL CHANGE\n', 'utf8')
       }
       return result
     },
-    rename: async (source: Parameters<typeof actual.rename>[0], destination: Parameters<typeof actual.rename>[1]) => {
-      if (fsFault.failStageRename && typeof source === 'string' && stagePattern.test(source)) {
-        fsFault.failStageRename = false
-        throw Object.assign(new Error('injected rename failure'), { code: 'EIO' })
-      }
-      return actual.rename(source, destination)
+      rename: async (source: Parameters<typeof actual.io.rename>[0], destination: Parameters<typeof actual.io.rename>[1]) => {
+        if (fsFault.failStageRename && typeof source === 'string' && stagePattern.test(source)) {
+          fsFault.failStageRename = false
+          throw Object.assign(new Error('injected rename failure'), { code: 'EIO' })
+        }
+        return actual.io.rename(source, destination)
+      },
     },
   }
 })
@@ -455,7 +457,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
     expect(getDatabase().prepare('SELECT marker FROM session_write_intents WHERE session_id=?').get(bloqueada)).toEqual({ marker: 'preserve-fixture' })
     const listada = await listagem(server)
     expect(listada.state).toBe('partial')
-    expect(listada.unavailable).toEqual([{ sessionId: bloqueada, code: 'session_publication_pending' }])
+    expect(listada.unavailable).toEqual([{ sessionId: bloqueada, code: 'session_publication_pending', titulo: 'antiga-A' }])
     expect(listada.sessions.find(s => s.id === saudavel)?.title).toBe('B editado')
     expect(listada.sessions.some(s => s.id === bloqueada)).toBe(false)
     // remoção manual do legado (operação humana) devolve a sessão ao normal
@@ -472,7 +474,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
     await writeFile(transcriptPath(slugA, corrompida), 'SYNTAX ERROR\n', 'utf8')
     let listada = await listagem(server)
     expect(listada.state).toBe('partial')
-    expect(listada.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_invalid' }])
+    expect(listada.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_invalid', titulo: 'corrompida' }])
     expect(listada.sessions.map(s => s.id)).toEqual([saudavel])
     expect(listada.sessions[0].chats[0].messages).toHaveLength(2)
     expect(listada.sessions[0].title).toBe('saudavel')
@@ -480,7 +482,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
     await unlink(transcriptPath(slugA, corrompida))
     listada = await listagem(server)
     expect(listada.state).toBe('partial')
-    expect(listada.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_missing' }])
+    expect(listada.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_missing', titulo: 'corrompida' }])
     expect(listada.sessions.map(s => s.id)).toEqual([saudavel])
     const porId = await fetch(`${server.baseUrl}/api/sessions/${corrompida}`)
     expect(porId.status).toBe(503)
@@ -508,10 +510,102 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => native(typeof input === 'string' && input.startsWith('/') ? server.baseUrl + input : input, init))
     const resultado = await loadPersistedSessions()
     expect(resultado.state).toBe('partial')
-    expect(resultado.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_invalid' }])
+    expect(resultado.unavailable).toEqual([{ sessionId: corrompida, code: 'transcript_invalid', titulo: 'parcial-cliente' }])
     expect(resultado.sessions.map(s => s.id)).toEqual([saudavel])
     // a base confirmada da conversa saudável é reutilizada sem conflito artificial
     await expect(persistSession({ ...resultado.sessions[0], title: 'editada pelo cliente' }))
       .resolves.toMatchObject({ id: saudavel, title: 'editada pelo cliente', persistenceRevision: 2 })
+  })
+
+
+  // ── Revisão P-B (homologação independente) — H1–H3 ──
+
+  it('H1: criação interrompida sem linha de catálogo é descoberta pela listagem (ou vira diagnóstico explícito)', async () => {
+    const id = randomUUID(), slug = `pb-h1-${id.slice(0, 8)}`
+    touched.push({ id, slug })
+    const bruta = makeSession(id, slug, 'h1-criacao')
+    const payload = projetarSessaoPersistida(bruta)
+    const entries = transcriptEntries(payload, [])
+    const bytes = Buffer.from(`${entries.map(entry => JSON.stringify(entry)).join('\n')}\n`, 'utf8')
+    const destPath = transcriptPath(slug, id)
+    mkdirSync(resolveProjectDir(slug), { recursive: true })
+    await writeFile(destPath, bytes, { flag: 'wx' })
+    const metadata = { ...payload, persistenceRevision: 1, worktreePath: payload.worktreePath ?? null,
+      chats: payload.chats.map(chat => ({ ...chat, messages: [] })) }
+    const requestDigest = sha(JSON.stringify({ session: { ...payload, persistenceRevision: undefined }, baseRevision: null }))
+    const mutationId = randomUUID()
+    registerWriteIntent({
+      sessionId: id, mutationId, criacao: true, baseRevision: 0, nextRevision: 1,
+      targetPath: destPath, stagedPath: `${destPath}.${process.pid}.${randomUUID()}.tmp`,
+      oldDigest: null, newDigest: sha(bytes),
+      record: { id, slug, title: payload.title, workspacePath: payload.workspacePath, worktreePath: payload.worktreePath ?? null,
+        messageCount: entries.length, createdAt: Date.now(), updatedAt: Date.now(), sessionJson: JSON.stringify(metadata) },
+      planos: [], checkpointCleanup: null,
+      receipt: { sessionId: id, mutationId, revision: 1, digest: requestDigest, creationId: mutationId, creationDigest: requestDigest, creationRevision: 1 },
+    })
+    // Nenhuma linha no catálogo — a listagem geral não pode responder lista vazia
+    // com estado normal enquanto existir publicação pendente sem registro.
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM sessions WHERE id=?').get(id)).toEqual({ n: 0 })
+    const listada = await listagem(server)
+    const servida = listada.sessions.find(s => s.id === id)
+    const diagnostico = listada.unavailable.find(item => item.sessionId === id)
+    expect(servida ?? diagnostico, `listagem escondeu a criação pendente: ${JSON.stringify(listada)}`).toBeDefined()
+    if (!servida) {
+      // recuperação impossível neste estado → diagnóstico explícito, nunca silêncio
+      expect(listada.state).toBe('partial')
+      expect(diagnostico?.code).toBe('session_publication_pending')
+    } else {
+      expect(servida.title).toBe('h1-criacao')
+      expect(servida.persistenceRevision).toBe(1)
+      expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(id)).toEqual({ n: 0 })
+      expect((await readTranscript(slug, id)).filter(entry => entry.type !== 'agir_event')).toHaveLength(2)
+    }
+  })
+
+  it('H2: a limpeza nunca exclui uma sessão legada vazia preexistente', async () => {
+    const id = randomUUID(), slug = `pb-h2-${id.slice(0, 8)}`
+    touched.push({ id, slug })
+    // Sessão legada real: revisão zero, sem receipt, sem mensagens, sem JSONL.
+    const legada = { id, slug, title: 'legada vazia', workspace: 'x', workspacePath: `/tmp/${slug}`,
+      section: 'today', status: 'completed', updated: new Date(0).toISOString(), diffAdded: 0, diffRemoved: 0,
+      branch: null, mainChatId: 'chat-main', chats: [{ id: 'chat-main', title: 'Main', status: 'completed', messages: [] }] }
+    getDatabase().exec(`INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, message_count, created_at, updated_at, session_json)
+      VALUES ('${id}', '${slug}', 'legada vazia', '/tmp/${slug}', NULL, 0, 1, 1,
+        '${JSON.stringify({ ...legada, persistenceRevision: undefined }).replace(/'/g, "''")}')`)
+    const stagedPath = transcriptPath(slug, id) + '.sem-stage.tmp'
+    registerWriteIntent({
+      sessionId: id, mutationId: randomUUID(), criacao: false, baseRevision: 0, nextRevision: 1,
+      targetPath: transcriptPath(slug, id), stagedPath, oldDigest: null, newDigest: 'qualquer',
+      record: { id, slug, title: 'legada vazia', workspacePath: `/tmp/${slug}`, worktreePath: null,
+        messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(legada) },
+      planos: [], checkpointCleanup: null,
+      receipt: { sessionId: id, mutationId: 'x', revision: 1, digest: 'x', creationId: null, creationDigest: null, creationRevision: null },
+    })
+    // Stage desapareceu (estado que dispara a limpeza honesta)…
+    const listada = await listagem(server)
+    // …mas a sessão legada é PREEXISTENTE: a limpeza só pode remover o journal.
+    expect(listada.unavailable.find(item => item.sessionId === id)).toBeUndefined()
+    expect(tituloNoCatalogo(id), 'a limpeza excluiu a sessão legada vazia legítima').toBe('legada vazia')
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(id)).toEqual({ n: 0 })
+    expect(listada.sessions.find(s => s.id === id)).toBeDefined()
+  })
+
+  it('H3: divergência de revisão do catálogo bloqueia ANTES de republicar (bytes e catálogo intactos)', async () => {
+    const { id, slug, session } = await novaSessao('h3-base')
+    const estado = await montarEstadoDeCrash(comNovaMensagem(session, 'h3-novo'), 'pre-rename') // stage íntegro, destino = base
+    const bytesBase = await readFile(estado.destPath)
+    // Fixture: catálogo divergente (revisão diferente da base registrada na intenção).
+    const sessionJson = JSON.parse((getDatabase().prepare('SELECT session_json AS j FROM sessions WHERE id=?').get(id) as { j: string }).j) as { persistenceRevision?: number }
+    getDatabase().prepare('UPDATE sessions SET session_json=? WHERE id=?')
+      .run(JSON.stringify({ ...sessionJson, persistenceRevision: 99 }), id)
+    const resposta = await fetch(`${server.baseUrl}/api/sessions/${id}`)
+    expect(resposta.status).toBe(503)
+    expect(await resposta.json()).toMatchObject({ code: 'session_publication_pending' })
+    // A prova é dos artefatos: nada foi republicado, nada foi limpo.
+    expect(await readFile(estado.destPath), 'a republicação substituiu o destino antes de validar a revisão').toEqual(bytesBase)
+    expect((getDatabase().prepare('SELECT session_json AS j FROM sessions WHERE id=?').get(id) as { j: string }).j)
+      .toBe(JSON.stringify({ ...sessionJson, persistenceRevision: 99 }))
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM session_write_intents WHERE session_id=?').get(id)).toEqual({ n: 1 })
+    expect((await readdir(resolveProjectDir(slug))).some(name => name.endsWith('.tmp'))).toBe(true)
   })
 })

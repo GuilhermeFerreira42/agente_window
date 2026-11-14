@@ -71,6 +71,7 @@ describe('P-B reinício de processo com SIGKILL real', () => {
   let server: HttpServerHandle
   const touched: Array<{ id: string; slug: string }> = []
   const arquivosTemp: string[] = []
+  const filhos = new Set<number>()
 
   beforeEach(async () => {
     touched.length = 0
@@ -86,6 +87,10 @@ describe('P-B reinício de processo com SIGKILL real', () => {
   })
 
   afterEach(async () => {
+    for (const pid of filhos) {
+      try { process.kill(pid, 'SIGKILL') } catch { /* já morto */ }
+    }
+    filhos.clear()
     await server.close()
     try { getDatabase().prepare('DELETE FROM session_write_intents').run() } catch { /* ausente */ }
     for (const { id, slug } of touched) { await deleteTranscript(slug, id); try { deleteSessionRecord(id) } catch { /* indisponível */ } }
@@ -112,112 +117,121 @@ describe('P-B reinício de processo com SIGKILL real', () => {
     const cli = resolverViteNode()
     const scriptSalvar = join(process.cwd(), 'src/server/session-persistence/__scripts__/pb-salvar-filho.ts')
     const scriptReconciliar = join(process.cwd(), 'src/server/session-persistence/__scripts__/pb-reconciliar-filho.ts')
+    const aguardar = async (predicado: () => boolean, timeoutMs: number) => {
+      const limite = Date.now() + timeoutMs
+      while (!predicado()) {
+        if (Date.now() > limite) return false
+        await esperar(10)
+      }
+      return true
+    }
 
-    const rodaFilho = () => spawn(process.execPath, [cli, scriptSalvar], {
-      cwd: process.cwd(),
-      env: { ...process.env, PB_SESSION_ID: id, PB_PROGRESSO: progresso, PB_RONDAS: '24', PB_DIAG: diag },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-
-    let capturado: { stagedPath: string; oldDigest: string | null; newDigest: string; targetPath: string; nextRevision: number; mutationId: string; tituloEsperado: string; classe: string } | undefined
-    let stderrAcumulado = ''
-
-    for (let tentativa = 0; tentativa < 3 && !capturado; tentativa += 1) {
-      try { rmSync(progresso, { force: true }) } catch { /* inexistente */ }
-      const filho = rodaFilho()
+    // H4: duas fronteiras EXPLÍCEITAS (pré/pós-rename) congeladas por
+    // sincronização — o filho assina um arquivo de fronteira e trava no gate de
+    // rename. Sem SIGSTOP, sem janela de milissegundos e sem tentativas até
+    // passar: cada ciclo falha de forma honesta se a fronteira não acontecer.
+    type Relatorio = { resultado: string; intentsRestantes: number; titulo: string | null; revision: number | null; ack: { mutationId: string; revision: number } | undefined; destDigest: string | null }
+    let relatorioFinal: Relatorio | undefined
+    for (const fronteira of ['pre-rename', 'pos-rename'] as const) {
+      const progresso = join(tmpdir(), `pb-progresso-${id}-${fronteira}.json`)
+      const boundary = join(tmpdir(), `pb-fronteira-${id}-${fronteira}.json`)
+      const relatorio = join(tmpdir(), `pb-relatorio-${id}-${fronteira}.json`)
+      const diag = join(tmpdir(), `pb-diag-${id}-${fronteira}.txt`)
+      arquivosTemp.push(progresso, boundary, relatorio, diag)
+      const filho = spawn(process.execPath, [cli, scriptSalvar], {
+        cwd: process.cwd(),
+        env: { ...process.env, PB_SESSION_ID: id, PB_PROGRESSO: progresso, PB_RONDAS: '24', PB_DIAG: diag,
+          PB_FRONTEIRA: fronteira, PB_BOUNDARY: boundary, PB_MARCADOR: fronteira },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      filhos.add(filho.pid!)
       let stderr = ''
-      filho.stderr.on('data', chunk => { stderr += String(chunk); stderrAcumulado += String(chunk) })
-      filho.stdout.on('data', chunk => { console.log('[E4 filho]', String(chunk).trim()); stderrAcumulado += String(chunk) })
-      const saida = new Promise<number | null>(resolve => filho.on('exit', code => resolve(code)))
+      filho.stderr.on('data', chunk => { stderr += String(chunk) })
+      filho.stdout.on('data', chunk => { console.log('[E4 filho]', String(chunk).trim()) })
+      const saidaFilho = new Promise<{ code: number | null; signal: string | null }>(resolve =>
+        filho.on('exit', (code, signal) => resolve({ code, signal })))
+      let matou = false
+      try {
+        // 1) sincronização EXPLÍCITA da fronteira — sem polling de janela e sem retry.
+        const assinada = await aguardar(() => existsSync(boundary), 60_000)
+        const diagProgresso = existsSync(progresso) ? readFileSync(progresso, 'utf8') : 'sem progresso'
+        expect(assinada, `fronteira ${fronteira} não assinada em 60s; progresso=${diagProgresso}; stderr=${stderr.slice(0, 600)}`).toBe(true)
 
-      // Polling curto da intenção durável — janela de milissegundos.
-      let iteracoes = 0
-      for (;;) {
-        iteracoes += 1
-        if (iteracoes % 500 === 0) marcar(`poll tentativa=${tentativa} iter=${iteracoes} progresso=${existsSync(progresso) ? readFileSync(progresso, 'utf8') : '-'}`)
-        const linha = getDatabase().prepare('SELECT staged_path, old_digest, new_digest, target_path, next_revision, mutation_id, record_json FROM session_write_intents WHERE session_id=?').get(id) as
+        const linha = () => getDatabase().prepare(`SELECT staged_path, old_digest, new_digest, target_path, next_revision, mutation_id, record_json FROM session_write_intents WHERE session_id=?`).get(id) as
           { staged_path: string; old_digest: string | null; new_digest: string; target_path: string; next_revision: number; mutation_id: string; record_json: string } | undefined
-        if (linha) {
-          marcar(`intencao-capturada classe-prefetch dest=${(await digestTranscriptFile(linha.target_path))?.slice(0, 8)}`)
-          process.kill(filho.pid!, 'SIGSTOP')
-          // Estado congelado: classifica a fronteira em que o processo morreu.
-          const destino = await digestTranscriptFile(linha.target_path)
-          const stage = await digestTranscriptFile(linha.staged_path)
-          let classe: string
-          if (destino === linha.new_digest) classe = 'pos-rename'
-          else if (destino === linha.old_digest && stage === linha.new_digest) classe = 'pre-rename'
-          else if (destino === linha.old_digest && stage === null) classe = 'stage-perdido'
-          else classe = `inesperado:${destino?.slice(0, 8)}/${stage?.slice(0, 8)}`
-          process.kill(filho.pid!, 'SIGKILL')
-          await saida
-          capturado = {
-            stagedPath: linha.staged_path, oldDigest: linha.old_digest, newDigest: linha.new_digest,
-            targetPath: linha.target_path, nextRevision: linha.next_revision, mutationId: linha.mutation_id,
-            tituloEsperado: (JSON.parse(linha.record_json) as { title: string }).title, classe,
+        const conferirFronteira = async (momento: string) => {
+          const atual = linha()
+          expect(atual, `intenção ausente em ${momento} (${fronteira})`).toBeDefined()
+          const destino = await digestTranscriptFile(atual!.target_path)
+          const stage = await digestTranscriptFile(atual!.staged_path)
+          if (fronteira === 'pre-rename') {
+            expect(stage, `stage íntegro antes do rename (${momento})`).toBe(atual!.new_digest)
+            expect(destino, `destino na base antes do rename (${momento})`).toBe(atual!.old_digest)
+          } else {
+            expect(destino, `destino na nova após o rename (${momento})`).toBe(atual!.new_digest)
+            expect(stage, `stage ausente após o rename (${momento})`).toBeNull()
           }
-          break
+          return atual!
         }
-        let progressoAtual: Record<string, unknown> | null = null
-        if (existsSync(progresso)) {
-          try { progressoAtual = JSON.parse(readFileSync(progresso, 'utf8')) as Record<string, unknown> } catch { progressoAtual = null /* escrita em andamento */ }
+        // 2) o estado durável corresponde à fronteira declarada, ANTES do kill.
+        const antes = await conferirFronteira('pré-kill')
+
+        // 3) encerramento garantido: SIGKILL (compatível Windows) do processo próprio.
+        process.kill(filho.pid!, 'SIGKILL')
+        matou = true
+        const morte = await saidaFilho
+        expect(morte.signal, `filho ${fronteira} não morreu com SIGKILL: ${JSON.stringify(morte)}`).toBe('SIGKILL')
+        filhos.delete(filho.pid!)
+
+        // 4) o estado congelado sobrevive à morte (reconferência pós-kill).
+        const depois = await conferirFronteira('pós-kill')
+        expect(depois).toEqual(antes)
+
+        // 5) processo NOVO reconcilia o journal (protocolo real, sem retries).
+        const reconciliador = spawn(process.execPath, [cli, scriptReconciliar], {
+          cwd: process.cwd(),
+          env: { ...process.env, PB_SESSION_ID: id, PB_RELATORIO: relatorio, PB_DESTINO: antes.target_path, PB_STAGE: antes.staged_path, PB_DIAG: diag },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+        filhos.add(reconciliador.pid!)
+        let stderrRec = ''
+        reconciliador.stderr.on('data', chunk => { stderrRec += String(chunk) })
+        const codigoRec = await new Promise<number | null>(resolve => reconciliador.on('exit', code => resolve(code)))
+        filhos.delete(reconciliador.pid!)
+        expect(codigoRec, `reconciliador saiu com erro: ${stderrRec}`).toBe(0)
+        const bruto = readFileSync(relatorio, 'utf8')
+        expect(bruto, `relatório vazio do reconciliador; stderr=${stderrRec.slice(0, 400)}`).not.toBe('')
+        const report = JSON.parse(bruto) as Relatorio
+        expect(report.resultado, bruto).toBe('finalizado')
+        expect(report.intentsRestantes).toBe(0)
+        expect(report.revision).toBe(antes.next_revision)
+        expect(report.titulo).toBe(`filho-${fronteira}`)
+        expect(report.ack).toMatchObject({ mutationId: antes.mutation_id, revision: antes.next_revision })
+        expect(report.destDigest).toBe(antes.new_digest)
+        relatorioFinal = report
+
+        // 6) o serviço serve a conversa recuperada após o reinício do processo.
+        const servida = await fetch(`${server.baseUrl}/api/sessions/${id}`)
+        expect(servida.status).toBe(200)
+        const corpoCiclo = await servida.json() as { session: Session }
+        expect(corpoCiclo.session.persistenceRevision).toBe(antes.next_revision)
+        expect(corpoCiclo.session.title).toBe(`filho-${fronteira}`)
+      } finally {
+        filhos.delete(filho.pid!)
+        if (!matou && filho.exitCode === null && filho.signalCode === null) {
+          try { process.kill(filho.pid!, 'SIGKILL') } catch { /* já saiu */ }
+          await saidaFilho
         }
-        if (progressoAtual && (progressoAtual.concluido || progressoAtual.erro || progressoAtual.paradoEm)) break // janela perdida nesta tentativa
-        if (await Promise.race([saida.then(() => 'saiu'), esperar(1).then(() => 'rodando')]) === 'saiu') break
-        await esperar(1)
-      }
-      if (!capturado) {
-        filho.kill('SIGKILL')
-        await saida
-        const prog = existsSync(progresso) ? readFileSync(progresso, 'utf8') : 'sem progresso'
-        console.log(`[E4] tentativa ${tentativa} sem captura; progresso=${prog}; stderr=${stderr.slice(0, 300)}`)
       }
     }
-    const diagnostico = existsSync(progresso) ? readFileSync(progresso, 'utf8') : 'sem progresso'
-    expect(capturado, `nenhuma janela capturada; progresso=${diagnostico}; stderr=${stderrAcumulado.slice(0, 800)}`).toBeDefined()
-    const alvo = capturado!
-
-    // Processo NOVO reconcilia (o que publicou está morto).
-    marcar(`spawn-reconciliador classe=${alvo.classe}`)
-    const reconciliador = spawn(process.execPath, [cli, scriptReconciliar], {
-      cwd: process.cwd(),
-      env: { ...process.env, PB_SESSION_ID: id, PB_RELATORIO: relatorio, PB_DESTINO: alvo.targetPath, PB_STAGE: alvo.stagedPath, PB_DIAG: diag },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let stderrRec = ''
-    reconciliador.stderr.on('data', chunk => { stderrRec += String(chunk) })
-    const codigoRec = await new Promise<number | null>(resolve => reconciliador.on('exit', code => resolve(code)))
-    marcar(`reconciliador-saiu codigo=${codigoRec}`)
-    expect(codigoRec, `reconciliador saiu com erro: ${stderrRec}`).toBe(0)
-    const bruto = readFileSync(relatorio, 'utf8')
-    expect(bruto, `relatório vazio do reconciliador; stderr=${stderrRec.slice(0, 400)}`).not.toBe('')
-    const report = JSON.parse(bruto) as {
-      resultado: string; intentsRestantes: number; titulo: string | null; revision: number | null
-      ack: { mutationId: string; revision: number; digest: string } | undefined
-      destDigest: string | null
-    }
-
-    if (alvo.classe === 'pos-rename' || alvo.classe === 'pre-rename') {
-      expect(report.resultado).toBe('finalizado')
-      expect(report.intentsRestantes).toBe(0)
-      expect(report.revision).toBe(alvo.nextRevision)
-      expect(report.titulo).toBe(alvo.tituloEsperado)
-      expect(report.ack).toMatchObject({ mutationId: alvo.mutationId, revision: alvo.nextRevision })
-      expect(report.destDigest).toBe(alvo.newDigest)
-    } else if (alvo.classe === 'stage-perdido') {
-      expect(report.resultado).toBe('limpo')
-      expect(report.intentsRestantes).toBe(0)
-      expect(report.revision).toBe(1)
-      expect(report.titulo).toBe('kill')
-    } else {
-      throw new Error(`classificação inesperada: ${alvo.classe}`)
-    }
+    expect(relatorioFinal).toBeDefined()
 
     // A sessão segue servível e consistente para o cliente (reinício completo).
     const servida = await fetch(`${server.baseUrl}/api/sessions/${id}`)
     expect(servida.status).toBe(200)
     const corpo = await servida.json() as { session: Session }
-    expect(corpo.session.persistenceRevision).toBe(report.revision)
-    expect(corpo.session.title).toBe(report.titulo)
+    expect(corpo.session.persistenceRevision).toBe(relatorioFinal!.revision)
+    expect(corpo.session.title).toBe(relatorioFinal!.titulo)
     // E uma nova gravação funciona normalmente após a recuperação.
     const nova = { ...corpo.session, title: 'apos-recuperacao',
       chats: corpo.session.chats.map((chat, index) => index === 0 ? { ...chat, messages: [...chat.messages, mensagem('pós-kill', 'user', 'pos:kill')] } : chat) }
