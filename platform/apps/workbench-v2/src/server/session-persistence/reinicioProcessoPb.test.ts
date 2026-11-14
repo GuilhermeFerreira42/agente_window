@@ -89,7 +89,14 @@ function verificarEncerramentoForcado(
   expect(morte.code !== null || morte.signal !== null,
     `o processo ${fronteira} não registrou nenhuma saída: ${JSON.stringify(morte)}`).toBe(true)
   if (plataforma === 'win32') {
-    expect(morte.code, `Windows sem code de saída (${fronteira}): ${JSON.stringify(morte)}`).not.toBeNull()
+    // Reteste Windows (14/11) observou AMBAS as formas válidas de término:
+    // {code:1, signal:null} e {code:null, signal:'SIGKILL'} — não presumir uma
+    // única representação. Exige-se término reconhecido (SIGKILL explícito OU
+    // código numérico); o pedido de kill aceito, a saída efetivamente
+    // confirmada e as provas de fronteira/artefatos/reconciliação do E4
+    // continuam obrigatórias — a recuperação não é enfraquecida.
+    const terminoReconhecido = morte.signal === 'SIGKILL' || typeof morte.code === 'number'
+    expect(terminoReconhecido, `Windows sem término reconhecido (${fronteira}): ${JSON.stringify(morte)}`).toBe(true)
   } else {
     expect(morte.signal, `filho ${fronteira} não morreu com SIGKILL: ${JSON.stringify(morte)}`).toBe('SIGKILL')
   }
@@ -103,6 +110,15 @@ describe('B1 interpretação de encerramento por plataforma', () => {
 
   it('aceita a saída do Windows observada {code:1, signal:null} com a saída confirmada', () => {
     expect(() => verificarEncerramentoForcado('win32', filhoSaiu, { code: 1, signal: null }, 'pre-rename')).not.toThrow()
+  })
+
+  it('aceita também {code:null, signal:SIGKILL} no Windows (segunda forma observada no reteste)', () => {
+    const filhoSaiuPorSinal = { exitCode: null, signalCode: 'SIGKILL' }
+    expect(() => verificarEncerramentoForcado('win32', filhoSaiuPorSinal, { code: null, signal: 'SIGKILL' }, 'pos-rename')).not.toThrow()
+  })
+
+  it('NÃO aceita sinal diverso de SIGKILL nem no Windows', () => {
+    expect(() => verificarEncerramentoForcado('win32', filhoSaiu, { code: null, signal: 'SIGTERM' }, 'pre-rename')).toThrow(/término reconhecido/)
   })
 
   it('NÃO aceita exit 1 genérico como encerramento forçado em POSIX (exige SIGKILL)', () => {
