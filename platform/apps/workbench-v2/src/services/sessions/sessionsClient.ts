@@ -1,6 +1,7 @@
 import { expectOk, forgetSessionPersistence, resumeSessionPersistence } from './sessionWriteQueue'
 import type { Session } from '../../types'
 export { SessionPersistenceError, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, holdSessionPersistence, loadPersistedSessions, loadPersistedSession, retrySessionPersistence, isSessionDirty, sessionFingerprint, confirmedRecoveryRevision } from './sessionWriteQueue'
+export type { ResultadoHidratacao, SessaoIndisponivel } from './sessionWriteQueue'
 const SESSIONS_ENDPOINT = '/api/sessions'
 
 export interface WorkspaceDescriptor { path: string; slug: string; name: string; isGit: boolean }
