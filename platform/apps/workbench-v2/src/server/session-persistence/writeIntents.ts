@@ -35,6 +35,8 @@ export interface WriteIntent {
   planos: OrigemChat[]
   receipt: MutationReceipt
   checkpointCleanup: string[] | null
+  /** Durable proof that THIS operation created the FK placeholder row (never inferred from base 0). */
+  placeholder: boolean
   state: string
   registeredAt: number
 }
@@ -45,6 +47,7 @@ type IntentRow = {
   record_json: string | null; origins_json: string | null; request_digest: string | null
   creation_id: string | null; creation_digest: string | null; creation_revision: number | null
   checkpoint_cleanup_json: string | null; state: string | null; registered_at: number | null
+  placeholder: number | null
 }
 
 const COLUNAS: Array<[string, string]> = [
@@ -53,6 +56,9 @@ const COLUNAS: Array<[string, string]> = [
   ['record_json', 'TEXT'], ['origins_json', 'TEXT'], ['request_digest', 'TEXT'],
   ['creation_id', 'TEXT'], ['creation_digest', 'TEXT'], ['creation_revision', 'INTEGER'],
   ['checkpoint_cleanup_json', 'TEXT'], ['state', 'TEXT'], ['registered_at', 'INTEGER'],
+  // H2: distinguishes o placeholder criado por ESTA operação de uma sessão
+  // preexistente (legado vazio com revisão zero nunca é apagado por inferência).
+  ['placeholder', 'INTEGER'],
 ]
 
 const schemaPronto = new WeakSet<object>()
@@ -114,7 +120,7 @@ function pendingIntentRow(sessionId: string): IntentRow | undefined {
   if (!hasWriteIntentTable()) return undefined
   return getDatabase().prepare(`SELECT session_id, mutation_id, base_revision, next_revision, target_path, staged_path,
     old_digest, new_digest, record_json, origins_json, request_digest, creation_id, creation_digest,
-    creation_revision, checkpoint_cleanup_json, state, registered_at
+    creation_revision, checkpoint_cleanup_json, state, registered_at, placeholder
     FROM session_write_intents WHERE session_id=?`).get(sessionId) as IntentRow | undefined
 }
 
@@ -134,6 +140,7 @@ export function pendingWriteIntent(sessionId: string): WriteIntent | undefined {
       creationRevision: row.creation_revision,
     },
     checkpointCleanup: row.checkpoint_cleanup_json ? JSON.parse(row.checkpoint_cleanup_json) as string[] : null,
+    placeholder: row.placeholder === 1,
     state: row.state!, registeredAt: row.registered_at!,
   }
 }
@@ -170,7 +177,7 @@ export function hasPendingWriteIntent(sessionId: string): boolean {
  * together with the intent when the staged copy was lost — a client that never
  * received an ACK therefore never sees a created session.
  */
-export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registeredAt'> & { criacao: boolean }): void {
+export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registeredAt' | 'placeholder'> & { criacao: boolean }): void {
   ensureWriteIntentSchema()
   const connection = getDatabase()
   connection.transaction(() => {
@@ -181,7 +188,8 @@ export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registe
     } else if (currentRevision !== intent.baseRevision) {
       throw new PersistenceProblem(409, 'stale_session_snapshot', 'Uma versão diferente desta conversa está salva. Suas alterações locais foram preservadas.')
     }
-    if (intent.criacao && journalHasForeignKey(connection)) {
+    const criouPlaceholder = Boolean(intent.criacao && journalHasForeignKey(connection))
+    if (criouPlaceholder) {
       const placeholder = JSON.parse(intent.record.sessionJson) as { persistenceRevision?: number } & Record<string, unknown>
       placeholder.persistenceRevision = 0
       connection.prepare(`INSERT INTO sessions (id, slug, title, workspace_path, worktree_path,
@@ -192,10 +200,10 @@ export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registe
     connection.prepare(`INSERT INTO session_write_intents (
       session_id, mutation_id, base_revision, next_revision, target_path, staged_path, old_digest, new_digest,
       record_json, origins_json, request_digest, creation_id, creation_digest, creation_revision,
-      checkpoint_cleanup_json, state, registered_at
+      checkpoint_cleanup_json, state, registered_at, placeholder
     ) VALUES (@sessionId, @mutationId, @baseRevision, @nextRevision, @targetPath, @stagedPath, @oldDigest, @newDigest,
       @recordJson, @originsJson, @requestDigest, @creationId, @creationDigest, @creationRevision,
-      @checkpointCleanup, 'preparado', @registeredAt)`).run({
+      @checkpointCleanup, 'preparado', @registeredAt, @placeholder)`).run({
       sessionId: intent.record.id, mutationId: intent.mutationId, baseRevision: intent.baseRevision,
       nextRevision: intent.nextRevision, targetPath: intent.targetPath, stagedPath: intent.stagedPath,
       oldDigest: intent.oldDigest, newDigest: intent.newDigest,
@@ -204,6 +212,7 @@ export function registerWriteIntent(intent: Omit<WriteIntent, 'state' | 'registe
       creationDigest: intent.receipt.creationDigest, creationRevision: intent.receipt.creationRevision,
       checkpointCleanup: intent.checkpointCleanup ? JSON.stringify(intent.checkpointCleanup) : null,
       registeredAt: Date.now(),
+      placeholder: criouPlaceholder ? 1 : 0,
     })
   })()
 }
@@ -239,21 +248,47 @@ export function finalizarPublicacao(dados: {
 export function clearWriteIntent(sessionId: string, mutationId?: string): boolean {
   if (!hasWriteIntentTable()) return false
   const connection = getDatabase()
-  const row = (mutationId
-    ? connection.prepare('SELECT base_revision AS base FROM session_write_intents WHERE session_id=? AND mutation_id=?').get(sessionId, mutationId)
-    : connection.prepare('SELECT base_revision AS base FROM session_write_intents WHERE session_id=?').get(sessionId)) as { base: number | null } | undefined
-  if (!row) return false
-  const removed = mutationId
-    ? connection.prepare('DELETE FROM session_write_intents WHERE session_id=? AND mutation_id=?').run(sessionId, mutationId).changes
-    : connection.prepare('DELETE FROM session_write_intents WHERE session_id=?').run(sessionId).changes
-  if (removed > 0 && row.base === 0) {
-    const receiptsTable = connection.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_persistence_receipts'").get()
-    const acknowledged = receiptsTable
-      ? connection.prepare('SELECT 1 FROM session_persistence_receipts WHERE session_id=?').get(sessionId)
-      : undefined
-    if (!acknowledged) {
-      connection.prepare('DELETE FROM sessions WHERE id=? AND message_count=0').run(sessionId)
+  return connection.transaction(() => {
+    const row = (mutationId
+      ? connection.prepare('SELECT placeholder FROM session_write_intents WHERE session_id=? AND mutation_id=?').get(sessionId, mutationId)
+      : connection.prepare('SELECT placeholder FROM session_write_intents WHERE session_id=?').get(sessionId)) as { placeholder: number | null } | undefined
+    if (!row) return false
+    const removed = mutationId
+      ? connection.prepare('DELETE FROM session_write_intents WHERE session_id=? AND mutation_id=?').run(sessionId, mutationId).changes
+      : connection.prepare('DELETE FROM session_write_intents WHERE session_id=?').run(sessionId).changes
+    // H2: apaga SOMENTE um placeholder comprovado por ESTA operação (coluna
+    // placeholder=1) e ainda não confirmado. Revisão zero sem receipt não é
+    // prova — sessão legada vazia preexistente é intocada.
+    if (removed > 0 && row.placeholder === 1) {
+      const receiptsTable = connection.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_persistence_receipts'").get()
+      const acknowledged = receiptsTable
+        ? connection.prepare('SELECT 1 FROM session_persistence_receipts WHERE session_id=?').get(sessionId)
+        : undefined
+      if (!acknowledged) {
+        connection.prepare('DELETE FROM sessions WHERE id=? AND message_count=0').run(sessionId)
+      }
     }
+    return removed > 0
+  })()
+}
+
+/** H1 — journal rows whose session has no catalog record yet (interrupted creations). */
+export function pendingOrphanIntentIds(): string[] {
+  if (!hasWriteIntentTable()) return []
+  const rows = getDatabase().prepare(
+    'SELECT session_id FROM session_write_intents WHERE session_id NOT IN (SELECT id FROM sessions)',
+  ).all() as Array<{ session_id: string }>
+  return rows.map(row => row.session_id)
+}
+
+/** Best-effort display identity for a pending journal (lenient; never throws). */
+export function tituloDaIntencao(sessionId: string): string | undefined {
+  try {
+    if (!hasWriteIntentTable()) return undefined
+    const row = getDatabase().prepare('SELECT record_json FROM session_write_intents WHERE session_id=?').get(sessionId) as { record_json: string | null } | undefined
+    if (!row?.record_json) return undefined
+    return (JSON.parse(row.record_json) as { title?: unknown }).title as string | undefined
+  } catch {
+    return undefined
   }
-  return removed > 0
 }

@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { useSessionPersistence } from './services/sessions/useSessionPersistence'
 import { mergeRecoveredSessions, mergeHydratedSessions, removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
@@ -134,7 +134,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
   const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
   const [sessionLoadError, setSessionLoadError] = useState<string>()
-  const [sessionLoadPartial, setSessionLoadPartial] = useState<string[]>()
+  const [sessionLoadPartial, setSessionLoadPartial] = useState<SessaoIndisponivel[]>()
   const [hydrationAttempt, setHydrationAttempt] = useState(0)
   const persistedLayout = useRef(loadLayoutState())
   const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? window.localStorage.getItem(ACTIVE_SESSION_KEY) ?? BOOT_SESSION_ID)
@@ -238,7 +238,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         install(resultado.sessions)
         setSessionLoadError(undefined)
         // SPEC §4: unavailable ≠ absent — one broken item never empties the list.
-        setSessionLoadPartial(resultado.unavailable.length ? resultado.unavailable.map(item => `${item.sessionId}:${item.code}`) : undefined)
+        setSessionLoadPartial(resultado.unavailable.length ? resultado.unavailable : undefined)
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -2492,7 +2492,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       />
       <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} />
       {sessionLoadError && <div role="alert" className="session-persistence-notice"><p>{sessionLoadError}</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
-      {!sessionLoadError && sessionLoadPartial && <div role="alert" className="session-persistence-notice"><p>{sessionLoadPartial.length === 1 ? 'Não foi possível carregar uma conversa salva.' : `Não foi possível carregar ${sessionLoadPartial.length} conversas salvas.`} As demais conversas foram carregadas e nenhuma mensagem local foi apagada — uma conversa indisponível não é uma conversa vazia ou inexistente.</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
+      {!sessionLoadError && sessionLoadPartial && <div role="alert" className="session-persistence-notice"><p>{sessionLoadPartial.length === 1 ? 'Não foi possível carregar uma conversa salva.' : `Não foi possível carregar ${sessionLoadPartial.length} conversas salvas.`} As demais conversas foram carregadas e nenhuma mensagem local foi apagada — uma conversa indisponível não é uma conversa vazia ou inexistente.</p><ul className="session-unavailable-list">{sessionLoadPartial.map(item => <li key={item.sessionId}>{item.titulo ?? item.sessionId}</li>)}</ul><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
       {editorSurface.portal}
       {explorerModule && <EditorCommandsSlot module={explorerModule} />}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>

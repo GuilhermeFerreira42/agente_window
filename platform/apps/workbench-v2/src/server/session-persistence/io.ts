@@ -1,5 +1,15 @@
-// Seam de IO do protocolo de publicação (SPEC §3): em produção são as
-// funções nativas de node:fs/promises, sem camada extra. Os testes podem
-// mockar ESTE módulo para injetar falhas nas fronteiras — nunca o builtin,
-// cuja substituição quebra o carregamento do better-sqlite3 no vitest.
-export { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import * as nodeFs from 'node:fs/promises'
+
+// Seam de I/O do journal (P-B): o produtur e o recoveredPublish passam por
+// `io` para que a prova de fronteira (H4) possa instalar um gate determinístico
+// de rename (pré/pós-rename) no processo filho, sem sinais POSIX e sem depender
+// de pausa do processo. Nenhum módulo fora deste importa `node:fs/promises`
+// para os arquivos da sessão.
+export const io = {
+  mkdir: nodeFs.mkdir,
+  readFile: nodeFs.readFile,
+  rename: nodeFs.rename,
+  stat: nodeFs.stat,
+  unlink: nodeFs.unlink,
+  writeFile: nodeFs.writeFile,
+}

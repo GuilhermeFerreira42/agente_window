@@ -1,13 +1,16 @@
 /**
  * P-B Evidência 4 — child de teste: publica N atualizações REAIS de uma
  * sessão através do servidor HTTP do produto (protocolo completo, sem hooks).
- * O parent intercepta a janela intenção→commit com SIGSTOP/SIGKILL e
- * reconcilia em um processo novo. Dados 100% sintéticos.
+ * H4: a fronteira (pré/pós-rename) é congelada por sincronização explícita —
+ * o gate de rename assina um arquivo de fronteira e trava — e o parent mata o
+ * processo com SIGKILL; a reconciliação acontece em um processo novo.
+ * Dados 100% sintéticos.
  */
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Session } from '../../../types'
+import { io } from '../io'
 import { sessionPersistencePlugin } from '../index'
 import type { ViteDevServer } from 'vite'
 
@@ -25,6 +28,29 @@ if (typeof plugin.configureServer !== 'function') { console.error('plugin sem co
 plugin.configureServer({ middlewares: { use: (middleware: typeof persistenceMiddleware) => { persistenceMiddleware = middleware } } } as unknown as ViteDevServer)
 
 async function main(): Promise<void> {
+  // H4 — fronteira congelada por sincronização EXPLÍCITA (sem SIGSTOP): o gate
+  // intercepta o rename do seam, assina o arquivo de fronteira e trava até o
+  // pai matar o processo com SIGKILL. Sem PB_FRONTEIRA o filho grava normal.
+  const fronteira = process.env.PB_FRONTEIRA ?? ''
+  const boundary = process.env.PB_BOUNDARY ?? ''
+  if (fronteira === 'pre-rename') {
+    if (!boundary) { console.error('PB_BOUNDARY ausente'); process.exit(2) }
+    io.rename = async () => {
+      writeFileSync(boundary, JSON.stringify({ fronteira }))
+      await new Promise<never>(() => { /* congela ANTES do rename: destino na base, stage íntegro */ })
+    }
+  } else if (fronteira === 'pos-rename') {
+    if (!boundary) { console.error('PB_BOUNDARY ausente'); process.exit(2) }
+    const originalRename = io.rename
+    io.rename = async (source, destination) => {
+      await originalRename(source, destination)
+      writeFileSync(boundary, JSON.stringify({ fronteira }))
+      await new Promise<never>(() => { /* congela APÓS o rename: destino na nova, commit não executou */ })
+    }
+  } else if (boundary) {
+    console.error(`fronteira desconhecida: ${fronteira}`)
+    process.exit(2)
+  }
   const server = createServer((request, response) => {
     if (!persistenceMiddleware) { response.statusCode = 500; response.end(); return }
     persistenceMiddleware(request, response, () => { response.statusCode = 404; response.end() })
@@ -52,9 +78,10 @@ async function main(): Promise<void> {
     if (!atual.ok) { falhas += 1; if (falhas >= 3) { writeFileSync(progresso, JSON.stringify({ rodada, erro: atual.status })); server.close(); process.exit(4) } continue }
     const corpo = await atual.json() as { session: Session }
     const sessao = corpo.session
-    const editada: Session = { ...sessao, title: `filho-${rodada}`,
+    const marcador = process.env.PB_MARCADOR ?? String(rodada)
+    const editada: Session = { ...sessao, title: `filho-${marcador}`,
       chats: sessao.chats.map((chat, index) => index === 0
-        ? { ...chat, messages: [...chat.messages, { id: `filho-${rodada}`, role: 'user' as const, content: `filho:${rodada}`, time: '10:00' }] }
+        ? { ...chat, messages: [...chat.messages, { id: `filho-${marcador}`, role: 'user' as const, content: `filho:${marcador}`, time: '10:00' }] }
         : chat) }
     writeFileSync(progresso, JSON.stringify({ rodada, fase: 'put', revision: sessao.persistenceRevision }))
     marcar(`r${rodada}-put-in`)

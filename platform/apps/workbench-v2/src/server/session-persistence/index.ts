@@ -9,7 +9,7 @@ import { resolverContextoAgir } from './agirContext'
 import { sanitizePath } from './paths'
 import { deleteTranscript, readTranscript, transcriptPath, writeTranscript, type TranscriptEntry } from './transcripts'
 import { reconciliarPublicacao } from './publicacaoRecuperavel'
-import { clearWriteIntent, finalizarPublicacao, registerWriteIntent } from './writeIntents'
+import { clearWriteIntent, finalizarPublicacao, pendingOrphanIntentIds, registerWriteIntent, tituloDaIntencao } from './writeIntents'
 import { projetarMensagemPersistida, projetarSessaoPersistida } from '../../domain/projecaoTranscript'
 import { createWorktree, observarGit, removeWorktree, WorktreeDirtyError } from './worktrees'
 import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory, rememberWorkspace, validateWorkspace, validateWorkspacePath, WorktreeRequiresGitError } from './workspaces'
@@ -429,7 +429,7 @@ function sanarStatusAposF5(session: Session): Session {
   })
 }
 
-export interface SessionUnavailable { sessionId: string; code: string }
+export interface SessionUnavailable { sessionId: string; code: string; titulo?: string }
 export interface SessionIndex { sessions: Session[]; unavailable: SessionUnavailable[]; state: 'ok' | 'partial' }
 
 /** Stable diagnostics only — never transcript content or raw parser output. */
@@ -441,7 +441,24 @@ function codigoDeIndisponivel(error: unknown): string {
 
 async function listSessions(): Promise<SessionIndex> {
   let records: ReturnType<typeof listSessionRecords>
+  // H1: a criação interrompida não tem linha de catálogo — descoberta e
+  // reconciliação das intenções órfãs ANTES de listar o catálogo.
+  let orfaos: string[]
   try {
+    orfaos = pendingOrphanIntentIds()
+  } catch {
+    orfaos = []
+  }
+  const diagnosticoOrfaos = await Promise.all(orfaos.map((sessionId) => withSessionPersistenceQueue(sessionId, async () => {
+    try {
+      await reconciliarPublicacao(sessionId)
+      return undefined
+    } catch (error: unknown) {
+      return { sessionId, code: codigoDeIndisponivel(error), titulo: tituloDaIntencao(sessionId) }
+    }
+  })))
+  try {
+    // Fetched AFTER the orphan pass so a creation finalized there is listed.
     records = listSessionRecords()
   } catch {
     // SPEC §4: total catalog failure is an explicit 503, never an empty list.
@@ -460,9 +477,10 @@ async function listSessions(): Promise<SessionIndex> {
     if (current.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
     return sanarStatusAposF5(restoreMessages(session, entries))
   }).then((session) => ({ session }))
-    .catch((error: unknown) => ({ unavailable: { sessionId: record.id, code: codigoDeIndisponivel(error) } }))))
+    .catch((error: unknown) => ({ unavailable: { sessionId: record.id, code: codigoDeIndisponivel(error), titulo: record.title } }))))
   const sessions: Session[] = []
   const unavailable: SessionUnavailable[] = []
+  for (const diagnostico of diagnosticoOrfaos) if (diagnostico) unavailable.push(diagnostico)
   for (const resultado of resultados) {
     if ('unavailable' in resultado) unavailable.push(resultado.unavailable)
     else if (resultado.session) sessions.push(resultado.session)

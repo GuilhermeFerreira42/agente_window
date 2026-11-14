@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, stat, unlink, writeFile } from './io'
+import { io } from './io'
 import { join } from 'node:path'
 import { resolveProjectDir } from './paths'
 import { PersistenceProblem } from './sessionMutations'
@@ -12,7 +12,7 @@ export function digestTranscriptBytes(bytes: Buffer | string): string {
 /** Digest of a published/staged file, or null only for a provable ENOENT. */
 export async function digestTranscriptFile(path: string): Promise<string | null> {
   try {
-    return digestTranscriptBytes(await readFile(path))
+    return digestTranscriptBytes(await io.readFile(path))
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw error
@@ -55,10 +55,10 @@ export async function readTranscript(slug: string, sessionId: string, maxBytes?:
   return withTranscript(destination, async () => {
     if (blockedPublications.has(destination)) throw new PersistenceProblem(503, 'session_publication_unavailable', 'Uma publicação falhou. Preserve os arquivos e solicite revisão antes de continuar.')
     try {
-      if (maxBytes !== undefined && (await stat(destination)).size > maxBytes) {
+      if (maxBytes !== undefined && (await io.stat(destination)).size > maxBytes) {
         throw Object.assign(new Error('O histórico excede o limite desta operação.'), { code: 'TRANSCRIPT_TOO_LARGE' })
       }
-      const content = await readFile(destination, 'utf8')
+      const content = await io.readFile(destination, 'utf8')
       if (maxBytes !== undefined || aoLerBytes) {
         const bytes = Buffer.byteLength(content, 'utf8')
         aoLerBytes?.(bytes)
@@ -103,7 +103,7 @@ export async function writeTranscript(slug: string, sessionId: string, entries: 
   const content = entries.map((entry) => JSON.stringify(entry)).join('\n')
   return withTranscript(destination, async () => {
     if (blockedPublications.has(destination)) throw new PersistenceProblem(503, 'session_publication_unavailable', 'A publicação desta conversa está indisponível.')
-    await mkdir(directory, { recursive: true })
+    await io.mkdir(directory, { recursive: true })
     // Each operation owns its temp file; exclusive creation prevents accidental reuse.
     // Keeping it beside the destination preserves same-filesystem atomic rename.
     const temporary = `${destination}.${process.pid}.${randomUUID()}.tmp`
@@ -112,7 +112,7 @@ export async function writeTranscript(slug: string, sessionId: string, entries: 
     let previous: string | undefined
     let previousBytes: Buffer | undefined
     if (options) {
-      try { previousBytes = await readFile(destination) } catch (error) {
+      try { previousBytes = await io.readFile(destination) } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       }
       previous = previousBytes?.toString('utf8')
@@ -123,8 +123,8 @@ export async function writeTranscript(slug: string, sessionId: string, entries: 
     }
     let published = false
     try {
-      if (options && previous !== undefined) await writeFile(rollback, previous, { encoding: 'utf8', flag: 'wx' })
-      await writeFile(temporary, content ? `${content}\n` : '', { encoding: 'utf8', flag: 'wx' })
+      if (options && previous !== undefined) await io.writeFile(rollback, previous, { encoding: 'utf8', flag: 'wx' })
+      await io.writeFile(temporary, content ? `${content}\n` : '', { encoding: 'utf8', flag: 'wx' })
       if (options?.prepararIntencao) {
         await options.prepararIntencao({
           stagedPath: temporary,
@@ -140,26 +140,26 @@ export async function writeTranscript(slug: string, sessionId: string, entries: 
           throw new PersistenceProblem(409, 'transcript_changed', 'O histórico foi alterado fora desta tentativa. Suas edições locais foram preservadas.')
         }
       }
-      await rename(temporary, destination)
+      await io.rename(temporary, destination)
       published = true
       options?.commit()
       // A cleanup error does not invalidate an already committed ACK.
-      if (options && previous !== undefined) await unlink(rollback).catch(() => undefined)
+      if (options && previous !== undefined) await io.unlink(rollback).catch(() => undefined)
     } catch (error) {
       if (published && options) {
         // Live failure compensation under the same file lock. This does not
         // claim recovery from a killed process between JSONL and SQLite (P-B).
         try {
-          if (previous === undefined) await unlink(destination)
-          else await rename(rollback, destination)
+          if (previous === undefined) await io.unlink(destination)
+          else await io.rename(rollback, destination)
         } catch {
           blockedPublications.add(destination)
           throw new PersistenceProblem(503, 'session_publication_unavailable', 'Falharam a publicação e a restauração. Os arquivos foram preservados; não feche o aplicativo antes de solicitar revisão.')
         }
       }
       // A hard process kill may leave the unique temp behind; readers ignore it.
-      await unlink(temporary).catch(() => undefined)
-      await unlink(rollback).catch(() => undefined)
+      await io.unlink(temporary).catch(() => undefined)
+      await io.unlink(rollback).catch(() => undefined)
       throw error
     }
   })
@@ -178,7 +178,7 @@ export async function publishStagedTranscript(stagedPath: string, destination: s
     if (observed !== expectedOldDigest) {
       throw new PersistenceProblem(409, 'transcript_changed', 'O histórico foi alterado fora desta tentativa. A publicação pendente foi preservada sem sobrescrever o destino.')
     }
-    await rename(stagedPath, destination)
+    await io.rename(stagedPath, destination)
   })
 }
 
@@ -195,7 +195,7 @@ export async function deleteTranscript(slug: string, sessionId: string): Promise
   const destination = transcriptPath(slug, sessionId)
   return withTranscript(destination, async () => {
     try {
-      await unlink(destination)
+      await io.unlink(destination)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }

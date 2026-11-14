@@ -99,7 +99,7 @@ export function holdSessionPersistence(sessionId: string): void {
   value.held = new SessionPersistenceError('Há edições locais a recuperar. Recarregue a versão salva ou salve uma cópia.', 409, 'stale_session_snapshot')
   states.set(sessionId, value)
 }
-export interface SessaoIndisponivel { sessionId: string; code: string }
+export interface SessaoIndisponivel { sessionId: string; code: string; titulo?: string }
 /** SPEC §4 — healthy sessions plus per-item diagnostics; total failure stays a 503. */
 export interface ResultadoHidratacao { sessions: Session[]; unavailable: SessaoIndisponivel[]; state: 'ok' | 'partial' }
 export async function loadPersistedSessions(signal?: AbortSignal): Promise<ResultadoHidratacao> {
@@ -108,6 +108,9 @@ export async function loadPersistedSessions(signal?: AbortSignal): Promise<Resul
   const sessions = Array.isArray(body.sessions) ? body.sessions : []
   const unavailable = (Array.isArray(body.unavailable) ? body.unavailable : [])
     .filter((item): item is SessaoIndisponivel => typeof item?.sessionId === 'string' && typeof item?.code === 'string')
+    .map(item => (typeof (item as { titulo?: unknown }).titulo === 'string'
+      ? { sessionId: item.sessionId, code: item.code, titulo: (item as { titulo?: string }).titulo }
+      : { sessionId: item.sessionId, code: item.code }))
   const state: ResultadoHidratacao['state'] = body.state === 'partial' || unavailable.length > 0 ? 'partial' : 'ok'
   for (const session of sessions) {
     const value = states.get(session.id)

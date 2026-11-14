@@ -1,4 +1,4 @@
-import { unlink } from './io'
+import { io } from './io'
 import { getDatabase } from './database'
 import { transcriptPath, digestTranscriptFile, publishStagedTranscript, releaseBlockedPublication } from './transcripts'
 import { clearWriteIntent, finalizarPublicacao, pendingPublicationProblem, pendingWriteIntent, type WriteIntent } from './writeIntents'
@@ -35,6 +35,11 @@ export async function reconciliarPublicacao(sessionId: string, opcoes?: { mutati
   } catch {
     throw pendingPublicationProblem()
   }
+  // H3: identity/catalog/base are proven BEFORE any artifact changes — a
+  // divergent catalog never triggers a republish or a cleanup first. The
+  // finalization transaction revalidates the same base again (CAS under tx).
+  verificarBaseNoCatalogo(intent)
+
   if (destDigest === intent.newDigest) {
     finalizarComVerificacao(intent)
     await limparArquivosDaIntencao(intent)
@@ -68,6 +73,13 @@ export async function reconciliarPublicacao(sessionId: string, opcoes?: { mutati
   throw pendingPublicationProblem()
 }
 
+/** H3 — the journal only applies to a catalog that still holds its recorded base. */
+function verificarBaseNoCatalogo(intent: WriteIntent): void {
+  const row = getDatabase().prepare('SELECT session_json FROM sessions WHERE id=?').get(intent.record.id) as { session_json: string } | undefined
+  const currentRevision = row ? (JSON.parse(row.session_json).persistenceRevision ?? 0) : 0
+  if (currentRevision !== intent.baseRevision) throw pendingPublicationProblem()
+}
+
 function finalizarComVerificacao(intent: WriteIntent): void {
   const connection = getDatabase()
   const row = connection.prepare('SELECT session_json FROM sessions WHERE id=?').get(intent.record.id) as { session_json: string } | undefined
@@ -85,8 +97,8 @@ function finalizarComVerificacao(intent: WriteIntent): void {
 }
 
 async function limparArquivosDaIntencao(intent: WriteIntent): Promise<void> {
-  await unlink(intent.stagedPath).catch(() => undefined)
-  await unlink(`${intent.stagedPath}.rollback`).catch(() => undefined)
+  await io.unlink(intent.stagedPath).catch(() => undefined)
+  await io.unlink(`${intent.stagedPath}.rollback`).catch(() => undefined)
 }
 
 /** Destination path of a session record — shared with tests and diagnostics. */
