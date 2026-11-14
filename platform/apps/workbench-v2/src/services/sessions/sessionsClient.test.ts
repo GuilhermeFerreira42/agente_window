@@ -57,10 +57,20 @@ describe('session write queue and HTTP boundary', () => {
     fetchMock.mockResolvedValueOnce(json({ workspace: null })); await expect(pickSessionWorkspace()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
   })
-  it('preserves normal and forced deletion URL contracts', async () => {
-    fetchMock.mockResolvedValue(json({ ok: true })); await removePersistedSession('session / one'); await removePersistedSession('session-2', true)
+  it('preserves normal and forced deletion URL contracts with attempt identity (P-C)', async () => {
+    // Uma resposta NOVA por chamada (o corpo de Response não é reutilizável).
+    fetchMock.mockImplementation(async () => json({ ok: true, estado: 'concluido' }))
+    await removePersistedSession('session / one', { expectedRevision: 0 })
+    await removePersistedSession('session-2', { force: true, expectedRevision: 3 })
     expect(fetchMock.mock.calls.map(c => c[0])).toEqual(['/api/sessions/session%20%2F%20one', '/api/sessions/session-2?force=true'])
-    expect(fetchMock.mock.calls.every(c => c[1]?.method === 'DELETE' && c[1]?.body === '{}')).toBe(true)
+    const revisões = [0, 3]
+    fetchMock.mock.calls.forEach(([url, init], index) => {
+      expect(init?.method).toBe('DELETE')
+      const body = JSON.parse(String(init?.body)) as { deletionId: string; expectedRevision: number }
+      expect(body.deletionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+      expect(body.expectedRevision).toBe(revisões[index])
+      expect(String(url).endsWith(index === 1 ? '?force=true' : '')).toBe(true)
+    })
   })
   it('never updates a previously created recovery copy with an older local snapshot after hydration', async () => {
     const copy = make(), creationId = randomUUID(), remote = { ...copy, title: 'edited elsewhere', persistenceRevision: 2 }
@@ -72,8 +82,8 @@ describe('session write queue and HTTP boundary', () => {
   })
   it('does not turn a stale queued snapshot into creation after deletion in this client', async () => {
     const session = make()
-    fetchMock.mockResolvedValue(json({ ok: true }))
-    await removePersistedSession(session.id)
+    fetchMock.mockResolvedValue(json({ ok: true, estado: 'concluido' }))
+    await removePersistedSession(session.id, { expectedRevision: 0 })
     await expect(persistSession(session)).rejects.toMatchObject({ status: 410 })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

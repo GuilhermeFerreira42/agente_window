@@ -1,7 +1,7 @@
 import type * as SessionsClientModule from '../services/sessions/sessionsClient'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
 
@@ -26,6 +26,9 @@ let streamsAgirAbertos: Set<ReadableStreamDefaultController<Uint8Array>>
 
 beforeEach(() => {
   window.localStorage.clear()
+  // P-C: todo DELETE pede confirmação de alvo+consequência antes da solicitação.
+  // Padrão "dono aceita"; testes podem sobrescrever para recusar.
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
   streamsAgirAbertos = new Set()
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -2030,5 +2033,121 @@ describe('P-B hidratação parcial (SPEC §4)', () => {
     // e o banner continua identificando a indisponível do servidor
     await screen.findByText(/Não foi possível carregar uma conversa salva/)
     expect(screen.getByText('Outra conversa')).toBeInTheDocument()
+  })
+})
+
+describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', () => {
+  beforeEach(async () => {
+    // Isola os mocks de DELETE entre testes (nenhum once pendente vaza).
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    vi.mocked(removePersistedSession).mockReset()
+    vi.mocked(removePersistedSession).mockImplementation(async () => 'concluido' as const)
+  })
+  afterEach(() => {
+    // Nenhum spy (ex.: Storage.setItem injetado) vaza para o teste seguinte.
+    vi.restoreAllMocks()
+  })
+  it('confirma alvo+consequência, mostra `excluindo`, suspende envio e só remove após confirmação', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    const confirmacoes: string[] = []
+    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
+    let liberar!: () => void
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
+    render(<App initialSessionSnapshot={testSessions} />)
+    // Sessão concluída é ativada primeiro: o composer fica em modo de ENVIO
+    // (sessão em working mostraria 'Parar execução' no mesmo botão).
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.click(within(sessionRow('Ajustar layout single-pane')).getByRole('button', { name: 'Excluir sessão' }))
+    // Confirmação ANTES da solicitação, nomeando o alvo e a consequência.
+    await waitFor(() => expect(confirmacoes).toHaveLength(1))
+    expect(confirmacoes[0]).toContain('Ajustar layout single-pane')
+    expect(confirmacoes[0]).toContain('outras conversas')
+    // Estado visível; a conversa NÃO sai da lista como sucesso antes da confirmação.
+    expect(await screen.findByText(/Excluindo conversa: Ajustar layout single-pane/)).toBeInTheDocument()
+    expect(screen.getByText('Ajustar layout single-pane')).toBeInTheDocument()
+    // Envio de mensagens fica suspenso neste alvo durante a exclusão.
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'mensagem durante exclusão')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(await screen.findByText(/envio de mensagens suspenso/)).toBeInTheDocument()
+    liberar()
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    expect(() => sessionRow('Ajustar layout single-pane')).toThrow('Session row not found')
+    expect(vi.mocked(removePersistedSession)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(removePersistedSession).mock.calls[0][1]).toMatchObject({ expectedRevision: expect.any(Number) })
+  })
+
+  it('falha de exclusão fica visível e retomável — nunca vira sucesso silencioso (P-T10)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(new Error('Não foi possível concluir a exclusão (falha injetada).')))
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+    expect(screen.getAllByText('Não foi possível concluir a exclusão (falha injetada).').length).toBeGreaterThan(0)
+    // Retomada do MESMO alvo depois da falha.
+    await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+    expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('edição de OUTRA conversa durante a exclusão não é perdida (atualização funcional, SPEC §6)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    let liberar!: () => void
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Excluindo conversa/)).toBeInTheDocument()
+    // Enquanto a exclusão espera, o DONO arquiva outra conversa (muda o estado).
+    await user.click(within(sessionRow('Replicar a Janela de Agentes')).getByRole('button', { name: 'Arquivar' }))
+    liberar()
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    // A edição concorrente sobrevive à remoção (sem array capturado pré-await):
+    // a conversa arquivada continua arquivada após a exclusão concluir.
+    await user.click(screen.getByRole('button', { name: /Arquivadas/ }))
+    expect(sessionRow('Replicar a Janela de Agentes')).toHaveClass('is-archived')
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+
+  it('falha de storage local não impede a exclusão nem esconde o aviso (SPEC §5)', async () => {
+    const user = userEvent.setup()
+    const { storeSessionRecovery } = await import('../services/sessions/sessionRecovery')
+    const alvo = testSessions.find((sessao) => sessao.title === 'Revisar alterações do workbench')!
+    storeSessionRecovery({ session: alvo, message: 'fixture', kind: 'unavailable' })
+    // removeSessionRecovery persiste via setItem; a falha só é injetada depois
+    // do hidratar (nenhuma outra gravação local é vítima da injeção).
+    const setItemOriginal = Storage.prototype.setItem
+    let storageQuebrado = false
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+      if (storageQuebrado) throw new Error('storage indisponível')
+      setItemOriginal.call(localStorage, String(key), String(value))
+    })
+    render(<App initialSessionSnapshot={testSessions} />)
+    await screen.findByText('Revisar alterações do workbench')
+    storageQuebrado = true
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Sessão excluída; não foi possível limpar a cópia de recuperação/)).toBeInTheDocument()
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+
+  it('worktree sujo: recusa, confirmação específica de descarte e force explícito (P-T08)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession, SessionPersistenceError } = await import('../services/sessions/sessionsClient')
+    const sujo = new SessionPersistenceError('worktree sujo', 409)
+    ;(sujo as { code?: string }).code = 'worktree_dirty'
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(sujo))
+    const confirmacoes: string[] = []
+    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    // fluxo: recusa → confirmação específica → force (nunca force implícito)
+    await waitFor(() => expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2))
+    expect(confirmacoes.some((mensagem) => mensagem.includes('alterações locais'))).toBe(true)
+    expect(vi.mocked(removePersistedSession).mock.calls[1][1]).toMatchObject({ force: true, expectedRevision: expect.any(Number) })
+    await screen.findByText('Sessão excluída')
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
   })
 })

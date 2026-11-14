@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { testSessions } from '../../__tests__/fixtures/sessions'
-import { mergeHydratedSessions, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
+import { descartarRecuperacoesExcluidas, mergeHydratedSessions, readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
 import { persistSession, resumeSessionPersistence } from './sessionsClient'
 
 afterEach(() => { localStorage.clear(); vi.unstubAllGlobals() })
@@ -22,4 +22,41 @@ it('does not grant a new remote base to a divergent backup after reload', async 
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
   await expect(persistSession(local)).rejects.toMatchObject({ status: 409 })
   expect(fetcher).not.toHaveBeenCalled()
+})
+
+it('P-C §5 — cópia local de identidade EXCLUÍDA não ressuscita o original na restauração', async () => {
+  const excluida = { ...testSessions[0], id: crypto.randomUUID(), persistenceRevision: 1 }
+  const rascunho = { ...testSessions[0], id: crypto.randomUUID() }
+  storeSessionRecovery({ session: excluida, message: 'fixture', kind: 'unavailable' })
+  storeSessionRecovery({ session: rascunho, message: 'fixture', kind: 'local' })
+  const consultas: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    consultas.push(String(input))
+    return { status: String(input).includes(excluida.id) ? 410 : 404, ok: false } as Response
+  }))
+  await descartarRecuperacoesExcluidas([{ id: rascunho.id }])
+  const restantes = readSessionRecoveries().map((recovery) => recovery.session.id)
+  expect(consultas).toHaveLength(1)
+  // 404 = nunca confirmada no servidor → rascunho local legítimo permanece.
+  expect(restantes).toContain(rascunho.id)
+  // 410 = excluída → a cópia é descartada em vez de reabrir o original.
+  expect(restantes).not.toContain(excluida.id)
+})
+
+it('P-C §5 — falha de consulta local não destrói cópia (storage indisponível preserva conteúdo)', async () => {
+  const local = { ...testSessions[0], id: crypto.randomUUID() }
+  storeSessionRecovery({ session: local, message: 'fixture', kind: 'unavailable' })
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+  await descartarRecuperacoesExcluidas([])
+  expect(readSessionRecoveries().map((recovery) => recovery.session.id)).toContain(local.id)
+})
+
+it('P-C §5 — identidades que continuam no servidor não são consultadas nem tocadas', async () => {
+  const presente = { ...testSessions[0], id: crypto.randomUUID() }
+  storeSessionRecovery({ session: presente, message: 'fixture', kind: 'unavailable' })
+  const fetcher = vi.fn()
+  vi.stubGlobal('fetch', fetcher)
+  await descartarRecuperacoesExcluidas([{ id: presente.id }])
+  expect(fetcher).not.toHaveBeenCalled()
+  expect(readSessionRecoveries().map((recovery) => recovery.session.id)).toContain(presente.id)
 })
