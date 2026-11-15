@@ -1,3 +1,15 @@
+# Estado vigente — 15/11/2026 — programa de persistência P-A/P-B/P-C encerrado; C-1 sem autorização
+
+**P-A, P-B e P-C concluídas tecnicamente. Aceite humano confirmado pelo proprietário para a P-A e para a P-C.** Aprovação técnica (gates, retestes e validações por ambiente) e homologação humana (aceite do proprietário) são coisas distintas e ficam registradas separadamente (`08` = aceite humano, `09` = resultados técnicos). Nenhum aceite é inferido por consequência desta entrega.
+
+- **P-A** (CAS, gravações em fila, recuperação estável) — commits `09a28f3` + `e0b337c`; entrega em `Memória de projeto/execucao-pa-2026-11-13/ENTREGA_P_A.md`; **concluída tecnicamente; aceite humano confirmado**.
+- **P-B** (publicação JSONL com journal + catálogo recuperável) — commits `d399ee5` … `c581bfa` (7 commits); rodadas de correção H1–H5 e verificações B1/B2 fechadas; **o teste original de encerramento B1 passou 6/6 em `c581bfa` (resultado informado pelo proprietário)**; **concluída tecnicamente; aceite humano não declarado**.
+- **P-C** (exclusão idempotente, limpeza retomável, proteção contra recriação) — commits `269e9e0` … `69f4510` (5 commits); reteste independente com achados **PC-R1/PC-R2** corrigidos em `6feef9f` e **ressalva de comunicação** corrigida em `69f4510` (recibo estruturado `copyConfirmed` + constantes de projeção); validação Windows do Codex sobre `69f4510` e **aceite humano confirmado** — comportamentos e proveniência em `08`, gates Debian/Windows em `09`.
+
+**Próxima fatia planejada: C-1 (Chat e workspace imutáveis)**, conforme `SPEC_PERSISTENCIA.md` e o replanejamento de 13/11. **C-1 NÃO está autorizada nesta mensagem — não implementar.** Nenhum merge na branch base. A PR #1 (`arena` → `0f2e5de2-agente-window`) segue **OPEN**, sem merge.
+
+**M1–M8, DEBT-25 e MC1** mantêm seus próprios estados (D197): esta consolidação **não lhes atribui homologação**. Evidências Windows do Codex foram **comunicadas pelo proprietário** — não executadas por esta sessão no Debian, e os artefatos externos correspondentes não estão neste ambiente. Somente dados sintéticos nas provas da Arena.
+
 # Estado vigente — 12/11/2026
 
 **Correção MC1 / D201 tecnicamente validada, base `c4dbff6`, branch `arena`.** O chat `memoria` tinha título salvo corretamente, mas era anterior à proveniência MC1. Renomear não comprovava sua origem; a interface confundia a recusa com ausência. Busca agora tolera `memória`/`memoria`, renomeação preserva vínculos e uma recusa encerra a consulta com explicação fiel. O menu existente “Gerenciar acesso histórico” permite autorizar/revogar somente o chat selecionado neste projeto, com recibo de confirmação e validação de raiz, perfil, incarnação e digest. Não há transferência entre projetos nem permissão de comandos.

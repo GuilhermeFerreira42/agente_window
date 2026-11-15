@@ -1,3 +1,50 @@
+# P-C — gates, reprodução e resultados por ambiente (15/11/2026)
+
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows = execução do Codex, com resultados comunicados pelo proprietário** — não executados por esta sessão e com artefatos externos ausentes deste ambiente. **Testes amplos** = regressão nominal completa da suíte; **retestes focados** = subconjuntos por escopo (protocolo, recovery, UI).
+
+## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
+
+| Fase | Comando | Resultado |
+|---|---|---|
+| Sondas RED da reentrega | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/server/session-persistence/deletions.test.ts src/services/sessions/sessionRecovery.test.ts` (com as sondas no diff) | **3 falhas exatas** (App PC-R1 · T19 `200≠409` · recovery `undefined`) + 80/0/13 nos demais |
+| Verde pós-correção `6feef9f` | idem, sem sondas | **96: 83/0/13** |
+| Foco 5 alvos (reentrega) | `sh platform/scripts/gate-unit.sh src/server/session-persistence/deletions.test.ts src/server/session-persistence/databaseMigration.test.ts src/services/sessions src/__tests__/App.test.tsx` | **108/0/13 (121)** — deletions 19/19 · migração 2/2 · recovery 5/5 · client 11/11 · notice 12/12 · App 72 |
+| Foco combinado | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/services/sessions src/server/session-persistence` | **314/0/14 (328; 29 arq)** |
+| Ampla `6feef9f` | `sh platform/scripts/gate-unit.sh` | **1795/4/33 (1832; 186 arq)** |
+| Foco da correção da ressalva `69f4510` | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/services/sessions/sessionRecovery.test.ts src/server/session-persistence/deletions.test.ts` | **98/0/13** |
+| Ampla `69f4510` | `sh platform/scripts/gate-unit.sh` | **1797/4/33 (1834; 186 arq)** |
+| Typecheck | `sh iniciar.sh typecheck` (raiz) | **exit 0 / 0 erros** |
+| Lint delta | `PATH=platform/.runtime/node-v26.13.0-linux-x64/bin:$PATH npx eslint <arquivos>` em `platform/apps/workbench-v2`; baseline por `git worktree add /tmp/base-lint <base>` + symlink de `node_modules` | **0 novos** (ressalva: 1 = 1 pré-existente `_historica`) |
+
+As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
+
+## 2. Windows — validação do Codex (resultados comunicados pelo proprietário)
+
+| Rodada | Versão | Resultado comunicado |
+|---|---|---|
+| P-B — teste original de encerramento B1 | `c581bfa` | **6/6** (Windows aceita `{code, signal:null}` somente com saída confirmada; POSIX exige SIGKILL; `exit 1` genérico nunca basta) |
+| P-C — correções PC-R1/PC-R2 | rodada anterior à ressalva | confirmadas (reteste independente + validação) |
+| P-C — ressalva + reteste focado | `69f4510` | aviso “Cópia salva”; confirmação preservada após F5; retentativa sem duplicação; conteúdo local preservado; identidade original ainda excluída; **30 testes focados aprovados** |
+
+Nenhuma dessas linhas foi executada por esta sessão; os relatórios/log do Codex não estão neste ambiente. O registro aqui é o **relato do proprietário**, sem alegar leitura de arquivos ausentes.
+
+## 3. Comandos Windows de referência (receitas da entrega P-C, para reprodução do dono/Codex)
+
+```
+iniciar.cmd test src/server/session-persistence/deletions.test.ts src/server/session-persistence/databaseMigration.test.ts src/services/sessions src/__tests__/App.test.tsx > logs-pc\foco.log 2>&1
+iniciar.cmd test --maxWorkers=1 --reporter=dot > logs-pc\ampla.log 2>&1
+```
+
+Referência da rodada `6feef9f` (Debian, §1): foco 108/0/13; ampla 4 failed / 1795 passed / 33 skipped (1832; 186 arquivos). A rodada Windows `69f4510` corresponde aos **30 testes focados** comunicados. Diferenças Debian/Windows nominais devem ser classificadas como ambiente, nunca como falha silenciosa.
+
+## 4. Limites
+
+1. Suíte global **não** é integralmente verde (4 pré-existentes fora do perímetro da P-C).
+2. Nenhum aceite humano é produzido por estes gates — homologação humana vive em `08`.
+3. Dados somente sintéticos; perfis `mkdtemp` por teste; nenhum dado pessoal, banco, worktree ou processo real tocado nas provas da Arena.
+
+---
+
 # MC1 corretiva / D201 — autorização específica e renomeação (12/11/2026)
 
 Base `c4dbff6`, branch `arena`, somente `agente_window`. A inspeção somente leitura do caso humano confirmou título `memoria`, criação anterior à MC1, digest consistente e origem `unverifiable` sem identidade física histórica. O problema não era perda comprovada de vínculo por rename. Havia também falta de tolerância a acentos e uma recusa transformada pelo modelo em ausência. Contrato corrigido em D201; evidências anteriores D200 abaixo são históricas e não substituem esta rodada.

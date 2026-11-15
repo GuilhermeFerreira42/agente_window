@@ -1,3 +1,21 @@
+# 15/11/2026 — P-C homologada pelo proprietário após validação Windows
+
+O proprietário registrou o **aceite humano da P-C** após validar, com o Codex no **Windows**, a versão **`69f4510`**: aviso **“Cópia salva”** ao salvar a cópia da identidade excluída, confirmação **preservada após F5**, retentativa **sem duplicação**, conteúdo local **preservado** e identidade original **ainda excluída**. Os **30 testes focados** dessa rodada passaram. Resultado **comunicado pelo proprietário**: esta sessão não executou os testes Windows e os artefatos externos do Codex não estão neste ambiente. As correções **PC-R1/PC-R2** já haviam sido confirmadas na rodada anterior. Aprovação técnica ≠ homologação humana; nenhum aceite é atribuído a M1–M8/DEBT-25/MC1 (D197). **C-1** é a próxima fatia planejada e **segue sem autorização de implementação**. Consolidação documental nesta rodada (canônicos `01`/`03`/`06`/`07`/`08`/`09`, memória operacional, entrega da P-C e estado estruturado), **somente documentação, sem alteração de código e sem merge na base**.
+
+# 15/11/2026 — P-C: ressalva de comunicação corrigida (`69f4510`)
+
+O reteste independente (Debian) aprovou a reentrega **com uma ressalva**: após salvar a cópia da identidade excluída a UI mantinha o aviso genérico de “alterações locais não salvas”. Correção em **`69f4510`** (4 arquivos, +131/−12): recibo estruturado `copyConfirmed?: boolean` + constantes `MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO`/`MENSAGEM_EXCLUIDA_COPIA_SALVA`; `projetarRecovery` escolhe texto fixo por `kind==='excluida'`+flag (mensagem gravada nunca vira UI); `recover()` grava o recibo somente no ACK e o preserva no ciclo intermediário de cópia. Testes novos: projeção (`sessionRecovery.test`) e **UI completa** no cenário do parecer (410 → clique → ACK troca o aviso → F5 → retentativa sem novo POST e exatamente 1 cópia). Gates Debian: foco **98/0/13** · ampla **1797/4/33 (1834; 186 arq — mesmas 4 pré-existentes)** · typecheck **0** · lint delta **0**. Push `6feef9f..69f4510`.
+
+# 14/11/2026 — entrega da P-C e correções PC-R1/PC-R2
+
+Entrega inicial em **`269e9e0`** (tombstone de exclusão idempotente e guardas de ciclo de vida), **`a445fab`** (contrato de exclusão com identidade e estados honestos na UI) e **`d7a69f7`** (cenários de exclusão, retomada e proteção contra recriação); base `c581bfa`; entrega em `/home/user/execucao-pc/ENTREGA_P_C.md` (fotografia imutável). O parecer independente reprovou com dois achados P1: **PC-R1** (exclusão seguia sob `abortar()`→`pending`/throw; faltava a guarda server-side `session_run_active`) e **PC-R2** (o 410 apagava a cópia de recuperação em vez de marcá-la `excluida`). Correções em **`6feef9f`** (9 arquivos, +203/−32) com sondas RED registradas antes; reentrega em `/home/user/execucao-pc/ENTREGA_P_C_REENTREGA.md`. Gates Debian da reentrega: foco **108/0/13** · combinado **314/0/14 (328; 29 arq)** · ampla **1795/4/33 (1832; 186 arq)** · typecheck **0** · lint **22 = 22** do baseline.
+
+# 14/11/2026 — P-A e P-B concluídas tecnicamente no programa de persistência
+
+Contexto do encerramento da P-C: **P-A** (`09a28f3`, `e0b337c`) concluída tecnicamente, com **aceite humano confirmado** pelo proprietário; **P-B** (`d399ee5` … `c581bfa`) concluída tecnicamente com as rodadas H1–H5 e as verificações B1/B2 — **o teste original B1 passou 6/6 em `c581bfa`, informado pelo proprietário** — e **sem aceite humano declarado**. Entregas: `Memória de projeto/execucao-pa-2026-11-13/ENTREGA_P_A.md` e `/home/user/execucao-pb/ENTREGA_P_B.md` (+ `status.json`). P-B **não** é registrada como pendente de execução Windows.
+
+---
+
 # 12/11/2026 — Autorizada publicação da correção MC1, sem aceite humano
 
 Correção em `8c5ffa2`; o proprietário autorizou push na branch existente `arena`. Relatou sucesso inicial em chat limpo e manteve expressamente os aceites pendentes, avaliando as memórias durante o uso nas próximas alterações/fatias conforme D197. Print da tentativa anterior “tente novamente” mostrou consulta ao histórico do chat atual; esse caso fica registrado como limitação de continuidade ainda não corrigida/validada, sem invalidar ou ampliar o escopo dos testes executados. Nenhuma alteração funcional adicional nesta consolidação documental.

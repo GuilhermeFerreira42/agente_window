@@ -1,3 +1,20 @@
+# Registro de homologação — P-C (aceite do proprietário, 15/11/2026)
+
+**Aceite humano da P-C registrado pelo proprietário**, após validação no Windows (Codex) da versão **`69f4510`**. Comportamentos comprovados na validação (relato do proprietário):
+
+1. Ao salvar a cópia da identidade excluída, a UI passa do aviso de conteúdo local preservado para a confirmação **“Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.”**
+2. A confirmação **preserva após F5** (recibo estruturado — não recai no texto genérico de alterações não salvas).
+3. **Retentativa sem duplicação**: devolve a mesma cópia, sem novo POST e sem linha duplicada na lista.
+4. **Conteúdo local preservado** durante todo o fluxo.
+5. **Identidade original permanece excluída** (nunca reanexada) após a cópia.
+6. **30 testes focados** da rodada Windows passaram; as correções **PC-R1/PC-R2** já haviam sido confirmadas na rodada anterior.
+
+**Proveniência:** a validação Windows foi executada pelo Codex e **comunicada pelo proprietário** — não foi executada por esta sessão (Debian) e os artefatos externos correspondentes não estão neste ambiente; a Arena não afirma ter rodado esses testes. **Aprovação técnica ≠ homologação:** gates Debian, pareceres e retestes ficam em `09` e nas entregas (`ENTREGA_P_C.md` / `ENTREGA_P_C_REENTREGA.md`); este registro é o aceite humano.
+
+**Alcance deste aceite:** somente a **P-C**. O proprietário confirmou também o **aceite humano da P-A** (registrado em `03`). **P-B:** aceite humano **não declarado** — permanece conclusão técnica, com o teste original B1 **6/6 em `c581bfa`** (informado). **M1–M8, DEBT-25 e MC1:** sem homologação por consequência desta entrega (D197 segue vigente). **C-1:** não homologada (não implementada; sem autorização nesta mensagem).
+
+---
+
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
 ## MC1 — consultar outro chat, aceite humano pendente

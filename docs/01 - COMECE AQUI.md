@@ -137,4 +137,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-As Fatias 14 e 15 têm aceite informado pelo proprietário, registrado em 08 (D186). A sequência D133 coloca M1–M8 antes da Fatia 16. Consulte o estado atual em 03, as pendências em 06 e os resultados técnicos em 09.
+No programa de persistência, P-A, P-B e P-C estão concluídas tecnicamente; os aceites humanos de P-A e P-C estão confirmados em 08 (15/11) e C-1 é a próxima fatia, ainda sem autorização. As Fatias 14 e 15 têm aceite informado pelo proprietário, registrado em 08 (D186). A sequência D133 coloca M1–M8 antes da Fatia 16. Consulte o estado atual em 03, as pendências em 06 e os resultados técnicos em 09.
