@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import type { Attachment, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
+import { sessaoSemPasta } from '../domain/sessionState'
 import { workspaceFiles } from '../data'
 import { DragTypes } from '../domain/dragAndDrop'
 import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
@@ -557,7 +558,7 @@ export function ChatInput({
 
   // C-1 (SPEC C §4/§5.3) — Chat sem pasta: Agent/Edit e "Permitir tudo"
   // ficam indisponíveis com motivo honesto; o modo efetivo vira "Perguntar".
-  const semPasta = session.workspacePath === null || session.contexto?.tipo === 'chat'
+  const semPasta = sessaoSemPasta(session)
   const modoEfetivo = semPasta ? 'ask' : mode
   const MOTIVO_SEM_PASTA = 'Conversa Chat não tem pasta: este modo exige arquivos e comandos de workspace.'
   const MOTIVO_PERMISSAO_SEM_PASTA = 'Conversa Chat não tem pasta: "Permitir tudo" exige uma conversa workspace.'

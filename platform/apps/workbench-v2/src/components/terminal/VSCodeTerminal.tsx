@@ -49,7 +49,8 @@ export interface ShellProfile {
 interface Props {
   visible: boolean;
   sessionId: string;
-  workspace?: string;
+/** C-1/F4 — `null`/ausente = sessão sem pasta: terminal indisponível (sem cwd implícito). */
+  workspace?: string | null;
   onClose: () => void;
 }
 
@@ -306,8 +307,13 @@ export function VSCodeTerminal({ visible, sessionId: workbenchSessionId, workspa
   // da conexão usa workspaceRef.current.
   useEffect(() => {
     if (workspace === lastTerminalWorkspaceRef.current || !visible) return;
+    // C-1/F4 — sem raiz não há o que criar nem o que manter.
+    if (!workspace) return;
     lastTerminalWorkspaceRef.current = workspace;
-    if (workspace && instances.some((instance) => instance.status === 'open')) createTerminal();
+    // Raiz nova com shell aberto → shell no novo cwd (D60). Raiz nova sem
+    // nenhuma instância (ex.: landing sem pasta que acabou de escolher) →
+    // primeira instância na raiz real, nunca na global implícita.
+    if (instances.some((instance) => instance.status === 'open') || instances.length === 0) createTerminal();
   }, [workspace, visible, instances, createTerminal]);
 
   // Dividir terminal (split horizontal ao lado)
@@ -443,30 +449,40 @@ export function VSCodeTerminal({ visible, sessionId: workbenchSessionId, workspa
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
-    // Cria instância inicial imediatamente (mesmo antes de WS abrir) para testes de erro
-    setInstances((current) => {
-      if (current.length === 0) {
-        const firstId = generateId();
-        const firstInst: TerminalInstance = {
-          id: firstId,
-          label: '1: powershell',
-          shell: 'powershell',
-          cols: 80,
-          rows: 24,
-          status: 'connecting',
-        };
-        setActiveId(firstId);
-        setGroups([{ groupId: generateId(), terminalIds: [firstId], direction: 'horizontal' }]);
-        return [firstInst];
-      }
-      return current;
-    });
+    // C-1/F4 — sem raiz de workspace NÃO existe terminal: a instância inicial
+    // (que dispara `open` com cwd implícito na raiz global) só nasce com
+    // pasta confirmada. Handlers e cleanup do WS continuam vivos — na landing
+    // sem pasta, ao escolher a pasta o efeito de troca cria o shell na raiz
+    // real.
+    if (workspaceRef.current) {
+      // Cria instância inicial imediatamente (mesmo antes de WS abrir) para testes de erro
+      setInstances((current) => {
+        if (current.length === 0) {
+          const firstId = generateId();
+          const firstInst: TerminalInstance = {
+            id: firstId,
+            label: '1: powershell',
+            shell: 'powershell',
+            cols: 80,
+            rows: 24,
+            status: 'connecting',
+          };
+          setActiveId(firstId);
+          setGroups([{ groupId: generateId(), terminalIds: [firstId], direction: 'horizontal' }]);
+          return [firstInst];
+        }
+        return current;
+      });
+    }
 
     ws.onopen = () => {
       while (wsQueueRef.current.length > 0) {
         const msg = wsQueueRef.current.shift();
         if (msg) ws.send(msg);
       }
+
+      // C-1/F4 — só manda `open` quando há raiz confirmada (cwd honesto).
+      if (!workspaceRef.current) return;
 
       setInstances((current) => {
         if (current.length === 0) {
@@ -874,6 +890,39 @@ export function VSCodeTerminal({ visible, sessionId: workbenchSessionId, workspa
   const ptyStatus = activeInstance?.status ?? (instances.length > 0 ? 'open' : 'connecting');
   const ptyPid = activeInstance?.pid ? String(activeInstance.pid) : activeInstance?.id ?? '';
   const ptyShellPath = availableProfiles.find((p) => p.id === activeInstance?.shell)?.path ?? activeInstance?.shell ?? '';
+
+  // C-1/F4 — sessão sem pasta: o terminal é INDISPONÍVEL. Sem superfície de
+  // xterm, sem instância, sem shell implícito na raiz global. O estado vazio
+  // é honesto — não é `''`, nem diretório global, nem caminho artificial.
+  if (!workspace) {
+    return (
+      <section
+        className="terminal-panel terminal-sem-workspace"
+        aria-label="Painel Inferior"
+        data-session-id={workbenchSessionId}
+        data-pty-status="sem-workspace"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          width: '100%',
+          minHeight: '130px',
+          padding: '14px 16px',
+          background: 'var(--vscode-panel-background, #181818)',
+          color: 'var(--vscode-panel-foreground, #cccccc)',
+          borderTop: '1px solid var(--vscode-panel-border, #2b2b2b)',
+          position: 'relative',
+          zIndex: 10,
+          overflow: 'hidden',
+          fontFamily: 'var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
+          fontSize: '13px',
+        }}
+      >
+        <p style={{ margin: 0 }}>Terminal indisponível nesta sessão: nenhuma pasta de trabalho aberta.</p>
+        <p style={{ margin: 0, opacity: 0.7, fontSize: '12px' }}>Escolha uma pasta para iniciar um shell nesta sessão.</p>
+      </section>
+    );
+  }
 
   return (
     <section

@@ -102,8 +102,14 @@ function responderChatComSSE(
   })
 }
 
+const terminalPropsCapturadas = vi.hoisted(() => [] as Array<{ visible: boolean; sessionId: string; workspace?: string | null }>)
 vi.mock('../components/TerminalPanel', () => ({
-  TerminalPanel: () => null,
+  // Continua sem montar o xterm em jsdom; as props ficam capturadas para os
+  // testes de contrato C-1/F4 (o que o App ENTREGA ao terminal).
+  TerminalPanel: (props: { visible: boolean; sessionId: string; workspace?: string | null }) => {
+    terminalPropsCapturadas.push(props)
+    return null
+  },
 }))
 
 function sessionRow(title: string): HTMLElement {
@@ -2353,5 +2359,141 @@ describe('C-T05 — landing Chat/Pasta (App)', () => {
     expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
     // O caminho manual fica disponível como saída honesta.
     expect(await screen.findByRole('button', { name: 'Digitar caminho' })).toBeInTheDocument()
+  })
+})
+
+
+// Registro de chamadas com stub SSE — usado pelos testes B2/B3 (sem mock
+// permissivo: cada URL é capturada; o que não é do teste segue o fetch real).
+function instalarFetchComRegistro(): Array<{ url: string; corpo?: Record<string, unknown> }> {
+  const chamadas: Array<{ url: string; corpo?: Record<string, unknown> }> = []
+  const codificar = new TextEncoder()
+  const frames = [
+    codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: 'Resposta do modelo em Chat.' })}\n\n`),
+    codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`),
+  ]
+  const fetchOriginal = globalThis.fetch.bind(globalThis)
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    let corpo: Record<string, unknown> | undefined
+    if (typeof init?.body === 'string') {
+      try { corpo = JSON.parse(init.body) as Record<string, unknown> } catch { /* não-JSON */ }
+      chamadas.push({ url, corpo })
+    } else { chamadas.push({ url }) }
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir/instruction') return new Response(JSON.stringify({ token: 'human-fixture' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir') {
+      const fio = new ReadableStream<Uint8Array>({
+        start(controller) {
+          let indice = 0
+          const passo = () => {
+            if (indice >= frames.length) { controller.close(); return }
+            controller.enqueue(frames[indice]); indice += 1; setTimeout(passo, 5)
+          }
+          setTimeout(passo, 5)
+        },
+      })
+      return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'run-c1', 'X-Agir-Generation': '1' } })
+    }
+    return fetchOriginal(input, init)
+  })
+  return chamadas
+}
+
+// ============================================================================
+// C-1/B2 (revisão Codex) — a preparação do run resolve a modalidade: em Chat
+// o App NÃO chama as rotas de permissão/instrução de pasta (que o servidor
+// recusa com 409), o modo do payload é o efetivo `ask` e o run completa até o
+// modelo. Espião de URL por cima do stub de SSE — nada de mock permissivo.
+// ============================================================================
+describe('C-1/B2 — envio em Chat sem sincronização de pasta', () => {
+  it('1º envio em Chat: zero chamadas a /permission e /instruction, modo ask e resposta completa', async () => {
+    const chamadas = instalarFetchComRegistro()
+
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'mensagem em Chat puro')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+
+    // O run completa e a resposta do modelo aparece (chegou ao fluxo).
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    const urls = chamadas.map((chamada) => chamada.url)
+    expect(urls).not.toContain('/api/agir/permission')
+    expect(urls).not.toContain('/api/agir/instruction')
+    expect(urls).toContain('/api/agir/mode')
+    expect(urls).toContain('/api/agir')
+    const modo = chamadas.find((chamada) => chamada.url === '/api/agir/mode')
+    expect(modo?.corpo).toMatchObject({ mode: 'ask' })
+    const run = chamadas.find((chamada) => chamada.url === '/api/agir')
+    expect(run?.corpo?.mode).toBe('ask')
+    expect(run?.corpo?.instructionToken).toBeUndefined()
+  })
+})
+
+// ============================================================================
+// C-1/B3 (revisão Codex) — Explorer em sessão Chat: sem raiz implícita. O
+// gating `explorerEnabled = !!explorerWorkspacePath` desliga o boot do módulo
+// (nenhum /fs/workspace, nenhum discoverRoot) e a vista fica no estado vazio
+// existente, sem o botão "Abrir pasta" (que é da landing).
+// ============================================================================
+describe('C-1/B3 — Explorer em sessão Chat', () => {
+  it('sem workspace: zero chamadas /fs/*, vista vazia e sem "Abrir pasta"', async () => {
+    const chamadas = instalarFetchComRegistro()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    // A sessão fixture s1 (workspace) ativa o Explorer dela no boot — legítimo.
+    // O que B3 proíbe é NOVA atividade de /fs ao entrar na sessão Chat.
+    const marcas = chamadas.length
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'sessão chat sem explorer')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    // Nenhuma operação de filesystem DEPOIS de a sessão Chat ser criada —
+    // nem ativação (/fs/workspace) nem descoberta de raiz (/fs/root) sobre a
+    // raiz global implícita.
+    const urlsFs = chamadas.slice(marcas).map((chamada) => chamada.url).filter((url) => url.startsWith('/fs/'))
+    expect(urlsFs).toEqual([])
+
+    // Vista Explorer (view padrão da Side Bar): estado vazio existente, sem
+    // botão de abrir pasta dentro da sessão.
+    expect(screen.getByText('Nenhuma pasta aberta.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Abrir pasta' })).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// C-1/F4 (revisão Codex) — abrir o terminal dentro de uma sessão Chat: o
+// painel fica indisponível e NENHUM `open` de PTY é emitido (sem shell
+// implícito na raiz global). A sessão com pasta continua com o terminal
+// normal (coberta pelos testes existentes de toggle em s1).
+// ============================================================================
+describe('C-1/F4 — terminal em sessão Chat', () => {
+  it('Chat: o App entrega o terminal SEM raiz (nada de `\'\'`/caminho implícito) e o painel é aberto', async () => {
+    terminalPropsCapturadas.length = 0
+    instalarFetchComRegistro()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'chat sem terminal com raiz')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    const terminalToggle = screen.getByRole('button', { name: 'Alternar terminal' })
+    if (!terminalToggle.classList.contains('is-active')) await user.click(terminalToggle)
+
+    // O painel (mockado como null aqui) recebeu a prop `workspace` — em Chat
+    // ela é SEM raiz (`null`, nunca `\'\'`, raiz global ou caminho artificial).
+    // Quem prova que sem raiz não nasce shell é TerminalPanel.test (C-1/F4).
+    const ultima = await waitFor(() => {
+      const entrega = terminalPropsCapturadas.at(-1)
+      expect(entrega).toBeDefined()
+      return entrega!
+    })
+    expect(ultima.visible).toBe(true)
+    expect(ultima.workspace).toBeNull()
   })
 })

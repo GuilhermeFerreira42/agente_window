@@ -26,7 +26,7 @@ import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, registrarInstrucaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
+import { continuarAgir, enviarAgir, prepararExecucaoAgir, responderAguardarComando, responderAprovacao, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -46,6 +46,7 @@ import type { MedicaoContexto, EstadoCompactacao } from './domain/usoContexto'
 import {
   assertWorkbenchInvariants,
   resolveActiveChatId,
+  sessaoSemPasta,
   setAllDiffAccepted,
   setDiffAccepted,
   toggleDiffViewed,
@@ -178,7 +179,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // context for the new session and must drive Explorer before the first chat
   // message; it must not rewrite the older persisted session.
   const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : (currentSessionWorkspacePath ?? undefined)
-  const explorerEnabled = !landingVisible || !!explorerWorkspacePath
+  // C-1/B3 — ativação EXPLÍCITA: o Explorer só liga com uma raiz real. Sessão
+  // Chat (workspacePath nulo) fica DESLIGADA — sem /fs/workspace, sem
+  // discoverRoot, sem módulo montado sobre a raiz global; a vista vira o
+  // estado vazio existente. Pasta e landing com pasta escolhida inalteradas.
+  const explorerEnabled = !!explorerWorkspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -425,7 +430,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
     ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined}
-        onOpenFolder={!explorerEnabled ? () => void handlePickWorkspace() : undefined} />
+        // C-1/B3 — o seletor de pasta é da LANDING (entrada de sessão nova);
+        // dentro de uma sessão Chat não há o que abrir e o botão não aparece.
+        onOpenFolder={!explorerEnabled && landingVisible ? () => void handlePickWorkspace() : undefined} />
     : view.id === 'search'
       ? <SearchView slot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined} />
       : view.id === 'scm'
@@ -1905,22 +1912,21 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
     const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
-    const sessaoPermissao = sessions.find(session => session.id === sessionId)
-    const permissionKey = `${runKey}:${sessaoPermissao?.worktreePath ?? sessaoPermissao?.workspacePath ?? ''}`
-    const permissao = permissionByChat[permissionKey] ?? 'manual'
-    const entrada = {
-      instructionToken: undefined as string | undefined,
-      mensagens: historico,
-      modelSelection,
-      // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
-      // aprovações desta resposta — nada vaza para a próxima troca.
-      fluxo: `${sessionId}:${chatId}:${responseId}`,
-      sessionId,
-      chatId,
-      // O servidor ignora este campo; o modo é enviado separadamente pelo
-      // comando de seleção e permanece independente da resposta do modelo.
-      mode: modo,
+    // Espelho vivo (não o snapshot do closure): o envio vindo da landing é
+    // agendado com setTimeout e o estado novo já está no ref quando roda.
+    const sessaoPreparacao = sessionsRef.current.find(session => session.id === sessionId)
+    if (!sessaoPreparacao) {
+      // Sem snapshot não há como resolver a modalidade — falha honesta.
+      notify('Sessão não encontrada para preparar a execução.')
+      return
     }
+    // C-1/B2 — a MODALIDADE resolve as políticas de permissão: Chat nunca usa
+    // a chave com raiz falsa (`?? ''`); o nível efetivo de Chat é 'manual'
+    // (autoridade do servidor) e a sincronização acontece só em workspace.
+    const semPasta = sessaoSemPasta(sessaoPreparacao)
+    const permissionKey = semPasta ? null : `${runKey}:${sessaoPreparacao.worktreePath ?? sessaoPreparacao.workspacePath}`
+    const permissao = permissionKey === null ? 'manual' : (permissionByChat[permissionKey] ?? 'manual')
+    const fluxo = `${sessionId}:${chatId}:${responseId}`
     const ouvintes = criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir)
     let real: ControleAgir | null = null
     let canceladaAntesDoInicio = false
@@ -1935,16 +1941,33 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       },
     }
     agirAtivas.current.set(runKey, controle)
-    void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(async () => {
+    // C-1/B2 — a preparação (modo efetivo, permissão e instrução por
+    // modalidade) é responsabilidade do módulo de execução; o App só compõe
+    // o run e o estado React.
+    void prepararExecucaoAgir({
+      sessionId,
+      chatId,
+      fluxo,
+      sessao: sessaoPreparacao,
+      modo,
+      permissao,
+      instrucao: instrucaoHumana,
+      signal: controladorModo.signal,
+    }).then((preparada) => {
       if (canceladaAntesDoInicio) return
-      await selecionarPermissaoAgir(sessionId, chatId, permissao)
-      if (canceladaAntesDoInicio) return
-      if (instrucaoHumana !== undefined) entrada.instructionToken = await registrarInstrucaoAgir(sessionId, chatId, entrada.fluxo, instrucaoHumana, controladorModo.signal)
-      if (canceladaAntesDoInicio) return
-      real = enviarAgir(entrada, ouvintes)
+      real = enviarAgir({
+        instructionToken: preparada.instructionToken,
+        mensagens: historico,
+        modelSelection,
+        fluxo,
+        sessionId,
+        chatId,
+        // Modo do PAYLOAD = modo efetivo resolvido ('ask' em Chat).
+        mode: preparada.modoEfetivo,
+      }, ouvintes)
     }).catch((erro: unknown) => {
       if (canceladaAntesDoInicio) return
-      ouvintes.onError('configuracao', erro instanceof Error ? erro.message : 'Não foi possível registrar o modo de execução.')
+      ouvintes.onError('configuracao', erro instanceof Error ? erro.message : 'Não foi possível preparar a execução.')
     })
   }
 
@@ -2335,7 +2358,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         permission={permissionByChat[permissionKey] ?? 'manual'}
         automaticDeletes={automaticDeletesByChat[permissionKey] === true && permissionByChat[permissionKey] === 'allow-all'}
         onChangeAutomaticDeletes={async (permitir) => {
-          await selecionarPermissaoAgir(session.id, sessionChatId, permissionByChat[permissionKey] ?? 'manual', permitir)
+          // C-1/B2 — Chat não tem exclusões de pasta; a rota recusa com 409.
+          if (!sessaoSemPasta(session)) {
+            await selecionarPermissaoAgir(session.id, sessionChatId, permissionByChat[permissionKey] ?? 'manual', permitir)
+          }
           setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: permitir }))
         }}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
@@ -2344,7 +2370,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (ehModoAgir(nextMode)) setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))
         }}
         onChangePermission={async (nextPermission) => {
-          await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
+          // C-1/B2 — em Chat a autoridade já responde 'manual' sem raiz; o
+          // seletor de pasta não tem o que sincronizar (a rota recusa 409).
+          if (!sessaoSemPasta(session)) {
+            await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
+          }
           setPermissionByChat((current) => ({ ...current, [permissionKey]: nextPermission }))
           if (nextPermission === 'manual') setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: false }))
         }}
@@ -2780,7 +2810,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               visible={terminalVisible && !customViewActive}
               sessionId={persistedActiveSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (persistedActiveSession.worktreePath ?? persistedActiveSession.workspacePath ?? '')}
+              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (persistedActiveSession.worktreePath ?? persistedActiveSession.workspacePath)}
               onClose={() => setTerminalVisible(false)}
             />
           </div>
