@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { testSessions } from '../../__tests__/fixtures/sessions'
-import { descartarRecuperacoesExcluidas, mergeHydratedSessions, readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
+import { descartarRecuperacoesExcluidas, MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO, MENSAGEM_EXCLUIDA_COPIA_SALVA, mergeHydratedSessions, readSessionRecoveries, restoreUnsavedSessions, storeSessionRecovery } from './sessionRecovery'
 import { persistSession, resumeSessionPersistence } from './sessionsClient'
 
 afterEach(() => { localStorage.clear(); vi.unstubAllGlobals() })
@@ -49,6 +49,24 @@ it('P-C §5 — 410 preserva a cópia marcada como EXCLUÍDA: não ressuscita o 
   expect(restauradas).not.toContain(excluida.id)
   // …enquanto o rascunho nunca confirmado continua sendo restaurado.
   expect(restauradas).toContain(rascunho.id)
+})
+
+it('ressalva 15/11 — projeção distingue conteúdo preservado de cópia confirmada sem expor mensagem bruta', async () => {
+  const excluida = { ...testSessions[0], id: crypto.randomUUID(), persistenceRevision: 1 }
+  storeSessionRecovery({ session: excluida, message: 'texto bruta sensível qualquer', kind: 'excluida' })
+  // Pré-cópia: a projeção OWN a mensagem (a bruta gravada nunca vira UI).
+  expect(readSessionRecoveries()[0]).toMatchObject({ kind: 'excluida', message: MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO })
+  // Recibo estruturado do ACK: a releitura (App via readSessionRecoveries)
+  // passa a exibir a confirmação específica de cópia salva.
+  storeSessionRecovery({ session: excluida, message: 'Cópia em recuperação.', kind: 'excluida', copyConfirmed: true })
+  expect(readSessionRecoveries()[0]).toMatchObject({ kind: 'excluida', copyConfirmed: true, message: MENSAGEM_EXCLUIDA_COPIA_SALVA })
+  // O ciclo do hook regrava com texto arbitrário; o recibo sobrevive e o
+  // marcador de excluída também (nunca rebaixa para `unavailable`).
+  const atual = readSessionRecoveries()[0]
+  storeSessionRecovery({ session: excluida, message: 'outra gravação arbitrária', kind: 'excluida', copyConfirmed: atual.copyConfirmed, recovery: atual.recovery })
+  expect(readSessionRecoveries()[0]).toMatchObject({ kind: 'excluida', copyConfirmed: true, message: MENSAGEM_EXCLUIDA_COPIA_SALVA })
+  // Ressalva: nada disso reanexa a origem.
+  expect(restoreUnsavedSessions([]).map((session) => session.id)).not.toContain(excluida.id)
 })
 
 it('P-C §5 — falha de consulta local não destrói cópia (storage indisponível preserva conteúdo)', async () => {

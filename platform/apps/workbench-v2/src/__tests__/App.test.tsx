@@ -2201,3 +2201,86 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
   })
 })
+
+describe('P-C ressalva 15/11 — aviso e cópia da identidade excluída (PC-R2 UI)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('clique após 410: ACK troca o aviso por confirmação, sobrevive a F5 e a retentativa não duplica', async () => {
+    const user = userEvent.setup()
+    const { MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO, MENSAGEM_EXCLUIDA_COPIA_SALVA, storeSessionRecovery } = await import('../services/sessions/sessionRecovery')
+    const excluida = { ...testSessions[0], id: crypto.randomUUID(), title: 'Origem excluída pc-ressalva', persistenceRevision: 1 }
+    storeSessionRecovery({ session: excluida, message: 'fixture bruta que não pode vazar', kind: 'excluida' })
+
+    // Fronteira real do contrato: origem GET → 410; cópia GET → 404 antes do
+    // POST (cria+ACK) e 200+ack depois — é isso que impede duplicar na
+    // retentativa pós-F5, mesmo sem memória de fila.
+    const anterior = vi.mocked(globalThis.fetch).getMockImplementation()!
+    const posts: Array<{ creationId: string; sessionId: string }> = []
+    const copias = new Map<string, { session: typeof testSessions[number]; creationId: string }>()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const metodo = init?.method ?? 'GET'
+      if (metodo === 'POST' && url === '/api/sessions') {
+        const corpo = JSON.parse(String(init?.body)) as { session: typeof testSessions[number]; creationId: string }
+        posts.push({ creationId: corpo.creationId, sessionId: corpo.session.id })
+        const salva = { ...corpo.session, persistenceRevision: 1 }
+        copias.set(salva.id, { session: salva, creationId: corpo.creationId })
+        return Promise.resolve(new Response(JSON.stringify({ sessionId: salva.id, mutationId: corpo.creationId, revision: 1, session: salva }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (metodo === 'GET' && url.startsWith('/api/sessions/')) {
+        const id = decodeURIComponent(url.slice('/api/sessions/'.length))
+        if (id === excluida.id) return Promise.resolve(new Response(JSON.stringify({ message: 'A conversa foi excluída.', code: 'session_deleted' }), { status: 410, headers: { 'Content-Type': 'application/json' } }))
+        const criada = copias.get(id)
+        if (criada) return Promise.resolve(new Response(JSON.stringify({ session: criada.session, ack: { creationId: criada.creationId, mutationId: criada.creationId, revision: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+        return Promise.resolve(new Response(JSON.stringify({ message: 'A conversa não existe.', code: 'session_not_found' }), { status: 404, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return anterior(input, init)
+    })
+
+    const { unmount } = render(<App initialSessionSnapshot={testSessions} />)
+    // Estado A (pré-cópia): projeção distingue conteúdo preservado — e a
+    // mensagem bruta do armazenamento NUNCA aparece na UI.
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(screen.queryByText('fixture bruta que não pode vazar')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Conversa excluída: Origem excluída pc-ressalva')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Salvar uma cópia separada' })).toHaveLength(1)
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+
+    await user.click(screen.getByRole('button', { name: 'Salvar uma cópia separada' }))
+    // Estado B (ACK): confirmação ESPECÍFICA substitui o aviso genérico; a
+    // cópia entra na lista; a origem continua fora (bloqueada).
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    expect(screen.queryByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).not.toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(() => sessionRow('Origem excluída pc-ressalva (cópia recuperada)')).not.toThrow()
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+    expect(posts).toHaveLength(1)
+
+    // F5: o RECIBO estruturado sobrevive — a confirmação não volta ao texto
+    // genérico de "alterações locais não salvas". Isolamento do ruído: no boot
+    // por snapshot (sem hidratação real) o autosave grava backups das fixtures;
+    // aqui só a ORIGEM exclusa atravessa o F5, como no servidor (410).
+    const CHAVE_RECOVERY = 'workbench.sessions.unsaved.v1'
+    const guardadas = JSON.parse(window.localStorage.getItem(CHAVE_RECOVERY) ?? '[]') as Array<{ session: { id: string } }>
+    window.localStorage.setItem(CHAVE_RECOVERY, JSON.stringify(guardadas.filter((item) => item.session.id === excluida.id)))
+    unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    expect(screen.queryByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).not.toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Salvar uma cópia separada' })).toHaveLength(1)
+
+    // Retentativa pós-F5: GET+ack devolve a MESMA cópia → nenhum POST novo e
+    // nenhuma duplicata na lista.
+    await user.click(screen.getByRole('button', { name: 'Salvar uma cópia separada' }))
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    await waitFor(() => expect(posts).toHaveLength(1))
+    const linhasDeCopia = () => Array.from(document.querySelectorAll('.session-title-text'))
+      .filter((elemento) => elemento.textContent === 'Origem excluída pc-ressalva (cópia recuperada)')
+    expect(linhasDeCopia()).toHaveLength(1)
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+  })
+})

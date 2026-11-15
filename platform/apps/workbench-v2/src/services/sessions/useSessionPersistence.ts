@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '../../types'
 import { isSessionDirty, loadPersistedSession, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, retrySessionPersistence, sessionFingerprint, SessionPersistenceError } from './sessionsClient'
-import { createRecoveryCopy, readSessionRecoveries, removeSessionRecovery, sanitizarRecuperacao, storeSessionRecovery } from './sessionRecovery'
+import { createRecoveryCopy, MENSAGEM_EXCLUIDA_COPIA_SALVA, readSessionRecoveries, removeSessionRecovery, sanitizarRecuperacao, storeSessionRecovery } from './sessionRecovery'
 
 type Kind = 'unavailable' | 'conflict' | 'local' | 'excluindo' | 'falha_exclusao' | 'excluida'
 interface PersistenceIssue { message: string; backupAvailable: boolean; kind?: Kind }
@@ -125,8 +125,10 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
     }
     try {
       // O marcador `excluida` (autoridade do armazenamento) sobrevive aos
-      // ciclos de cópia: nunca é rebaixado para `unavailable` nem apagado.
-      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: excluida ? 'excluida' : kindDeBackup(issuesRef.current[id]?.kind), recovery: task })
+      // ciclos de cópia: nunca é rebaixado para `unavailable` nem apagado;
+      // o recibo `copyConfirmed` também atravessa o ciclo sem piscar falso.
+      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: excluida ? 'excluida' : kindDeBackup(issuesRef.current[id]?.kind),
+        copyConfirmed: recuperacao?.copyConfirmed, recovery: task })
       if (!task.saved) task.saved = await persistRecoveryCopy(task.copy, task.creationId)
       // The copy ACK becomes visible before either origin lookup or local cleanup.
       callback.current(task.saved, source, undefined)
@@ -139,13 +141,14 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
           updateIssue(id, { kind: 'local', message: 'Cópia salva; não foi possível limpar o backup local.', backupAvailable: true })
         }
       } else {
-        // P-C (PC-R2) — cópia confirmada da identidade EXCLUÍDA: a marca
-        // permanece `excluida` (o original nunca volta a ser reanexável).
+        // P-C (PC-R2/ressalva 15/11) — cópia confirmada da identidade
+        // EXCLUÍDA: o RECIBO `copyConfirmed` (estado estruturado, não texto
+        // arbitrário) faz a projeção exibir a confirmação — inclusive após F5.
         const kind: Kind = excluida ? 'excluida' : remote ? 'conflict' : 'unavailable'
         const mensagem = excluida
-          ? 'Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.'
+          ? MENSAGEM_EXCLUIDA_COPIA_SALVA
           : 'Cópia salva. O original local continua aqui com edições adicionais ou sem confirmação da versão salva.'
-        updateIssue(id, { kind, message: mensagem, backupAvailable: storeSessionRecovery({ session: current ?? source, message: excluida ? mensagem : 'Cópia salva; original local preservado.', kind, recovery: task }) })
+        updateIssue(id, { kind, message: mensagem, backupAvailable: storeSessionRecovery({ session: current ?? source, message: excluida ? mensagem : 'Cópia salva; original local preservado.', kind, copyConfirmed: excluida || undefined, recovery: task }) })
       }
     } catch (error) {
       if (error instanceof SessionPersistenceError && error.code === 'recovery_copy_changed') task.diverged = true

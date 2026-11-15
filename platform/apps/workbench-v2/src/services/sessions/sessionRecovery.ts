@@ -11,11 +11,25 @@ export interface SessionRecovery {
    * (410). A cópia é PRESERVADA para oferecer uma cópia nova, mas nunca mais
    * reanexa o original na restauração. */
   kind?: 'unavailable' | 'conflict' | 'local' | 'excluida'
+  /** Ressalva 15/11 — RECIBO ESTRUTURADO da cópia já confirmada da origem
+   * excluída (ACK do servidor). A projeção é que escolhe o texto exibido;
+   * mensagem bruta gravada nunca vira UI. */
+  copyConfirmed?: boolean
   recovery?: { copy: Session; creationId: string; source?: string }
 }
 
-function projetarRecovery({ session, kind, recovery }: SessionRecovery): SessionRecovery {
-  return { message: 'A conversa possui alterações locais não salvas.', kind, session: projetarSessaoPersistida(session),
+/** Estados de comunicação da identidade excluída — textos FIXOS da projeção
+ * (nunca mensagens arbitrárias persistidas): distinguem conteúdo local
+ * preservado de cópia já confirmada. */
+export const MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO = 'Esta conversa foi excluída no servidor. Seu conteúdo local está preservado aqui; salve uma cópia nova para não perdê-lo.'
+export const MENSAGEM_EXCLUIDA_COPIA_SALVA = 'Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.'
+
+function projetarRecovery({ session, kind, recovery, copyConfirmed }: SessionRecovery): SessionRecovery {
+  const message = kind === 'excluida'
+    ? (copyConfirmed ? MENSAGEM_EXCLUIDA_COPIA_SALVA : MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)
+    : 'A conversa possui alterações locais não salvas.'
+  return { message, kind, session: projetarSessaoPersistida(session),
+    ...(copyConfirmed === undefined ? {} : { copyConfirmed }),
     ...(recovery ? { recovery: { copy: projetarSessaoPersistida(recovery.copy), creationId: recovery.creationId, source: recovery.source } } : {}) }
 }
 
@@ -122,8 +136,9 @@ export async function descartarRecuperacoesExcluidas(servidor: readonly { id: st
       // P-C (PC-R2) — 410 NÃO destrói a cópia: o registro permanece marcado
       // (`excluida`) e é a única porta de entrada para salvar uma cópia nova.
       if (response.status === 410) {
-        storeSessionRecovery({ ...item, kind: 'excluida',
-          message: 'Esta conversa foi excluída no servidor. Suas alterações locais só voltam como uma cópia nova — nada é reanexado à identidade excluída.' })
+        // A UI lê via projeção (texto fixo por estado); gravar a mesma
+        // mensagem canônica mantém armazenamento e exibição coerentes.
+        storeSessionRecovery({ ...item, kind: 'excluida', message: MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO })
       }
     } catch {
       /* Sem rede não se apaga nada: higiene local nunca destrói conteúdo. */
