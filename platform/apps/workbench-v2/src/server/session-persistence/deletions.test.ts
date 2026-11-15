@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ViteDevServer } from 'vite'
 import type { ChatMessage, Session } from '../../types'
 import type * as TranscriptModule from './transcripts'
+import type * as RotasModule from '../../bairros/2-inteligencia/casas/agir/server/rotas'
 
 const cleanupFault = vi.hoisted(() => ({
   failDelete: false,
@@ -16,6 +17,10 @@ const cleanupFault = vi.hoisted(() => ({
   deleteStarted: undefined as (() => void) | undefined,
   releaseDelete: undefined as (() => void) | undefined,
 }))
+// P-C (PC-R1) — guarda de run vivo no DELETE: o harness não sobe execuções de
+// verdade, então `sessaoEmExecucao` é injetada aqui (mock parcial do MESMO
+// módulo `server/rotas` — fora do barrel — de onde a produção a importa).
+const runFault = vi.hoisted(() => ({ ativo: false }))
 // Falhas injetadas SOMENTE em fronteiras controladas da limpeza (módulo próprio,
 // nunca builtin) — produção permanece intacta.
 vi.mock('./transcripts', async (importOriginal) => {
@@ -32,6 +37,16 @@ vi.mock('./transcripts', async (importOriginal) => {
       }
       return actual.deleteTranscript(...args)
     },
+  }
+})
+// P-C (PC-R1) — parcial: mantém `conversaEmExecucao`/`tratarRotasAgir` reais e
+// só injeta a guarda de sessão em execução usada pelo DELETE (código de prova;
+// a produção passa a exportá-la deste MESMO módulo `server/rotas`).
+vi.mock('../../bairros/2-inteligencia/casas/agir/server/rotas', async (importOriginal) => {
+  const actual = await importOriginal<typeof RotasModule>()
+  return {
+    ...actual,
+    sessaoEmExecucao: () => runFault.ativo,
   }
 })
 import { deleteSessionRecord, getSessionRecord, getSessionRecordRaw, getDatabase, resetDatabase, upsertSessionRecord } from './database'
@@ -121,6 +136,7 @@ describe('P-C — exclusão idempotente, limpeza retomável e proteção contra 
     cleanupFault.blockDelete = false
     cleanupFault.deleteStarted = undefined
     cleanupFault.releaseDelete = undefined
+    runFault.ativo = false
     resetDatabase()
     const profile = mkdtempSync(join(tmpdir(), 'agent-pc-'))
     vi.stubEnv('AGENTE_WINDOW_DATA_DIR', join(profile, 'data'))
@@ -480,6 +496,25 @@ describe('P-C — exclusão idempotente, limpeza retomável e proteção contra 
     cleanupFault.failDelete = false
     expect((await deleteSession(server, id, revision)).status).toBe(200)
     expect(consultarDelecao(id)?.cleanupState).toBe('concluido')
+    expect(getSessionRecordRaw(id)).toBeUndefined()
+  })
+
+  it('T19 — DELETE com execução viva na sessão é recusado (409 session_run_active) sem tombstone', async () => {
+    const { id, revision } = await criar(server, 't19')
+    runFault.ativo = true
+    const recusa = await deleteSession(server, id, revision)
+    expect(recusa.status).toBe(409)
+    expect(await recusa.json()).toMatchObject({ code: 'session_run_active' })
+    // Nada destrutivo sob o run vivo: sem tombstone, registro e leitura intactos.
+    expect(getDatabase().prepare('SELECT COUNT(*) c FROM session_deletions WHERE session_id=?').get(id)).toEqual({ c: 0 })
+    expect(consultarDelecao(id)).toBeUndefined()
+    expect(getSessionRecord(id)).toBeDefined()
+    expect((await fetch(`${server.baseUrl}/api/sessions/${id}`)).status).toBe(200)
+    // Run encerrado → o MESMO pedido conclui: o único bloqueio era a execução.
+    runFault.ativo = false
+    const liberado = await deleteSession(server, id, revision)
+    expect(liberado.status).toBe(200)
+    expect((await liberado.json()).estado).toBe('concluido')
     expect(getSessionRecordRaw(id)).toBeUndefined()
   })
 })

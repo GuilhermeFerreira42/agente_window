@@ -2093,6 +2093,56 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('abort do run que não termina (pending) falha SEM remover: controle mantido e `excluindo`→`falha_exclusao` (PC-R1)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    render(<App initialSessionSnapshot={testSessions} />)
+    // Run VIVO no mesmo alvo que será excluído: o stream padrão nunca encerra
+    // e o controle fica registrado em `agirAtivas`.
+    const anterior = vi.mocked(globalThis.fetch).getMockImplementation()!
+    let postsAgir = 0
+    const cancels: string[] = []
+    let liberarCancel!: () => void
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/agir') postsAgir += 1
+      if (url.endsWith('/api/agir/cancel')) {
+        // O servidor RECEBE o cancelamento, mas o run nunca chega a estado
+        // terminal — é o cenário pending/erro do achado PC-R1.
+        cancels.push(url)
+        return new Promise<Response>((resolve) => {
+          liberarCancel = () => resolve(new Response(JSON.stringify({ status: 'pending' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+        })
+      }
+      return anterior(input, init)
+    })
+    await user.click(sessionRow('Revisar alterações do workbench'))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'rodando enquanto exclui')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await screen.findByRole('button', { name: 'Parar execução' })
+    // POST /api/agir disparou ⇒ controle real publicou identidade para o cancel.
+    await waitFor(() => expect(postsAgir).toBeGreaterThanOrEqual(1))
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    // A tentativa fica visível EnQuanto o abort não termina…
+    expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
+    liberarCancel()
+    // …e vira FALHA honesta e retomável no MESMO alvo: sem run parado, nada é removido.
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(screen.queryByText(/Excluindo conversa: Revisar alterações do workbench/)).not.toBeInTheDocument()
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+    expect(vi.mocked(removePersistedSession)).not.toHaveBeenCalled()
+    expect(cancels.length).toBeGreaterThanOrEqual(1)
+    // Controle MANTIDO em `agirAtivas`: a retomada ainda enxerga o run vivo e
+    // falha de novo em vez de partir para o DELETE às cegas.
+    await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
+    liberarCancel()
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(vi.mocked(removePersistedSession)).not.toHaveBeenCalled()
+    expect(cancels.length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+  })
+
   it('edição de OUTRA conversa durante a exclusão não é perdida (atualização funcional, SPEC §6)', async () => {
     const user = userEvent.setup()
     const { removePersistedSession } = await import('../services/sessions/sessionsClient')

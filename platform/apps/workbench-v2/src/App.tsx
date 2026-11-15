@@ -15,7 +15,7 @@ import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
 import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
 import { useSessionPersistence, type SessionPersistenceIssue } from './services/sessions/useSessionPersistence'
-import { mergeRecoveredSessions, mergeHydratedSessions, removeSessionRecovery, restoreUnsavedSessions, descartarRecuperacoesExcluidas } from './services/sessions/sessionRecovery'
+import { mergeRecoveredSessions, mergeHydratedSessions, readSessionRecoveries, removeSessionRecovery, restoreUnsavedSessions, descartarRecuperacoesExcluidas } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
@@ -1490,14 +1490,25 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const confirmado = window.confirm(`Excluir a conversa "${alvo.title}"? O histórico e os dados dela serão removidos. As outras conversas e edições ficam intactas.`)
     if (!confirmado) return
     setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
-    // Run vivo → cancelamento EXISTENTE aguardando estado terminal (P-T07);
-    // um retorno tardio é recusado pelo servidor e não reabre a conversa.
-    const emVoo = [...agirAtivas.current.entries()].filter(([runKey]) => runKey.startsWith(`${id}:`))
-    await Promise.all(emVoo.map(async ([runKey, controle]) => {
-      try { await controle.abortar() } catch { /* cancelamento best-effort */ }
-      finally { agirAtivas.current.delete(runKey) }
-    }))
+    // P-C §2/PC-R1 — o estado `excluindo` entra ANTES do cancelamento: o dono
+    // vê a tentativa enquanto o abort corre; uma falha desce para `falha_exclusao`.
     setExcluindo((current) => new Set(current).add(id))
+    // Run vivo → cancelamento até estado terminal (P-T07/PC-R1). `pending` ou
+    // erro = run AINDA ATIVO: falha honesta e retomável SEM chamar o DELETE, e o
+    // controle permanece em `agirAtivas` (a retomada volta a enxergar o run).
+    // Um retorno tardio é recusado pelo servidor e não reabre a conversa.
+    const emVoo = [...agirAtivas.current.entries()].filter(([runKey]) => runKey.startsWith(`${id}:`))
+    const resultados = await Promise.all(emVoo.map(async ([runKey, controle]) => {
+      try { return { runKey, estado: await controle.abortar() } }
+      catch { return { runKey, estado: 'pending' as const } }
+    }))
+    const algumNaoTerminal = resultados.some(({ estado }) =>
+      estado !== 'cancelled' && estado !== 'cancelled_with_effects' && estado !== 'already_terminal')
+    if (algumNaoTerminal) {
+      falhaDeExclusao(id, new Error('A execução desta conversa ainda não terminou. Aguarde a parada terminar e tente excluir novamente.'))
+      return
+    }
+    for (const { runKey } of resultados) agirAtivas.current.delete(runKey)
     try {
       const estado = await removePersistedSession(id, { expectedRevision: alvo.persistenceRevision ?? 0 })
       if (estado === 'limpeza_pendente') {
@@ -2552,6 +2563,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             .map(([id, message]) => sessions.find((session) => session.id === id) && { id, message, session: sessions.find((session) => session.id === id)! })
             .filter((entry): entry is { id: string; message: string; session: Session } => Boolean(entry))
             .map(({ session, message }): SessionPersistenceIssue => ({ session, kind: 'falha_exclusao', message, backupAvailable: false })),
+          // P-C (PC-R2) — aviso da identidade EXCLUÍDA composto FORA de
+          // `sessions.find`: a origem morta não está na lista (não reanexa),
+          // mas o snapshot preservado ainda oferece uma cópia nova.
+          ...readSessionRecoveries()
+            .filter((recovery) => recovery.kind === 'excluida'
+              && !sessions.some((session) => session.id === recovery.session.id)
+              && !excluindo.has(recovery.session.id) && !falhasExclusao.has(recovery.session.id))
+            .map((recovery): SessionPersistenceIssue => ({ session: recovery.session, kind: 'excluida', message: recovery.message, backupAvailable: true })),
         ]}
         recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} onExcluir={handleDelete} />
       {sessionLoadError && <div role="alert" className="session-persistence-notice"><p>{sessionLoadError}</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}

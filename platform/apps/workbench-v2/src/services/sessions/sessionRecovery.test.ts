@@ -24,7 +24,7 @@ it('does not grant a new remote base to a divergent backup after reload', async 
   expect(fetcher).not.toHaveBeenCalled()
 })
 
-it('P-C §5 — cópia local de identidade EXCLUÍDA não ressuscita o original na restauração', async () => {
+it('P-C §5 — 410 preserva a cópia marcada como EXCLUÍDA: não ressuscita o original nem some do registro (PC-R2)', async () => {
   const excluida = { ...testSessions[0], id: crypto.randomUUID(), persistenceRevision: 1 }
   const rascunho = { ...testSessions[0], id: crypto.randomUUID() }
   storeSessionRecovery({ session: excluida, message: 'fixture', kind: 'unavailable' })
@@ -35,12 +35,20 @@ it('P-C §5 — cópia local de identidade EXCLUÍDA não ressuscita o original 
     return { status: String(input).includes(excluida.id) ? 410 : 404, ok: false } as Response
   }))
   await descartarRecuperacoesExcluidas([{ id: rascunho.id }])
-  const restantes = readSessionRecoveries().map((recovery) => recovery.session.id)
+  const restantes = readSessionRecoveries()
   expect(consultas).toHaveLength(1)
   // 404 = nunca confirmada no servidor → rascunho local legítimo permanece.
-  expect(restantes).toContain(rascunho.id)
-  // 410 = excluída → a cópia é descartada em vez de reabrir o original.
-  expect(restantes).not.toContain(excluida.id)
+  expect(restantes.map((recovery) => recovery.session.id)).toContain(rascunho.id)
+  // 410 = excluída → a cópia é PRESERVADA e marcada (nunca descartada): o
+  // registro fica disponível para oferecer uma cópia em vez de sumir.
+  const marcada = restantes.find((recovery) => recovery.session.id === excluida.id)
+  expect(marcada).toBeDefined()
+  expect(marcada?.kind).toBe('excluida')
+  // A identidade marcada não reanexa na restauração (a lista nunca a ressuscita)…
+  const restauradas = restoreUnsavedSessions([]).map((session) => session.id)
+  expect(restauradas).not.toContain(excluida.id)
+  // …enquanto o rascunho nunca confirmado continua sendo restaurado.
+  expect(restauradas).toContain(rascunho.id)
 })
 
 it('P-C §5 — falha de consulta local não destrói cópia (storage indisponível preserva conteúdo)', async () => {

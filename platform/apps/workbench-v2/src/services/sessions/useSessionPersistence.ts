@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '../../types'
 import { isSessionDirty, loadPersistedSession, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, retrySessionPersistence, sessionFingerprint, SessionPersistenceError } from './sessionsClient'
-import { createRecoveryCopy, readSessionRecoveries, removeSessionRecovery, storeSessionRecovery } from './sessionRecovery'
+import { createRecoveryCopy, readSessionRecoveries, removeSessionRecovery, sanitizarRecuperacao, storeSessionRecovery } from './sessionRecovery'
 
-type Kind = 'unavailable' | 'conflict' | 'local' | 'excluindo' | 'falha_exclusao'
+type Kind = 'unavailable' | 'conflict' | 'local' | 'excluindo' | 'falha_exclusao' | 'excluida'
 interface PersistenceIssue { message: string; backupAvailable: boolean; kind?: Kind }
 /** Só os kinds persistíveis entram no backup local; `excluindo`/`falha_exclusao`
- * são estados de UI da exclusão (P-C) e nunca são gravados. */
-const kindDeBackup = (kind?: Kind): 'unavailable' | 'conflict' | 'local' | undefined =>
+ * são estados de UI da exclusão (P-C) e nunca são gravados. `excluida` (PC-R2)
+ * É persistível — o marcador precisa sobreviver aos ciclos de autosave. */
+const kindDeBackup = (kind?: Kind): 'unavailable' | 'conflict' | 'local' | 'excluida' | undefined =>
   kind === 'excluindo' || kind === 'falha_exclusao' ? 'unavailable' : kind
 export interface SessionPersistenceIssue extends PersistenceIssue { session: Session }
 type Recovered = (copy: Session, source: Session, savedSource: Session | undefined) => void
@@ -108,18 +109,24 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
 
   const recover = useCallback(async (id: string) => {
     if (busy.current) return
-    const source = latest.current.find(s => s.id === id)
+    // P-C (PC-R2) — identidade EXCLUÍDA não está na lista viva: a fonte da
+    // cópia é o snapshot de recuperação marcado, nunca uma reanexação.
+    const recuperacao = readSessionRecoveries().find(r => r.session.id === id)
+    const excluida = recuperacao?.kind === 'excluida'
+    const source = latest.current.find(s => s.id === id) ?? (excluida && recuperacao ? sanitizarRecuperacao(recuperacao.session) : undefined)
     if (!source || source.chats.some(c => c.messages.some(m => m.running))) return
     busy.current = true; setRecovering(id)
     let task = tasks.current.get(id)
     if (task?.diverged || (task?.saved && sessionFingerprint(source) !== task.source)) task = undefined
     if (!task) {
-      const stored = tasks.current.has(id) ? undefined : readSessionRecoveries().find(r => r.session.id === id)?.recovery
+      const stored = tasks.current.has(id) ? undefined : recuperacao?.recovery
       task = { copy: stored?.copy ?? createRecoveryCopy(source), creationId: stored?.creationId ?? crypto.randomUUID(), source: stored?.source ?? sessionFingerprint(source) }
       tasks.current.set(id, task)
     }
     try {
-      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: kindDeBackup(issuesRef.current[id]?.kind), recovery: task })
+      // O marcador `excluida` (autoridade do armazenamento) sobrevive aos
+      // ciclos de cópia: nunca é rebaixado para `unavailable` nem apagado.
+      storeSessionRecovery({ session: source, message: 'Cópia em recuperação.', kind: excluida ? 'excluida' : kindDeBackup(issuesRef.current[id]?.kind), recovery: task })
       if (!task.saved) task.saved = await persistRecoveryCopy(task.copy, task.creationId)
       // The copy ACK becomes visible before either origin lookup or local cleanup.
       callback.current(task.saved, source, undefined)
@@ -132,8 +139,13 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
           updateIssue(id, { kind: 'local', message: 'Cópia salva; não foi possível limpar o backup local.', backupAvailable: true })
         }
       } else {
-        const kind = remote ? 'conflict' : 'unavailable'
-        updateIssue(id, { kind, message: 'Cópia salva. O original local continua aqui com edições adicionais ou sem confirmação da versão salva.', backupAvailable: storeSessionRecovery({ session: current ?? source, message: 'Cópia salva; original local preservado.', kind, recovery: task }) })
+        // P-C (PC-R2) — cópia confirmada da identidade EXCLUÍDA: a marca
+        // permanece `excluida` (o original nunca volta a ser reanexável).
+        const kind: Kind = excluida ? 'excluida' : remote ? 'conflict' : 'unavailable'
+        const mensagem = excluida
+          ? 'Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.'
+          : 'Cópia salva. O original local continua aqui com edições adicionais ou sem confirmação da versão salva.'
+        updateIssue(id, { kind, message: mensagem, backupAvailable: storeSessionRecovery({ session: current ?? source, message: excluida ? mensagem : 'Cópia salva; original local preservado.', kind, recovery: task }) })
       }
     } catch (error) {
       if (error instanceof SessionPersistenceError && error.code === 'recovery_copy_changed') task.diverged = true

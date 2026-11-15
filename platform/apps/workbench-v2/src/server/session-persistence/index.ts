@@ -18,7 +18,7 @@ import { listRecentWorkspaces, listWorkspaceDirectories, pickWorkspaceDirectory,
 // reconhece os caminhos e delega — nenhuma regra de provedores mora aqui.
 import { rotaPertenceAoModulo, tratarRotasProvedores } from '../../bairros/2-inteligencia/casas/provedores/server/rotas'
 import { rotaPertenceAoModuloConversa, tratarRotasConversa } from '../../bairros/2-inteligencia/casas/conversa/server/rotas'
-import { conversaEmExecucao, conversaTemPausa, rotaPertenceAoModuloAgir, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
+import { conversaEmExecucao, conversaTemPausa, rotaPertenceAoModuloAgir, sessaoEmExecucao, tratarRotasAgir } from '../../bairros/2-inteligencia/casas/agir/server/rotas'
 import { validarSelecaoModelo } from '../../bairros/2-inteligencia/casas/agir/server/protocoloHttp'
 import type { RegistroExecucaoAgir } from '../../bairros/2-inteligencia/casas/agir'
 import { definirModoAgir, definirPermissaoAgir, lerModoAgir, lerPermissaoAgir, definirExclusaoAutomaticaAgir, lerExclusaoAutomaticaAgir } from '../../bairros/2-inteligencia/casas/agir/server/modos'
@@ -896,6 +896,12 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     }
     try {
       const resultado = await withSessionPersistenceQueue(id, async () => {
+        // P-C (PC-R1) — nunca excluir sob execução viva: o run continua
+        // escrevendo e o tombstone abriria corrida de recriação. O cliente só
+        // chega aqui com ACK de cancelamento terminal; a guarda do servidor é
+        // a fonte de verdade para qualquer fronteira.
+        if (sessaoEmExecucao(id)) throw new PersistenceProblem(409, 'session_run_active',
+          'Há uma execução em andamento nesta conversa. Aguarde a conclusão ou cancele a execução e tente novamente.')
         // Conflito com a fila P-B: nenhuma exclusão sob intenção pendente de
         // publicação — os dois protocolos seguem íntegros.
         if (hasPendingWriteIntent(id)) throw new PersistenceProblem(409, 'session_publication_pending',

@@ -34,6 +34,18 @@ export function SessionPersistenceNotice({ issues, recovering, onRecover, onRetr
           {onExcluir && <button type="button" disabled={Boolean(recovering)} onClick={() => onExcluir(session.id)}>Tentar excluir novamente</button>}
         </div>
       )
+      // P-C (PC-R2) — identidade morta no servidor: nunca "Tentar novamente"
+      // (renasceria) nem recarregar (410); a ÚNICA saída honesta é a cópia nova.
+      if (kind === 'excluida') return (
+        <div className="session-persistence-notice" role="alert" key={session.id}>
+          <div>
+            <strong>Conversa excluída: {session.title}</strong>
+            <p>{message}</p>
+            {!backupAvailable && <p>Backup do navegador indisponível. Mantenha esta janela aberta até salvar uma cópia.</p>}
+          </div>
+          <button type="button" disabled={Boolean(recovering)} onClick={() => void onRecover(session.id)}>Salvar uma cópia separada</button>
+        </div>
+      )
       return (
         <div className="session-persistence-notice" role="alert" key={session.id}>
           <div>

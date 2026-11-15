@@ -153,6 +153,13 @@ export function conversaEmExecucao(sessionId: string, chatId: string): boolean {
 export function conversaTemPausa(sessionId: string, chatId: string): boolean {
   return [...retomarPorFluxo.values()].some(({ contexto }) => contexto.sessionId === sessionId && contexto.chatId === chatId)
 }
+/** P-C (PC-R1) — guarda para fronteiras que não podem seguir com a identidade
+ * (ex.: DELETE) enquanto um run NÃO-TERMINAL da sessão ainda vive no mapa.
+ * Cancelamento já concluído (`estado` terminal) não bloqueia: o ACK veio e o
+ * `finally` do fio só limpa o mapa em seguida. */
+export function sessaoEmExecucao(sessionId: string): boolean {
+  return [...execucaoPorFluxo.values()].some((execucao) => execucao.sessionId === sessionId && !execucaoTerminal(execucao))
+}
 function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
   geracaoPorFluxo.set(fluxo, generation)
