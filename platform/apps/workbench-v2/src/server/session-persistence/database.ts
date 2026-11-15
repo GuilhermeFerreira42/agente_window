@@ -47,14 +47,33 @@ export function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS sessions_slug_idx ON sessions(slug);
   `)
   const columns = database.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string; notnull: number }>
-  // Rebuilds renomeiam `sessions` e depois derrubam a tabela temporária. Com
-  // `foreign_keys = ON`, o RENAME reescreve as referências dos filhos
-  // (grants/checkpoints/deletions) para o nome temporário e o DROP os deixa
-  // apontando para uma tabela fantasma — todo INSERT filho passa a falhar com
-  // "no such table". Desligar FKs durante o rebuild mantém os filhos apontando
-  // para `sessions`, que sempre volta a existir na mesma transação.
+  // Rebuilds renomeiam `sessions` e depois derrubam a tabela temporária. Desde
+  // o SQLite 3.25 (`legacy_alter_table = OFF`, padrão), o RENAME **segue e
+  // reescreve** as referências dos filhos (grants/receipts/checkpoints/origens)
+  // mesmo com `foreign_keys = OFF` — o DROP então deixa os filhos apontando
+  // para a tabela fantasma e todo INSERT filho falha com "no such table"
+  // (reproduzido pela sonda C-1/B1 em databaseMigration.test). Com
+  // `legacy_alter_table = ON` o RENAME muda somente o nome da própria tabela:
+  // os filhos seguem apontando para `sessions`, que reexiste na mesma
+  // transação. Os dois pragmas são LIDOS de volta antes de qualquer RENAME —
+  // se não pegarem (ex.: conexão dentro de transação alheia), a migração
+  // aborta sem tocar no schema. O `foreign_key_check` roda DENTRO da transação
+  // do rebuild: violação = rollback = estado original intacto (nunca migra pela
+  // metade nem deixa pragmas inseguros ativos).
   database.pragma('foreign_keys = OFF')
+  database.pragma('legacy_alter_table = ON')
   try {
+    const fkDesligadas = String(database.pragma('foreign_keys', { simple: true })) === '0'
+    const legacyAtivo = String(database.pragma('legacy_alter_table', { simple: true })) === '1'
+    if (!fkDesligadas || !legacyAtivo) {
+      throw new Error('Migração abortada: os pragmas de segurança (foreign_keys/legacy_alter_table) não foram aceitos; nenhum rebuild foi executado.')
+    }
+    const verificarIntegridade = (): void => {
+      const violacoes = database!.prepare('PRAGMA foreign_key_check').all()
+      if (violacoes.length > 0) {
+        throw new Error(`Migração abortada por violação de integridade referencial (${violacoes.length}); a transação foi revertida.`)
+      }
+    }
     if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
       database.transaction(() => {
         database!.exec(`
@@ -71,39 +90,50 @@ export function getDatabase(): Database.Database {
         CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
         CREATE INDEX sessions_slug_idx ON sessions(slug);
       `)
-    })()
-  }
-  // C-1 (SPEC C §3) — modalidade explícita: coluna `context_kind` + `workspace_path`
-  // anulável SOMENTE para Chat, com CHECK de coerência. Migração aditiva: IDs e
-  // metadata preservados; toda linha legada recebe `workspace` (compatibilidade —
-  // rótulo/título nunca reatribuem modalidade).
-  const possuiContexto = columns.find((column) => column.name === 'context_kind') !== undefined
-  const caminhoAnulavel = columns.find((column) => column.name === 'workspace_path')?.notnull === 0
-  if (!possuiContexto || !caminhoAnulavel) {
-    database.transaction(() => {
-      database!.exec(`
-        ALTER TABLE sessions RENAME TO sessions_legacy_c1;
-        CREATE TABLE sessions (
-          id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
-          workspace_path TEXT, worktree_path TEXT,
-          context_kind TEXT NOT NULL DEFAULT 'workspace' CHECK (context_kind IN ('chat', 'workspace')),
-          message_count INTEGER NOT NULL DEFAULT 0,
-          created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-          session_json TEXT NOT NULL,
-          CHECK ((context_kind = 'workspace' AND workspace_path IS NOT NULL)
-              OR (context_kind = 'chat' AND workspace_path IS NULL))
-        );
-        INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, context_kind, message_count, created_at, updated_at, session_json)
-          SELECT id, slug, title, workspace_path, worktree_path, 'workspace', message_count, created_at, updated_at, session_json
-          FROM sessions_legacy_c1;
-        DROP TABLE sessions_legacy_c1;
-        CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
-        CREATE INDEX sessions_slug_idx ON sessions(slug);
-      `)
-    })()
-  }
+        verificarIntegridade()
+      })()
+    }
+    // C-1 (SPEC C §3) — modalidade explícita: coluna `context_kind` + `workspace_path`
+    // anulável SOMENTE para Chat, com CHECK de coerência. Migração aditiva: IDs e
+    // metadata preservados; toda linha legada recebe `workspace` (compatibilidade —
+    // rótulo/título nunca reatribuem modalidade).
+    const possuiContexto = columns.find((column) => column.name === 'context_kind') !== undefined
+    const caminhoAnulavel = columns.find((column) => column.name === 'workspace_path')?.notnull === 0
+    if (!possuiContexto || !caminhoAnulavel) {
+      database.transaction(() => {
+        database!.exec(`
+          ALTER TABLE sessions RENAME TO sessions_legacy_c1;
+          CREATE TABLE sessions (
+            id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
+            workspace_path TEXT, worktree_path TEXT,
+            context_kind TEXT NOT NULL DEFAULT 'workspace' CHECK (context_kind IN ('chat', 'workspace')),
+            message_count INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            session_json TEXT NOT NULL,
+            CHECK ((context_kind = 'workspace' AND workspace_path IS NOT NULL)
+                OR (context_kind = 'chat' AND workspace_path IS NULL))
+          );
+          INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, context_kind, message_count, created_at, updated_at, session_json)
+            SELECT id, slug, title, workspace_path, worktree_path, 'workspace', message_count, created_at, updated_at, session_json
+            FROM sessions_legacy_c1;
+          DROP TABLE sessions_legacy_c1;
+          CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
+          CREATE INDEX sessions_slug_idx ON sessions(slug);
+        `)
+        verificarIntegridade()
+      })()
+    }
   } finally {
+    database.pragma('legacy_alter_table = OFF')
     database.pragma('foreign_keys = ON')
+  }
+  // Perfil já corrompido por uma versão ANTERIOR desta migração (o defeito que
+  // a revisão encontrou): torna a violação visível sem derrubar a abertura —
+  // a C-1 nunca saiu em produção e o reparo de schema já derrubado é fora do
+  // escopo autorizado (registrado na reentrega).
+  const violacoesPreexistentes = database.prepare('PRAGMA foreign_key_check').all()
+  if (violacoesPreexistentes.length > 0) {
+    console.warn(`[database] ${violacoesPreexistentes.length} violação(ões) de integridade pré-existente(s) no catálogo (migração anterior); verifique o perfil.`)
   }
   database.exec(`
     CREATE TABLE IF NOT EXISTS session_tool_grants (
