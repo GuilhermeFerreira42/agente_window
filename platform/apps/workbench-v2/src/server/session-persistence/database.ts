@@ -10,7 +10,10 @@ export interface SessionRecord {
   id: string
   slug: string
   title: string
-  workspacePath: string
+  /** C-1 — `null` somente para modalidade `chat` (raiz nula real). */
+  workspacePath: string | null
+  /** C-1 — modalidade explícita; catálogo é a autoridade (não inferir de rótulo/título). */
+  contextKind: 'chat' | 'workspace'
   worktreePath: string | null
   messageCount: number
   createdAt: number
@@ -44,9 +47,17 @@ export function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS sessions_slug_idx ON sessions(slug);
   `)
   const columns = database.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string; notnull: number }>
-  if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
-    database.transaction(() => {
-      database!.exec(`
+  // Rebuilds renomeiam `sessions` e depois derrubam a tabela temporária. Com
+  // `foreign_keys = ON`, o RENAME reescreve as referências dos filhos
+  // (grants/checkpoints/deletions) para o nome temporário e o DROP os deixa
+  // apontando para uma tabela fantasma — todo INSERT filho passa a falhar com
+  // "no such table". Desligar FKs durante o rebuild mantém os filhos apontando
+  // para `sessions`, que sempre volta a existir na mesma transação.
+  database.pragma('foreign_keys = OFF')
+  try {
+    if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
+      database.transaction(() => {
+        database!.exec(`
         ALTER TABLE sessions RENAME TO sessions_legacy_064a;
         CREATE TABLE sessions (
           id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
@@ -61,6 +72,38 @@ export function getDatabase(): Database.Database {
         CREATE INDEX sessions_slug_idx ON sessions(slug);
       `)
     })()
+  }
+  // C-1 (SPEC C §3) — modalidade explícita: coluna `context_kind` + `workspace_path`
+  // anulável SOMENTE para Chat, com CHECK de coerência. Migração aditiva: IDs e
+  // metadata preservados; toda linha legada recebe `workspace` (compatibilidade —
+  // rótulo/título nunca reatribuem modalidade).
+  const possuiContexto = columns.find((column) => column.name === 'context_kind') !== undefined
+  const caminhoAnulavel = columns.find((column) => column.name === 'workspace_path')?.notnull === 0
+  if (!possuiContexto || !caminhoAnulavel) {
+    database.transaction(() => {
+      database!.exec(`
+        ALTER TABLE sessions RENAME TO sessions_legacy_c1;
+        CREATE TABLE sessions (
+          id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
+          workspace_path TEXT, worktree_path TEXT,
+          context_kind TEXT NOT NULL DEFAULT 'workspace' CHECK (context_kind IN ('chat', 'workspace')),
+          message_count INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+          session_json TEXT NOT NULL,
+          CHECK ((context_kind = 'workspace' AND workspace_path IS NOT NULL)
+              OR (context_kind = 'chat' AND workspace_path IS NULL))
+        );
+        INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, context_kind, message_count, created_at, updated_at, session_json)
+          SELECT id, slug, title, workspace_path, worktree_path, 'workspace', message_count, created_at, updated_at, session_json
+          FROM sessions_legacy_c1;
+        DROP TABLE sessions_legacy_c1;
+        CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
+        CREATE INDEX sessions_slug_idx ON sessions(slug);
+      `)
+    })()
+  }
+  } finally {
+    database.pragma('foreign_keys = ON')
   }
   database.exec(`
     CREATE TABLE IF NOT EXISTS session_tool_grants (
@@ -176,6 +219,7 @@ export function saveCheckpoint(sessionId: string, chatId: string, checkpoint: Ch
 export function listSessionRecords(): SessionRecord[] {
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
+      context_kind AS contextKind,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions
@@ -186,16 +230,17 @@ export function listSessionRecords(): SessionRecord[] {
 export function upsertSessionRecord(record: SessionRecord): void {
   getDatabase().prepare(`
     INSERT INTO sessions (
-      id, slug, title, workspace_path, worktree_path, message_count,
+      id, slug, title, workspace_path, context_kind, worktree_path, message_count,
       created_at, updated_at, session_json
     ) VALUES (
-      @id, @slug, @title, @workspacePath, @worktreePath, @messageCount,
+      @id, @slug, @title, @workspacePath, @contextKind, @worktreePath, @messageCount,
       @createdAt, @updatedAt, @sessionJson
     )
     ON CONFLICT(id) DO UPDATE SET
       slug = excluded.slug,
       title = excluded.title,
       workspace_path = excluded.workspace_path,
+      context_kind = excluded.context_kind,
       worktree_path = excluded.worktree_path,
       message_count = excluded.message_count,
       updated_at = excluded.updated_at,
@@ -243,6 +288,7 @@ export function getSessionRecord(id: string): SessionRecord | undefined {
 export function getSessionRecordRaw(id: string): SessionRecord | undefined {
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
+      context_kind AS contextKind,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions WHERE id = ?

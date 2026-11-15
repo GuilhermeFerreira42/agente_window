@@ -3,6 +3,9 @@ import { ArrowUp, Bot, ChevronDown, FolderGit2, Mic, MessageSquare, Plus, Shield
 
 interface SessionLandingProps {
   workspace: string
+  /** C-1 (SPEC C §2) — modalidade explícita; default Chat (raiz nula). */
+  contexto?: 'chat' | 'workspace'
+  onChangeContexto?: (contexto: 'chat' | 'workspace') => void
   onSubmit: (text: string) => void
   onChangeMode?: () => void
   onChangeModel?: () => void
@@ -16,7 +19,7 @@ interface SessionLandingProps {
   isFileSystemSupported?: boolean
 }
 
-export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, onValidateWorkspacePath, onListWorkspaceDirectories, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
+export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, onValidateWorkspacePath, onListWorkspaceDirectories, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
   const [text, setText] = useState('')
   const [manualPathOpen, setManualPathOpen] = useState(!isFileSystemSupported)
   const [manualPath, setManualPath] = useState('')
@@ -69,9 +72,29 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
   return (
     <section className="session-landing" aria-label="Nova sessão">
       <div className="session-landing-center">
+        {onChangeContexto && (
+          <div className="session-landing-contexto" role="group" aria-label="Modalidade da conversa">
+            <button
+              type="button"
+              className={`session-landing-contexto-option${contexto === 'chat' ? ' is-active' : ''}`}
+              aria-pressed={contexto === 'chat'}
+              data-testid="contexto-chat"
+              onClick={() => onChangeContexto('chat')}
+            >Chat</button>
+            <button
+              type="button"
+              className={`session-landing-contexto-option${contexto === 'workspace' ? ' is-active' : ''}`}
+              aria-pressed={contexto === 'workspace'}
+              data-testid="contexto-workspace"
+              onClick={() => onChangeContexto('workspace')}
+            >Pasta</button>
+          </div>
+        )}
         <h1 className="session-landing-title">
           <span className="session-landing-title-lead">Nova sessão em</span>
-          {onPickWorkspace || workspaceSelectionDisabledReason ? (
+          {contexto === 'chat' ? (
+            <span className="session-landing-chip" data-testid="landing-chat-chip"><MessageSquare size={14} aria-hidden="true" />Chat sem pasta</span>
+          ) : onPickWorkspace || workspaceSelectionDisabledReason ? (
             <button
               className="session-landing-chip is-clickable"
               type="button"
@@ -90,7 +113,7 @@ export function SessionLanding({ workspace, onSubmit, onChangeMode, onChangeMode
           <span className="session-landing-chip"><Bot size={14} aria-hidden="true" />Copilot<ChevronDown size={13} aria-hidden="true" /></span>
         </h1>
 
-        {(workspaceSelectionDisabledReason || onPickWorkspace || onValidateWorkspacePath) && (
+        {contexto === 'workspace' && (workspaceSelectionDisabledReason || onPickWorkspace || onValidateWorkspacePath) && (
           <div className="session-landing-workspace-choice">
             <p className="session-landing-workspace-hint">
               {workspaceSelectionDisabledReason ?? (isFileSystemSupported ? <>Clique em <strong>{workspace}</strong> para escolher pasta real do disco</> : <>O seletor nativo não está disponível neste sistema.</>)}

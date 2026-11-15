@@ -555,7 +555,15 @@ export function ChatInput({
     chipRefs.current.get(nextAttachment.id)?.focus()
   }
 
+  // C-1 (SPEC C §4/§5.3) — Chat sem pasta: Agent/Edit e "Permitir tudo"
+  // ficam indisponíveis com motivo honesto; o modo efetivo vira "Perguntar".
+  const semPasta = session.workspacePath === null || session.contexto?.tipo === 'chat'
+  const modoEfetivo = semPasta ? 'ask' : mode
+  const MOTIVO_SEM_PASTA = 'Conversa Chat não tem pasta: este modo exige arquivos e comandos de workspace.'
+  const MOTIVO_PERMISSAO_SEM_PASTA = 'Conversa Chat não tem pasta: "Permitir tudo" exige uma conversa workspace.'
+
   const selectMode = (nextMode: string) => {
+    if (semPasta && (nextMode === 'agent' || nextMode === 'edit')) return
     onChangeMode(nextMode)
     setModeOpen(false)
     setPermissionOpen(false)
@@ -564,6 +572,11 @@ export function ChatInput({
 
   const selectPermission = async (nextPermission: NivelPermissaoAgir) => {
     if (permissionBusy || nextPermission === permission) {
+      setPermissionOpen(false)
+      return
+    }
+    if (semPasta && nextPermission === 'allow-all') {
+      setPermissionError(MOTIVO_PERMISSAO_SEM_PASTA)
       setPermissionOpen(false)
       return
     }
@@ -790,30 +803,36 @@ export function ChatInput({
               }}
             >
               <Sparkles size={12} />
-              <span>{modes.find((item) => item.id === mode)?.label ?? 'Agente'}</span>
+              <span>{modes.find((item) => item.id === modoEfetivo)?.label ?? 'Agente'}</span>
               <ChevronDown size={11} />
             </button>
             {modeOpen && (
               <div className="popover mode-popover" role="menu" aria-label="Selecionar modo" onKeyDown={handleModeMenuKeyDown}>
-                {modes.map((item) => (
-                  <button
-                    className={`popover-option${item.id === mode ? ' is-selected' : ''}`}
-                    key={item.id}
-                    type="button"
-                    aria-pressed={item.id === mode}
-                    tabIndex={item.id === mode ? 0 : -1}
-                    ref={(element) => {
-                      if (element) modeOptionRefs.current.set(item.id, element)
-                      else modeOptionRefs.current.delete(item.id)
-                    }}
-                    onClick={() => selectMode(item.id)}
-                  >
-                    <Sparkles size={12} aria-hidden="true" />
-                    <span>{item.label}</span>
-                    <span className="popover-option-description">{item.description}</span>
-                    {item.id === mode && <Check size={12} aria-hidden="true" />}
-                  </button>
-                ))}
+                {modes.map((item) => {
+                  const bloqueado = semPasta && (item.id === 'agent' || item.id === 'edit')
+                  return (
+                    <button
+                      className={`popover-option${item.id === modoEfetivo ? ' is-selected' : ''}`}
+                      key={item.id}
+                      type="button"
+                      aria-pressed={item.id === modoEfetivo}
+                      aria-disabled={bloqueado || undefined}
+                      disabled={bloqueado}
+                      title={bloqueado ? MOTIVO_SEM_PASTA : undefined}
+                      tabIndex={item.id === modoEfetivo ? 0 : -1}
+                      ref={(element) => {
+                        if (element) modeOptionRefs.current.set(item.id, element)
+                        else modeOptionRefs.current.delete(item.id)
+                      }}
+                      onClick={() => selectMode(item.id)}
+                    >
+                      <Sparkles size={12} aria-hidden="true" />
+                      <span>{item.label}</span>
+                      <span className="popover-option-description">{bloqueado ? MOTIVO_SEM_PASTA : item.description}</span>
+                      {item.id === modoEfetivo && <Check size={12} aria-hidden="true" />}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -840,10 +859,10 @@ export function ChatInput({
                   <span className="popover-option-description">Pede aprovação quando necessária; grants existentes continuam valendo.</span>
                   {permission === 'manual' && <Check size={12} aria-hidden="true" />}
                 </button>
-                <button className={`popover-option permission-risk-option${permission === 'allow-all' ? ' is-selected' : ''}`} role="menuitemradio" aria-checked={permission === 'allow-all'} type="button" onClick={() => void selectPermission('allow-all')}>
+                <button className={`popover-option permission-risk-option${permission === 'allow-all' ? ' is-selected' : ''}`} role="menuitemradio" aria-checked={permission === 'allow-all'} type="button" disabled={semPasta} aria-disabled={semPasta || undefined} title={semPasta ? MOTIVO_PERMISSAO_SEM_PASTA : undefined} onClick={() => void selectPermission('allow-all')}>
                   <ShieldAlert size={12} aria-hidden="true" />
                   <span>Permitir tudo</span>
-                  <span className="popover-option-description">Sem confirmações individuais; limitado à conta do SO. Perguntar/Planejar continuam somente leitura.</span>
+                  <span className="popover-option-description">{semPasta ? MOTIVO_PERMISSAO_SEM_PASTA : 'Sem confirmações individuais; limitado à conta do SO. Perguntar/Planejar continuam somente leitura.'}</span>
                   {permission === 'allow-all' && <Check size={12} aria-hidden="true" />}
                 </button>
                 <button className="popover-option permission-risk-option" role="menuitemcheckbox" aria-checked={automaticDeletes} type="button" disabled={permissionBusy || (permission !== 'allow-all' && !automaticDeletes)} onClick={() => {

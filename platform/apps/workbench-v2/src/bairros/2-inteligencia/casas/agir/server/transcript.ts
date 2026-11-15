@@ -19,7 +19,8 @@ export interface RegistroExecucaoAgir {
   turnoId?: string
   pedidoId?: string
   categoria?: 'historico' | 'retomada'
-  raiz: string
+  /** C-1 — Chat registra execução sem raiz (`null`): nenhum território de pasta. */
+  raiz: string | null
   alvo?: { providerId: string; modelId: string }
   eventos: readonly EventoTranscriptAgir[]
 }

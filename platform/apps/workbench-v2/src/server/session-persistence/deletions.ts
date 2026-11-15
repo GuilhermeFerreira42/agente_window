@@ -94,7 +94,7 @@ export async function executarLimpezaDelecao(sessionId: string, force: boolean):
     'Esta conversa não tem exclusão registrada. Recarregue e tente novamente.')
   if (tombstone.cleanupState === 'concluido') return tombstone
   const record = getSessionRecordRaw(sessionId)
-  if (record?.worktreePath) {
+  if (record?.worktreePath && record.workspacePath) {
     try {
       await removeWorktree(record.workspacePath, record.worktreePath, sessionId, force)
     } catch (error) {

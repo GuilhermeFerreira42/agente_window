@@ -18,7 +18,7 @@ async function fixture(raizExistente?: string, legacy = true) {
   destinos.push({ id, raiz })
   const session = { id, title: 'Nome anterior', workspacePath: raiz, mainChatId: 'main', chats: [{ id: 'main', title: 'Main', messages: [{ id: 'mensagem', role: 'user', time: '10:00', content: 'Decisão SQLite preservada.' }] }] } as Session
   const entries: TranscriptEntry[] = [{ chatId: 'main', uuid: 'mensagem', timestamp: 1, type: 'user', message: session.chats[0].messages[0] }]
-  const record = (s = session): SessionRecord => ({ id, slug: id, title: s.title, workspacePath: s.workspacePath, worktreePath: null, createdAt: 1, updatedAt: 1, messageCount: 1, sessionJson: JSON.stringify({ ...s, chats: s.chats.map(c => ({ ...c, messages: [] })) }) })
+  const record = (s = session): SessionRecord => ({ id, slug: id, title: s.title, workspacePath: s.workspacePath, worktreePath: null, createdAt: 1, updatedAt: 1, messageCount: 1, contextKind: 'workspace', sessionJson: JSON.stringify({ ...s, chats: s.chats.map(c => ({ ...c, messages: [] })) }) })
   if (legacy) upsertSessionRecord(record())
   publicarCatalogoComOrigens(record(), prepararOrigens(session, legacy ? session : undefined, legacy ? entries : [], raiz), entries)
   await writeTranscript(id, id, entries)

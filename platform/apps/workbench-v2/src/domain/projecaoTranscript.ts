@@ -31,11 +31,11 @@ export function projetarMensagemPersistida(mensagem: ChatMessage): ChatMessage {
 
 /** Campos extensíveis recebidos do navegador nunca viram um store paralelo. */
 export function projetarSessaoPersistida(session: Session): Session {
-  const { id, title, workspace, workspacePath, slug, worktreePath, section, status, updated,
+  const { id, title, workspace, workspacePath, contexto, slug, worktreePath, section, status, updated,
     diffAdded, diffRemoved, branch, pinned, unread, archived, ciFailure, mainChatId,
     isQuickChat, automation, customGroup, provider, isDraft, createdSeq, updatedSeq, persistenceRevision } = session
   return {
-    id, title, workspace, workspacePath, slug, worktreePath, section, status, updated,
+    id, title, workspace, workspacePath, contexto, slug, worktreePath, section, status, updated,
     diffAdded, diffRemoved, branch, pinned, unread, archived, ciFailure, mainChatId,
     isQuickChat, automation, customGroup, provider, isDraft, createdSeq, updatedSeq, persistenceRevision,
     approval: session.approval ? 'Aprovação anterior expirada.' : undefined,

@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, revokeSessionToolGrants, saveCheckpoint, upsertSessionRecord, type SessionToolGrant } from './database'
+import { excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, saveCheckpoint, type SessionToolGrant } from './database'
 import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
 import { consultarDelecao, deletionsPendentes, executarLimpezaDelecao, iniciarOuConsultarDelecao, problemaSessaoExcluida, sessaoExcluida } from './deletions'
@@ -37,7 +37,7 @@ import { aplicarCheckpoint, checkpointCorresponde, mensagensDoCheckpoint, propor
 import { gerarResumo } from './compactacao'
 import { buscarTranscript } from './buscaTranscript'
 import { recuperarHistorico } from './recuperarHistorico'
-import { digestChat, prepararOrigens, invalidarOrigensForaDaRaiz } from './origensChats'
+import { digestChat, prepararOrigens } from './origensChats'
 import { criarConsultaEntreChats, abrirFonteEntreChats } from './consultaEntreChats'
 import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional } from './retomadaOperacional'
 import { criarMemoriaAutomatica, selecionarMemorias, type EscopoMemoria, type FonteMemoria } from './memoriaAutomatica'
@@ -75,8 +75,9 @@ async function lerFonteMemoria(contexto: EscopoMemoria): Promise<FonteMemoria> {
   const record = getSessionRecord(contexto.sessionId)
   const atual = resolverContextoAgir(contexto.sessionId, contexto.chatId)
   if (!record || !atual.ok || atual.raiz !== contexto.raiz) throw new Error('O escopo da memória mudou.')
+  // C-1 — escopo estável sem raiz: Chat usa a identidade da sessão (nunca pasta).
   return { entries: await readTranscript(record.slug, record.id, 16 * 1024 * 1024),
-    escopo: chaveEscopo(contexto.raiz), checkpoint: getCheckpoint(record.id, contexto.chatId) }
+    escopo: chaveEscopo(contexto.raiz ?? contexto.sessionId), checkpoint: getCheckpoint(record.id, contexto.chatId) }
 }
 
 const prepararChamadaAutomatica = criarMemoriaAutomatica({
@@ -91,7 +92,7 @@ const prepararChamadaAutomatica = criarMemoriaAutomatica({
   }),
   memorias: (contexto) => withSessionPersistenceQueue(contexto.sessionId, async () => {
     await lerFonteMemoria(contexto)
-    return listarMemoriasProjeto(chaveEscopo(contexto.raiz.normalize('NFC')))
+    return listarMemoriasProjeto(chaveEscopo((contexto.raiz ?? contexto.sessionId).normalize('NFC')))
   }),
 })
 
@@ -101,6 +102,8 @@ export interface SessionPersistencePluginOptions {
 
 interface PersistedSessionPayload {
   session: Session
+  /** C-1 (SPEC C §3) — modalidade explícita da criação; ausente em payloads legados. */
+  contexto?: { tipo: 'chat' } | { tipo: 'workspace'; path?: string }
 }
 
 function validPersistenceRevision(value: unknown): value is number {
@@ -178,9 +181,10 @@ async function gravarExecucaoAgir(registro: RegistroExecucaoAgir): Promise<void>
       ? Math.max(maior, entry.sequence ?? 0) : maior, 0)
     if (!Number.isSafeInteger(sequence + eventos.length)) throw new Error('Sequência do transcript esgotada.')
     const timestamp = Date.now()
-    const escopo = chaveEscopo(raiz)
+    const escopo = chaveEscopo(raiz ?? sessionId)
     const primeiro = anteriores.find((entry) => entry.type === 'agir_event' && entry.uuid === `${runId}:1`)?.message as EventoGravado | undefined
-    const git = primeiro ? primeiro.git : await observarGit(raiz)
+    // C-1 — Chat grava eventos sem inspecionar Git (nenhuma raiz de pasta).
+    const git = primeiro ? primeiro.git : raiz !== null ? await observarGit(raiz) : null
     const novos = eventos.flatMap((evento, indice): TranscriptEntry[] => {
       const uuid = `${runId}:${indice + 1}`
       if (ids.has(uuid)) return []
@@ -198,9 +202,12 @@ async function lerRevisaoOperacional(sessionId: string, chatId: string) {
   if (!session.chats.some((chat) => chat.id === chatId)) return
   const contexto = resolverContextoAgir(sessionId, chatId)
   const entries = await readTranscript(record.slug, sessionId, 16 * 1024 * 1024)
-  const revisao = revisarOperacao(entries, chatId, contexto.ok ? chaveEscopo(contexto.raiz) : undefined,
-    contexto.ok ? await observarGit(contexto.raiz) : null, conversaTemPausa(sessionId, chatId))
-  if (revisao && contexto.ok) await conferirArquivosOperacionais(revisao, entries, chatId, contexto.raiz)
+  // C-1 — Chat revisa a operação SEM inspecionar Git/arquivos (raiz nula).
+  const revisao = revisarOperacao(entries, chatId,
+    contexto.ok ? chaveEscopo(contexto.raiz ?? sessionId) : undefined,
+    contexto.ok && contexto.raiz !== null ? await observarGit(contexto.raiz) : null,
+    conversaTemPausa(sessionId, chatId))
+  if (revisao && contexto.ok && contexto.raiz !== null) await conferirArquivosOperacionais(revisao, entries, chatId, contexto.raiz)
   return { revisao: revisao ?? null, ativa: conversaEmExecucao(sessionId, chatId) }
 }
 
@@ -245,7 +252,7 @@ async function compactarSessao(request: IncomingMessage, response: ServerRespons
     const sessao = getSessionRecord(sessionId)
     const contexto = resolverContextoAgir(sessionId, chatId)
     if (!sessao || !contexto.ok) return
-    const escopo = chaveEscopo(contexto.raiz)
+    const escopo = chaveEscopo(contexto.raiz ?? sessionId)
     return { escopo, entries: await readTranscript(sessao.slug, sessionId), checkpoint: getCheckpoint(sessionId, chatId) }
   }
   try {
@@ -335,8 +342,11 @@ async function gerirMemoriaProjeto(request: IncomingMessage, response: ServerRes
   try {
     await withSessionPersistenceQueue(sessionId, async () => {
       const contexto = resolverContextoAgir(sessionId, chatId)
-      if (!contexto.ok) {
-        sendJson(response, 409, { message: 'O projeto da conversa não está disponível.' })
+      if (!contexto.ok || contexto.raiz === null) {
+        // C-1 (SPEC C) — M5 memórias de projeto: Chat não tem pasta/projeto.
+        sendJson(response, 409, { message: contexto.ok
+          ? 'Conversa Chat não tem pasta: memórias de projeto exigem uma conversa workspace.'
+          : 'O projeto da conversa não está disponível.' })
         return
       }
       const projeto = chaveEscopo(contexto.raiz.normalize('NFC'))
@@ -350,7 +360,10 @@ async function gerirMemoriaProjeto(request: IncomingMessage, response: ServerRes
           const resolver = async (): Promise<Set<string>> => {
             const record = getSessionRecord(id)
             if (!record) return new Set()
-            const pasta = validateWorkspacePath(record.worktreePath || record.workspacePath)
+            // C-1 — Chat não participa de escopo de projeto: sem pasta → vazio.
+            const caminho = record.worktreePath || record.workspacePath
+            if (!caminho) return new Set()
+            const pasta = validateWorkspacePath(caminho)
             if (!pasta.valid || !pasta.exists || !pasta.isDir || chaveEscopo(pasta.realpath.normalize('NFC')) !== projeto) return new Set()
             if (!checarMensagens) {
               const sessao = JSON.parse(record.sessionJson) as Session
@@ -440,6 +453,13 @@ function codigoDeIndisponivel(error: unknown): string {
   return 'session_unavailable'
 }
 
+/** C-1 — o catálogo é a autoridade da modalidade; materializa `contexto` na
+ * leitura (snapshots legados não têm o campo e nunca mudam de tipo). */
+function comContextoDoCatalogo(session: Session, record: { contextKind: 'chat' | 'workspace' }): Session {
+  const esperado = record.contextKind
+  return session.contexto?.tipo === esperado ? session : { ...session, contexto: { tipo: esperado } }
+}
+
 async function listSessions(): Promise<SessionIndex> {
   let records: ReturnType<typeof listSessionRecords>
   // H1: a criação interrompida não tem linha de catálogo — descoberta e
@@ -495,7 +515,7 @@ async function listSessions(): Promise<SessionIndex> {
     await reconciliarPublicacao(record.id)
     const current = getSessionRecord(record.id)
     if (!current) return undefined
-    const session = JSON.parse(current.sessionJson) as Session
+    const session = comContextoDoCatalogo(JSON.parse(current.sessionJson) as Session, current)
     const entries = await readTranscript(current.slug, current.id)
     if (current.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
     return sanarStatusAposF5(restoreMessages(session, entries))
@@ -519,7 +539,7 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     || !raw.chats.some(c => c.id === raw.mainChatId) || new Set(raw.chats.map(c => c.id)).size !== raw.chats.length
     || raw.chats.some(c => !c || typeof c.id !== 'string' || !c.id || !Array.isArray(c.messages)
       || c.messages.some(m => !m || typeof m.id !== 'string' || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string'))
-    || typeof raw.workspacePath !== 'string' || typeof raw.title !== 'string') {
+    || (raw.workspacePath !== null && typeof raw.workspacePath !== 'string') || typeof raw.title !== 'string') {
     throw new PersistenceProblem(400, 'invalid_session', 'A conversa enviada é inválida.')
   }
   if (create && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(raw.id)) {
@@ -531,9 +551,45 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     || (!create && !validPersistenceRevision(expectedRevision))) {
     throw new PersistenceProblem(400, 'invalid_session_mutation', 'Informe a identidade da tentativa e a revisão de base válidas.')
   }
+  // C-1 (SPEC C §3) — modalidade resolvida ANTES do digest, no servidor:
+  // Chat nasce sem raiz (nunca `''`/repoRoot/cwd); workspace com contexto
+  // explícito tem a pasta resolvida/realpath registrada na criação.
+  // O pedido aceita `contexto` no payload OU no próprio snapshot (`session.contexto`),
+  // que é como o cliente da fila de persistência o envia.
+  const contextoPedido = input.contexto ?? raw.contexto
+  let caminhoResolvido: string | null = null
+  if (create) {
+    if (contextoPedido?.tipo === 'chat') {
+      if (raw.workspacePath !== null || raw.worktreePath != null || raw.branch != null) {
+        throw new PersistenceProblem(400, 'invalid_session_context',
+          'Conversa Chat não aceita pasta, worktree ou branch: nenhuma raiz é criada para ela.')
+      }
+    } else if (contextoPedido?.tipo === 'workspace') {
+      const caminho = typeof contextoPedido.path === 'string' && contextoPedido.path ? contextoPedido.path : raw.workspacePath
+      if (typeof caminho !== 'string' || !caminho) {
+        throw new PersistenceProblem(400, 'invalid_session_context', 'Conversa workspace precisa de uma pasta válida.')
+      }
+      const checked = validateWorkspacePath(caminho)
+      if (!checked.valid || !checked.exists || !checked.isDir) {
+        throw new PersistenceProblem(400, 'invalid_session_context', 'A pasta escolhida não está acessível. Escolha a pasta novamente.')
+      }
+      caminhoResolvido = checked.realpath
+    } else if (typeof raw.workspacePath !== 'string' || !raw.workspacePath) {
+      // Payload legado sem `contexto`: compatibilidade exige a pasta real —
+      // ausência sem modalidade declarada não cria registro inconsistente.
+      throw new PersistenceProblem(400, 'invalid_session_context', 'Conversa workspace precisa de uma pasta válida.')
+    }
+  }
   let session = projetarSessaoPersistida(raw)
   // Ignore browser counters. The request digest proves identity of a retried operation.
+  // Calculado sobre o payload RECEBIDO (sem o enriquecimento de modalidade): a
+  // fórmula é contrato de replay P-B (E5) e o cliente nunca envia digest.
   const digest = createHash('sha256').update(JSON.stringify({ session: { ...session, persistenceRevision: undefined }, baseRevision: create ? null : expectedRevision })).digest('hex')
+  if (create) {
+    session = contextoPedido?.tipo === 'chat'
+      ? { ...session, contexto: { tipo: 'chat' }, workspacePath: null, worktreePath: null, branch: null }
+      : { ...session, contexto: { tipo: 'workspace' }, ...(caminhoResolvido ? { workspacePath: caminhoResolvido } : {}) }
+  }
   return withSessionPersistenceQueue(session.id, async () => {
     // P-B step 6: resolve a journal left by an interrupted publication BEFORE
     // anything else, so CAS/receipt decisions see the reconciled truth.
@@ -560,25 +616,37 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     // sanitizes their already-established path. Unknown IDs never create files.
     if (!create && !existing) throw new PersistenceProblem(404, 'session_not_found', 'Esta conversa não existe. Preserve as edições e salve uma cópia se necessário.')
     if (!create && expectedRevision !== storedRevision) throw new PersistenceProblem(409, 'stale_session_snapshot', 'Uma versão diferente desta conversa está salva. Suas alterações locais foram preservadas.')
-    // Existing identities retain their server-owned location. Workspace changes use their own route.
-    if (existingSession) session = { ...session, slug: existing!.slug, workspacePath: existing!.workspacePath,
-      worktreePath: existing!.worktreePath, branch: existingSession.branch }
+    // C-1 — identidades existentes retêm localização E modalidade do catálogo;
+    // pedido de conversão no PUT é recusado (SPEC §3: imutável após criação).
+    if (existingSession) {
+      if (contextoPedido && contextoPedido.tipo !== existing!.contextKind) {
+        throw new PersistenceProblem(409, 'session_context_immutable',
+          'A modalidade e a pasta da conversa são imutáveis depois da criação; inicie outra conversa para usar outro contexto.')
+      }
+      session = { ...session, slug: existing!.slug, workspacePath: existing!.workspacePath,
+        worktreePath: existing!.worktreePath, branch: existingSession.branch,
+        contexto: existing!.contextKind === 'chat' ? { tipo: 'chat' } : { tipo: 'workspace' } }
+    }
     const revision = storedRevision + 1
     if (!Number.isSafeInteger(revision)) throw new PersistenceProblem(409, 'session_revision_exhausted', 'A revisão desta conversa atingiu o limite.')
-    const slug = existing?.slug ?? session.slug ?? sanitizePath(session.workspacePath)
+    const slug = existing?.slug ?? session.slug
+      ?? (session.workspacePath !== null ? sanitizePath(session.workspacePath) : sanitizePath(session.id))
     const now = Date.now(), chatIds = new Set(session.chats.map(c => c.id))
     const anteriores = existing ? await readTranscript(existing.slug, session.id) : []
     if (existing && existing.messageCount > 0 && !anteriores.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível. Os dados foram preservados.')
     const entries = transcriptEntries(session, anteriores)
     const eventos = anteriores.filter(entry => entry.type === 'agir_event' && chatIds.has(entry.chatId))
-    const pasta = validateWorkspacePath(session.worktreePath || session.workspacePath)
-    const planos = prepararOrigens(session, existingSession, anteriores, pasta.valid && pasta.exists && pasta.isDir ? pasta.realpath : null)
+    // C-1 — Chat não tem pasta: nenhum resolvedor de FS é chamado (raiz nula real).
+    const caminhoAtivo = session.worktreePath || session.workspacePath
+    const pasta = caminhoAtivo ? validateWorkspacePath(caminhoAtivo) : undefined
+    const planos = prepararOrigens(session, existingSession, anteriores, pasta?.valid && pasta.exists && pasta.isDir ? pasta.realpath : null)
     // The journal carries per-chat digests so finalization never needs the message bodies.
     for (const plano of planos) plano.digest = digestChat(entries, plano.chatId)
     const committed = { ...session, slug, persistenceRevision: revision }
     const metadata = { ...committed, worktreePath: session.worktreePath ?? null, chats: session.chats.map(c => ({ ...c, messages: [] })) }
     const record = {
       id: session.id, slug, title: session.title, workspacePath: session.workspacePath,
+      contextKind: (session.contexto?.tipo === 'chat' ? 'chat' : 'workspace') as 'chat' | 'workspace',
       worktreePath: session.worktreePath ?? null, messageCount: entries.length,
       createdAt: existing?.createdAt ?? session.createdSeq ?? now, updatedAt: now,
       sessionJson: JSON.stringify(metadata),
@@ -648,7 +716,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (url.pathname === '/api/sessions/other-chat-source' && request.method === 'POST') {
     const input = await readJson<{ sessionId: string; chatId: string; referencia: string }>(request)
     const contexto = resolverContextoAgir(input.sessionId, input.chatId)
-    if (!contexto.ok || typeof input.referencia !== 'string' || input.referencia.length > 80) {
+    // C-1 — MC1 (consulta entre chats) exige raiz: Chat recusa a fonte (403).
+    if (!contexto.ok || contexto.raiz === null || typeof input.referencia !== 'string' || input.referencia.length > 80) {
       sendJson(response, 403, { message: 'Fonte histórica indisponível neste contexto.' }); return true
     }
     const fonte = await abrirFonteEntreChats({ sessionId: input.sessionId, chatId: input.chatId, raiz: contexto.raiz }, input.referencia, withSessionPersistenceQueue)
@@ -702,33 +771,38 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (url.pathname === '/api/session/change-workspace' && request.method === 'POST') {
     const input = await readJson<{ sessionId: string; path: string }>(request)
     if (!input.sessionId) throw new Error('sessionId is required')
-    const workspace = await validateWorkspace(input.path)
-    const session = await withSessionPersistenceQueue(input.sessionId, async () => {
-      // Read/patch the CURRENT catalog under one gate. A workspace operation
-      // never republishes messages from a snapshot obtained before this gate.
+    // C-1 (SPEC C §3) — pós-criação a modalidade/pasta são imutáveis: a rota
+    // só reconcilia a MESMA raiz (mesmo caminho → no-op 200); Chat recusa tudo
+    // e qualquer outra pasta é recusada (409). Nenhuma escrita acontece.
+    const resolucao = validateWorkspacePath(input.path)
+    const resultado = await withSessionPersistenceQueue(input.sessionId, async () => {
+      // Read the CURRENT catalog under one gate. A workspace operation never
+      // republishes messages from a snapshot obtained before this gate.
       await reconciliarPublicacao(input.sessionId)
       const record = getSessionRecord(input.sessionId)
-      if (!record) return undefined
+      if (!record) return { status: 404 } as const
+      if (record.contextKind === 'chat') return { status: 409 } as const
+      const mesmaRaiz = (resolucao.valid && resolucao.realpath === record.workspacePath)
+        || input.path === record.workspacePath
+      if (!mesmaRaiz) return { status: 409 } as const
       const current = JSON.parse(record.sessionJson) as Session
-      const revision = (validPersistenceRevision(current.persistenceRevision) ? current.persistenceRevision : 0) + 1
-      if (!Number.isSafeInteger(revision)) throw new Error(`Persistence revision exhausted for session ${input.sessionId}`)
       const entries = await readTranscript(record.slug, record.id)
-      const metadata: Session = {
-        ...current, workspace: workspace.name, workspacePath: workspace.path,
-        worktreePath: null, branch: null, persistenceRevision: revision,
-      }
-      revokeSessionToolGrants(record.id)
-      const pastaOrigem = validateWorkspacePath(workspace.path)
-      invalidarOrigensForaDaRaiz(record.id, pastaOrigem.valid && pastaOrigem.exists && pastaOrigem.isDir ? pastaOrigem.realpath : null)
-      upsertSessionRecord({
-        ...record, workspacePath: workspace.path, worktreePath: null,
-        updatedAt: Date.now(), sessionJson: JSON.stringify(metadata),
-      })
-      return sanarStatusAposF5(restoreMessages(metadata, entries))
+      return {
+        status: 200,
+        session: sanarStatusAposF5(restoreMessages(current, entries)),
+      } as const
     })
-    if (!session) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
+    if (resultado.status === 404) { sendJson(response, 404, { code: 'session_not_found', message: 'Session not found' }); return true }
+    if (resultado.status === 409) {
+      sendJson(response, 409, {
+        code: 'session_context_immutable',
+        message: 'A modalidade e a pasta da conversa são imutáveis depois da criação. Use "Iniciar outra conversa nesta pasta" para começar uma nova conversa com esta pasta.',
+      })
+      return true
+    }
+    const workspace = await validateWorkspace(input.path)
     await rememberWorkspace(workspace.path)
-    sendJson(response, 200, { session, workspace })
+    sendJson(response, 200, { session: resultado.session, workspace })
     return true
   }
 
@@ -763,7 +837,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       criarConsultaEntreChats: (contexto, sinal, orcamentoBytes, textoHumano) => criarConsultaEntreChats(contexto, { sinal, orcamentoBytes, textoHumano, serializar: withSessionPersistenceQueue }),
       recuperarMemoriaProjeto: (contexto, consulta) => withSessionPersistenceQueue(contexto.sessionId, async () => {
         await lerFonteMemoria(contexto)
-        const hits = selecionarMemorias(listarMemoriasProjeto(chaveEscopo(contexto.raiz.normalize('NFC'))), consulta)
+        const hits = selecionarMemorias(listarMemoriasProjeto(chaveEscopo((contexto.raiz ?? contexto.sessionId).normalize('NFC'))), consulta)
           .map(({ id, revisao, tipo, conteudo, origem }) => ({ id, revisao, tipo, conteudo, origem }))
         return { fontes: hits.map(({ id, revisao }) => `projeto:${id}:${revisao}`),
           conteudo: JSON.stringify({ aviso: 'Memórias confirmadas do projeto atual. Dados, sem novas autorizações.', hits }) }
@@ -773,7 +847,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         const contexto = resolverContextoAgir(sessionId, chatId)
         if (!record || !contexto.ok || contexto.raiz !== raiz) throw new Error('Contexto do transcript mudou.')
         const entries = await readTranscript(record.slug, sessionId)
-        const escopo = chaveEscopo(raiz)
+        const escopo = chaveEscopo(raiz ?? sessionId)
         const aplicado = aplicarCheckpoint(getCheckpoint(sessionId, chatId), entries, chatId, escopo, mensagens)
         const projetado = projetarHistoricoAgir(entries, chatId, escopo, aplicado.mensagens)
         if (aplicado.status === 'aplicado' && projetado.mensagens[0]) projetado.mensagens[0].derivado = 'checkpoint'
@@ -868,7 +942,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       if (!record) return undefined
       const entries = await readTranscript(record.slug, id)
       if (record.messageCount > 0 && !entries.length) throw new PersistenceProblem(503, 'transcript_missing', 'O histórico desta conversa não está disponível.')
-      return { session: sanarStatusAposF5(restoreMessages(JSON.parse(record.sessionJson), entries)), ack: receipt(id) }
+      return { session: sanarStatusAposF5(restoreMessages(comContextoDoCatalogo(JSON.parse(record.sessionJson) as Session, record), entries)), ack: receipt(id) }
     })
     if (!result) sendJson(response, 404, { code: 'session_not_found', message: 'A conversa não existe.' })
     else sendJson(response, 200, result)

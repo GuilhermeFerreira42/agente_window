@@ -96,11 +96,19 @@ export interface NestedChat {
   messages: ChatMessage[]
 }
 
+/** C-1 (SPEC C §3) — modalidade EXPLÍCITA da sessão. `chat` não tem raiz;
+   * `workspace` carrega a pasta original canônica. Catálogo SQLite é autoridade. */
+export type ContextoSessao = { tipo: 'chat' } | { tipo: 'workspace'; path?: string }
+
 export interface Session {
   id: string
   title: string
   workspace: string
-  workspacePath: string
+  /** C-1 — raiz REAL da conversa; `null` somente em modalidade `chat`
+   * (nunca `''`, repoRoot, cwd ou outro fallback). Legados preservam a pasta. */
+  workspacePath: string | null
+  /** Modalidade explícita; ausente em snapshots legados — o catálogo materializa na leitura. */
+  contexto?: ContextoSessao
   /** Stable filesystem-safe project key used by SQLite and JSONL storage. */
   slug?: string
   /** Optional isolated directory; null/absent means direct workspace mode. */

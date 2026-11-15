@@ -158,7 +158,7 @@ async function montarEstadoDeCrash(raw: Session, fase: 'pre-rename' | 'post-rena
     chats: payload.chats.map(chat => ({ ...chat, messages: [] })) }
   const record: SessionRecord = {
     id: payload.id, slug: existing.slug, title: payload.title, workspacePath: payload.workspacePath,
-    worktreePath: payload.worktreePath ?? null, messageCount: entries.length,
+    worktreePath: payload.worktreePath ?? null, messageCount: entries.length, contextKind: 'workspace',
     createdAt: existing.createdAt, updatedAt: Date.now(), sessionJson: JSON.stringify(metadata),
   }
   const requestDigest = sha(JSON.stringify({ session: { ...payload, persistenceRevision: undefined }, baseRevision: base }))
@@ -393,7 +393,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       sessionId: id, mutationId, criacao: true, baseRevision: 0, nextRevision: 1,
       targetPath: destPath, stagedPath, oldDigest: null, newDigest: sha(bytes),
       record: { id, slug, title: payload.title, workspacePath: payload.workspacePath, worktreePath: payload.worktreePath ?? null,
-        messageCount: entries.length, createdAt: Date.now(), updatedAt: Date.now(), sessionJson: JSON.stringify(metadata) },
+        messageCount: entries.length, contextKind: 'workspace', createdAt: Date.now(), updatedAt: Date.now(), sessionJson: JSON.stringify(metadata) },
       planos: [], checkpointCleanup: null,
       receipt: { sessionId: id, mutationId, revision: 1, digest: requestDigest, creationId: mutationId, creationDigest: requestDigest, creationRevision: 1 },
     })
@@ -539,7 +539,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       targetPath: destPath, stagedPath: `${destPath}.${process.pid}.${randomUUID()}.tmp`,
       oldDigest: null, newDigest: sha(bytes),
       record: { id, slug, title: payload.title, workspacePath: payload.workspacePath, worktreePath: payload.worktreePath ?? null,
-        messageCount: entries.length, createdAt: Date.now(), updatedAt: Date.now(), sessionJson: JSON.stringify(metadata) },
+        messageCount: entries.length, contextKind: 'workspace', createdAt: Date.now(), updatedAt: Date.now(), sessionJson: JSON.stringify(metadata) },
       planos: [], checkpointCleanup: null,
       receipt: { sessionId: id, mutationId, revision: 1, digest: requestDigest, creationId: mutationId, creationDigest: requestDigest, creationRevision: 1 },
     })
@@ -577,7 +577,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       sessionId: id, mutationId: randomUUID(), criacao: false, baseRevision: 0, nextRevision: 1,
       targetPath: transcriptPath(slug, id), stagedPath, oldDigest: null, newDigest: 'qualquer',
       record: { id, slug, title: 'legada vazia', workspacePath: `/tmp/${slug}`, worktreePath: null,
-        messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(legada) },
+        messageCount: 0, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(legada) },
       planos: [], checkpointCleanup: null,
       receipt: { sessionId: id, mutationId: 'x', revision: 1, digest: 'x', creationId: null, creationDigest: null, creationRevision: null },
     })
@@ -633,7 +633,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.b2.tmp`,
       oldDigest: 'antigo', newDigest: 'novo',
       record: { id, slug, title: 'b2-migracao', workspacePath: `/tmp/${slug}`, worktreePath: null,
-        messageCount: 1, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(sessao) },
+        messageCount: 1, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(sessao) },
       planos: [], checkpointCleanup: null,
       receipt: { sessionId: id, mutationId: 'm', revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
     })
@@ -657,7 +657,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
       targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.dup.tmp`,
       oldDigest: 'antigo', newDigest: 'novo',
       record: { id, slug, title: titulo, workspacePath: `/tmp/${slug}`, worktreePath: null,
-        messageCount: 1, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ persistenceRevision: 1 }) },
+        messageCount: 1, contextKind: 'workspace' as const, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ persistenceRevision: 1 }) },
       planos: [], checkpointCleanup: null,
       receipt: { sessionId: id, mutationId: mut, revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
     })
@@ -699,7 +699,7 @@ describe('P-B publicação JSONL + catálogo recuperável', () => {
         targetPath: transcriptPath(slug, id), stagedPath: `${transcriptPath(slug, id)}.b2.tmp`,
         oldDigest: 'antigo', newDigest: 'novo',
         record: { id, slug, title: 'b2-bloqueio', workspacePath: `/tmp/${slug}`, worktreePath: null,
-          messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: '{}' },
+          messageCount: 0, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: '{}' },
         planos: [], checkpointCleanup: null,
         receipt: { sessionId: id, mutationId: 'm', revision: 2, digest: 'd', creationId: null, creationDigest: null, creationRevision: null },
       })

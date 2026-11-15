@@ -4636,6 +4636,30 @@ svg {
   opacity: 0.72;
   transform: none;
 }
+/* C-1 (SPEC C §2) — seletor de modalidade Chat/Pasta na landing; Chat é o default. */
+.session-landing-contexto {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 14px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  background: var(--vscode-editor-background);
+}
+.session-landing-contexto-option {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.session-landing-contexto-option.is-active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
 .session-landing-workspace-hint {
   margin: 0 0 16px;
   color: var(--vscode-descriptionForeground);

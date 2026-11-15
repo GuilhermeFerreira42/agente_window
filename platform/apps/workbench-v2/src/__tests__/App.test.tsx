@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
+import * as sessionsClient from '../services/sessions/sessionsClient'
 
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
@@ -2282,5 +2283,75 @@ describe('P-C ressalva 15/11 — aviso e cópia da identidade excluída (PC-R2 U
       .filter((elemento) => elemento.textContent === 'Origem excluída pc-ressalva (cópia recuperada)')
     expect(linhasDeCopia()).toHaveLength(1)
     expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+  })
+})
+
+// C-1 (SPEC C §2/§4) — landing: Chat é o DEFAULT e nasce sem worktree, sem
+// /fs/workspace e sem Git; Pasta exige pasta escolhida (sem fallback
+// 'workspace-local' escondido).
+describe('C-T05 — landing Chat/Pasta (App)', () => {
+  it('default é Chat: chip pressionado e NENHUM seletor de pasta visível', async () => {
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    expect(screen.getByTestId('contexto-chat')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat sem pasta')
+    expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
+  })
+
+  it('enviar em Chat cria sessão sem raiz e NÃO chama createSessionWorktree', async () => {
+    vi.mocked(sessionsClient.persistSession).mockClear()
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'conversa somente chat')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nova sessão' })).not.toBeInTheDocument())
+    expect(sessionRow('conversa somente chat')).toBeInTheDocument()
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    const salva = vi.mocked(sessionsClient.persistSession).mock.calls.at(-1)?.[0]
+    expect(salva?.contexto).toEqual({ tipo: 'chat' })
+    expect(salva?.workspacePath).toBeNull()
+  })
+
+  it('Pasta sem pasta escolhida não cria sessão e explica o motivo', async () => {
+    vi.mocked(sessionsClient.persistSession).mockClear()
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.click(screen.getByTestId('contexto-workspace'))
+    expect(screen.getByRole('button', { name: /Workspace atual/ })).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'preciso escolher pasta')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(await screen.findByText(/Escolha uma pasta real do disco/)).toBeInTheDocument()
+    // A fila de persistência regrava sessões carregadas em background; o
+    // critério é que a mensagem da landing NÃO vire sessão.
+    const titulos = vi.mocked(sessionsClient.persistSession).mock.calls.map((chamada) => chamada[0]?.title)
+    expect(titulos).not.toContain('preciso escolher pasta')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
+  })
+
+  it('erro nativo do seletor: aviso honesto, rascunho preservado e nada criado', async () => {
+    vi.mocked(sessionsClient.persistSession).mockClear()
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    vi.mocked(sessionsClient.pickSessionWorkspace).mockRejectedValueOnce(new Error('native dialog failed'))
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'rascunho preservado')
+    await user.click(screen.getByTestId('contexto-workspace'))
+    await user.click(screen.getByRole('button', { name: /Workspace atual/ }))
+    // C-T05 — erro nativo: estado/foco preservados, sem fallback de raiz.
+    expect(await screen.findByText(/Seletor nativo indisponível/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('rascunho preservado')
+    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
+    const titulos = vi.mocked(sessionsClient.persistSession).mock.calls.map((chamada) => chamada[0]?.title)
+    expect(titulos).not.toContain('rascunho preservado')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    // O caminho manual fica disponível como saída honesta.
+    expect(await screen.findByRole('button', { name: 'Digitar caminho' })).toBeInTheDocument()
   })
 })

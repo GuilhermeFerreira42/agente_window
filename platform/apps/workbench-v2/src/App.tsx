@@ -159,6 +159,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId) } catch { /* Selection storage must not invalidate a confirmed save/copy. */ }
   }, [activeSessionId])
   const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
+  // C-1 (SPEC C §2) — modalidade da landing: Chat é o DEFAULT; Pasta exige
+  // escolha explícita de pasta real (sem fallback 'workspace-local').
+  const [landingContexto, setLandingContexto] = useState<'chat' | 'workspace'>('chat')
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
@@ -174,7 +177,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // A landing can sit above older sessions. Its selected folder is a pending
   // context for the new session and must drive Explorer before the first chat
   // message; it must not rewrite the older persisted session.
-  const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : currentSessionWorkspacePath
+  const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : (currentSessionWorkspacePath ?? undefined)
   const explorerEnabled = !landingVisible || !!explorerWorkspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
@@ -1315,6 +1318,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
     removeSessionResources(BOOT_SESSION_ID)
     setSelectedWorkspace(undefined)
+    setLandingContexto('chat')
     setNewSessionLanding(true)
     layout.showView('explorer')
     setMobilePane('chat')
@@ -1326,7 +1330,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setWorkspacePickerPending(true)
     try {
       const workspace = await pickSessionWorkspace()
-      if (workspace) setSelectedWorkspace(workspace)
+      if (workspace) { setSelectedWorkspace(workspace); setLandingContexto('workspace') }
       setWorkspaceNativePickerAvailable(true)
     } catch (error) {
       setWorkspaceNativePickerAvailable(false)
@@ -1346,6 +1350,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const response = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: workspace.path }) })
         if (!response.ok) throw new Error(`Falha ao atualizar Explorer (${response.status})`)
         setSelectedWorkspace(workspace)
+        setLandingContexto('workspace')
         document.title = workspace.path
         notify(`Workspace selecionado: ${workspace.path}`)
         return
@@ -1370,13 +1375,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         ...candidate, workspace: session.workspace, workspacePath: session.workspacePath,
         worktreePath: session.worktreePath, branch: session.branch, persistenceRevision: session.persistenceRevision,
       } : candidate))
-      document.title = session.workspacePath
-      notify(`Workspace alterado para ${session.workspacePath}`)
+      document.title = session.workspacePath ?? session.title
+      notify(`Workspace alterado para ${session.workspacePath ?? session.title}`)
     } catch (error) {
+      // C-1 (SPEC C §3) — pós-criação a modalidade/pasta são imutáveis: o
+      // servidor recusa com 409 e a orientação honesta é começar OUTRA conversa.
+      if (error instanceof SessionPersistenceError && error.status === 409 && error.code === 'session_context_immutable') {
+        notify('A pasta desta conversa é imutável. Use "Iniciar outra conversa nesta pasta" para começar uma nova conversa com esta pasta.')
+        return
+      }
       // Compensação: se a persistência já mudou antes de o Explorer falhar, restaura
       // o workspace anterior; terminais vivos não foram alterados nesta etapa.
       try {
-        if (workspaceCommitted) {
+        if (workspaceCommitted && previousPath !== null) {
           await changeSessionWorkspace(activeSession.id, previousPath)
           await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
         }
@@ -1402,26 +1413,53 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const id = crypto.randomUUID()
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
+    // C-1 (SPEC C §2/§4) — Pasta exige pasta escolhida (sem fallback
+    // 'workspace-local'); Chat nasce sem raiz, sem worktree, sem /fs e sem Git.
+    if (landingContexto === 'workspace' && !selectedWorkspace) {
+      notify('Escolha uma pasta real do disco para começar uma conversa workspace.')
+      return
+    }
     try {
-      const workspaceLabel = selectedWorkspace?.name ?? 'workspace-local'
-      const worktree = await createSessionWorktree(selectedWorkspace?.path ?? '', selectedWorkspace?.slug ?? 'workspace-local', id)
       const seededLayout = seedCreatedFromNewSession(newSessionState)
       setAuxiliaryTab(seededLayout.activeViewContainerId)
-      const next: Session = {
-        id,
-        title,
-        workspace: workspaceLabel,
-        workspacePath: worktree.repoRoot,
-        worktreePath: worktree.path,
-        slug: worktree.slug,
-        section: 'today',
-        status: 'completed',
-        updated: 'agora',
-        diffAdded: 0,
-        diffRemoved: 0,
-        branch: worktree.branch,
-        chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-        mainChatId: chatId,
+      let next: Session
+      if (landingContexto === 'chat') {
+        next = {
+          id,
+          title,
+          workspace: 'Chat',
+          workspacePath: null,
+          worktreePath: null,
+          contexto: { tipo: 'chat' },
+          section: 'today',
+          status: 'completed',
+          updated: 'agora',
+          diffAdded: 0,
+          diffRemoved: 0,
+          branch: null,
+          chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
+          mainChatId: chatId,
+        }
+      } else {
+        const workspace = selectedWorkspace!
+        const worktree = await createSessionWorktree(workspace.path, workspace.slug, id)
+        next = {
+          id,
+          title,
+          workspace: workspace.name,
+          workspacePath: worktree.repoRoot,
+          worktreePath: worktree.path,
+          slug: worktree.slug,
+          contexto: { tipo: 'workspace' },
+          section: 'today',
+          status: 'completed',
+          updated: 'agora',
+          diffAdded: 0,
+          diffRemoved: 0,
+          branch: worktree.branch,
+          chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
+          mainChatId: chatId,
+        }
       }
       // F1: registrar sessão/contexto no servidor antes de abrir qualquer execução Agir.
       await persistSession(next)
@@ -1432,12 +1470,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setVisibleSessionIds([id])
       setNewSessionLanding(false)
       setSelectedWorkspace(undefined)
+      setLandingContexto('chat')
       layoutSyncRef.current?.setPreviousResource(id)
       setMobilePane('chat')
       window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
     } catch (error) {
-      console.error('[sessions] worktree creation failed', error)
-      notify(error instanceof Error ? error.message : 'Falha ao criar worktree da sessão')
+      console.error('[sessions] session creation failed', error)
+      notify(error instanceof Error ? error.message : 'Falha ao criar a conversa')
     }
   }
 
@@ -2345,7 +2384,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
         onValidateWorkspacePath={handleChangeActiveWorkspace}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
@@ -2541,7 +2580,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
-        workspacePath={landingVisible ? (selectedWorkspace?.path ?? '') : (activeSession.worktreePath ?? activeSession.workspacePath)}
+        workspacePath={landingVisible ? (selectedWorkspace?.path ?? '') : (activeSession.worktreePath ?? activeSession.workspacePath ?? '')}
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onFindFile={() => executeEditorCommand('workbench.action.quickOpen')}
@@ -2741,7 +2780,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               visible={terminalVisible && !customViewActive}
               sessionId={persistedActiveSession.id}
               sessionLabel={activeSessionLabel}
-              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (persistedActiveSession.worktreePath ?? persistedActiveSession.workspacePath)}
+              workspace={!hasSessions && selectedWorkspace?.path ? selectedWorkspace.path : (persistedActiveSession.worktreePath ?? persistedActiveSession.workspacePath ?? '')}
               onClose={() => setTerminalVisible(false)}
             />
           </div>
