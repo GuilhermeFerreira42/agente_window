@@ -25,6 +25,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
     launchOptions: {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+      // C-1: o ambiente não baixa o bundle Playwright (CDN fora da lista de
+      // hosts); o Chromium do sistema é apontado por variável (e2e-c1.sh).
+      ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+        ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
+        : {}),
     },
   },
 })
