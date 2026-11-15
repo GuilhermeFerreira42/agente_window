@@ -1,3 +1,47 @@
+# C-1 — gates, reprodução e resultados (15/11/2026)
+
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
+
+## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
+
+| Fase | Comando | Resultado |
+|---|---|---|
+| Sondas RED C-T01–03 (antes da implementação) | `sh platform/scripts/gate-unit.sh src/server/session-persistence/sessionContext.test.ts` | **9 falhas exatas** (todas as sondas) |
+| Verde `sessionContext` (pós-implementação) | idem | **11/11** (9 originais + 2 negativos novos: `other-chat-source` 403 · `project-memory` 409) |
+| C-T04 + negativos Agir | `sh platform/scripts/gate-unit.sh src/bairros/2-inteligencia/casas/agir/__tests__/chatExecucao.test.ts` | **4/4** — anúncio `tools: []`, spy `criarExecutores` zero, forjado recusado com motivo, `instruction`→409 e `permission`→409 |
+| Cliente C-T05/C-T08 | `sh platform/scripts/gate-unit.sh src/__tests__/SessionLanding.test.tsx src/__tests__/ChatInput.test.tsx src/__tests__/App.test.tsx src/__tests__/fatia07_destravar.test.tsx` | **14/14** · **35/35** · **77 (64 pass/0 fail/13 skip)** · **3/3** |
+| Suites intermediárias (pós-GREEN) | session-persistence · agir · personalizacoes | **236/237** (1 pulado condicional) · **229/235** (6 pulados) · **135/135** |
+| **Foco completo** (arquivos tocados + suítes) | `sh platform/scripts/gate-unit.sh <lista da entrega §6>` | **636/0/20 (135 arq)** |
+| **Ampla** (`d589179`) | `sh platform/scripts/gate-unit.sh` | **1823/4/33 (514 arq)** |
+| Typecheck | `sh iniciar.sh typecheck` | **exit 0 / 0 erros** |
+| Lint delta | `npx eslint <25 arquivos>` agora vs. base `5720ca2` (worktree temporário + symlink `node_modules`) | **23 = 23 (0 novos)**; arquivos novos (`sessionContext.test`, `chatExecucao.test`): **0 problemas** |
+
+As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
+
+## 2. Cobertura dos critérios C-1 (C-T01–05/08/16)
+
+| Critério | Onde é provado | Estado |
+|---|---|---|
+| C-T01 — Chat sem FS/Git/shell; mensagem/restore funcionam | `sessionContext.test.ts` (2 testes; espelho `validateWorkspacePath` = 0 na criação) | GREEN |
+| C-T02 — POST/PUT/change-workspace forjados; negativos | `sessionContext.test.ts` (4 + 2 negativos servidor) + `index.test.ts` (change-workspace reescrito) | GREEN |
+| C-T03 — legados preservam pasta/worktree/origens | `sessionContext.test.ts` (2) + demais da suíte | GREEN |
+| C-T04 — anúncio vazio + spy de fábrica + forjado recusado | `chatExecucao.test.ts` (2) | GREEN |
+| C-T05 — recents/inacessível/picker nulo/erro nativo/retorno tardio, sem fallback de raiz | `SessionLanding.test.tsx` (3 novos + 6 ajustados) · `App.test.tsx` (4 novos) · `workspaces.test.ts` (recents/inexistente) | GREEN |
+| C-T08 — modos/permissões em workspace; Chat não amplia; Interativo sem Autopilot | `ChatInput.test.tsx` (4 novos: Agent/Editar desabilitados com motivo, guardas de seleção, Permitir tudo desabilitado, regressão workspace) | GREEN |
+| C-T16 — regressão geral sem novas falhas | ampla completa (1823/4/33 — 4 pré-existentes) | GREEN |
+
+## 3. Windows
+
+**Nenhuma execução Windows nesta sessão para C-1.** O pacote de receitas (`iniciar.cmd` foco/ampla/typecheck com esperados batendo com o Debian acima) está no § da entrega; resultados Windows, quando executados pelo dono/Codex, serão registrados como **comunicados**, nunca executados por esta sessão.
+
+## 4. Limites
+
+1. Suíte global **não** é integralmente verde (4 pré-existentes fora do perímetro da C-1).
+2. Nenhum aceite humano é produzido por estes gates — homologação humana vive em `08`.
+3. Dados somente sintéticos; perfis `mkdtemp` por teste; nenhum dado pessoal, banco, worktree ou processo real tocado nas provas da Arena.
+
+---
+
 # P-C — gates, reprodução e resultados por ambiente (15/11/2026)
 
 Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows = execução do Codex, com resultados comunicados pelo proprietário** — não executados por esta sessão e com artefatos externos ausentes deste ambiente. **Testes amplos** = regressão nominal completa da suíte; **retestes focados** = subconjuntos por escopo (protocolo, recovery, UI).

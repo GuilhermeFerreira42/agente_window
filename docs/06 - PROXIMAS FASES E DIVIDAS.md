@@ -1,12 +1,12 @@
-# Programa de persistência — P-A/P-B/P-C encerradas; C-1 aguardando autorização (15/11/2026)
+# Programa de persistência — P-A/P-B/P-C encerradas; C-1 concluída tecnicamente, aguardando homologação (15/11/2026)
 
 **Bloqueios da P-C encerrados (retirados):** a espera de parecer/homologação da P-C, a trava de não avançar o programa enquanto a P-C estava em reteste e o estado “aguardando aceite” — tudo encerrado com o **aceite humano da P-C pelo proprietário em 15/11** (`08`), após a validação Windows de `69f4510` comunicada pelo proprietário. A entrega da P-C e suas correções ficam preservadas em `/home/user/execucao-pc/` (`ENTREGA_P_C.md` imutável + `ENTREGA_P_C_REENTREGA.md`, §§1–10).
 
-**Sequência aprovada mantida:** P-A ✓ → P-B ✓ → P-C ✓ → **C-1 (Chat e workspace imutáveis)** — **próxima fatia planejada, SEM autorização de implementação nesta mensagem; não iniciar.** O bloqueio de C-1 muda de natureza: deixa de ser dependência da P-C e passa a ser **ausência de autorização explícita do proprietário**. Especificação em `SPEC_PERSISTENCIA.md` (replanejamento 13/11).
+**Sequência aprovada mantida:** P-A ✓ → P-B ✓ → P-C ✓ → **C-1 ✓ (tecnicamente)** → **MM-0**. A **C-1 (Chat e workspace imutáveis)** foi **autorizada expressamente pelo proprietário em 15/11** e implementada no commit **`d589179`** (push `5720ca2..d589179`, PR #1 segue OPEN sem merge): modalidade explícita, raiz nula de Chat, imutabilidade backend/UI, compatibilidade legada e execução sem tools de workspace; critérios C-T01–05/08/16 com negativos nos endpoints relevantes; gates em `09`; entrega em `/home/user/execucao-c1/ENTREGA_C_1.md`. **Homologação humana da C-1 pendente** (apresentação ≠ aceite). **MM-0 não começa sem nova autorização após a homologação.**
 
-**Pendências reais que permanecem (nada abaixo foi alterado por esta consolidação):** a matriz de dívidas desta matriz (DEBTs abertos, PEND-01, DP-03/DP-06 e os gates da Fatia 14, conforme as notas vigentes), os **aceites humanos de M1–M8/DEBT-25/MC1 pendentes por D197**, a **P-B sem aceite humano declarado** (conclusão técnica + B1 6/6 em `c581bfa`, informado — **não** é pendência de execução Windows) e as limitações registradas em `09`. Homologação das Fatias 14/15 continua conforme D186 em `08`.
+**Pendências reais que permanecem (nada abaixo foi alterado por esta rodada):** a matriz de dívidas desta matriz (DEBTs abertos, PEND-01, DP-03/DP-06 e os gates da Fatia 14, conforme as notas vigentes), os **aceites humanos de M1–M8/DEBT-25/MC1 pendentes por D197**, a **P-B sem aceite humano declarado** (conclusão técnica + B1 6/6 em `c581bfa`, informado — **não** é pendência de execução Windows), a **C-1 sem homologação humana declarada** e as limitações registradas em `09`. Homologação das Fatias 14/15 continua conforme D186 em `08`.
 
-**Nesta rodada:** somente documentação (commit documental na branch de trabalho `0f2e5de2-agente-window`) — nenhum código, nenhuma implementação de C-1, nenhum merge na base `arena`. M1–M8/MC1 seguem separados; esta entrega não lhes atribui homologação.
+**Nesta rodada:** implementação autorizada da C-1 (`d589179`) + documentação canônica (commit documental na branch `0f2e5de2-agente-window`) — nenhum merge na base `arena`. M1–M8/MC1 seguem separados; esta entrega não lhes atribui homologação.
 
 ---
 
