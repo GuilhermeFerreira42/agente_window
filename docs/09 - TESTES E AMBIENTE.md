@@ -1,3 +1,30 @@
+# C-1 REENTREGA (revisão do Codex) — gates, E2E e reprodução das correções B1/B2/B3/F4 (15/11/2026)
+
+Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/execucao-c1/rev-c1-gates.log`**.
+
+## 1. Resultados desta rodada (execução real)
+
+| Escopo | Comando | Resultado |
+|---|---|---|
+| Foco B1 | `sh platform/scripts/gate-unit.sh src/server/session-persistence/databaseMigration.test.ts` | **3/3** |
+| Foco B1 (pasta) | `sh platform/scripts/gate-unit.sh src/server/session-persistence` | **240/239/0/1** (55 arquivos) |
+| Foco cliente B2/B3/F4 | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/TerminalPanel.test.tsx` | **91/69/0/22** |
+| Foco casa Agir | `sh platform/scripts/gate-unit.sh src/bairros/2-inteligencia/casas/agir` | **239/233/0/6** (frontier FT-05 verde) |
+| **Ampla** | `sh platform/scripts/gate-unit.sh` | **1866 / 1829 / 4 / 33** (518 arquivos) — 4 = baseline `themeTokens`×2/`editorTabs`/`monacoLoadFailure`, **confirmadas com as correções revertidas (stash)** |
+| Typecheck | `sh iniciar.sh typecheck` | **0 erros** |
+| Lint delta | `npx eslint` nos arquivos do diff (PATH do runtime) | **0 novos** — por-arquivo idêntico à baseline com stash (`VSCodeTerminal 20 / App 17 / TerminalPanel.test 2 / ChatInput 1`); novos `preparacao.ts` e `c1_correcoes.spec.ts` = **0** |
+| **E2E integrado** | `sh platform/scripts/e2e-c1.sh` | **4 passed** (34–37 s) |
+
+**RED → GREEN (sondas com a correção revertida via `git stash push`, teste já escrito):** B1 `foreign_key_check` **5 violações** → verde; B2 `expected […] to not include '/api/agir/permission'` → verde; B3 `expected [ '/fs/root' ] to deeply equal []` → verde; F4 `expected '' to be null` + `toHaveAttribute("data-pty-status", "sem-workspace")` → verdes.
+
+## 2. E2E integrado — o que é e o que NÃO é
+
+`platform/apps/workbench-v2/e2e/c1_correcoes.spec.ts` (4 testes): a spec **spawna o próprio Vite** (receita da `m7_restart`) com `AGENTE_WINDOW_DATA_DIR` descartável em `/tmp`, planta o **banco legado preenchido** antes do primeiro boot, dirige o **Chromium real** e usa provedor **fixture SSE local** = **backend CONTROLADO**. Cobertura: (1) migração legada com dependentes (API + `foreign_key_check` + UI + cascatas reais); (2) 1º envio em Chat completo no modelo, **zero** `/api/agir/permission|instruction`, `mode:'ask'`, **zero** 409, **zero** `/fs` e `/git`, terminal `sem-workspace` e **zero** frames `open` de PTY; (3) Pasta preservada (permission presente, `/fs/workspace` com raiz real, `open` com `cwd` real); (4) reboot real + `409 session_context_immutable` + integridade + F5.
+
+**NÃO é E2E com provedor real de produção** — esta **não foi executada** e não é declarada. Screenshots reais: `platform/apps/workbench-v2/test-results/c1_*.png`.
+
+Ambiente: o CDN do Playwright está fora da lista de hosts do sandbox; o runner aponta o Chromium do ambiente (`PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium` + `LD_LIBRARY_PATH=/tmp/al2023/lib` para as NSS). `playwright.config.ts` lê a variável (ausente = comportamento antigo).
+
 # C-1 — gates, reprodução e resultados (15/11/2026)
 
 Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
