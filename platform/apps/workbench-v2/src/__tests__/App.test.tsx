@@ -2365,7 +2365,7 @@ describe('C-T05 — landing Chat/Pasta (App)', () => {
 
 // Registro de chamadas com stub SSE — usado pelos testes B2/B3 (sem mock
 // permissivo: cada URL é capturada; o que não é do teste segue o fetch real).
-function instalarFetchComRegistro(): Array<{ url: string; corpo?: Record<string, unknown> }> {
+function instalarFetchComRegistro(opcoes: { aoValidarWorkspace?: Promise<void>; responderWorkspace?: boolean } = {}): Array<{ url: string; corpo?: Record<string, unknown> }> {
   const chamadas: Array<{ url: string; corpo?: Record<string, unknown> }> = []
   const codificar = new TextEncoder()
   const frames = [
@@ -2380,6 +2380,13 @@ function instalarFetchComRegistro(): Array<{ url: string; corpo?: Record<string,
       try { corpo = JSON.parse(init.body) as Record<string, unknown> } catch { /* não-JSON */ }
       chamadas.push({ url, corpo })
     } else { chamadas.push({ url }) }
+    if (url === '/api/workspaces/validate') {
+      // Gate determinístico da rodada 2: segura a validação até o teste liberar.
+      if (opcoes.aoValidarWorkspace) await opcoes.aoValidarWorkspace
+      const caminho = typeof corpo?.path === 'string' ? corpo.path : '/tmp/c1-rodada2'
+      return new Response(JSON.stringify({ workspace: { path: caminho, slug: 'c1-rodada2', name: 'c1-rodada2', isGit: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (url === '/fs/workspace' && opcoes.responderWorkspace) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url === '/api/agir/mode' || url === '/api/agir/permission') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url === '/api/agir/instruction') return new Response(JSON.stringify({ token: 'human-fixture' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -2495,5 +2502,47 @@ describe('C-1/F4 — terminal em sessão Chat', () => {
     })
     expect(ultima.visible).toBe(true)
     expect(ultima.workspace).toBeNull()
+  })
+})
+
+// ============================================================================
+// Ressalva do reteste independente (16/11) — "tentativa de envio antecipado em
+// Pasta": causa isolada no código como `SessionLanding.submit` limpava o campo
+// sem handshake + `handleLandingSubmit` recusando EM SILENCIO com
+// `workspaceChangePending` durante a validação da pasta. Garantia exigida:
+// ACEITAR E CONCLUIR ou BLOQUEAR VISIVELMENTE MANTENDO O TEXTO. O gate abaixo
+// é determinístico (o teste segura a resposta real da validação) — sem espera
+// arbitrária.
+// ============================================================================
+describe('C-1/rodada2 — envio durante a validação da pasta', () => {
+  it('com validação em voo: bloqueio visível com texto mantido; ao liberar, aceita e conclui', async () => {
+    let liberarValidacao = () => {}
+    const validacaoLiberada = new Promise<void>((liberar) => { liberarValidacao = liberar })
+    const chamadas = instalarFetchComRegistro({ aoValidarWorkspace: validacaoLiberada, responderWorkspace: true })
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.click(screen.getByTestId('contexto-workspace'))
+    await user.click(screen.getByRole('button', { name: 'Digitar caminho' }))
+    const campoCaminho = screen.getByLabelText('Caminho manual do workspace')
+    await user.type(campoCaminho, '/tmp/c1-rodada2-ws')
+    await user.type(campoCaminho, '{Enter}')
+
+    // Enquanto a validação está SEGURADA pelo teste, o envio chega à landing.
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'envio durante validação')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+
+    // ★ Garantia: bloqueio VISÍVEL e texto MANTIDO (RED: sumia sem aviso).
+    expect(await screen.findByText(/ainda está sendo validada/, {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('envio durante validação')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    expect(chamadas.filter((c) => c.url === '/api/worktrees')).toEqual([])
+
+    // Libera a validação → workspace selecionado → reenvio ACEITO E CONCLUÍDO.
+    liberarValidacao()
+    expect(await screen.findByText(/Workspace selecionado/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 6000 })
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).toHaveBeenCalledTimes(1)
   })
 })

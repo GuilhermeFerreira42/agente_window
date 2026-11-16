@@ -6,7 +6,8 @@ interface SessionLandingProps {
   /** C-1 (SPEC C §2) — modalidade explícita; default Chat (raiz nula). */
   contexto?: 'chat' | 'workspace'
   onChangeContexto?: (contexto: 'chat' | 'workspace') => void
-  onSubmit: (text: string) => void
+  /** Ressalva 16/11 — retornar `false` = recusado/falhou: o campo DEVOLVE o texto. */
+  onSubmit: (text: string) => boolean | void | Promise<boolean>
   onChangeMode?: () => void
   onChangeModel?: () => void
   onAddContext?: () => void
@@ -58,8 +59,17 @@ export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto,
     event?.preventDefault()
     const trimmed = text.trim()
     if (!trimmed) return
-    onSubmit(trimmed)
+    // Ressalva do reteste 16/11 ("envio antecipado em Pasta"): o texto só
+    // definitivamente desaparece se o envio NÃO for recusado. O dono sinaliza
+    // recusa/falha com `false` — o campo devolve o texto (sem corrida de
+    // reenvio: a limpeza imediata impede duplo Enter; a devolução só preenche
+    // o campo vazio).
+    const resultado = onSubmit(trimmed)
     setText('')
+    const devolver = () => setText((atual) => (atual.trim() ? atual : trimmed))
+    void Promise.resolve(resultado).then((aceito) => {
+      if (aceito === false) devolver()
+    }, devolver)
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

@@ -30,7 +30,11 @@ const PORTA = 5211
 const BASE = `http://127.0.0.1:${PORTA}`
 const app = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const marca = `C1E2E${Date.now()}`
-const PASTA = join('/tmp', `c1-e2e-ws-${Date.now()}`)
+const PASTA = join(tmpdir(), `c1-e2e-ws-${Date.now()}`)
+/** Ressalva 16/11 — comparação de caminhos normalizada (Windows usa `\` e
+ *  caixa diferente; a regra é por segmento normalizado, nunca regex com o
+ *  caminho bruto). */
+const norm = (valor: string) => valor.replace(/\\/g, '/').toLowerCase()
 
 test.setTimeout(240_000)
 test.describe.configure({ mode: 'serial' })
@@ -345,7 +349,7 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     await page.getByLabel('Caminho manual do workspace').press('Enter')
     // Pasta escolhida (pendência da landing): a landing segue visível com o
     // caminho validado no cabeçalho — o 1º envio cria a sessão workspace.
-    await expect(page.getByRole('button', { name: new RegExp(`Workspace atual: ${PASTA}`) })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Workspace atual' })).toBeVisible({ timeout: 15_000 })
 
     const marcas = coletor.marcar()
     await page.getByLabel('Mensagem para a nova sessão').fill(`${marca} Pasta primeira mensagem`)
@@ -357,7 +361,7 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     expect(coletor.urlsDepois(marcas, (u) => u.startsWith('/api/agir/permission')).length).toBeGreaterThanOrEqual(1)
 
     // Explorer ligado com a raiz REAL da sessão.
-    const chamadasWorkspace = coletor.requisicoes.filter((r) => r.url.startsWith('/fs/workspace') && (r.corpo ?? '').includes(PASTA))
+    const chamadasWorkspace = coletor.requisicoes.filter((r) => r.url.startsWith('/fs/workspace') && norm(r.corpo ?? '').includes(norm(PASTA)))
     expect(chamadasWorkspace.length).toBeGreaterThanOrEqual(1)
     await expect(page.getByText('Nenhuma pasta aberta.')).toHaveCount(0, { timeout: 15_000 })
     await shot(page, 'c1_pasta_explorer')
@@ -365,9 +369,52 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     // Terminal em Pasta: instância nasce e o `open` sai com cwd da raiz real.
     await page.getByRole('button', { name: 'Alternar terminal' }).click()
     await expect(page.locator('.terminal-panel')).toBeVisible()
-    await expect.poll(() => coletor.quadrosPty.some((q) => q.includes('"type":"open"') && q.includes(PASTA)), { timeout: 15_000 })
+    await expect.poll(() => coletor.quadrosPty.some((q) => q.includes('"type":"open"') && norm(q).includes(norm(PASTA))), { timeout: 15_000 })
       .toBe(true)
     await shot(page, 'c1_pasta_terminal')
+  })
+
+  test('rodada2 — envio durante a validação da pasta: bloqueio visível com texto mantido e conclusão após liberar', async ({ page }) => {
+    // Ressalva do reteste 16/11 ("tentativa de envio antecipado em Pasta"):
+    // causa isolada no cliente (limpeza sem handshake + guarda em silêncio).
+    // Cenário DETERMINÍSTICO: o teste segura a resposta REAL da validação e
+    // envia durante a espera — sem qualquer espera arbitrária.
+    const coletor = await coletar(page)
+    await configurarProvedor(page, (provedor!.address() as { port: number }).port)
+    await resetApp(page)
+
+    let liberarValidacao = (): void => {}
+    const validacaoLiberada = new Promise<void>((liberar) => { liberarValidacao = liberar })
+    await page.route('**/api/workspaces/validate', async (rota) => {
+      await validacaoLiberada
+      await rota.continue()
+    })
+
+    await page.getByRole('button', { name: 'Nova sessão' }).first().click()
+    await page.getByTestId('contexto-workspace').click()
+    await page.getByRole('button', { name: 'Digitar caminho' }).click()
+    await page.getByLabel('Caminho manual do workspace').fill(PASTA)
+    await page.getByLabel('Caminho manual do workspace').press('Enter')
+
+    // Validação em voo (segurada pelo gate) → envia ENQUANTO carrega.
+    const rascunho = `${marca} Pasta durante validacao`
+    await page.getByLabel('Mensagem para a nova sessão').fill(rascunho)
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+
+    // ★ Garantia: bloqueio VISÍVEL e texto MANTIDO.
+    await expect(page.getByText(/ainda está sendo validada/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByLabel('Mensagem para a nova sessão')).toHaveValue(rascunho)
+    // Nada criado durante o bloqueio (o sintoma relatado: sem /api/worktrees).
+    expect(coletor.requisicoes.filter((r) => r.url.includes('/api/worktrees'))).toEqual([])
+
+    // Libera a validação → workspace selecionado → reenvio ACEITO E CONCLUÍDO.
+    liberarValidacao()
+    await expect(page.getByText(/Workspace selecionado/)).toBeVisible({ timeout: 15_000 })
+    const antes = coletor.marcar()
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    await expect(ultimaBolha(page)).toContainText('Resposta C-1 em Pasta.', { timeout: 20_000 })
+    expect(coletor.urlsDepois(antes, (u) => u.includes('/api/worktrees')).length).toBeGreaterThanOrEqual(1)
+    await shot(page, 'c1_rodada2_envio_durante_validacao')
   })
 
   test('B1 — reinicialização: dados migrados persistem e a modalidade é imutável (409 session_context_immutable)', async ({ page }) => {

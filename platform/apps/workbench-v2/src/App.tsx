@@ -1415,8 +1415,20 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
   // digitada na landing, derivando o título do texto (paridade com o original).
-  const handleLandingSubmit = async (text: string) => {
-    if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
+  const handleLandingSubmit = async (text: string): Promise<boolean> => {
+    // Ressalva do reteste 16/11 — envio durante seleção/carregamento da pasta:
+    // recusa VISÍVEL com texto devolvido (SessionLanding devolve o campo quando
+    // recebemos `false`). Antes estes guardas retornavam em silêncio com o
+    // campo já esvaziado — exatamente a ocorrência relatada no Windows.
+    if (workspacePickerPending) {
+      notify('A pasta ainda está sendo escolhida; envie a mensagem de novo.')
+      return false
+    }
+    if (workspaceChangePending) {
+      notify('A pasta ainda está sendo validada; envie a mensagem de novo.')
+      return false
+    }
+    if (!editorFilesSaved()) return false
     const id = crypto.randomUUID()
     const chatId = `${id}-main`
     const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
@@ -1424,7 +1436,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // 'workspace-local'); Chat nasce sem raiz, sem worktree, sem /fs e sem Git.
     if (landingContexto === 'workspace' && !selectedWorkspace) {
       notify('Escolha uma pasta real do disco para começar uma conversa workspace.')
-      return
+      return false
     }
     try {
       const seededLayout = seedCreatedFromNewSession(newSessionState)
@@ -1481,9 +1493,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       layoutSyncRef.current?.setPreviousResource(id)
       setMobilePane('chat')
       window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
+      return true
     } catch (error) {
       console.error('[sessions] session creation failed', error)
       notify(error instanceof Error ? error.message : 'Falha ao criar a conversa')
+      return false
     }
   }
 
@@ -2414,7 +2428,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
+      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={(text) => handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
         onValidateWorkspacePath={handleChangeActiveWorkspace}
         onChangeMode={() => notify('Seletor de modo (mock)')}
         onChangeModel={() => notify('Seletor de modelo (mock)')}
