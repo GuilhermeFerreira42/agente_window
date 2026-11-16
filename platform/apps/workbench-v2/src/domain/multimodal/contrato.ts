@@ -311,9 +311,14 @@ export interface EntradaComposicaoPool {
 
 /** Entrada da adaptação de mensagem textual legada → envelope v1. */
 export interface EntradaAdaptacaoLegada {
-  /** Identidade opaca existente (não impor UUID novo ao legado). */
+  /**
+   * ID opaco EXISTENTE da mensagem legada (o `id` real da ChatMessage):
+   * preservado verbatim como `messageId` do envelope — nunca substituído
+   * por hash novo. Não impor UUID ao legado; só o `partId` é derivado.
+   */
   identidade: string
   content: string
+  /** Posição da mensagem na sequência legada (validada; não reescreve id). */
   indice: number
 }
 
@@ -321,8 +326,15 @@ export interface EntradaAdaptacaoLegada {
 // Predicados e utilidades puras de validação (sem IO)
 // ----------------------------------------------------------------------------
 
+/**
+ * Objeto de dado genuinamente plano: protótipo `Object.prototype` ou
+ * `null`. Recusa instâncias de classe e `Object.create(proto)` — propriedade
+ * herdada NUNCA confirma validação nem entra em montagem (SPEC 02 §1–2).
+ */
 export function ehObjetoPlano(valor: unknown): valor is Record<string, unknown> {
-  return typeof valor === 'object' && valor !== null && !Array.isArray(valor)
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false
+  const proto = Object.getPrototypeOf(valor)
+  return proto === Object.prototype || proto === null
 }
 
 /** Acesso SOMENTE a propriedade própria — protótipo herdado nunca conta. */

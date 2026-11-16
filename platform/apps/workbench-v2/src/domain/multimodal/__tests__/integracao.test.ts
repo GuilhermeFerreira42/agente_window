@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as porta from '../index'
 import {
@@ -101,7 +101,12 @@ describe('MM0-T01 — domínio neutro: sem IO/framework e porta mínima', () => 
       for (const spec of importsDe(readFileSync(arquivo, 'utf8'))) {
         if (!spec.startsWith('.')) continue
         const alvo = resolve(dirname(arquivo), spec)
-        const dentro = alvo === MULTIMODAL || alvo.startsWith(MULTIMODAL + '/')
+        // Relação de caminho PORTÁVEL (Windows usa `\`): `relative` +
+        // `isAbsolute` decidem a fronteira sem depender do separador.
+        const relativo = relative(MULTIMODAL, alvo)
+        const dentro =
+          relativo === '' ||
+          (relativo !== '..' && !relativo.startsWith(`..${sep}`) && !isAbsolute(relativo))
         if (!dentro) infratores.push(`${relative(SRC_ROOT, arquivo)} → ${spec}`)
       }
     }
@@ -237,7 +242,9 @@ describe('MM0-T24 — testes novos portáveis (Linux/Windows, sem armadilhas)', 
     const testes = arquivosDe(join(MULTIMODAL, '__tests__'), false).filter((arquivo) =>
       arquivo.endsWith('.test.ts'),
     )
-    expect(testes.length).toBe(4)
+    // 4 suítes originais + sondas-revisao (parecer 16/11) — a contagem
+    // garante que a varredura de portabilidade cobre TODOS os arquivos.
+    expect(testes.length).toBe(5)
     const proibidos: Array<[string, RegExp]> = [
       ['/tmp literal', /['"`]\/tmp\//],
       ['sinais de controle de processo', /SIG\((STOP|CONT|KILL)|SIG[A-Z]{3,8}\b/],

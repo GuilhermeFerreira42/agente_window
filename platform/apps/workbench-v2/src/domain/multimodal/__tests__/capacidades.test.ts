@@ -386,7 +386,10 @@ function compor(destinos: readonly DestinoAvaliacaoPool[], pedidoPool: PedidoCap
 
 describe('MM0-T17 — pool admite só a interseção (nunca o maior teto)', () => {
   it('dois destinos positivos com tetos 10 e 20 resultam no teto 10', () => {
-    const resultado = compor([destino('destino-a', 10), destino('destino-b', 20)])
+    const resultado = compor([destino('destino-a', 10), destino('destino-b', 20)], {
+      ...pedido,
+      medidas: [{ medida: 'max-bytes', valor: 5 }],
+    })
     expect(resultado.estado).toBe('disponivel')
     expect(resultado.limitesEfetivos).toEqual([
       { medida: 'max-bytes', unidade: 'bytes', valorMaximo: 10 },
@@ -496,5 +499,163 @@ describe('MM0-T19 — conjunto de destinos é identidade; nome/alias não determ
       perfil: perfil([evidencia({ estado: 'suportada' })], undefined, alvo),
     })
     expect(resultado.estado).toBe('desconhecida')
+  })
+})
+
+// ----------------------------------------------------------------------------
+// Rodada de revisão independente 16/11 (achados MM0-A1..A4) — positivos e
+// negativos para cada correção.
+// ----------------------------------------------------------------------------
+
+describe('MM0-REV-A1 — limite conhecido exige medida; pool não apaga restrição', () => {
+  it('restrição declarada SEM medida pedida é desconhecida (não disponibilidade)', () => {
+    const resultado = avaliar({
+      perfil: perfil([evidencia({ estado: 'suportada' })], [
+        { medida: 'max-bytes', unidade: 'bytes', valorMaximo: 10 },
+      ]),
+    })
+    expect(resultado.estado).toBe('desconhecida')
+    expect(resultado.motivos).toContain('limite-desconhecido')
+  })
+
+  it('dimensão assimétrica no pool: sem prova comum, o pool não fica disponível', () => {
+    const destinoSemLimite = (destinoId: string): DestinoAvaliacaoPool => {
+      const alvoDestino = { ...alvo, endpointIdentity: `ep-${destinoId}` }
+      return {
+        destinoId,
+        alvo: alvoDestino,
+        codec: { chave, implementado: true },
+        perfil: {
+          alvo: alvoDestino,
+          entradas: [{ chave, evidencias: [evidencia({ estado: 'suportada', sobre: alvoDestino })] }],
+        },
+      }
+    }
+    // Sem medida: quem tem a restrição fica desconhecido → pool desconhecido.
+    const semMedida = comporCapacidadeDePool({
+      alvo: alvoPool,
+      destinos: [destino('destino-a', 10), destinoSemLimite('destino-b')],
+      pedido,
+    })
+    expect(semMedida.estado).not.toBe('disponivel')
+
+    // Com medida: quem NÃO tem a restrição fica com medida sem limite →
+    // desconhecido; a interseção nunca descarta o teto conhecido de um lado.
+    const comMedida = comporCapacidadeDePool({
+      alvo: alvoPool,
+      destinos: [destino('destino-a', 10), destinoSemLimite('destino-b')],
+      pedido: { ...pedido, medidas: [{ medida: 'max-bytes', valor: 5 }] },
+    })
+    expect(comMedida.estado).not.toBe('disponivel')
+  })
+})
+
+describe('MM0-REV-A2 — entradas duplicadas agregam de forma conservadora', () => {
+  const positiva = (): PerfilMultimodal['entradas'][number] => ({
+    chave,
+    evidencias: [evidencia({ estado: 'suportada' })],
+  })
+  const negativa = (): PerfilMultimodal['entradas'][number] => ({
+    chave,
+    evidencias: [evidencia({ estado: 'nao-suportada' })],
+  })
+
+  it('negativa atual vence em QUALQUER ordem das entradas duplicadas', () => {
+    for (const entradas of [
+      [positiva(), negativa()],
+      [negativa(), positiva()],
+    ]) {
+      const resultado = avaliarCapacidadeEfetiva({
+        alvo,
+        pedido,
+        codec: codecOk,
+        perfil: { alvo, entradas },
+      })
+      expect(resultado.estado).toBe('indisponivel')
+      expect(resultado.motivos).toContain('evidencia-negativa')
+    }
+  })
+
+  it('duplicadas positivas: ordem irrelevante e o MENOR teto prevalece', () => {
+    const comLimite10: PerfilMultimodal['entradas'][number] = {
+      ...positiva(),
+      restricoes: [{ medida: 'max-bytes', unidade: 'bytes', valorMaximo: 10 }],
+    }
+    const comLimite20: PerfilMultimodal['entradas'][number] = {
+      ...positiva(),
+      restricoes: [{ medida: 'max-bytes', unidade: 'bytes', valorMaximo: 20 }],
+    }
+    for (const entradas of [
+      [comLimite10, comLimite20],
+      [comLimite20, comLimite10],
+    ]) {
+      const dentro = avaliarCapacidadeEfetiva({
+        alvo,
+        pedido: { ...pedido, medidas: [{ medida: 'max-bytes', valor: 8 }] },
+        codec: codecOk,
+        perfil: { alvo, entradas },
+      })
+      expect(dentro.estado).toBe('disponivel')
+      expect(dentro.limitesEfetivos).toEqual([
+        { medida: 'max-bytes', unidade: 'bytes', valorMaximo: 10 },
+      ])
+    }
+    const acima = avaliarCapacidadeEfetiva({
+      alvo,
+      pedido: { ...pedido, medidas: [{ medida: 'max-bytes', valor: 15 }] },
+      codec: codecOk,
+      perfil: { alvo, entradas: [comLimite10, comLimite20] },
+    })
+    expect(acima.estado).toBe('indisponivel')
+    expect(acima.motivos).toContain('limite-excedido')
+  })
+})
+
+describe('MM0-REV-A3 — avaliador público não contorna a guarda de pool', () => {
+  function avaliarPool(pool: { revisao: string; destinos: readonly string[] }) {
+    const alvoPoolDireto = { ...alvo, pool: { revisao: pool.revisao, destinos: [...pool.destinos] } }
+    return avaliarCapacidadeEfetiva({
+      alvo: alvoPoolDireto,
+      pedido,
+      codec: codecOk,
+      perfil: {
+        alvo: alvoPoolDireto,
+        entradas: [
+          { chave, evidencias: [evidencia({ estado: 'suportada', sobre: alvoPoolDireto })] },
+        ],
+      },
+    })
+  }
+
+  it('pool com destinos vazios + evidência agregada positiva NÃO vira disponível', () => {
+    const resultado = avaliarPool({ revisao: 'p', destinos: [] })
+    expect(resultado.estado).toBe('desconhecida')
+    expect(resultado.motivos).toContain('pool-exige-composicao')
+  })
+
+  it('pool com destinos preenchidos também exige composição na rota direta', () => {
+    const resultado = avaliarPool({ revisao: 'p', destinos: ['destino-a', 'destino-b'] })
+    expect(resultado.estado).not.toBe('disponivel')
+    expect(resultado.motivos).toContain('pool-exige-composicao')
+  })
+})
+
+describe('MM0-REV-A4 — propriedade herdada por protótipo nunca confirma', () => {
+  it('identidade montada com Object.create não passa na validação', () => {
+    const herdado = Object.create(alvo) as IdentidadeAlvoMultimodal
+    const resultado = avaliar({
+      alvo: herdado,
+      perfil: {
+        alvo: herdado,
+        entradas: [{ chave, evidencias: [evidencia({ estado: 'suportada', sobre: herdado })] }],
+      },
+    })
+    expect(resultado.estado).toBe('desconhecida')
+    expect(resultado.motivos).toContain('alvo-invalido')
+  })
+
+  it('positivo: objeto de dado genuinamente plano segue disponível', () => {
+    const resultado = avaliar({ perfil: perfil([evidencia({ estado: 'suportada' })]) })
+    expect(resultado.estado).toBe('disponivel')
   })
 })

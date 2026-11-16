@@ -21,30 +21,6 @@ import {
 } from './contrato'
 
 // ----------------------------------------------------------------------------
-// IDs determinísticos (sem crypto/Node, sem relógio)
-// ----------------------------------------------------------------------------
-
-/** FNV-1a de 32 bits sobre UTF-16, semente explícita — puro e estável. */
-function fnv1a(texto: string, semente: number): string {
-  let hash = semente >>> 0
-  for (let i = 0; i < texto.length; i++) {
-    hash ^= texto.charCodeAt(i)
-    hash = Math.imul(hash, 16777619) >>> 0
-  }
-  return hash.toString(16).padStart(8, '0')
-}
-
-/**
- * Derivação determinística de ID: mesma entrada → mesmo ID em qualquer
- * execução; sem normalização (case/espaço/acentos importam) e sem
- * truncamento no pré-imagem (prefixado por comprimento — colisão por
- * concaturação ambígua é impossível).
- */
-function derivaId(base: string): string {
-  return fnv1a(base, 0x811c9dc5) + fnv1a(base, 0x9e3779b9)
-}
-
-// ----------------------------------------------------------------------------
 // Validação do envelope (escrita v1 estrita)
 // ----------------------------------------------------------------------------
 
@@ -142,10 +118,12 @@ export function validarMensagemMultimodal(entrada: unknown): ResultadoValidacao<
 // ----------------------------------------------------------------------------
 
 /**
- * Adaptador de MENSAGEM TEXTUAL legada: identidade + `content` → envelope
- * v1 com uma parte de texto. `messageId` deriva deterministicamente da
- * identidade e do índice; campos da entrada nunca são mutados. Isto é uma
- * VISÃO — não altera ChatMessage nem arquivo algum.
+ * Adaptador de MENSAGEM TEXTUAL legada: `identidade` (o ID opaco EXISTENTE
+ * da mensagem) + `content` → envelope v1 com uma parte de texto.
+ * `messageId` preserva o ID legado VERBATIM (SPEC 01 §2.2 — nunca hash
+ * novo no lugar do id real); só o `partId` é derivado deterministicamente.
+ * Campos da entrada nunca são mutados. Isto é uma VISÃO — não altera
+ * ChatMessage nem arquivo algum.
  */
 export function adaptarMensagemLegada(
   entrada: EntradaAdaptacaoLegada,
@@ -159,8 +137,9 @@ export function adaptarMensagemLegada(
     return falhaValidacao('indice-invalido', '$.indice')
   }
 
-  // Pré-imagem sem ambiguidade: comprimento do identificador separa os campos.
-  const messageId = derivaId(`mm0|${entrada.identidade.length}|${entrada.identidade}|${entrada.indice}`)
+  // ID opaco existente preservado; derivação determinística só no partId
+  // (parte 0 desta mensagem). Sem reescrita de histórico.
+  const messageId = entrada.identidade
   const partId = `${messageId}:0`
   return okValido<EnvelopeMensagemMultimodal>({
     versao: 1,

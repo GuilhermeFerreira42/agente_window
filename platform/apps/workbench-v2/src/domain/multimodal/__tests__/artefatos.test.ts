@@ -186,3 +186,22 @@ describe('MM0-T09 — sem campos de transporte/autoridade no DTO persistível', 
     }
   })
 })
+
+describe('MM0-REV-A4 — propriedade herdada por protótipo nunca entra no DTO', () => {
+  it('campo opcional herdado (Object.create) é recusado, não incorporado', () => {
+    const comPrototipo = Object.assign(Object.create({ messageId: 'vinculo-herdado' }), base())
+    const resultado = validarArtefato(comPrototipo)
+    expect(resultado.ok).toBe(false)
+    if (!resultado.ok) expect(resultado.codigo).toBe('entrada-invalida')
+  })
+
+  it('positivo: campo opcional PRÓPRIO e válido entra no DTO', () => {
+    const resultado = validarArtefato(base({ messageId: 'msg-1', partId: 'msg-1:0', generation: 3 }))
+    expect(resultado.ok).toBe(true)
+    if (resultado.ok) {
+      expect(resultado.valor.messageId).toBe('msg-1')
+      expect(resultado.valor.partId).toBe('msg-1:0')
+      expect(resultado.valor.generation).toBe(3)
+    }
+  })
+})

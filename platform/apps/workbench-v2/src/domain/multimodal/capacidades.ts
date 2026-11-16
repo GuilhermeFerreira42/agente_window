@@ -242,6 +242,9 @@ export function avaliarCapacidadeEfetiva(entrada: EntradaAvaliacaoCapacidade): R
   const { alvo, pedido, perfil, codec } = entrada
 
   if (!ehIdentidade(alvo)) return desconhecida('alvo-invalido')
+  // Identidade de POOL não é deployment individual: a API direta não
+  // prova disponibilidade sem compor TODOS os elegíveis (T18/02 §4).
+  if (alvo.pool !== undefined) return desconhecida('pool-exige-composicao')
   if (!ehPedido(pedido)) return desconhecida('pedido-invalido')
   if (!ehCodec(codec)) return desconhecida('codec-invalido')
 
@@ -260,14 +263,16 @@ export function avaliarCapacidadeEfetiva(entrada: EntradaAvaliacaoCapacidade): R
     entradas = perfil.entradas
   }
 
-  const entradaPerfil =
-    perfil === undefined ? undefined : entradas.find((item) => mesmaChave(item.chave, chave))
-  const evidenciasAplicaveis: readonly EvidenciaCapacidade[] =
-    entradaPerfil === undefined
-      ? []
-      : entradaPerfil.evidencias.filter(
-          (evidencia) => ehIdentidade(evidencia.alvo) && mesmaIdentidadeMultimodal(evidencia.alvo, alvo),
-        )
+  // A2: TODAS as entradas da combinação participam — ordem não pode
+  // esconder negativo nem descartar restrição de entrada duplicada.
+  const entradasCorrespondentes =
+    perfil === undefined ? [] : entradas.filter((item) => mesmaChave(item.chave, chave))
+  const evidenciasAplicaveis: readonly EvidenciaCapacidade[] = entradasCorrespondentes.flatMap(
+    (item) =>
+      item.evidencias.filter(
+        (evidencia) => ehIdentidade(evidencia.alvo) && mesmaIdentidadeMultimodal(evidencia.alvo, alvo),
+      ),
+  )
 
   // Passo 1 — negativo aplicável ou codec comprovadamente ausente.
   if (evidenciasAplicaveis.some((evidencia) => evidencia.estado === 'nao-suportada')) {
@@ -279,7 +284,7 @@ export function avaliarCapacidadeEfetiva(entrada: EntradaAvaliacaoCapacidade): R
 
   // Passo 2 — perfil/identidade/evidência.
   if (perfil === undefined) return desconhecida('perfil-ausente')
-  if (entradaPerfil === undefined) return desconhecida('evidencia-ausente')
+  if (entradasCorrespondentes.length === 0) return desconhecida('evidencia-ausente')
 
   // Passo 3 — declaração manual isolada não confirma (nem fabrica codec).
   const positivas = evidenciasAplicaveis.filter((evidencia) => evidencia.estado === 'suportada')
@@ -292,15 +297,22 @@ export function avaliarCapacidadeEfetiva(entrada: EntradaAvaliacaoCapacidade): R
   // Codec específico para a combinação exata é exigência do "disponível".
   if (!mesmaChave(codec.chave, chave)) return desconhecida('codec-nao-declarado')
 
-  // Passo 4 — limites.
+  // Passo 4 — limites (união conservadora entre entradas duplicadas;
+  // repetição da mesma medida fica com o MENOR teto).
   const restricoes: RestricaoMedida[] = []
-  if (entradaPerfil.restricoes !== undefined) {
-    for (const restricaoBruta of entradaPerfil.restricoes) {
+  const restricoesPorMedida = new Map<MedidaId, RestricaoMedida>()
+  for (const entradaCorrespondente of entradasCorrespondentes) {
+    if (entradaCorrespondente.restricoes === undefined) continue
+    for (const restricaoBruta of entradaCorrespondente.restricoes) {
       const validada = validarRestricaoMedida(restricaoBruta)
       if (!validada.ok) return desconhecida(validada.codigo)
-      restricoes.push(validada.valor)
+      const anterior = restricoesPorMedida.get(validada.valor.medida)
+      if (anterior === undefined || validada.valor.valorMaximo < anterior.valorMaximo) {
+        restricoesPorMedida.set(validada.valor.medida, validada.valor)
+      }
     }
   }
+  for (const restricao of restricoesPorMedida.values()) restricoes.push(restricao)
   const medidas = pedido.medidas ?? []
   for (const medida of medidas) {
     if (!Number.isFinite(medida.valor) || medida.valor < 0) return desconhecida('medida-invalida')
@@ -311,9 +323,10 @@ export function avaliarCapacidadeEfetiva(entrada: EntradaAvaliacaoCapacidade): R
   }
   for (const restricao of restricoes) {
     const medida = medidas.find((item) => item.medida === restricao.medida)
-    if (medida !== undefined && medida.valor > restricao.valorMaximo) {
-      return indisponivel('limite-excedido')
-    }
+    // A1: limite conhecido exige a medida correspondente para ser
+    // SATISFEITO — ausência é desconhecimento, não disponibilidade.
+    if (medida === undefined) return desconhecida('limite-desconhecido')
+    if (medida.valor > restricao.valorMaximo) return indisponivel('limite-excedido')
   }
 
   // Passo 5 — disponível.
@@ -379,8 +392,24 @@ export function comporCapacidadeDePool(entrada: EntradaComposicaoPool): Resultad
     return { estado: 'desconhecida', motivos: [...motivos] }
   }
 
-  const limites = intersecaoLimites(resultados.map((resultado) => resultado.limitesEfetivos ?? []))
+  const limitesPorDestino = resultados.map((resultado) => resultado.limitesEfetivos ?? [])
+  // A1: dimensões assimétricas entre destinos nunca são descartadas —
+  // sem prova do mesmo conjunto em TODOS os elegíveis, o pool fica
+  // desconhecido (a interseção não pode apagar restrição conhecida).
+  if (!mesmoConjuntoDeLimites(limitesPorDestino)) {
+    return desconhecida('limite-desconhecido')
+  }
+  const limites = intersecaoLimites(limitesPorDestino)
   return { estado: 'disponivel', motivos: [], limitesEfetivos: limites }
+}
+
+/** Todos os destinos precisam declarar exatamente o mesmo conjunto de medidas. */
+function mesmoConjuntoDeLimites(listas: readonly (readonly RestricaoMedida[])[]): boolean {
+  if (listas.length === 0) return false
+  const assinatura = (lista: readonly RestricaoMedida[]): string =>
+    [...new Set(lista.map((restricao) => `${restricao.medida}|${restricao.unidade}`))].sort().join(',')
+  const base = assinatura(listas[0])
+  return listas.every((lista) => assinatura(lista) === base)
 }
 
 /** Mínimo por medida, somente nas medidas presentes em TODOS os destinos. */

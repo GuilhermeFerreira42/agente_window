@@ -55,7 +55,7 @@ describe('MM0-T03 — determinismo, imutabilidade e não colisão de IDs', () =>
     expect(Object.isFrozen(entrada)).toBe(true)
   })
 
-  it('identidade/índice distintos não colidem por truncamento ou normalização', () => {
+  it('IDs legados são preservados verbatim — sem hash, sem normalização, sem truncamento', () => {
     const bases: Array<{ identidade: string; indice: number }> = [
       { identidade: 'a'.repeat(120), indice: 0 },
       { identidade: `${'a'.repeat(119)}b`, indice: 0 },
@@ -68,10 +68,17 @@ describe('MM0-T03 — determinismo, imutabilidade e não colisão de IDs', () =>
       { identidade: 'mm0|x|y|0', indice: 0 },
       { identidade: 'mm0|1|x|y|0', indice: 0 },
     ]
-    // Derivação por pré-imagem com comprimento: nenhum formato vira colisão.
-    const envelopes = bases.map((base) => adaptar('x', base.indice, base.identidade))
-    const messageIds = new Set(envelopes.map((envelope) => envelope.messageId))
-    expect(messageIds.size).toBe(bases.length)
+    // Cada envelope carrega exatamente o id legado de entrada (A5).
+    for (const base of bases) {
+      expect(adaptar('x', base.indice, base.identidade).messageId).toBe(base.identidade)
+    }
+    // Preservar não normaliza nem trunca: identidades distintas continuam
+    // distintas ('Chat' ≠ 'chat' ≠ 'chat ' ≠ ' chat').
+    const distintas = new Set(bases.map((base) => base.identidade))
+    expect(distintas.size).toBe(9)
+    // O par IDENTIDADE×índices é o MESMO id legado: o índice documenta a
+    // posição na sequência e não reescreve nem deriva novo id.
+    expect(adaptar('x', 0, IDENTIDADE).messageId).toBe(adaptar('x', 1, IDENTIDADE).messageId)
   })
 
   it('partId deriva do messageId e permanece único na mensagem', () => {
@@ -256,6 +263,8 @@ describe('MM0-T21 — a adaptação volta pela projeção atual sem alterar a me
     const antes = JSON.parse(JSON.stringify(mensagem)) as ChatMessage
 
     const envelope = adaptar(mensagem.content, 0, mensagem.id)
+    // A5: o ID opaco real da ChatMessage é preservado no envelope.
+    expect(envelope.messageId).toBe(mensagem.id)
     const projetada = projetarTextoLegado(envelope)
     expect(projetada.ok).toBe(true)
     if (projetada.ok) expect(projetada.valor).toBe(mensagem.content)
