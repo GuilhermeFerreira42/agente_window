@@ -1,6 +1,6 @@
 # MM-0 — gates da implementação (Debian, 16/11/2026) — PRONTA PARA GATE WINDOWS
 
-**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/execucao-mm0/`.
+**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/Memória de projeto/execucao-mm0/`.
 
 | Gate | Comando | Resultado |
 |---|---|---|
@@ -75,7 +75,7 @@ Commit **`6db61d1`** (push `50386ad..6db61d1`; PR #1 OPEN, sem merge, sem MM-0).
 
 # C-1 REENTREGA (revisão do Codex) — gates, E2E e reprodução das correções B1/B2/B3/F4 (15/11/2026)
 
-Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/execucao-c1/rev-c1-gates.log`**.
+Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/Memória de projeto/execucao-c1/rev-c1-gates.log`**.
 
 ## 1. Resultados desta rodada (execução real)
 
@@ -102,7 +102,7 @@ Ambiente: o CDN do Playwright está fora da lista de hosts do sandbox; o runner 
 
 # C-1 — gates, reprodução e resultados (15/11/2026)
 
-Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/Memória de projeto/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
 
 ## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
 
@@ -118,7 +118,7 @@ Separação obrigatória: **Debian = execução da Arena** neste workspace (runt
 | Typecheck | `sh iniciar.sh typecheck` | **exit 0 / 0 erros** |
 | Lint delta | `npx eslint <25 arquivos>` agora vs. base `5720ca2` (worktree temporário + symlink `node_modules`) | **23 = 23 (0 novos)**; arquivos novos (`sessionContext.test`, `chatExecucao.test`): **0 problemas** |
 
-As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
+As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/Memória de projeto/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
 
 ## 2. Cobertura dos critérios C-1 (C-T01–05/08/16)
 
@@ -162,7 +162,7 @@ Separação obrigatória: **Debian = execução da Arena** neste workspace (runt
 | Typecheck | `sh iniciar.sh typecheck` (raiz) | **exit 0 / 0 erros** |
 | Lint delta | `PATH=platform/.runtime/node-v26.13.0-linux-x64/bin:$PATH npx eslint <arquivos>` em `platform/apps/workbench-v2`; baseline por `git worktree add /tmp/base-lint <base>` + symlink de `node_modules` | **0 novos** (ressalva: 1 = 1 pré-existente `_historica`) |
 
-As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
+As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/Memória de projeto/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/Memória de projeto/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
 
 ## 2. Windows — validação do Codex (resultados comunicados pelo proprietário)
 
