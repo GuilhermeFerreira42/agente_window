@@ -96,3 +96,13 @@ export type EventoChat =
   | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'done'; model?: string }
   | { type: 'error'; code: CategoriaErro; message: string }
+
+// ——— MM-0 (contrato neutro multimodal): reexport de TIPOS por composição ———
+// Uma definição só (o domínio é a fonte). Isto NÃO faz o endpoint aceitar
+// mídia nem ativa payload novo: G2 = transmitir só com capacidade efetiva.
+export type {
+  EnvelopeMensagemMultimodal,
+  Modalidade,
+  ParteMensagem,
+  ResultadoValidacao,
+} from '../../../../domain/multimodal'

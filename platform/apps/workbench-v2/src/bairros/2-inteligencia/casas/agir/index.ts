@@ -11,6 +11,13 @@
 // ============================================================================
 
 export type {
+  ArtefatoMultimodal,
+  EnvelopeMensagemMultimodal,
+  Modalidade,
+  ParteMensagem,
+} from './contract'
+
+export type {
   ArgumentosFerramenta,
   CategoriaErroAgir,
   DecisaoAprovacao,

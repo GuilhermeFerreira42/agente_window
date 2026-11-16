@@ -244,3 +244,12 @@ export interface ResultadoRecuperacao {
 
 /** Quem executa um pedido. O loop e a rota continuam sendo donos de cancelamento e grants. */
 export type ExecutorFerramenta = (pedido: PedidoFerramenta, contexto?: ContextoExecucaoFerramenta) => Promise<ResultadoFerramenta>
+
+// ——— MM-0 (contrato neutro multimodal): reexport de TIPOS por composição ———
+// Sem payload novo no fluxo do agente; sem ativação de partes persistidas.
+export type {
+  ArtefatoMultimodal,
+  EnvelopeMensagemMultimodal,
+  Modalidade,
+  ParteMensagem,
+} from '../../../../domain/multimodal'
