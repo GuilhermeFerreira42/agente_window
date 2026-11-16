@@ -1,3 +1,29 @@
+# C-1 RODADA 2 (ressalvas do reteste 16/11) — gates, cenário determinístico e e2e Windows (16/11/2026)
+
+Commit **`6db61d1`** (push `50386ad..6db61d1`; PR #1 OPEN, sem merge, sem MM-0). Execução **Debian = Arena**; **Windows não executado por esta sessão**; **E2E com provedor real não executada** (mesma bateria backend controlado).
+
+## 1. Resultados desta rodada (execução real)
+
+| Escopo | Comando | Resultado |
+|---|---|---|
+| Typecheck | `sh iniciar.sh typecheck` | **0 erros** |
+| Foco rodada2 | `bash platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/SessionLanding.test.tsx` | **95/82/0/13** |
+| Foco clientes | `bash platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/SessionLanding.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/databaseMigration.test.ts` | **106/84/0/22** |
+| **Ampla** | `bash platform/scripts/gate-unit.sh` | **1867 / 1830 / 4 / 33** — 4 = baseline (`themeTokens`×2, `editorTabs`, `monacoLoadFailure`), **reconfirmadas com `git stash`** |
+| Lint delta | `npx eslint` nos 4 arquivos do diff × baseline com stash | **0 novos** — mesmos 17 problemas pré-existentes (só deslocamento de linha) |
+| **E2E integrado (5 cenários)** | `sh platform/scripts/e2e-c1.sh` | **5 passed (36,3 s)** |
+
+## 2. Cenário determinístico da ressalva “envio antecipado em Pasta”
+
+- **Unitário** (`App.test.tsx`, describe *rodada2*): `aoValidarWorkspace` do mock **segura** o `POST /api/workspaces/validate` até `liberarValidacao()`; envio durante a validação → `findByText(/ainda está sendo validada/)` + campo com o texto íntegro + `createSessionWorktree` **nunca** chamado + zero `/api/worktrees` → libera → `Workspace selecionado` → reenvio → `Resposta do modelo em Pasta.` com `createSessionWorktree` exatamente 1×.
+- **E2E** (`c1_correcoes.spec.ts`, teste *rodada2*): `page.route` segura o mesmo endpoint; garantias idênticas no navegador real e conclusão após liberar (`ultimaBolha` com `Resposta do modelo em Pasta.`).
+- **RED** (correção revertida via `git stash`): `Unable to find an element with the text: /ainda está sendo validada/` — o aviso nunca aparecia (sintoma relatado). Sem espera arbitrária em nenhum dos dois níveis.
+- **Fix:** `SessionLanding.submit` devolve o texto em recusa/falha; `handleLandingSubmit → Promise<boolean>` com `notify` em cada recusa; `setWorkspaceChangePending` cobre até a conclusão do envio aceito.
+
+## 3. e2e Windows (`.ps1`) — o que foi e o que NÃO foi executado
+
+`platform/scripts/e2e-c1.ps1` foi **escrito** (Chrome local do Windows, servidor porta 5211, mesmos 5 cenários, falha se a porta já estiver em uso) e o spec foi tornado portável (`tmpdir()`, normalização `\\`→`/`, botão `'Workspace atual'`). **Não executado por esta sessão** (Debian); a execução Windows é do avaliador. O runner Linux `e2e-c1.sh` permanece e foi executado: **5/5**.
+
 # C-1 REENTREGA (revisão do Codex) — gates, E2E e reprodução das correções B1/B2/B3/F4 (15/11/2026)
 
 Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/execucao-c1/rev-c1-gates.log`**.
