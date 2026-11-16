@@ -1,4 +1,12 @@
-# Próximas fases — C-1 homologada com dívida C1-EXCLUSAO-01
+# Próximas fases — MM-0 implementada (pronta para gate Windows); C-1 homologada com dívida C1-EXCLUSAO-01
+
+## MM-0 — contratos neutros multimodais (implementada em 16/11/2026; aguarda gate Windows + homologação)
+
+**Escopo entregue (commit local `d0e63d8`, branch `0f2e5de2-agente-window`, sem push/merge):** núcleo puro `src/domain/multimodal/` (contrato v1, `adaptarMensagemLegada`/`projetarTextoLegado`/`validarMensagemMultimodal`, `validarArtefato`, `mesmaIdentidadeMultimodal`/`avaliarCapacidadeEfetiva`/`comporCapacidadeDePool`) + reexport de tipos pelas casas Conversa/Agir/Provedores + 82 testes (matriz MM0-T01–T26). **Fora (futuro, não autorizado por esta fatia):** upload/storage/SQLite de artefatos, mídia na UI, codecs, geração, jobs, descoberta/rede, ativação de `parts` (C-3b), MM-I/MM-O, plugins/MCP.
+
+**Gates Debian (execução real):** foco 82/82; regressão 204/191/0/13; agir rotas+chatExecucao 63/63; typecheck 0; lint 0; ampla 1952/1915/4/33 com diff nominal ZERO vs baseline 1870/1833/4/33; E2E C-1 6/6; mutação "tudo disponível" → 24 falhas (suíte efetiva). **Pendências:** (a) **gate Windows** com `VALIDAR_MM0_WINDOWS.ps1` do pacote (foco esperado 82; regressão 204 com 13 pulados; build/lint/ampla); (b) `vite build` no Linux do sandbox morre com OOM (3,9 GB; `tsc -b` ok) — limitação de ambiente com diagnóstico em `/home/user/execucao-mm0/build-mm0*.log`; (c) **homologação humana** (dono). Entrega: `/home/user/execucao-mm0/ENTREGA_MM_0.md`. **Sem push (a SPEC não autoriza por si só), sem MM-0-automática para a próxima fatia, sem `08`.**
+
+**Dívidas mantidas:** C1-EXCLUSAO-01 (abaixo) e a dívida de tamanho do App (2889 linhas em `7ac8260` — MM-0 NÃO alterou o App) seguem intactas; MM-0 não as incorpora.
 
 ## C1-EXCLUSAO-01 — primeira exclusão recusa por revisão alterada (aberta, 16/11/2026)
 
@@ -15,7 +23,7 @@
 
 **Sequência aprovada mantida:** P-A ✓ → P-B ✓ → P-C ✓ → **C-1 ✓ (tecnicamente)** → **MM-0**. A **C-1 (Chat e workspace imutáveis)** foi **autorizada expressamente pelo proprietário em 15/11** e implementada no commit **`d589179`** (push `5720ca2..d589179`, PR #1 segue OPEN sem merge): modalidade explícita, raiz nula de Chat, imutabilidade backend/UI, compatibilidade legada e execução sem tools de workspace; critérios C-T01–05/08/16 com negativos nos endpoints relevantes; gates em `09`; entrega em `/home/user/execucao-c1/ENTREGA_C_1.md`. **Homologação humana da C-1 confirmada em 16/11, com dívida C1-EXCLUSAO-01 aceita** (apresentação ≠ aceite). Após a **revisão do Codex**, as correções **B1/B2/B3/F4** foram implementadas nesta rodada (`31f318c`/`4653f55`/`9dad771`) com RED→GREEN, gates e testes integrados `4/4` (backend controlado) — **reentrega em `/home/user/execucao-c1/ENTREGA_C_1_REENTREGA.md`**. **MM-0 não começa sem nova autorização após a revisão e a homologação.**
 
-**Pendências reais que permanecem (nada abaixo foi alterado por esta rodada):** a matriz de dívidas desta matriz (DEBTs abertos, PEND-01, DP-03/DP-06 e os gates da Fatia 14, conforme as notas vigentes), os **aceites humanos de M1–M8/DEBT-25/MC1 pendentes por D197**, a **P-B sem aceite humano declarado** (conclusão técnica + B1 6/6 em `c581bfa`, informado — **não** é pendência de execução Windows), a **C-1 sem homologação humana declarada** e as limitações registradas em `09`. Homologação das Fatias 14/15 continua conforme D186 em `08`.
+**Pendências reais que permanecem (nada abaixo foi alterado por esta rodada):** a matriz de dívidas desta matriz (DEBTs abertos, PEND-01, DP-03/DP-06 e os gates da Fatia 14, conforme as notas vigentes), os **aceites humanos de M1–M8/DEBT-25/MC1 pendentes por D197**, a **P-B sem aceite humano declarado** (conclusão técnica + B1 6/6 em `c581bfa`, informado — **não** é pendência de execução Windows), a **MM-0 sem homologação** (pronta para gate Windows) e as limitações registradas em `09`. Homologação das Fatias 14/15 continua conforme D186 em `08`.
 
 **Nesta rodada:** correções da revisão do Codex sobre a C-1 — B1 (`31f318c`), B2/B3/F4 (`4653f55`), testes integrados (`9dad771`) + documentação canônica (`50386ad`), na branch `0f2e5de2-agente-window` — nenhum merge na base `arena`, sem MM-0. M1–M8/MC1 seguem separados; esta reentrega não lhes atribui homologação. Pendência nova registrada (sem ampliar escopo): decisão do botão “Abrir pasta” (ausente em Chat) a confirmar na homologação.
 

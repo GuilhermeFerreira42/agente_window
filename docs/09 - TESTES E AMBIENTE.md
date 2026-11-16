@@ -1,3 +1,26 @@
+# MM-0 — gates da implementação (Debian, 16/11/2026) — PRONTA PARA GATE WINDOWS
+
+**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/execucao-mm0/`.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Foco novo | `bash platform/scripts/gate-unit.sh src/domain/multimodal/__tests__` | **82/82/0/0 — exit 0** (mensagens 28, capacidades 32, artefatos 13, integração 9) |
+| Regressão (lista do `VALIDAR_MM0_WINDOWS.ps1`) | `bash platform/scripts/gate-unit.sh <11 arquivos: SessionLanding, App, sessionRecovery, session-persistence index/publicacaoRecuperavel/deletions/__tests__/checkpoint, provedores capacidades+frontier, conversa frontier, agir frontier>` | **204/191/0/13 — exit 0** (13 pulados = pré-existentes declarados) |
+| T22 — fluxo real `/api/agir` | `bash platform/scripts/gate-unit.sh src/bairros/…/agir/__tests__/rotas.test.ts src/bairros/…/agir/__tests__/chatExecucao.test.ts` | **63/63/0 — exit 0** |
+| Typecheck (cobre `@ts-expect-error` do T07) | `sh iniciar.sh typecheck` | **0 erros — exit 0** |
+| Lint (escopo MM-0) | `npx eslint src/domain/multimodal …/casas/{conversa,agir,provedores}/{contract,index}.ts` | **exit 0 — 0 problemas** |
+| Build oficial | `PATH=<runtime-fixado> npm run build -w agents-window-replica-v2` (cwd `platform/`) | `build:fs-boundary` **ok**; `tsc -b` **ok**; `vite build` **SIGKILL/OOM exit 137** (sandbox 3,9 GB; repetido com `--max-old-space-size=3072`) — **limitação de ambiente**, logs `build-mm0.log`/`build-mm0b.log` |
+| Baseline ampla (ANTES, 775e4a6 limpo) | `bash platform/scripts/gate-unit.sh` | **1870/1833/4/33** — `baseline-nominal.json` |
+| Ampla pós-mudança | `bash platform/scripts/gate-unit.sh` | **1952/1915/4/33** — **diff nominal: 0 novas, 0 resolvidas, mesmos 33 pulados** (`comparacao-nominal.json`) |
+| E2E C-1 (navegador + servidor real, backend controlado) | `sh platform/scripts/e2e-c1.sh` | **6 passed (43,1 s) — exit 0** |
+| Windows | `powershell … -File .\VALIDAR_MM0_WINDOWS.ps1 -Repositorio <repo> -Modo Completo` | **NÃO EXECUTADO — pendência** (runner do pacote; os 4 arquivos de teste existem com os nomes exigidos) |
+
+**Autoauditoria:** mutação proposital em `avaliarCapacidadeEfetiva` ("tudo disponível") → **24 falhas** em T10–T19 → restaurado → foco 82/82 (a suíte não é vazia). Tentativas adversáriais cobertas por teste: mídia sem texto (T05), endpoint trocado com mesmo modelId (T13/T19), pool parcial (T18), versão futura (T06), `pronto` sem SHA (T07), byte no limite/zero/NaN/unidade (T16), campo secreto extra (T06/T09), CRLF congelado (T03/T21), import que carregaria servidor (T01). Dois achados foram de autoria de teste (cenário T12 invertido; meta-teste T24 auto-casa) — corrigidos; **nenhum defeito do produto** encontrado; nenhum vermelho artificial apresentado.
+
+**Classificação exata: PRONTA PARA GATE WINDOWS** (não homologada, não "pronta final"). Reprodução Windows e roteiro humano focal: `ENTREGA_MM_0.md`. Números são os efetivamente coletados; nenhum skip novo foi tratado como executado; nenhuma falha preexistente foi ocultada.
+
+---
+
 # C-1 — correção Codex R2-1/R2-2 validada no Windows, 16/11/2026
 
 **Aceite posterior do proprietário (16/11):** C-1 homologada com a dívida C1-EXCLUSAO-01 (primeira exclusão recusa; após F5 funciona, conforme relato). O relato não é teste automatizado nem diagnóstico da causa. Ver 06/08. Nenhum gate adicional foi executado para essa dívida.
