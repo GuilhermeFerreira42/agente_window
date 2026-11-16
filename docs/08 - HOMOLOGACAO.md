@@ -1,3 +1,15 @@
+# Homologação MM-0 — aceite explícito do proprietário, 16/11/2026
+
+**O proprietário declarou a MM-0 homologada nesta conversa e autorizou registrar o aceite e fazer push para a branch de trabalho 0f2e5de2-agente-window.** Alcance: contratos neutros multimodais e compatibilidade textual implementados até d1dd69d, com a correção pontual de transporte sem ferramentas em **055bbd4**. Publicação sem merge na base e sem autorização automática para a próxima fatia.
+
+Proveniência do aceite: após a correção, o proprietário confirmou que o Google voltou a responder e apresentou um resumo de teste das sete ferramentas (listar, criar, ler, escrever, excluir para a Lixeira, buscar e executar), seguido do aceite explícito. Esse resumo é relato trazido pelo proprietário, não inspeção independente pelo Codex dos arquivos ou da Lixeira. Não se atribui a mesma conta/modelo a cada operação sem evidência. Os testes automatizados e suas limitações estão em 09.
+
+**Ressalvas técnicas preservadas no aceite:** ampla Windows com 42 falhas comuns à base e dois timeouts extras no App, ambos aprovados no reteste dirigido e na regressão focada; causa exata não isolada. A rejeição 404 do Gemini 2.5 Flash mostrada no teste é indisponibilidade do modelo para a conta/destino, não defeito corrigido por esta entrega. A dívida C1-EXCLUSAO-01 permanece aberta.
+
+A MM-0 não disponibiliza upload, armazenamento de anexos, apresentação/geração de mídia ou codecs de produção. O aceite não homologa M1–M8/MC1, P-B ou outras frentes por consequência. C-2 é a próxima fatia planejada, ainda sem autorização de implementação. Entradas seguintes são históricas.
+
+---
+
 # Registro de homologação — C-1 com dívida aceita, 16/11/2026
 
 **Aceite humano confirmado pelo proprietário nesta conversa:** após testar, informou que o funcionamento está correto, considerou a fatia finalizada e autorizou commit/push na branch de trabalho. Alcance: C-1 e correções locais R2-1/R2-2 sobre `7ac8260`, com os gates Windows registrados em `09` (91 testes aprovados, 6 cenários integrados, build/lint passando).

@@ -1,3 +1,19 @@
+# 16/11/2026 (5) — MM-0 homologada pelo proprietário; publicação autorizada
+
+O proprietário confirmou expressamente o aceite da MM-0 e solicitou push. Registrados escopo, origem do relato de teste das sete ferramentas, sucesso remoto informado do Chat Google e ressalvas técnicas no 08. Correção Google/LiteLLM sem ferramentas em **055bbd4** (140/140, tipos/lint, testes HTTP locais reais contra fixture); não implementa mídia. Atualizados 03/06/08/09 e este histórico, sem modificar os registros de testes anteriores nem inferir aceite de outras frentes. Sem merge e sem iniciar C-2.
+
+A pedido do proprietário, verificada a documentação da próxima fatia: C-2 está prevista na SPEC geral C, seção 5, matriz C-T05–08/15/16 e planejamento F/H, mas não há pacote específico consolidado contra o estado pós-C-1/MM-0. É necessária preparação documental antes da implementação, sem reabrir G1/G2 nem acrescentar responsabilidade no App.
+
+---
+
+# 16/11/2026 (4) — correção autorizada: Chat sem ferramentas e Google/LiteLLM
+
+Sobre d1dd69d, o proprietário relatou 400 `Function calling config is set without function_declarations` no Google via LiteLLM e autorizou a correção. Regressões de transporte HTTP local reproduziram a rejeição antes do ajuste (2/2 vermelhas). `agir/server/vizinho.ts` agora só envia `tool_choice: auto` se houver ferramentas efetivamente anunciadas; `agir/server/anuncio.ts` omite o anúncio Gemini quando o filtro deixa zero funções. Preservados ferramentas de Pasta, Chat sem tools, seleção de provedor e ausência de retry/fallback. Nenhuma mudança no App, MM-0 ou geração de mídia. Bateria 140/140, typecheck/lint exit 0. Provedores remotos não acionados; sem ampla/build/E2E novos. Fonte e documentação permanecem locais, sem commit/push/merge.
+
+Consolidado também o reteste Windows anterior da MM-0 em d1dd69d: foco 99/99, sondas originais 7/7, build/tipos/lint aprovados; ampla 1894/44/31 contra base 1797/42/31, duas diferenças de timeout App aprovadas no reteste 2/2, com ressalva explícita. Nenhuma homologação humana inferida. Evidências no diretório externo memoria-de-projeto, pastas correcao-google-sem-tools-2026-11-16 e reteste-MM0-2026-11-16.
+
+---
+
 # 16/11/2026 (3) — MM-0: parecer independente (6 achados) corrigido e revalidado
 
 Parecer do revisor independente (Windows, sobre `47c9a77`): **REPROVADA para homologação** com seis achados — nenhum deles indicava mídia ligada à UI (o domínio segue sem transporte), mas consolidaria contratos incorretos para as próximas fatias. Correções aplicadas na mesma branch, sem avançar C-2/C-3/MM-I/MM-O:

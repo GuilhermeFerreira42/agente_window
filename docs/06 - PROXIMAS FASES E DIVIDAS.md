@@ -1,3 +1,13 @@
+# Próximas fases — MM-0 homologada em 16/11/2026; preparar SPEC executável C-2
+
+**MM-0 encerrada por aceite humano explícito** (08), sobre d1dd69d e correção de transporte 055bbd4. Gates Windows e ressalvas registrados em 09. A pendência Windows da rodada Debian abaixo é histórica; build passou no Windows, e os dois timeouts extras da ampla passaram no reteste dirigido. C1-EXCLUSAO-01 e dívida de responsabilidade/tamanho do App permanecem.
+
+**C-2 é a próxima microfatia planejada, ainda não iniciada.** Base documental existente: `memoria-de-projeto/replanejamento-2026-11-13/C_SPEC_TELA_CENTRAL_E_ANEXOS.md` seção 5 e C-T05–08/15/16; recorte/dependências em F/H. Escopo de referência: composer inicial adaptativo, seleção exata de provedor/modelo, modos/permissões já existentes, foco/pickers/menus e estados honestos; sem anexos funcionais, novos runtimes, ambientes remotos ou controles fictícios.
+
+**Preparação necessária antes de implementar:** consolidar recorte C-2 contra a C-1 e a MM-0 homologadas; discriminar reaproveitamento versus trabalho restante; atualizar mapa dos módulos e contratos de envio/retentativa; fornecer matriz de aceite, autorrevisão e gate Windows reproduzível; explicitar o que fica para U-1/C-3/MM-I/MM-O. Não foi encontrado pacote independente C-2 no diretório de especificações. Esta verificação não autoriza sua implementação nem inicia a elaboração integral da SPEC.
+
+---
+
 # Próximas fases — MM-0: revisão independente corrigida (6/6 achados); aguarda reexecução Windows + homologação
 
 ## MM-0 — contratos neutros multimodais (implementada em 16/11/2026; aguarda gate Windows + homologação)

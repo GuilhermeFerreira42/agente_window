@@ -1,3 +1,25 @@
+# Aceite e retorno manual do proprietário — 16/11/2026
+
+MM-0 homologada expressamente pelo proprietário (08); correção de transporte sem ferramentas em **055bbd4**. O proprietário confirmou resposta Google após a correção e trouxe resumo de teste bem-sucedido de listar/criar/ler/escrever/excluir/buscar/executar. Registro de relato humano: o Codex não inspecionou independentemente o arquivo final nem a Lixeira e não confirmou o backend exato de cada operação. Uma execução anterior parou após três ferramentas por 404 de acesso a Gemini 2.5 Flash; não foi atribuída ao funcionamento das ferramentas nem corrigida alterando o provedor silenciosamente. O aceite preserva as ressalvas da ampla Windows descritas abaixo. Não foram repetidos gates para esta atualização documental.
+
+---
+
+# Google/LiteLLM — Chat sem ferramentas — correção Windows (16/11/2026)
+
+Base d1dd69d; alteração local autorizada. Dados sintéticos, perfis externos isolados, Node canônico 26.13.0 e transporte HTTP real contra fixture local. Sem chamadas pagas, dados pessoais, alterações em LiteLLM ou bypass de produção.
+
+- Repro: `agir/__tests__/vizinho.test.ts`, describe `Chat sem ferramentas — transporte compatível`: fixture recusa configuração OpenAI de function calling sem tools e grupo Gemini com declarações vazias. **Antes: 2 falhas com 400; depois: ambas aprovadas**, resposta textual e zero chamadas de ferramentas, exatamente uma requisição.
+- Foco: vizinho + chatExecucao + instrucoes + domínio multimodal inteiro: **140 aprovados, zero falhas**, oito arquivos. Suítes existentes mantêm anúncio e execução com ferramentas, incluindo o protocolo OpenAI-compatible também usado com NVIDIA.
+- Typecheck workspace: **exit 0**. Lint dos três TS alterados: **exit 0**. Diff sem erros de whitespace.
+- Não repetidos ampla, build ou E2E por esta correção focal. **Não foi comprovada resposta remota Google/NVIDIA nesta rodada**: o usuário deve carregar o backend atualizado e repetir texto simples no Google configurado. Geração de imagens permanece fora desta correção.
+- Evidências externas: `memoria-de-projeto/correcao-google-sem-tools-2026-11-16/` (`vermelho.json`, `transporte-verde.json`, `typecheck.log`, `lint.log`, `testar-foco.ps1`).
+
+## MM-0 — consolidação do reteste independente Windows em d1dd69d
+
+Foco completo **99/99**, sondas externas originais **7/7**, tipos/build/lint exit 0. Regressão de onze arquivos **183/8/13**, mesmas oito falhas da base. Ampla Windows: base 775e4a6 **1797 aprovados/42 falhas/31 pulados (1870)**; atual **1894/44/31 (1969)**. Comparação nominal: 42 falhas comuns, duas ocorrências extras de timeout App (persistência de modo; excluir última sessão). Ambos aprovados no reteste dirigido **2/2**, sem alterar timeout/teste/fixture; também passaram na regressão focada. Causa dos timeouts não isolada; não afirmar delta bruto zero. As amplas tiveram sobreposição temporal com perfis separados. Parecer: apta à homologação com ressalva da instabilidade do gate amplo; homologação humana não inferida. Relatório e JSONs em `memoria-de-projeto/reteste-MM0-2026-11-16/`. Estes resultados substituem a pendência Windows dos registros históricos abaixo. Nenhum provedor remoto ou E2E foi executado no reteste MM-0.
+
+---
+
 # MM-0 — rodada de revisão independente: gates das correções (Debian, 16/11/2026)
 
 **Escopo:** correções MM0-A1..A6 sobre `47c9a77` (commits da rodada). Execução **Debian = Arena**; **foco Windows pendente** (reexecução pelos 4 arquivos corrigidos + runner v1.1 completo); provedor real não executado (E2E = backend controlado). Evidências em `/home/user/memoria-de-projeto/execucao-mm0/` (`ampla-rev.log`, `comparacao-rev.json`).
