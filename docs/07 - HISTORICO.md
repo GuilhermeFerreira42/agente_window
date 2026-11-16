@@ -1,3 +1,18 @@
+# 16/11/2026 — Proprietário homologa C-1, aceita dívida da primeira exclusão e autoriza publicação
+
+Após uso manual, o proprietário confirmou o encerramento da C-1 e autorizou commit/push na branch de trabalho. Relatou aviso de revisão alterada na primeira exclusão, resolvido ao recarregar e tentar novamente; pediu manter como dívida para ajuste posterior. Registro **C1-EXCLUSAO-01** em `06`, aceite com ressalva em `08`, estado em `03`. Nenhuma correção de exclusão foi implementada nesta rodada. Sem merge na base ou avanço MM-0.
+
+---
+# 16/11/2026 — Codex corrige R2-1/R2-2 da C-1 e valida o runner original no Windows
+
+Autorização do proprietário: corrigir diretamente e atualizar a documentação do estado real. Sobre `7ac8260`, a revisão confirmou perda do primeiro texto quando a criação falhava enquanto outro rascunho era digitado, e falso negativo do E2E ao comparar caminhos dentro de JSON bruto.
+
+- `hooks/useLandingSubmission.ts` assume rascunho e serialização da criação; a landing mantém texto visível e somente leitura durante confirmação, anuncia a espera e impede botão/Enter concorrentes. Recusa/erro liberam retentativa mantendo o texto; só aceitação limpa. **App.tsx não alterado**; dívida geral de responsabilidades preservada.
+- Spec E2E compara `path`/`cwd` decodificados e ganha cenário de criação com falha 500, tentativa de edição/reenvio, preservação do texto, retentativa única e F5. Runner Windows passa de cinco para seis cenários.
+- Gates locais Windows: **91 aprovados/13 pulados**, **6/6 integrados** pelo runner e fontes do repositório, **build exit 0** (TypeScript + Vite), **lint exit 0** nos quatro TS/TSX alterados. Perfis descartáveis e provedor local controlado, sem dados pessoais. Suíte ampla não repetida. Artefatos e limites em `09`.
+- Canônicos 03/04/06/07/09 atualizados; `08` não alterado, pois **homologação humana C-1 permanece pendente**. Sem commit/push/merge desta correção e sem MM-0. Os registros anteriores abaixo descrevem rodadas históricas, não o gate vigente.
+
+---
 # 16/11/2026 — Reteste do Codex da C-1 (aprovado com ressalvas) → rodada2: envio durante validação bloqueado visível + e2e Windows (.ps1)
 
 O reteste independente do Codex sobre `50386ad`, comunicado pelo proprietário, **aprovou B1–B3 e F4 tecnicamente com ressalvas** (B1/B2/F4 confirmados no Windows; B3 confirmado pela correção em Chat; 155 testes verdes e 4 cenários integrados). As ressalvas foram respondidas nesta rodada (commit **`6db61d1`**, push `50386ad..6db61d1`, **PR #1 segue OPEN, sem merge, sem MM-0**):

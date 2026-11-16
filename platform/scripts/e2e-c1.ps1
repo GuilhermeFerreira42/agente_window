@@ -7,7 +7,7 @@
 #     já definido pelo chamador);
 #   · base URL da porta 5211 (a spec spawna o próprio Vite com perfil
 #     descartável — o banco pessoal NUNCA é tocado);
-#   · roda e2e/c1_correcoes.spec.ts (5 cenários: B1/B2/B3/F4 + rodada 2).
+#   · roda e2e/c1_correcoes.spec.ts (6 cenários: B1/B2/B3/F4 + falhas de envio).
 #
 # USO (PowerShell, na raiz do repositório):
 #   powershell -ExecutionPolicy Bypass -File platform\scripts\e2e-c1.ps1

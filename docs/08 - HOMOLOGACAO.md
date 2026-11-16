@@ -1,3 +1,12 @@
+# Registro de homologação — C-1 com dívida aceita, 16/11/2026
+
+**Aceite humano confirmado pelo proprietário nesta conversa:** após testar, informou que o funcionamento está correto, considerou a fatia finalizada e autorizou commit/push na branch de trabalho. Alcance: C-1 e correções locais R2-1/R2-2 sobre `7ac8260`, com os gates Windows registrados em `09` (91 testes aprovados, 6 cenários integrados, build/lint passando).
+
+**Ressalva aceita expressamente para ajuste futuro:** primeira exclusão pode mostrar aviso de revisão alterada; segundo o relato, após recarregar a página a exclusão funciona. Registrada como **C1-EXCLUSAO-01** em `06`, sem causa confirmada e sem correção nesta rodada. O aceite não afirma ausência desse defeito nem substitui a investigação futura.
+
+Este registro não atribui aceite à P-B, M1–M8/MC1 ou outras frentes; os respectivos estados permanecem próprios. Publicação autorizada somente na branch `0f2e5de2-agente-window`; sem merge na base e sem início automático de MM-0. Entradas abaixo são históricas.
+
+---
 # Registro de homologação — P-C (aceite do proprietário, 15/11/2026)
 
 **Aceite humano da P-C registrado pelo proprietário**, após validação no Windows (Codex) da versão **`69f4510`**. Comportamentos comprovados na validação (relato do proprietário):

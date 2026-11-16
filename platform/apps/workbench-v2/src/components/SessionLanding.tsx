@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowUp, Bot, ChevronDown, FolderGit2, Mic, MessageSquare, Plus, ShieldCheck, Wand2 } from 'lucide-react'
+import { useLandingSubmission, type SubmitLanding } from '../hooks/useLandingSubmission'
 
 interface SessionLandingProps {
   workspace: string
   /** C-1 (SPEC C §2) — modalidade explícita; default Chat (raiz nula). */
   contexto?: 'chat' | 'workspace'
   onChangeContexto?: (contexto: 'chat' | 'workspace') => void
-  /** Ressalva 16/11 — retornar `false` = recusado/falhou: o campo DEVOLVE o texto. */
-  onSubmit: (text: string) => boolean | void | Promise<boolean>
+  /** Somente a aceitação permite limpar o rascunho; false/erro preservam-no. */
+  onSubmit: SubmitLanding
   onChangeMode?: () => void
   onChangeModel?: () => void
   onAddContext?: () => void
@@ -21,7 +22,7 @@ interface SessionLandingProps {
 }
 
 export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto, onSubmit, onChangeMode, onChangeModel, onAddContext, onDictate, onPickWorkspace, onValidateWorkspacePath, onListWorkspaceDirectories, workspaceSelectionDisabledReason, workspacePickerPending = false, isFileSystemSupported = true }: SessionLandingProps) {
-  const [text, setText] = useState('')
+  const { text, setText, pending: submitPending, submit: submitMessage } = useLandingSubmission(onSubmit)
   const [manualPathOpen, setManualPathOpen] = useState(!isFileSystemSupported)
   const [manualPath, setManualPath] = useState('')
   const [manualPathError, setManualPathError] = useState('')
@@ -57,19 +58,7 @@ export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto,
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
-    const trimmed = text.trim()
-    if (!trimmed) return
-    // Ressalva do reteste 16/11 ("envio antecipado em Pasta"): o texto só
-    // definitivamente desaparece se o envio NÃO for recusado. O dono sinaliza
-    // recusa/falha com `false` — o campo devolve o texto (sem corrida de
-    // reenvio: a limpeza imediata impede duplo Enter; a devolução só preenche
-    // o campo vazio).
-    const resultado = onSubmit(trimmed)
-    setText('')
-    const devolver = () => setText((atual) => (atual.trim() ? atual : trimmed))
-    void Promise.resolve(resultado).then((aceito) => {
-      if (aceito === false) devolver()
-    }, devolver)
+    void submitMessage()
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -143,12 +132,13 @@ export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto,
           </div>
         )}
 
-        <form className="session-landing-input" onSubmit={submit}>
+        <form className="session-landing-input" onSubmit={submit} aria-busy={submitPending}>
           <textarea
             className="session-landing-textarea"
             placeholder="O que você está tentando fazer?"
             aria-label="Mensagem para a nova sessão"
             value={text}
+            readOnly={submitPending}
             rows={1}
             autoFocus
             onChange={(event) => setText(event.target.value)}
@@ -162,10 +152,11 @@ export function SessionLanding({ workspace, contexto = 'chat', onChangeContexto,
             </div>
             <div className="session-landing-toolbar-right">
               <button type="button" className="session-landing-icon-button" aria-label="Ditar por voz" title="Ditar por voz" onClick={onDictate}><Mic size={15} /></button>
-              <button type="submit" className="session-landing-send" aria-label="Enviar mensagem" title="Enviar" disabled={!text.trim()}><ArrowUp size={15} /></button>
+              <button type="submit" className="session-landing-send" aria-label="Enviar mensagem" title="Enviar" disabled={submitPending || !text.trim()}><ArrowUp size={15} /></button>
             </div>
           </div>
         </form>
+        {submitPending && <p role="status">Criando conversa. Sua mensagem está preservada.</p>}
 
         <div className="session-landing-footer">
           <span className="session-landing-footer-item"><MessageSquare size={13} aria-hidden="true" />Interativo</span>

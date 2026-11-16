@@ -1,3 +1,29 @@
+# C-1 — correção Codex R2-1/R2-2 validada no Windows, 16/11/2026
+
+**Aceite posterior do proprietário (16/11):** C-1 homologada com a dívida C1-EXCLUSAO-01 (primeira exclusão recusa; após F5 funciona, conforme relato). O relato não é teste automatizado nem diagnóstico da causa. Ver 06/08. Nenhum gate adicional foi executado para essa dívida.
+
+Implementação local autorizada pelo proprietário sobre `7ac8260`, branch `0f2e5de2-agente-window`, publicação autorizada pelo proprietário nesta branch, sem merge na base. Esta seção é o resultado vigente e sucede os gates históricos abaixo. **Homologação humana C-1 confirmada posteriormente com dívida C1-EXCLUSAO-01; MM-0 não iniciado.**
+
+| Gate executado no Windows | Resultado |
+|---|---|
+| App + centerFrontierApp + SessionLanding (3 arquivos) | **91 aprovados / 13 pulados / 0 falhas** |
+| Runner original `platform/scripts/e2e-c1.ps1`, spec do repositório | **6/6**, sem adaptar cópia externa |
+| Build oficial `npm run build -w agents-window-replica-v2` (inclui `tsc -b` e Vite) | **exit 0** |
+| ESLint no hook, landing, testes da landing e spec E2E | **exit 0**, executado na pasta workbench-v2 |
+
+**R2-1:** `useLandingSubmission` conserva o texto visível até confirmação. Campo somente leitura, estado anunciado e botão/Enter bloqueados durante o pedido; `false`, rejeição ou exceção síncrona conservam o texto e liberam a edição/retentativa. Os três testes novos de componente provam esses caminhos, tentativa de edição concorrente e uma única chamada pendente. O cenário integrado novo segura `/api/worktrees`, tenta editar/reenviar durante a espera, devolve 500, verifica mensagem original preservada, libera a retentativa pela rota real e confirma uma única sessão também após F5. O cenário de validação pendente da Arena permanece verde.
+
+**R2-2:** comparações de `path` e `cwd` usam os campos obtidos por `JSON.parse`, não o JSON serializado inteiro. O runner original agora completa todos os cenários no Windows. O primeiro ensaio do novo teste encontrou seletor ambíguo de `role=status` (toast da pasta + aviso do envio); o teste foi corrigido para identificar o aviso de preservação, e a execução final passou 6/6.
+
+**Ambiente:** Windows, Node 26.13.0 fixado, Chrome local, dados/configurações/HOME em perfis descartáveis externos, sem credenciais de provedores. SQLite 12.11.1 compilado externamente para esse Node foi carregado por alias/preload apenas na validação; dependências versionadas não foram alteradas. Provedor SSE HTTP local de fixture: rotas reais do produto, backend controlado; não é teste com LightLLM/provedor de produção. No cenário de falha, apenas a criação é interceptada; a retentativa atravessa o servidor real.
+
+**Artefatos externos:** pasta acordada `memoria-de-projeto/correcao-c1-2026-11-16/` contém `foco.json/.log`, `integrado-oficial.log`, `build.log`, `lint-workbench.log`, scripts de isolamento e `ENTREGA_CORRECAO_C_1.md`. Não são parte do runtime nem da memória M1–M8. Uma primeira chamada de lint fora da pasta que contém a configuração falhou por ausência de config; o gate válido acima usa a pasta correta. O build mantém avisos já existentes de tamanho de chunk e boundary nativo desabilitado; não foram tratados como falhas desta correção.
+
+**Limites:** suíte ampla não repetida nesta correção; não se afirma resultado global novo nem se reaproveitam números Debian como execução Windows. Migração/P-B/P-C mantêm evidências datadas da revisão anterior; os cenários integrados de migração, cascata e reinício foram executados novamente aqui. Não houve acesso a dados pessoais, homologação humana presumida ou avanço de fatia.
+
+**Roteiro humano:** (1) abrir nova conversa Pasta; durante criação lenta, conferir texto visível, aviso e edição temporariamente bloqueada; (2) provocar falha controlada somente em perfil de teste, conferir texto editável e retentar sem duplicação; (3) confirmar Chat/Pasta, Explorer e terminal conforme modalidade; (4) registrar aceite no `08` somente quando o proprietário homologar.
+
+---
 # C-1 RODADA 2 (ressalvas do reteste 16/11) — gates, cenário determinístico e e2e Windows (16/11/2026)
 
 Commit **`6db61d1`** (push `50386ad..6db61d1`; PR #1 OPEN, sem merge, sem MM-0). Execução **Debian = Arena**; **Windows não executado por esta sessão**; **E2E com provedor real não executada** (mesma bateria backend controlado).

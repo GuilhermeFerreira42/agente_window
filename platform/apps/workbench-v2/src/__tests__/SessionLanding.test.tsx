@@ -1,7 +1,52 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionLanding } from '../components/SessionLanding'
+
+describe('SessionLanding — confirmação de criação e rascunho pendente', () => {
+  it.each(['recusa', 'rejeição'] as const)('preserva texto e impede corrida até %s; permite retentativa', async (resultado) => {
+    let resolver!: (value: boolean) => void
+    let rejeitar!: (reason: Error) => void
+    const espera = new Promise<boolean>((resolve, reject) => { resolver = resolve; rejeitar = reject })
+    const onSubmit = vi.fn().mockImplementationOnce(() => espera).mockResolvedValue(true)
+    const user = userEvent.setup()
+    render(<SessionLanding workspace="fixture" onSubmit={onSubmit} />)
+    const campo = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    await user.type(campo, 'primeiro texto preservado')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(campo).toHaveValue('primeiro texto preservado')
+    expect(campo).toHaveAttribute('readonly')
+    expect(screen.getByRole('status')).toHaveTextContent('Sua mensagem está preservada')
+    expect(screen.getByRole('button', { name: 'Enviar mensagem' })).toBeDisabled()
+    await user.type(campo, 'segundo texto durante a espera')
+    fireEvent.change(campo, { target: { value: 'mudança concorrente' } })
+    fireEvent.keyDown(campo, { key: 'Enter' })
+    expect(campo).toHaveValue('primeiro texto preservado')
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      if (resultado === 'recusa') resolver(false)
+      else rejeitar(new Error('falha de criação'))
+      await espera.catch(() => {})
+    })
+    expect(campo).not.toHaveAttribute('readonly')
+    expect(campo).toHaveValue('primeiro texto preservado')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(onSubmit).toHaveBeenCalledTimes(2)
+    expect(onSubmit).toHaveBeenLastCalledWith('primeiro texto preservado')
+    expect(campo).toHaveValue('')
+  })
+
+  it('preserva o rascunho e libera a edição se o callback lançar antes de retornar', async () => {
+    const user = userEvent.setup()
+    render(<SessionLanding workspace="fixture" onSubmit={() => { throw new Error('falha síncrona') }} />)
+    const campo = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    await user.type(campo, 'rascunho intacto')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(campo).toHaveValue('rascunho intacto')
+    expect(campo).not.toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Enviar mensagem' })).toBeEnabled()
+  })
+})
 
 describe('SessionLanding (estado inicial vazio)', () => {
   it('mostra o cabeçalho de nova sessão e o input centralizado', () => {

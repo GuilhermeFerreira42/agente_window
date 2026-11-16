@@ -361,7 +361,7 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     expect(coletor.urlsDepois(marcas, (u) => u.startsWith('/api/agir/permission')).length).toBeGreaterThanOrEqual(1)
 
     // Explorer ligado com a raiz REAL da sessão.
-    const chamadasWorkspace = coletor.requisicoes.filter((r) => r.url.startsWith('/fs/workspace') && norm(r.corpo ?? '').includes(norm(PASTA)))
+    const chamadasWorkspace = coletor.requisicoes.filter((r) => r.url.startsWith('/fs/workspace') && norm(JSON.parse(r.corpo ?? '{}').path ?? '') === norm(PASTA))
     expect(chamadasWorkspace.length).toBeGreaterThanOrEqual(1)
     await expect(page.getByText('Nenhuma pasta aberta.')).toHaveCount(0, { timeout: 15_000 })
     await shot(page, 'c1_pasta_explorer')
@@ -369,7 +369,10 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     // Terminal em Pasta: instância nasce e o `open` sai com cwd da raiz real.
     await page.getByRole('button', { name: 'Alternar terminal' }).click()
     await expect(page.locator('.terminal-panel')).toBeVisible()
-    await expect.poll(() => coletor.quadrosPty.some((q) => q.includes('"type":"open"') && norm(q).includes(norm(PASTA))), { timeout: 15_000 })
+    await expect.poll(() => coletor.quadrosPty.some((q) => {
+      const frame = JSON.parse(q) as { type?: string; cwd?: string }
+      return frame.type === 'open' && norm(frame.cwd ?? '') === norm(PASTA)
+    }), { timeout: 15_000 })
       .toBe(true)
     await shot(page, 'c1_pasta_terminal')
   })
@@ -415,6 +418,56 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     await expect(ultimaBolha(page)).toContainText('Resposta C-1 em Pasta.', { timeout: 20_000 })
     expect(coletor.urlsDepois(antes, (u) => u.includes('/api/worktrees')).length).toBeGreaterThanOrEqual(1)
     await shot(page, 'c1_rodada2_envio_durante_validacao')
+  })
+
+  test('falha assíncrona de criação: texto preservado, edição bloqueada e retentativa única', async ({ page }) => {
+    const coletor = await coletar(page)
+    await configurarProvedor(page, (provedor!.address() as { port: number }).port)
+    await resetApp(page)
+    await page.getByRole('button', { name: 'Nova sessão' }).first().click()
+    await page.getByTestId('contexto-workspace').click()
+    await page.getByRole('button', { name: 'Digitar caminho' }).click()
+    await page.getByLabel('Caminho manual do workspace').fill(PASTA)
+    await page.getByLabel('Caminho manual do workspace').press('Enter')
+    await expect(page.getByText(/Workspace selecionado/)).toBeVisible()
+    await expect(page.getByRole('tree', { name: 'Files Explorer' })).toBeVisible()
+
+    let liberar!: () => void
+    let chegou!: () => void
+    const gate = new Promise<void>((resolve) => { liberar = resolve })
+    const pedido = new Promise<void>((resolve) => { chegou = resolve })
+    await page.route('**/api/worktrees', async (rota) => {
+      chegou()
+      await gate
+      await rota.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({
+        code: 'fixture_creation_failure', message: 'Falha sintética de criação',
+      }) })
+    }, { times: 1 })
+    const original = `C1FALHA${Date.now()} Pasta`
+    const campo = page.getByLabel('Mensagem para a nova sessão')
+    await campo.fill(original)
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    await pedido
+    await expect(campo).toHaveAttribute('readonly')
+    await expect(campo).toHaveValue(original)
+    await expect(page.getByRole('status').filter({ hasText: 'Sua mensagem está preservada' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Enviar mensagem' })).toBeDisabled()
+    await campo.press('End')
+    await page.keyboard.type('outro texto durante a espera')
+    await campo.press('Enter')
+    await expect(campo).toHaveValue(original)
+    expect(coletor.requisicoes.filter((r) => r.url === '/api/worktrees')).toHaveLength(1)
+    liberar()
+    await expect(page.getByText('Falha sintética de criação')).toBeVisible()
+    await expect(campo).toBeEditable()
+    await expect(campo).toHaveValue(original)
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    await expect(ultimaBolha(page)).toContainText('Resposta C-1 em Pasta.', { timeout: 20_000 })
+    expect(coletor.requisicoes.filter((r) => r.url === '/api/worktrees')).toHaveLength(2)
+    await expect(page.locator('.session-row', { hasText: original })).toHaveCount(1)
+    await page.reload()
+    await expect(page.locator('.session-row', { hasText: original })).toHaveCount(1)
+    await shot(page, 'c1_criacao_falhou_rascunho_preservado')
   })
 
   test('B1 — reinicialização: dados migrados persistem e a modalidade é imutável (409 session_context_immutable)', async ({ page }) => {
