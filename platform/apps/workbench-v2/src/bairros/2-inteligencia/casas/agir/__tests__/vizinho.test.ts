@@ -56,6 +56,42 @@ const HISTORICO: MensagemAgir[] = [
   { papel: 'ferramenta', conteudo: 'Arquivo "ola.txt" criado (escrita atômica).', pedidoId: 'p1', ferramenta: 'criar' },
 ]
 
+describe('Chat sem ferramentas — transporte compatível', () => {
+  it.each(['openai-chat', 'gemini'] as const)('%s não configura chamadas sem funções declaradas', async protocolo => {
+    let chamadas = 0
+    const s = await servidorFalso((_req, res, corpo) => {
+      chamadas++
+      const tools = corpo.tools as Array<{ functionDeclarations?: unknown[] }> | undefined
+      const configuracaoSemFuncoes = protocolo === 'openai-chat'
+        ? corpo.tool_choice !== undefined && !tools?.length
+        : tools?.some(tool => tool.functionDeclarations?.length === 0)
+      if (configuracaoSemFuncoes) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({
+          error: { message: 'Function calling config is set without function_declarations.' },
+        }))
+        return
+      }
+      const resposta = protocolo === 'openai-chat'
+        ? { choices: [{ delta: { content: 'Texto recebido.' } }] }
+        : { candidates: [{ content: { parts: [{ text: 'Texto recebido.' }] } }] }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' }).end(`data: ${JSON.stringify(resposta)}\n\n`)
+    })
+    try {
+      const resultado = await criarVizinhoReal(alvoDe(protocolo, s.baseUrl))(
+        [{ papel: 'usuario', conteudo: 'Olá' }],
+        { ferramentasPermitidas: [] },
+      )
+      expect(resultado.texto).toBe('Texto recebido.')
+      expect(resultado.pedidos).toEqual([])
+      expect(chamadas).toBe(1)
+      expect(s.captura.corpo).not.toHaveProperty('tool_choice')
+      expect(s.captura.corpo).not.toHaveProperty('toolConfig')
+      if (protocolo === 'gemini') expect(s.captura.corpo).not.toHaveProperty('tools')
+      else expect(s.captura.corpo?.tools).toEqual([])
+    } finally { await s.fechar() }
+  })
+})
+
 describe('Missão 2 — erros reais de transporte e resposta', () => {
   it('retira include_usage somente após recusa explícita e preserva estimativa', async () => {
     const corpos: Record<string, unknown>[] = []

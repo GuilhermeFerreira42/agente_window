@@ -205,7 +205,7 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   if (alvo.protocolo === 'openai-chat') {
     return {
       url: `${baseUrl}/chat/completions`,
-      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...temperatura, ...anuncio, tool_choice: 'auto' },
+      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...temperatura, ...anuncio, ...(Array.isArray(anuncio.tools) && anuncio.tools.length > 0 ? { tool_choice: 'auto' } : {}) },
     }
   }
   if (alvo.protocolo === 'anthropic') {
