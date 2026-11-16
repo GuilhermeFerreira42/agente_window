@@ -1,6 +1,28 @@
+# MM-0 — rodada de revisão independente: gates das correções (Debian, 16/11/2026)
+
+**Escopo:** correções MM0-A1..A6 sobre `47c9a77` (commits da rodada). Execução **Debian = Arena**; **foco Windows pendente** (reexecução pelos 4 arquivos corrigidos + runner v1.1 completo); provedor real não executado (E2E = backend controlado). Evidências em `/home/user/memoria-de-projeto/execucao-mm0/` (`ampla-rev.log`, `comparacao-rev.json`).
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Foco do domínio (4 suítes + `sondas-revisao`) | `sh platform/scripts/gate-unit.sh src/domain/multimodal/__tests__` | **99/99/0/0 — exit 0** |
+| Sondas do revisor (independentes) | incluídas no foco: `__tests__/sondas-revisao.test.ts` | **7/7** (antes 7/7 falhavam contra `47c9a77`) |
+| Regressão (lista do `VALIDAR_MM0_WINDOWS.ps1`) | `npx vitest run <11 arquivos>` com runtime canônico `node v26.13.0` | **204/191/0/13 — exit 0** |
+| T22 — fluxo real `/api/agir` | `npx vitest run …/agir/__tests__/{rotas,chatExecucao}.test.ts` | **63/63 — exit 0** |
+| Typecheck | `sh iniciar.sh typecheck` (`tsc -b --force`) | **0 erros — exit 0** |
+| Lint (escopo MM-0 + casas) | `npx eslint src/domain/multimodal …/casas/{conversa,agir,provedores}/{contract,index}.ts` | **exit 0** |
+| Ampla pós-correções | `sh platform/scripts/gate-unit.sh` | **1969/1932/4/33** — **diff nominal 0 novas/0 resolvidas** vs baseline (`comparacao-rev.json`; mesmas 4 pré-existentes) |
+| E2E C-1 | `sh platform/scripts/e2e-c1.sh` | **6 passed (43,6 s) — exit 0** |
+| Windows (foco corrigido + runner v1.1) | receita do revisor/pacote | **NÃO EXECUTADO — pendência** |
+
+**Armadilha ambiental registrada:** executar `npx vitest` fora do runtime canônico (`/usr/local/bin/node` v22) quebra o `better-sqlite3` nativo (`Module did not self-register`) e derruba as rotas de persistência com 500 — a regressão só é válida com `PATH` do `platform/.runtime/node-v26.13.0-linux-x64/bin`.
+
+**Classificação da MM-0 após a rodada:** correções completas e verdes em Debian; **aguarda reexecução Windows + homologação humana** (nenhum aceite inferido; `08` intocado).
+
+---
+
 # MM-0 — gates da implementação (Debian, 16/11/2026) — PRONTA PARA GATE WINDOWS
 
-**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/Memória de projeto/execucao-mm0/`.
+**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/memoria-de-projeto/execucao-mm0/`.
 
 | Gate | Comando | Resultado |
 |---|---|---|
@@ -75,7 +97,7 @@ Commit **`6db61d1`** (push `50386ad..6db61d1`; PR #1 OPEN, sem merge, sem MM-0).
 
 # C-1 REENTREGA (revisão do Codex) — gates, E2E e reprodução das correções B1/B2/B3/F4 (15/11/2026)
 
-Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/Memória de projeto/execucao-c1/rev-c1-gates.log`**.
+Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/memoria-de-projeto/execucao-c1/rev-c1-gates.log`**.
 
 ## 1. Resultados desta rodada (execução real)
 
@@ -102,7 +124,7 @@ Ambiente: o CDN do Playwright está fora da lista de hosts do sandbox; o runner 
 
 # C-1 — gates, reprodução e resultados (15/11/2026)
 
-Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/Memória de projeto/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/memoria-de-projeto/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
 
 ## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
 
@@ -118,7 +140,7 @@ Separação obrigatória: **Debian = execução da Arena** neste workspace (runt
 | Typecheck | `sh iniciar.sh typecheck` | **exit 0 / 0 erros** |
 | Lint delta | `npx eslint <25 arquivos>` agora vs. base `5720ca2` (worktree temporário + symlink `node_modules`) | **23 = 23 (0 novos)**; arquivos novos (`sessionContext.test`, `chatExecucao.test`): **0 problemas** |
 
-As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/Memória de projeto/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
+As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/memoria-de-projeto/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
 
 ## 2. Cobertura dos critérios C-1 (C-T01–05/08/16)
 
@@ -162,7 +184,7 @@ Separação obrigatória: **Debian = execução da Arena** neste workspace (runt
 | Typecheck | `sh iniciar.sh typecheck` (raiz) | **exit 0 / 0 erros** |
 | Lint delta | `PATH=platform/.runtime/node-v26.13.0-linux-x64/bin:$PATH npx eslint <arquivos>` em `platform/apps/workbench-v2`; baseline por `git worktree add /tmp/base-lint <base>` + symlink de `node_modules` | **0 novos** (ressalva: 1 = 1 pré-existente `_historica`) |
 
-As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/Memória de projeto/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/Memória de projeto/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
+As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/memoria-de-projeto/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/memoria-de-projeto/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
 
 ## 2. Windows — validação do Codex (resultados comunicados pelo proprietário)
 
