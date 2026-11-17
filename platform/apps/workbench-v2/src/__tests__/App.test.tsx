@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
 import * as sessionsClient from '../services/sessions/sessionsClient'
+import { SIDEBAR_WIDTH_DEFAULT } from '../domain/layoutPersistence'
 
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
@@ -1643,9 +1644,9 @@ describe('App session flows', () => {
     expect(handle).not.toBeNull()
     expect(body.style.getPropertyValue('--sidebar-width')).toBe('360px')
 
-    // Duplo-clique restaura o padrão (280px) e avisa.
+    // Duplo-clique restaura o padrão (270px — fidelidade ao mockup) e avisa.
     fireEvent.doubleClick(handle as HTMLElement)
-    expect(body.style.getPropertyValue('--sidebar-width')).toBe('280px')
+    expect(body.style.getPropertyValue('--sidebar-width')).toBe(`${SIDEBAR_WIDTH_DEFAULT}px`)
     const toast = await screen.findByRole('status')
     expect(toast).toHaveTextContent('Largura da barra de sessões restaurada')
   })
