@@ -1,3 +1,9 @@
+# 17/11/2026 — consolidação do encerramento técnico C-2 e publicação documental
+
+Após o autocomplete de pastas, proprietário pediu conferir se restava algo dos ajustes, atualizar documentação e subir tudo ao GitHub. Conferida árvore limpa em24bfd55 e envio anterior do código; consolidado encerramento da implementação C-2 em03/06, pronta para aceite humano final. Não adicionadas funcionalidades nem executados testes novos nesta alteração documental. Referenciados resultados reais da última entrega:141 aprovados/13 pulados, E2E17+6 e tipos/build/lint do perímetro0. Autopilot/assistência/sandbox/anexos continuam fora do recorte. Sem merge, homologação inferida ou início de próxima fatia; estados de memória e dívida C1 preservados.
+
+---
+
 # 17/11/2026 — autocomplete de diretórios da landing
 
 Implementada sugestão de diretórios conforme caminho digitado, por pedido do proprietário. Reutilizado listSessionWorkspaceDirectories/GETapi/fs/list, com AbortSignal opcional compatível. Hook próprio trata debounce180ms, listagem exata, prefixo incompleto pelo pai, erros e concorrência; App intocado. UI lista subpastas separadas das recentes e permite explorar por clique/teclado sem ativar destino. Confirmação continua na validação existente; drive sem barra aponta consistentemente para raiz.

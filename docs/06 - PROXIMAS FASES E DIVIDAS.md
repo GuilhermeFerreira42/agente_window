@@ -1,3 +1,9 @@
+# Encerramento do recorte C-2 — 17/11/2026
+
+Implementação e correções solicitadas da tela inicial/controles estão tecnicamente concluídas, publicadas até24bfd55, prontas para aceite final do proprietário. Não prolongar C-2 para habilitar recursos futuros visíveis na referência: anexos seguem C-3; Autopilot, assistência de permissões e isolamento de terminal exigem escopo/especificação próprios. Não há novo código autorizado automaticamente por este encerramento. Estado/provas em03/09, escopos originais e dívidas abaixo preservados; C1-EXCLUSAO-01 e homologações de memória não são encerradas por consequência.
+
+---
+
 # Escolha de pasta — sugestões locais disponíveis (17/11/2026)
 
 Campo de caminho da landing oferece leitura de subpastas por caminho absoluto e prefixo parcial, reutilizando API existente. Clicar sugestão explora; confirmar em Usar pasta/Enter ativa o destino validado. Não trocar root nem criar sessão só ao navegar nas sugestões. Nomes relativos continuam filtrando recentes; autocomplete não faz busca recursiva ou pesquisa remota. Preservar debounce/cancelamento e erros distintos de lista vazia. App não ganhou responsabilidades. Sem novo armazenamento, anexos, autonomia, memória ou aceite de fatia; contexto/tema/F5 continuam como em03.

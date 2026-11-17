@@ -1,3 +1,15 @@
+# Estado vigente — 17/11/2026 — implementação C-2 encerrada, pronta para aceite final
+
+**Não há nova alteração funcional pendente dos pedidos desta rodada.** A implementação C-2 e os ajustes solicitados de aparência/interação estão tecnicamente concluídos no código publicado até `24bfd55`. Proprietário pediu encerrar o prolongamento da fatia, atualizar documentação e enviar tudo à branch de trabalho. Esta consolidação é **somente documental**; não inicia outra fatia nem transforma aprovação técnica em homologação humana. O aceite final C-2 ainda não foi declarado explicitamente; `08` permanece preservado.
+
+Entregue: menu único Chat/pasta com recentes, caminho atual e sugestões de subpastas; confirmação de destino pelo fluxo existente; controles reais de modo/execução/permissão; menus descendentes; composer expansível; cores claras nos dois composers; limpeza do Explorer em Chat; F5 preservando o destino inicial; Nova sessão respeitando a visibilidade do Explorer. Estados/consultas ficam em hooks/componentes próprios, sem ampliar responsabilidades do App. O histórico abaixo detalha cada alteração e suas provas.
+
+**Últimos gates efetivamente executados, sobre a entrega funcional:** Windows/Node canônico, 141 aprovados/13 pulados em nove arquivos; C-2 E2E17/17 e C-1 E2E6/6; tipos/build/lint do perímetro exit0. Perfis sintéticos e provedor HTTP local; sem dados pessoais/APIs externas. Suíte ampla não foi repetida. Não repetir nem atribuir novo resultado de testes nesta atualização somente documental.
+
+**Fora do escopo encerrado:** anexos (+ mantido indisponível por escolha expressa, C-3), Autopilot, permissões assistidas, sandbox de terminal e demais etapas do roadmap. C1-EXCLUSAO-01 e estados M1–M8/MC1 permanecem separados. Publicação na branch `0f2e5de2-agente-window`, sem merge na base. Próxima ação: conferência/aceite final do proprietário; outra fase exige sua orientação. Entradas seguintes são históricas.
+
+---
+
 # Estado vigente — 17/11/2026 — sugestões de subpastas no caminho da landing
 
 Conforme pedido do proprietário, o menu de contexto agora lista **subpastas conforme o caminho digitado**, inclusive último segmento incompleto (consulta o pai e filtra prefixo). Usa o `GET /api/fs/list` já existente; novo hook `useWorkspaceDirectorySuggestions` cuida de debounce180ms, cancelamento e descarte de respostas antigas. Não há indexação/varredura recursiva, backend ou armazenamento novo. Caminhos locais absolutos Windows/POSIX; nome relativo continua buscando somente nas recentes. Drive `C:` é normalizado para raiz tanto na consulta quanto na confirmação.
