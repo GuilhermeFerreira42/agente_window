@@ -34,13 +34,15 @@ beforeEach(() => {
 function Monte({ onSubmit, extra }: { onSubmit: (entrada: EntradaSubmitLanding) => unknown; extra?: Record<string, unknown> }) {
   const [contexto, setContexto] = useState<'chat' | 'workspace'>('chat')
   return (
+    <>
+    <button onClick={() => setContexto('workspace')}>fixture pasta</button>
     <SessionLanding
       workspace="Nenhuma pasta aberta"
       contexto={contexto}
       onChangeContexto={setContexto}
       onSubmit={onSubmit as never}
       {...extra}
-    />
+    /></>
   )
 }
 
@@ -177,7 +179,8 @@ describe('c2Composer — C2-T11/T01 Chat × Pasta', () => {
     expect(screen.getByTestId('landing-motivo-chat')).toBeInTheDocument()
 
     // Em Pasta, o seletor de modos abre com as 4 opções.
-    fireEvent.click(screen.getByTestId('contexto-workspace'))
+    // Pasta real validada aplica o contexto pelo dono.
+    fireEvent.click(screen.getByRole('button', { name: 'fixture pasta' }))
     await user.click(screen.getByRole('button', { name: /^Modo:/ }))
     for (const rotulo of ['Agente', 'Editar', 'Perguntar', 'Planejar']) {
       expect(screen.getByRole('menuitemradio', { name: new RegExp(rotulo) })).toBeInTheDocument()
@@ -186,8 +189,8 @@ describe('c2Composer — C2-T11/T01 Chat × Pasta', () => {
 
   it('T01: default Chat com chip "Chat sem pasta", sem seletor de pasta e sem This Computer', () => {
     montar(() => true)
-    expect(screen.getByTestId('contexto-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat sem pasta')
+    expect(screen.getByTestId('landing-contexto')).toHaveTextContent('Chat')
+    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat')
     expect(screen.queryByTestId('landing-workspace-chip')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/This Computer/i)).not.toBeInTheDocument()
@@ -223,6 +226,50 @@ function MonteTentativa({ onSubmit }: { onSubmit: (entrada: EntradaSubmitLanding
 }
 
 describe('c2Composer — C2-T18/RV06 menus com teclado e retorno ao acionador', () => {
+  it('Interativo abre o menu real; Planejar e permissões compõem o mesmo snapshot', async () => {
+    const user = userEvent.setup(); const submit = vi.fn(() => false)
+    montar(submit)
+    await user.click(screen.getByRole('button', { name: 'fixture pasta' }))
+    await user.click(screen.getByTestId('landing-interativo'))
+    expect(screen.getByRole('menu', { name: 'Modo de execução' })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /Autopilot/ })).toBeDisabled()
+    await user.click(screen.getByRole('menuitemradio', { name: /Planejar/ }))
+    expect(screen.getByTestId('landing-interativo')).toHaveTextContent('Planejar')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    await user.click(screen.getByRole('button', { name: /^Permissão:/ }))
+    expect(screen.getByRole('menuitem', { name: /Permissões assistidas/ })).toBeDisabled()
+    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    expect(screen.getByRole('button', { name: /^Permissão:/ })).toHaveTextContent('Permissões manuais')
+    await user.click(screen.getByRole('button', { name: /^Permissão:/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'planejar sem editar')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ modo: 'plan', permissao: 'allow-all' }) }))
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+  })
+  it('Agente seleciona de fato; Escape e clique fora fecham o menu portado', async () => {
+    const user = userEvent.setup(); montar(() => false)
+    await user.click(screen.getByRole('button', { name: 'fixture pasta' }))
+    const trigger = screen.getByRole('button', { name: /^Modo:/ })
+    await user.click(trigger)
+    await user.keyboard('{End}{Enter}')
+    expect(trigger).toHaveTextContent('Planejar')
+    await user.click(screen.getByTestId('landing-interativo'))
+    await user.keyboard('{Escape}')
+    expect(screen.getByTestId('landing-interativo')).toHaveFocus()
+    await user.click(trigger); await user.click(document.body)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+  it('seleciona com ponteiro no atalho inferior sem o clique fora fechar antes da escolha', async () => {
+    const user = userEvent.setup()
+    montar(() => true)
+    await user.click(screen.getByTestId('landing-modelo-resumo'))
+    await user.click(await screen.findByRole('menuitemradio', { name: /Claude Sintético/ }))
+    expect(screen.getByTestId('landing-modelo-resumo')).toHaveTextContent('Claude Sintético')
+    expect(screen.getByTestId('landing-modelo-topo')).toHaveTextContent('Claude Sintético')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
   it('T18: setas movem o foco no menu; Escape devolve ao acionador que ABRIU (topo ou resumo)', async () => {
     const user = userEvent.setup()
     montar(() => true)
@@ -272,11 +319,12 @@ describe('c2Composer — C2-T04/T05/RV05 lock da tentativa (remount controlado)'
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'em voo')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    expect(screen.getByTestId('contexto-chat')).toBeDisabled()
-    expect(screen.getByTestId('contexto-workspace')).toBeDisabled()
+    expect(screen.getByTestId('landing-contexto')).toBeDisabled()
+    expect(screen.getByTestId('landing-modelo-topo')).toBeDisabled()
+    expect(screen.getByTestId('landing-modelo-resumo')).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveAttribute('readonly')
     await act(async () => { liberar?.() })
-    expect(screen.getByTestId('contexto-chat')).not.toBeDisabled()
+    expect(screen.getByTestId('landing-contexto')).not.toBeDisabled()
   })
 
   it('T05: remount da landing com criação em voo preserva rascunho e lock (estado no dono)', async () => {
@@ -297,7 +345,7 @@ describe('c2Composer — C2-T04/T05/RV05 lock da tentativa (remount controlado)'
     expect(campo()).toHaveValue('texto preservado')
     expect(campo()).toHaveAttribute('readonly')
     expect(screen.getByText('Criando conversa. Sua mensagem está preservada.')).toBeInTheDocument()
-    expect(screen.getByTestId('contexto-workspace')).toBeDisabled()
+    expect(screen.getByTestId('landing-contexto')).toBeDisabled()
 
     await act(async () => { liberar?.() })
     await waitFor(() => expect(campo()).not.toHaveAttribute('readonly'))

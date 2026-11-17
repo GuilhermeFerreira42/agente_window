@@ -1,6 +1,6 @@
 // ============================================================================
 // C-2 — landing: centro conforme 08_LAYOUT (título, faixa Chat/Pasta + seletor
-// REAL de LLM na posição de Copilot, card com textarea/toolbar, dica). Host
+// REAL de LLM na posição de Copilot, card com textarea/toolbar). Host
 // fino: estado do rascunho no hook de submissão; seleção de catálogo no hook
 // compartilhado; nenhuma regra de negócio nova aqui. This Computer AUSENTE;
 // anexos/ditado indisponíveis com motivo (sem promessa de upload/voz).
@@ -22,20 +22,17 @@ import {
   Bot,
   ChevronDown,
   CircleAlert,
-  FolderGit2,
-  MessageSquare,
   Mic,
   Plus,
   RefreshCw,
-  ShieldCheck,
-  Wand2,
 } from 'lucide-react'
+import { LandingExecutionControls } from './LandingExecutionControls'
+import { LandingContextMenu } from './LandingContextMenu'
 import { useLandingSubmission, type ControleTentativa, type SubmitLanding } from '../hooks/useLandingSubmission'
 import { useCatalogoModelos } from '../hooks/useCatalogoModelos'
 import { isNavigationKey, nextRovingIndex } from '../domain/keyboardNavigation'
 import { MODEL_AUTO, rotuloDaSelecao, tokenDaSelecao, tokenDoPar } from '../domain/selecaoModelo'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
-import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 import type { RascunhoLanding } from '../domain/landingDraft'
 
 interface SessionLandingProps {
@@ -56,7 +53,6 @@ interface SessionLandingProps {
   tentativaControlada?: ControleTentativa
   onPickWorkspace?: () => void
   onValidateWorkspacePath?: (path: string) => Promise<void>
-  onListWorkspaceDirectories?: (path: string) => Promise<Array<{ name: string; path: string }>>
   workspaceSelectionDisabledReason?: string
   workspacePickerPending?: boolean
   isFileSystemSupported?: boolean
@@ -66,34 +62,20 @@ interface SessionLandingProps {
 
 const MOTIVO_ANEXOS = 'Anexos ainda não estão disponíveis nesta versão.'
 const MOTIVO_VOZ = 'Ditado por voz ainda não está disponível nesta versão.'
-const MOTIVO_CHAT_MODO = 'Conversa Chat começa em Perguntar/manual. Para Planejar, Editar ou Agente, inicie uma conversa com pasta.'
-const MOTIVO_CHAT_PERMISSAO = 'Conversa Chat não tem pasta: "Permitir tudo" exige uma conversa workspace.'
-
-const MODOS: Array<{ id: ModoAgir; label: string }> = [
-  { id: 'agent', label: 'Agente' },
-  { id: 'edit', label: 'Editar' },
-  { id: 'ask', label: 'Perguntar' },
-  { id: 'plan', label: 'Planejar' },
-]
-
-const ROTULOS_PERMISSAO: Record<NivelPermissaoAgir, string> = {
-  manual: 'Permissões manuais',
-  'allow-all': 'Permitir tudo',
-}
-
 function useCliqueFora(
   aberto: boolean,
   wrapRef: RefObject<HTMLDivElement | null>,
   fechar: () => void,
+  outraRef?: RefObject<HTMLDivElement | null>,
 ) {
   useEffect(() => {
     if (!aberto) return
     const aoFora = (event: PointerEvent) => {
-      if (!wrapRef.current?.contains(event.target as Node)) fechar()
+      if (!wrapRef.current?.contains(event.target as Node) && !outraRef?.current?.contains(event.target as Node)) fechar()
     }
     document.addEventListener('pointerdown', aoFora, true)
     return () => document.removeEventListener('pointerdown', aoFora, true)
-  }, [aberto, wrapRef, fechar])
+  }, [aberto, wrapRef, fechar, outraRef])
 }
 
 export function SessionLanding({
@@ -105,7 +87,6 @@ export function SessionLanding({
   onSubmit,
   onPickWorkspace,
   onValidateWorkspacePath,
-  onListWorkspaceDirectories,
   workspaceSelectionDisabledReason,
   workspacePickerPending = false,
   isFileSystemSupported = true,
@@ -122,45 +103,12 @@ export function SessionLanding({
     }, rascunhoControlado && onChangeRascunho ? { rascunho: rascunhoControlado, setRascunho: onChangeRascunho } : undefined,
     tentativaControlada)
 
-  // — workspace manual (C-1, preservado) —
-  const [manualPathOpen, setManualPathOpen] = useState(!isFileSystemSupported)
-  const [manualPath, setManualPath] = useState('')
-  const [manualPathError, setManualPathError] = useState('')
-  const [manualPathPending, setManualPathPending] = useState(false)
-  const [directoryOptions, setDirectoryOptions] = useState<Array<{ name: string; path: string }>>([])
-  const [directoryListPending, setDirectoryListPending] = useState(false)
-  useEffect(() => { if (!isFileSystemSupported) setManualPathOpen(true) }, [isFileSystemSupported])
-  useEffect(() => {
-    if (!manualPathOpen || !onListWorkspaceDirectories || !manualPath.trim()) { setDirectoryOptions([]); return }
-    const path = manualPath.endsWith('/') || manualPath.endsWith('\\') ? manualPath : manualPath.replace(/[\\/][^\\/]*$/, '') || '/'
-    const timer = window.setTimeout(() => {
-      setDirectoryListPending(true)
-      void onListWorkspaceDirectories(path)
-        .then(setDirectoryOptions)
-        .catch(() => setDirectoryOptions([]))
-        .finally(() => setDirectoryListPending(false))
-    }, 120)
-    return () => window.clearTimeout(timer)
-  }, [manualPath, manualPathOpen, onListWorkspaceDirectories])
-
-  const chooseDirectory = (path: string) => {
-    const separator = path.includes('\\') && !path.includes('/') ? '\\' : '/'
-    setManualPath(path.endsWith(separator) ? path : `${path}${separator}`)
-  }
-
-  const validateManualPath = async () => {
-    if (!manualPath.trim() || !onValidateWorkspacePath) return
-    setManualPathPending(true); setManualPathError('')
-    try { await onValidateWorkspacePath(manualPath.trim()); setManualPathOpen(false) }
-    catch (error) { setManualPathError(error instanceof Error ? error.message : 'Pasta inválida') }
-    finally { setManualPathPending(false) }
-  }
-
   // — seletor REAL de LLM (posição do Copilot no frame) —
   const { itens: catalogo, erro: catalogoErro, atualizar: atualizarCatalogo } = useCatalogoModelos()
   const [modeloAberto, setModeloAberto] = useState(false)
   const [modeloAncora, setModeloAncora] = useState<'topo' | 'resumo'>('topo')
   const [catalogoCarregado, setCatalogoCarregado] = useState(false)
+  const modeloResumoWrapRef = useRef<HTMLDivElement>(null)
   const modeloWrapRef = useRef<HTMLDivElement>(null)
   const modeloBotaoRef = useRef<HTMLButtonElement>(null)
   const modeloMenuRef = useRef<HTMLDivElement>(null)
@@ -191,43 +139,15 @@ export function SessionLanding({
     // C2-RV06 — devolver o foco ao acionador da âncora ABERTA (topo ou resumo).
     if (devolverFoco) (modeloAncora === 'resumo' ? modeloResumoRef : modeloBotaoRef).current?.focus()
   }
-  useCliqueFora(modeloAberto, modeloWrapRef, () => fecharModelo(false))
+  useCliqueFora(modeloAberto, modeloWrapRef, () => fecharModelo(false), modeloResumoWrapRef)
 
   const escolherModelo = (selecao: SelecaoModelo) => {
+    if (submitPending) return
     setSelecaoModelo({ ...selecao })
     fecharModelo()
   }
 
-  // — menus de modo/permissão —
-  const [modoAberto, setModoAberto] = useState(false)
-  const modoWrapRef = useRef<HTMLDivElement>(null)
-  const modoBotaoRef = useRef<HTMLButtonElement>(null)
-  useCliqueFora(modoAberto, modoWrapRef, () => { setModoAberto(false); modoBotaoRef.current?.focus() })
-  const [permissaoAberta, setPermissaoAberta] = useState(false)
-  const permissaoWrapRef = useRef<HTMLDivElement>(null)
-  const permissaoBotaoRef = useRef<HTMLButtonElement>(null)
-  useCliqueFora(permissaoAberta, permissaoWrapRef, () => { setPermissaoAberta(false); permissaoBotaoRef.current?.focus() })
-
   const semPasta = contexto === 'chat'
-  const modoEfetivo = semPasta ? 'ask' : rascunho.modo
-  const permissaoEfetiva: NivelPermissaoAgir = semPasta ? 'manual' : rascunho.permissao
-
-  const escolherModo = (id: ModoAgir) => {
-    if (semPasta) return
-    setModo(id)
-    setModoAberto(false)
-    modoBotaoRef.current?.focus()
-  }
-  const escolherPermissao = (id: NivelPermissaoAgir) => {
-    if (semPasta) return
-    if (id === 'allow-all') {
-      const aceitou = window.confirm('ATENÇÃO — Permitir tudo: tools e comandos de terminal poderão executar sem confirmações individuais, acessar arquivos fora do workspace e modificar ou apagar dados, limitados pelos privilégios da sua conta no sistema operacional. Perguntar e Planejar continuam somente leitura; proteções do servidor e da origem local permanecem ativas. Você pode voltar a Permissões manuais a qualquer momento. Ativar?')
-      if (!aceitou) { setPermissaoAberta(false); permissaoBotaoRef.current?.focus(); return }
-    }
-    setPermissao(id)
-    setPermissaoAberta(false)
-    permissaoBotaoRef.current?.focus()
-  }
 
   // — textarea: cresce com o conteúdo até 200px (e à área útil), depois rola —
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -292,6 +212,7 @@ export function SessionLanding({
                     role="menuitemradio"
                     aria-checked={rascunho.selecaoModelo.tipo === 'auto'}
                     className="session-landing-menu-item"
+                    disabled={submitPending}
                     onClick={() => escolherModelo({ tipo: 'auto' })}
                   >
                     <Bot size={13} aria-hidden="true" />
@@ -306,6 +227,7 @@ export function SessionLanding({
                         role="menuitemradio"
                         aria-checked={tokenSelecionado === token}
                         className="session-landing-menu-item"
+                        disabled={submitPending}
                         onClick={() => escolherModelo({ tipo: 'explicita', providerId: item.providerId, modelId: item.modelId })}
                       >
                         <span><strong>{item.label}</strong><small>{item.providerId} · {item.protocol}</small></span>
@@ -316,7 +238,7 @@ export function SessionLanding({
                     <p className="session-landing-menu-vazio" role="status">Nenhum modelo configurado. Abra Provedores para adicionar.</p>
                   )}
                   {onOpenProvedores && (
-                    <button type="button" className="session-landing-menu-acoes" role="menuitem" onClick={() => { fecharModelo(false); onOpenProvedores() }}>
+                    <button type="button" className="session-landing-menu-acoes" role="menuitem" disabled={submitPending} onClick={() => { fecharModelo(false); onOpenProvedores() }}>
                       Abrir Provedores
                     </button>
                   )}
@@ -330,46 +252,11 @@ export function SessionLanding({
 
         {/* faixa superior: Chat/Pasta + contexto local + seletor de LLM */}
         <div className="session-landing-faixa" role="group" aria-label="Contexto e modelo">
-          {onChangeContexto && (
-            <div className="session-landing-contexto" role="group" aria-label="Modalidade da conversa">
-              <button
-                type="button"
-                className={`session-landing-contexto-option${contexto === 'chat' ? ' is-active' : ''}`}
-                aria-pressed={contexto === 'chat'}
-                data-testid="contexto-chat"
-                disabled={submitPending}
-                onClick={() => onChangeContexto('chat')}
-              >Chat</button>
-              <button
-                type="button"
-                className={`session-landing-contexto-option${contexto === 'workspace' ? ' is-active' : ''}`}
-                aria-pressed={contexto === 'workspace'}
-                data-testid="contexto-workspace"
-                disabled={submitPending}
-                onClick={() => onChangeContexto('workspace')}
-              >Pasta</button>
-            </div>
-          )}
-
-          {/* chips de estado (C-1 preservado): Chat sem pasta / pasta escolhida */}
-          {contexto === 'chat' && (
-            <span className="session-landing-chip" data-testid="landing-chat-chip" title="Conversa sem pasta: sem worktree, sem arquivos locais e sem Git."><MessageSquare size={14} aria-hidden="true" />Chat sem pasta</span>
-          )}
-          {contexto === 'workspace' && (onPickWorkspace || workspaceSelectionDisabledReason) ? (
-            <button
-              className="session-landing-chip is-clickable"
-              type="button"
-              title={workspaceSelectionDisabledReason ?? (isFileSystemSupported ? 'Escolher pasta real do disco' : 'File System API não suportada')}
-              aria-label={workspaceSelectionDisabledReason ? `Workspace atual: ${workspace}. ${workspaceSelectionDisabledReason}` : `Workspace atual: ${workspace}. Clique para escolher pasta real`}
-              onClick={onPickWorkspace}
-              disabled={Boolean(workspaceSelectionDisabledReason) || workspacePickerPending || submitPending}
-              aria-busy={workspacePickerPending}
-            >
-              <FolderGit2 size={14} aria-hidden="true" />{workspace}<ChevronDown size={13} aria-hidden="true" />
-            </button>
-          ) : contexto === 'workspace' ? (
-            <span className="session-landing-chip" data-testid="landing-workspace-chip"><FolderGit2 size={14} aria-hidden="true" />{workspace}</span>
-          ) : null}
+          <LandingContextMenu contexto={contexto} workspace={workspace} workspacePath={workspacePath}
+            onChangeContexto={onChangeContexto} onPickWorkspace={onPickWorkspace}
+            onValidateWorkspacePath={onValidateWorkspacePath} disabled={submitPending}
+            disabledReason={workspaceSelectionDisabledReason} pickerPending={workspacePickerPending}
+            nativeAvailable={isFileSystemSupported} />
 
           {/* seletor REAL de LLM na posição de Copilot (C2-R01/R04) */}
           <div className="session-landing-modelo-wrap" ref={modeloWrapRef}>
@@ -381,6 +268,7 @@ export function SessionLanding({
               aria-expanded={modeloAberto}
               aria-label={`Modelo: ${rotuloModelo}. Escolher modelo`}
               data-testid="landing-modelo-topo"
+              disabled={submitPending}
               onClick={() => (modeloAberto && modeloAncora === 'topo' ? fecharModelo() : abrirModelo('topo'))}
             >
               <Bot size={14} aria-hidden="true" />
@@ -390,26 +278,6 @@ export function SessionLanding({
             {modeloAncora === 'topo' && menuModelos}
           </div>
         </div>
-
-        {contexto === 'workspace' && (workspaceSelectionDisabledReason || onPickWorkspace || onValidateWorkspacePath) && (
-          <div className="session-landing-workspace-choice">
-            <p className="session-landing-workspace-hint">
-              {workspaceSelectionDisabledReason ?? (isFileSystemSupported ? <>Clique em <strong>{workspace}</strong> para escolher pasta real do disco</> : <>O seletor nativo não está disponível neste sistema.</>)}
-              {onValidateWorkspacePath && <button type="button" className="session-landing-manual-toggle" onClick={() => setManualPathOpen((value) => !value)}>Digitar caminho</button>}
-            </p>
-            {manualPathOpen && onValidateWorkspacePath && <div className="session-landing-manual-path">
-              <div className="session-landing-path-combobox">
-                <input role="combobox" aria-expanded={directoryOptions.length > 0} aria-controls="workspace-directory-options" aria-autocomplete="list" value={manualPath} onChange={(event) => { setManualPath(event.target.value); setManualPathError('') }} placeholder="/caminho/da/pasta" aria-label="Caminho manual do workspace" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void validateManualPath() } }} />
-                {(directoryOptions.length > 0 || directoryListPending) && <div id="workspace-directory-options" className="session-landing-directory-options" role="listbox" aria-label="Pastas disponíveis">
-                  {directoryListPending && <div className="session-landing-directory-loading">Listando pastas…</div>}
-                  {!directoryListPending && directoryOptions.map((directory) => <button type="button" role="option" aria-selected="false" key={directory.path} onClick={() => chooseDirectory(directory.path)}><FolderGit2 size={13} /><span>{directory.name}</span><small>{directory.path}</small></button>)}
-                </div>}
-              </div>
-              <button type="button" onClick={() => void validateManualPath()} disabled={manualPathPending || !manualPath.trim()}>{manualPathPending ? 'Validando…' : 'Usar pasta'}</button>
-              {manualPathError && <span role="alert">{manualPathError}</span>}
-            </div>}
-          </div>
-        )}
 
         {/* card do composer */}
         <form className="session-landing-input" onSubmit={submit} aria-busy={submitPending}>
@@ -440,64 +308,13 @@ export function SessionLanding({
                 data-testid="landing-anexos-indisponivel"
               ><Plus size={15} /></button>
 
-              {/* modo (esquerda) — mesmo estado do resumo inferior */}
-              <div className="session-landing-menu-wrap" ref={modoWrapRef}>
-                <button
-                  ref={modoBotaoRef}
-                  type="button"
-                  className="session-landing-pill"
-                  aria-haspopup="menu"
-                  aria-expanded={modoAberto}
-                  aria-label={semPasta
-                    ? `Modo: Perguntar (único em Chat). ${MOTIVO_CHAT_MODO}`
-                    : `Modo: ${MODOS.find((item) => item.id === modoEfetivo)?.label ?? modoEfetivo}`}
-                  title={semPasta ? MOTIVO_CHAT_MODO : 'Modo da conversa'}
-                  disabled={semPasta}
-                  onClick={() => setModoAberto((value) => !value)}
-                ><Wand2 size={13} aria-hidden="true" />{MODOS.find((item) => item.id === modoEfetivo)?.label ?? modoEfetivo}<ChevronDown size={12} aria-hidden="true" /></button>
-                {modoAberto && !semPasta && (
-                  <div className="session-landing-menu" role="menu" aria-label="Modos" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setModoAberto(false); modoBotaoRef.current?.focus(); return } navegarNoMenu(event) }}>
-                    {MODOS.map((item) => (
-                      <button key={item.id} type="button" role="menuitemradio" aria-checked={rascunho.modo === item.id} className="session-landing-menu-item" onClick={() => escolherModo(item.id)}>
-                        <span><strong>{item.label}</strong></span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <span className="session-landing-status-pill" data-testid="landing-interativo" title="Estado do composer">Interativo</span>
-
-              {/* permissão */}
-              <div className="session-landing-menu-wrap" ref={permissaoWrapRef}>
-                <button
-                  ref={permissaoBotaoRef}
-                  type="button"
-                  className={`session-landing-pill${permissaoEfetiva === 'allow-all' ? ' is-risky' : ''}`}
-                  aria-haspopup="menu"
-                  aria-expanded={permissaoAberta}
-                  aria-label={semPasta
-                    ? `Permissão: Permissões manuais (única em Chat). ${MOTIVO_CHAT_PERMISSAO}`
-                    : `Permissão: ${ROTULOS_PERMISSAO[permissaoEfetiva]}`}
-                  title={semPasta ? MOTIVO_CHAT_PERMISSAO : 'Permissões da conversa'}
-                  disabled={semPasta}
-                  onClick={() => setPermissaoAberta((value) => !value)}
-                ><ShieldCheck size={13} aria-hidden="true" />{ROTULOS_PERMISSAO[permissaoEfetiva]}<ChevronDown size={12} aria-hidden="true" /></button>
-                {permissaoAberta && !semPasta && (
-                  <div className="session-landing-menu" role="menu" aria-label="Permissões" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setPermissaoAberta(false); permissaoBotaoRef.current?.focus(); return } navegarNoMenu(event) }}>
-                    {(['manual', 'allow-all'] as const).map((id) => (
-                      <button key={id} type="button" role="menuitemradio" aria-checked={rascunho.permissao === id} className="session-landing-menu-item" onClick={() => escolherPermissao(id)}>
-                        <span><strong>{ROTULOS_PERMISSAO[id]}</strong>{id === 'allow-all' && <small>Requer confirmação a cada ativação</small>}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <LandingExecutionControls modo={rascunho.modo} permissao={rascunho.permissao}
+                semPasta={semPasta} pending={submitPending} onModo={setModo} onPermissao={setPermissao} />
             </div>
 
             <div className="session-landing-toolbar-right">
               {/* resumo/atalho inferior: espelha a MESMA seleção do topo */}
-              <div className="session-landing-menu-wrap session-landing-modelo-resumo-wrap">
+              <div className="session-landing-menu-wrap session-landing-modelo-resumo-wrap" ref={modeloResumoWrapRef}>
                 <button
                   ref={modeloResumoRef}
                   type="button"
@@ -506,6 +323,7 @@ export function SessionLanding({
                   aria-expanded={modeloAberto}
                   aria-label={`Resumo do modelo: ${rotuloModelo}`}
                   data-testid="landing-modelo-resumo"
+                  disabled={submitPending}
                   onClick={() => (modeloAberto && modeloAncora === 'resumo' ? fecharModelo() : abrirModelo('resumo'))}
                 ><Bot size={13} aria-hidden="true" />{rotuloModelo}<ChevronDown size={12} aria-hidden="true" /></button>
                 {modeloAncora === 'resumo' && menuModelos}
@@ -539,10 +357,6 @@ export function SessionLanding({
         )}
 
         {submitPending && <p role="status">Criando conversa. Sua mensagem está preservada.</p>}
-
-        <div className="session-landing-dica" data-testid="landing-dica">
-          <strong>Dica:</strong> quer começar outra tarefa? Inicie uma nova conversa para trabalhar nela em seguida.
-        </div>
 
         {contexto === 'chat' && (
           <p className="session-landing-motivo" data-testid="landing-motivo-chat">

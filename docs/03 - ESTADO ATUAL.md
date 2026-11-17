@@ -1,3 +1,27 @@
+# Estado vigente — 17/11/2026 — controles da landing corrigidos; publicação autorizada
+
+Proprietário autorizou commit e push dos ajustes da tela inicial e solicitou corrigir Agente/Interativo/permissões. `LandingExecutionControls` passou a ser dono apenas da apresentação desses controles; recebe modo/permissão do rascunho existente, sem estado de execução paralelo nem alteração no App.tsx. **Interativo deixou de ser texto estático:** abre a seção de execução, alterna Interativo/Planejar e compartilha o menu de permissões. O seletor de modos mantém Agente/Editar/Perguntar/Planejar. Menus abrem acima da barra, fora do recorte dos ancestrais, com teclado/Escape/clique fora e retorno de foco.
+
+Manual/Permitir tudo continuam reais; cada ativação de Permitir tudo exige confirmação. Planejar conserva o modo somente leitura do servidor. Chat continua Perguntar/manual; Autopilot, permissões assistidas e sandbox ainda indisponíveis e indicados como tais. **Decisão explícita adicional do proprietário: manter o botão + desabilitado até C-3.** Não antecipar anexos nem interpretar a publicação como aceite de todas as fatias.
+
+Validação final Windows: **130 aprovados/13 pulados** em sete arquivos; foco landing **35/35**; **E2E C-2 14/14 + C-1 6/6**. J14 prova abertura/visibilidade dos três menus em 1872×1080 e 800×600, seleção efetiva de Planejar, confirmação de permissão e primeiro pedido real ao backend com `mode: plan`. Typecheck/build/lint do perímetro **exit 0**. Apenas perfis descartáveis e provedor HTTP local; ampla não repetida e APIs externas não chamadas. Capturas e logs em `memoria-de-projeto/ajuste-landing-2026-11-17/`, fora do Git.
+
+Publicação autorizada na branch de trabalho `0f2e5de2-agente-window`, sem merge na base. Revisão a identificar pelo Git desta entrega. App.tsx preservado; canônico08 intocado; C1-EXCLUSAO-01 e M1–M8/MC1 mantêm estados separados. O menu único de contexto/histórico e a retirada das dicas continuam conforme registro abaixo. Entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — ajuste da tela inicial, aguardando validação humana
+
+Por autorização expressa do proprietário, a landing agora usa **um único menu de contexto**, como na referência fornecida: Chat, pastas recentes e campo para buscar/digitar caminho dentro do mesmo menu. **A faixa de dicas foi removida.** Esta decisão substitui somente os requisitos anteriores de dois botões Chat/Pasta e tip box; os contratos C-1/C-2 de segurança, seleção e publicação continuam vigentes.
+
+`LandingContextMenu` concentra a interação e consulta sob demanda o histórico já existente (`GET /api/workspaces/recent`, até dez pastas), sem novo armazenamento. Toda escolha recente/manual passa pela mesma validação e atualização de Explorer. Erros preservam caminho/rascunho. `SessionLanding` compõe o novo menu e corrige o fechamento indevido do seletor inferior de modelos por clique fora; contexto/modelo/modo/permissão ficam bloqueados durante envio. **App.tsx intocado** nesta rodada; nenhuma nova responsabilidade nele.
+
+Windows/Node canônico: regressão dirigida **128 aprovados / 13 pulados** (sete arquivos); foco landing **33/33**; navegador C-2 **13/13**, incluindo histórico após F5 e limites da coluna em 800×600/1872×1080; C-1 **6/6**; typecheck/build/lint do perímetro **exit 0**. Perfis sintéticos, provedor HTTP local controlado; sem dados reais nem chamadas a provedores externos. Suíte ampla não repetida nesta rodada. O seletor nativo não foi operado manualmente; falha/cancelamento continuam usando a porta existente e saída por caminho manual.
+
+Evidências externas: pasta operacional `ajuste-landing-2026-11-17/` (SPEC_AJUSTE, scripts/logs, gates.json e capturas). Sem commit/push/merge; C-2 segue sem aceite humano atribuído; C1-EXCLUSAO-01, M1–M8/MC1 e próximas fatias conservam seus estados. O servidor existente na porta 5174 foi preservado e respondeu HTTP 200. Entradas seguintes são históricas.
+
+---
+
 # Estado vigente — 13/11/2026 (6) — C-2 IMPLEMENTADA; correções do parecer RV01–RV08; gates verdes; aguarda homologação
 
 **C-2 (tela central, sessões e composer) implementada na branch `0f2e5de2-agente-window`** contra o pacote `memoria-de-projeto/C-2/C-2/` (matriz `04` C2-T01..T30 + 8 jornadas; parecer `parecer/PARECER_C_2.md` com achados RV01–RV08). Entrega em duas etapas: commit `7b0292e` (landing do centro com seletor LLM real no lugar do Copilot, rascunho do App, adaptação 800×600) e a correção dos achados do parecer no mesmo working tree (RV01 seleção explícita preservada no primeiro envio; RV02 publicação confirmada antes do run com retry na MESMA sessão; RV03 rascunho do rascunho; RV04 Chats × grupos de projeto separados com contagem; RV05 menus/foco; RV06 `Contexto não medido` no composer; RV07 título/faixa/tip box na composição da referência). Sem "This Computer", textos PT-BR, LLMs reais no seletor; recursos das referências fora do escopo não aparecem como funcionais.

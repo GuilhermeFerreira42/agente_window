@@ -5069,6 +5069,10 @@ svg {
 .session-landing-menu-item > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .session-landing-menu-item small { color: var(--vscode-descriptionForeground); font-size: 11px; }
 .session-landing-menu-item[aria-checked='true']::after { content: '✓'; margin-left: auto; color: var(--vscode-focusBorder); font-weight: 700; }
+.landing-execution-popup { z-index: 10000; min-width: 0; box-sizing: border-box; font-size: 13px; }
+.landing-execution-popup .landing-execution-heading { align-items: center; justify-content: space-between; border-bottom: 1px solid var(--vscode-widget-border); border-radius: 0; }
+.landing-execution-popup button:disabled { opacity: .45; cursor: default; }
+.landing-execution-popup .session-landing-menu-item:disabled:hover { background: transparent; }
 .session-landing-menu-erro { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 8px; color: var(--vscode-errorForeground); font-size: 12px; }
 .session-landing-menu-erro button { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; }
 .session-landing-menu-vazio { margin: 0; padding: 6px 8px; color: var(--vscode-descriptionForeground); font-size: 12px; }
@@ -5099,18 +5103,17 @@ svg {
   text-align: center;
 }
 .session-landing-aviso button { border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; text-decoration: underline; }
-.session-landing-dica {
-  margin: 20px 0 0;
-  padding: 6px 10px;
-  text-align: left;
-  color: var(--vscode-descriptionForeground);
-  font-size: 12px;
-  line-height: 18px;
-  border: 1px solid var(--vscode-widget-border);
-  border-radius: var(--vscode-cornerRadius-medium, 6px);
-  background: transparent;
-}
-.session-landing-dica strong { color: var(--vscode-foreground); font-weight: 600; }
+.session-landing-context-menu { position: relative; min-width: 0; }
+.session-landing-context-menu > button { max-width: 260px; }
+.session-landing-context-menu > button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-landing-context-dialog { box-sizing: border-box; width: 500px; max-width: min(500px, calc(100vw - 32px)); min-width: 0; }
+.session-landing-context-dialog > input { box-sizing: border-box; width: 100%; padding: 5px 8px; margin-bottom: 4px; border: 1px solid var(--vscode-input-border, var(--vscode-widget-border)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); font: inherit; }
+.session-landing-context-recents { max-height: min(230px, 30vh); overflow: auto; border-block: 1px solid var(--vscode-widget-border); }
+.session-landing-context-dialog p { margin: 6px 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+.session-landing-context-dialog p[role='alert'] { color: var(--vscode-errorForeground); }
+.session-landing-context-dialog .session-landing-menu-item small { overflow-wrap: anywhere; }
+.session-landing-context-dialog button:disabled { opacity: .5; cursor: default; }
+.session-landing-context-dialog .session-landing-menu-acoes { display: flex; align-items: center; gap: 8px; width: 100%; }
 .session-landing-motivo { margin: 8px 0 0; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
 
 /* ── FATIA 14 (SPEC 2H v1): acréscimos da tela REAL de Personalizações ────────

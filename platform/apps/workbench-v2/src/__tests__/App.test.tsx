@@ -2301,8 +2301,8 @@ describe('C-T05 — landing Chat/Pasta (App)', () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
-    expect(screen.getByTestId('contexto-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat sem pasta')
+    expect(screen.getByTestId('landing-contexto')).toHaveTextContent('Chat')
+    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat')
     expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
   })
 
@@ -2322,23 +2322,18 @@ describe('C-T05 — landing Chat/Pasta (App)', () => {
     expect(salva?.workspacePath).toBeNull()
   })
 
-  it('Pasta sem pasta escolhida não cria sessão e explica o motivo', async () => {
-    vi.mocked(sessionsClient.persistSession).mockClear()
+  it('caminho inválido não cria sessão e preserva o rascunho', async () => {
+    vi.spyOn(sessionsClient, 'validateSessionWorkspace').mockRejectedValueOnce(new Error('Pasta inexistente'))
     vi.mocked(sessionsClient.createSessionWorktree).mockClear()
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
-    await user.click(screen.getByTestId('contexto-workspace'))
-    expect(screen.getByRole('button', { name: /Workspace atual/ })).toBeInTheDocument()
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'preciso escolher pasta')
-    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
-    expect(await screen.findByText(/Escolha uma pasta real do disco/)).toBeInTheDocument()
-    // A fila de persistência regrava sessões carregadas em background; o
-    // critério é que a mensagem da landing NÃO vire sessão.
-    const titulos = vi.mocked(sessionsClient.persistSession).mock.calls.map((chamada) => chamada[0]?.title)
-    expect(titulos).not.toContain('preciso escolher pasta')
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.type(screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' }), '/inexistente{Enter}')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pasta inexistente')
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('preciso escolher pasta')
     expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
-    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
   })
 
   it('erro nativo do seletor: aviso honesto, rascunho preservado e nada criado', async () => {
@@ -2349,17 +2344,17 @@ describe('C-T05 — landing Chat/Pasta (App)', () => {
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'rascunho preservado')
-    await user.click(screen.getByTestId('contexto-workspace'))
-    await user.click(screen.getByRole('button', { name: /Workspace atual/ }))
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.click(screen.getByRole('button', { name: 'Abrir pasta…' }))
     // C-T05 — erro nativo: estado/foco preservados, sem fallback de raiz.
-    expect(await screen.findByText(/Seletor nativo indisponível/)).toBeInTheDocument()
+    expect((await screen.findAllByText(/Seletor nativo indisponível/)).length).toBeGreaterThan(0)
     expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('rascunho preservado')
     expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
     const titulos = vi.mocked(sessionsClient.persistSession).mock.calls.map((chamada) => chamada[0]?.title)
     expect(titulos).not.toContain('rascunho preservado')
     expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
     // O caminho manual fica disponível como saída honesta.
-    expect(await screen.findByRole('button', { name: 'Digitar caminho' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' })).toBeInTheDocument()
   })
 })
 
@@ -2523,9 +2518,8 @@ describe('C-1/rodada2 — envio durante a validação da pasta', () => {
     const user = userEvent.setup()
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
-    await user.click(screen.getByTestId('contexto-workspace'))
-    await user.click(screen.getByRole('button', { name: 'Digitar caminho' }))
-    const campoCaminho = screen.getByLabelText('Caminho manual do workspace')
+    await user.click(screen.getByTestId('landing-contexto'))
+    const campoCaminho = screen.getByLabelText('Buscar ou digitar caminho da pasta')
     await user.type(campoCaminho, '/tmp/c1-rodada2-ws')
     await user.type(campoCaminho, '{Enter}')
 

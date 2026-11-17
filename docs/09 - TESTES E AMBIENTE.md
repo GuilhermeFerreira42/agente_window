@@ -1,3 +1,34 @@
+# 17/11/2026 — revalidação dos controles da barra da landing
+
+Sobre a rodada do menu único, testes finais com Node26 canônico/Chrome Windows e perfis isolados: **35/35** nas três suítes da landing; **130 aprovados/13 pulados** nos sete arquivos já listados abaixo; **14/14 C-2 + 6/6 C-1**. Typecheck/build e lint do perímetro (agora incluindo `LandingExecutionControls.tsx`) exit0. Os resultados anteriores abaixo permanecem históricos.
+
+Novas provas em `c2Composer.test.tsx`: Interativo abre menu real; Planejar altera o snapshot; cancelar confirmação preserva manual, confirmar muda allow-all; teclado/seleção/Escape/clique fora funcionam após portal. **J14** em `e2e/c2_centro.spec.ts`: três menus em1872×1080 e800×600 com caixa dentro do viewport, escolha de Planejar, confirmação de Permitir tudo e `/api/agir` real recebe `mode: plan`, resposta completa da fixture. Capturas `toolbar_*` e logs finais `regressao.log`, `unit.log`, `e2e-c2-original.log`, `e2e-c1.log`, `gates.json` na pasta operacional externa `ajuste-landing-2026-11-17/`. Não houve APIs remotas, dados pessoais ou suíte ampla nesta rodada; diálogo nativo manual não foi testado.
+
+Anexos continuam C-3 por decisão explícita do proprietário; não testar upload nesta entrega nem considerar + uma ação de upload funcional. Nenhuma prova habilita Autopilot, assistência de permissões ou sandbox. Repetir comandos e pré-condições de isolamento da seção abaixo, agora com14 jornadas C-2.
+
+---
+
+# 17/11/2026 — Windows: ajuste da landing (base bb6857a)
+
+Node 26.13.0 do runtime versionado, Chrome instalado, perfis externos descartáveis com `test-profile.cjs`, credenciais removidas. Nenhum dado real/provedor remoto. O servidor de uso na porta 5174 foi preservado; servidores de teste nas portas 5211/5212 são próprios das suítes e encerrados por elas.
+
+| Verificação | Resultado observado |
+|---|---|
+| LandingContextMenu + SessionLanding + c2Composer | 33 aprovados |
+| Os três acima + App + c2PrimeiroEnvio + c2Arquitetura + c2SessaoLateral | 128 aprovados, 13 pulados, sete arquivos |
+| E2E C-2 `e2e/c2_centro.spec.ts` | 13/13; servidor real + provedor HTTP local estrito |
+| E2E C-1 `e2e/c1_correcoes.spec.ts` | 6/6; Chat sem FS/permission, Pasta, validação pendente, migração e falha assíncrona |
+| Typecheck / build Vite | exit 0 / exit 0 |
+| ESLint: componentes LandingContextMenu/SessionLanding, sessionsClient e seus três testes focais | exit 0 |
+
+**Reprodução:** após preparar o runtime e um perfil isolado conforme as regras abaixo, executar Vitest com um worker (`--maxWorkers=1 --minWorkers=1`) nos sete arquivos citados em `src/__tests__`; typecheck com `tsc --noEmit -p tsconfig.app.json`; build com `vite build`. Runners Windows de navegador existentes: `platform/scripts/e2e-c2.ps1` e `e2e-c1.ps1` na raiz, com o Node canônico no PATH. As specs criam seus perfis e fixtures e continuam portáveis para Linux. Não executar em perfil pessoal.
+
+**Provas novas:** histórico só é carregado ao abrir o menu; caminhos homônimos mantêm identidade; validação recusada deixa texto e caminho intactos; falha de histórico não se disfarça de lista vazia; Enter/teclado/Escape/clique fora; exclusão de duas opções separadas e dicas; atalho inferior seleciona modelo por ponteiro; trava de escolhas durante envio. J13 usa backend real, registra pasta, reabre após F5 e compara caixa do menu com a coluna e o viewport, além de capturas em 1872×1080 e 800×600.
+
+**Limites:** suíte ampla não repetida; avisos conhecidos de fixtures/React `act` e `NO_COLOR` não são considerados falhas nem removidos dos logs. Não houve chamada Google/NVIDIA, homologação humana, interação manual com diálogo nativo, commit/push/merge. Logs/scripts/capturas extensos ficam fora do Git em `memoria-de-projeto/ajuste-landing-2026-11-17/`. Não declarar paridade de toda a aplicação nem aprovação de C-2 por estes gates.
+
+---
+
 # C-2 — gates da entrega (Debian/Arena, 13/11/2026) — AGUARDA HOMOLOGAÇÃO + GATE WINDOWS
 
 **Escopo:** correções do parecer C-2 (RV01–RV08) sobre `7b0292e`, branch `0f2e5de2-agente-window`. Execução **Debian = Arena**; **Windows não executado**; E2E com backend controlado (fixture de provedor local); provedores reais não pagos chamados. Evidências em `/home/user/memoria-de-projeto/execucao-c2/`.

@@ -98,7 +98,8 @@ describe('SessionLanding (estado inicial vazio)', () => {
   it('aciona o seletor de workspace do servidor', async () => {
     const user = userEvent.setup(); const onPickWorkspace = vi.fn()
     render(<SessionLanding workspace="workspace-local" contexto="workspace" onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
-    await user.click(screen.getByRole('button', { name: /Workspace atual: workspace-local/ }))
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.click(screen.getByRole('button', { name: 'Abrir pasta…' }))
     expect(onPickWorkspace).toHaveBeenCalledTimes(1)
   })
 
@@ -121,16 +122,12 @@ describe('SessionLanding (estado inicial vazio)', () => {
     expect(input).toHaveValue('mensagem preservada')
   })
 
-  it('explica a escolha e permite caminho manual validado quando o diálogo não existe', async () => {
-    const user = userEvent.setup(); const onValidateWorkspacePath = vi.fn().mockResolvedValue(undefined)
-    const onListWorkspaceDirectories = vi.fn().mockResolvedValue([{ name: 'home', path: '/home' }, { name: 'tmp', path: '/tmp' }])
-    render(<SessionLanding workspace="workspace-local" contexto="workspace" onSubmit={() => {}} onPickWorkspace={() => {}} onValidateWorkspacePath={onValidateWorkspacePath} onListWorkspaceDirectories={onListWorkspaceDirectories} isFileSystemSupported={false} />)
-    expect(screen.getByText(/seletor nativo não está disponível/i)).toBeInTheDocument()
-    await user.type(screen.getByRole('combobox', { name: 'Caminho manual do workspace' }), '/')
-    await user.click(await screen.findByRole('option', { name: /home/ }))
-    expect(screen.getByRole('combobox', { name: 'Caminho manual do workspace' })).toHaveValue('/home/')
-    await user.click(screen.getByRole('button', { name: 'Usar pasta' }))
-    expect(onValidateWorkspacePath).toHaveBeenCalledWith('/home/')
+  it('permite caminho manual mesmo sem seletor nativo', async () => {
+    const user = userEvent.setup(); const validate = vi.fn().mockResolvedValue(undefined)
+    render(<SessionLanding workspace="fixture" onSubmit={() => {}} onValidateWorkspacePath={validate} isFileSystemSupported={false} />)
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.type(screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' }), '/home{Enter}')
+    expect(validate).toHaveBeenCalledWith('/home')
   })
 
   it('suporta bloqueio explícito com motivo sem chamar o seletor', async () => {
@@ -141,40 +138,13 @@ describe('SessionLanding (estado inicial vazio)', () => {
   })
 })
 
-// C-1 (SPEC C §2) — modalidade explícita na landing: Chat é o DEFAULT, sem
-// pasta, sem seletor de pasta; Pasta aparece só após escolha explícita.
-describe('SessionLanding — C-1 modalidade Chat/Pasta', () => {
-  it('C-T05 — default é Chat: chip "Chat sem pasta" e NENHUM seletor de pasta visível', () => {
-    const onPickWorkspace = vi.fn()
-    render(<SessionLanding workspace="Nenhuma pasta aberta" contexto="chat" onChangeContexto={() => {}} onSubmit={() => {}} onPickWorkspace={onPickWorkspace} onValidateWorkspacePath={async () => undefined} />)
-    expect(screen.getByTestId('contexto-chat')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat sem pasta')
-    expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
-    expect(screen.queryByText(/seletor nativo não está disponível/i)).not.toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: 'Caminho manual do workspace' })).not.toBeInTheDocument()
-  })
-
-  it('C-T05 — alternar para Pasta notifica onChangeContexto e, com o estado aplicado, revela o seletor', async () => {
-    const user = userEvent.setup()
-    const onChangeContexto = vi.fn()
-    const onPickWorkspace = vi.fn()
-    const { rerender } = render(<SessionLanding workspace="repo-x" contexto="chat" onChangeContexto={onChangeContexto} onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
-    expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
-    await user.click(screen.getByTestId('contexto-workspace'))
-    expect(onChangeContexto).toHaveBeenCalledWith('workspace')
-    rerender(<SessionLanding workspace="repo-x" contexto="workspace" onChangeContexto={onChangeContexto} onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
-    expect(screen.getByRole('button', { name: /Workspace atual: repo-x/ })).toBeInTheDocument()
-    expect(screen.queryByTestId('landing-chat-chip')).not.toBeInTheDocument()
-  })
-
-  it('C-T05 — em Pasta, escolher pasta dispara onPickWorkspace; em Chat o chip não dispara nada', async () => {
-    const user = userEvent.setup()
-    const onPickWorkspace = vi.fn()
-    const { rerender } = render(<SessionLanding workspace="repo-x" contexto="chat" onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
-    expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
-    rerender(<SessionLanding workspace="repo-x" contexto="workspace" onSubmit={() => {}} onPickWorkspace={onPickWorkspace} />)
-    await user.click(screen.getByRole('button', { name: /Workspace atual: repo-x/ }))
-    expect(onPickWorkspace).toHaveBeenCalledTimes(1)
+// C-1: Chat continua sem raiz; a escolha agora vive em um único menu.
+describe('SessionLanding — contexto único', () => {
+  it('default Chat, sem dicas e sem botões separados Chat/Pasta', () => {
+    render(<SessionLanding workspace="Nenhuma pasta aberta" contexto="chat" onChangeContexto={() => {}} onSubmit={() => {}} />)
+    expect(screen.getByTestId('landing-contexto')).toHaveTextContent('Chat')
+    expect(screen.queryByTestId('contexto-workspace')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('landing-dica')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
-

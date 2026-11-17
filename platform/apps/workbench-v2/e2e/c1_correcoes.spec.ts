@@ -343,13 +343,12 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
 
     // Jornada Pasta na landing: modalidade Pasta → caminho manual validado.
     await page.getByRole('button', { name: 'Nova sessão' }).first().click()
-    await page.getByTestId('contexto-workspace').click()
-    await page.getByRole('button', { name: 'Digitar caminho' }).click()
-    await page.getByLabel('Caminho manual do workspace').fill(PASTA)
-    await page.getByLabel('Caminho manual do workspace').press('Enter')
+    await page.getByTestId('landing-contexto').click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(PASTA)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
     // Pasta escolhida (pendência da landing): a landing segue visível com o
     // caminho validado no cabeçalho — o 1º envio cria a sessão workspace.
-    await expect(page.getByRole('button', { name: 'Workspace atual' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('landing-contexto')).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 15_000 })
 
     const marcas = coletor.marcar()
     await page.getByLabel('Mensagem para a nova sessão').fill(`${marca} Pasta primeira mensagem`)
@@ -394,10 +393,9 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     })
 
     await page.getByRole('button', { name: 'Nova sessão' }).first().click()
-    await page.getByTestId('contexto-workspace').click()
-    await page.getByRole('button', { name: 'Digitar caminho' }).click()
-    await page.getByLabel('Caminho manual do workspace').fill(PASTA)
-    await page.getByLabel('Caminho manual do workspace').press('Enter')
+    await page.getByTestId('landing-contexto').click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(PASTA)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
 
     // Validação em voo (segurada pelo gate) → envia ENQUANTO carrega.
     const rascunho = `${marca} Pasta durante validacao`
@@ -425,10 +423,9 @@ test.describe('C-1 — correções integradas (servidor real + navegador + backe
     await configurarProvedor(page, (provedor!.address() as { port: number }).port)
     await resetApp(page)
     await page.getByRole('button', { name: 'Nova sessão' }).first().click()
-    await page.getByTestId('contexto-workspace').click()
-    await page.getByRole('button', { name: 'Digitar caminho' }).click()
-    await page.getByLabel('Caminho manual do workspace').fill(PASTA)
-    await page.getByLabel('Caminho manual do workspace').press('Enter')
+    await page.getByTestId('landing-contexto').click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(PASTA)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
     await expect(page.getByText(/Workspace selecionado/)).toBeVisible()
     await expect(page.getByRole('tree', { name: 'Files Explorer' })).toBeVisible()
 

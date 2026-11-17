@@ -1,3 +1,17 @@
+# Esclarecimento de escopo — 17/11/2026: barra da landing
+
+Agente, Interativo/Planejar e permissões agora usam controles reais e o mesmo rascunho do primeiro envio; componentes próprios, sem mais lógica no App. **Proprietário escolheu expressamente manter anexos na C-3:** + permanece indisponível com motivo. Autopilot/permissões assistidas/sandbox não foram implementados apenas por constarem da referência visual. Publicação dos ajustes autorizada, sem avanço automático de fatia nem alteração de limites de segurança. Provas atuais em03/09; dívida C1-EXCLUSAO-01 preservada.
+
+---
+
+# Atualização de escopo C-2 — 17/11/2026
+
+Decisão direta do proprietário: **menu único Chat/pasta com histórico e caminho digitável dentro da lista; retirar dicas da landing**. Não restaurar os dois botões separados nem o tip box por seguir versões anteriores do pacote C-2. Histórico e validação reutilizam o servidor existente; a modalidade/raiz de conversas já criadas continua imutável. Modelos e permissões mantêm seus contratos reais; anexos/voz/funcionalidades futuras continuam indisponíveis com motivo.
+
+Ajuste técnico implementado e validado conforme 03/09; aguarda inspeção visual/homologação do proprietário. App.tsx não foi alterado, sem declarar quitada a dívida arquitetural anterior. C1-EXCLUSAO-01 continua registrada. Nenhuma próxima fatia foi iniciada ou aceita automaticamente. O pacote ZIP C-2 v2 anterior é histórico quanto a estes dois requisitos visuais; prevalecem esta orientação e o estado vigente em 03.
+
+---
+
 # Próximas fases — C-2 implementada em 13/11/2026; aguarda homologação e gate Windows
 
 **C-2 implementada e documentada (13/11/2026), aguardando homologação.** Entrega na branch `0f2e5de2-agente-window` (commit `7b0292e` + correções RV01–RV08 no mesmo working tree): landing central com seletor LLM real, seleção explícita preservada no primeiro envio (RV01), publicação confirmada antes do run com retry na mesma sessão (RV02), rascunho preservado (RV03), lateral `Chats × grupos` separada (RV04), menus/foco (RV05), estado `Contexto não medido` (RV06), composição da referência (RV07) e 12 jornadas E2E verdes (RV08). Gates: typecheck 0 · FOCO 422+13+0 · lint 111=111 · build 0 · E2E 12/12. Evidências em `memoria-de-projeto/execucao-c2/`. **Pendências:** execução do `VALIDAR_C2_WINDOWS.ps1` (Windows), comparação de screenshots com as referências do parecer e **homologação humana** (nenhum aceite inferido; `08` intocado). Sem merge (PR #1 OPEN).

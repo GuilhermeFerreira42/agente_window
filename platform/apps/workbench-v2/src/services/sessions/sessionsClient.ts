@@ -9,6 +9,16 @@ export interface WorkspaceDirectoryEntry { name: string; path: string; isDir: tr
 export interface WorkspaceDirectoryListing { path: string; realpath: string; parent: string; folders: WorkspaceDirectoryEntry[]; error?: string }
 export interface CreatedWorktree { slug: string; path: string | null; branch: string | null; repoRoot: string }
 
+export async function listRecentSessionWorkspaces(): Promise<string[]> {
+  const response = await expectOk(await fetch('/api/workspaces/recent'))
+  const body: unknown = await response.json()
+  const paths = body && typeof body === 'object' && 'paths' in body ? body.paths : null
+  if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string')) {
+    throw new Error('Histórico de pastas inválido.')
+  }
+  return paths.filter((path: string) => path.trim()).slice(0, 10)
+}
+
 export async function validateSessionWorkspace(path: string): Promise<WorkspaceDescriptor> {
   const response = await expectOk(await fetch('/api/workspaces/validate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }),

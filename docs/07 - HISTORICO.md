@@ -1,3 +1,19 @@
+# 17/11/2026 — controles reais da barra da landing; commit/push autorizados
+
+Após o menu único de contexto, proprietário apontou Agente/Interativo/permissões e autorizou publicação na branch de trabalho. Extraído `LandingExecutionControls`: Interativo antes era span, agora seletor; Planejar usa o modo existente, permissões usam o nível existente com confirmação para Permitir tudo. Menu único alterna seções de execução e permissões, enquanto o seletor de modos preserva os quatro modos atuais. Popups portados ao body evitam corte por ancestrais; posicionamento acima da barra, teclado e foco verificados. Nenhum novo estado/regra no App, backend ou armazenamento paralelo.
+
+Usuário confirmou por resposta explícita: + fica desabilitado até C-3. Recursos não implementados da referência continuam indisponíveis; sem upload antecipado, novos grants ou Autopilot. Foco35/35, regressão130/13/0, E2E C2 14/14 e C1 6/6, tipos/build/lint do perímetro0, perfis sintéticos e fixture HTTP local. 03/06/07/09 atualizados,08 intocado, sem merge ou próxima fatia. Evidências externas na pasta operacional do ajuste.
+
+---
+
+# 17/11/2026 — Codex: menu único da landing e correção de controles
+
+Base local recebida limpa em `bb6857a`. Proprietário autorizou implementar menu único Chat/pastas, histórico e caminho manual dentro do menu, retirada de dicas e correção dos controles. Criado `LandingContextMenu`; adicionada porta cliente para o endpoint de recentes já existente, sem novo backend/storage. Retirado o antigo formulário externo da landing. Corrigida detecção de clique fora do seletor inferior de modelos, e travados os seletores durante envio.
+
+App.tsx preservado byte a byte nesta rodada. Testes C-1/C-2 adaptados ao novo fluxo, mantendo provas de Chat sem filesystem, validação pendente, falha de criação/publicação e rascunho preservado. Novo cenário integrado prova histórico real após F5, escolha de recente, retorno a Chat e viewport pequeno. Capturas revelaram corte por ancestral e, depois, medição desatualizada após mudança responsiva; correção limita à coluna e observa seu redimensionamento. Evidência final em 09 e na memória operacional externa. Sem commit/push/merge, aceite humano ou avanço de fatia.
+
+---
+
 # 13/11/2026 (6) — C-2 implementada; achados RV01–RV08 do parecer corrigidos; gates verdes; aguarda homologação
 
 Implementação da C-2 na branch `0f2e5de2-agente-window` a partir do pacote `memoria-de-projeto/C-2/C-2/` e do parecer independente (`parecer/PARECER_C_2.md`, RV01–RV08). Duas etapas: **`7b0292e`** (landing do centro com seletor LLM real no lugar do Copilot, rascunho do App no composer, adaptação 800×600, sem "This Computer", PT-BR) e a **correção dos oito achados do parecer** no mesmo working tree — RV01 seleção explícita de provedor/modelo/permissão/mode confirmada no primeiro envio; RV02 `esperarPublicacao` publica ANTES de iniciar o run, com retry na MESMA sessão via banner `Tentar novamente`; RV03 rascunho do landing é fonte única e preservado em recusa/erro; RV04 `Chats` e grupos de projeto separados na lateral com contagem; RV05 menus e foco do composer; RV06 chip `Contexto não medido`; RV07 composição da referência (título 26/600, faixa colada ao card 800×86, tip box abaixo); RV08 jornadas T19–T30 implementadas em `e2e/c2_centro.spec.ts`.
