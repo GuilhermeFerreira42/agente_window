@@ -5111,6 +5111,7 @@ svg {
 .session-landing-context-dialog { box-sizing: border-box; width: 500px; max-width: min(500px, calc(100vw - 32px)); min-width: 0; }
 .session-landing-context-dialog > input { box-sizing: border-box; width: 100%; padding: 5px 8px; margin-bottom: 4px; border: 1px solid var(--vscode-input-border, var(--vscode-widget-border)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); font: inherit; }
 .session-landing-context-recents { max-height: min(230px, 30vh); overflow: auto; border-block: 1px solid var(--vscode-widget-border); }
+.session-landing-directory-suggestions { max-height: min(180px, 25vh); overflow: auto; border-top: 1px solid var(--vscode-widget-border); }
 .session-landing-context-dialog p { margin: 6px 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }
 .session-landing-context-dialog p[role='alert'] { color: var(--vscode-errorForeground); }
 .session-landing-context-dialog .session-landing-menu-item small { overflow-wrap: anywhere; }

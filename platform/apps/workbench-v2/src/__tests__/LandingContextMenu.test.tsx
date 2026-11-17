@@ -2,14 +2,38 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LandingContextMenu } from '../components/LandingContextMenu'
-import { listRecentSessionWorkspaces } from '../services/sessions/sessionsClient'
+import { listRecentSessionWorkspaces, listSessionWorkspaceDirectories } from '../services/sessions/sessionsClient'
 
-vi.mock('../services/sessions/sessionsClient', () => ({ listRecentSessionWorkspaces: vi.fn() }))
-beforeEach(() => { vi.mocked(listRecentSessionWorkspaces).mockReset().mockResolvedValue(['/a/repo', '/b/repo']) })
+vi.mock('../services/sessions/sessionsClient', () => ({ listRecentSessionWorkspaces: vi.fn(), listSessionWorkspaceDirectories: vi.fn() }))
+beforeEach(() => {
+  vi.mocked(listRecentSessionWorkspaces).mockReset().mockResolvedValue(['/a/repo', '/b/repo'])
+  vi.mocked(listSessionWorkspaceDirectories).mockReset().mockResolvedValue({ path: '/', realpath: '/', parent: '/', folders: [] })
+})
 const props = () => ({ contexto: 'chat' as const, workspace: 'Nenhuma pasta aberta', workspacePath: null,
   onChangeContexto: vi.fn(), onValidateWorkspacePath: vi.fn().mockResolvedValue(undefined) })
 
 describe('LandingContextMenu — contexto único antes da criação', () => {
+  it('confirma drive sem barra como raiz, igual à consulta de sugestões', async () => {
+    const user = userEvent.setup(); const p = props(); render(<LandingContextMenu {...p} />)
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.type(screen.getByRole('textbox'), 'C:{Enter}')
+    expect(p.onValidateWorkspacePath).toHaveBeenCalledWith('C:\\')
+  })
+  it('explora subpastas sem ativar workspace; somente Usar pasta confirma o destino', async () => {
+    vi.mocked(listSessionWorkspaceDirectories)
+      .mockResolvedValueOnce({ path: 'C:\\base', realpath: 'C:\\base', parent: 'C:\\', folders: [{ name: 'filha', path: 'C:\\base\\filha', isDir: true }] })
+      .mockResolvedValue({ path: 'C:\\base\\filha', realpath: 'C:\\base\\filha', parent: 'C:\\base', folders: [] })
+    const user = userEvent.setup(); const p = props(); render(<LandingContextMenu {...p} />)
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.type(screen.getByRole('textbox'), 'C:\\base')
+    await screen.findByRole('button', { name: /Explorar pasta: filha/ })
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(screen.getByRole('textbox')).toHaveValue('C:\\base\\filha\\')
+    expect(p.onValidateWorkspacePath).not.toHaveBeenCalled()
+    expect(await screen.findByText('Nenhuma subpasta encontrada.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /Usar pasta:/ }))
+    expect(p.onValidateWorkspacePath).toHaveBeenCalledWith('C:\\base\\filha\\')
+  })
   it('mostra o caminho selecionado sem esconder as demais recentes até a edição', async () => {
     const user = userEvent.setup(); const p = props()
     render(<LandingContextMenu {...p} contexto="workspace" workspace="/a/repo" workspacePath="/a/repo" />)

@@ -1,3 +1,11 @@
+# 17/11/2026 — autocomplete de diretórios da landing
+
+Implementada sugestão de diretórios conforme caminho digitado, por pedido do proprietário. Reutilizado listSessionWorkspaceDirectories/GETapi/fs/list, com AbortSignal opcional compatível. Hook próprio trata debounce180ms, listagem exata, prefixo incompleto pelo pai, erros e concorrência; App intocado. UI lista subpastas separadas das recentes e permite explorar por clique/teclado sem ativar destino. Confirmação continua na validação existente; drive sem barra aponta consistentemente para raiz.
+
+Testes: regressão141 aprovados/13 pulados (nove arquivos), C2E2E17/17 e C1E2E6/6, tipos/build/lint do perímetro0. J17 com filesystem sintético real comprova duas descidas, filtro de arquivos, negativa de permissão, rascunho preservado, ausência de validação/LLM ao explorar e confirmação final única. Hook testado contra resposta antiga após abort. Docs03/06/07/09 atualizados,08 intacto; sem ampla/API externa/dados reais/aceite/avanço de fase. Evidências na memória operacional externa.
+
+---
+
 # 17/11/2026 — corrigidos tema claro, caminho, Explorer, F5 e Nova sessão
 
 Proprietário trouxe cinco capturas/comportamentos. Reprodução integrada J16 com conversa já existente confirmou fundo escuro nos dois composers, input vazio apesar da pasta selecionada, árvore antiga após escolher Chat, F5 abrindo conversa anterior e Nova sessão reabrindo Explorer fechado. Corrigidos tokens centrais claros, prefill/busca do menu e transição para Chat; extraído `useLandingContext` com destino booleano best-effort e sem persistir pastas/grants. App perdeu duas linhas; removida abertura forçada do Explorer, acrescentado apenas wiring do guarda existente de arquivos não salvos.

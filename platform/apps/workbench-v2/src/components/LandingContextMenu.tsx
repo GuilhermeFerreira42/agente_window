@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, FolderOpen, MessageSquare } from 'lucide-react'
 import { listRecentSessionWorkspaces } from '../services/sessions/sessionsClient'
+import { normalizeDirectoryQuery, useWorkspaceDirectorySuggestions } from '../hooks/useWorkspaceDirectorySuggestions'
 
 interface Props {
   contexto: 'chat' | 'workspace'
@@ -33,6 +34,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
   const input = useRef<HTMLInputElement>(null)
   const inFlight = useRef(false)
   const locked = disabled || Boolean(disabledReason) || pickerPending || validating
+  const suggestions = useWorkspaceDirectorySuggestions(open, query)
   const close = (focus = true) => { setOpen(false); if (focus) trigger.current?.focus() }
 
   useEffect(() => {
@@ -75,11 +77,17 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
     if (locked || inFlight.current || !onValidateWorkspacePath || !path.trim()) return
     inFlight.current = true; setValidating(true); setError('')
     try {
-      await onValidateWorkspacePath(path.trim())
+      await onValidateWorkspacePath(normalizeDirectoryQuery(path))
       setQuery(''); close()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível abrir esta pasta.')
     } finally { inFlight.current = false; setValidating(false) }
+  }
+  const browse = (path: string) => {
+    if (locked) return
+    const separator = path.includes('\\') ? '\\' : '/'
+    setQuery(/[\\/]$/.test(path) ? path : path + separator)
+    setEdited(true); setError(''); input.current?.focus()
   }
   const paths = [...new Set([...(workspacePath ? [workspacePath] : []), ...recent])]
     .filter((path) => !edited || path.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -103,7 +111,12 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
         if (event.target === input.current && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
         const current = items.findIndex((item) => item === document.activeElement)
+        const suggested = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-directory-suggestion]:not(:disabled)'))
+        if (event.target === input.current && suggested.length) {
+          event.preventDefault(); (event.key === 'ArrowUp' ? suggested[suggested.length - 1] : suggested[0])?.focus(); return
+        }
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+          : current < 0 ? (event.key === 'ArrowUp' ? items.length - 1 : 0)
           : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length
         if (items[next]) { event.preventDefault(); items[next].focus() }
       }}>
@@ -115,6 +128,17 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
         aria-pressed={contexto === 'chat'} onClick={() => { onChangeContexto?.('chat'); close() }}>
         <MessageSquare size={14} aria-hidden="true" /><span>Chat<small>Conversa sem pasta</small></span>
       </button>
+      {(suggestions.pending || suggestions.error || suggestions.available) && <div className="session-landing-directory-suggestions" role="group" aria-label="Subpastas disponíveis">
+        <p>Subpastas</p>
+        {suggestions.pending && <p role="status">Buscando subpastas…</p>}
+        {suggestions.error && !error && <p role="alert">{suggestions.error}</p>}
+        {suggestions.available && suggestions.folders.length === 0 && <p role="status">Nenhuma subpasta encontrada.</p>}
+        {suggestions.folders.map((folder) => <button key={folder.path} type="button" className="session-landing-menu-item"
+          data-directory-suggestion disabled={locked} title={folder.path} aria-label={`Explorar pasta: ${folder.name}. ${folder.path}`}
+          onClick={() => browse(folder.path)}>
+          <FolderOpen size={14} aria-hidden="true" /><span><strong>{folder.name}</strong><small>{folder.path}</small></span><ChevronDown size={12} aria-hidden="true" />
+        </button>)}
+      </div>}
       <div className="session-landing-context-recents" aria-label="Pastas recentes">
         {loading && <p role="status">Carregando pastas recentes…</p>}
         {recentError && <p role="status">Não foi possível carregar o histórico. Você pode digitar um caminho.</p>}

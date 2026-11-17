@@ -1,3 +1,13 @@
+# 17/11/2026 — autocomplete de subpastas: gates Windows
+
+Runtime Node26 canônico, Chrome e perfis descartáveis: **141 aprovados/13 pulados**, nove arquivos (oito da rodada anterior mais `workspaceDirectorySuggestions.test.tsx`); **C-2 E2E17/17 + C-1 E2E6/6**; typecheck/build/lint do hook/menu/porta cliente/testes alterados **exit0**. Ampla não repetida; não chamadas APIs reais de LLM nem dados pessoais. Scripts/logs/captura e gates.json externos em `memoria-de-projeto/autocomplete-pastas-2026-11-17/`; mesmas pré-condições de isolamento das rodadas abaixo.
+
+Hook: não consultar FS com menu fechado, vazio ou busca relativa; Windows parcial consulta pai/filtra prefixo; `C:` consulta raiz; resposta velha nunca substitui resultado novo mesmo se serviço ignora abort; permissão negada distinta de pasta vazia. UI: teclado explora sem validar; Usar pasta confirma pelo callback existente; drive normalizado também ao confirmar.
+
+**J17 integrado:** árvore real em perfil temporário, consulta por prefixo, clique em pasta/filha e recuperação do conteúdo, nenhuma validação ou chamada de modelo durante exploração; somente diretórios (arquivo fixture ausente da lista); negativa de permissão controlada e retomada; rascunho preservado e confirmação final única. Captura `landing_autocomplete_subpastas.png` conferida. J1–J16 e C-1 reexecutados; nenhum resultado atribui homologação humana. App.tsx não foi alterado.
+
+---
+
 # 17/11/2026 — correções de estado/tema/navegação da landing
 
 | Gate Windows (Node26 canônico/Chrome) | Resultado |

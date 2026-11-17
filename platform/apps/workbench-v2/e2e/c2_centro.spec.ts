@@ -16,7 +16,7 @@
 // REGRA DA CASA: todo teste tem pelo menos um `expect` (e2eAssertionContract).
 // =============================================================================
 import { spawn, type ChildProcess } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
@@ -719,6 +719,47 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     await expect(page.locator('.chat-input-container')).toBeVisible()
     expect.soft(await page.locator('.chat-input-container').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 255, 255)')
     await page.getByRole('button', { name: 'Mudar para tema escuro' }).click()
+  })
+
+  test('J17 — explorar diretórios por caminho e prefixo sem ativar workspace até confirmar', async ({ page }) => {
+    const base = join(raiz, 'explorar')
+    const child = join(base, 'alpha', 'filha')
+    mkdirSync(child, { recursive: true }); mkdirSync(join(base, 'beta'), { recursive: true })
+    writeFileSync(join(base, 'arquivo-nao-diretorio.txt'), 'fixture')
+    await abrirApp(page)
+    await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+    const validates: string[] = []
+    page.on('request', (request) => { if (request.url().includes('/api/workspaces/validate')) validates.push(request.url()) })
+    const calls = chamadasProvedor
+    await campo(page).fill('rascunho enquanto exploro pastas')
+    await page.getByTestId('landing-contexto').click()
+    const input = page.getByLabel('Buscar ou digitar caminho da pasta')
+    await input.fill(join(raiz, 'explo'))
+    await page.getByRole('button', { name: /Explorar pasta: explorar/ }).click()
+    await page.getByRole('button', { name: /Explorar pasta: alpha/ }).click()
+    await page.getByRole('button', { name: /Explorar pasta: filha/ }).click()
+    await expect(input).toHaveValue(child + (child.includes('\\') ? '\\' : '/'))
+    await expect(page.getByRole('group', { name: 'Subpastas disponíveis' }).getByText('Nenhuma subpasta encontrada.')).toBeVisible()
+    expect(validates).toHaveLength(0)
+    expect(chamadasProvedor).toBe(calls)
+    await expect(page.getByTestId('landing-contexto')).toContainText('Chat')
+    expect(await campo(page).inputValue()).toBe('rascunho enquanto exploro pastas')
+    await input.fill(base)
+    await expect(page.getByRole('button', { name: /Explorar pasta: beta/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /arquivo-nao-diretorio/ })).toHaveCount(0)
+    await shot(page, 'landing_autocomplete_subpastas')
+    await page.route('**/api/fs/list?**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ path: '/', realpath: '/', parent: '/', folders: [], error: 'permission' }) })
+    })
+    await input.fill(join(raiz, 'negada'))
+    await expect(page.getByRole('group', { name: 'Subpastas disponíveis' }).getByRole('alert')).toContainText('Sem permissão')
+    await page.unroute('**/api/fs/list?**')
+    await input.fill(child)
+    await expect(page.getByText('Nenhuma subpasta encontrada.')).toBeVisible()
+    await page.getByRole('button', { name: /Usar pasta:/ }).click()
+    await expect(page.getByTestId('landing-contexto')).toContainText('filha')
+    expect(validates).toHaveLength(1)
+    expect(chamadasProvedor).toBe(calls)
   })
 
 })

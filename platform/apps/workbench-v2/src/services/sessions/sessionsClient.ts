@@ -33,8 +33,8 @@ export async function pickSessionWorkspace(): Promise<WorkspaceDescriptor | unde
   return ((await response.json()) as { workspace: WorkspaceDescriptor | null }).workspace ?? undefined
 }
 
-export async function listSessionWorkspaceDirectories(path: string): Promise<WorkspaceDirectoryListing> {
-  const response = await expectOk(await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`))
+export async function listSessionWorkspaceDirectories(path: string, signal?: AbortSignal): Promise<WorkspaceDirectoryListing> {
+  const response = await expectOk(await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`, { signal }))
   return response.json() as Promise<WorkspaceDirectoryListing>
 }
 

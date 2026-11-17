@@ -1,3 +1,9 @@
+# Escolha de pasta — sugestões locais disponíveis (17/11/2026)
+
+Campo de caminho da landing oferece leitura de subpastas por caminho absoluto e prefixo parcial, reutilizando API existente. Clicar sugestão explora; confirmar em Usar pasta/Enter ativa o destino validado. Não trocar root nem criar sessão só ao navegar nas sugestões. Nomes relativos continuam filtrando recentes; autocomplete não faz busca recursiva ou pesquisa remota. Preservar debounce/cancelamento e erros distintos de lista vazia. App não ganhou responsabilidades. Sem novo armazenamento, anexos, autonomia, memória ou aceite de fatia; contexto/tema/F5 continuam como em03.
+
+---
+
 # Comportamento vigente da landing — tema/contexto/recarga (17/11/2026)
 
 Nova sessão preserva a visibilidade e a view ativa da Side Bar; não chamar `showView('explorer')` apenas para abrir a landing. F5 mantém o destino inicial quando o usuário estava nele; escolher conversa existente volta a preservar a conversa pelo mecanismo atual. Preferência de destino é UI, sem persistir conteúdo/permissões/pasta pendente. Trocar para Chat remove seleção da landing e árvore anterior, sem apagar histórico de pastas ou arquivos; alterações não salvas bloqueiam a troca pelo guarda existente. Menu mostra caminho atual ao abrir e filtra recentes somente após edição. Tema claro também cobre os dois composers. Gates em03/09; nenhuma dívida anterior, etapa de memória ou fase futura aceita por consequência.

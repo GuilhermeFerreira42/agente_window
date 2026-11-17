@@ -1,3 +1,15 @@
+# Estado vigente — 17/11/2026 — sugestões de subpastas no caminho da landing
+
+Conforme pedido do proprietário, o menu de contexto agora lista **subpastas conforme o caminho digitado**, inclusive último segmento incompleto (consulta o pai e filtra prefixo). Usa o `GET /api/fs/list` já existente; novo hook `useWorkspaceDirectorySuggestions` cuida de debounce180ms, cancelamento e descarte de respostas antigas. Não há indexação/varredura recursiva, backend ou armazenamento novo. Caminhos locais absolutos Windows/POSIX; nome relativo continua buscando somente nas recentes. Drive `C:` é normalizado para raiz tanto na consulta quanto na confirmação.
+
+Clicar numa subpasta preenche o novo caminho e explora o conteúdo, mantendo rascunho/contexto/Explorer intactos. Setas e Enter permitem explorar com teclado. **Usar pasta ou Enter no campo** confirmam pelo mesmo fluxo de validação existente; recentes conservam a seleção direta. Erro de permissão, caminho inválido, carregamento e pasta vazia são estados distintos; novas consultas não recebem resultados do caminho anterior. App.tsx intocado.
+
+Windows: **141 aprovados/13 pulados** em nove arquivos; **E2E C-2 17/17 + C-1 6/6**; tipos/build/lint do perímetro **exit0**. J17 usa árvore real descartável, prefixo parcial, dois níveis, exclusão de arquivos da lista, erro de permissão controlado e confirmação final; prova nenhuma validação/ativação/LLM durante exploração, só uma validação ao confirmar. Testes de hook incluem resposta fora de ordem mesmo se a porta ignorar abort. Dados sintéticos/provedor HTTP local; ampla e APIs externas não executadas. Capturas/logs externos: `memoria-de-projeto/autocomplete-pastas-2026-11-17/`.
+
+Publicação na branch de trabalho sob autorização vigente, sem merge, aceite humano ou próxima fase. + continua C-3, guardas de Chat e de alterações não salvas preservados. Entradas seguintes históricas.
+
+---
+
 # Estado vigente — 17/11/2026 — cinco correções de tema/contexto/navegação da landing
 
 Corrigidos os cinco achados do proprietário: **tema claro** agora define o fundo/cores centrais dos composers da landing e das conversas; **menu de contexto** preenche o caminho selecionado e mantém outras recentes visíveis até editar a busca; **voltar para Chat** limpa a seleção pendente e desmonta a árvore do Explorer; **F5 na landing** permanece na tela inicial; **Nova sessão** preserva aba/visibilidade atuais da Side Bar em vez de forçar o Explorer aberto.
