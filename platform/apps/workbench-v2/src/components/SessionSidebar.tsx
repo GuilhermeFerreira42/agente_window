@@ -20,11 +20,12 @@ import {
   Search,
   SlidersHorizontal,
   Trash2,
+  Wand2,
   Wrench,
   X,
 } from 'lucide-react'
 import type { NestedChat, Session, SessionStatus } from '../types'
-import { PERSONALIZATION_SECTIONS, PersonalizationIcon, type PersonalizationSection } from '../bairros/2-inteligencia/casas/personalizacoes'
+import type { PersonalizationSection } from '../bairros/2-inteligencia/casas/personalizacoes'
 import { ContextMenu, type ContextMenuState } from './ContextMenu'
 import { DragTypes, canReorderSessions } from '../domain/dragAndDrop'
 import {
@@ -324,8 +325,6 @@ export function SessionSidebar({
   onRemoveGroup,
   onOpenBeside,
 }: SessionSidebarProps) {
-  const [personalizationsCollapsed, setPersonalizationsCollapsed] = useState(() => { try { return localStorage.getItem('workbench.personalizations.collapsed') === 'true' } catch { return false } })
-  useEffect(() => { try { localStorage.setItem('workbench.personalizations.collapsed', String(personalizationsCollapsed)) } catch { /* private/quota */ } }, [personalizationsCollapsed])
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -502,6 +501,9 @@ export function SessionSidebar({
       customGroupLabels,
       (presentIds, labelOf) => orderCustomGroups(sectionOrder, presentIds, labelOf),
       grouping,
+      // C-2 (R12): projeção lateral liga quando o dono já carrega `contexto`
+      // (C-1); fixtures sem contexto seguem o modo legado (R10).
+      sessions.some((session) => session.contexto !== undefined),
     ),
     [sessions, filters, sortMode, activeSessionId, sectionOrder, grouping],
   )
@@ -579,7 +581,14 @@ export function SessionSidebar({
     const contentId = `sessions-section-${encodeURIComponent(name)}`
     const hiddenOlderCount = totalCount - items.length
     return (
-      <section className="session-section-block" key={name}>
+      <section
+        className="session-section-block"
+        key={name}
+        data-testid={group.section.kind === 'contexto'
+          ? (group.section.contexto === 'chat' ? 'sidebar-secao-chats' : 'sidebar-grupo-pasta')
+          : undefined}
+        data-workspace-path={group.section.kind === 'contexto' ? (group.section.workspacePath ?? undefined) : undefined}
+      >
         <button
           className="session-section-header"
           type="button"
@@ -588,14 +597,15 @@ export function SessionSidebar({
           onClick={() => setCollapsedSections((current) => ({ ...current, [name]: !collapsed }))}
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-          {group.section.kind === 'workspace' && <Folder size={13} />}
+          {(group.section.kind === 'workspace' || (group.section.kind === 'contexto' && group.section.contexto === 'workspace')) && <Folder size={13} />}
+          {group.section.kind === 'contexto' && group.section.contexto === 'chat' && <MessageCircle size={13} />}
           <span>{group.label}</span>
           <span className="session-section-count">{totalCount}</span>
         </button>
         {!collapsed && <div id={contentId} className="session-section-content">
           {visibleWorkspaces.map((workspace) => (
             <div key={`${name}-${workspace}`}>
-              {group.section.kind !== 'workspace' && <div className="workspace-section-header"><Folder size={12} /><span>{workspace}</span></div>}
+              {group.section.kind !== 'workspace' && group.section.kind !== 'contexto' && <div className="workspace-section-header"><Folder size={12} /><span>{workspace}</span></div>}
               {(grouped[workspace] ?? []).map((session) => (
                 <SessionRow
                   key={`${name}-${session.id}`}
@@ -683,6 +693,7 @@ export function SessionSidebar({
           <>
             <span className="sessions-sidebar-title">Sessões{totalVisible !== sessions.length && <span className="sessions-count">{totalVisible}/{sessions.length}</span>}</span>
             <div className="sessions-header-actions">
+              {onOpenPersonalizations && <button className="toolbar-button sessions-personalizacoes" type="button" title="Personalizações" aria-label="Personalizações" data-testid="sidebar-personalizacoes" onClick={() => onOpenPersonalizations('visao')}><Wand2 size={14} /></button>}
               <button className="toolbar-button sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>Novo</button>
               <button ref={filterButtonRef} className="toolbar-button" type="button" title="Filtros de sessões" aria-label="Filtros de sessões" aria-haspopup="menu" aria-expanded={filtersOpen || contextMenu?.label === 'Opções das sessões'} onClick={openSessionOptions}><SlidersHorizontal size={14}/></button>
               <button ref={searchButtonRef} className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => { setFiltersOpen(false); setSearchOpen(true) }}><Search size={14} /></button>
@@ -734,10 +745,6 @@ export function SessionSidebar({
           {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
         </div>}
       </div>
-      {onOpenPersonalizations && <section className="personalizations-shortcuts" aria-label="Atalhos de Personalizações">
-        <button className="personalizations-shortcuts-header" type="button" aria-expanded={!personalizationsCollapsed} onClick={() => setPersonalizationsCollapsed(value => !value)}><span>Personalizações</span>{personalizationsCollapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}</button>
-        {!personalizationsCollapsed && <div>{PERSONALIZATION_SECTIONS.map(section => <button type="button" key={section.id} onClick={() => onOpenPersonalizations(section.id)}><PersonalizationIcon section={section.id}/>{section.label}</button>)}</div>}
-      </section>}
       <ContextMenu menu={contextMenu} onClose={() => {
         if (contextMenu?.label === 'Opções das sessões') filterButtonRef.current?.focus()
         setContextMenu(null)

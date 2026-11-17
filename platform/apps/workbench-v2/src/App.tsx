@@ -25,6 +25,9 @@ import { manageHistoryAccess } from './services/sessions/historyAccessClient'
 import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
+import { executarPrimeiroEnvio } from './domain/primeiroEnvio'
+import { rascunhoInicial, type RascunhoLanding } from './domain/landingDraft'
+import type { EntradaSubmitLanding } from './hooks/useLandingSubmission'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
 import { continuarAgir, enviarAgir, prepararExecucaoAgir, responderAguardarComando, responderAprovacao, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
@@ -163,6 +166,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // C-1 (SPEC C §2) — modalidade da landing: Chat é o DEFAULT; Pasta exige
   // escolha explícita de pasta real (sem fallback 'workspace-local').
   const [landingContexto, setLandingContexto] = useState<'chat' | 'workspace'>('chat')
+  const [rascunhoLanding, setRascunhoLanding] = useState<RascunhoLanding>(rascunhoInicial)
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
@@ -1413,92 +1417,69 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     } finally { setWorkspacePickerPending(false) }
   }
 
-  // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
-  // digitada na landing, derivando o título do texto (paridade com o original).
-  const handleLandingSubmit = async (text: string): Promise<boolean> => {
-    // Ressalva do reteste 16/11 — envio durante seleção/carregamento da pasta:
-    // recusa VISÍVEL com texto devolvido (SessionLanding devolve o campo quando
-    // recebemos `false`). Antes estes guardas retornavam em silêncio com o
-    // campo já esvaziado — exatamente a ocorrência relatada no Windows.
-    if (workspacePickerPending) {
-      notify('A pasta ainda está sendo escolhida; envie a mensagem de novo.')
-      return false
-    }
-    if (workspaceChangePending) {
-      notify('A pasta ainda está sendo validada; envie a mensagem de novo.')
-      return false
-    }
-    if (!editorFilesSaved()) return false
-    const id = crypto.randomUUID()
-    const chatId = `${id}-main`
-    const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
-    // C-1 (SPEC C §2/§4) — Pasta exige pasta escolhida (sem fallback
-    // 'workspace-local'); Chat nasce sem raiz, sem worktree, sem /fs e sem Git.
-    if (landingContexto === 'workspace' && !selectedWorkspace) {
+  // — C-2 — abertura pós-criação: as MESMAS atualizações do fluxo da C-1
+  // (seed da view nova + auxiliar + recursos de BOOT + foco), sem regra nova.
+  const abrirSessaoCriada = (sessao: Session) => {
+    const seededLayout = seedCreatedFromNewSession(newSessionState)
+    setAuxiliaryTab(seededLayout.activeViewContainerId)
+    removeSessionResources(BOOT_SESSION_ID)
+    setSessions((current) => [sessao, ...current.filter((s) => s.id !== sessao.id)])
+    setActiveChatBySession((current) => ({ ...current, [sessao.id]: `${sessao.id}-main` }))
+    setActiveSessionId(sessao.id)
+    setVisibleSessionIds([sessao.id])
+    setNewSessionLanding(false)
+    setSelectedWorkspace(undefined)
+    setLandingContexto('chat')
+    layoutSyncRef.current?.setPreviousResource(sessao.id)
+    setMobilePane('chat')
+  }
+
+  // — C-2 — primeiro envio: guardas do shell + controlador de fases (domain) +
+  // portas de efeito. O snapshot do rascunho É o primeiro pedido (par exato,
+  // modo/permissão efetivos); nenhuma seleção default vence aqui e não há
+  // agendamento após o create — publicação explícita na mesma sequência.
+  const handleLandingSubmit = async (entrada: EntradaSubmitLanding): Promise<boolean> => {
+    const { snapshot, confirmada, aoConfirmar, aoEncerrar } = entrada
+    // Ressalva do reteste 16/11 — recusa VISÍVEL com texto devolvido.
+    const motivoPasta = workspacePickerPending ? 'A pasta ainda está sendo escolhida; envie a mensagem de novo.'
+      : workspaceChangePending ? 'A pasta ainda está sendo validada; envie a mensagem de novo.'
+      : null
+    if (motivoPasta) { notify(motivoPasta); aoEncerrar(null); return false }
+    if (!editorFilesSaved()) { aoEncerrar(null); return false }
+    // C-1 — Pasta exige pasta escolhida (sem fallback 'workspace-local').
+    if (snapshot.contexto === 'workspace' && !selectedWorkspace) {
       notify('Escolha uma pasta real do disco para começar uma conversa workspace.')
+      aoEncerrar(null)
       return false
     }
-    try {
-      const seededLayout = seedCreatedFromNewSession(newSessionState)
-      setAuxiliaryTab(seededLayout.activeViewContainerId)
-      let next: Session
-      if (landingContexto === 'chat') {
-        next = {
-          id,
-          title,
-          workspace: 'Chat',
-          workspacePath: null,
-          worktreePath: null,
-          contexto: { tipo: 'chat' },
-          section: 'today',
-          status: 'completed',
-          updated: 'agora',
-          diffAdded: 0,
-          diffRemoved: 0,
-          branch: null,
-          chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-          mainChatId: chatId,
-        }
-      } else {
-        const workspace = selectedWorkspace!
-        const worktree = await createSessionWorktree(workspace.path, workspace.slug, id)
-        next = {
-          id,
-          title,
-          workspace: workspace.name,
-          workspacePath: worktree.repoRoot,
-          worktreePath: worktree.path,
-          slug: worktree.slug,
-          contexto: { tipo: 'workspace' },
-          section: 'today',
-          status: 'completed',
-          updated: 'agora',
-          diffAdded: 0,
-          diffRemoved: 0,
-          branch: worktree.branch,
-          chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-          mainChatId: chatId,
-        }
-      }
-      // F1: registrar sessão/contexto no servidor antes de abrir qualquer execução Agir.
-      await persistSession(next)
-      removeSessionResources(BOOT_SESSION_ID)
-      setSessions((current) => [next, ...current])
-      setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
-      setActiveSessionId(id)
-      setVisibleSessionIds([id])
-      setNewSessionLanding(false)
-      setSelectedWorkspace(undefined)
-      setLandingContexto('chat')
-      layoutSyncRef.current?.setPreviousResource(id)
-      setMobilePane('chat')
-      window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
-      return true
-    } catch (error) {
-      console.error('[sessions] session creation failed', error)
-      notify(error instanceof Error ? error.message : 'Falha ao criar a conversa')
-      return false
-    }
+    const resultado = await executarPrimeiroEnvio({
+      snapshot,
+      confirmada,
+      aoConfirmar,
+      aoEncerrar,
+      gerarId: () => crypto.randomUUID(),
+      portas: {
+        // A mesma validação/criação de worktree de sempre (slug do dono).
+        criarWorktree: async (caminhoRaiz, id) => {
+          const slug = selectedWorkspace?.path === caminhoRaiz ? selectedWorkspace.slug : caminhoRaiz.split(/[\\/]/).filter(Boolean).pop() ?? 'pasta'
+          const worktree = await createSessionWorktree(caminhoRaiz, slug, id)
+          return { repoRoot: worktree.repoRoot, path: worktree.path, slug: worktree.slug, branch: worktree.branch }
+        },
+        persistir: async (sessao) => { await persistSession(sessao) },
+        publicar: async (sessao, chatId, snap) => {
+          abrirSessaoCriada(sessao)
+          // PRIMEIRO pedido: snapshot explícito (par exato + modo/permissão
+          // efetivos + a sessão já persistida — sem leitura de closure).
+          handleSend(snap.texto, [], { sessionId: sessao.id, chatId }, snap.selecaoModelo, {
+            modo: snap.modo,
+            permissao: snap.permissao,
+            sessao,
+          })
+        },
+      },
+    })
+    if (!resultado.ok && resultado.motivo) notify(resultado.motivo)
+    return resultado.ok
   }
 
   const handleToggleArchived = (id: string) => {
@@ -1922,13 +1903,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     aoConcluir?: () => void,
     modelSelection: SelecaoModelo = { tipo: 'auto' },
     instrucaoHumana?: string,
+    // C-2: snapshot explícito do primeiro envio (modo/permissão/sessão já
+    // persistida). Sem opções, o chat continua sendo a fonte — nunca default.
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session },
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
-    const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
-    // Espelho vivo (não o snapshot do closure): o envio vindo da landing é
-    // agendado com setTimeout e o estado novo já está no ref quando roda.
-    const sessaoPreparacao = sessionsRef.current.find(session => session.id === sessionId)
+    const modo = (opcoes?.modo ?? modeByChat[runKey] ?? 'agent') as ModoAgir
+    // Espelho vivo (não o snapshot do closure) para envios de chat existente;
+    // o primeiro envio traz a sessão recém-persistida (mesmo tick, sem
+    // agendamento — o ref ainda não a contém).
+    const sessaoPreparacao = opcoes?.sessao ?? sessionsRef.current.find(session => session.id === sessionId)
     if (!sessaoPreparacao) {
       // Sem snapshot não há como resolver a modalidade — falha honesta.
       notify('Sessão não encontrada para preparar a execução.')
@@ -1939,7 +1924,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // (autoridade do servidor) e a sincronização acontece só em workspace.
     const semPasta = sessaoSemPasta(sessaoPreparacao)
     const permissionKey = semPasta ? null : `${runKey}:${sessaoPreparacao.worktreePath ?? sessaoPreparacao.workspacePath}`
-    const permissao = permissionKey === null ? 'manual' : (permissionByChat[permissionKey] ?? 'manual')
+    const permissao = opcoes?.permissao ?? (permissionKey === null ? 'manual' : (permissionByChat[permissionKey] ?? 'manual'))
     const fluxo = `${sessionId}:${chatId}:${responseId}`
     const ouvintes = criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir)
     let real: ControleAgir | null = null
@@ -2078,7 +2063,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     agirAtivas.current.set(runKey, controle)
   }
 
-  const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }, modelSelection: SelecaoModelo = { tipo: 'auto' }) => {
+  const handleSend = (
+    text: string,
+    attachments: Attachment[],
+    target?: { sessionId: string; chatId: string },
+    modelSelection: SelecaoModelo = { tipo: 'auto' },
+    // C-2: modo/permissão/sessão EXPLÍCITOS do snapshot do primeiro envio
+    // (nunca vêm do closure/estado da landing).
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session },
+  ) => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
     // P-C §2 — durante `excluindo`, novas mensagens ficam suspensas nesse alvo
@@ -2097,7 +2090,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       role: 'user' as const,
       content: messageContent,
       time: timeLabel(),
-      mode: selectedMode,
+      mode: opcoes?.modo ?? selectedMode,
       attachments: attachments.length > 0 ? attachments.map((attachment) => ({ ...attachment })) : undefined,
     }
     const runningResponse = {
@@ -2146,7 +2139,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
     // servidor, a resposta chega em pedaços e as ferramentas viram cartões
     // com aprovação do dono (SPEC PARTE 2D).
-    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim())
+    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
   }
 
   const handleStop = async () => {
@@ -2428,12 +2421,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={(text) => handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
-        onValidateWorkspacePath={handleChangeActiveWorkspace}
-        onChangeMode={() => notify('Seletor de modo (mock)')}
-        onChangeModel={() => notify('Seletor de modelo (mock)')}
-        onAddContext={() => notify('Adicionar contexto (mock)')}
-        onDictate={() => notify('Ditar por voz (mock)')}
+      <SessionLanding
+        workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'}
+        workspacePath={selectedWorkspace?.path ?? null} workspaceName={selectedWorkspace?.name ?? 'Nenhuma pasta aberta'}
+        contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={handleLandingSubmit}
+        rascunhoControlado={rascunhoLanding} onChangeRascunho={setRascunhoLanding}
+        onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending}
+        isFileSystemSupported={workspaceNativePickerAvailable} onValidateWorkspacePath={handleChangeActiveWorkspace}
+        onOpenProvedores={openProviders}
       />
     ) : (
       // (E14) Grid multi-sessão quando há peers visíveis (só fora do single-pane);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft,
   AtSign,
@@ -19,7 +19,6 @@ import type { Attachment, ComposerDraft, ComposerHistoryEntry, NestedChat, Sessi
 import { sessaoSemPasta } from '../domain/sessionState'
 import { workspaceFiles } from '../data'
 import { DragTypes } from '../domain/dragAndDrop'
-import { carregarEstado, type ItemCatalogoModelo } from '../bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 import { ocupacaoContexto, type MedicaoContexto, type EstadoCompactacao } from '../domain/usoContexto'
@@ -55,20 +54,11 @@ const modes = [
   { id: 'plan', label: 'Planejar', description: 'Descreva o plano de execução' },
 ]
 
-const MODEL_AUTO = 'Auto'
-function tokenDoPar(providerId: string, modelId: string): string {
-  return `pair:${encodeURIComponent(providerId)}:${encodeURIComponent(modelId)}`
-}
-export function selecaoDoToken(token: string): SelecaoModelo {
-  if (token === MODEL_AUTO) return { tipo: 'auto' }
-  const partes = token.startsWith('pair:') ? token.slice(5).split(':') : []
-  if (partes.length !== 2) return { tipo: 'explicita', providerId: '', modelId: '' }
-  try {
-    return { tipo: 'explicita', providerId: decodeURIComponent(partes[0]), modelId: decodeURIComponent(partes[1]) }
-  } catch {
-    return { tipo: 'explicita', providerId: '', modelId: '' }
-  }
-}
+// C-2: a regra do par (token/par/rotulo) mora no domínio — fonte única,
+// compartilhada com a landing. Re-export mantém o contrato antigo do ChatPanel.
+export { selecaoDoToken } from '../domain/selecaoModelo'
+import { MODEL_AUTO, selecaoDoToken, tokenDoPar } from '../domain/selecaoModelo'
+import { useCatalogoModelos } from '../hooks/useCatalogoModelos'
 
 function IndicadorContexto({ medicao, selecao }: { medicao?: MedicaoContexto; selecao: SelecaoModelo }) {
   if (!medicao || (selecao.tipo === 'explicita' &&
@@ -240,8 +230,9 @@ export function ChatInput({
   const [permissionError, setPermissionError] = useState<string | undefined>()
   const [modelOpen, setModelOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
-  const [catalogoModelos, setCatalogoModelos] = useState<ItemCatalogoModelo[]>([])
-  const catalogoRequestRef = useRef(0)
+  // C-2: catálogo compartilhado com a landing (uma fonte, guarda de resposta
+  // velha e atualização ao foco/abrir — mesmo comportamento de sempre).
+  const { itens: catalogoModelos, atualizar: atualizarCatalogoModelos } = useCatalogoModelos()
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false)
   const [attachmentPickerView, setAttachmentPickerView] = useState<AttachmentPickerView>('sources')
   const [isFileDropTarget, setIsFileDropTarget] = useState(false)
@@ -391,22 +382,6 @@ export function ChatInput({
     document.addEventListener('pointerdown', handleOutsidePointerDown, true)
     return () => document.removeEventListener('pointerdown', handleOutsidePointerDown, true)
   }, [modeOpen, mode])
-
-  const atualizarCatalogoModelos = useCallback(() => {
-    const requisicao = ++catalogoRequestRef.current
-    void carregarEstado()
-      .then((estado) => { if (requisicao === catalogoRequestRef.current) setCatalogoModelos(estado.catalogo ?? []) })
-      .catch(() => { if (requisicao === catalogoRequestRef.current) setCatalogoModelos([]) })
-  }, [])
-
-  useEffect(() => {
-    atualizarCatalogoModelos()
-    window.addEventListener('focus', atualizarCatalogoModelos)
-    return () => {
-      catalogoRequestRef.current += 1
-      window.removeEventListener('focus', atualizarCatalogoModelos)
-    }
-  }, [atualizarCatalogoModelos])
 
   // Atualiza ao abrir o seletor: mudanças feitas em Provedores aparecem sem
   // reiniciar a aplicação ou depender de uma troca de foco da janela.

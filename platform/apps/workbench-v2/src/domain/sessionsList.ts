@@ -39,6 +39,12 @@ export type PrimarySection =
   | { kind: 'workspace' }
   | { kind: 'date'; section: SessionSection }
   | { kind: 'archived' }
+  /**
+   * C-2 (R12): projeção lateral — Chat × grupos por workspacePath, sem
+   * inferir por `workspace === 'Chat'`. O path canônico expõe homônimos como
+   * grupos distintos; o rótulo continua sendo o nome da pasta.
+   */
+  | { kind: 'contexto'; contexto: 'chat' | 'workspace'; workspacePath?: string | null }
 
 export interface SessionGroup {
   id: string
@@ -112,6 +118,51 @@ function compareForSort(a: Session, b: Session, mode: SortMode): number {
  * - `activeCustomGroups` names the known custom groups (id → label) so empty
  *   ones can still be omitted while labels stay stable.
  */
+/**
+ * C-2 — contexto da sessão para a projeção lateral: `contexto` (C-1) é a
+ * fonte; sem ele, cai para a raiz (compat com fixtures antigas).
+ */
+function contextoDaSessao(session: Session): 'chat' | 'workspace' {
+  if (session.contexto) return session.contexto.tipo
+  return session.workspacePath ? 'workspace' : 'chat'
+}
+
+/**
+ * C-2 (R10/R12): projeção ADITIVA sobre a mesma pipeline — Chat (sessões sem
+ * pasta) em grupo único; pastas agrupadas por workspacePath canônico
+ * (homônimos = grupos distintos, rótulo = nome da pasta). Fixadas/Custom/
+ * Quick Chats/Arquivadas mantêm a colocação; a ordem de coleta das datas
+ * fica subordinada dentro de cada contexto.
+ */
+function projetarPorContexto(groups: SessionGroup[]): SessionGroup[] {
+  const fixas = groups.filter((g) => g.section.kind === 'pinned' || g.section.kind === 'custom' || g.section.kind === 'quickChats')
+  const arquivadas = groups.filter((g) => g.section.kind === 'archived')
+  const demais = groups.filter((g) => g.section.kind === 'date' || g.section.kind === 'workspace' || g.section.kind === 'contexto')
+  const chats: Session[] = []
+  const pastas = new Map<string, { label: string; sessions: Session[] }>()
+  for (const group of demais) {
+    for (const session of group.sessions) {
+      if (contextoDaSessao(session) === 'chat') {
+        chats.push(session)
+        continue
+      }
+      const chave = session.workspacePath ?? `ws:${session.workspace}`
+      const atual = pastas.get(chave)
+      if (atual) atual.sessions.push(session)
+      else pastas.set(chave, { label: session.workspace, sessions: [session] })
+    }
+  }
+  const projetados: SessionGroup[] = []
+  if (chats.length > 0) {
+    projetados.push({ id: 'Chat', label: 'Chat', section: { kind: 'contexto', contexto: 'chat', workspacePath: null }, sessions: chats })
+  }
+  for (const [chave, pasta] of pastas) {
+    projetados.push({ id: `pasta:${chave}`, label: pasta.label, section: { kind: 'contexto', contexto: 'workspace', workspacePath: chave }, sessions: pasta.sessions })
+  }
+  // Ordem por seção preservada: fixadas → custom → quickChats → Chat/pastas → arquivadas.
+  return [...fixas, ...projetados, ...arquivadas]
+}
+
 export function buildSessionsList(
   sessions: readonly Session[],
   filters: SessionFilters,
@@ -120,6 +171,7 @@ export function buildSessionsList(
   customGroupLabels: Readonly<Record<string, string>> = {},
   orderCustomIds?: (presentIds: string[], labelOf: (id: string) => string) => string[],
   grouping: SessionGrouping = 'date',
+  projetarContextos = false,
 ): SessionGroup[] {
   const primary = sessions.filter((session) => !session.automation)
   const visible = primary.filter(
@@ -211,6 +263,7 @@ export function buildSessionsList(
     groups.push({ id: 'archived', label: DATE_LABELS.archived, section: { kind: 'archived' }, sessions: sortBucket(archived) })
   }
 
+  if (projetarContextos) return projetarPorContexto(groups)
   return groups
 }
 

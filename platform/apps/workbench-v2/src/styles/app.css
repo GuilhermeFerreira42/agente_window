@@ -1281,6 +1281,9 @@ svg {
    (.app-frame.is-empty-landing) foi aposentado na Onda 1 (E5). ===== */
 .session-landing {
   flex: 1 1 auto;
+  /* 08 §viewport: em 800x600 a coluna é estreita; sem min-width:0 a landing
+     usa a min-content da toolbar e transborda para os dois lados (corte). */
+  min-width: 0;
   /* A1/DEBT-04 (17/10): era `min-height: 0`. A landing tem só a altura do conteúdo, e
      quem a centraliza é o PAI. Fechada (sem aba de editor), o pai é a faixa central com
      `chat-centered` (align-items:center) → centraliza. Abrindo uma aba global (ex.:
@@ -1340,6 +1343,8 @@ svg {
   background: var(--vscode-agentsChatInput-background, var(--vscode-input-background));
   border: 1px solid var(--vscode-widget-border);
   border-radius: var(--vscode-cornerRadius-large);
+  /* 08 §viewport: o textarea não pode impor a min-content (cols) na coluna estreita. */
+  min-width: 0;
 }
 
 .session-landing-input:focus-within {
@@ -1358,6 +1363,7 @@ svg {
   font-family: inherit;
   font-size: var(--vscode-fontSize-label1);
   line-height: 1.5;
+  min-width: 0;
 }
 
 .session-landing-textarea::placeholder {
@@ -1369,6 +1375,8 @@ svg {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* 08 §viewport: quebra em vez de cortar quando a coluna é estreita. */
+  flex-wrap: wrap;
 }
 
 .session-landing-toolbar-left,
@@ -1376,6 +1384,10 @@ svg {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 08 §viewport: cada lado quebra a própria linha em coluna estreita; sem isto
+     a min-content do grupo (Perguntar+Interativo+Permissões) estoura 800x600. */
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .session-landing-icon-button,
@@ -3182,6 +3194,12 @@ svg {
   /* 420 px de chat + 2 px de borda do .main-surface */
   min-width: max(422px, 50%);
 }
+/* FATIA-C-2 08 §viewport ("adaptar em 800x600 sem corte"): em janela estreita o
+   piso de 420 px do chat (regra A+2/420 da 05) excede a coluna útil e a landing
+   é cortada na direita. O piso continua valendo para desktop (>=960 px). */
+@media (max-width: 960px) {
+  .top-right-section > .main-surface { min-width: 0; }
+}
 /* FATIA 15 Onda 3 (D158): o bloco que governava a faixa [chat][auxiliary-bar] saiu.
    A coluna não existe mais (2c-ii); o centro ocupa a faixa e o chat é o seu par no
    PanelGroup. `.main-surface` continua com o piso de 420 px acima, que ainda vale. */
@@ -4926,6 +4944,91 @@ svg {
 .session-landing-directory-options button:hover,.session-landing-directory-options button:focus { outline: none; background: var(--vscode-quickInputList-focusBackground, var(--vscode-list-activeSelectionBackground)); color: var(--vscode-quickInputList-focusForeground, var(--vscode-list-activeSelectionForeground)); }
 .session-landing-directory-options small { overflow: hidden; color: var(--vscode-descriptionForeground); text-overflow: ellipsis; white-space: nowrap; }
 .session-landing-directory-loading { padding: 7px 8px; color: var(--vscode-descriptionForeground); font-size: 11px; }
+
+/* ── C-2 (08_LAYOUT): faixa Chat/Pasta + seletor REAL de LLM na posição do
+   Copilot; toolbar do card; dica/estado. Reproduz a aparência VS Code 1.146
+   com tokens existentes — nada novo é inventado, nenhum mock é estilizado. ── */
+.session-landing-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.session-landing-modelo-wrap,
+.session-landing-menu-wrap { position: relative; }
+.session-landing-modelo-topo { font-weight: 500; }
+.session-landing-menu,
+.session-landing-modelo-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 264px;
+  max-height: 320px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--vscode-menu-background, var(--vscode-widget-background));
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: var(--vscode-cornerRadius-large, 6px);
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
+}
+.session-landing-modelo-resumo-wrap .session-landing-menu,
+.session-landing-modelo-resumo-wrap .session-landing-modelo-menu { left: auto; right: 0; }
+.session-landing-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--vscode-foreground);
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--vscode-fontSize-label2);
+}
+.session-landing-menu-item:hover,
+.session-landing-menu-item:focus-visible { background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground)); outline: none; }
+.session-landing-menu-item > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.session-landing-menu-item small { color: var(--vscode-descriptionForeground); font-size: 11px; }
+.session-landing-menu-item[aria-checked='true']::after { content: '✓'; margin-left: auto; color: var(--vscode-focusBorder); font-weight: 700; }
+.session-landing-menu-erro { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 8px; color: var(--vscode-errorForeground); font-size: 12px; }
+.session-landing-menu-erro button { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; }
+.session-landing-menu-vazio { margin: 0; padding: 6px 8px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+.session-landing-menu-acoes { margin-top: 2px; padding: 6px 8px; border: none; border-top: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; text-align: left; font-size: 12px; }
+.session-landing-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--vscode-cornerRadius-small);
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+  font-size: 11px;
+  font-weight: 600;
+}
+.session-landing-pill.is-risky { color: var(--vscode-inputValidation-errorForeground, #f14c4c); }
+.session-landing-modelo-resumo { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-landing-aviso {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+  font-size: 12px;
+  text-align: center;
+}
+.session-landing-aviso button { border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; text-decoration: underline; }
+.session-landing-dica { margin: 0; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; line-height: 1.5; }
+.session-landing-dica strong { color: var(--vscode-foreground); font-weight: 600; }
+.session-landing-motivo { margin: 0; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
 
 /* ── FATIA 14 (SPEC 2H v1): acréscimos da tela REAL de Personalizações ────────
    Reutiliza os tokens e a linguagem visual das classes .customizations-* que já

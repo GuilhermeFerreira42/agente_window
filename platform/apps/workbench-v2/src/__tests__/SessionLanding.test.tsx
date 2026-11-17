@@ -32,7 +32,7 @@ describe('SessionLanding — confirmação de criação e rascunho pendente', ()
     expect(campo).toHaveValue('primeiro texto preservado')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     expect(onSubmit).toHaveBeenCalledTimes(2)
-    expect(onSubmit).toHaveBeenLastCalledWith('primeiro texto preservado')
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ texto: 'primeiro texto preservado' }) }))
     expect(campo).toHaveValue('')
   })
 
@@ -70,7 +70,7 @@ describe('SessionLanding (estado inicial vazio)', () => {
     render(<SessionLanding workspace="vscode-main" onSubmit={onSubmit} />)
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'criar réplica fiel')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
-    expect(onSubmit).toHaveBeenCalledWith('criar réplica fiel')
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ texto: 'criar réplica fiel' }) }))
   })
 
   it('envia com Enter e não envia com Shift+Enter', async () => {
@@ -83,7 +83,7 @@ describe('SessionLanding (estado inicial vazio)', () => {
     expect(onSubmit).not.toHaveBeenCalled()
     await user.keyboard('{Enter}')
     expect(onSubmit).toHaveBeenCalledTimes(1)
-    expect(onSubmit).toHaveBeenCalledWith('primeira linha')
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ texto: 'primeira linha' }) }))
   })
 
   it('não envia texto apenas com espaços', async () => {
