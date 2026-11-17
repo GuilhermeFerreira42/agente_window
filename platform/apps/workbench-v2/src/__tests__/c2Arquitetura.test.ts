@@ -1,5 +1,5 @@
 // ============================================================================
-// C-2 — c2Arquitetura (C2-T01/T06/T09/T10/T12 · R10/R11/R12): monolito
+// C-2 — c2Arquitetura (C2-T12/T15/T22/T25/T26 · R10/R11/R12): monolito
 // modular sem espelho novo de estado, domínio puro sem IO, fonte única da
 // regra do par e do catálogo, contratos do primeiro envio e legado preservado.
 // Asserções sobre as FONTES reais (nada de espelhar código no teste).
@@ -40,7 +40,7 @@ const primeiroEnvio = ler('domain/primeiroEnvio.ts')
 const catalogoHook = ler('hooks/useCatalogoModelos.ts')
 
 describe('c2Arquitetura — R11 App fino, sem espelho novo', () => {
-  it('T01: App.tsx mantém a linha final ≤2889 e não ganha espelho/chave nova de estado', () => {
+  it('T22: App.tsx mantém a linha final ≤2889 e não ganha espelho/chave nova de estado', () => {
     const linhas = app.split('\n').length
     expect(linhas).toBeLessThanOrEqual(2889)
     // Nenhum espelho novo de landing/seleção no App (chaves pré-existentes de
@@ -53,7 +53,7 @@ describe('c2Arquitetura — R11 App fino, sem espelho novo', () => {
     expect(app).not.toMatch(/setTimeout\(\(\) => handleSend/)
   })
 
-  it('T01: a regra do par mora NO DOMÍNIO (fonte única) e o ChatInput só a re-exporta', () => {
+  it('T22: a regra do par mora NO DOMÍNIO (fonte única) e o ChatInput só a re-exporta', () => {
     expect(selecaoModelo).toContain("export const MODEL_AUTO = 'Auto'")
     // Uma única definição de MODEL_AUTO em todo o src.
     const fontes = arquivosTs(raiz).filter((arquivo) => !arquivo.includes('__tests__'))
@@ -69,13 +69,13 @@ describe('c2Arquitetura — R11 App fino, sem espelho novo', () => {
     expect(app).not.toContain('MODEL_AUTO')
   })
 
-  it('T01: catálogo compartilhado — ChatInput e landing usam o MESMO hook', () => {
+  it('T22: catálogo compartilhado — ChatInput e landing usam o MESMO hook', () => {
     expect(catalogoHook).toContain('carregarEstado')
     expect(chatInput).toContain("from '../hooks/useCatalogoModelos'")
     expect(sessionLanding).toContain("from '../hooks/useCatalogoModelos'")
   })
 
-  it('T06: domínio puro — landingDraft, selecaoModelo e primeiroEnvio sem IO de estado', () => {
+  it('T22: domínio puro — landingDraft, selecaoModelo e primeiroEnvio sem IO de estado', () => {
     for (const fonte of [landingDraft, selecaoModelo, primeiroEnvio]) {
       expect(fonte).not.toMatch(/localStorage|sessionStorage|new EventSource/)
       expect(fonte).not.toMatch(/\bfetch\s*\(/)
@@ -96,13 +96,13 @@ describe('c2Arquitetura — R10 legado preservado (parâmetro default)', () => {
     },
   ]
 
-  it('T10: sem a projeção, a lista continua no formato legado (nenhum grupo contexto)', () => {
+  it('T25: sem a projeção, a lista continua no formato legado (nenhum grupo contexto)', () => {
     const grupos = buildSessionsList(sessoes, EMPTY_FILTERS, 'manual', undefined)
     expect(grupos.some((grupo) => grupo.section.kind === 'contexto')).toBe(false)
     expect(grupos.map((grupo) => grupo.id)).toContain('today')
   })
 
-  it('T10: com a projeção, Chat e pasta nascem dos campos canônicos (contexto/raiz)', () => {
+  it('T26: com a projeção, Chat e pasta nascem dos campos canônicos (contexto/raiz)', () => {
     const chat: Session = { ...sessoes[0], id: 's-chat', contexto: { tipo: 'chat' }, workspace: 'Chat', workspacePath: null }
     const pasta: Session = { ...sessoes[0], id: 's-pasta', contexto: { tipo: 'workspace' } }
     const grupos = buildSessionsList([chat, pasta], EMPTY_FILTERS, 'manual', undefined, {}, undefined, 'date', true)
@@ -113,7 +113,7 @@ describe('c2Arquitetura — R10 legado preservado (parâmetro default)', () => {
     expect(grupoPasta?.section.kind === 'contexto' && grupoPasta.section.workspacePath).toBe('/ws')
   })
 
-  it('T10: a sessão Chat nasce sem raiz e com chatId estável', () => {
+  it('T15: a sessão Chat nasce sem raiz e com chatId estável', () => {
     const sessao = construirSessaoChat('abc', 'pedido')
     expect(sessao.contexto).toEqual({ tipo: 'chat' })
     expect(sessao.workspacePath).toBeNull()

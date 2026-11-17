@@ -30,6 +30,10 @@ export interface TentativaConfirmada {
   tentativaId: string
   sessao: Session
   chatId: string
+  /** C2-RV03 — contexto lógico da tentativa (bind da identidade à raiz). */
+  contexto: 'chat' | 'workspace'
+  /** Raiz SOLICITADA (snapshot); worktree.repoRoot pode divergir de subpasta. */
+  workspacePathSolicitado: string | null
 }
 
 export interface PortasPrimeiroEnvio {
@@ -140,10 +144,13 @@ export async function executarPrimeiroEnvio(opcoes: {
   let chatId: string
   let identidade: TentativaConfirmada | undefined
 
-  // Retentativa: MESMA geração do rascunho → identidade confirmada vale
-  // (sem novo create, sem mensagem duplicada). Edição nova muda a geração
-  // e descarta a tentativa antiga.
-  const reutilizavel = confirmada != null && confirmada.geracao === snapshot.geracao
+  // Retentativa: MESMA geração E MESMO contexto/raiz → identidade confirmada
+  // vale (sem novo create, sem mensagem duplicada). C2-RV03: geração igual com
+  // outra raiz/contexto NÃO reutiliza — publicar na raiz anterior seria silencioso.
+  const reutilizavel = confirmada != null
+    && confirmada.geracao === snapshot.geracao
+    && confirmada.contexto === snapshot.contexto
+    && confirmada.workspacePathSolicitado === snapshot.workspacePath
 
   if (reutilizavel) {
     sessao = confirmada!.sessao
@@ -165,7 +172,8 @@ export async function executarPrimeiroEnvio(opcoes: {
       }
       // — persistindo (ACK antes de qualquer efeito remoto) —
       await Promise.resolve(portas.persistir(sessao))
-      identidade = { geracao: snapshot.geracao, tentativaId: snapshot.tentativaId, sessao, chatId }
+      identidade = { geracao: snapshot.geracao, tentativaId: snapshot.tentativaId, sessao, chatId,
+        contexto: snapshot.contexto, workspacePathSolicitado: snapshot.workspacePath }
       aoConfirmar?.(identidade)
     } catch (error) {
       return {
@@ -192,6 +200,27 @@ export async function executarPrimeiroEnvio(opcoes: {
 
   aoEncerrar?.(null)
   return { ok: true, fase: 'admitida', sessao, chatId }
+}
+
+/**
+ * C2-RV02 — aplica a mensagem do primeiro envio na sessão recém-criada
+ * (mesma forma do fluxo P do chat): status working + user/assistant otimista.
+ * Puro: o App só enfileira o persistSession(resultante) e dispara o run após
+ * o ACK — nunca antes da publicação durável.
+ */
+export function aplicarMensagemPrimeiroEnvio(
+  sessao: Session,
+  chatId: string,
+  userMessage: Session['chats'][number]['messages'][number],
+  runningResponse: Session['chats'][number]['messages'][number],
+): Session {
+  const next = { ...sessao, updated: 'agora', unread: false }
+  return {
+    ...next,
+    chats: next.chats.map((chat) => chat.id === chatId
+      ? { ...chat, messages: [...chat.messages, userMessage, runningResponse], approval: undefined }
+      : chat),
+  }
 }
 
 /** Descarta identidade confirmada quando o rascunho avançou de geração. */

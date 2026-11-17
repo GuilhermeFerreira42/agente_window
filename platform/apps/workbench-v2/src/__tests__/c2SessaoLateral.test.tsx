@@ -1,8 +1,9 @@
 // ============================================================================
-// C-2 — c2SessaoLateral (C2-T16/T17 · R10/R12): projeção lateral Chat ×
+// C-2 — c2SessaoLateral (C2-T25/T26/T27/T29 · R12): projeção lateral Chat ×
 // grupos por workspacePath (homônimos distintos, sem inferir por `workspace`),
-// colocação fixadas/quick/archived preservada, Personalizações no topo abrindo
-// o MESMO modal e legado sem `contexto` intacto.
+// filtro/identificação por IDENTIDADE DE RAIZ (RV04), colocação fixadas/quick/
+// archived preservada, Personalizações no topo abrindo o MESMO modal e legado
+// sem `contexto` intacto.
 // ============================================================================
 
 import { describe, expect, it, vi } from 'vitest'
@@ -59,7 +60,7 @@ function props(onOpenPersonalizations = vi.fn()) {
   }
 }
 
-describe('c2SessaoLateral — C2-T16 projeção Chat × pastas', () => {
+describe('c2SessaoLateral — C2-T25/T26 projeção Chat × pastas', () => {
   it('sessões de Chat e de pasta ficam em grupos separados, sem inferir por workspace', () => {
     render(<SessionSidebar {...props()} />)
     const chats = screen.getByTestId('sidebar-secao-chats')
@@ -85,6 +86,30 @@ describe('c2SessaoLateral — C2-T16 projeção Chat × pastas', () => {
     expect(within(pastas[1]).getByText('Repo beta')).toBeInTheDocument()
   })
 
+  it('T26/RV04: filtro por IDENTIDADE DE RAIZ e cabeçalhos com caminho (homônimos distinguíveis)', async () => {
+    const user = userEvent.setup()
+    render(<SessionSidebar {...props()} />)
+    await user.click(screen.getByRole('button', { name: 'Filtros de sessões' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Filtrar…' }))
+    const select = await screen.findByLabelText('Filtrar por workspace')
+    const opcoes = within(select).getAllByRole('option').map((opcao) => opcao.textContent)
+    // Homônimos: opções DISTINCTAS com o caminho (nunca um option fundido).
+    expect(opcoes).toEqual(['Todos', '/home/u/alpha/repo-x', '/home/u/beta/repo-x', 'Chat'])
+
+    // Cabeçalhos acessíveis distintos (tooltip/nome com o caminho da raiz).
+    const cabecalhos = screen.getAllByTestId('sidebar-grupo-pasta')
+      .map((grupo) => grupo.querySelector('.session-section-header'))
+    expect(cabecalhos[0]).toHaveAttribute('title', '/home/u/alpha/repo-x')
+    expect(cabecalhos[1]).toHaveAttribute('title', '/home/u/beta/repo-x')
+    expect(cabecalhos[0]).toHaveAccessibleName('repo-x — /home/u/alpha/repo-x')
+    expect(cabecalhos[1]).toHaveAccessibleName('repo-x — /home/u/beta/repo-x')
+
+    // Selecionar a raiz A mostra só as sessões da raiz A.
+    await user.selectOptions(select, '/home/u/alpha/repo-x')
+    expect(screen.getByText('Repo alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Repo beta')).not.toBeInTheDocument()
+  })
+
   it('lista legada (sem campo contexto) mantém o formato antigo — R10', () => {
     // Fixture antiga: MESMA sessão sem o campo contexto (modo legado R10).
     const legado: Session[] = [{ ...sessoesComContexto[0], contexto: undefined }]
@@ -95,7 +120,7 @@ describe('c2SessaoLateral — C2-T16 projeção Chat × pastas', () => {
   })
 })
 
-describe('c2SessaoLateral — C2-T17 Personalizações no topo → MESMO modal', () => {
+describe('c2SessaoLateral — C2-T29 Personalizações no topo → MESMO modal', () => {
   it('botão no topo chama o MESMO handler de Personalizações e os atalhos da base saíram', async () => {
     const user = userEvent.setup()
     const onOpenPersonalizations = vi.fn()

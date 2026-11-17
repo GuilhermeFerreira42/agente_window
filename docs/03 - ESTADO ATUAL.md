@@ -1,3 +1,13 @@
+# Estado vigente — 13/11/2026 (6) — C-2 IMPLEMENTADA; correções do parecer RV01–RV08; gates verdes; aguarda homologação
+
+**C-2 (tela central, sessões e composer) implementada na branch `0f2e5de2-agente-window`** contra o pacote `memoria-de-projeto/C-2/C-2/` (matriz `04` C2-T01..T30 + 8 jornadas; parecer `parecer/PARECER_C_2.md` com achados RV01–RV08). Entrega em duas etapas: commit `7b0292e` (landing do centro com seletor LLM real no lugar do Copilot, rascunho do App, adaptação 800×600) e a correção dos achados do parecer no mesmo working tree (RV01 seleção explícita preservada no primeiro envio; RV02 publicação confirmada antes do run com retry na MESMA sessão; RV03 rascunho do rascunho; RV04 Chats × grupos de projeto separados com contagem; RV05 menus/foco; RV06 `Contexto não medido` no composer; RV07 título/faixa/tip box na composição da referência). Sem "This Computer", textos PT-BR, LLMs reais no seletor; recursos das referências fora do escopo não aparecem como funcionais.
+
+**Gates da entrega (Debian/Arena, Node canônico 26.13.0):** typecheck 0 · FOCO do `VALIDAR_C2_WINDOWS.ps1` (26 arquivos) **422 aprovados + 13 pulados + 0 falhas** · lint `src` **111 = 111 do baseline** · build `vite` exit 0 (heap 1408) · **E2E C-2 `e2e/c2_centro.spec.ts` — 12/12 jornadas (J1–J12) aprovadas**. Evidências em `memoria-de-projeto/execucao-c2/` (`e2e-c2-jornadas.md`, `ampla-final.json`, `lint-comparacao-final.json`). **Windows: `VALIDAR_C2_WINDOWS.ps1` NÃO executado — pendência.** Homologação humana não atribuída; `08` intocado; sem merge (PR #1 OPEN). U-1/C-3/MM-I/MM-O permanecem não iniciadas.
+
+C1-EXCLUSAO-01 e homologações M1–M8/MC1 permanecem separadas. O 404 de acesso ao Gemini 2.5 Flash é configuração/disponibilidade do serviço, fora da correção de transporte. As entradas seguintes são históricas.
+
+---
+
 # Estado vigente — 16/11/2026 (5) — MM-0 HOMOLOGADA; correção Google sem ferramentas em 055bbd4
 
 **Aceite humano explícito da MM-0 registrado em 08**, após os testes relatados pelo proprietário. Correção de transporte sem ferramentas versionada em **055bbd4**; publicação autorizada na branch **0f2e5de2-agente-window**, sem merge na base. Gates e ressalvas preservados em 09: 99/99 MM-0 + 7/7 sondas originais; tipos/build/lint aprovados no reteste; ampla com 42 falhas comuns e dois timeouts App aprovados no reteste 2/2. Correção Google/LiteLLM: 140/140 + tipos/lint, sem App alterado. Sucesso remoto de texto e resumo das sete ferramentas foram informados pelo proprietário; não equivalem a execução remota independente pelo Codex. Geração de imagens não implementada.

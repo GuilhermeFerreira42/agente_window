@@ -1,3 +1,22 @@
+# C-2 — gates da entrega (Debian/Arena, 13/11/2026) — AGUARDA HOMOLOGAÇÃO + GATE WINDOWS
+
+**Escopo:** correções do parecer C-2 (RV01–RV08) sobre `7b0292e`, branch `0f2e5de2-agente-window`. Execução **Debian = Arena**; **Windows não executado**; E2E com backend controlado (fixture de provedor local); provedores reais não pagos chamados. Evidências em `/home/user/memoria-de-projeto/execucao-c2/`.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Typecheck | `npx tsc -b --force` | **0 erros — exit 0** |
+| Typecheck do E2E | `npx tsc --noEmit … e2e/c2_centro.spec.ts` | **0 erros — exit 0** |
+| Foco C-2 (lista do `VALIDAR_C2_WINDOWS.ps1`, 26 arquivos) | `npx vitest run <FOCO>` | **422 aprovados + 13 pulados + 0 falhas** |
+| Ampla | `sh memoria-de-projeto/execucao-c2/ampla-c2.sh` vs `baseline-nominal.json` | **diff nominal 0 novas / 0 resolvidas** (`ampla-final.json`, `comparacao-ampla.json`) |
+| Lint (piso do baseline) | `npx eslint src --format json` vs baseline worktree | **111 = 111** (84 erros — piso mantido; `lint-comparacao-final.json`) |
+| Build oficial | `NODE_OPTIONS=--max-old-space-size=1408 npx vite build` | **exit 0** |
+| **E2E C-2 (8 jornadas base + RV08)** | `sh platform/scripts/e2e-c2.sh` | **12 passed (1,2 min) — 0 failed** — `e2e-c2-jornadas.md` |
+| Windows | `VALIDAR_C2_WINDOWS.ps1` | **NÃO EXECUTADO — pendência declarada** |
+
+**Ressalvas:** (1) Windows pendente — repetir FOCO/ampla/E2E no runner do pacote; (2) comparação de screenshots com as 7 referências do parecer (1872×1080, 800×600, menus abertos) é etapa posterior de homologação; (3) E2E C-1 não reexecutado nesta rodada (RV08); (4) as 8 falhas de fronteira pré-existentes da ampla permanecem (não corrigidas por decisão de escopo). Homologação humana não atribuída; `08` intocado.
+
+---
+
 # Aceite e retorno manual do proprietário — 16/11/2026
 
 MM-0 homologada expressamente pelo proprietário (08); correção de transporte sem ferramentas em **055bbd4**. O proprietário confirmou resposta Google após a correção e trouxe resumo de teste bem-sucedido de listar/criar/ler/escrever/excluir/buscar/executar. Registro de relato humano: o Codex não inspecionou independentemente o arquivo final nem a Lixeira e não confirmou o backend exato de cada operação. Uma execução anterior parou após três ferramentas por 404 de acesso a Gemini 2.5 Flash; não foi atribuída ao funcionamento das ferramentas nem corrigida alterando o provedor silenciosamente. O aceite preserva as ressalvas da ampla Windows descritas abaixo. Não foram repetidos gates para esta atualização documental.

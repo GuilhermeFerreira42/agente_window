@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Pin,
   PinOff,
+  Plus,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -328,7 +329,6 @@ export function SessionSidebar({
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [chatsCollapsed, setChatsCollapsed] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [readState, setReadState] = useState<SessionFilters['readState']>('all')
   const [provider, setProvider] = useState('')
@@ -475,12 +475,22 @@ export function SessionSidebar({
   // Filtros: query de texto, readState, sortMode (SESSIONS_LIST.md original).
   const filterOptions = useMemo(() => {
     const primary = sessions.filter(session => !session.automation)
+    // C2-RV04 — filtro por IDENTIDADE DE RAIZ (workspacePath), não por rótulo:
+    // pastas homônimas viram opções distintas; rótulo puro fica na compat legada.
+    const raizes = primary.map(session => (session.workspacePath ?? session.workspace).trim()).filter(Boolean)
     return {
       providers: [...new Set(primary.map(sessionProvider).filter(Boolean))].sort(),
       statuses: [...new Set(primary.map(session => session.status))],
-      workspaces: [...new Set(primary.map(session => session.workspace).filter(Boolean))].sort(),
+      workspaces: [...new Set(raizes)].sort(),
     }
   }, [sessions])
+
+  /** Rótulo do option: basename quando único; caminho completo quando homônimo. */
+  const rotuloRaiz = (valor: string) => {
+    const base = valor.split(/[\\/]/).filter(Boolean).pop() ?? valor
+    const homonimo = filterOptions.workspaces.some((outro) => outro !== valor && (outro.split(/[\\/]/).filter(Boolean).pop() ?? outro) === base)
+    return homonimo ? valor : base
+  }
   const filters: SessionFilters = useMemo(
     () => ({
       ...EMPTY_FILTERS,
@@ -594,6 +604,10 @@ export function SessionSidebar({
           type="button"
           aria-expanded={!collapsed}
           aria-controls={contentId}
+          title={group.section.kind === 'contexto' && group.section.contexto === 'workspace' ? group.section.workspacePath ?? undefined : undefined}
+          aria-label={group.section.kind === 'contexto' && group.section.contexto === 'workspace' && group.section.workspacePath
+            ? `${group.label} — ${group.section.workspacePath}`
+            : undefined}
           onClick={() => setCollapsedSections((current) => ({ ...current, [name]: !collapsed }))}
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
@@ -677,6 +691,17 @@ export function SessionSidebar({
 
   return (
     <aside className={`sessions-sidebar${visible ? '' : ' is-hidden'}`} aria-label="Lista de sessões" aria-hidden={!visible}>
+      {/* C2-RV07 — entradas superiores SEPARADAS do cabeçalho/lista (referência). */}
+      <div className="sessions-sidebar-topentries">
+        <button className="sessions-topentry sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>
+          <Plus size={14} aria-hidden="true" /><span>Nova sessão</span>
+        </button>
+        {onOpenPersonalizations && (
+          <button className="sessions-topentry sessions-personalizacoes" type="button" title="Personalizações" aria-label="Personalizações" data-testid="sidebar-personalizacoes" onClick={() => onOpenPersonalizations('visao')}>
+            <Wand2 size={14} aria-hidden="true" /><span>Personalizações</span>
+          </button>
+        )}
+      </div>
       <div className="sessions-sidebar-header">
         {searchOpen ? (
           <div className="sessions-inline-search" onKeyDown={event => {
@@ -693,8 +718,6 @@ export function SessionSidebar({
           <>
             <span className="sessions-sidebar-title">Sessões{totalVisible !== sessions.length && <span className="sessions-count">{totalVisible}/{sessions.length}</span>}</span>
             <div className="sessions-header-actions">
-              {onOpenPersonalizations && <button className="toolbar-button sessions-personalizacoes" type="button" title="Personalizações" aria-label="Personalizações" data-testid="sidebar-personalizacoes" onClick={() => onOpenPersonalizations('visao')}><Wand2 size={14} /></button>}
-              <button className="toolbar-button sessions-new" type="button" title="Nova sessão" aria-label="Nova sessão" onClick={onNewSession}>Novo</button>
               <button ref={filterButtonRef} className="toolbar-button" type="button" title="Filtros de sessões" aria-label="Filtros de sessões" aria-haspopup="menu" aria-expanded={filtersOpen || contextMenu?.label === 'Opções das sessões'} onClick={openSessionOptions}><SlidersHorizontal size={14}/></button>
               <button ref={searchButtonRef} className="toolbar-button" type="button" title="Buscar sessões" aria-label="Buscar sessões" onClick={() => { setFiltersOpen(false); setSearchOpen(true) }}><Search size={14} /></button>
             </div>
@@ -735,15 +758,13 @@ export function SessionSidebar({
         <label>Workspace
           <select aria-label="Filtrar por workspace" value={filters.workspace ?? ''} onChange={event => setWorkspace(event.target.value)}>
             <option value="">Todos</option>
-            {filterOptions.workspaces.map(id => <option key={id} value={id}>{id}</option>)}
+            {filterOptions.workspaces.map(id => <option key={id} value={id}>{rotuloRaiz(id)}</option>)}
           </select>
         </label>
       </div>}
       <div className="sessions-list-scroll" ref={listRef} onKeyDown={handleListKeyDown}>
-        <button className="sessions-chats-header" type="button" aria-expanded={!chatsCollapsed} onClick={() => setChatsCollapsed(value => !value)}><MessageCircle size={14}/><span>Chats</span>{chatsCollapsed ? <ChevronRight size={12}/> : <ChevronDown size={12}/>}</button>
-        {!chatsCollapsed && <div>{groups.map((group) => renderGroup(group))}
-          {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
-        </div>}
+        {groups.map((group) => renderGroup(group))}
+        {totalVisible === 0 && <div className="sessions-empty"><MessageCircle size={22} /><p>Nenhuma sessão encontrada.</p></div>}
       </div>
       <ContextMenu menu={contextMenu} onClose={() => {
         if (contextMenu?.label === 'Opções das sessões') filterButtonRef.current?.focus()

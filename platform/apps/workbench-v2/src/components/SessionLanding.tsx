@@ -30,8 +30,9 @@ import {
   ShieldCheck,
   Wand2,
 } from 'lucide-react'
-import { useLandingSubmission, type SubmitLanding } from '../hooks/useLandingSubmission'
+import { useLandingSubmission, type ControleTentativa, type SubmitLanding } from '../hooks/useLandingSubmission'
 import { useCatalogoModelos } from '../hooks/useCatalogoModelos'
+import { isNavigationKey, nextRovingIndex } from '../domain/keyboardNavigation'
 import { MODEL_AUTO, rotuloDaSelecao, tokenDaSelecao, tokenDoPar } from '../domain/selecaoModelo'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
@@ -51,6 +52,8 @@ interface SessionLandingProps {
   /** Rascunho controlado pelo dono (App) — sobrevive a remounts da landing. */
   rascunhoControlado?: RascunhoLanding
   onChangeRascunho?: Dispatch<SetStateAction<RascunhoLanding>>
+  /** C2-RV05 — tentativa controlada pelo dono: lock/identidade sobrevivem a remount. */
+  tentativaControlada?: ControleTentativa
   onPickWorkspace?: () => void
   onValidateWorkspacePath?: (path: string) => Promise<void>
   onListWorkspaceDirectories?: (path: string) => Promise<Array<{ name: string; path: string }>>
@@ -109,13 +112,15 @@ export function SessionLanding({
   onOpenProvedores,
   rascunhoControlado,
   onChangeRascunho,
+  tentativaControlada,
 }: SessionLandingProps) {
   const { rascunho, setText, setSelecaoModelo, setModo, setPermissao, pending: submitPending, submit: enviar } =
     useLandingSubmission(onSubmit, {
       contexto,
       workspacePath: contexto === 'chat' ? null : workspacePath,
       workspaceName: contexto === 'chat' ? null : (workspaceName ?? workspace),
-    }, rascunhoControlado && onChangeRascunho ? { rascunho: rascunhoControlado, setRascunho: onChangeRascunho } : undefined)
+    }, rascunhoControlado && onChangeRascunho ? { rascunho: rascunhoControlado, setRascunho: onChangeRascunho } : undefined,
+    tentativaControlada)
 
   // — workspace manual (C-1, preservado) —
   const [manualPathOpen, setManualPathOpen] = useState(!isFileSystemSupported)
@@ -180,9 +185,11 @@ export function SessionLanding({
     setModeloAberto(true)
     window.setTimeout(() => primeiroItemRef.current?.focus(), 0)
   }
+  const modeloResumoRef = useRef<HTMLButtonElement>(null)
   const fecharModelo = (devolverFoco = true) => {
     setModeloAberto(false)
-    if (devolverFoco) modeloBotaoRef.current?.focus()
+    // C2-RV06 — devolver o foco ao acionador da âncora ABERTA (topo ou resumo).
+    if (devolverFoco) (modeloAncora === 'resumo' ? modeloResumoRef : modeloBotaoRef).current?.focus()
   }
   useCliqueFora(modeloAberto, modeloWrapRef, () => fecharModelo(false))
 
@@ -236,6 +243,20 @@ export function SessionLanding({
     alvo.style.overflowY = contentHeight > teto ? 'auto' : 'hidden'
   }, [rascunho.texto])
 
+  // C2-RV06 — navegação de menu com o MESMO helper do roving de lista:
+  // Escape fecha; setas/Home/End movem o foco entre os itens do menu atual.
+  const navegarNoMenu = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') return
+    if (!isNavigationKey(event.key)) return
+    const itens = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitemradio"],[role="menuitem"]'))
+    const focado = itens.findIndex((item) => item === document.activeElement)
+    const proximo = nextRovingIndex(event.key, { count: itens.length, current: focado })
+    if (proximo >= 0 && itens[proximo]) {
+      event.preventDefault()
+      itens[proximo]!.focus()
+    }
+  }
+
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
     void enviar()
@@ -254,7 +275,8 @@ export function SessionLanding({
   // Menu do seletor: renderizado SOMENTE na âncora clicada (topo ou resumo).
   const menuModelos = modeloAberto ? (
                 <div className="session-landing-menu session-landing-modelo-menu" role="menu" aria-label="Modelos disponíveis" ref={modeloMenuRef} onKeyDown={(event) => {
-                  if (event.key === 'Escape') { event.preventDefault(); fecharModelo() }
+                  if (event.key === 'Escape') { event.preventDefault(); fecharModelo(); return }
+                  navegarNoMenu(event)
                 }}>
                   {catalogoErro && (
                     <div className="session-landing-menu-erro" role="alert">
@@ -315,6 +337,7 @@ export function SessionLanding({
                 className={`session-landing-contexto-option${contexto === 'chat' ? ' is-active' : ''}`}
                 aria-pressed={contexto === 'chat'}
                 data-testid="contexto-chat"
+                disabled={submitPending}
                 onClick={() => onChangeContexto('chat')}
               >Chat</button>
               <button
@@ -322,6 +345,7 @@ export function SessionLanding({
                 className={`session-landing-contexto-option${contexto === 'workspace' ? ' is-active' : ''}`}
                 aria-pressed={contexto === 'workspace'}
                 data-testid="contexto-workspace"
+                disabled={submitPending}
                 onClick={() => onChangeContexto('workspace')}
               >Pasta</button>
             </div>
@@ -338,7 +362,7 @@ export function SessionLanding({
               title={workspaceSelectionDisabledReason ?? (isFileSystemSupported ? 'Escolher pasta real do disco' : 'File System API não suportada')}
               aria-label={workspaceSelectionDisabledReason ? `Workspace atual: ${workspace}. ${workspaceSelectionDisabledReason}` : `Workspace atual: ${workspace}. Clique para escolher pasta real`}
               onClick={onPickWorkspace}
-              disabled={Boolean(workspaceSelectionDisabledReason) || workspacePickerPending}
+              disabled={Boolean(workspaceSelectionDisabledReason) || workspacePickerPending || submitPending}
               aria-busy={workspacePickerPending}
             >
               <FolderGit2 size={14} aria-hidden="true" />{workspace}<ChevronDown size={13} aria-hidden="true" />
@@ -432,7 +456,7 @@ export function SessionLanding({
                   onClick={() => setModoAberto((value) => !value)}
                 ><Wand2 size={13} aria-hidden="true" />{MODOS.find((item) => item.id === modoEfetivo)?.label ?? modoEfetivo}<ChevronDown size={12} aria-hidden="true" /></button>
                 {modoAberto && !semPasta && (
-                  <div className="session-landing-menu" role="menu" aria-label="Modos" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setModoAberto(false); modoBotaoRef.current?.focus() } }}>
+                  <div className="session-landing-menu" role="menu" aria-label="Modos" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setModoAberto(false); modoBotaoRef.current?.focus(); return } navegarNoMenu(event) }}>
                     {MODOS.map((item) => (
                       <button key={item.id} type="button" role="menuitemradio" aria-checked={rascunho.modo === item.id} className="session-landing-menu-item" onClick={() => escolherModo(item.id)}>
                         <span><strong>{item.label}</strong></span>
@@ -460,7 +484,7 @@ export function SessionLanding({
                   onClick={() => setPermissaoAberta((value) => !value)}
                 ><ShieldCheck size={13} aria-hidden="true" />{ROTULOS_PERMISSAO[permissaoEfetiva]}<ChevronDown size={12} aria-hidden="true" /></button>
                 {permissaoAberta && !semPasta && (
-                  <div className="session-landing-menu" role="menu" aria-label="Permissões" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setPermissaoAberta(false); permissaoBotaoRef.current?.focus() } }}>
+                  <div className="session-landing-menu" role="menu" aria-label="Permissões" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setPermissaoAberta(false); permissaoBotaoRef.current?.focus(); return } navegarNoMenu(event) }}>
                     {(['manual', 'allow-all'] as const).map((id) => (
                       <button key={id} type="button" role="menuitemradio" aria-checked={rascunho.permissao === id} className="session-landing-menu-item" onClick={() => escolherPermissao(id)}>
                         <span><strong>{ROTULOS_PERMISSAO[id]}</strong>{id === 'allow-all' && <small>Requer confirmação a cada ativação</small>}</span>
@@ -475,6 +499,7 @@ export function SessionLanding({
               {/* resumo/atalho inferior: espelha a MESMA seleção do topo */}
               <div className="session-landing-menu-wrap session-landing-modelo-resumo-wrap">
                 <button
+                  ref={modeloResumoRef}
                   type="button"
                   className="session-landing-pill session-landing-modelo-resumo"
                   aria-haspopup="menu"

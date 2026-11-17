@@ -1,8 +1,9 @@
 // ============================================================================
-// C-2 — c2Composer (C2-T01..T05 · R01/R02): aparência PT-BR no centro, seletor
-// REAL de LLM na posição do Copilot, compositor com estado local (crescimento,
-// Enter/IME), snapshot único por tentativa com trava anti-corrida, modo em
-// Chat/Pasta e default Chat sem pasta.
+// C-2 — c2Composer (C2-T01/T03/T04/T05/T07/T09/T11/T18 · R01/R02/R08):
+// aparência PT-BR no centro, seletor REAL de LLM na posição do Copilot,
+// compositor com estado local (crescimento, Enter/IME), snapshot único com
+// trava anti-corrida, modo em Chat/Pasta, default Chat, menus com teclado
+// (RV06) e lock da tentativa sobrevivendo a remount (RV05).
 // Dados 100% sintéticos; provedores mockados só para o catálogo desta suíte.
 // ============================================================================
 
@@ -11,7 +12,9 @@ import { useState } from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionLanding } from '../components/SessionLanding'
-import type { EntradaSubmitLanding } from '../hooks/useLandingSubmission'
+import type { RascunhoLanding } from '../domain/landingDraft'
+import { rascunhoInicial } from '../domain/landingDraft'
+import { useLandingTentativa, type EntradaSubmitLanding } from '../hooks/useLandingSubmission'
 
 const catalogoMock = [
   { providerId: 'p1', modelId: 'm1', label: 'GPT Sintético', protocol: 'openai' as const },
@@ -67,7 +70,7 @@ describe('c2Composer — R01 centro PT-BR + seletor LLM real', () => {
     expect(carregarEstado).toHaveBeenCalled()
   })
 
-  it('T13: falha de catálogo vira mensagem honesta com Tentar novamente (sem lista vazia silenciosa)', async () => {
+  it('T09: falha de catálogo vira mensagem honesta com Tentar novamente (sem lista vazia silenciosa)', async () => {
     const user = userEvent.setup()
     // Falha no carregamento inicial E na abertura; só o retry resolve.
     carregarEstado.mockRejectedValueOnce(new Error('rede')).mockRejectedValueOnce(new Error('rede'))
@@ -81,7 +84,7 @@ describe('c2Composer — R01 centro PT-BR + seletor LLM real', () => {
 })
 
 describe('c2Composer — R02 compositor', () => {
-  it('T02: Enter envia, Shift+Enter quebra linha, IME não envia e a área cresce até 200px', async () => {
+  it('T03: Enter envia, Shift+Enter quebra linha, IME não envia e a área cresce até 200px', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     montar(onSubmit)
@@ -111,7 +114,7 @@ describe('c2Composer — R02 compositor', () => {
 })
 
 describe('c2Composer — R03 snapshot único por tentativa', () => {
-  it('T03: um submit = um snapshot; durante a tentativa a edição trava e a recusa preserva o rascunho', async () => {
+  it('T04: um submit = um snapshot; durante a tentativa a edição trava e a recusa preserva o rascunho', async () => {
     const user = userEvent.setup()
     let liberar!: (ok: boolean) => void
     const gate = new Promise<boolean>((resolve) => { liberar = resolve })
@@ -162,8 +165,8 @@ describe('c2Composer — R03 snapshot único por tentativa', () => {
   })
 })
 
-describe('c2Composer — C2-T04/T05 Chat × Pasta', () => {
-  it('T04: em Chat só Perguntar/manual fica ativo, com motivo acessível; Pasta libera os 4 modos', async () => {
+describe('c2Composer — C2-T11/T01 Chat × Pasta', () => {
+  it('T11: em Chat só Perguntar/manual fica ativo, com motivo acessível; Pasta libera os 4 modos', async () => {
     const user = userEvent.setup()
     montar(() => true)
     const modo = screen.getByRole('button', { name: /Modo: Perguntar/ })
@@ -181,12 +184,122 @@ describe('c2Composer — C2-T04/T05 Chat × Pasta', () => {
     }
   })
 
-  it('T05: default Chat com chip "Chat sem pasta", sem seletor de pasta e sem This Computer', () => {
+  it('T01: default Chat com chip "Chat sem pasta", sem seletor de pasta e sem This Computer', () => {
     montar(() => true)
     expect(screen.getByTestId('contexto-chat')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat sem pasta')
     expect(screen.queryByTestId('landing-workspace-chip')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/This Computer/i)).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// C2-T18/RV06 — navegação dos menus (setas/Home/End/Escape) e retorno ao
+// acionador CORRETO (topo e atalho inferior); C2-T04/T05/RV05 — lock da
+// tentativa e sobrevivência a remount com rascunho/identidade controlados.
+// ---------------------------------------------------------------------------
+function MonteTentativa({ onSubmit }: { onSubmit: (entrada: EntradaSubmitLanding) => unknown }) {
+  const tentativa = useLandingTentativa()
+  const [contexto, setContexto] = useState<'chat' | 'workspace'>('chat')
+  const [rascunho, setRascunho] = useState<RascunhoLanding>(rascunhoInicial())
+  const [mostrar, setMostrar] = useState(true)
+  return (
+    <>
+      <button type="button" onClick={() => setMostrar((valor) => !valor)}>alternar landing</button>
+      {mostrar && (
+        <SessionLanding
+          workspace="Nenhuma pasta aberta"
+          contexto={contexto}
+          onChangeContexto={setContexto}
+          onSubmit={onSubmit as never}
+          rascunhoControlado={rascunho}
+          onChangeRascunho={setRascunho}
+          tentativaControlada={tentativa}
+        />
+      )}
+    </>
+  )
+}
+
+describe('c2Composer — C2-T18/RV06 menus com teclado e retorno ao acionador', () => {
+  it('T18: setas movem o foco no menu; Escape devolve ao acionador que ABRIU (topo ou resumo)', async () => {
+    const user = userEvent.setup()
+    montar(() => true)
+
+    // Âncora TOPO: abre, foco no primeiro item, ArrowDown avança, Escape volta ao topo.
+    const topo = screen.getByTestId('landing-modelo-topo')
+    await user.click(topo)
+    const menu = await screen.findByRole('menu', { name: 'Modelos disponíveis' })
+    const itens = menu.querySelectorAll('[role="menuitemradio"]')
+    expect(document.activeElement).toBe(itens[0])
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(itens[1])
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(itens[0])
+    await user.keyboard('{Escape}')
+    expect(await screen.queryByRole('menu', { name: 'Modelos disponíveis' })).toBeNull()
+    expect(document.activeElement).toBe(topo)
+
+    // Atalho INFERIOR: abre do resumo; Escape devolve ao resumo (não ao topo).
+    const resumo = screen.getByTestId('landing-modelo-resumo')
+    await user.click(resumo)
+    await screen.findByRole('menu', { name: 'Modelos disponíveis' })
+    await user.keyboard('{Escape}')
+    expect(document.activeElement).toBe(resumo)
+  })
+
+  it('T18: Enter na opção fecha o menu e devolve o foco ao acionador; Tab não prende no menu', async () => {
+    const user = userEvent.setup()
+    montar(() => true)
+    const resumo = screen.getByTestId('landing-modelo-resumo')
+    await user.click(resumo)
+    const menu = await screen.findByRole('menu', { name: 'Modelos disponíveis' })
+    const primeiro = menu.querySelector('[role="menuitemradio"]') as HTMLElement
+    primeiro.focus()
+    await user.keyboard('{Enter}')
+    expect(await screen.queryByRole('menu', { name: 'Modelos disponíveis' })).toBeNull()
+    expect(document.activeElement).toBe(resumo)
+  })
+})
+
+describe('c2Composer — C2-T04/T05/RV05 lock da tentativa (remount controlado)', () => {
+  it('T04: durante submit os controles de contexto ficam BLOQUEADOS (Chat/Pasta sem troca concorrente)', async () => {
+    const user = userEvent.setup()
+    let liberar: (() => void) | undefined
+    const onSubmit = vi.fn(() => new Promise<boolean>((ok) => { liberar = () => ok(true) }))
+    montar(onSubmit)
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'em voo')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('contexto-chat')).toBeDisabled()
+    expect(screen.getByTestId('contexto-workspace')).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveAttribute('readonly')
+    await act(async () => { liberar?.() })
+    expect(screen.getByTestId('contexto-chat')).not.toBeDisabled()
+  })
+
+  it('T05: remount da landing com criação em voo preserva rascunho e lock (estado no dono)', async () => {
+    const user = userEvent.setup()
+    let liberar: (() => void) | undefined
+    const onSubmit = vi.fn(() => new Promise<boolean>((ok) => { liberar = () => ok(true) }))
+    render(<MonteTentativa onSubmit={onSubmit} />)
+    const campo = () => screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    await user.type(campo(), 'texto preservado')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+
+    // Remount (abrir/fechar Provedores) no MEIO do envio.
+    await user.click(screen.getByRole('button', { name: 'alternar landing' }))
+    expect(screen.queryByRole('textbox', { name: 'Mensagem para a nova sessão' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'alternar landing' }))
+
+    expect(campo()).toHaveValue('texto preservado')
+    expect(campo()).toHaveAttribute('readonly')
+    expect(screen.getByText('Criando conversa. Sua mensagem está preservada.')).toBeInTheDocument()
+    expect(screen.getByTestId('contexto-workspace')).toBeDisabled()
+
+    await act(async () => { liberar?.() })
+    await waitFor(() => expect(campo()).not.toHaveAttribute('readonly'))
   })
 })

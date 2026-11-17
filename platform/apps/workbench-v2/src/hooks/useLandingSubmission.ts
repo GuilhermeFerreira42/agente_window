@@ -41,6 +41,23 @@ export type ControleRascunho = {
   setRascunho: Dispatch<SetStateAction<RascunhoLanding>>
 }
 
+export interface EstadoTentativa {
+  pending: boolean
+  confirmada: TentativaConfirmada | null
+}
+
+/**
+ * C2-RV05 — estado da tentativa no DONO (App): sobrevive ao remount da
+ * landing (abrir Provedores com criação em voo) sem perder lock/identidade.
+ */
+export function useLandingTentativa() {
+  const [estado, setEstado] = useState<EstadoTentativa>({ pending: false, confirmada: null })
+  const inFlight = useRef(false)
+  return { estado, setEstado, inFlight }
+}
+
+export type ControleTentativa = ReturnType<typeof useLandingTentativa>
+
 // O rascunho pode ser controlado pelo dono (App) — assim ele sobrevive a
 // remounts da landing (ex.: abrir a aba de Provedores) — ou ficar interno
 // quando o componente é usado de forma isolada.
@@ -48,15 +65,27 @@ export function useLandingSubmission(
   onSubmit: SubmitLanding,
   contextoAtual: ContextoLanding,
   controle?: ControleRascunho,
+  tentativa?: ControleTentativa,
 ) {
   const [rascunhoInterno, setRascunhoInterno] = useState<RascunhoLanding>(rascunhoInicial)
   const rascunho = controle?.rascunho ?? rascunhoInterno
   const setRascunhoState = controle?.setRascunho ?? setRascunhoInterno
-  const [pending, setPending] = useState(false)
-  const inFlight = useRef(false)
+  const [pendingInterno, setPendingInterno] = useState(false)
+  const inFlightInterno = useRef(false)
+  const confirmadaInterna = useRef<TentativaConfirmada | null>(null)
+  const pending = tentativa ? tentativa.estado.pending : pendingInterno
+  const inFlight = tentativa ? tentativa.inFlight : inFlightInterno
+  const confirmadaAtual = tentativa ? tentativa.estado.confirmada : confirmadaInterna.current
+  const setPending = (valor: boolean) => {
+    if (tentativa) tentativa.setEstado((atual) => ({ ...atual, pending: valor }))
+    else setPendingInterno(valor)
+  }
+  const setConfirmada = (valor: TentativaConfirmada | null) => {
+    if (tentativa) tentativa.setEstado((atual) => ({ ...atual, confirmada: valor }))
+    else confirmadaInterna.current = valor
+  }
   const rascunhoRef = useRef(rascunho)
   const contextoRef = useRef(contextoAtual)
-  const confirmadaRef = useRef<TentativaConfirmada | null>(null)
   rascunhoRef.current = rascunho
   contextoRef.current = contextoAtual
 
@@ -89,13 +118,13 @@ export function useLandingSubmission(
       )
       const aceito = await onSubmit({
         snapshot,
-        confirmada: confirmadaRef.current,
-        aoConfirmar: (t) => { confirmadaRef.current = t },
-        aoEncerrar: (t) => { confirmadaRef.current = t },
+        confirmada: confirmadaAtual,
+        aoConfirmar: (t) => { setConfirmada(t) },
+        aoEncerrar: (t) => { setConfirmada(t) },
       })
       if (aceito !== false) {
         rascunhoRef.current = rascunhoInicial()
-        confirmadaRef.current = null
+        setConfirmada(null)
         setRascunhoState(rascunhoInicial())
       }
       return aceito !== false

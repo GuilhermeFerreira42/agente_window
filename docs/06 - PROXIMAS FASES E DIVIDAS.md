@@ -1,4 +1,12 @@
-# Próximas fases — MM-0 homologada em 16/11/2026; preparar SPEC executável C-2
+# Próximas fases — C-2 implementada em 13/11/2026; aguarda homologação e gate Windows
+
+**C-2 implementada e documentada (13/11/2026), aguardando homologação.** Entrega na branch `0f2e5de2-agente-window` (commit `7b0292e` + correções RV01–RV08 no mesmo working tree): landing central com seletor LLM real, seleção explícita preservada no primeiro envio (RV01), publicação confirmada antes do run com retry na mesma sessão (RV02), rascunho preservado (RV03), lateral `Chats × grupos` separada (RV04), menus/foco (RV05), estado `Contexto não medido` (RV06), composição da referência (RV07) e 12 jornadas E2E verdes (RV08). Gates: typecheck 0 · FOCO 422+13+0 · lint 111=111 · build 0 · E2E 12/12. Evidências em `memoria-de-projeto/execucao-c2/`. **Pendências:** execução do `VALIDAR_C2_WINDOWS.ps1` (Windows), comparação de screenshots com as referências do parecer e **homologação humana** (nenhum aceite inferido; `08` intocado). Sem merge (PR #1 OPEN).
+
+**Após a homologação:** U-1, C-3, MM-I e MM-O permanecem **não iniciadas** (nescumprir esta ordem = escopo indevido). C1-EXCLUSAO-01 segue aberta, separada.
+
+---
+
+# Próximas fases — MM-0 homologada em 16/11/2026; preparar SPEC executável C-2 (histórico)
 
 **MM-0 encerrada por aceite humano explícito** (08), sobre d1dd69d e correção de transporte 055bbd4. Gates Windows e ressalvas registrados em 09. A pendência Windows da rodada Debian abaixo é histórica; build passou no Windows, e os dois timeouts extras da ampla passaram no reteste dirigido. C1-EXCLUSAO-01 e dívida de responsabilidade/tamanho do App permanecem.
 

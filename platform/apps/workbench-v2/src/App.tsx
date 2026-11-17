@@ -25,9 +25,10 @@ import { manageHistoryAccess } from './services/sessions/historyAccessClient'
 import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
 import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
-import { executarPrimeiroEnvio } from './domain/primeiroEnvio'
+import { aplicarMensagemPrimeiroEnvio, executarPrimeiroEnvio } from './domain/primeiroEnvio'
+import { tokenDaSelecao } from './domain/selecaoModelo'
 import { rascunhoInicial, type RascunhoLanding } from './domain/landingDraft'
-import type { EntradaSubmitLanding } from './hooks/useLandingSubmission'
+import { useLandingTentativa, type EntradaSubmitLanding } from './hooks/useLandingSubmission'
 import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
 import { continuarAgir, enviarAgir, prepararExecucaoAgir, responderAguardarComando, responderAprovacao, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
@@ -167,6 +168,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // escolha explícita de pasta real (sem fallback 'workspace-local').
   const [landingContexto, setLandingContexto] = useState<'chat' | 'workspace'>('chat')
   const [rascunhoLanding, setRascunhoLanding] = useState<RascunhoLanding>(rascunhoInicial)
+  const tentativaLanding = useLandingTentativa() // C2-RV05: lock/identidade sobrevivem a remount
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
@@ -1417,8 +1419,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     } finally { setWorkspacePickerPending(false) }
   }
 
-  // — C-2 — abertura pós-criação: as MESMAS atualizações do fluxo da C-1
-  // (seed da view nova + auxiliar + recursos de BOOT + foco), sem regra nova.
+  // C-2 — abertura pós-criação: mesmas atualizações do fluxo da C-1 (seed+BOOT).
   const abrirSessaoCriada = (sessao: Session) => {
     const seededLayout = seedCreatedFromNewSession(newSessionState)
     setAuxiliaryTab(seededLayout.activeViewContainerId)
@@ -1434,10 +1435,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setMobilePane('chat')
   }
 
-  // — C-2 — primeiro envio: guardas do shell + controlador de fases (domain) +
-  // portas de efeito. O snapshot do rascunho É o primeiro pedido (par exato,
-  // modo/permissão efetivos); nenhuma seleção default vence aqui e não há
-  // agendamento após o create — publicação explícita na mesma sequência.
+  // C-2 — primeiro envio: guardas + controlador de fases (domain), sem timer pós-create.
   const handleLandingSubmit = async (entrada: EntradaSubmitLanding): Promise<boolean> => {
     const { snapshot, confirmada, aoConfirmar, aoEncerrar } = entrada
     // Ressalva do reteste 16/11 — recusa VISÍVEL com texto devolvido.
@@ -1468,12 +1466,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         persistir: async (sessao) => { await persistSession(sessao) },
         publicar: async (sessao, chatId, snap) => {
           abrirSessaoCriada(sessao)
-          // PRIMEIRO pedido: snapshot explícito (par exato + modo/permissão
-          // efetivos + a sessão já persistida — sem leitura de closure).
-          handleSend(snap.texto, [], { sessionId: sessao.id, chatId }, snap.selecaoModelo, {
-            modo: snap.modo,
-            permissao: snap.permissao,
-            sessao,
+          // C2-RV01 — admissão grava par/modo/permissão por runKey (composer+F5).
+          const runKey = `${sessao.id}:${chatId}`
+          setModelByChat((current) => ({ ...current, [runKey]: tokenDaSelecao(snap.selecaoModelo) }))
+          setModeByChat((current) => ({ ...current, [runKey]: snap.modo }))
+          if (snap.contexto === 'workspace') setPermissionByChat((current) => ({ ...current, [`${runKey}:${sessao.worktreePath ?? sessao.workspacePath}`]: snap.permissao }))
+          // C2-RV02 — publicação DURÁVEL (ACK da fila P) antes do efeito remoto.
+          await handleSend(snap.texto, [], { sessionId: sessao.id, chatId }, snap.selecaoModelo, {
+            modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true,
           })
         },
       },
@@ -1903,8 +1903,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     aoConcluir?: () => void,
     modelSelection: SelecaoModelo = { tipo: 'auto' },
     instrucaoHumana?: string,
-    // C-2: snapshot explícito do primeiro envio (modo/permissão/sessão já
-    // persistida). Sem opções, o chat continua sendo a fonte — nunca default.
+    // C-2: snapshot explícito do 1º envio (modo/permissão/sessão persistidos); sem opções o chat é a fonte.
     opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session },
   ): void => {
     const runKey = `${sessionId}:${chatId}`
@@ -2068,9 +2067,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     attachments: Attachment[],
     target?: { sessionId: string; chatId: string },
     modelSelection: SelecaoModelo = { tipo: 'auto' },
-    // C-2: modo/permissão/sessão EXPLÍCITOS do snapshot do primeiro envio
-    // (nunca vêm do closure/estado da landing).
-    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session },
+    // C-2: opções EXPLÍCITAS do snapshot; `esperarPublicacao` = ACK antes do run.
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean },
   ) => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
@@ -2110,11 +2108,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       { id: userMessage.id, role: 'user', content: messageContent },
     ]
 
+    // C2-RV02 — primeiro envio: ACK da fila P antes do run (nada remoto antes).
+    if (opcoes?.esperarPublicacao && opcoes.sessao) {
+      return (async () => {
+        const atualizada = aplicarMensagemPrimeiroEnvio(opcoes.sessao!, chatId, userMessage, runningResponse)
+        setSessions((current) => current.map((session) => session.id === atualizada.id ? atualizada : session))
+        await persistSession(atualizada)
+        iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
+      })()
+    }
     updateSession(sessionId, (session) => {
       const next = updateSessionAndChatStatus(session, chatId, 'working')
-      // (R-003) Primeiro envio commita o draft: o Management deixa de possuir o
-      // rascunho e a sessão entra no catálogo. O título "Nova sessão" passa a
-      // ser derivado do texto enviado (paridade com o original).
+      // (R-003) Primeiro envio commita o draft no Management; o título deriva
+      // do texto enviado (paridade com o original).
       let committed = next
       if (session.isDraft) {
         management.current = commitDraft(management.current, sessionId)
@@ -2136,9 +2142,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       }
     })
 
-    // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
-    // servidor, a resposta chega em pedaços e as ferramentas viram cartões
-    // com aprovação do dono (SPEC PARTE 2D).
+    // FATIA 10 — AGIR real com o provedor ativo (cartões com aprovação do dono).
     iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
   }
 
@@ -2425,7 +2429,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'}
         workspacePath={selectedWorkspace?.path ?? null} workspaceName={selectedWorkspace?.name ?? 'Nenhuma pasta aberta'}
         contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={handleLandingSubmit}
-        rascunhoControlado={rascunhoLanding} onChangeRascunho={setRascunhoLanding}
+        rascunhoControlado={rascunhoLanding} onChangeRascunho={setRascunhoLanding} tentativaControlada={tentativaLanding}
         onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending}
         isFileSystemSupported={workspaceNativePickerAvailable} onValidateWorkspacePath={handleChangeActiveWorkspace}
         onOpenProvedores={openProviders}

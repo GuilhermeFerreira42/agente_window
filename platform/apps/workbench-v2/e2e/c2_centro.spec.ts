@@ -4,16 +4,20 @@
 // Chromium + provedor FIXTURE local (backend controlado — NÃO é provedor real
 // de produção; a distinção fica registrada na entrega).
 //
-// 8 jornadas: (1) centro PT-BR + seletor LLM real, (2) Enter/IME/Shift+Enter e
-// 1ª resposta, (3) par exato no /api/agir, (4) Chat ask/manual com motivo,
-// (5) Pasta sem raiz recusa preservando o rascunho, (6) projeção lateral da
-// sidebar, (7) Personalizações no topo → MESMO modal, (8) novo rascunho volta
-// ao Auto (sem default fantasma).
+// 12 jornadas (matriz 04 — as 8 integrais da SPEC + as 4 de recorte C-2):
+// J1 centro PT-BR/seletor + viewports, J2 Enter/IME e 1ª resposta, J3 par
+// EXATO com label ambíguo + F5/RV01, J4 Chat ask/manual, J5 Pasta sem raiz
+// recusa, J6 projeção lateral, J7 Personalizações no topo → MESMO modal,
+// J8 Auto sem default fantasma, J9 falha entre create e publicação (RV02,
+// journey 4), J10 modelo removido após escolha (journey 5), J11 lateral
+// mista com homônimos/legado/grupo+F5 (journey 7), J12 ações reais da
+// lateral entre títulos iguais (journey 8).
 //
 // REGRA DA CASA: todo teste tem pelo menos um `expect` (e2eAssertionContract).
 // =============================================================================
 import { spawn, type ChildProcess } from 'node:child_process'
-import { rmSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -61,13 +65,26 @@ async function pararServidor(): Promise<void> {
   await terminou
 }
 
-/** Provedor OpenAI-compatível local (fixture sintética): devolve uma linha. */
+/** Modelos aceitos pela fixture (C2-RV08: payload desconhecido = 400). */
+const modelosAceitos = new Set(['c2-fixture', 'outro-fixture'])
+let ultimoModeloRecebido: string | null = null
+
+/** Provedor OpenAI-compatível local (fixture sintética): devolve uma linha.
+ *  Rota/payload fora do contrato → 404/400 (nunca 200 para tudo). */
 async function subirProvedor(): Promise<number> {
   provedor = createServer((req, res) => {
-    if (req.method !== 'POST') { res.writeHead(404).end(); return }
+    if (req.method !== 'POST' || !(req.url ?? '').endsWith('/chat/completions')) { res.writeHead(404).end(); return }
     const partes: Buffer[] = []
     req.on('data', (pedaco: Buffer) => partes.push(pedaco))
     req.on('end', () => {
+      let corpo: { model?: unknown } | undefined
+      try { corpo = JSON.parse(Buffer.concat(partes).toString('utf8')) as { model?: unknown } } catch { corpo = undefined }
+      if (!corpo || typeof corpo.model !== 'string' || !modelosAceitos.has(corpo.model)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'model fora do contrato da fixture' }))
+        return
+      }
+      ultimoModeloRecebido = corpo.model
       chamadasProvedor += 1
       res.writeHead(200, { 'Content-Type': 'text/event-stream' })
       res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Resposta C-2 do provedor fixture.' } }] })}\n\n`)
@@ -147,6 +164,14 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     await page.setViewportSize({ width: 1400, height: 900 })
     await shot(page, 'c2_j1_centro_ptbr')
 
+    // Evidência de homologação: menu do seletor ABERTO na dimensão da referência.
+    await page.setViewportSize({ width: 1872, height: 1080 })
+    await page.getByTestId('landing-modelo-topo').click()
+    await page.getByRole('menu', { name: 'Modelos disponíveis' }).waitFor()
+    await shot(page, 'c2_menu_modelo_aberto_1872x1080')
+    await page.keyboard.press('Escape')
+    await page.setViewportSize({ width: 1400, height: 900 })
+
     // Rascunho sobrevive à abertura de Provedores (mesmo rascunho ao voltar).
     await campo(page).fill('rascunho que precisa sobreviver')
     await page.getByTestId('landing-modelo-topo').click()
@@ -173,13 +198,30 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     await shot(page, 'c2_j2_primeira_resposta')
   })
 
-  test('J3 — par exato do rascunho no primeiro /api/agir (sem fallback Auto)', async ({ page }) => {
+  test('J3 — par EXATO com label ambíguo no primeiro /api/agir; F5 preserva histórico e seleção (RV01)', async ({ page }) => {
     await abrirApp(page)
+    // Dois provedores com label IDÊNTICO (nome genérico igual ao nativo +
+    // mesmo modelId) — só o providerId da entrada distingue a escolha.
+    const porta = await portaDoProvedor()
+    const ambigua = await page.request.put(`${BASE}/api/providers`, {
+      headers: headersApi,
+      data: {
+        ativo: 'openai-compat',
+        provedores: {
+          'openai-compat': { nome: 'Ollama (local)', baseUrl: `http://127.0.0.1:${porta}/v1`, modelo: 'c2-fixture', apiKey: 'fixture' },
+          ollama: { baseUrl: 'http://127.0.0.1:11434', modelo: 'c2-fixture' },
+        },
+      },
+    })
+    expect(ambigua.ok(), `PUT /api/providers ambíguo: ${await ambigua.text()}`).toBe(true)
+
     await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
     await page.getByTestId('landing-modelo-topo').waitFor()
-    // Escolha explícita no seletor da landing (rascunho novo em nova sessão).
+    // Duas ENTRADAS com o MESMO label no menu (prova da ambiguidade).
     await page.getByTestId('landing-modelo-topo').click()
-    await page.getByRole('menuitemradio', { name: /c2-fixture/ }).click()
+    await expect(page.getByRole('menuitemradio', { name: /Ollama \(local\) — c2-fixture/ })).toHaveCount(2)
+    // Escolha explícita da entrada openai-compat (id no texto acessível).
+    await page.getByRole('menuitemradio', { name: /openai-compat/ }).click()
     expect(await page.getByTestId('landing-modelo-topo').textContent()).toContain('c2-fixture')
 
     const marcador = page.waitForRequest((req) => req.url().endsWith('/api/agir') && req.method() === 'POST')
@@ -188,7 +230,23 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     const requisicao = await marcador
     const corpo = requisicao.postDataJSON() as { modelSelection?: { tipo?: string; providerId?: string; modelId?: string } }
     expect(corpo.modelSelection).toEqual({ tipo: 'explicita', providerId: 'openai-compat', modelId: 'c2-fixture' })
+    // PUT que leva a RESPOSTA ao banco — só então o F5 pode recarregar tudo.
+    const persistiuResposta = page.waitForResponse((resp) => resp.url().endsWith('/api/sessions')
+      && resp.request().method() === 'PUT' && resp.ok()
+      && (resp.request().postData() ?? '').includes('Resposta C-2 do provedor fixture.'))
     await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    await persistiuResposta
+
+    // C2-RV01 — o composer do chat JÁ nasce com o par escolhido na landing.
+    await expect(page.getByTitle('Selecionar modelo')).toContainText('c2-fixture')
+
+    // F5: histórico íntegro na MESMA sessão e seleção mantida pelo dono atual.
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench')
+    await expect(page.locator('.session-row', { hasText: 'mensagem com modelo exato C-2' })).toHaveCount(1)
+    await expect(page.locator('.chat-message', { hasText: 'mensagem com modelo exato C-2' })).toHaveCount(1)
+    await expect(page.locator('.chat-message', { hasText: 'Resposta C-2 do provedor fixture.' })).toHaveCount(1)
+    await expect(page.getByTitle('Selecionar modelo')).toContainText('c2-fixture')
     await shot(page, 'c2_j3_par_exato')
   })
 
@@ -248,6 +306,255 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     expect(await page.getByTestId('landing-modelo-topo').textContent()).toContain('Auto')
     expect(await campo(page).inputValue()).toBe('')
     await shot(page, 'c2_j8_auto_default')
+  })
+
+  test('J9 — falha entre create e publicação (RV02/journey 4): zero run antes do ACK, retry na MESMA sessão e duplo submit', async ({ page }) => {
+    await abrirApp(page)
+    await configurarProvedor(page, await portaDoProvedor())
+    let bloquearPublicacao = true
+    await page.route('**/api/sessions', async (rota) => {
+      if (bloquearPublicacao && rota.request().method() === 'PUT') {
+        await rota.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'publicação bloqueada (E2E)' }) })
+        return
+      }
+      await rota.continue()
+    })
+
+    const antes = chamadasProvedor
+    await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+    await campo(page).fill('mensagem da tentativa bloqueada')
+    await botaoEnviar(page).click()
+    await page.getByText('publicação bloqueada (E2E)').waitFor({ timeout: 15_000 })
+    expect(chamadasProvedor, 'nenhum run antes do ACK da publicação').toBe(antes)
+
+    // Recuperação EXPLÍCITA do produto: a gravação incerta (fila P) fica
+    // visível com "Tentar novamente" — liberado o caminho, reconcilia.
+    bloquearPublicacao = false
+    await page.getByRole('button', { name: 'Tentar novamente' }).click()
+    await expect(page.getByText('Conversa não salva')).toHaveCount(0, { timeout: 15_000 })
+
+    // Rascunho + identidade preservados: reabre a landing com o MESMO texto.
+    await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+    await expect(campo(page)).toHaveValue('mensagem da tentativa bloqueada')
+
+    // Duplo submit no MESMO tick: o lock em voo aceita UMA tentativa.
+    await page.evaluate(() => {
+      const alvo = [...document.querySelectorAll('button')].find((botao) => (botao.getAttribute('aria-label') ?? botao.textContent ?? '').includes('Enviar mensagem'))
+      if (!alvo) throw new Error('botão de envio ausente')
+      alvo.click()
+      alvo.click()
+    })
+    await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    expect(chamadasProvedor - antes, 'retry = exatamente 1 run').toBe(1)
+    // Identidade reutilizada: UMA sessão com a mensagem (sem duplicar create).
+    await expect(page.locator('.session-row', { hasText: 'mensagem da tentativa bloqueada' })).toHaveCount(1)
+    await expect(page.locator('.chat-message', { hasText: 'mensagem da tentativa bloqueada' })).toHaveCount(1)
+    await shot(page, 'c2_j9_publicacao_bloqueada')
+  })
+
+  test('J10 — modelo removido após a escolha (journey 5): Indisponível, zero run, escolha humana reativa', async ({ page }) => {
+    await abrirApp(page)
+    await configurarProvedor(page, await portaDoProvedor())
+    await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+    await page.getByTestId('landing-modelo-topo').click()
+    await page.getByRole('menuitemradio', { name: /c2-fixture/ }).click()
+    await campo(page).fill('mensagem com modelo que vai sumir')
+
+    // Remove o modelo do catálogo (sobra outro-fixture no mesmo provedor).
+    const porta = await portaDoProvedor()
+    const troca = await page.request.put(`${BASE}/api/providers`, {
+      headers: headersApi,
+      data: { ativo: 'openai-compat', provedores: { 'openai-compat': { nome: 'C2 fixture', baseUrl: `http://127.0.0.1:${porta}/v1`, modelo: 'outro-fixture', apiKey: 'fixture' } } },
+    })
+    expect(troca.ok()).toBe(true)
+
+    // Reabre o seletor: catálogo recarrega e a seleção vira Indisponível.
+    await page.getByTestId('landing-modelo-topo').click()
+    await page.getByRole('menu', { name: 'Modelos disponíveis' }).waitFor()
+    await expect(page.getByRole('menuitemradio', { name: /c2-fixture/ })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('landing-modelo-topo')).toContainText('Indisponível')
+
+    const antes = chamadasProvedor
+    expect(await botaoEnviar(page).isDisabled(), 'envio bloqueado sem modelo válido').toBe(true)
+    expect(chamadasProvedor, 'zero run com seleção removida').toBe(antes)
+    await expect(campo(page), 'rascunho preservado').toHaveValue('mensagem com modelo que vai sumir')
+    await shot(page, 'c2_j10_modelo_removido')
+
+    // Escolha HUMANA de outro modelo habilita o envio de novo.
+    await page.getByTestId('landing-modelo-topo').click()
+    await page.getByRole('menuitemradio', { name: /Auto/ }).click()
+    expect(await botaoEnviar(page).isEnabled()).toBe(true)
+    await botaoEnviar(page).click()
+    await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    expect(chamadasProvedor - antes, 'escolha humana reativa 1 run').toBe(1)
+    expect(ultimoModeloRecebido, 'Auto resolve outro-fixture (default vigente)').toBe('outro-fixture')
+  })
+
+  test('J11 — lateral mista (journey 7): Chat × homônimos × legado × grupo; filtro e F5 preservam raízes', async ({ page }) => {
+    await abrirApp(page)
+    await configurarProvedor(page, await portaDoProvedor())
+    const raizA = join(raiz, 'a', 'repo-x')
+    const raizB = join(raiz, 'b', 'repo-x')
+    const raizLegado = join(raiz, 'legado', 'repo-y')
+    mkdirSync(raizA, { recursive: true })
+    mkdirSync(raizB, { recursive: true })
+    mkdirSync(raizLegado, { recursive: true })
+
+    const criarChat = async (texto: string) => {
+      await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+      await campo(page).fill(texto)
+      await botaoEnviar(page).click()
+      await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    }
+    const criarPasta = async (caminho: string, texto: string) => {
+      await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+      await page.getByTestId('contexto-workspace').click()
+      await page.getByRole('button', { name: 'Digitar caminho' }).click()
+      await page.getByLabel('Caminho manual do workspace').fill(caminho)
+      await page.getByLabel('Caminho manual do workspace').press('Enter')
+      await expect(page.getByRole('button', { name: 'Workspace atual' })).toBeVisible({ timeout: 15_000 })
+      await campo(page).fill(texto)
+      await botaoEnviar(page).click()
+      await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    }
+
+    await criarChat('chat um da mista')
+    await criarChat('chat do grupo misto')
+    await criarPasta(raizA, 'projeto alpha da mista')
+    await criarPasta(raizB, 'projeto beta da mista')
+
+    // Grupo personalizado: UMA chat sai do Chats e entra no grupo (prompt).
+    page.once('dialog', (dialog) => void dialog.accept('Grupo misto'))
+    await page.locator('.session-row', { hasText: 'chat do grupo misto' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Atribuir a grupo' }).click()
+    await expect(page.locator('.sessions-sidebar').getByText('Grupo misto', { exact: true })).toBeVisible()
+
+    // Sessão legada SEM campo contexto (worktree antigo) direto no banco.
+    const legadaId = randomUUID()
+    const legada = {
+      id: legadaId,
+      title: 'sessão legada repo-y',
+      workspace: 'repo-y',
+      workspacePath: raizLegado,
+      section: 'today',
+      status: 'completed',
+      updated: 'agora',
+      diffAdded: 0,
+      diffRemoved: 0,
+      branch: null,
+      chats: [{ id: `${legadaId}-main`, title: 'Chat principal', status: 'completed', messages: [] }],
+      mainChatId: `${legadaId}-main`,
+    }
+    const inserida = await page.request.post(`${BASE}/api/sessions`, {
+      headers: headersApi,
+      data: { session: legada, creationId: legadaId },
+    })
+    expect(inserida.ok(), `POST legado: ${await inserida.text()}`).toBe(true)
+
+    // F5: classificação por contexto/raiz, cada ID uma vez, homônimos distintos.
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench')
+    await expect(page.getByTestId('sidebar-secao-chats')).toContainText('chat um da mista')
+    await expect(page.getByTestId('sidebar-secao-chats')).not.toContainText('chat do grupo misto')
+    const pastas = page.getByTestId('sidebar-grupo-pasta')
+    await expect(pastas).toHaveCount(3)
+    const caminhos = await pastas.evaluateAll((nos) => nos.map((no) => no.getAttribute('data-workspace-path') ?? ''))
+    expect(new Set(caminhos).size, 'homônimos com raízes distintas').toBe(3)
+    expect(caminhos.filter((caminho) => caminho.endsWith('repo-x'))).toHaveLength(2)
+    expect(caminhos.filter((caminho) => caminho.endsWith('repo-y'))).toHaveLength(1)
+    await expect(page.locator('.session-row', { hasText: 'chat um da mista' })).toHaveCount(1)
+    await expect(page.locator('.session-row', { hasText: 'projeto alpha da mista' })).toHaveCount(1)
+    await expect(page.locator('.session-row', { hasText: 'projeto beta da mista' })).toHaveCount(1)
+    await expect(page.locator('.session-row', { hasText: 'sessão legada repo-y' })).toHaveCount(1)
+
+    // RV04: filtro por identidade de raiz — homônimos em opções DISTINTAS.
+    await page.getByRole('button', { name: 'Filtros de sessões' }).click()
+    await page.getByRole('menuitem', { name: 'Filtrar…' }).click()
+    // Evidência de homologação: painel de filtros ABERTO na dimensão da referência.
+    await page.setViewportSize({ width: 1872, height: 1080 })
+    await shot(page, 'c2_menu_filtros_aberto_1872x1080')
+    await page.setViewportSize({ width: 1400, height: 900 })
+    const opcoes = await page.getByLabel('Filtrar por workspace').locator('option').allTextContents()
+    expect(opcoes.filter((opcao) => opcao.includes('repo-x')), 'duas opções para homônimos').toHaveLength(2)
+    await page.keyboard.press('Escape')
+    await shot(page, 'c2_j11_lateral_mista')
+  })
+
+  test('J12 — ações da lateral no backend real (journey 8): títulos iguais, arquivo, exclusão com falha', async ({ page }) => {
+    await abrirApp(page)
+    await configurarProvedor(page, await portaDoProvedor())
+    const criarChat = async (texto: string) => {
+      await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).click()
+      await campo(page).fill(texto)
+      await botaoEnviar(page).click()
+      await page.locator('.chat-message').last().getByText('Resposta C-2 do provedor fixture.').waitFor({ timeout: 30_000 })
+    }
+    await criarChat('ensaio um da lateral')
+    await criarChat('ensaio dois da lateral')
+
+    // Renomeia as DUAS para o MESMO título (identificação só pelo contexto/raiz).
+    // O editor inline SUBSTITUI o texto da linha — localizar o input pela classe.
+    for (const marca of ['ensaio um da lateral', 'ensaio dois da lateral']) {
+      const linha = page.locator('.session-row', { hasText: marca }).first()
+      await linha.click({ button: 'right' })
+      await page.getByRole('menuitem', { name: 'Renomear' }).click()
+      const editor = page.locator('input.session-title-editor')
+      await editor.fill('título igual')
+      await editor.press('Enter')
+    }
+    await expect(page.locator('.session-row', { hasText: 'título igual' })).toHaveCount(2)
+
+    // Arquiva a segunda e restaura (ações persistidas no backend real).
+    const segunda = page.locator('.session-row', { hasText: 'título igual' }).last()
+    await segunda.hover()
+    await segunda.getByRole('button', { name: 'Arquivar' }).click()
+    await expect(page.getByText('Arquivadas')).toBeVisible()
+    // Arquivadas nasce RECOLIDA (default do produto) — expandir para a linha.
+    const cabecalhoArquivadas = page.locator('button.session-section-header', { hasText: 'Arquivadas' })
+    if ((await cabecalhoArquivadas.getAttribute('aria-expanded')) === 'false') await cabecalhoArquivadas.click()
+    const arquivada = page.locator('.session-row.is-archived', { hasText: 'título igual' })
+    await expect(arquivada).toBeVisible()
+    await arquivada.hover()
+    await arquivada.getByRole('button', { name: 'Restaurar' }).click()
+    await expect(page.getByText('Arquivadas')).toHaveCount(0)
+
+    // Exclusão com falha controlada: item e erro ficam; nada some sozinho.
+    let bloquearExclusao = true
+    await page.route('**/api/sessions/**', async (rota) => {
+      if (bloquearExclusao && rota.request().method() === 'DELETE') {
+        await rota.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'exclusão recusada (E2E)' }) })
+        return
+      }
+      await rota.continue()
+    })
+    page.on('dialog', (dialog) => void dialog.accept()) // as DUAS confirmações
+    const alvo = page.locator('.session-row', { hasText: 'título igual' }).first()
+    // Evidência de homologação: menu de contexto da lateral ABERTO na dimensão da referência.
+    await page.setViewportSize({ width: 1872, height: 1080 })
+    await alvo.click({ button: 'right' })
+    await shot(page, 'c2_menu_contexto_lateral_1872x1080')
+    await page.getByRole('menuitem', { name: 'Excluir' }).click()
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await page.getByText('exclusão recusada (E2E)').first().waitFor({ timeout: 15_000 })
+    await expect(page.locator('.session-row', { hasText: 'título igual' })).toHaveCount(2)
+
+    // Exclusão confirmada de verdade: some e NÃO reaparece no F5.
+    // A recusa anterior diverge a revisão do cliente (409 do DELETE); o próprio
+    // produto orienta "Recarregue e tente novamente" — F5 reidrata as revisões.
+    bloquearExclusao = false
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench')
+    await expect(page.locator('.session-row', { hasText: 'título igual' })).toHaveCount(2)
+    const restante = page.locator('.session-row', { hasText: 'título igual' }).first()
+    await restante.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Excluir' }).click()
+    await expect(page.locator('.session-row', { hasText: 'título igual' })).toHaveCount(1, { timeout: 15_000 })
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench')
+    // A excluída NÃO volta; a homônima continua (mesmo título — contar linhas).
+    await expect(page.locator('.session-row', { hasText: 'título igual' })).toHaveCount(1)
+    await shot(page, 'c2_j12_acoes_lateral')
   })
 })
 

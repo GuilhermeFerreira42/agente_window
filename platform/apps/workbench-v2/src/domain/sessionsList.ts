@@ -94,7 +94,8 @@ export function sessionMatchesFilters(session: Session, filters: SessionFilters)
   }
   if (filters.statuses.length > 0 && !filters.statuses.includes(session.status)) return false
   if (filters.providers.length > 0 && !filters.providers.includes(sessionProvider(session))) return false
-  if (filters.workspace && session.workspace !== filters.workspace) return false
+  // C2-RV04 — casa por RAZ (workspacePath) ou rótulo legado (ambíguo p/ compat).
+  if (filters.workspace && session.workspace !== filters.workspace && session.workspacePath !== filters.workspace) return false
   if (filters.readState === 'unread' && !session.unread) return false
   if (filters.readState === 'read' && session.unread) return false
   if (!filters.includeArchived && (session.archived || session.section === 'archived')) return false
@@ -154,7 +155,7 @@ function projetarPorContexto(groups: SessionGroup[]): SessionGroup[] {
   }
   const projetados: SessionGroup[] = []
   if (chats.length > 0) {
-    projetados.push({ id: 'Chat', label: 'Chat', section: { kind: 'contexto', contexto: 'chat', workspacePath: null }, sessions: chats })
+    projetados.push({ id: 'Chat', label: 'Chats', section: { kind: 'contexto', contexto: 'chat', workspacePath: null }, sessions: chats })
   }
   for (const [chave, pasta] of pastas) {
     projetados.push({ id: `pasta:${chave}`, label: pasta.label, section: { kind: 'contexto', contexto: 'workspace', workspacePath: chave }, sessions: pasta.sessions })

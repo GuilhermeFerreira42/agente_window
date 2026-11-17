@@ -1,5 +1,5 @@
 // ============================================================================
-// C-2 — c2PrimeiroEnvio (C2-T07..T12 · R03/R04/R05): snapshot único por
+// C-2 — c2PrimeiroEnvio (C2-T04..T07/T11/T12/T15 · R03/R04/R05): snapshot único por
 // tentativa, par exato no primeiro pedido (sem fallback), identidade
 // confirmada reaproveitada só na MESMA geração, ordem das fases (nenhum efeito
 // remoto antes do ACK), Chat nasce ask/manual com raiz nula e "Permitir tudo"
@@ -65,7 +65,7 @@ function portasRegistro(ordem: string[], extra: Partial<PortasPrimeiroEnvio> = {
 }
 
 describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
-  it('T08/T09: ordem validar→criar→persistir→publicar; erro em publicar preserva a identidade p/ retry', async () => {
+  it('T06: ordem validar→criar→persistir→publicar; erro em publicar preserva a identidade p/ retry', async () => {
     const ordem: string[] = []
     const snapshot = snapshotBase({ contexto: 'workspace', workspacePath: '/ws/demo', workspaceName: 'demo' })
     const primeira = await executarPrimeiroEnvio({
@@ -94,7 +94,7 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
     expect(segunda.sessao?.id).toBe('id-1')
   })
 
-  it('T08: edição nova (geração diferente) DESCARTA a identidade e cria outra sessão', async () => {
+  it('T05: edição nova (geração diferente) DESCARTA a identidade e cria outra sessão', async () => {
     const ordem: string[] = []
     const snapshot = snapshotBase({ contexto: 'workspace', workspacePath: '/ws/demo', workspaceName: 'demo', geracao: 1 })
     const confirmada: TentativaConfirmada = {
@@ -102,6 +102,8 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
       tentativaId: snapshot.tentativaId,
       sessao: construirSessaoChat('id-velho', snapshot.texto),
       chatId: chatIdDaSessao('id-velho'),
+      contexto: 'workspace',
+      workspacePathSolicitado: '/ws/demo',
     }
     const editado = snapshotBase({ contexto: 'workspace', workspacePath: '/ws/demo', workspaceName: 'demo', geracao: 2, tentativaId: 't-2' })
     const resultado = await executarPrimeiroEnvio({
@@ -114,7 +116,53 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
     expect(resultado.sessao?.id).toBe('id-novo')
   })
 
-  it('T09: falha em criar/persistir NÃO chama publicar (nenhum efeito antes do ACK)', async () => {
+  it('T06/RV03: geração igual com OUTRA raiz NÃO reutiliza — cria outra sessão (nunca publica na raiz antiga)', async () => {
+    const ordem: string[] = []
+    const snapshotA = snapshotBase({ contexto: 'workspace', workspacePath: '/ws/raiz-a', workspaceName: 'raiz-a' })
+    const primeira = await executarPrimeiroEnvio({
+      snapshot: snapshotA,
+      portas: portasRegistro(ordem, { publicar: async () => { ordem.push('publicar:falha'); throw new Error('rede') } }),
+      gerarId: () => 'id-a',
+    })
+    expect(primeira.ok).toBe(false)
+    expect(primeira.confirmada?.workspacePathSolicitado).toBe('/ws/raiz-a')
+
+    // Mesmo texto/geração, raiz B: identidade da A não pode publicar em A.
+    const ordem2: string[] = []
+    const snapshotB = snapshotBase({ contexto: 'workspace', workspacePath: '/ws/raiz-b', workspaceName: 'raiz-b' })
+    const segunda = await executarPrimeiroEnvio({
+      snapshot: snapshotB,
+      confirmada: primeira.confirmada ?? null,
+      portas: portasRegistro(ordem2),
+      gerarId: () => 'id-b',
+    })
+    expect(ordem2).toEqual(['criar', 'persistir', 'publicar:auto'])
+    expect(segunda.ok).toBe(true)
+    expect(segunda.sessao?.id).toBe('id-b')
+    expect(segunda.sessao?.workspacePath).not.toBe('/ws/raiz-a')
+  })
+
+  it('T06/RV03: Chat com geração igual e MESMA raiz reutiliza a identidade (retry sem novo create)', async () => {
+    const ordem: string[] = []
+    const snapshot = snapshotBase({ contexto: 'chat', workspacePath: null, workspaceName: null })
+    const primeira = await executarPrimeiroEnvio({
+      snapshot,
+      portas: portasRegistro(ordem, { publicar: async () => { ordem.push('publicar:falha'); throw new Error('rede') } }),
+      gerarId: () => 'id-chat',
+    })
+    expect(primeira.confirmada?.contexto).toBe('chat')
+    const ordem2: string[] = []
+    const segunda = await executarPrimeiroEnvio({
+      snapshot,
+      confirmada: primeira.confirmada ?? null,
+      portas: portasRegistro(ordem2),
+      gerarId: () => 'id-outro',
+    })
+    expect(ordem2).toEqual(['publicar:auto'])
+    expect(segunda.sessao?.id).toBe('id-chat')
+  })
+
+  it('T06: falha em criar/persistir NÃO chama publicar (nenhum efeito antes do ACK)', async () => {
     const ordem: string[] = []
     const resultado = await executarPrimeiroEnvio({
       snapshot: snapshotBase({ contexto: 'workspace', workspacePath: '/ws/demo', workspaceName: 'demo' }),
@@ -126,7 +174,7 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
     expect(resultado.confirmada).toBeUndefined()
   })
 
-  it('T09: snapshot inválido (texto vazio/Pasta sem raiz) recusa na fase validar SEM tocar nas portas', async () => {
+  it('T05: snapshot inválido (texto vazio/Pasta sem raiz) recusa na fase validar SEM tocar nas portas', async () => {
     const criarWorktree = vi.fn()
     const resultado = await executarPrimeiroEnvio({
       snapshot: snapshotBase({ texto: '   ', geracao: 0 }),
@@ -144,7 +192,7 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
     expect(semRaiz).toMatchObject({ ok: false, fase: 'validando' })
   })
 
-  it('T10: o PRIMEIRO pedido recebe o par exato escolhido (sem fallback para Auto)', async () => {
+  it('T07: o PRIMEIRO pedido recebe o par exato escolhido (sem fallback para Auto)', async () => {
     const publicar = vi.fn<(sessao: Session, chatId: string, snap: SnapshotPrimeiroEnvio) => Promise<void>>(async () => {})
     await executarPrimeiroEnvio({
       snapshot: snapshotBase({ selecaoModelo: { tipo: 'explicita', providerId: 'p1', modelId: 'm1' } }),
@@ -155,7 +203,7 @@ describe('c2PrimeiroEnvio — R03/R04 fases e snapshot explícito', () => {
     expect(publicar.mock.calls[0][2].selecaoModelo).toEqual({ tipo: 'explicita', providerId: 'p1', modelId: 'm1' })
   })
 
-  it('T10: sessão Chat nasce sem raiz, sem worktree e com contexto chat (contrato C-1 preservado)', async () => {
+  it('T15: sessão Chat nasce sem raiz, sem worktree e com contexto chat (contrato C-1 preservado)', async () => {
     const persistir = vi.fn<(sessao: Session) => Promise<void>>(async () => {})
     await executarPrimeiroEnvio({
       snapshot: snapshotBase({ contexto: 'chat', workspacePath: null, workspaceName: null, texto: 'criar chat' }),
@@ -204,12 +252,12 @@ function Monte({ onSubmit }: { onSubmit: (entrada: EntradaSubmitLanding) => unkn
   )
 }
 
-describe('c2PrimeiroEnvio — landing como aceitador (T07/T08)', () => {
-  it('T07: um clique = UMA tentativa; falha preserva o texto e a nova tentativa mantém a geração', async () => {
+describe('c2PrimeiroEnvio — landing como aceitador (T04/T07)', () => {
+  it('T04: um clique = UMA tentativa; falha preserva o texto e a nova tentativa mantém a geração', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
       .mockImplementationOnce(async (entrada: EntradaSubmitLanding) => {
-        entrada.aoConfirmar({ geracao: entrada.snapshot.geracao, tentativaId: entrada.snapshot.tentativaId, sessao: construirSessaoChat('id-1', entrada.snapshot.texto), chatId: chatIdDaSessao('id-1') })
+        entrada.aoConfirmar({ geracao: entrada.snapshot.geracao, tentativaId: entrada.snapshot.tentativaId, sessao: construirSessaoChat('id-1', entrada.snapshot.texto), chatId: chatIdDaSessao('id-1'), contexto: 'chat', workspacePathSolicitado: null })
         return false
       })
       .mockResolvedValue(true)

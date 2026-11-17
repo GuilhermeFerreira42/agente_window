@@ -1,3 +1,11 @@
+# 13/11/2026 (6) — C-2 implementada; achados RV01–RV08 do parecer corrigidos; gates verdes; aguarda homologação
+
+Implementação da C-2 na branch `0f2e5de2-agente-window` a partir do pacote `memoria-de-projeto/C-2/C-2/` e do parecer independente (`parecer/PARECER_C_2.md`, RV01–RV08). Duas etapas: **`7b0292e`** (landing do centro com seletor LLM real no lugar do Copilot, rascunho do App no composer, adaptação 800×600, sem "This Computer", PT-BR) e a **correção dos oito achados do parecer** no mesmo working tree — RV01 seleção explícita de provedor/modelo/permissão/mode confirmada no primeiro envio; RV02 `esperarPublicacao` publica ANTES de iniciar o run, com retry na MESMA sessão via banner `Tentar novamente`; RV03 rascunho do landing é fonte única e preservado em recusa/erro; RV04 `Chats` e grupos de projeto separados na lateral com contagem; RV05 menus e foco do composer; RV06 chip `Contexto não medido`; RV07 composição da referência (título 26/600, faixa colada ao card 800×86, tip box abaixo); RV08 jornadas T19–T30 implementadas em `e2e/c2_centro.spec.ts`.
+
+**Gates (Debian/Arena, Node 26 canônico):** typecheck 0 · FOCO (26 arquivos do `VALIDAR_C2_WINDOWS.ps1`) **422/13/0** · ampla diff nominal **0/0** vs baseline · lint **111 = 111** · build exit 0 · **E2E C-2 12/12 (J1–J12)**. Evidências em `memoria-de-projeto/execucao-c2/` (`e2e-c2-jornadas.md` e JSONs). **Atualizados 03/06/07/09; `08` intocado (nenhum aceite inferido); Windows do `VALIDAR_C2_WINDOWS.ps1` não executado (pendência); sem merge (PR #1 OPEN); U-1/C-3/MM-I/MM-O não iniciadas.** Comparação de screenshots com as referências do parecer e homologação são o passo seguinte.
+
+---
+
 # 16/11/2026 (5) — MM-0 homologada pelo proprietário; publicação autorizada
 
 O proprietário confirmou expressamente o aceite da MM-0 e solicitou push. Registrados escopo, origem do relato de teste das sete ferramentas, sucesso remoto informado do Chat Google e ressalvas técnicas no 08. Correção Google/LiteLLM sem ferramentas em **055bbd4** (140/140, tipos/lint, testes HTTP locais reais contra fixture); não implementa mídia. Atualizados 03/06/08/09 e este histórico, sem modificar os registros de testes anteriores nem inferir aceite de outras frentes. Sem merge e sem iniciar C-2.
