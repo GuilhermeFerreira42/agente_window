@@ -1,3 +1,9 @@
+# Esclarecimento — Chat não desabilita os acionadores dos menus (17/11/2026)
+
+Na landing Chat, permitir abrir Perguntar, Interativo e Permissões manuais. Bloquear **as opções**, com motivo, quando dependem de pasta: Agente/Editar/Planejar e Permitir tudo. Não voltar a aplicar `semPasta` ao disabled do acionador inteiro. Restrições efetivas C-1 e trava durante envio permanecem. + segue C-3; nenhuma nova permissão de execução, modalidade ou fase foi habilitada.
+
+---
+
 # Esclarecimento de escopo — 17/11/2026: barra da landing
 
 Agente, Interativo/Planejar e permissões agora usam controles reais e o mesmo rascunho do primeiro envio; componentes próprios, sem mais lógica no App. **Proprietário escolheu expressamente manter anexos na C-3:** + permanece indisponível com motivo. Autopilot/permissões assistidas/sandbox não foram implementados apenas por constarem da referência visual. Publicação dos ajustes autorizada, sem avanço automático de fatia nem alteração de limites de segurança. Provas atuais em03/09; dívida C1-EXCLUSAO-01 preservada.

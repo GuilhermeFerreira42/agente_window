@@ -1,3 +1,9 @@
+# 17/11/2026 — corrigido bloqueio dos menus em Chat
+
+Proprietário apontou nova captura com Chat selecionado. Causa: o bloqueio global de semPasta em LandingExecutionControls impedia abrir menus, embora a rodada anterior provasse os controles em Pasta. Separado bloqueio de envio do bloqueio por opção; menus abrem em Chat, mas escolhas restritas continuam desabilitadas e guardadas também nos callbacks. Projeções efetivas ask/manual e raiz nula preservadas, sem tocar App/backend. Teste T11 atualizado e novo teste de interação+snapshot; J4 integrado passa a abrir os três menus em Chat. Foco36/36, C2E2E14/14 e tipos/build/lint0, perfis sintéticos. Documentação atualizada, publicação sob autorização vigente, sem merge/aceite/avanço de fase.
+
+---
+
 # 17/11/2026 — controles reais da barra da landing; commit/push autorizados
 
 Após o menu único de contexto, proprietário apontou Agente/Interativo/permissões e autorizou publicação na branch de trabalho. Extraído `LandingExecutionControls`: Interativo antes era span, agora seletor; Planejar usa o modo existente, permissões usam o nível existente com confirmação para Permitir tudo. Menu único alterna seções de execução e permissões, enquanto o seletor de modos preserva os quatro modos atuais. Popups portados ao body evitam corte por ancestrais; posicionamento acima da barra, teclado e foco verificados. Nenhum novo estado/regra no App, backend ou armazenamento paralelo.

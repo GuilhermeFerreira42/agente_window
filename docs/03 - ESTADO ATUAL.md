@@ -1,3 +1,11 @@
+# Estado vigente — 17/11/2026 — menus também abrem no contexto Chat
+
+Correção após captura do proprietário: o bloqueio `semPasta || pending` desabilitava os três acionadores da barra em Chat. Agora **Perguntar, Interativo e Permissões manuais abrem seus menus também sem pasta**. Somente as opções incompatíveis ficam desabilitadas, com motivo visível: Agente/Editar/Planejar e Permitir tudo exigem conversa com pasta. Perguntar, Interativo e manual continuam selecionáveis em Chat; snapshot efetivo permanece `ask/manual`, raiz nula. Durante envio pendente, acionadores e opções continuam bloqueados. Backend, App.tsx e regras C-1 não foram alterados.
+
+Windows: foco **36/36**, E2E C-2 **14/14**, tipos/build/lint do perímetro **exit0**. J4 agora abre os três menus reais em Chat e verifica opções permitidas/bloqueadas; teste de componente envia após interação e comprova snapshot Chat ask/manual sem raiz. Perfil sintético/provedor HTTP local, sem dados pessoais; ampla/regressão completa e C-1 não repetidas nesta correção pontual. Capturas/logs externos: `memoria-de-projeto/correcao-menus-chat-2026-11-17/`. Publicação na mesma branch dentro da autorização vigente; sem merge/aceite humano ou próxima fatia. + continua reservado à C-3 por escolha expressa. Registros abaixo históricos.
+
+---
+
 # Estado vigente — 17/11/2026 — controles da landing corrigidos; publicação autorizada
 
 Proprietário autorizou commit e push dos ajustes da tela inicial e solicitou corrigir Agente/Interativo/permissões. `LandingExecutionControls` passou a ser dono apenas da apresentação desses controles; recebe modo/permissão do rascunho existente, sem estado de execução paralelo nem alteração no App.tsx. **Interativo deixou de ser texto estático:** abre a seção de execução, alterna Interativo/Planejar e compartilha o menu de permissões. O seletor de modos mantém Agente/Editar/Perguntar/Planejar. Menus abrem acima da barra, fora do recorte dos ancestrais, com teclado/Escape/clique fora e retorno de foco.

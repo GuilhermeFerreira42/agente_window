@@ -172,11 +172,22 @@ describe('c2Composer — C2-T11/T01 Chat × Pasta', () => {
     const user = userEvent.setup()
     montar(() => true)
     const modo = screen.getByRole('button', { name: /Modo: Perguntar/ })
-    expect(modo).toBeDisabled()
+    expect(modo).toBeEnabled()
     expect(modo.getAttribute('aria-label')).toContain('Chat começa em Perguntar')
     const permissao = screen.getByRole('button', { name: /Permissão: Permissões manuais/ })
-    expect(permissao).toBeDisabled()
+    expect(permissao).toBeEnabled()
     expect(screen.getByTestId('landing-motivo-chat')).toBeInTheDocument()
+    await user.click(modo)
+    expect(screen.getByRole('menuitemradio', { name: 'Perguntar' })).toBeEnabled()
+    for (const name of ['Agente', 'Editar', 'Planejar']) {
+      expect(screen.getByRole('menuitemradio', { name: new RegExp(name) })).toBeDisabled()
+    }
+    await user.keyboard('{Escape}')
+    await user.click(permissao)
+    expect(screen.getByRole('menuitemradio', { name: /Permissões manuais/ })).toBeEnabled()
+    expect(screen.getByRole('menuitemradio', { name: /Permitir tudo/ })).toBeDisabled()
+    await user.keyboard('{Escape}')
+
 
     // Em Pasta, o seletor de modos abre com as 4 opções.
     // Pasta real validada aplica o contexto pelo dono.
@@ -226,6 +237,23 @@ function MonteTentativa({ onSubmit }: { onSubmit: (entrada: EntradaSubmitLanding
 }
 
 describe('c2Composer — C2-T18/RV06 menus com teclado e retorno ao acionador', () => {
+  it('Chat abre os três menus e envia apenas ask/manual após interação', async () => {
+    const user = userEvent.setup(); const submit = vi.fn(() => false)
+    montar(submit)
+    await user.click(screen.getByRole('button', { name: /^Modo:/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /Agente/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Perguntar' }))
+    await user.click(screen.getByTestId('landing-interativo'))
+    expect(screen.getByRole('menuitemradio', { name: /Planejar/ })).toBeDisabled()
+    await user.click(screen.getByRole('menuitemradio', { name: /Interativo/ }))
+    await user.click(screen.getByRole('button', { name: /^Permissão:/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: /Permissões manuais/ }))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'chat continua sem ferramentas')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ contexto: 'chat', modo: 'ask', permissao: 'manual', workspacePath: null }) }))
+  })
+
   it('Interativo abre o menu real; Planejar e permissões compõem o mesmo snapshot', async () => {
     const user = userEvent.setup(); const submit = vi.fn(() => false)
     montar(submit)

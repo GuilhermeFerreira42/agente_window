@@ -26,7 +26,7 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
   const [position, setPosition] = useState({ top: 0, left: 0, width: 310 })
   const buttons = useRef<Partial<Record<Menu, HTMLButtonElement | null>>>({})
   const menu = useRef<HTMLDivElement>(null)
-  const locked = semPasta || pending
+  const locked = pending
   const mode = semPasta ? 'ask' : modo
   const permission = semPasta ? 'manual' : permissao
   const close = useCallback((restore = true) => { setOpen(null); if (restore) buttons.current[anchor]?.focus() }, [anchor])
@@ -61,9 +61,9 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
     return () => document.removeEventListener('pointerdown', outside, true)
   }, [open, close])
 
-  const chooseMode = (value: ModoAgir) => { if (!locked) { onModo(value); close() } }
+  const chooseMode = (value: ModoAgir) => { if (!locked && (!semPasta || value === 'ask')) { onModo(value); close() } }
   const choosePermission = (value: NivelPermissaoAgir) => {
-    if (locked) return
+    if (locked || (semPasta && value !== 'manual')) return
     if (value === 'allow-all' && !window.confirm('ATENÇÃO — Permitir tudo: tools e comandos de terminal poderão executar sem confirmações individuais, acessar arquivos fora do workspace e modificar ou apagar dados, limitados pelos privilégios da sua conta no sistema operacional. Perguntar e Planejar continuam somente leitura; proteções do servidor e da origem local permanecem ativas. Você pode voltar a Permissões manuais a qualquer momento. Ativar?')) { close(); return }
     onPermissao(value); close()
   }
@@ -100,15 +100,15 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
         if (items[next]) { event.preventDefault(); items[next].focus() }
       }}>
       {open === 'modos' ? modos.map((item) => <button key={item.id} type="button" role="menuitemradio" aria-checked={mode === item.id}
-        className="session-landing-menu-item" disabled={locked} onClick={() => chooseMode(item.id)}><span><strong>{item.label}</strong></span></button>) : <>
+        className="session-landing-menu-item" disabled={locked || (semPasta && item.id !== 'ask')} onClick={() => chooseMode(item.id)}><span><strong>{item.label}</strong>{semPasta && item.id !== 'ask' && <small>Escolha uma pasta para usar este modo</small>}</span></button>) : <>
         <button type="button" role="menuitem" className="session-landing-menu-item landing-execution-heading" disabled={locked} onClick={() => setOpen('execucao')}>
           Modo de execução <small>{executionLabel}</small>
         </button>
         {open === 'execucao' && <>
           <button type="button" role="menuitemradio" aria-checked={mode !== 'plan'} className="session-landing-menu-item" disabled={locked} onClick={() => chooseMode(mode === 'plan' ? 'agent' : mode)}>
             <span><strong>Interativo</strong><small>Colaboração passo a passo</small></span></button>
-          <button type="button" role="menuitemradio" aria-checked={mode === 'plan'} className="session-landing-menu-item" disabled={locked} onClick={() => chooseMode('plan')}>
-            <span><strong>Planejar</strong><small>Planeja antes de executar; somente leitura</small></span></button>
+          <button type="button" role="menuitemradio" aria-checked={mode === 'plan'} className="session-landing-menu-item" disabled={locked || semPasta} onClick={() => chooseMode('plan')}>
+            <span><strong>Planejar</strong><small>{semPasta ? 'Escolha uma pasta para planejar' : 'Planeja antes de executar; somente leitura'}</small></span></button>
           <button type="button" role="menuitem" className="session-landing-menu-item" disabled title="Execução Autopilot ainda não está disponível.">
             <span>Autopilot<small>Ainda não disponível</small></span></button>
         </>}
@@ -120,8 +120,8 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
             <span><strong>Permissões manuais</strong><small>Solicita as aprovações necessárias</small></span></button>
           <button type="button" role="menuitem" className="session-landing-menu-item" disabled title="Permissões assistidas ainda não estão disponíveis.">
             <span>Permissões assistidas<small>Ainda não disponíveis</small></span></button>
-          <button type="button" role="menuitemradio" aria-checked={permission === 'allow-all'} className="session-landing-menu-item" disabled={locked} onClick={() => choosePermission('allow-all')}>
-            <span><strong>Permitir tudo</strong><small>Requer confirmação a cada ativação</small></span></button>
+          <button type="button" role="menuitemradio" aria-checked={permission === 'allow-all'} className="session-landing-menu-item" disabled={locked || semPasta} onClick={() => choosePermission('allow-all')}>
+            <span><strong>Permitir tudo</strong><small>{semPasta ? 'Disponível apenas em conversa com pasta' : 'Requer confirmação a cada ativação'}</small></span></button>
           <button type="button" role="menuitem" className="session-landing-menu-item" disabled title="Sandbox de terminal ainda não está disponível.">
             <span>Sandbox de terminal<small>Ainda não disponível</small></span></button>
         </>}

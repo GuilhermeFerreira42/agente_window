@@ -1,3 +1,11 @@
+# 17/11/2026 — correção pontual: menus da landing em Chat
+
+Foco `LandingContextMenu.test.tsx`, `SessionLanding.test.tsx`, `c2Composer.test.tsx`: **36/36**. E2E `e2e/c2_centro.spec.ts`: **14/14** no Chrome/Windows com Node26 canônico e perfil sintético; J4 abre os três menus em Chat e inspeciona opções restritas; J14 conserva prova de Workspace. Typecheck/build Vite e lint de LandingExecutionControls/c2Composer: **exit0**. Comandos e infraestrutura de perfil iguais às rodadas abaixo; scripts/logs/capturas da rodada em pasta externa `memoria-de-projeto/correcao-menus-chat-2026-11-17/`.
+
+Novo teste unitário: interagir com os três menus em Chat, tentar opções desabilitadas, selecionar Perguntar/Interativo/manual e enviar; snapshot continua contexto chat, modo ask, permissão manual e raiz null. Sem chamadas a modelos externos ou dados pessoais. Não repetidas ampla, regressão completa ou C-1 nesta mudança pontual; placares dessas baterias abaixo são históricos, não reexecuções desta rodada. Sem interação nativa manual, aceite humano ou próximo escopo.
+
+---
+
 # 17/11/2026 — revalidação dos controles da barra da landing
 
 Sobre a rodada do menu único, testes finais com Node26 canônico/Chrome Windows e perfis isolados: **35/35** nas três suítes da landing; **130 aprovados/13 pulados** nos sete arquivos já listados abaixo; **14/14 C-2 + 6/6 C-1**. Typecheck/build e lint do perímetro (agora incluindo `LandingExecutionControls.tsx`) exit0. Os resultados anteriores abaixo permanecem históricos.
