@@ -1,3 +1,9 @@
+# Comportamento vigente da landing — tema/contexto/recarga (17/11/2026)
+
+Nova sessão preserva a visibilidade e a view ativa da Side Bar; não chamar `showView('explorer')` apenas para abrir a landing. F5 mantém o destino inicial quando o usuário estava nele; escolher conversa existente volta a preservar a conversa pelo mecanismo atual. Preferência de destino é UI, sem persistir conteúdo/permissões/pasta pendente. Trocar para Chat remove seleção da landing e árvore anterior, sem apagar histórico de pastas ou arquivos; alterações não salvas bloqueiam a troca pelo guarda existente. Menu mostra caminho atual ao abrir e filtra recentes somente após edição. Tema claro também cobre os dois composers. Gates em03/09; nenhuma dívida anterior, etapa de memória ou fase futura aceita por consequência.
+
+---
+
 # Preferência vigente da landing — 17/11/2026
 
 Menus da barra **para baixo**, conforme nova instrução do proprietário, com rolagem quando faltar altura. Composer expansível (mínimo inicial86px, textarea até200px/área útil, rolagem posterior); não reinstalar altura fixa para preservar somente a captura vazia do mockup. Autopilot, assistência de permissões e sandbox continuam sem implementação própria, fora deste ajuste; não confundir permitir tudo com isolamento ou autonomia adicional. + continua reservado à C-3. Nenhuma dívida anterior foi quitada por esses ajustes de layout; sem avanço de fase.

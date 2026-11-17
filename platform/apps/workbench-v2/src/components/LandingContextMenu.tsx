@@ -21,6 +21,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
   pickerPending = false, nativeAvailable = true }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [edited, setEdited] = useState(false)
   const [recent, setRecent] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,6 +34,10 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
   const inFlight = useRef(false)
   const locked = disabled || Boolean(disabledReason) || pickerPending || validating
   const close = (focus = true) => { setOpen(false); if (focus) trigger.current?.focus() }
+
+  useEffect(() => {
+    if (open && !edited) setQuery(contexto === 'workspace' ? workspacePath ?? '' : '')
+  }, [open, edited, contexto, workspacePath])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -58,6 +63,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
       .catch(() => { if (active) setRecentError(true) })
       .finally(() => { if (active) setLoading(false) })
     input.current?.focus()
+    input.current?.select()
     const outside = (event: PointerEvent) => {
       if (!wrap.current?.contains(event.target as Node) && !inFlight.current) close(false)
     }
@@ -76,7 +82,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
     } finally { inFlight.current = false; setValidating(false) }
   }
   const paths = [...new Set([...(workspacePath ? [workspacePath] : []), ...recent])]
-    .filter((path) => path.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .filter((path) => !edited || path.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   const label = contexto === 'chat' ? 'Chat' : workspace.split(/[\\/]/).filter(Boolean).pop() || workspace
 
   return <div className="session-landing-context-menu" ref={wrap}>
@@ -84,7 +90,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
       data-testid="landing-contexto" aria-label={`${contexto === 'chat' ? 'Contexto: Chat. Escolher chat ou pasta' : `Workspace atual: ${workspace}. Escolher chat ou pasta`}${disabledReason ? `. ${disabledReason}` : ''}`}
       aria-haspopup="dialog" aria-expanded={open} aria-busy={pickerPending || validating}
       title={disabledReason ?? (contexto === 'chat' ? 'Chat sem pasta' : workspace)}
-      disabled={locked} onClick={() => { setError(''); setOpen((value) => !value) }}>
+      disabled={locked} onClick={() => { setError(''); setEdited(false); setQuery(contexto === 'workspace' ? workspacePath ?? '' : ''); setOpen((value) => !value) }}>
       {contexto === 'chat' ? <MessageSquare size={14} aria-hidden="true" /> : <FolderOpen size={14} aria-hidden="true" />}
       <span data-testid={contexto === 'chat' ? 'landing-chat-chip' : 'landing-workspace-chip'}>{label}</span>
       <ChevronDown size={13} aria-hidden="true" />
@@ -103,7 +109,7 @@ export function LandingContextMenu({ contexto, workspace, workspacePath, onChang
       }}>
       <input ref={input} value={query} disabled={locked}
         aria-label="Buscar ou digitar caminho da pasta" placeholder="Buscar ou digitar caminho da pasta"
-        onChange={(event) => { setQuery(event.target.value); setError('') }}
+        onChange={(event) => { setQuery(event.target.value); setEdited(true); setError('') }}
         onKeyDown={(event) => { if (event.key === 'Enter' && query.trim()) { event.preventDefault(); void choosePath(query) } }} />
       <button type="button" className="session-landing-menu-item" disabled={locked || !onChangeContexto}
         aria-pressed={contexto === 'chat'} onClick={() => { onChangeContexto?.('chat'); close() }}>

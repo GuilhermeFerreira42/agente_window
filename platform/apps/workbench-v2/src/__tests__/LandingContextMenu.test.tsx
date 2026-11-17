@@ -5,11 +5,25 @@ import { LandingContextMenu } from '../components/LandingContextMenu'
 import { listRecentSessionWorkspaces } from '../services/sessions/sessionsClient'
 
 vi.mock('../services/sessions/sessionsClient', () => ({ listRecentSessionWorkspaces: vi.fn() }))
-beforeEach(() => { vi.mocked(listRecentSessionWorkspaces).mockResolvedValue(['/a/repo', '/b/repo']) })
+beforeEach(() => { vi.mocked(listRecentSessionWorkspaces).mockReset().mockResolvedValue(['/a/repo', '/b/repo']) })
 const props = () => ({ contexto: 'chat' as const, workspace: 'Nenhuma pasta aberta', workspacePath: null,
   onChangeContexto: vi.fn(), onValidateWorkspacePath: vi.fn().mockResolvedValue(undefined) })
 
 describe('LandingContextMenu — contexto único antes da criação', () => {
+  it('mostra o caminho selecionado sem esconder as demais recentes até a edição', async () => {
+    const user = userEvent.setup(); const p = props()
+    render(<LandingContextMenu {...p} contexto="workspace" workspace="/a/repo" workspacePath="/a/repo" />)
+    await user.click(screen.getByTestId('landing-contexto'))
+    const input = screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' }) as HTMLInputElement
+    expect(input).toHaveValue('/a/repo')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe('/a/repo'.length)
+    expect(await screen.findByRole('button', { name: /\/b\/repo/ })).toBeVisible()
+    await user.keyboard('/b/repo')
+    expect(screen.queryByRole('button', { name: /^repo \/a\/repo$/ })).not.toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    expect(p.onValidateWorkspacePath).toHaveBeenCalledWith('/b/repo')
+  })
   it('não carrega histórico nem acessa pastas até abrir; recentes homônimas mostram a raiz completa', async () => {
     const user = userEvent.setup(); render(<LandingContextMenu {...props()} />)
     expect(listRecentSessionWorkspaces).not.toHaveBeenCalled()

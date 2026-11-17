@@ -286,7 +286,12 @@
   --vscode-agents-background: var(--vscode-editor-background);
   --vscode-sideBar-background: #f8f8f8;
   --vscode-sideBar-foreground: #3b3b3b;
-  --vscode-agentsLandingPicker-background: #eceae4;
+  --vscode-agentsLandingPicker-background: var(--vscode-editorWidget-background);
+  --vscode-agentsChatInput-background: var(--vscode-input-background);
+  --vscode-agentsChatInput-foreground: var(--vscode-input-foreground);
+  --vscode-agentsChatInput-border: var(--vscode-input-border);
+  --vscode-agentsChatInput-focusBorder: var(--vscode-focusBorder);
+  --vscode-agentsChatInput-placeholderForeground: var(--vscode-input-placeholderForeground);
   --vscode-agentsTab-activeBackground: rgba(0, 0, 0, 0.06);
   --vscode-agentsTab-hoverBackground: rgba(0, 0, 0, 0.04);
   --vscode-agentsOverlay-background: rgb(0, 0, 0, 0.4);

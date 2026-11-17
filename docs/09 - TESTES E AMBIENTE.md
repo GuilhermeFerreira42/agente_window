@@ -1,3 +1,20 @@
+# 17/11/2026 — correções de estado/tema/navegação da landing
+
+| Gate Windows (Node26 canônico/Chrome) | Resultado |
+|---|---|
+| Regressão dos sete arquivos anteriores + `landingContextState.test.tsx` | **135 aprovados / 13 pulados**, oito arquivos |
+| C-2 `e2e/c2_centro.spec.ts` | **16/16** |
+| C-1 `e2e/c1_correcoes.spec.ts` | **6/6** |
+| Typecheck / build | **exit0 / exit0** |
+| Lint hook/menu/testes alterados | **exit0** |
+| Lint App vs base33541c1 por stdin, mesmo nome de arquivo/regras | **17 = 17**, mesmas mensagens, zero novas |
+
+**J16 RED→GREEN real:** pré-condição cria conversa existente; alterna tema claro e verifica CSS computado dos dois composers; escolhe pasta validada, reabre menu e confere input; volta para Chat e exige árvore ausente/vista vazia; F5 exige landing visível mesmo com conversas no banco; fecha Explorer, Nova sessão deve mantê-lo fechado, abre e repete mantendo aberto. `expect.soft` capturou todas as divergências na base antes de corrigir. Acrescentados testes de prefill/busca e hook: remount, mudança de destino, limpeza da raiz e storage inválido/quota.
+
+Scripts/logs/RED/capturas e `gates.json`/`lint-app-comparacao.json` externos em `memoria-de-projeto/correcao-estado-landing-2026-11-17/`; comandos e política de perfil são os mesmos das rodadas abaixo. Perfis descartáveis, fixture HTTP local estrita; sem API remota/dados reais. Ampla não repetida. Primeiro rascunho da sonda foi interrompido por faltar conversa prévia no fixture; a reprodução documentada é a versão corrigida com essa pré-condição, não o timeout de infraestrutura. Nenhum teste dá aceite humano ou avança a fase.
+
+---
+
 # 17/11/2026 — validação de crescimento real e direção dos menus
 
 Node26 canônico, Chrome Windows, perfis descartáveis: **36/36** em LandingContextMenu/SessionLanding/c2Composer; **15/15** em `e2e/c2_centro.spec.ts`; typecheck, build e lint de SessionLanding/LandingExecutionControls **exit0**. Scripts/logs e capturas externos em `memoria-de-projeto/correcao-crescimento-menus-2026-11-17/`; infraestrutura de isolamento/reprodução igual às rodadas abaixo.

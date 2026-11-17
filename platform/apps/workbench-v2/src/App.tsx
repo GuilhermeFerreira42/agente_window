@@ -13,7 +13,7 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
+import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace } from './services/sessions/sessionsClient'
 import { useSessionPersistence, type SessionPersistenceIssue } from './services/sessions/useSessionPersistence'
 import { mergeRecoveredSessions, mergeHydratedSessions, readSessionRecoveries, removeSessionRecovery, restoreUnsavedSessions, descartarRecuperacoesExcluidas } from './services/sessions/sessionRecovery'
 import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
@@ -104,6 +104,7 @@ import { commitDraft, createManagementState, discardDraft, openDraft, selectProv
 import { ChatPanel } from './components/ChatPanel'
 import { EditorArea } from './components/EditorArea'
 import { MobileDiffView } from './components/MobileDiffView'
+import { useLandingContext } from './hooks/useLandingContext'
 import { SessionLanding } from './components/SessionLanding'
 import { SessionSidebar } from './components/SessionSidebar'
 import { SessionsPicker } from './components/SessionsPicker'
@@ -156,17 +157,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const hydrationView = useRef({ sessions, activeSessionId })
   hydrationView.current = { sessions, activeSessionId }
   const [fonteHistorica, setFonteHistorica] = useState<FonteEntreChats>()
-  const [newSessionLanding, setNewSessionLanding] = useState(false)
+  const { newSessionLanding, setNewSessionLanding,
+    selectedWorkspace, setSelectedWorkspace, landingContexto, setLandingContexto } = useLandingContext()
   // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
   // a primeira da lista e a conversa "parecia" perdida.
   useEffect(() => {
     if (!activeSessionId) return
     try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId) } catch { /* Selection storage must not invalidate a confirmed save/copy. */ }
   }, [activeSessionId])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
   // C-1 (SPEC C §2) — modalidade da landing: Chat é o DEFAULT; Pasta exige
   // escolha explícita de pasta real (sem fallback 'workspace-local').
-  const [landingContexto, setLandingContexto] = useState<'chat' | 'workspace'>('chat')
   const [rascunhoLanding, setRascunhoLanding] = useState<RascunhoLanding>(rascunhoInicial)
   const tentativaLanding = useLandingTentativa() // C2-RV05: lock/identidade sobrevivem a remount
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
@@ -184,7 +184,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // A landing can sit above older sessions. Its selected folder is a pending
   // context for the new session and must drive Explorer before the first chat
   // message; it must not rewrite the older persisted session.
-  const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : (currentSessionWorkspacePath ?? undefined)
+  const explorerWorkspacePath = landingVisible ? (landingContexto === 'workspace' ? selectedWorkspace?.path : undefined) : (currentSessionWorkspacePath ?? undefined)
   // C-1/B3 — ativação EXPLÍCITA: o Explorer só liga com uma raiz real. Sessão
   // Chat (workspacePath nulo) fica DESLIGADA — sem /fs/workspace, sem
   // discoverRoot, sem módulo montado sobre a raiz global; a vista vira o
@@ -1330,10 +1330,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // O rascunho e o worktree só passam a existir após a primeira mensagem.
     if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
     removeSessionResources(BOOT_SESSION_ID)
-    setSelectedWorkspace(undefined)
     setLandingContexto('chat')
     setNewSessionLanding(true)
-    layout.showView('explorer')
     setMobilePane('chat')
     notify('Nova sessão pronta para escolher contexto')
   }
@@ -2428,7 +2426,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       <SessionLanding
         workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'}
         workspacePath={selectedWorkspace?.path ?? null} workspaceName={selectedWorkspace?.name ?? 'Nenhuma pasta aberta'}
-        contexto={landingContexto} onChangeContexto={setLandingContexto} onSubmit={handleLandingSubmit}
+        contexto={landingContexto} onChangeContexto={contexto => { if (editorFilesSaved()) setLandingContexto(contexto) }} onSubmit={handleLandingSubmit}
         rascunhoControlado={rascunhoLanding} onChangeRascunho={setRascunhoLanding} tentativaControlada={tentativaLanding}
         onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending}
         isFileSystemSupported={workspaceNativePickerAvailable} onValidateWorkspacePath={handleChangeActiveWorkspace}

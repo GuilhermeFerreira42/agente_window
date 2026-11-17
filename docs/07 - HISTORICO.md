@@ -1,3 +1,11 @@
+# 17/11/2026 — corrigidos tema claro, caminho, Explorer, F5 e Nova sessão
+
+Proprietário trouxe cinco capturas/comportamentos. Reprodução integrada J16 com conversa já existente confirmou fundo escuro nos dois composers, input vazio apesar da pasta selecionada, árvore antiga após escolher Chat, F5 abrindo conversa anterior e Nova sessão reabrindo Explorer fechado. Corrigidos tokens centrais claros, prefill/busca do menu e transição para Chat; extraído `useLandingContext` com destino booleano best-effort e sem persistir pastas/grants. App perdeu duas linhas; removida abertura forçada do Explorer, acrescentado apenas wiring do guarda existente de arquivos não salvos.
+
+J16 verde e captura clara conferida; regressão135/13/0 (oito arquivos), C2E2E16/16 e C1E2E6/6, tipos/build0, lint perímetro0 e mesmas17 mensagens do App na comparação nominal com a base. Sem dados reais, APIs externas, ampla nova, aceite ou próxima fatia. Canônicos03/06/07/09 atualizados,08 preservado; publicação na mesma branch conforme autorização vigente.
+
+---
+
 # 17/11/2026 — menus descendentes e crescimento real do input
 
 Proprietário pediu menus para baixo e corrigir expansão do input, além de esclarecer opções futuras. Reproduzido J15 contra o código anterior: após sete linhas, card permaneceu86px (esperado>136). Removida altura fixa do card, mantido mínimo86px; textarea não é comprimido por flex e continua com teto200px/área útil. Recalcula quando largura/viewport mudam. LandingExecutionControls ancora o portal abaixo do botão e limita sua altura, preservando rolagem. App/backend intactos.

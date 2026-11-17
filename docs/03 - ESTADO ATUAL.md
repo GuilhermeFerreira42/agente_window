@@ -1,3 +1,15 @@
+# Estado vigente — 17/11/2026 — cinco correções de tema/contexto/navegação da landing
+
+Corrigidos os cinco achados do proprietário: **tema claro** agora define o fundo/cores centrais dos composers da landing e das conversas; **menu de contexto** preenche o caminho selecionado e mantém outras recentes visíveis até editar a busca; **voltar para Chat** limpa a seleção pendente e desmonta a árvore do Explorer; **F5 na landing** permanece na tela inicial; **Nova sessão** preserva aba/visibilidade atuais da Side Bar em vez de forçar o Explorer aberto.
+
+Novo `useLandingContext` é dono dos três estados de contexto/destino antes residentes no App. Guarda somente uma preferência booleana de destino em `agente-window:landing-visible:v1`, não conversas/rascunhos/pastas/permissões. Abrir uma conversa desmarca o destino inicial; root da landing continua exigindo escolha explícita validada e reinicia em Chat após reload. Falha de storage é best-effort, sem impedir navegação. A troca para Chat reutiliza o guarda de arquivos não salvos antes de limpar seleção. **App.tsx diminuiu duas linhas**, com wiring explícito; não houve implementação de memória ou armazenamento paralelo.
+
+Windows/runtime canônico: **135 aprovados / 13 pulados** em oito arquivos, **E2E C-2 16/16 + C-1 6/6**, tipos/build **exit0**. Lint do perímetro novo **exit0**; App conserva exatamente as17 mensagens da base, zero novas. J16 reproduziu e depois comprovou os cinco comportamentos no navegador, incluindo composers claro de landing/conversa, caminho atual, limpeza, F5 e Explorer aberto/fechado. Logs/RED/captura externos: `memoria-de-projeto/correcao-estado-landing-2026-11-17/`. Dados sintéticos e provedor HTTP local; nenhuma API externa/dado pessoal; ampla não repetida.
+
+Publicação no mandato vigente, mesma branch, sem merge/aceite de fatia ou avanço de fase. + continua C-3; recursos futuros e restrições de Chat preservados. Entradas abaixo históricas.
+
+---
+
 # Estado vigente — 17/11/2026 — menus para baixo e composer expansível
 
 Por solicitação do proprietário, os menus da barra agora abrem **abaixo do acionador**, com altura limitada ao espaço restante e rolagem interna. Esta orientação substitui a anterior de abrir acima. O composer mantém altura inicial mínima86px, mas cresce com o textarea até200px/área útil; após o limite, rola, e reduz ao apagar texto. Largura/viewport são observados para recalcular quebras. Causa corrigida: `height:86px` no contêiner e flex-shrink comprimiam o campo mesmo após o cálculo de altura. App.tsx e backend intocados.
