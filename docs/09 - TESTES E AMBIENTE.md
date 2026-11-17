@@ -1,3 +1,13 @@
+# 17/11/2026 — validação de crescimento real e direção dos menus
+
+Node26 canônico, Chrome Windows, perfis descartáveis: **36/36** em LandingContextMenu/SessionLanding/c2Composer; **15/15** em `e2e/c2_centro.spec.ts`; typecheck, build e lint de SessionLanding/LandingExecutionControls **exit0**. Scripts/logs e capturas externos em `memoria-de-projeto/correcao-crescimento-menus-2026-11-17/`; infraestrutura de isolamento/reprodução igual às rodadas abaixo.
+
+**RED real:** J15 no código anterior devolveu card86px em vez de>136 após sete linhas. **GREEN:** J15 digita Shift+Enter, cola60 linhas, prova crescimento real de card/textarea, altura<=200px, conteúdo maior que área visível (rolagem), redução a86px ao retornar texto curto e adaptação800×600; J14 agora compara popup.y com o fim de cada acionador, exigindo abrir abaixo e caber no viewport. Capturas `landing_campo_expandido*` e `toolbar_*` conferidas.
+
+Não repetidas ampla/regressão completa/C-1 neste ajuste; sem APIs externas, dados pessoais, diálogo nativo ou homologação humana. Placar antigo não representa nova execução. Não habilitados Autopilot/assistência/sandbox/anexos; restrições de Chat e confirmação de allow-all permanecem.
+
+---
+
 # 17/11/2026 — correção pontual: menus da landing em Chat
 
 Foco `LandingContextMenu.test.tsx`, `SessionLanding.test.tsx`, `c2Composer.test.tsx`: **36/36**. E2E `e2e/c2_centro.spec.ts`: **14/14** no Chrome/Windows com Node26 canônico e perfil sintético; J4 abre os três menus em Chat e inspeciona opções restritas; J14 conserva prova de Workspace. Typecheck/build Vite e lint de LandingExecutionControls/c2Composer: **exit0**. Comandos e infraestrutura de perfil iguais às rodadas abaixo; scripts/logs/capturas da rodada em pasta externa `memoria-de-projeto/correcao-menus-chat-2026-11-17/`.

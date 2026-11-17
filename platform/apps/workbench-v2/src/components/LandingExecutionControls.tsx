@@ -41,9 +41,8 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
       const rect = buttons.current[anchor]?.getBoundingClientRect()
       if (!rect) return
       const width = Math.min(310, window.innerWidth - 16)
-      const height = menu.current?.getBoundingClientRect().height ?? 0
       setPosition({ width, left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-        top: Math.max(8, Math.min(rect.top - height - 6, window.innerHeight - height - 8)) })
+        top: Math.min(rect.bottom + 6, window.innerHeight - 8) })
     }
     measure()
     menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)[role]')?.focus()
@@ -92,7 +91,7 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
     </button>
     {open && createPortal(<div ref={menu} className="session-landing-menu landing-execution-popup" role="menu"
       aria-label={open === 'modos' ? 'Modos' : open === 'execucao' ? 'Modo de execução' : 'Permissões'}
-      style={{ ...position, position: 'fixed', maxHeight: 'calc(100vh - 16px)' }} onKeyDown={(event) => {
+      style={{ ...position, position: 'fixed', maxHeight: Math.max(0, window.innerHeight - position.top - 8) }} onKeyDown={(event) => {
         if (event.key === 'Escape') { event.preventDefault(); close(); return }
         if (!isNavigationKey(event.key)) return
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role]:not(:disabled)'))

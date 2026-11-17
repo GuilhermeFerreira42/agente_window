@@ -1347,7 +1347,8 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 0;
-  height: 86px;
+  min-height: 86px;
+  height: auto;
   box-sizing: border-box;
   padding: 0 6px 6px;
   background: var(--vscode-agentsChatInput-background);
@@ -1363,8 +1364,9 @@ svg {
 
 .session-landing-textarea {
   width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 50px;
+  box-sizing: border-box;
   max-height: 200px;
   resize: none;
   border: none;

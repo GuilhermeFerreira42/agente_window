@@ -1,3 +1,13 @@
+# Estado vigente — 17/11/2026 — menus para baixo e composer expansível
+
+Por solicitação do proprietário, os menus da barra agora abrem **abaixo do acionador**, com altura limitada ao espaço restante e rolagem interna. Esta orientação substitui a anterior de abrir acima. O composer mantém altura inicial mínima86px, mas cresce com o textarea até200px/área útil; após o limite, rola, e reduz ao apagar texto. Largura/viewport são observados para recalcular quebras. Causa corrigida: `height:86px` no contêiner e flex-shrink comprimiam o campo mesmo após o cálculo de altura. App.tsx e backend intocados.
+
+Validação Windows: **36/36 foco**, **15/15 E2E C-2**, tipos/build/lint do perímetro **exit0**. Reprodução anterior real: esperado card>136px após sete linhas, obtido86px. Novo J15 prova crescimento por Shift+Enter, texto colado longo, teto/rolagem, redução e viewport800×600; J14 exige posição abaixo dos três botões. Capturas e logs externos em `memoria-de-projeto/correcao-crescimento-menus-2026-11-17/`. Ampla/regressão completa/C-1 não repetidas nesta correção de layout; perfis sintéticos e provedor HTTP local, sem dados pessoais/APIs externas.
+
+As opções Autopilot, permissões assistidas e sandbox permanecem indisponíveis porque **não há implementação dessas capacidades no runtime**; a referência visual não as habilita. Chat conserva ask/manual/null, e + segue C-3 por escolha expressa. Publicação na mesma branch sob autorização vigente, sem merge, aceite humano ou avanço de fase. Entradas seguintes são históricas.
+
+---
+
 # Estado vigente — 17/11/2026 — menus também abrem no contexto Chat
 
 Correção após captura do proprietário: o bloqueio `semPasta || pending` desabilitava os três acionadores da barra em Chat. Agora **Perguntar, Interativo e Permissões manuais abrem seus menus também sem pasta**. Somente as opções incompatíveis ficam desabilitadas, com motivo visível: Agente/Editar/Planejar e Permitir tudo exigem conversa com pasta. Perguntar, Interativo e manual continuam selecionáveis em Chat; snapshot efetivo permanece `ask/manual`, raiz nula. Durante envio pendente, acionadores e opções continuam bloqueados. Backend, App.tsx e regras C-1 não foram alterados.

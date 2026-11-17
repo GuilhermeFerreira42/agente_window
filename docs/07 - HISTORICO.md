@@ -1,3 +1,11 @@
+# 17/11/2026 — menus descendentes e crescimento real do input
+
+Proprietário pediu menus para baixo e corrigir expansão do input, além de esclarecer opções futuras. Reproduzido J15 contra o código anterior: após sete linhas, card permaneceu86px (esperado>136). Removida altura fixa do card, mantido mínimo86px; textarea não é comprimido por flex e continua com teto200px/área útil. Recalcula quando largura/viewport mudam. LandingExecutionControls ancora o portal abaixo do botão e limita sua altura, preservando rolagem. App/backend intactos.
+
+J15 verde com crescimento, texto colado, rolagem, redução e viewport menor; J14 verifica explicitamente a direção para baixo nos três menus. Foco36/36, E2EC2 15/15, tipos/build/lint0. Explicado ao dono: Autopilot, assistência de permissões e sandbox são capacidades não implementadas, não erros de clique. Canônicos03/06/07/09 atualizados,08 preservado; publicação no mandato existente, sem merge/aceite/avanço de fatia.
+
+---
+
 # 17/11/2026 — corrigido bloqueio dos menus em Chat
 
 Proprietário apontou nova captura com Chat selecionado. Causa: o bloqueio global de semPasta em LandingExecutionControls impedia abrir menus, embora a rodada anterior provasse os controles em Pasta. Separado bloqueio de envio do bloqueio por opção; menus abrem em Chat, mas escolhas restritas continuam desabilitadas e guardadas também nos callbacks. Projeções efetivas ask/manual e raiz nula preservadas, sem tocar App/backend. Teste T11 atualizado e novo teste de interação+snapshot; J4 integrado passa a abrir os três menus em Chat. Foco36/36, C2E2E14/14 e tipos/build/lint0, perfis sintéticos. Documentação atualizada, publicação sob autorização vigente, sem merge/aceite/avanço de fase.

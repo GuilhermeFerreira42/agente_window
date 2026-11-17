@@ -1,3 +1,9 @@
+# Preferência vigente da landing — 17/11/2026
+
+Menus da barra **para baixo**, conforme nova instrução do proprietário, com rolagem quando faltar altura. Composer expansível (mínimo inicial86px, textarea até200px/área útil, rolagem posterior); não reinstalar altura fixa para preservar somente a captura vazia do mockup. Autopilot, assistência de permissões e sandbox continuam sem implementação própria, fora deste ajuste; não confundir permitir tudo com isolamento ou autonomia adicional. + continua reservado à C-3. Nenhuma dívida anterior foi quitada por esses ajustes de layout; sem avanço de fase.
+
+---
+
 # Esclarecimento — Chat não desabilita os acionadores dos menus (17/11/2026)
 
 Na landing Chat, permitir abrir Perguntar, Interativo e Permissões manuais. Bloquear **as opções**, com motivo, quando dependem de pasta: Agente/Editar/Planejar e Permitir tudo. Não voltar a aplicar `semPasta` ao disabled do acionador inteiro. Restrições efetivas C-1 e trava durante envio permanecem. + segue C-3; nenhuma nova permissão de execução, modalidade ou fase foi habilitada.

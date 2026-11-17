@@ -154,13 +154,23 @@ export function SessionLanding({
   useLayoutEffect(() => {
     const alvo = textareaRef.current
     if (!alvo) return
-    alvo.style.height = 'auto'
-    const contentHeight = alvo.scrollHeight
-    const areaUtil = Math.max(50, window.innerHeight - 360)
-    const teto = Math.min(200, areaUtil)
-    const nextHeight = Math.min(teto, Math.max(50, contentHeight))
-    alvo.style.height = `${nextHeight}px`
-    alvo.style.overflowY = contentHeight > teto ? 'auto' : 'hidden'
+    const ajustar = () => {
+      alvo.style.height = 'auto'
+      const contentHeight = alvo.scrollHeight
+      const areaUtil = Math.max(50, window.innerHeight - 360)
+      const teto = Math.min(200, areaUtil)
+      alvo.style.height = `${Math.min(teto, Math.max(50, contentHeight))}px`
+      alvo.style.overflowY = contentHeight > teto ? 'auto' : 'hidden'
+    }
+    ajustar()
+    let width = alvo.getBoundingClientRect().width
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      const next = alvo.getBoundingClientRect().width
+      if (next !== width) { width = next; ajustar() }
+    })
+    observer?.observe(alvo)
+    window.addEventListener('resize', ajustar)
+    return () => { observer?.disconnect(); window.removeEventListener('resize', ajustar) }
   }, [rascunho.texto])
 
   // C2-RV06 — navegação de menu com o MESMO helper do roving de lista:
