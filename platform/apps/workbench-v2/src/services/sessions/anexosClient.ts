@@ -112,24 +112,78 @@ export async function baixarAnexo(sessionId: string, chatId: string, artifactId:
   return response.blob()
 }
 
-export async function recuperarAnexo(sessionId: string, chatId: string, uploadId: string, etapa: 'prepare' | 'confirm'): Promise<ReciboAnexo> {
-  const response = await expectOk(await fetch(rota(sessionId, chatId, `recovery/${etapa}`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uploadId }),
+/** Retomada da MESMA tentativa (sem path de origem): estado ou finalização. */
+export async function retomarAnexo(sessionId: string, chatId: string, uploadId: string): Promise<ReciboAnexo> {
+  const response = await expectOk(await fetch(rota(sessionId, chatId, `uploads/${encodeURIComponent(uploadId)}`), {
+    method: 'PUT',
   }))
   return (await response.json()) as ReciboAnexo
 }
 
+export interface PlanoRecuperacao {
+  recoveryId: string
+  token: string
+  expiraEm: number
+  itens: Array<{ oldId: string; name: string; bytes: number; disponivel: boolean }>
+}
+
+export interface ReciboRecuperacao {
+  recoveryId: string
+  mapa: Array<{ oldId: string; newId: string }>
+  indisponiveis: Array<{ oldId: string; name: string; motivo: string }>
+  consumidoEm: number
+}
+
+/**
+ * R13 — cópia de conversa: plano opaco curto (a origem vai por ID, nunca por
+ * caminho) e confirmação com `{recoveryId, token}`.
+ */
+export async function prepararRecuperacao(sessionId: string, chatId: string, origemSessionId: string): Promise<PlanoRecuperacao> {
+  const response = await expectOk(await fetch(rota(sessionId, chatId, 'recovery/prepare'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origemSessionId }),
+  }))
+  return (await response.json()) as PlanoRecuperacao
+}
+
+export async function confirmarRecuperacao(sessionId: string, chatId: string, plano: { recoveryId: string; token: string }): Promise<ReciboRecuperacao> {
+  const response = await expectOk(await fetch(rota(sessionId, chatId, 'recovery/confirm'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recoveryId: plano.recoveryId, token: plano.token }),
+  }))
+  return (await response.json()) as ReciboRecuperacao
+}
+
 /** Reconcilia o estado do ledger com o transcript no carregamento (F5/offline). */
+export interface ResultadoFusao {
+  mensagens: Array<{ attachments?: Attachment[] }>
+  /**
+   * R11/B10 — prontos AINDA SEM MENSAGEM. A fusão antiga só reescrevia
+   * mensagens existentes; um upload publicado antes de a mensagem falhar
+   * desaparecia da UI depois do F5. Aqui ele é exposto ao dono (chip "salvo
+   * sem mensagem").
+   */
+  orfaos: AnexoSeguroCliente[]
+}
+
 export function fundirEstadoAnexos(
   mensagens: Array<{ attachments?: Attachment[] }>,
   lista: ListaAnexos,
-): Array<{ attachments?: Attachment[] }> {
-  if (lista.attachments.length === 0 && lista.uploads.length === 0) return mensagens
+): ResultadoFusao {
+  if (lista.attachments.length === 0 && lista.uploads.length === 0) return { mensagens, orfaos: [] }
   const porArtigo = new Map(lista.attachments.map((item) => [item.artifactId, item]))
   const porUpload = new Map(lista.uploads.map((item) => [item.uploadId, item]))
-  return mensagens.map((mensagem) => {
+  const citados = new Set<string>()
+  for (const mensagem of mensagens) {
+    for (const anexo of mensagem.attachments ?? []) {
+      if (anexo.artifactId) citados.add(anexo.artifactId)
+      if (anexo.uploadId) citados.add(anexo.uploadId)
+    }
+  }
+  const orfaos = lista.attachments.filter((item) => !citados.has(item.artifactId))
+  const fundidas = mensagens.map((mensagem) => {
     if (!mensagem.attachments?.length) return mensagem
     return {
       ...mensagem,
@@ -156,4 +210,5 @@ export function fundirEstadoAnexos(
       }),
     }
   })
+  return { mensagens: fundidas, orfaos }
 }

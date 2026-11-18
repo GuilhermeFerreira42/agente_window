@@ -8,14 +8,17 @@ import type { ModoAgir, NivelPermissaoAgir } from '../../bairros/2-inteligencia/
 import type { MensagemSimples } from '../../bairros/2-inteligencia/casas/agir'
 import { transferirAnexos, type TransporteAnexos } from '../../domain/enviarAnexos'
 import {
-  admitirAnexo, enviarConteudoAnexo, registrarReferenciaAnexo,
+  admitirAnexo, enviarConteudoAnexo, estadoAnexo, registrarReferenciaAnexo,
 } from './anexosClient'
+import { guardarRecibo } from '../../domain/rascunhoTransferencia'
 
 /** Transporte real dos anexos (mesmo origin, sem provedor de IA). */
 export const transporteAnexosHttp: TransporteAnexos = {
   admitir: (entrada) => admitirAnexo(entrada),
   enviar: (sessionId, chatId, uploadId, file) => enviarConteudoAnexo(sessionId, chatId, uploadId, file),
   referencia: (entrada) => registrarReferenciaAnexo(entrada),
+  // R11/B10 — recibo por ID antes do File; 404 honesto = item não existe.
+  estado: (sessionId, chatId, uploadId) => estadoAnexo(sessionId, chatId, uploadId),
 }
 
 const MENSAGEM_ESCOLHA = 'Os arquivos serão armazenados nesta conversa, mas NÃO serão enviados ao modelo nesta fase (sem codec). '
@@ -46,12 +49,40 @@ export async function prepararAnexosDaLanding(entrada: {
     transporte: transporteAnexosHttp,
   })
   if (!transferencia.todosProntos) {
-    throw new Error(`Falha ao transferir: ${transferencia.falhas.map((item) => item.name).join(', ')}. O rascunho foi preservado; reenvie para tentar de novo.`)
+    // B10/H11 — falha parcial NUNCA descarta o que já está salvo: o dono
+    // recebe os itens com o estado REAL (prontos + falhos) para que a landing
+    // continue exibindo o primeiro arquivo e o retry reuse o mesmo ID.
+    const erro = new Error(`Falha ao transferir: ${transferencia.falhas.map((item) => item.name).join(', ')}. O rascunho foi preservado; reenvie para tentar de novo.`) as Error & { anexos?: Attachment[] }
+    erro.anexos = transferencia.anexos
+    throw erro
   }
-  return transferencia.anexos.map((anexo) => ({
+  const prontos = transferencia.anexos.map((anexo) => ({
     ...anexo,
     envioModelo: (entrada.texto.trim() ? ('excluido-sem-codec' as const) : undefined),
   }))
+  // O dono da landing guarda os recibos (sobrevivem à remontagem/F5).
+  for (const anexo of prontos) {
+    if (anexo.uploadId && anexo.artifactId && anexo.sha256) {
+      guardarRecibo(entrada.sessionId, entrada.chatId, {
+        uploadId: anexo.uploadId, artifactId: anexo.artifactId, name: anexo.name,
+        bytes: anexo.bytes ?? 0, sha256: anexo.sha256,
+        state: anexo.estado === 'referencia' ? 'pronto' : 'pronto',
+        mode: anexo.mode ?? 'copy', scope: anexo.modoCopia === 'projeto' ? 'workspace' : 'chat',
+        errorCode: null,
+      })
+    }
+  }
+  return prontos
+}
+
+/**
+ * R11/B10 — resultado da retomada da landing: itens com estado real + os que
+ * já estavam prontos no servidor sem mensagem (após F5).
+ */
+export interface ResultadoRetomadaLanding {
+  anexos: Attachment[]
+  prontos: Attachment[]
+  salvoSemMensagem: Attachment[]
 }
 
 export interface PortasEnvioAnexos {

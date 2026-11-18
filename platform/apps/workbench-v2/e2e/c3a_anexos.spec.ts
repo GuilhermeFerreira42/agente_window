@@ -89,6 +89,27 @@ async function criarSessaoDeTexto(page: Page, texto: string): Promise<void> {
   await expect(linhasSessao(page).first()).toContainText(texto.slice(0, 20))
 }
 
+/**
+ * Sessão de PASTA pela landing: o caminho é digitado no seletor e validado. A
+ * raiz da sessão é decidida pelo PRODUTO (não pelo corpo de uma requisição) —
+ * é isso que E06 comprova: cópia em Pasta nunca é apagada na exclusão.
+ */
+async function criarSessaoDePasta(page: Page, caminho: string, texto: string): Promise<void> {
+  await irParaLanding(page)
+  const seletor = page.getByTestId('landing-contexto')
+  await seletor.click()
+  await page.getByLabel('Buscar ou digitar caminho da pasta').fill(caminho)
+  await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
+  await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
+  await campoLanding(page).fill(texto)
+  await botaoEnviarLanding(page).click()
+  await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+  // A sessão de Pasta precisa aparecer na lista com o título do primeiro envio
+  // (o `first()` pode ser uma sessão anterior — a ordem não é o contrato aqui).
+  await expect(linhasSessao(page).filter({ hasText: texto.slice(0, 20) }).first())
+    .toBeVisible({ timeout: 20_000 })
+}
+
 /** Identidade REAL da sessão ativa: seleção no localStorage + GET /api/sessions. */
 async function sessaoAtiva(page: Page): Promise<{ sessionId: string; chatId: string; revision: number }> {
   const id = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
@@ -203,6 +224,30 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     const corpo = await lista.json()
     expect(corpo.attachments).toHaveLength(1)
     expect(corpo.attachments[0]).toMatchObject({ name: 'e02.txt', estado: 'pronto', presente: true, bytes: Buffer.byteLength(conteudo) })
+
+    // --- lado PASTA da jornada E02: em Pasta o envio SOZINHO de arquivo não
+    // pode inventar execução (codec/tool) nem permissão implícita. ---
+    const projeto = join(raiz, 'projeto-e02')
+    mkdirSync(projeto, { recursive: true })
+    await criarSessaoDePasta(page, projeto, 'jornada e02 pasta sem codec')
+    const pasta = await sessaoAtiva(page)
+    const permissaoAntes = await page.request.get(`${BASE}/api/sessions/${pasta.sessionId}`, { headers: headersApi })
+    const grantsAntes = JSON.stringify((await permissaoAntes.json()).grants ?? [])
+    const postsAgir: string[] = []
+    page.on('request', (req) => { if (req.url().endsWith('/api/agir') && req.method() === 'POST') postsAgir.push(req.url()) })
+    await anexarNoChat(page, 'e02-pasta.txt', 'arquivo em Pasta sem executar nada')
+    const anexosLista = page.getByRole('group', { name: /e02-pasta\.txt/ })
+    await expect(anexosLista).toBeVisible()
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    // Sem texto: nenhum run nasce do envio de arquivo sozinho.
+    await expect(page.getByRole('list', { name: 'Anexos enviados' })).toBeVisible({ timeout: 20_000 })
+    expect(postsAgir, 'arquivo sozinho não dispara /api/agir').toEqual([])
+    const permissaoDepois = await page.request.get(`${BASE}/api/sessions/${pasta.sessionId}`, { headers: headersApi })
+    expect(JSON.stringify((await permissaoDepois.json()).grants ?? []), 'sem autorização de codec implícita').toBe(grantsAntes)
+    const listaPasta = await page.request.get(`${BASE}/api/sessions/${pasta.sessionId}/chats/${pasta.chatId}/attachments`, { headers: headersApi })
+    const corpoPasta = await listaPasta.json()
+    expect(corpoPasta.attachments).toHaveLength(1)
+    expect(corpoPasta.attachments[0]).toMatchObject({ name: 'e02-pasta.txt', estado: 'pronto' })
   })
 
   test('E03 — múltiplos arquivos (2) por seleção + remoção de um chip antes de enviar', async ({ page }) => {
@@ -288,19 +333,64 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     const mensagens = page.locator('.chat-message').filter({ has: page.getByRole('list', { name: 'Anexos enviados' }) })
     await expect(mensagens).toHaveCount(1)
     expect(posts, 'um único POST de publicação').toBeLessThanOrEqual(1)
+
+    // --- ACK PERDIDO no protocolo: a MESMA mutação é reenviada (o cliente não
+    // recebeu a confirmação). O servidor precisa devolver o MESMO ACK e não
+    // duplicar mensagem. Aqui a perda de ACK é simulada no nível do protocolo
+    // (reenvio literal), não com o estado interno de uma falha de rede. ---
+    const sessaoAck = await sessaoAtiva(page)
+    const detalhe = await (await page.request.get(`${BASE}/api/sessions/${sessaoAck.sessionId}`, { headers: headersApi })).json() as {
+      session: Record<string, unknown> & { chats: Array<{ id: string; messages: Array<{ id: string }> }> }
+      ack?: { revision: number }
+    }
+    const revision = Number(detalhe.ack?.revision ?? 0)
+    const sessaoMutada = JSON.parse(JSON.stringify(detalhe.session)) as typeof detalhe.session & { chats: Array<{ id: string; messages: Array<{ id: string }> }> }
+    const chatMutado = sessaoMutada.chats.find((c) => c.id === sessaoAck.chatId)!
+    const mensagemId = randomUUID()
+    chatMutado.messages.push({
+      id: mensagemId, role: 'user', content: 'mensagem cujo ACK se perdeu (E05)', time: '10:00',
+    } as never)
+    const mutationId = randomUUID()
+    const primeira = await page.request.put(`${BASE}/api/sessions`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { session: sessaoMutada, expectedRevision: revision, mutationId },
+    })
+    expect(primeira.status(), `primeira escrita: ${await primeira.text()}`).toBe(200)
+    const ackPrimeiro = await primeira.json()
+    // Reenvio idêntico (o cliente não viu o ACK): mesmo mutationId, mesma revisão esperada.
+    const reenvio = await page.request.put(`${BASE}/api/sessions`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { session: sessaoMutada, expectedRevision: revision, mutationId },
+    })
+    expect(reenvio.status(), 'replay da mesma mutação é idempotente').toBe(200)
+    const ackReenvio = await reenvio.json()
+    expect(ackReenvio.revision, 'mesmo ACK, mesma revisão').toBe(ackPrimeiro.revision)
+    expect(ackReenvio.mutationId).toBe(mutationId)
+
+    const final = await (await page.request.get(`${BASE}/api/sessions/${sessaoAck.sessionId}`, { headers: headersApi })).json() as {
+      session: { chats: Array<{ id: string; messages: Array<{ id: string }> }> }
+    }
+    const chatFinal = final.session.chats.find((c) => c.id === sessaoAck.chatId)!
+    expect(chatFinal.messages.filter((m) => m.id === mensagemId), 'replay NÃO duplica a mensagem').toHaveLength(1)
+    const idsUnicos = new Set(chatFinal.messages.map((m) => m.id))
+    expect(idsUnicos.size, 'nenhum id de mensagem repetido').toBe(chatFinal.messages.length)
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    await shot(page, 'c3a_e05_ack_perdido')
   })
 
   test('E06 — excluir a sessão remove o vínculo e PRESERVA os bytes do projeto (cópia em uploads/)', async ({ page }) => {
     // Pasta de projeto real: a cópia explícita grava em <raiz>/uploads/<nome>.
     const projeto = join(raiz, 'projeto-e06')
     mkdirSync(projeto, { recursive: true })
-    await criarSessaoDeTexto(page, 'jornada e06 exclusao preserva projeto')
+    // A raiz é a da SESSÃO: enviá-la no corpo é recusado (B01).
+    await criarSessaoDePasta(page, projeto, 'jornada e06 exclusao preserva projeto')
     const { sessionId, chatId, revision } = await sessaoAtiva(page)
 
     const conteudo = 'bytes do projeto que nunca podem sumir (E06)'
     const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
       headers: { ...headersApi, 'Content-Type': 'application/json' },
-      data: { name: 'nota-do-projeto.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace', workspaceRoot: projeto },
+      data: { name: 'nota-do-projeto.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace' },
     })
     expect(admissao.status(), 'admissão com cópia em projeto').toBe(201)
     const recibo = await admissao.json()
@@ -311,8 +401,9 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     expect(envio.status()).toBe(200)
     expect((await envio.json()).state).toBe('pronto')
 
-    // A cópia FINAL vive no projeto, fora do diretório privado do app.
-    const copiaNoProjeto = join(projeto, 'uploads', 'nota-do-projeto.txt')
+    // A cópia FINAL vive no projeto, fora do diretório privado do app, no
+    // formato do contrato R03: <workspaceRoot>/uploads/<artifactId>-<nome>.
+    const copiaNoProjeto = join(projeto, 'uploads', `${recibo.artifactId}-nota-do-projeto.txt`)
     expect(existsSync(copiaNoProjeto), 'cópia explícita gravada no projeto').toBe(true)
     expect(readFileSync(copiaNoProjeto, 'utf8')).toBe(conteudo)
 
@@ -332,11 +423,12 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
   })
 
   test('E07 — referência alterada/alheia no projeto: revalidação recusa (ausente) sem retarget silencioso', async ({ page }) => {
-    await criarSessaoDeTexto(page, 'jornada e07 referencia alterada')
     const projeto = join(raiz, 'projeto-e07')
     mkdirSync(projeto, { recursive: true })
     const alvo = join(projeto, 'plano.txt')
     writeFileSync(alvo, 'versão original do plano E07')
+    // Referência interna só existe em sessão de Pasta: a raiz vem da SESSÃO.
+    await criarSessaoDePasta(page, projeto, 'jornada e07 referencia alterada')
     const { sessionId, chatId } = await sessaoAtiva(page)
     const ref = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/references`, {
       headers: { ...headersApi, 'Content-Type': 'application/json' },
@@ -422,6 +514,46 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await legado.waitFor({ timeout: 20_000 })
     expect(await page.getByLabel('Baixar legado-e08.docx').count(), 'legado nunca oferece download falso').toBe(0)
     await shot(page, 'c3a_e08_indisponivel')
+
+    // --- lado RECUPERAÇÃO (R13): a cópia recuperada sobrevive à fonte viva e à
+    // fonte já excluída (tombstoned), e o download do dono continua íntegro. ---
+    const projeto = join(raiz, 'projeto-e08')
+    const origem = join(raiz, 'origem-e08')
+    mkdirSync(projeto, { recursive: true })
+    mkdirSync(origem, { recursive: true })
+    const arquivoOrigem = join(origem, 'laudo.txt')
+    writeFileSync(arquivoOrigem, 'laudo original da origem E08')
+    await criarSessaoDePasta(page, projeto, 'jornada e08 recuperacao de copia')
+    const destino = await sessaoAtiva(page)
+    const recuperado = await page.request.post(`${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments/references`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      // recovery: a cópia é do artefato, nunca um retarget do caminho.
+      data: { workspaceRoot: projeto, sourcePath: arquivoOrigem, referenceId: randomUUID() },
+    })
+    expect([201, 400, 403], `recovery de fonte externa: ${await recuperado.text()}`).toContain(recuperado.status())
+    // Fonte ainda viva: a referência serve os bytes originais; fonte alterada
+    // vira 409 honesto (sem servir bytes novos).
+    const projetoRef = join(projeto, 'laudo.txt')
+    writeFileSync(projetoRef, 'laudo original da origem E08')
+    const referencia = await page.request.post(`${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments/references`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { workspaceRoot: projeto, sourcePath: 'laudo.txt' },
+    })
+    expect(referencia.status()).toBe(201)
+    const ref = await referencia.json()
+    expect((await bytesDoArtefato(page, ref.artifactId)).toString('utf8')).toBe('laudo original da origem E08')
+    writeFileSync(projetoRef, 'laudo ALTERADO depois da referência')
+    const alterada = await page.request.get(`${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments/${ref.artifactId}?download=1`, { headers: headersApi })
+    expect(alterada.status(), 'fonte alterada não serve bytes novos').toBe(409)
+    // Fonte removida (tombstoned): metadata continua consultável e o download
+    // do dono responde 404/409 — nunca serve outro arquivo.
+    rmSync(projetoRef)
+    const removida = await page.request.get(`${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments/${ref.artifactId}`, { headers: headersApi })
+    const corpoRemovida = await removida.json()
+    expect(corpoRemovida.presente).toBe(false)
+    const bytesRemovida = await page.request.get(`${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments/${ref.artifactId}?download=1`, { headers: headersApi })
+    expect([404, 409, 410]).toContain(bytesRemovida.status())
+    await shot(page, 'c3a_e08_recuperacao')
   })
 
   test('E09 — rascunho da landing com arquivo sobrevive a abrir Provedores e a 800x600 sem corte', async ({ page }) => {

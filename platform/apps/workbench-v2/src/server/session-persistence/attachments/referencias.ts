@@ -9,6 +9,7 @@ import { PersistenceProblem } from '../persistenceErrors'
 import { inserirUpload, obterArtigo, upsertArtigo } from './catalogo'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
 import { carregarPolitica, problemaPolitica } from './politica'
+import { garantirDentroDaRaiz } from './contencao'
 
 export interface EntradaReferencia {
   sessionId: string
@@ -30,29 +31,31 @@ export interface ReciboReferencia {
   state: 'pronto'
 }
 
-/** Contenção: resolvido, sem escape, sem symlink de saída. */
+/**
+ * Contenção (R08/B08): a raiz é resolvida e CADA componente do caminho é
+ * conferido com `lstat` — prefixo lexical + lstat do alvo deixava um junction
+ * no diretório pai escapar do workspace. Devolve o caminho absoluto real.
+ */
 export async function resolverDentroDoWorkspace(workspaceRoot: string, bruto: string): Promise<string> {
   const raiz = path.resolve(workspaceRoot)
   const absoluto = path.isAbsolute(bruto) ? path.resolve(bruto) : path.resolve(raiz, bruto)
-  if (absoluto !== raiz && !absoluto.startsWith(raiz + path.sep)) {
-    throw new PersistenceProblem(400, 'reference_out_of_scope',
-      'O caminho escolhido está fora da pasta do workspace desta conversa. A referência não foi registrada.')
-  }
   if (absoluto === raiz) {
     throw new PersistenceProblem(400, 'reference_out_of_scope', 'A pasta do workspace não pode ser registrada como arquivo de referência.')
   }
-  const info = await lstat(absoluto).catch(() => null)
-  if (!info) {
-    throw new PersistenceProblem(404, 'reference_absent', 'O arquivo escolhido não existe mais. Nada foi registrado.')
-  }
-  if (info.isSymbolicLink()) {
-    throw new PersistenceProblem(400, 'reference_out_of_scope',
-      'Links simbólicos não são aceitos como referência: o destino real precisa estar dentro do workspace.')
-  }
-  if (!info.isFile()) {
+  const contido = await garantirDentroDaRaiz(raiz, absoluto, {
+    code: 'reference_out_of_scope',
+    mensagem: 'O caminho escolhido está fora da pasta do workspace desta conversa. A referência não foi registrada.',
+  }).catch((erro: unknown) => {
+    if (erro instanceof PersistenceProblem && erro.code === 'path_absent') {
+      throw new PersistenceProblem(404, 'reference_absent', 'O arquivo escolhido não existe mais. Nada foi registrado.')
+    }
+    throw erro
+  })
+  const info = await lstat(contido.alvo).catch(() => null)
+  if (!info || !info.isFile()) {
     throw new PersistenceProblem(400, 'reference_out_of_scope', 'Só arquivos podem virar referência de projeto.')
   }
-  return absoluto
+  return contido.alvo
 }
 
 export async function fingerprintDeArquivo(caminho: string): Promise<{ bytes: number; sha256: string; mtimeMs: number }> {
@@ -115,7 +118,14 @@ export async function verificarReferencia(artifactId: string): Promise<{ present
   const raiz = artigo.workspaceRoot ? path.resolve(artigo.workspaceRoot) : null
   if (!raiz) return { presente: false, integro: false }
   const absoluto = path.resolve(raiz, artigo.locator)
-  if (absoluto !== raiz && !absoluto.startsWith(raiz + path.sep)) return { presente: false, integro: false }
+  // B08 — a mesma contenção da admissão: os pais do locator persistido também
+  // precisam continuar reais (um junction criado depois da referência não
+  // pode redirecionar a leitura).
+  try {
+    await garantirDentroDaRaiz(raiz, absoluto, { code: 'reference_out_of_scope' })
+  } catch {
+    return { presente: false, integro: false }
+  }
   const info = await stat(absoluto).catch(() => null)
   if (!info || !info.isFile()) return { presente: false, integro: false }
   if (info.size !== artigo.bytes) return { presente: true, integro: false }

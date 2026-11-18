@@ -290,7 +290,7 @@ describe('c3aSend — T25: falha parcial preserva o primeiro, draft retém IDs e
       }],
       uploads: [{ uploadId: ID2, artifactId: ID2, state: 'pronto', name: 'segundo.txt', mode: 'copy', errorCode: null }],
     }
-    const restauradas = fundirEstadoAnexos([{ attachments: resultado2.anexos }], lista)
+    const restauradas = fundirEstadoAnexos([{ attachments: resultado2.anexos }], lista).mensagens
     expect(restauradas[0].attachments![0]).toMatchObject({ uploadId: ID1, estado: 'pronto' })
     expect(restauradas[0].attachments![1]).toMatchObject({ uploadId: ID2, estado: 'pronto' })
     // A fusão devolve APENAS anexos — nenhuma mensagem é criada pelo F5.

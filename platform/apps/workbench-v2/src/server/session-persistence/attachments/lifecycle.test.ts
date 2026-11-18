@@ -11,8 +11,8 @@ import { getDatabasePath } from '../paths'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao, sessaoExcluida } from '../deletions'
 import { receipt } from '../sessionMutations'
 import { readTranscript, writeTranscript, type TranscriptEntry } from '../transcripts'
-import { atualizarUpload, listarArtigosChat, obterArtigo, obterUpload } from './catalogo'
-import { admitirUpload, caminhoFinalChat, caminhoStage, cancelarUpload, receberConteudo } from './estoque'
+import { atualizarUpload, listarArtigosChat, obterArtigo, obterUpload, planosPendentes } from './catalogo'
+import { admitirUpload, caminhoFinalChat, cancelarUpload, receberConteudo } from './estoque'
 import { registrarReferencia } from './referencias'
 import { tratarRotasAnexos } from './rotas'
 import { validarSchemaAnexos } from './schemaAnexos'
@@ -28,8 +28,27 @@ function seedSessao(id: string, chatId: string, slug: string): void {
   upsertSessionRecord({
     id, slug, title: `Sessão ${slug}`, workspacePath: null, contextKind: 'chat',
     worktreePath: null, messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(),
-    sessionJson: JSON.stringify({ id, chats: [{ id: chatId, messages: [] }] }),
+    sessionJson: JSON.stringify({ id, workspacePath: null, worktreePath: null, chats: [{ id: chatId, messages: [] }] }),
   })
+}
+
+function seedWorkspace(id: string, chatId: string, slug: string, raiz: string): void {
+  upsertSessionRecord({
+    id, slug, title: `Sessão ${slug}`, workspacePath: raiz, contextKind: 'workspace',
+    worktreePath: null, messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    sessionJson: JSON.stringify({
+      id, workspacePath: raiz, worktreePath: null,
+      chats: [{ id: chatId, messages: [] }],
+    }),
+  })
+}
+
+/** Lixeira dos ensaios: XDG temporário, plataforma explícita, nada real tocado. */
+async function lixeiraTemporaria(): Promise<{ pastaTrash: string; opcoes: { plataforma: NodeJS.Platform; pastaTrash: string } }> {
+  const pastaTrash = join(base, 'lixeira-xdg')
+  mkdirSync(join(pastaTrash, 'files'), { recursive: true })
+  mkdirSync(join(pastaTrash, 'info'), { recursive: true })
+  return { pastaTrash, opcoes: { plataforma: process.platform === 'win32' ? 'win32' : 'linux', pastaTrash } }
 }
 
 async function publicarCopia(
@@ -40,8 +59,9 @@ async function publicarCopia(
     sessionId, chatId, name, declaredBytes: bytes.length, mode: 'copy', scope: escopo, workspaceRoot,
   })
   await receberConteudo(sessionId, chatId, recibo.uploadId, Readable.from([bytes]))
+  // Nome final do workspace: `<uploads>/<artifactId>-<nome>` (R03/B04).
   const final = escopo === 'workspace'
-    ? join(workspaceRoot!, 'uploads', name)
+    ? join(workspaceRoot!, 'uploads', `${recibo.artifactId}-${name}`)
     : caminhoFinalChat(undefined, sessionId, chatId, recibo.artifactId, name)
   return { uploadId: recibo.uploadId, artifactId: recibo.artifactId, final }
 }
@@ -103,6 +123,9 @@ describe('C-3a ciclo de vida na exclusão', () => {
   it('C3A-T27 — arquivar preserva; excluir sessão/worktree nunca limpa upload final de workspace, referência nem original do projeto', async () => {
     const ws = join(base, 'workspace-t27')
     mkdirSync(join(ws, 'docs'), { recursive: true })
+    // A cópia de workspace exige contexto `workspace` no catálogo (B01).
+    seedWorkspace(SID, CID, 'c3a-t27', ws)
+    const lixeira = await lixeiraTemporaria()
     const original = join(ws, 'docs', 'original-do-projeto.txt')
     writeFileSync(original, 'original intocável do projeto', 'utf8')
 
@@ -126,11 +149,14 @@ describe('C-3a ciclo de vida na exclusão', () => {
     expect(existsSync(finalWs.final)).toBe(true)
     expect(existsSync(original)).toBe(true)
 
-    const concluido = await executarLimpezaDelecao(SID, false)
+    const concluido = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes })
     expect(concluido.cleanupState).toBe('concluido')
 
-    // Privado exclusivo da conversa sai; o território do projeto fica:
+    // Privado exclusivo da conversa sai (para a LIXEIRA, não `rm`) e o
+    // território do projeto fica:
     expect(existsSync(privado.final)).toBe(false)
+    expect(existsSync(join(lixeira.pastaTrash, 'files', 'privado-chat.txt'))).toBe(true)
+    expect(readFileSync(join(lixeira.pastaTrash, 'files', 'privado-chat.txt'), 'utf8')).toBe('cópia privada da conversa')
     // upload final na raiz ORIGINAL do workspace (E06) nunca é limpo:
     expect(existsSync(finalWs.final)).toBe(true)
     // referência e o próprio original do projeto permanecem intactos:
@@ -141,42 +167,47 @@ describe('C-3a ciclo de vida na exclusão', () => {
   it('C3A-T28 — excluir chat interno limpa só privados exclusivos; falha preserva e retry conclui sem cascade precoce', async () => {
     const ws = join(base, 'workspace-t28')
     mkdirSync(join(ws, 'docs'), { recursive: true })
+    seedWorkspace(SID, CID, 'c3a-t28', ws)
+    const lixeira = await lixeiraTemporaria()
     const original = join(ws, 'docs', 'dados.csv')
     writeFileSync(original, 'a,b\n1,2\n', 'utf8')
 
     const exclusivo = await publicarCopia(SID, CID, 'exclusivo.txt', Buffer.from('conteúdo exclusivo A', 'utf8'))
     const divergente = await publicarCopia(SID, CID, 'divergente.txt', Buffer.from('conteúdo B antes da adulteração', 'utf8'))
-    const finalWs = await publicarCopia(SID, CID, 'permanente-ws.txt', Buffer.from('cópia do projeto', 'utf8'), 'workspace', ws)
     await registrarReferencia({ sessionId: SID, chatId: CID, workspaceRoot: ws, sourcePath: 'docs/dados.csv' })
 
     // Conteúdo adulterado FORA do produto depois da publicação: a limpeza
-    // confere hash e preserva (evidência `falhou`), nunca apaga às cegas.
+    // confere hash e preserva (evidência do plano), nunca apaga às cegas.
     appendFileSync(divergente.final, ' | adulterado fora do produto')
 
     iniciarOuConsultarDelecao({ sessionId: SID, deletionId: 'del-t28', expectedRevision: 0 })
-    const tombstone = await executarLimpezaDelecao(SID, false)
-    expect(tombstone.cleanupState).toBe('concluido')
+    // B06/H3 — arquivo divergente NÃO pode resultar em exclusão "concluída":
+    // o plano falha, o blob fica, o LEDGER fica e a limpeza continua pendente.
+    await expect(executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes }))
+      .rejects.toMatchObject({ status: 503, code: 'session_cleanup_pending' })
+    expect(sessaoExcluida(SID)).toBe(true)
+    const falhas = planosPendentes(SID).filter((item) => item.state === 'falhou')
+    expect(falhas.map((item) => item.alvo)).toEqual(['chat-copy'])
+    expect(obterArtigo(divergente.artifactId)).toBeDefined()
+    expect(obterArtigo(exclusivo.artifactId)).toBeDefined() // ledger só sai com o plano completo
 
-    // Só o privado EXCLUSIVO e íntegro é limpo:
+    // Só o privado EXCLUSIVO e íntegro foi para a Lixeira:
     expect(existsSync(exclusivo.final)).toBe(false)
+    expect(existsSync(join(lixeira.pastaTrash, 'files', 'exclusivo.txt'))).toBe(true)
     expect(existsSync(divergente.final)).toBe(true)
     expect(readFileSync(divergente.final, 'utf8')).toContain('adulterado fora do produto')
-    expect(existsSync(finalWs.final)).toBe(true)
     expect(existsSync(original)).toBe(true)
 
-    // Evidência honesta da falha fica no plano; as linhas concluídas saíram.
-    const planos = getDatabase().prepare(
-      'SELECT artifact_id AS artifactId, state FROM attachment_cleanup_plan WHERE session_id = ?',
-    ).all(SID) as Array<{ artifactId: string; state: string }>
-    expect(planos).toEqual([{ artifactId: divergente.artifactId, state: 'falhou' }])
-
-    // Retry idempotente: conclui de novo sem cascade (nada é re-apagado).
-    const retry = await executarLimpezaDelecao(SID, false)
+    // Restaurar a versão íntegra (ação humana) permite retomar e CONCLUIR.
+    writeFileSync(divergente.final, 'conteúdo B antes da adulteração', 'utf8')
+    const retry = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes })
     expect(retry.cleanupState).toBe('concluido')
     expect(existsSync(exclusivo.final)).toBe(false)
-    expect(existsSync(divergente.final)).toBe(true)
-    expect(existsSync(finalWs.final)).toBe(true)
+    expect(existsSync(divergente.final)).toBe(false)
+    expect(existsSync(join(lixeira.pastaTrash, 'files', 'divergente.txt'))).toBe(true)
     expect(existsSync(original)).toBe(true)
+    // Só agora o ledger do chat saiu (plano completo).
+    expect(obterArtigo(divergente.artifactId)).toBeUndefined()
   })
 
   it('C3A-T29 — exclusão versus upload em voo: tombstone impede publicação tardia; outro dono preservado', async () => {
@@ -186,7 +217,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
 
     // Vítima: transferência preparada pronta para publicar (stage completo).
     const emVoo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'em-voo.txt', declaredBytes: bytes.length, mode: 'copy', scope: 'chat' })
-    const stage = caminhoStage(undefined, SID, CID, emVoo.uploadId)
+    const stage = obterUpload(SID, CID, emVoo.uploadId)!.stagePath!
     mkdirSync(join(stage, '..'), { recursive: true })
     writeFileSync(stage, bytes)
     atualizarUpload(SID, CID, emVoo.uploadId, {
@@ -197,11 +228,12 @@ describe('C-3a ciclo de vida na exclusão', () => {
 
     iniciarOuConsultarDelecao({ sessionId: SID, deletionId: 'del-t29', expectedRevision: 0 })
 
-    // Publicação tardia via rota (recovery/confirm) é recusada pelo tombstone.
-    const caminho = `/api/sessions/${SID}/chats/${CID}/attachments/recovery/confirm`
+    // Publicação tardia via rota de finalização é recusada pelo tombstone —
+    // inclusive para um stream que JÁ começou (não só para chamada nova).
+    const caminho = `/api/sessions/${SID}/chats/${CID}/attachments/uploads/${emVoo.uploadId}/content`
     const antes = resposta()
     const tratado = await tratarRotasAnexos(
-      requisicao('POST', caminho, { uploadId: emVoo.uploadId }) as never,
+      requisicao('POST', caminho, {}) as never,
       antes as never,
       new URL(caminho, 'http://127.0.0.1:5174'),
     )
@@ -216,7 +248,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
     // Depois da limpeza a publicação tardia continua recusada.
     const depois = resposta()
     await tratarRotasAnexos(
-      requisicao('POST', caminho, { uploadId: emVoo.uploadId }) as never,
+      requisicao('POST', caminho, {}) as never,
       depois as never,
       new URL(caminho, 'http://127.0.0.1:5174'),
     )
@@ -243,7 +275,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
     // (a) transferência em voo: o cancelamento limpa SÓ o estágio próprio,
     // com diagnóstico durável, sem publicar nada.
     const emVoo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'rascunho.bin', declaredBytes: 32, mode: 'copy', scope: 'chat' })
-    const stage = caminhoStage(undefined, SID, CID, emVoo.uploadId)
+    const stage = obterUpload(SID, CID, emVoo.uploadId)!.stagePath!
     mkdirSync(join(stage, '..'), { recursive: true })
     writeFileSync(stage, Buffer.alloc(8, 3))
     await cancelarUpload(SID, CID, emVoo.uploadId)
@@ -255,25 +287,27 @@ describe('C-3a ciclo de vida na exclusão', () => {
     // fechar o draft de novo é idempotente (nenhuma exceção, nenhum efeito colateral)
     await cancelarUpload(SID, CID, emVoo.uploadId)
 
-    // (b) final de projeto já publicado: cancelar é recusado e o arquivo permanece.
+    // (b) final de projeto já publicado: cancelar devolve o estado pronto e o
+    // arquivo permanece (contrato DELETE: idempotente, nunca apaga o final).
     const ws = join(base, 'workspace-t26')
     mkdirSync(join(ws, 'docs'), { recursive: true })
+    seedWorkspace(SID, CID, 'c3a-t26', ws)
     const finalWs = await publicarCopia(SID, CID, 'projeto-final.txt', Buffer.from('arquivo final do projeto', 'utf8'), 'workspace', ws)
-    await expect(cancelarUpload(SID, CID, finalWs.uploadId))
-      .rejects.toMatchObject({ status: 409, code: 'upload_already_finalized' })
+    const cancelado = await cancelarUpload(SID, CID, finalWs.uploadId)
+    expect(cancelado.state).toBe('pronto')
     expect(existsSync(finalWs.final)).toBe(true)
 
     // (c) rascunho de workspace em voo cancelado: o território do projeto
     // não ganha nem perde arquivo algum.
-    const antes = existsSync(join(ws, 'uploads', 'projeto-final.txt'))
+    const antes = existsSync(finalWs.final)
     const emVooWs = await admitirUpload({ sessionId: SID, chatId: CID, name: 'parcial-ws.bin', declaredBytes: 16, mode: 'copy', scope: 'workspace', workspaceRoot: ws })
-    const stageWs = caminhoStage(undefined, SID, CID, emVooWs.uploadId)
+    const stageWs = obterUpload(SID, CID, emVooWs.uploadId)!.stagePath!
     mkdirSync(join(stageWs, '..'), { recursive: true })
     writeFileSync(stageWs, Buffer.alloc(4, 9))
     await cancelarUpload(SID, CID, emVooWs.uploadId)
     expect(existsSync(stageWs)).toBe(false)
-    expect(existsSync(join(ws, 'uploads', 'parcial-ws.bin'))).toBe(false)
-    expect(existsSync(join(ws, 'uploads', 'projeto-final.txt'))).toBe(antes)
+    expect(existsSync(join(ws, 'uploads', `${emVooWs.uploadId}-parcial-ws.bin`))).toBe(false)
+    expect(existsSync(finalWs.final)).toBe(antes)
     expect(obterUpload(SID, CID, emVooWs.uploadId)!.state).toBe('cancelado')
   })
 
@@ -351,6 +385,15 @@ describe('C-3a migração de banco legado', () => {
       erro = capturado
     }
     expect(erro).toMatchObject({ status: 500, code: 'attachment_schema_not_ready' })
-    rmSync(dir2, { recursive: true, force: true })
+    // Teardown portátil: no Windows a fixture só pode ser removida DEPOIS de
+    // fechar a conexão SQLite (EPERM). `finally` garante isso mesmo em falha
+    // de asserção — o banco nunca fica aberto sobre o diretório a remover.
+    try {
+      resetDatabase()
+      rmSync(dir2, { recursive: true, force: true })
+    } finally {
+      process.env.AGENTE_WINDOW_DATA_DIR = base
+      resetDatabase()
+    }
   }, 30_000)
 })

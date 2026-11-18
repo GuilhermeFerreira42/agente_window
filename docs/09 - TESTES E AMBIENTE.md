@@ -1,3 +1,24 @@
+# 19/11/2026 — C-3a reentrega: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint | `npx eslint src --format json` | 84 erros / 27 avisos — **iguais à base `3a78ca0`** (medida lado a lado): novos 0 |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 2m15s (OOM em 1024/1408 neste sandbox de 4 GB) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/11-foco` | **199 aprovados · 0 falhas · 0 pulados · `missingCriteria=[]`** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/12-ampla` | **2085 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Anexos | `vitest run …/session-persistence/attachments` | **61/61** (store 20, probes 19, lifecycle 5, routes 5, recovery 6, policy 6) |
+| Sondas | config dedicada em `/home/user/c3a-validacao/13-sondas` | **13/13** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky (aparece em `resolvedFailures` por ter sido vermelho na baseline).
+
+**Windows:** não executado (sem SO Windows neste ambiente). Correções de portabilidade aplicadas nos testes (T14–T17: `--pool=forks --poolOptions.forks.singleFork=true`, sem flags numéricas conflitantes, `cwd` na raiz do projeto; T32: `resetDatabase()` em `try/finally` antes do `rmSync`) e runner `platform/scripts/e2e-c3a.ps1` entregue. Procedimento e resultados esperados em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md` (§7). Nada aqui atribui homologação ou execução Windows.
+
+---
+
 # 17/11/2026 — autocomplete de subpastas: gates Windows
 
 Runtime Node26 canônico, Chrome e perfis descartáveis: **141 aprovados/13 pulados**, nove arquivos (oito da rodada anterior mais `workspaceDirectorySuggestions.test.tsx`); **C-2 E2E17/17 + C-1 E2E6/6**; typecheck/build/lint do hook/menu/porta cliente/testes alterados **exit0**. Ampla não repetida; não chamadas APIs reais de LLM nem dados pessoais. Scripts/logs/captura e gates.json externos em `memoria-de-projeto/autocomplete-pastas-2026-11-17/`; mesmas pré-condições de isolamento das rodadas abaixo.

@@ -7,6 +7,7 @@
 # na porta 5214 com AGENTE_WINDOW_DATA_DIR descartável.
 #
 # USO: sh platform/scripts/e2e-c3a.sh
+# Equivalente Windows: platform/scripts/e2e-c3a.ps1 (mesma porta, mesmas jornadas).
 # =============================================================================
 set -eu
 

@@ -136,7 +136,7 @@ describe('c3aDraft — T20: P30 mantém partes/metadados sem bytes/base64/locato
       }],
       uploads: [],
     }
-    const fundidas = fundirEstadoAnexos(mensagens, lista)
+    const fundidas = fundirEstadoAnexos(mensagens, lista).mensagens
     expect(fundidas[0].attachments![0]).toMatchObject({
       id: 'anexo-1', estado: 'pronto', bytes: 42, sha256: 'd'.repeat(64), modoCopia: 'privado',
       artifactId: 'aaaaaaa1-0000-4000-8000-000000000001',
@@ -160,7 +160,7 @@ describe('c3aDraft — T21: legado metadata-only honesto', () => {
       }],
       uploads: [],
     }
-    const fundidas = fundirEstadoAnexos(mensagens, lista)
+    const fundidas = fundirEstadoAnexos(mensagens, lista).mensagens
     // Legado permanece EXATAMENTE {id,name,kind}: sem artefato, sem estado,
     // sem busca por nome — nenhuma identidade é emprestada.
     expect(fundidas[0].attachments![0]).toEqual({ id: 'antigo-1', name: 'documento-antigo.docx', kind: 'local' })

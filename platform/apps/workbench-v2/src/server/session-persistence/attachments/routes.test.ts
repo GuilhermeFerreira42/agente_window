@@ -28,7 +28,16 @@ function seedSessao(id: string, chatId: string): void {
   upsertSessionRecord({
     id, slug: `c3a-${id.slice(0, 4)}`, title: 'Sessão C-3a', workspacePath: null, contextKind: 'chat',
     worktreePath: null, messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(),
-    sessionJson: JSON.stringify({ id, chats: [{ id: chatId, messages: [] }] }),
+    sessionJson: JSON.stringify({ id, workspacePath: null, worktreePath: null, chats: [{ id: chatId, messages: [] }] }),
+  })
+}
+
+/** Sessão de Pasta com a raiz REAL validada pelo catálogo (B01). */
+function seedWorkspace(id: string, chatId: string, raiz: string): void {
+  upsertSessionRecord({
+    id, slug: `c3a-ws-${id.slice(0, 4)}`, title: 'Sessão Pasta', workspacePath: raiz, contextKind: 'workspace',
+    worktreePath: null, messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    sessionJson: JSON.stringify({ id, workspacePath: raiz, worktreePath: null, chats: [{ id: chatId, messages: [] }] }),
   })
 }
 
@@ -63,14 +72,29 @@ function requisicao(metodo: string, caminho: string, corpo?: unknown, headers: R
   return fluxo as unknown as IncomingMessage
 }
 
-function resposta(): ServerResponse & { statusCode: number; body: string; headers: Record<string, string> } {
-  const fluxo = new PassThrough() as PassThrough & { statusCode: number; body: string; headers: Record<string, string>; setHeader(chave: string, valor: string): void }
+interface RespostaFake extends PassThrough {
+  statusCode: number
+  body: string
+  /** Bytes crus (download binário) — nunca decodificados como UTF-8. */
+  binario: Buffer
+  headers: Record<string, string>
+  setHeader(chave: string, valor: string): void
+}
+
+function resposta(): ServerResponse & RespostaFake {
+  const fluxo = new PassThrough() as unknown as RespostaFake
+  const pedacos: Buffer[] = []
   fluxo.statusCode = 0
   fluxo.body = ''
+  fluxo.binario = Buffer.alloc(0)
   fluxo.headers = {}
   fluxo.setHeader = (chave, valor) => { fluxo.headers[chave] = String(valor) }
-  fluxo.on('data', (pedaco: Buffer) => { fluxo.body += pedaco.toString('utf8') })
-  return fluxo as unknown as ServerResponse & { statusCode: number; body: string; headers: Record<string, string> }
+  fluxo.on('data', (pedaco: Buffer) => {
+    pedacos.push(Buffer.from(pedaco))
+    fluxo.body += pedaco.toString('utf8')
+    fluxo.binario = Buffer.concat(pedacos)
+  })
+  return fluxo as unknown as ServerResponse & RespostaFake
 }
 
 async function chamar(metodo: string, caminho: string, corpo?: unknown, headers: Record<string, string> = {}) {
@@ -188,8 +212,12 @@ describe('C-3a rotas de anexo', () => {
     const tratado = await tratarRotasAnexos(req, res, new URL(rota(`/${artifactId}?download=1`), 'http://127.0.0.1:5174'))
     expect(tratado).toBe(true)
     expect(res.headers['Content-Type']).toBe('application/octet-stream')
+    expect(res.headers['X-Content-Type-Options']).toBe('nosniff')
+    expect(res.headers['Cache-Control']).toContain('no-store')
     await new Promise<void>((resolve) => (res as unknown as PassThrough).on('end', resolve))
-    expect(Buffer.from(res.body, 'binary').length).toBeGreaterThan(0)
+    const baixado = (res as unknown as RespostaFake).binario
+    expect(baixado.length).toBe(bytes.length)
+    expect(createHash('sha256').update(baixado).digest('hex')).toBe(obterArtigo(artifactId)!.sha256)
     // artefato alheio não baixa
     const negado = await chamar('GET', rota('/11111111-0000-4000-8000-000000000000'))
     expect(negado.status).toBe(404)
@@ -199,6 +227,8 @@ describe('C-3a rotas de anexo', () => {
   it('C3A-T22 — referência removida/alterada: revalidação impede uso; atualização explícita sem retarget silencioso', async () => {
     const ws = join(base, 'ws-t22')
     mkdirSync(join(ws, 'docs'), { recursive: true })
+    // Referência de projeto exige conversa com Pasta (Chat não recebe raiz).
+    seedWorkspace(SID, CID, ws)
     const original = join(ws, 'docs', 'relatorio.md')
     writeFileSync(original, 'versão 1 do relatório', 'utf8')
     const ref1 = await registrarReferencia({ sessionId: SID, chatId: CID, workspaceRoot: ws, sourcePath: 'docs/relatorio.md' })

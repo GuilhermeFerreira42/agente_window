@@ -1,21 +1,26 @@
-// C-3a — endpoints de anexo (R08): mesmo namespace /api/sessions,
-// mesmo bind/Host/Origin (revalidação defensiva via local-boundary),
-// dono = (sessão, chat) consultado no SQLite, corpo binário em stream
-// (nunca Buffer/JSON/base64). Devolve true quando a rota foi tratada.
+// C-3a — endpoints de anexo (R08). Mesmo namespace `/api/sessions`, mesma
+// fronteira local (Host/Origin/porta) revalidada DENTRO da rota, dono e
+// contexto derivados do CATÁLOGO — nunca do corpo (parecer B01/B02/B07):
+//  - chat precisa existir no snapshot persistido da sessão;
+//  - escopo/raiz do armazenamento são derivados (`dono.ts`), e declaração
+//    divergente é recusada em vez de virar default permissivo;
+//  - nenhuma rota aceita caminho livre do cliente (nem em recovery);
+//  - download usa o MESMO resolver validado da metadata (hash incluído) e
+//    responde com headers seguros, sem path.
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { validateLocalRequest } from '../../../../server/local-boundary.mjs'
-import { getDatabase, getSessionRecord } from '../database'
-import { consultarDelecao, problemaSessaoExcluida } from '../deletions'
 import { PersistenceProblem } from '../persistenceErrors'
+import { consultarDelecao } from '../deletions'
 import { obterArtigo, listarArtigosChat, listarUploads } from './catalogo'
-import { validarSchemaAnexos } from './schemaAnexos'
 import { projetarArtigoSeguro } from './dtoAnexo'
 import {
-  cancelarUpload, consultarUpload, admitirUpload, receberConteudo, lerArtigo, reconciliarIdentidade,
+  admitirUpload, cancelarUpload, consultarUpload, lerArtigo, publicarPreparado, receberConteudo,
+  reconciliarIdentidade, retomarUpload, type ReciboUpload,
 } from './estoque'
 import { registrarReferencia } from './referencias'
 import { confirmRecovery, prepareRecovery } from './recuperacao'
+import { exigirCampos, exigirVivo, escopoDoPedido, raizDoPedido, resolverDonoAnexos } from './dono'
 import type { ModoAnexo } from './schemaAnexos'
 
 const PREFIXO = '/api/sessions'
@@ -23,15 +28,17 @@ const PREFIXO = '/api/sessions'
 function sendJson(response: ServerResponse, status: number, corpo: unknown): void {
   response.statusCode = status
   response.setHeader('Content-Type', 'application/json; charset=utf-8')
+  response.setHeader('Cache-Control', 'no-store')
   response.end(JSON.stringify(corpo))
 }
 
 function problemaParaResposta(response: ServerResponse, error: unknown): void {
   if (error instanceof PersistenceProblem) {
+    // Erro estruturado sem path privado/stack/segredo (contrato §Portas).
     sendJson(response, error.status, { code: error.code, message: error.message })
     return
   }
-  sendJson(response, 500, { code: 'attachment_error', message: `Falha no serviço de anexos: ${String(error)}` })
+  sendJson(response, 500, { code: 'attachment_error', message: 'Falha inesperada no serviço de anexos. Nada foi publicado.' })
 }
 
 interface AlvoAnexos { sessionId: string; chatId: string; resto: string }
@@ -46,14 +53,6 @@ function interpretarCaminho(pathname: string): AlvoAnexos | null {
   return { sessionId, chatId, resto: pedacos.slice(4).join('/') }
 }
 
-function exigirDono(sessionId: string, chatId: string): void {
-  validarSchemaAnexos(getDatabase())
-  if (consultarDelecao(sessionId)) throw problemaSessaoExcluida()
-  const registro = getSessionRecord(sessionId)
-  if (!registro) throw new PersistenceProblem(404, 'session_not_found', 'Sessão não encontrada.')
-  void chatId
-}
-
 async function lerJson(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let bytes = 0
@@ -62,29 +61,44 @@ async function lerJson(request: IncomingMessage): Promise<Record<string, unknown
     if (bytes > 64 * 1024) throw new PersistenceProblem(413, 'session_payload_too_large', 'Corpo excede 64 KiB.')
     chunks.push(pedaco as Buffer)
   }
+  let bruto: unknown
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+    bruto = JSON.parse(Buffer.concat(chunks).toString('utf8'))
   } catch {
     throw new PersistenceProblem(400, 'invalid_json', 'Corpo JSON inválido.')
   }
+  if (typeof bruto !== 'object' || bruto === null || Array.isArray(bruto)) {
+    throw new PersistenceProblem(400, 'invalid_json', 'O corpo precisa ser um objeto JSON.')
+  }
+  return bruto as Record<string, unknown>
 }
 
 function texto(campo: unknown, rotulo: string, obrigatorio = true): string {
-  if (typeof campo === 'string' && campo.length > 0) return campo
-  if (!obrigatorio) return ''
+  if (typeof campo === 'string' && campo.length > 0 && campo.length <= 4096) return campo
+  if (campo === undefined || campo === null) {
+    if (!obrigatorio) return ''
+  }
   throw new PersistenceProblem(400, 'invalid_field', `Campo ${rotulo} inválido.`)
 }
 
 function inteiro(campo: unknown, rotulo: string): number | null {
-  if (campo == null) return null
+  if (campo === undefined || campo === null) return null
   if (typeof campo === 'number' && Number.isSafeInteger(campo) && campo >= 0) return campo
   throw new PersistenceProblem(400, 'invalid_field', `Campo ${rotulo} inválido.`)
 }
 
-/**
- * Despacha as rotas de anexo. Chamar no handleRequest ANTES do caminho
- * genérico de sessão (o byId ancorado em `$` não cobre subrotas).
- */
+/** `attachment; filename="…"; filename*=UTF-8''…` — nunca eco de path. */
+function cabecalhoDisposicao(nome: string): string {
+  const ascii = nome.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_')
+  const utf8 = encodeURIComponent(nome)
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`
+}
+
+function reciboPublico(recibo: ReciboUpload): ReciboUpload {
+  // O recibo não expõe locator/stage — só identidade, estado e hash.
+  return recibo
+}
+
 export async function tratarRotasAnexos(request: IncomingMessage, response: ServerResponse, url: URL): Promise<boolean> {
   const alvo = interpretarCaminho(url.pathname)
   if (!alvo) return false
@@ -100,12 +114,16 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
   const { sessionId, chatId, resto } = alvo
   const metodo = (request.method ?? 'GET').toUpperCase()
   try {
-    exigirDono(sessionId, chatId)
-    await reconciliarIdentidade(sessionId, chatId)
+    // Dono + contexto do CATÁLOGO (chat existente, sessão viva, raiz real).
+    // Leitura (F5) tolera pasta offline com estado honesto; escrita nunca —
+    // o 409 de pasta inacessível continua valendo para admissão/conteúdo.
+    const somenteLeitura = metodo === 'GET'
+    const dono = resolverDonoAnexos(sessionId, chatId, { permitirRaizOffline: somenteLeitura })
 
     // GET /attachments — lista segura (F5/offline): artefatos publicados +
     // transferências ainda em voo (estado honesto dos chips).
     if (metodo === 'GET' && resto === '') {
+      await reconciliarIdentidade(sessionId, chatId)
       const artigos = listarArtigosChat(sessionId, chatId)
       const projetados = await Promise.all(artigos.map(projetarArtigoSeguro))
       const emVoo = listarUploads(sessionId, chatId).map((linha) => ({
@@ -116,30 +134,46 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
       return true
     }
 
-    // POST /attachments/uploads — admissão.
+    // POST /attachments/uploads — admissão (dono/escopo derivados).
     if (metodo === 'POST' && resto === 'uploads') {
       const corpo = await lerJson(request)
+      exigirCampos(corpo, ['uploadId', 'name', 'bytes', 'declaredBytes', 'mime', 'mode', 'scope', 'workspaceRoot'])
+      const escopo = escopoDoPedido(dono, corpo.scope)
+      const raiz = raizDoPedido(dono, corpo.workspaceRoot)
+      if (raiz === null && escopo === 'workspace') {
+        throw new PersistenceProblem(403, 'storage_out_of_scope', 'Esta conversa não tem pasta de projeto para receber cópia.')
+      }
+      const modo = texto(corpo.mode, 'mode') === 'reference' ? 'reference' as ModoAnexo : 'copy' as ModoAnexo
       const recibo = await admitirUpload({
         sessionId, chatId,
         name: texto(corpo.name, 'name'),
-        declaredBytes: inteiro(corpo.bytes, 'bytes'),
+        declaredBytes: inteiro(corpo.bytes ?? corpo.declaredBytes, 'bytes'),
         mime: texto(corpo.mime, 'mime', false),
-        mode: (texto(corpo.mode, 'mode') === 'reference' ? 'reference' : 'copy') as ModoAnexo,
-        scope: texto(corpo.scope, 'scope') === 'workspace' ? 'workspace' : 'chat',
-        workspaceRoot: typeof corpo.workspaceRoot === 'string' && corpo.workspaceRoot ? corpo.workspaceRoot : null,
+        mode: modo,
+        scope: escopo,
+        workspaceRoot: raiz,
         uploadId: typeof corpo.uploadId === 'string' && /^[0-9a-f-]{36}$/i.test(corpo.uploadId) ? corpo.uploadId : undefined,
       })
-      sendJson(response, 201, recibo)
+      sendJson(response, recibo.state === 'pronto' ? 200 : 201, reciboPublico(recibo))
       return true
     }
 
     // PUT /attachments/uploads/:uploadId/content — corpo binário em stream.
     const casarConteudo = /^uploads\/([^/]+)\/content$/.exec(resto)
-    if (metodo === 'PUT' && casarConteudo) {
+    if (casarConteudo) {
       const uploadId = casarConteudo[1]
-      const recibo = await receberConteudo(sessionId, chatId, uploadId, request)
-      sendJson(response, 200, recibo)
-      return true
+      if (metodo === 'PUT') {
+        const recibo = await receberConteudo(sessionId, chatId, uploadId, request)
+        sendJson(response, 200, reciboPublico(recibo))
+        return true
+      }
+      if (metodo === 'POST') {
+        // Variante de finalização (reconciliação/recovery) — mesmo dono.
+        exigirVivo(sessionId)
+        const recibo = await publicarPreparado(sessionId, chatId, uploadId)
+        sendJson(response, 200, reciboPublico(recibo))
+        return true
+      }
     }
 
     // GET/DELETE /attachments/uploads/:uploadId — estado e cancelamento.
@@ -147,28 +181,54 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
     if (casarUpload) {
       const uploadId = casarUpload[1]
       if (metodo === 'GET') { sendJson(response, 200, consultarUpload(sessionId, chatId, uploadId)); return true }
-      if (metodo === 'DELETE') { await cancelarUpload(sessionId, chatId, uploadId); sendJson(response, 200, { ok: true }); return true }
+      if (metodo === 'DELETE') { sendJson(response, 200, await cancelarUpload(sessionId, chatId, uploadId)); return true }
+      if (metodo === 'PUT') {
+        // Retomada idempotente da MESMA tentativa, sem path de origem.
+        sendJson(response, 200, await retomarUpload(sessionId, chatId, uploadId))
+        return true
+      }
     }
 
     // POST /attachments/references — referência de projeto (sem cópia).
     if (metodo === 'POST' && resto === 'references') {
       const corpo = await lerJson(request)
+      exigirCampos(corpo, ['sourcePath', 'path', 'workspaceRoot', 'referenceId'])
+      const raiz = raizDoPedido(dono, corpo.workspaceRoot)
+      if (!raiz) {
+        throw new PersistenceProblem(403, 'workspace_not_allowed',
+          'Referência de projeto exige uma conversa com pasta. Em Chat, o arquivo precisa ser copiado para a área privada.')
+      }
       const recibo = await registrarReferencia({
         sessionId, chatId,
-        workspaceRoot: texto(corpo.workspaceRoot, 'workspaceRoot'),
+        workspaceRoot: raiz,
         sourcePath: texto(corpo.sourcePath ?? corpo.path, 'sourcePath'),
       })
-      sendJson(response, 201, recibo)
+      sendJson(response, 201, { ...recibo, uploadId: recibo.uploadId })
       return true
     }
 
-    // POST /attachments/recovery/prepare|confirm — R11/T30/T31.
+    // POST /attachments/recovery/prepare|confirm — R13 (plano opaco curto).
     if (metodo === 'POST' && (resto === 'recovery/prepare' || resto === 'recovery/confirm')) {
       const corpo = await lerJson(request)
-      const uploadId = texto(corpo.uploadId, 'uploadId')
-      const recibo = resto.endsWith('prepare')
-        ? await prepareRecovery(sessionId, chatId, uploadId, typeof corpo.source === 'string' ? corpo.source : undefined)
-        : await confirmRecovery(sessionId, chatId, uploadId)
+      exigirVivo(sessionId)
+      if (resto.endsWith('prepare')) {
+        exigirCampos(corpo, ['origemSessionId'])
+        const plano = await prepareRecovery({
+          destinoSessionId: sessionId, destinoChatId: chatId,
+          origemSessionId: texto(corpo.origemSessionId, 'origemSessionId'),
+        })
+        sendJson(response, 200, {
+          recoveryId: plano.recoveryId, token: plano.token, expiraEm: plano.expiraEm,
+          itens: plano.itens.map((item) => ({ oldId: item.oldId, name: item.name, bytes: item.bytes, disponivel: item.disponivel })),
+        })
+        return true
+      }
+      exigirCampos(corpo, ['recoveryId', 'token'])
+      const recibo = await confirmRecovery({
+        destinoSessionId: sessionId, destinoChatId: chatId,
+        recoveryId: texto(corpo.recoveryId, 'recoveryId'),
+        token: texto(corpo.token, 'token'),
+      })
       sendJson(response, 200, recibo)
       return true
     }
@@ -182,18 +242,27 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
         throw new PersistenceProblem(404, 'attachment_not_found', 'Artefato não encontrado nesta conversa.')
       }
       if (url.searchParams.get('download') === '1') {
+        // B07 — mesmo resolver validado (contenção + tamanho + hash).
         const alvoArquivo = await lerArtigo(artifactId)
         response.statusCode = 200
         response.setHeader('Content-Type', 'application/octet-stream')
         response.setHeader('Content-Length', String(alvoArquivo.bytes))
-        response.setHeader('Content-Disposition', `attachment; filename="${alvoArquivo.name.replace(/["\\]/g, '_')}"`)
-        createReadStream(alvoArquivo.caminho).pipe(response)
+        response.setHeader('Content-Disposition', cabecalhoDisposicao(alvoArquivo.name))
+        response.setHeader('X-Content-Type-Options', 'nosniff')
+        response.setHeader('Cache-Control', 'private, no-store')
+        const fluxo = createReadStream(alvoArquivo.caminho)
+        // Falha do stream depois do 200 não vira corpo truncado silencioso.
+        fluxo.on('error', () => { try { response.destroy() } catch { /* socket já fechou */ } })
+        fluxo.pipe(response)
         return true
       }
       sendJson(response, 200, await projetarArtigoSeguro(artigo))
       return true
     }
 
+    if (metodo !== 'GET' && consultarDelecao(sessionId)) {
+      throw new PersistenceProblem(410, 'session_deleted', 'Esta conversa foi excluída.')
+    }
     sendJson(response, 404, { code: 'route_not_found', message: 'Rota de anexo desconhecida.' })
     return true
   } catch (error) {

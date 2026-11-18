@@ -101,16 +101,18 @@ describe('C-3a política de admissão', () => {
     // cancelamento remove stage e mantém evidência no ledger
     await cancelarUpload(SID, CID, primeiro.uploadId)
     expect(consultarUpload(SID, CID, primeiro.uploadId).state).toBe('cancelado')
-    // expiração de stage abandonado (mtime antigo) — sem estado pronto
-    const dirStages = join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', 'stages', SID, CID)
-    mkdirSync(dirStages, { recursive: true })
-    writeFileSync(join(dirStages, 'orfao.part'), 'parcial')
-    const { utimesSync } = await import('node:fs')
-    const antigo = new Date(Date.now() - 60_000)
-    utimesSync(join(dirStages, 'orfao.part'), antigo, antigo)
-    await reconciliarIdentidade(SID, CID)
+    // expiração de tentativa abandonada (janela vencida) — nunca "pronto", e
+    // o stage PRÓPRIO é limpo após a prova de abandono.
+    const abandonada = await admitirUpload({ sessionId: SID, chatId: CID, name: 'orfao.bin', declaredBytes: 8, mode: 'copy', scope: 'chat' })
+    const linha = obterUpload(SID, CID, abandonada.uploadId)!
+    mkdirSync(join(linha.stagePath!, '..'), { recursive: true })
+    writeFileSync(linha.stagePath!, 'parcial')
+    await new Promise((resolve) => setTimeout(resolve, 70))
+    await reconciliarIdentidade(SID, CID, { agora: () => Date.now() + 60_000 })
     const { existsSync } = await import('node:fs')
-    expect(existsSync(join(dirStages, 'orfao.part'))).toBe(false)
+    expect(obterUpload(SID, CID, abandonada.uploadId)!.state).toBe('falhou')
+    expect(obterUpload(SID, CID, abandonada.uploadId)!.errorCode).toBe('abandoned')
+    expect(existsSync(linha.stagePath!)).toBe(false)
   })
 
   it('C3A-T04 — transferência válida dentro da política conclui com hash (fixture positiva pequena)', async () => {

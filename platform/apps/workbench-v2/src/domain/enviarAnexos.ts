@@ -4,6 +4,10 @@
 // injetável para os testes usarem fronteiras reais sem provedor pago.
 import type { Attachment } from '../types'
 import { arquivoVivo, apagarArquivoVivo } from './arquivosVivos'
+import { aplicarRecibo, guardarFalha, guardarRecibo, lerRecibo } from './rascunhoTransferencia'
+
+export type EstadoRecibo =
+  | 'admitido' | 'recebendo' | 'preparado' | 'pronto' | 'falhou' | 'cancelado'
 
 export interface ReciboTransporte {
   uploadId: string
@@ -11,7 +15,7 @@ export interface ReciboTransporte {
   name: string
   bytes: number
   sha256: string | null
-  state: string
+  state: EstadoRecibo
   mode: 'copy' | 'reference'
   scope: 'chat' | 'workspace'
   errorCode: string | null
@@ -31,6 +35,8 @@ export interface TransporteAnexos {
   }): Promise<ReciboTransporte>
   enviar(sessionId: string, chatId: string, uploadId: string, file: File): Promise<ReciboTransporte>
   referencia(entrada: { sessionId: string; chatId: string; workspaceRoot: string; sourcePath: string }): Promise<ReciboTransporte>
+  /** Recibo estável por ID (R11/B10): consultado ANTES de exigir o File. */
+  estado?(sessionId: string, chatId: string, uploadId: string): Promise<ReciboTransporte>
 }
 
 export interface ResultadoTransferencia {
@@ -39,9 +45,9 @@ export interface ResultadoTransferencia {
   falhas: Array<{ name: string; motivo: string }>
 }
 
-function falha(anexo: Attachment, motivo: string): Attachment {
-  return { ...anexo, estado: 'falhou' }
-  void motivo
+/** Item em falha preserva TODAS as identidades já conhecidas (R11). */
+function falha(anexo: Attachment, uploadId: string | undefined): Attachment {
+  return { ...anexo, ...(uploadId ? { uploadId } : {}), estado: 'falhou' }
 }
 
 /**
@@ -69,7 +75,7 @@ export async function transferirAnexos(entrada: {
     const uploadId = anexo.uploadId ?? anexo.artifactId
     if (!uploadId) {
       falhas.push({ name: anexo.name, motivo: 'identificador de transferência ausente' })
-      saida.push(falha(anexo, 'sem id'))
+      saida.push(falha(anexo, undefined))
       continue
     }
     try {
@@ -78,10 +84,11 @@ export async function transferirAnexos(entrada: {
         const caminho = anexo.id.startsWith('workspace:') ? anexo.id.slice('workspace:'.length) : anexo.referencia ?? ''
         if (!caminho || !workspaceRoot) {
           falhas.push({ name: anexo.name, motivo: 'caminho do workspace indisponível' })
-          saida.push(falha(anexo, 'sem caminho'))
+          saida.push(falha(anexo, uploadId))
           continue
         }
         const recibo = await transporte.referencia({ sessionId, chatId, workspaceRoot, sourcePath: caminho })
+        guardarRecibo(sessionId, chatId, recibo)
         saida.push({
           ...anexo, artifactId: recibo.artifactId, uploadId: recibo.uploadId,
           bytes: recibo.bytes, sha256: recibo.sha256 ?? undefined,
@@ -90,10 +97,31 @@ export async function transferirAnexos(entrada: {
         continue
       }
 
+      // R11/B10 — o RECIBO do servidor vem antes do File: um item já pronto
+      // (ACK perdido, F5, falha parcial anterior) é reusado sem reenvio, e um
+      // item sem File mas pronto continua sendo sucesso, não falha.
+      const conhecido = lerRecibo(sessionId, chatId, uploadId)
+      if (conhecido?.recibo.state === 'pronto') {
+        saida.push(aplicarRecibo(anexo, conhecido.recibo))
+        continue
+      }
+      if (transporte.estado) {
+        const remoto = await transporte.estado(sessionId, chatId, uploadId).catch(() => null)
+        if (remoto) {
+          guardarRecibo(sessionId, chatId, remoto)
+          if (remoto.state === 'pronto') {
+            saida.push(aplicarRecibo(anexo, remoto))
+            continue
+          }
+        }
+      }
+
       const file = arquivoVivo(uploadId)
       if (!file) {
-        falhas.push({ name: anexo.name, motivo: 'arquivo local indisponível após recarregar' })
-        saida.push(falha(anexo, 'sem arquivo'))
+        const motivo = 'arquivo local indisponível após recarregar; o servidor não tem este item pronto'
+        guardarFalha(sessionId, chatId, uploadId, motivo)
+        falhas.push({ name: anexo.name, motivo })
+        saida.push(falha(anexo, uploadId))
         continue
       }
       // R03: cópia privada é o DEFAULT; a cópia na pasta do projeto só
@@ -104,9 +132,11 @@ export async function transferirAnexos(entrada: {
         mime: file.type, mode: 'copy', scope: escopo,
         ...(escopo === 'workspace' && workspaceRoot ? { workspaceRoot } : {}),
       })
+      guardarRecibo(sessionId, chatId, recibo)
       const concluido = recibo.state === 'pronto'
         ? recibo
         : await transporte.enviar(sessionId, chatId, uploadId, file)
+      guardarRecibo(sessionId, chatId, concluido)
       saida.push({
         ...anexo,
         artifactId: concluido.artifactId,
@@ -118,11 +148,14 @@ export async function transferirAnexos(entrada: {
         mode: 'copy',
         legado: false,
       })
+      // O File transitório só sai DEPOIS de o recibo pronto ficar guardado
+      // pelo dono (B10): a retomada nunca depende de um File já descartado.
       apagarArquivoVivo(uploadId)
     } catch (error) {
       const motivo = error instanceof Error ? error.message : String(error)
+      guardarFalha(sessionId, chatId, uploadId, motivo)
       falhas.push({ name: anexo.name, motivo })
-      saida.push({ ...anexo, uploadId, estado: 'falhou' })
+      saida.push(falha(anexo, uploadId))
     }
   }
 

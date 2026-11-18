@@ -1,3 +1,17 @@
+# Estado vigente — 19/11/2026 — C-3a corrigida após parecer REPROVADA (reentrega técnica)
+
+O parecer de revisão independente sobre `df86f6d` reprovou a C-3a (13 sondas vermelhas, 5 falhas de foco no Windows). A reentrega corrige B01–B11 e a seção 3 do parecer **somente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.
+
+Entregue nesta reentrega: dono/contexto e raiz derivados exclusivamente do catálogo (corpo nunca declara dono, raiz, escopo ou caminho); recuperação por `{recoveryId, token}` com plano durável e recibo idempotente; digest calculado e reconferido contra os bytes físicos; estado+ledger em transação única com intenção durável e reconciliação em processo novo; fila do dono compartilhada com a persistência e revalidação de lifecycle no commit; Lixeira como porta única (`moverParaLixeira`) com plano persistido antes de destruir; mesmo resolver em metadata/download/uso (409 `reference_changed`/`attachment_changed`); contenção canônica recusando junction/symlink em diretório pai; pedido imutável (409 `upload_conflict`); recibo do rascunho consultado antes do `File` (chip “salvo sem mensagem”); admissão atômica (IMMEDIATE) com stage no volume do destino e `flags:'wx'`.
+
+Defeito de produto encontrado durante a rodada (não estava no parecer): **leitura de anexos em Pasta offline devolvia 409**, quebrando C-1 e o contrato F5/offline. A leitura (`GET`) agora degrada com lista honesta; toda escrita continua 409 até a pasta voltar (`probes.test.ts` H1d).
+
+Provas no Debian/Node 26.13.0: anexos **61/61**, foco **199/0/0 com `missingCriteria=[]`**, ampla **2085 aprovados, 0 `newFailures`, 0 `newSkips`**, E2E **C-3a 10/10 + C-1 6/6 + C-2 17/17**, tipos exit 0, lint novos 0 (84 = base), build ok, e as 13 sondas transformadas em regressões verdes (`probes.test.ts`, 19 casos) mais 13/13 na cópia portátil. Windows **não foi executado** neste ambiente: as cinco falhas do foco foram corrigidas no launcher/teardown e o runner `platform/scripts/e2e-c3a.ps1` foi entregue com procedimento em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md`; os resultados Windows permanecem pendentes.
+
+Fora do escopo preservado: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. Publicação apenas na branch de trabalho, sem merge; `08` intacto (nenhuma homologação atribuída). Entrega extensa fora dos nove canônicos, com referência no caminho acima.
+
+---
+
 # Estado vigente — 17/11/2026 — implementação C-2 encerrada, pronta para aceite final
 
 **Não há nova alteração funcional pendente dos pedidos desta rodada.** A implementação C-2 e os ajustes solicitados de aparência/interação estão tecnicamente concluídos no código publicado até `24bfd55`. Proprietário pediu encerrar o prolongamento da fatia, atualizar documentação e enviar tudo à branch de trabalho. Esta consolidação é **somente documental**; não inicia outra fatia nem transforma aprovação técnica em homologação humana. O aceite final C-2 ainda não foi declarado explicitamente; `08` permanece preservado.

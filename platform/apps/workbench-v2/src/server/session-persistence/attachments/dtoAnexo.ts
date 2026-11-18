@@ -1,9 +1,9 @@
 // C-3a — projeção segura do artefato para DTOs de mensagem/lista (P30):
 // apenas metadados aditivos; nunca bytes, base64, locator físico ou token.
-import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { LinhaArtigo } from './schemaAnexos'
 import { getAppDir } from '../paths'
+import { lerArtigo } from './estoque'
 
 export interface AnexoSeguro {
   artifactId: string
@@ -25,16 +25,15 @@ export async function caminhoAbsolutoArtigo(artigo: LinhaArtigo): Promise<string
 }
 
 export async function projetarArtigoSeguro(artigo: LinhaArtigo): Promise<AnexoSeguro> {
-  const absoluto = await caminhoAbsolutoArtigo(artigo)
-  const info = await stat(absoluto).catch(() => null)
-  let presente = Boolean(info?.isFile())
-  if (artigo.mode === 'reference') {
-    // T22 — revalidação no momento da leitura: presença + integridade.
-    // Alterada ou removida → `ausente` (o uso é impedido); a atualização é
-    // explícita (novo registro), nunca retarget silencioso do legado.
-    const { verificarReferencia } = await import('./referencias')
-    const revalidacao = await verificarReferencia(artigo.artifactId)
-    presente = revalidacao.presente && revalidacao.integro
+  // T22/B07 — MESMO resolver validado usado pelo download: presença,
+  // contenção de pais, tamanho e hash. Referência alterada aparece `ausente`
+  // (o uso é impedido) e download responde 409 honesto; nunca retarget.
+  let presente = false
+  try {
+    await lerArtigo(artigo.artifactId)
+    presente = true
+  } catch {
+    presente = false
   }
   const seguro: AnexoSeguro = {
     artifactId: artigo.artifactId,

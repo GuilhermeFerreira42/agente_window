@@ -2,7 +2,7 @@ import type { SessionRecord, TombstoneDelecao } from './database'
 import { consultarDelecao, deleteSessionRecord, getSessionRecordRaw, getDatabase, problemaSessaoExcluida } from './database'
 import { PersistenceProblem } from './persistenceErrors'
 import { deleteTranscript } from './transcripts'
-import { executarPlanoAnexos, registrarPlanoAnexos } from './attachments/limpeza'
+import { executarPlanoAnexos, registrarPlanoAnexos, removerStagesDaSessao, type OpcoesLimpeza } from './attachments/limpeza'
 import { removeWorktree, WorktreeDirtyError } from './worktrees'
 
 // O tombstone mora no dono do catálogo (mesmo SQLite, primeira conexão);
@@ -92,7 +92,7 @@ export function deletionsPendentes(): TombstoneDelecao[] {
  * worktree (única etapa com recusa 409 e rollback de primeira tentativa) →
  * estado durável `limpeza_pendente` → transcrição → registro (cascata dos
  * mecanismos atuais remove grants/checkpoints/receipts/origins) → `concluido`. */
-export async function executarLimpezaDelecao(sessionId: string, force: boolean): Promise<TombstoneDelecao> {
+export async function executarLimpezaDelecao(sessionId: string, force: boolean, limpeza: OpcoesLimpeza = {}): Promise<TombstoneDelecao> {
   const tombstone = consultarDelecao(sessionId)
   if (!tombstone) throw new PersistenceProblem(409, 'deletion_state_missing',
     'Esta conversa não tem exclusão registrada. Recarregue e tente novamente.')
@@ -118,11 +118,17 @@ export async function executarLimpezaDelecao(sessionId: string, force: boolean):
   }
   marcarLimpezaPendente(sessionId)
   try {
+    // C-3a (T27–T29/R12) — arquivos por plano ANTES de qualquer cascade: o
+    // plano foi capturado no tombstone e a Lixeira decide cada privado.
+    // Falha de item NÃO apaga evidência: a limpeza fica pendente (B06).
+    const anexosCompletos = await executarPlanoAnexos(sessionId, limpeza)
+    if (!anexosCompletos) {
+      throw new PersistenceProblem(503, 'session_cleanup_pending',
+        'Nem todos os arquivos privados desta conversa puderam ir para a Lixeira. A exclusão continua pendente e o que falhou foi preservado; tente novamente.')
+    }
+    await removerStagesDaSessao(sessionId)
     if (record) await deleteTranscript(record.slug, sessionId)
     deleteSessionRecord(sessionId)
-    // C-3a (T27–T29) — arquivos por plano (ownership já capturado); o ledger
-    // sai depois; referências nunca tocam o original do usuário.
-    await executarPlanoAnexos(sessionId)
     concluirLimpeza(sessionId)
   } catch (error) {
     // Falha de limpeza NUNCA vira sucesso: estado fica `limpeza_pendente`,

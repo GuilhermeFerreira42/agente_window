@@ -57,6 +57,12 @@ export interface ChatMessage {
   tetoAtual?: number
   /** Quando a corrida começou (pós-11) — o contador "há Xs" do dono. */
   inicioEm?: number
+  /**
+   * C-3a (R11/B10) — chip de artefato PRONTO que ainda não tem mensagem
+   * (upload publicado, publicação da mensagem falhou). Nunca vai ao modelo e
+   * não participa do histórico enviado à IA.
+   */
+  salvoSemMensagem?: boolean
 }
 
 export interface ContinuarNoChat {
@@ -84,6 +90,12 @@ export interface ComposerHistoryEntry {
   attachments: Attachment[]
   model: string
   mode: string
+  /**
+   * C-3a (R11/B10) — chip de artefato PRONTO que ainda não tem mensagem
+   * (upload publicado, publicação da mensagem falhou). Nunca vai ao modelo e
+   * não participa do histórico enviado à IA.
+   */
+  salvoSemMensagem?: boolean
 }
 
 export interface NestedChat {

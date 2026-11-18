@@ -51,7 +51,7 @@ export interface LinhaArtigo {
   createdAt: number
 }
 
-const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan'] as const
+const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans'] as const
 
 const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
   attachment_uploads: [
@@ -64,7 +64,11 @@ const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
     'mode', 'locator', 'root_kind', 'workspace_root', 'bytes', 'sha256', 'state',
     'message_id', 'part_id', 'created_at',
   ],
-  attachment_cleanup_plan: ['session_id', 'artifact_id', 'alvo', 'locator', 'root_kind', 'workspace_root', 'sha256', 'state', 'created_at'],
+  attachment_cleanup_plan: ['session_id', 'artifact_id', 'alvo', 'locator', 'root_kind', 'workspace_root', 'sha256', 'state', 'created_at', 'destino', 'motivo'],
+  attachment_recovery_plans: [
+    'recovery_id', 'origem_session_id', 'origem_chat_id', 'destino_session_id', 'destino_chat_id',
+    'token_hash', 'itens', 'state', 'mapa', 'criado_em', 'expira_em',
+  ],
 }
 
 /** Cria as tabelas aditivas na primeira conexão (chamado por getDatabase). */
@@ -122,9 +126,30 @@ export function criarTabelasAnexos(db: Database.Database): void {
       sha256 TEXT,
       state TEXT NOT NULL DEFAULT 'pendente' CHECK (state IN ('pendente','concluido','falhou')),
       created_at INTEGER NOT NULL,
+      destino TEXT,
+      motivo TEXT,
       PRIMARY KEY (session_id, artifact_id)
     );
+    CREATE TABLE IF NOT EXISTS attachment_recovery_plans (
+      recovery_id TEXT PRIMARY KEY,
+      origem_session_id TEXT NOT NULL,
+      origem_chat_id TEXT NOT NULL,
+      destino_session_id TEXT NOT NULL,
+      destino_chat_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      itens TEXT NOT NULL,
+      state TEXT NOT NULL CHECK (state IN ('preparado','consumido')),
+      mapa TEXT,
+      criado_em INTEGER NOT NULL,
+      expira_em INTEGER NOT NULL
+    );
   `)
+  // Migração ADITIVA da própria C-3a (T32): bancos criados antes de o plano
+  // registrar o destino da Lixeira recebem as colunas sem perder dados.
+  for (const coluna of ['destino', 'motivo']) {
+    const presentes = new Set((db.prepare('PRAGMA table_info(attachment_cleanup_plan)').all() as Array<{ name: string }>).map((c) => c.name))
+    if (!presentes.has(coluna)) db.exec(`ALTER TABLE attachment_cleanup_plan ADD COLUMN ${coluna} TEXT`)
+  }
 }
 
 /** Forma esperada do schema de anexos; qualquer desvio = não pronto (T32). */

@@ -1,3 +1,13 @@
+# C-3a — dívidas e limites após a reentrega técnica (19/11/2026)
+
+A C-3a foi corrigida após parecer REPROVADA (B01–B11 + seção 3), sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção (apresentação/geração de mídia), Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.
+
+Dívidas abertas e honestas desta entrega: (1) **validação Windows pendente** — as cinco falhas do foco foram corrigidas no launcher dos filhos (T14–T17) e no teardown SQLite (T32), mas não há SO Windows neste ambiente; o runner `platform/scripts/e2e-c3a.ps1` e o procedimento estão na entrega extensa externa; (2) **T36 não mata o processo fisicamente** — o cenário é “um escritor por tentativa” e a morte física fica coberta por T14–T17; (3) as 13 sondas do parecer foram executadas pela cópia portátil com config dedicada, porque o runner original grava o próprio template e falha por anti-padrão do template (registrado); (4) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa e evidências em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md`.
+
+---
+
 # Encerramento do recorte C-2 — 17/11/2026
 
 Implementação e correções solicitadas da tela inicial/controles estão tecnicamente concluídas, publicadas até24bfd55, prontas para aceite final do proprietário. Não prolongar C-2 para habilitar recursos futuros visíveis na referência: anexos seguem C-3; Autopilot, assistência de permissões e isolamento de terminal exigem escopo/especificação próprios. Não há novo código autorizado automaticamente por este encerramento. Estado/provas em03/09, escopos originais e dívidas abaixo preservados; C1-EXCLUSAO-01 e homologações de memória não são encerradas por consequência.

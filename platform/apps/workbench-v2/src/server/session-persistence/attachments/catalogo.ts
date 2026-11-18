@@ -1,6 +1,13 @@
 // C-3a — ledger de anexos no MESMO SQLite da sessão (sem banco paralelo).
 // Consultas do ledger; o schema aditivo vive em schemaAnexos.ts (T32).
+//
+// Duas invariantes desta camada (parecer B04/B09/B11):
+//  - estado do upload e registro do artefato finalizam na MESMA transação
+//    (`finalizarPublicacao`), nunca em dois commits separados;
+//  - contagem de concorrência/quota é feita DENTRO da transação de admissão
+//    (`reservarAdmissao`), então duas admissões simultâneas não passam juntas.
 import { getDatabase } from '../database'
+import { PersistenceProblem } from '../persistenceErrors'
 import type { LinhaUpload, LinhaArtigo, EstadoUpload, ModoAnexo, EscopoAnexo } from './schemaAnexos'
 
 export type { LinhaUpload, LinhaArtigo, EstadoUpload, ModoAnexo, EscopoAnexo }
@@ -86,6 +93,12 @@ export function obterUpload(sessionId: string, chatId: string, uploadId: string)
   return bruto ? linhaUpload(bruto) : undefined
 }
 
+/** Busca por uploadId no ledger inteiro (recibo de ACK perdido, sem dono na URL). */
+export function obterUploadPorId(uploadId: string): LinhaUpload | undefined {
+  const bruto = getDatabase().prepare('SELECT * FROM attachment_uploads WHERE upload_id = ?').get(uploadId) as Record<string, unknown> | undefined
+  return bruto ? linhaUpload(bruto) : undefined
+}
+
 export function listarUploads(sessionId: string, chatId: string): LinhaUpload[] {
   const brutos = getDatabase().prepare('SELECT * FROM attachment_uploads WHERE session_id = ? AND chat_id = ? ORDER BY created_at')
     .all(sessionId, chatId) as Array<Record<string, unknown>>
@@ -138,10 +151,89 @@ export function bytesPublicadosChat(sessionId: string, chatId: string): number {
   return linha.total
 }
 
-/** Uploads ativos (concorrência) — identidades em recebimento recente. */
-export function uploadsAtivos(): LinhaUpload[] {
-  const brutos = getDatabase().prepare(`SELECT * FROM attachment_uploads WHERE state IN ('admitido','recebendo','preparado')`).all() as Array<Record<string, unknown>>
-  return brutos.map(linhaUpload)
+/**
+ * Transferências em voo (concorrência). `porDono` filtra o dono: a política é
+ * um recurso do perfil, mas o DIAGNÓSTICO e a reconciliação de um chat nunca
+ * precisam enxergar transferências de outro.
+ */
+export function uploadsAtivos(porDono?: { sessionId: string; chatId?: string }): LinhaUpload[] {
+  const brutos = porDono
+    ? porDono.chatId
+      ? getDatabase().prepare("SELECT * FROM attachment_uploads WHERE state IN ('admitido','recebendo','preparado') AND session_id = ? AND chat_id = ?").all(porDono.sessionId, porDono.chatId)
+      : getDatabase().prepare("SELECT * FROM attachment_uploads WHERE state IN ('admitido','recebendo','preparado') AND session_id = ?").all(porDono.sessionId)
+    : getDatabase().prepare("SELECT * FROM attachment_uploads WHERE state IN ('admitido','recebendo','preparado')").all()
+  return (brutos as Array<Record<string, unknown>>).map(linhaUpload)
+}
+
+export interface ReservaAdmissao {
+  uploadId: string
+  criado: boolean
+  existente: LinhaUpload | null
+  ativos: number
+}
+
+/**
+ * Admissão ATÔMICA (R05/B11): a contagem de concorrência e a soma de quota do
+ * dono são lidas e a linha é inserida na MESMA transação `IMMEDIATE`. Sem
+ * isso, três `Promise.all` passavam pelo limite de concorrência 2.
+ *
+ * `criar` recebe o número de ativos (já sob a transação) e devolve a linha a
+ * inserir, ou `null` quando o chamador só quer reutilizar/consultar. Erros de
+ * política viram `PersistenceProblem` e a transação é revertida (nenhuma
+ * reserva fantasma).
+ */
+export function reservarAdmissao(
+  sessionId: string,
+  chatId: string,
+  decidir: (ativos: LinhaUpload[]) => { inserir?: Parameters<typeof inserirUpload>[0] } | { recusar: PersistenceProblem } | { reutilizar: LinhaUpload },
+): ReservaAdmissao {
+  const db = getDatabase()
+  const transacao = db.transaction((): ReservaAdmissao => {
+    const ativos = uploadsAtivos()
+    const decisao = decidir(ativos)
+    if ('recusar' in decisao) throw decisao.recusar
+    if ('reutilizar' in decisao) {
+      return { uploadId: decisao.reutilizar.uploadId, criado: false, existente: decisao.reutilizar, ativos: ativos.length }
+    }
+    if (!decisao.inserir) {
+      throw new PersistenceProblem(500, 'attachment_error', 'Admissão sem decisão de reserva.')
+    }
+    inserirUpload(decisao.inserir)
+    return { uploadId: decisao.inserir.uploadId, criado: true, existente: null, ativos: ativos.length }
+  })
+  return transacao.immediate()
+}
+
+/**
+ * Finalização ATÔMICA (R04/B04): estado `pronto` + registro do artefato no
+ * MESMO commit. Se o registro falhar (ex.: trigger/constraint), o estado
+ * volta a `preparado` e o final continua íntegro para retomada — nunca uma
+ * linha `pronto` sem artefato consultável.
+ */
+export function finalizarPublicacao(linha: LinhaUpload, campos: { finalPath: string; bytes: number; sha256: string; locator: string; modalidade: string; papel: string; createdAt: number }): LinhaUpload {
+  const db = getDatabase()
+  const transacao = db.transaction((): LinhaUpload => {
+    atualizarUpload(linha.sessionId, linha.chatId, linha.uploadId, { state: 'pronto', finalPath: campos.finalPath })
+    upsertArtigo({
+      artifactId: linha.artifactId ?? linha.uploadId, sessionId: linha.sessionId, chatId: linha.chatId,
+      uploadId: linha.uploadId, name: linha.name, modalidade: campos.modalidade, papel: campos.papel,
+      mode: linha.mode, locator: campos.locator, rootKind: linha.scope === 'workspace' ? 'workspace' : 'appdir',
+      workspaceRoot: linha.workspaceRoot, bytes: campos.bytes, sha256: campos.sha256, state: 'pronto',
+      messageId: null, partId: null, createdAt: campos.createdAt,
+    })
+    const depois = obterUpload(linha.sessionId, linha.chatId, linha.uploadId)!
+    if (depois.state !== 'pronto' || !obterArtigo(depois.artifactId ?? depois.uploadId)) {
+      throw new PersistenceProblem(503, 'attachment_commit_failed',
+        'Não foi possível finalizar o anexo no catálogo. O arquivo publicado fica preservado para reconciliação; nada foi anunciado como pronto.')
+    }
+    return depois
+  })
+  return transacao.immediate()
+}
+
+/** Gravação em lote (migração/reconciliação) sob UMA transação. */
+export function emTransacao<T>(operacao: () => T): T {
+  return getDatabase().transaction(operacao).immediate()
 }
 
 export function inserirPlanoLimpeza(linha: { sessionId: string; artifactId: string; alvo: 'chat-copy' | 'workspace-copy' | 'referencia'; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null }): void {
@@ -152,7 +244,7 @@ export function inserirPlanoLimpeza(linha: { sessionId: string; artifactId: stri
   `).run(linha.sessionId, linha.artifactId, linha.alvo, linha.locator, linha.rootKind, linha.workspaceRoot, linha.sha256, Date.now())
 }
 
-export function planosPendentes(sessionId: string): Array<{ artifactId: string; alvo: string; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null; state: string }> {
+export function planosPendentes(sessionId: string): Array<{ artifactId: string; alvo: string; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null; state: string; destino: string | null }> {
   const brutos = getDatabase().prepare('SELECT * FROM attachment_cleanup_plan WHERE session_id = ? ORDER BY created_at').all(sessionId) as Array<Record<string, unknown>>
   return brutos.map((bruto) => ({
     artifactId: bruto.artifact_id as string,
@@ -162,11 +254,19 @@ export function planosPendentes(sessionId: string): Array<{ artifactId: string; 
     workspaceRoot: (bruto.workspace_root as string | null) ?? null,
     sha256: (bruto.sha256 as string | null) ?? null,
     state: bruto.state as string,
+    destino: (bruto.destino as string | null) ?? null,
   }))
 }
 
-export function marcarPlano(artifactId: string, state: 'concluido' | 'falhou'): void {
-  getDatabase().prepare('UPDATE attachment_cleanup_plan SET state = ? WHERE artifact_id = ?').run(state, artifactId)
+export function marcarPlano(artifactId: string, state: 'pendente' | 'concluido' | 'falhou', destino?: string | null, motivo?: string | null): void {
+  getDatabase().prepare('UPDATE attachment_cleanup_plan SET state = ?, destino = COALESCE(?, destino), motivo = COALESCE(?, motivo) WHERE artifact_id = ?')
+    .run(state, destino ?? null, motivo ?? null, artifactId)
+}
+
+/** Plano `falhou` cujo motivo é definitivo (não adianta retentar). */
+export function planosDefinitivamenteFalhos(sessionId: string): number {
+  const linha = getDatabase().prepare("SELECT COUNT(*) AS c FROM attachment_cleanup_plan WHERE session_id = ? AND state = 'falhou'").get(sessionId) as { c: number }
+  return linha.c
 }
 
 export function removerPlanos(sessionId: string): void {
@@ -181,4 +281,10 @@ export function removerArtigosChatCompleto(sessionId: string, chatId?: string): 
   }
   getDatabase().prepare('DELETE FROM attachment_artifacts WHERE session_id = ?').run(sessionId)
   getDatabase().prepare('DELETE FROM attachment_uploads WHERE session_id = ?').run(sessionId)
+}
+
+/** Remove só as identidades do chat internos (T28), preservando o resto da sessão. */
+export function removerLedgerDoChat(sessionId: string, chatId: string): void {
+  getDatabase().prepare('DELETE FROM attachment_artifacts WHERE session_id = ? AND chat_id = ?').run(sessionId, chatId)
+  getDatabase().prepare('DELETE FROM attachment_uploads WHERE session_id = ? AND chat_id = ?').run(sessionId, chatId)
 }

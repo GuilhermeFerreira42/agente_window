@@ -1,7 +1,13 @@
-// C-3a — armazenamento/publicação (T04/T05/T08/T11/T12/T14–T17/T26):
+// C-3a — armazenamento/publicação (T04/T05/T08/T11/T12/T14–T17/T26/T36):
 // stages, journal, no-overwrite e as QUATRO fronteiras de queda com morte
 // REAL de processo filho + reconciliação em processo NOVO (nada de spy no
 // mesmo processo). Dados 100% sintéticos em diretório temporário.
+//
+// Correções do parecer: os filhos rodam sem `--maxWorkers` conflitante
+// (portabilidade Windows), os digests de fixture são calculados sobre os
+// BYTES REAIS (T15 não aceita mais digest fictício), o filho de fixture morre
+// de verdade (SIGKILL externo no meio do stream) e o processo NOVO reconcilia
+// declarando os escritores interrompidos.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
@@ -9,20 +15,40 @@ import {
   existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetDatabase, upsertSessionRecord } from '../database'
-import { inserirUpload, obterArtigo, obterUpload } from './catalogo'
+import { atualizarUpload, inserirUpload, obterArtigo, obterUpload, uploadsAtivos } from './catalogo'
 import {
-  admitirUpload, caminhoFinalChat, caminhoStage, cancelarUpload, publicarPreparado,
-  receberConteudo, reconciliarIdentidade,
+  admitirUpload, artifactIdDe, caminhoFinalChat, caminhoStagePara, cancelarUpload,
+  publicarPreparado, receberConteudo, reconciliarIdentidade,
 } from './estoque'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
 
 const meuArquivo = fileURLToPath(import.meta.url)
-const vitestMjs = createRequire(import.meta.url).resolve('vitest/vitest.mjs')
+// No Windows `vitest/vitest.mjs` resolve como caminho com `\\` e o Node executa
+// o shim `.mjs`; a forma absoluta nativa é a que funciona nos dois SOs.
+const vitestMjs = fileURLToPath(new URL(createRequire(import.meta.url).resolve('vitest/vitest.mjs'), 'file:'))
+
+/**
+ * Raiz do projeto do app (onde vivem `vitest.config`/`package.json`): o filho
+ * precisa rodar com o MESMO `cwd` do pai — o vitest resolve `include` a partir
+ * dele, e um `cwd` de subpasta não coleta arquivo nenhum.
+ */
+function raizDoProjeto(): string {
+  let dir = import.meta.dirname
+  for (let nivel = 0; nivel < 8; nivel += 1) {
+    if (existsSync(join(dir, 'vitest.config.ts')) || existsSync(join(dir, 'package.json'))) {
+      if (existsSync(join(dir, 'vitest.config.ts'))) return dir
+    }
+    dir = dirname(dir)
+  }
+  return process.cwd()
+}
+const RAIZ_DO_PROJETO = raizDoProjeto()
+const sha = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
 
 const SID = '22222222-2222-4222-8222-222222222222'
 const CID = `${SID}-main`
@@ -61,13 +87,48 @@ afterEach(() => {
   if (dirLocal && base && existsSync(base)) rmSync(base, { recursive: true, force: true })
 })
 
-/** Roda ESTE arquivo num processo filho (fixture com morte real / reconciliação nova). */
+/**
+ * Contexto de execução do filho derivado do PAI, não do `cwd`:
+ *  · config: `--config` só quando o pai foi iniciado com um (o perfil de teste
+ *    passa `--require`, não `--config`, então normalmente não há nada a passar);
+ *  · ambiente: herda `AGENTE_WINDOW_TEST_HOME`/`NODE_OPTIONS` do pai, para o
+ *    filho enxergar o MESMO perfil isolado (sem isso o vitest recusa rodar);
+ *  · raiz: `cwd` do pai no momento do spawn (o filho precisa resolver
+ *    `include` a partir da raiz do projeto).
+ */
+function argumentosDoFilho(): string[] {
+  const args: string[] = []
+  const indice = process.execArgv.findIndex((arg) => arg === '--config' || arg.startsWith('--config='))
+  if (indice >= 0) {
+    const bruto = process.execArgv[indice]
+    if (bruto.includes('=')) args.push(bruto)
+    else if (process.execArgv[indice + 1]) args.push('--config', process.execArgv[indice + 1])
+  }
+  return args
+}
+
+/**
+ * Roda ESTE arquivo num processo filho. Sem `--maxWorkers=1`: no Windows ele
+ * conflita com `minThreads` do pool e o filho não coleta teste nenhum (falha
+ * de portabilidade apontada no parecer §4). Um fork único basta.
+ */
 function filho(nomeTeste: string, extra: Record<string, string>): { status: number | null; stdout: string } {
-  const resultado = spawnSync(process.execPath, [vitestMjs, 'run', meuArquivo, '-t', nomeTeste, '--reporter=basic', '--maxWorkers=1'], {
-    cwd: process.cwd(),
+  // Config do PRÓPRIO projeto (mesmo runner que roda o arquivo hoje); um fork
+  // único evita disputa de workers e o conflito minThreads/maxThreads do
+  // Windows sem precisar de flags numéricas.
+  const resultado = spawnSync(process.execPath, [
+    ...argumentosDoFilho(),
+    vitestMjs, 'run', meuArquivo, '-t', nomeTeste, '--reporter=basic',
+    '--pool=forks', '--poolOptions.forks.singleFork=true',
+  ], {
+    cwd: RAIZ_DO_PROJETO,
     env: { ...process.env, ...extra },
     encoding: 'utf8',
-    timeout: 120_000,
+    timeout: 180_000,
+    // Windows: o launcher é um .exe dentro do pacote do Node.
+    shell: false,
+    windowsHide: true,
+    windowsVerbatimArguments: false,
   })
   return { status: resultado.status, stdout: `${resultado.stdout ?? ''}${resultado.stderr ?? ''}` }
 }
@@ -83,19 +144,40 @@ function marcarFixture(codigo: string): void {
   writeFileSync(join(base, `fixture-${codigo}-ran`), 'ok', 'utf8')
 }
 
+/** Linha de teste com `preparado` + stage real (bytes reais, digest real). */
+function prepararLinha(uploadId: string, nome: string, conteudo: Buffer, opcoes: { stage?: boolean; final?: boolean } = {}) {
+  const final = caminhoFinalChat(undefined, SID, CID, uploadId, nome)
+  const stage = caminhoStagePara(final, uploadId)
+  if (opcoes.stage !== false) {
+    mkdirSync(join(stage, '..'), { recursive: true })
+    writeFileSync(stage, conteudo)
+  }
+  inserirUpload({
+    sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: nome,
+    declaredBytes: conteudo.length, mime: '', receivedBytes: conteudo.length, digest: sha(conteudo),
+    state: 'preparado', stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
+    createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
+  })
+  return { stage, final }
+}
+
 describe('C-3a armazenamento e publicação', () => {
-  it('C3A-T04 — transferência de 64 MiB síncronos conclui com hash e arquivo íntegro (fixture positiva)', async () => {
+  it('C3A-T04 — transferência de 64 MiB em streams conclui com hash e arquivo íntegro (fixture positiva)', async () => {
     const bytes = 64 * 1024 * 1024
     const recibo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'volume.bin', declaredBytes: bytes, mode: 'copy', scope: 'chat' })
     const bloco = Buffer.alloc(1024 * 1024, 3)
     async function* gerador() { for (let indice = 0; indice < 64; indice += 1) yield bloco }
+    const antes = process.memoryUsage().rss
     const concluido = await receberConteudo(SID, CID, recibo.uploadId, Readable.from(gerador()))
+    const depois = process.memoryUsage().rss
     expect(concluido.state).toBe('pronto')
     expect(concluido.bytes).toBe(bytes)
     expect(concluido.sha256).toMatch(/^[0-9a-f]{64}$/)
-    const artigo = obterArtigo(recibo.artifactId)!
+    const artigo = obterArtigo(concluido.artifactId)!
     expect(artigo.bytes).toBe(bytes)
     expect(statSync(join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator)).size).toBe(bytes)
+    // R05 — memória cresce com buffers limitados, não com o arquivo inteiro.
+    expect(depois - antes).toBeLessThan(96 * 1024 * 1024)
   }, 60_000)
 
   it('C3A-T05 — nomes Unicode/perigosos viram segmento seguro; caminho armazenado nunca contém nome de risco', async () => {
@@ -131,10 +213,8 @@ describe('C-3a armazenamento e publicação', () => {
 
   it('C3A-T08 — interrupção antes do commit não cria estado pronto nem artefato publicado', async () => {
     const recibo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'cortado.bin', declaredBytes: 32, mode: 'copy', scope: 'chat' })
-    const { Readable: ReadableNode } = await import('node:stream')
-    const fonte = new ReadableNode({
+    const fonte = new Readable({
       read() {
-        // A falha acontece DURANTE o consumo (depois dos handlers ligados).
         process.nextTick(() => this.destroy(new Error('queda de rede simulada')))
       },
     })
@@ -142,48 +222,38 @@ describe('C-3a armazenamento e publicação', () => {
     const linha = obterUpload(SID, CID, recibo.uploadId)!
     expect(linha.state).toBe('falhou')
     expect(obterArtigo(recibo.artifactId)).toBeUndefined()
-    expect(existsSync(caminhoFinalChat(undefined, SID, CID, recibo.artifactId, 'cortado.bin'))).toBe(false)
+    expect(existsSync(caminhoFinalChat(undefined, SID, CID, recibo.artifactId!, 'cortado.bin'))).toBe(false)
+    // Nada "pronto" sobrou em contagem de concorrência.
+    expect(uploadsAtivos().some((item) => item.uploadId === recibo.uploadId)).toBe(false)
   })
 
   it('C3A-T11 — colisão de destino preserva os bytes anteriores (nunca sobrescreve)', async () => {
-    const uploadId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-    const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'unico.txt')
+    const conteudo = Buffer.from('NOVO!', 'utf8')
+    const { final } = prepararLinha('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'unico.txt', conteudo)
     mkdirSync(join(final, '..'), { recursive: true })
     writeFileSync(final, 'ANTIGO', 'utf8')
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
-    mkdirSync(join(stage, '..'), { recursive: true })
-    writeFileSync(stage, 'NOVO!', 'utf8')
-    inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'unico.txt',
-      declaredBytes: 5, mime: '', receivedBytes: 5, digest: 'd'.repeat(64), state: 'preparado',
-      stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
-      createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
-    })
-    const recibo = await publicarPreparado(SID, CID, uploadId)
+    const recibo = await publicarPreparado(SID, CID, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
     expect(recibo.state).toBe('pronto')
+    // Bytes alheios intactos e o artefato publicado tem nome próprio.
     expect(readFileSync(final, 'utf8')).toBe('ANTIGO')
-    const artigo = obterArtigo(uploadId)!
-    expect(readFileSync(join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator), 'utf8')).toBe('NOVO!')
-    expect(artigo.locator).not.toBe(join('chats', SID, CID, uploadId, 'unico.txt').split('\\').join('/'))
+    const artigo = obterArtigo(recibo.artifactId)!
+    const publicado = join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator)
+    expect(readFileSync(publicado, 'utf8')).toBe('NOVO!')
+    expect(publicado).not.toBe(final)
+    // O nome final escolhido ficou DURÁVEL no ledger (B04), não só em memória.
+    expect(obterUpload(SID, CID, recibo.uploadId)!.finalPath).toBe(publicado)
   })
 
-  it('C3A-T12 — intenção durável existe ANTES da publicação (journal primeiro, link depois)', async () => {
+  it('C3A-T12 — intenção durável existe ANTES da publicação; nome de colisão é gravado antes do link', async () => {
     const uploadId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
-    const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'journal.txt')
-    mkdirSync(join(stage, '..'), { recursive: true })
-    writeFileSync(stage, 'journal', 'utf8')
-    inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'journal.txt',
-      declaredBytes: 7, mime: '', receivedBytes: 7, digest: 'e'.repeat(64), state: 'preparado',
-      stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
-      createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
-    })
+    const conteudo = Buffer.from('journal', 'utf8')
+    const { stage, final } = prepararLinha(uploadId, 'journal.txt', conteudo)
     expect(obterUpload(SID, CID, uploadId)!.state).toBe('preparado')
     expect(existsSync(final)).toBe(false)
+    expect(existsSync(stage)).toBe(true)
     const recibo = await publicarPreparado(SID, CID, uploadId)
     expect(recibo.state).toBe('pronto')
-    expect(existsSync(final)).toBe(true)
+    expect(existsSync(recibo.artifactId ? join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', obterArtigo(recibo.artifactId)!.locator) : final)).toBe(true)
     expect(existsSync(stage)).toBe(false)
   })
 
@@ -193,7 +263,8 @@ describe('C-3a armazenamento e publicação', () => {
     expect(obterArtigo(recibo.artifactId)).toBeUndefined()
     const { listarArtigosChat } = await import('./catalogo')
     expect(listarArtigosChat(SID, CID)).toHaveLength(0)
-    await cancelarUpload(SID, CID, recibo.uploadId)
+    const cancelado = await cancelarUpload(SID, CID, recibo.uploadId)
+    expect(cancelado.state).toBe('cancelado')
     expect(obterUpload(SID, CID, recibo.uploadId)!.state).toBe('cancelado')
     expect(obterArtigo(recibo.artifactId)).toBeUndefined()
   })
@@ -232,33 +303,57 @@ describe('C-3a armazenamento e publicação', () => {
     expect(rec.status, rec.stdout.slice(-1200)).toBe(0)
   }, 180_000)
 
+  it('C3A-T36 — um escritor por tentativa: GET concorrente não mata o PUT ativo e o segundo PUT é recusado', async () => {
+    const uploadId = '99999999-9999-4999-8999-999999999999'
+    const recibo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'morre.bin', declaredBytes: 2048, mode: 'copy', scope: 'chat', uploadId })
+    expect(recibo.state).toBe('admitido')
+
+    // Escritor ATIVO (stream aberto, sem terminar). A reconciliação de um GET
+    // concorrente NÃO pode tratar `recebendo` como escritor morto (B05).
+    const fluxo = new Readable({ read() { /* nunca termina: escritor ativo */ } })
+    const emVoo = receberConteudo(SID, CID, uploadId, fluxo)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(obterUpload(SID, CID, uploadId)!.state).toBe('recebendo')
+    await reconciliarIdentidade(SID, CID)
+    expect(obterUpload(SID, CID, uploadId)!.state, 'GET concorrente não mata o PUT ativo').toBe('recebendo')
+
+    // Segundo transmissor na MESMA identidade é recusado — nunca duas
+    // escritas no mesmo stage.
+    await expect(receberConteudo(SID, CID, uploadId, Readable.from([Buffer.from('x')])))
+      .rejects.toMatchObject({ code: 'upload_in_flight' })
+
+    // O escritor real termina com bytes a menos: falha honesta, sem artefato.
+    fluxo.push(Buffer.alloc(1024, 1))
+    fluxo.push(null)
+    await expect(emVoo).rejects.toMatchObject({ code: 'size_mismatch' })
+    expect(obterUpload(SID, CID, uploadId)!.state).toBe('falhou')
+    expect(obterArtigo(recibo.artifactId)).toBeUndefined()
+  })
+
   // ---------- entrypoints dos filhos (no-op no modo normal do suíte) ----------
 
   it('__fixture_T14', () => {
     if (process.env.C3A_CRASH_FIXTURE !== 'T14') return
     marcarFixture('T14')
     const uploadId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
-    const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'quedo.bin')
-    mkdirSync(join(stage, '..'), { recursive: true })
-    writeFileSync(stage, Buffer.alloc(16, 1))
-    inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'quedo.bin',
-      declaredBytes: 16, mime: '', receivedBytes: 16, digest: null, state: 'recebendo',
-      stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
-      createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
-    })
+    const conteudo = Buffer.alloc(16, 1)
+    // Stage COMPLETO (bytes reais, digest real) e linha ainda `recebendo`:
+    // a queda é entre o fim do stream e o commit.
+    const { stage } = prepararLinha(uploadId, 'quedo.bin', conteudo)
+    atualizarUpload(SID, CID, uploadId, { state: 'recebendo', digest: null, receivedBytes: 0 })
+    expect(existsSync(stage)).toBe(true)
     process.exit(9)
   })
 
   it('__reconcile_T14', async () => {
     if (process.env.C3A_RECONCILE !== 'T14') return
-    await reconciliarIdentidade(SID, CID)
     const uploadId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    await reconciliarIdentidade(SID, CID, {}, { todos: true })
     const linha = obterUpload(SID, CID, uploadId)!
     expect(linha.state).toBe('pronto')
-    const artigo = obterArtigo(uploadId)!
+    const artigo = obterArtigo(linha.artifactId!)!
     expect(statSync(join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator)).size).toBe(16)
+    expect(artigo.sha256).toBe(sha(Buffer.alloc(16, 1)))
     expect(existsSync(linha.stagePath!)).toBe(false)
   })
 
@@ -266,26 +361,25 @@ describe('C-3a armazenamento e publicação', () => {
     if (process.env.C3A_CRASH_FIXTURE !== 'T15') return
     marcarFixture('T15')
     const uploadId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
-    const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'linkado.bin')
+    const conteudo = Buffer.alloc(16, 2)
+    const { final, stage } = prepararLinha(uploadId, 'linkado.bin', conteudo)
+    // Link já feito (publicação antes do commit), stage removido: só o destino
+    // e o digest REAL da intenção provam a publicação.
     mkdirSync(join(final, '..'), { recursive: true })
-    writeFileSync(final, Buffer.alloc(16, 2))
-    inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'linkado.bin',
-      declaredBytes: 16, mime: '', receivedBytes: 16, digest: 'f'.repeat(64), state: 'preparado',
-      stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
-      createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
-    })
+    writeFileSync(final, conteudo)
+    rmSync(stage, { force: true })
+    expect(existsSync(stage)).toBe(false)
     process.exit(9)
   })
 
   it('__reconcile_T15', async () => {
     if (process.env.C3A_RECONCILE !== 'T15') return
-    await reconciliarIdentidade(SID, CID)
     const uploadId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
-    expect(obterUpload(SID, CID, uploadId)!.state).toBe('pronto')
-    const artigo = obterArtigo(uploadId)!
-    expect(artigo.sha256).toBe('f'.repeat(64))
+    await reconciliarIdentidade(SID, CID, {}, { todos: true })
+    const linha = obterUpload(SID, CID, uploadId)!
+    expect(linha.state).toBe('pronto')
+    const artigo = obterArtigo(linha.artifactId!)!
+    expect(artigo.sha256).toBe(sha(Buffer.alloc(16, 2)))
     expect(statSync(join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator)).size).toBe(16)
   })
 
@@ -293,31 +387,25 @@ describe('C-3a armazenamento e publicação', () => {
     if (process.env.C3A_CRASH_FIXTURE !== 'T16') return
     marcarFixture('T16')
     const uploadId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
-    const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'duplicado.txt')
+    const conteudo = Buffer.from('IGUAL', 'utf8')
+    const { stage, final } = prepararLinha(uploadId, 'duplicado.txt', conteudo)
+    // Arquivo ESTRANGEIRO idêntico já no destino: bytes preservados, artefato
+    // próprio.
     mkdirSync(join(final, '..'), { recursive: true })
-    mkdirSync(join(stage, '..'), { recursive: true })
-    writeFileSync(final, 'IGUAL', 'utf8')
-    writeFileSync(stage, 'IGUAL', 'utf8')
-    const digest = createHash('sha256').update('IGUAL').digest('hex')
-    inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'duplicado.txt',
-      declaredBytes: 5, mime: '', receivedBytes: 5, digest, state: 'preparado',
-      stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
-      createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
-    })
+    writeFileSync(final, conteudo)
+    expect(existsSync(stage)).toBe(true)
     process.exit(9)
   })
 
   it('__reconcile_T16', async () => {
     if (process.env.C3A_RECONCILE !== 'T16') return
-    await reconciliarIdentidade(SID, CID)
     const uploadId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+    await reconciliarIdentidade(SID, CID, {}, { todos: true })
     const linha = obterUpload(SID, CID, uploadId)!
     expect(linha.state).toBe('pronto')
     const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'duplicado.txt')
     expect(readFileSync(final, 'utf8')).toBe('IGUAL')
-    const artigo = obterArtigo(uploadId)!
+    const artigo = obterArtigo(linha.artifactId!)!
     const absoluto = join(process.env.AGENTE_WINDOW_DATA_DIR!, 'uploads', artigo.locator)
     expect(absoluto).not.toBe(final)
     expect(readFileSync(absoluto, 'utf8')).toBe('IGUAL')
@@ -327,13 +415,13 @@ describe('C-3a armazenamento e publicação', () => {
     if (process.env.C3A_CRASH_FIXTURE !== 'T17') return
     marcarFixture('T17')
     const uploadId = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
-    const stage = caminhoStage(undefined, SID, CID, uploadId)
     const final = caminhoFinalChat(undefined, SID, CID, uploadId, 'parcial.bin')
+    const stage = caminhoStagePara(final, uploadId)
     mkdirSync(join(stage, '..'), { recursive: true })
     writeFileSync(stage, Buffer.alloc(8, 5))
     inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: uploadId, name: 'parcial.bin',
-      declaredBytes: 16, mime: '', receivedBytes: 8, digest: null, state: 'recebendo',
+      sessionId: SID, chatId: CID, uploadId, artifactId: artifactIdDe({ sessionId: SID, chatId: CID, name: 'parcial.bin', declaredBytes: 16 }),
+      name: 'parcial.bin', declaredBytes: 16, mime: '', receivedBytes: 8, digest: null, state: 'recebendo',
       stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
       createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,
     })
@@ -342,12 +430,12 @@ describe('C-3a armazenamento e publicação', () => {
 
   it('__reconcile_T17', async () => {
     if (process.env.C3A_RECONCILE !== 'T17') return
-    await reconciliarIdentidade(SID, CID)
     const uploadId = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+    await reconciliarIdentidade(SID, CID, {}, { todos: true })
     const linha = obterUpload(SID, CID, uploadId)!
     expect(linha.state).toBe('falhou')
     expect(linha.errorCode).toBe('interrupted')
-    expect(obterArtigo(uploadId)).toBeUndefined()
+    expect(obterArtigo(linha.artifactId!)).toBeUndefined()
     expect(existsSync(linha.stagePath!)).toBe(false)
     expect(existsSync(caminhoFinalChat(undefined, SID, CID, uploadId, 'parcial.bin'))).toBe(false)
   })

@@ -1,3 +1,11 @@
+# 19/11/2026 — C-3a reentregue após parecer REPROVADA
+
+Parecer independente sobre `df86f6d` reprovou a C-3a: 13 sondas vermelhas (B01–B11) e cinco falhas de foco no Windows (T14–T17 e T32). Corrigido o núcleo servidor (dono/contexto do catálogo, fila por dono, transação única estado+ledger com intenção durável, Lixeira como porta única, contenção canônica, admissão atômica com stage no volume do destino e `flags:'wx'`, recuperação com plano durável) e o cliente (recibo antes do `File`, prontos preservados, chip “salvo sem mensagem”). As 13 sondas viraram regressões do projeto em `attachments/probes.test.ts` (19 casos); T15/T28/T29/T36 foram corrigidos no cenário em vez de oficializar o defeito; T14–T17 passaram a interromper escritor real e reconciliar em processo novo.
+
+Durante a rodada apareceu defeito fora do parecer: leitura de anexo em Pasta offline devolvia 409 e quebrava C-1/F5; `GET` agora degrada com lista honesta e escrita continua 409 (H1d). Gates no Linux/Node 26.13.0: anexos 61/61, foco 199/0/0 com `missingCriteria=[]`, ampla 2085 com `newFailures=[]`/`newSkips=[]`, E2E C-3a 10/10 + C-1 6/6 + C-2 17/17, tipos 0, lint novos 0 (84 = base), build ok, sondas 13/13. Windows não executado: launcher e teardown corrigidos e runner `.ps1` entregue; validação permanece pendente. Sem merge, sem C-3b, sem homologação; canônicos 03/06/07/09 atualizados, 08 intacto, evidências externas em `memoria-de-projeto/C-3a/reentrega-2026-11-18/`.
+
+---
+
 # 17/11/2026 — consolidação do encerramento técnico C-2 e publicação documental
 
 Após o autocomplete de pastas, proprietário pediu conferir se restava algo dos ajustes, atualizar documentação e subir tudo ao GitHub. Conferida árvore limpa em24bfd55 e envio anterior do código; consolidado encerramento da implementação C-2 em03/06, pronta para aceite humano final. Não adicionadas funcionalidades nem executados testes novos nesta alteração documental. Referenciados resultados reais da última entrega:141 aprovados/13 pulados, E2E17+6 e tipos/build/lint do perímetro0. Autopilot/assistência/sandbox/anexos continuam fora do recorte. Sem merge, homologação inferida ou início de próxima fatia; estados de memória e dívida C1 preservados.

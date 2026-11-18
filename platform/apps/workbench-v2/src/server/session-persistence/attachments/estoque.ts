@@ -1,28 +1,44 @@
-// C-3a — armazenamento e publicação de anexos (R03/R05/R06):
-// stage no mesmo volume, journal durável antes do link, publicação
-// no-overwrite (link EEXIST preserva bytes anteriores) e reconciliação
-// idempotente por identidade. Sem rename por cima de arquivo do usuário.
+// C-3a — armazenamento e publicação de anexos (R03/R05/R06/R07).
+//
+// Protocolo (02_CONTRATOS §Publicação):
+//  1. admissão: sob a fila do dono, conferir contexto/quota/concorrência e
+//     gravar a reserva durável (transação única);
+//  2. stream: stage EXCLUSIVO (`wx`, um escritor) no VOLUME DO DESTINO,
+//     contando bytes e hash numa passada — fila liberada, nunca transação;
+//  3. finalização: sob a fila, revalidar lifecycle, conferir bytes/hash REAIS
+//     do stage e do destino, gravar intenção durável com o nome final já
+//     decidido e publicar sem sobrescrever;
+//  4. commit: estado `pronto` + ledger na MESMA transação; recibo só depois.
+//
+// Correções do parecer C-3a: B03 (hash real antes de publicar), B04 (commit
+// único), B05 (fila do dono + revalidação de tombstone), B09 (pedido
+// imutável), B11 (reserva atômica + stage no volume do destino + `wx`).
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
 import {
-  link, mkdir, open, readdir, rm, stat, statfs, unlink,
+  link, lstat, mkdir, open, readdir, rename, rm, stat, statfs, unlink,
 } from 'node:fs/promises'
 import type { Readable } from 'node:stream'
 import path from 'node:path'
 import { getAppDir } from '../paths'
 import { PersistenceProblem } from '../persistenceErrors'
+import { consultarDelecao } from '../deletions'
+import { withSessionPersistenceQueue } from '../filaSessao'
 import {
-  atualizarUpload, bytesPublicadosChat, inserirUpload, listarUploads, obterArtigo, obterUpload,
-  upsertArtigo, uploadsAtivos,
+  atualizarUpload, bytesPublicadosChat, finalizarPublicacao, listarUploads, obterArtigo, obterUpload,
+  obterUploadPorId, reservarAdmissao, uploadsAtivos,
 } from './catalogo'
 import type { EscopoAnexo, LinhaUpload, ModoAnexo } from './schemaAnexos'
 import { carregarPolitica, problemaPolitica, type PoliticaAnexos } from './politica'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
+import { garantirDentroDaRaiz, garantirDiretorioReal, raizCanonica } from './contencao'
 
 export interface OpcoesEstoque {
   appDir?: string
   agora?: () => number
   uuid?: () => string
+  /** Fila do dono injetável nos ensaios (padrão: a fila real da sessão). */
+  fila?: <T>(operacao: () => Promise<T>) => Promise<T>
 }
 
 export interface EntradaAdmissao {
@@ -52,16 +68,26 @@ export interface ReciboUpload {
 
 function raiz(appDir?: string): string { return appDir ?? getAppDir() }
 
+/** Área privada da conversa — única raiz permitida para cópia de Chat. */
+export function raizPrivadaChat(appDir?: string): string {
+  return path.join(raiz(appDir), 'uploads', 'chats')
+}
+
 export function caminhoStage(appDir: string | undefined, sessionId: string, chatId: string, uploadId: string): string {
   return path.join(raiz(appDir), 'uploads', 'stages', sessionId, chatId, `${uploadId}.part`)
 }
 
-export function caminhoFinalChat(appDir: string | undefined, sessionId: string, chatId: string, artifactId: string, nome: string): string {
-  return path.join(raiz(appDir), 'uploads', 'chats', sessionId, chatId, artifactId, nome)
+/** Stage no VOLUME DO DESTINO (B11): mesma partição do arquivo final. */
+export function caminhoStagePara(finalPath: string, uploadId: string): string {
+  return path.join(path.dirname(finalPath), '.stages', `${uploadId}.part`)
 }
 
-export function caminhoFinalWorkspace(workspaceRoot: string, nome: string): string {
-  return path.join(workspaceRoot, 'uploads', nome)
+export function caminhoFinalChat(appDir: string | undefined, sessionId: string, chatId: string, artifactId: string, nome: string): string {
+  return path.join(raizPrivadaChat(appDir), sessionId, chatId, artifactId, nome)
+}
+
+export function caminhoFinalWorkspace(workspaceRoot: string, artifactId: string, nome: string): string {
+  return path.join(workspaceRoot, 'uploads', `${artifactId}-${nome}`)
 }
 
 function politicaOuBloqueio(): PoliticaAnexos {
@@ -78,17 +104,76 @@ function falhaUpload(linha: LinhaUpload, code: string, message: string, status =
   throw new PersistenceProblem(status, code, message)
 }
 
+/** B05 — revalidação de lifecycle na fronteira final (nunca só na entrada). */
+function exigirDonoVivo(sessionId: string): void {
+  if (consultarDelecao(sessionId)) {
+    throw new PersistenceProblem(410, 'session_deleted',
+      'Esta conversa foi excluída durante a transferência. Nada foi publicado; a tentativa foi encerrada.')
+  }
+}
+
+function filaDe(sessionId: string, opcoes: OpcoesEstoque) {
+  return opcoes.fila ?? (<T>(operacao: () => Promise<T>) => withSessionPersistenceQueue(sessionId, operacao))
+}
+
+/**
+ * Reserva de disco (R05/B11): o espaço livre é comparado com a reserva MENOS o
+ * que as tentativas admitidas/em voo prometeram no MESMO VOLUME (mesmo `dev`).
+ * Sem isso, N admissões concorrentes passam pelo mesmo `statfs`.
+ */
 async function garantirVolume(alvo: string, bytes: number, politica: PoliticaAnexos): Promise<void> {
-  await mkdir(path.dirname(alvo), { recursive: true })
-  const info = await statfs(path.dirname(alvo))
+  const dir = path.dirname(alvo)
+  await mkdir(dir, { recursive: true })
+  await garantirDiretorioReal(dir).catch(() => {
+    throw new PersistenceProblem(409, 'storage_out_of_scope',
+      'O diretório de destino não é um diretório real (há um link no caminho). Nada foi gravado.')
+  })
+  const info = await statfs(dir)
+  const disco = await stat(dir)
+  const prometido = (await Promise.all(uploadsAtivos().map(async (linha) => {
+    if (!linha.finalPath) return 0
+    const pai = await stat(path.dirname(linha.finalPath)).catch(() => null)
+    return pai && pai.dev === disco.dev ? (linha.declaredBytes ?? 0) : 0
+  }))).reduce((total, valor) => total + valor, 0)
   const livre = info.bavail * info.bsize
-  if (livre - bytes < politica.reservaDiscoBytes) {
+  if (livre - bytes - prometido < politica.reservaDiscoBytes) {
     throw new PersistenceProblem(507, 'insufficient_storage',
       'Espaço livre insuficiente no disco para esta transferência. Nenhum arquivo parcial foi salvo.')
   }
 }
 
-/** Admissão: valida política/escopo/quota/concorrência e grava a intenção durável. */
+/**
+ * IDENTIDADE do artefato (B09): nunca o id do cliente. Derivado dos dados do
+ * pedido (sessão, chat, nome normalizado e conteúdo declarado), estável entre
+ * retries do MESMO pedido e distinto entre donos/clientes — um id forjado não
+ * colide com o artefato de outra conversa.
+ */
+export function artifactIdDe(entrada: { sessionId: string; chatId: string; name: string; declaredBytes: number | null }): string {
+  const hash = createHash('sha256')
+    .update(`${entrada.sessionId}\u0000${entrada.chatId}\u0000${entrada.name}\u0000${entrada.declaredBytes ?? ''}`)
+    .digest('hex')
+  const hex = hash.slice(0, 32)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+/** Identidade do pedido (B09): mesmo uploadId só continua com o MESMO pedido. */
+function pedidoIncompativel(linha: LinhaUpload, entrada: EntradaAdmissao, nome: string, raizWorkspace: string | null): string | null {
+  if (linha.name !== nome) return `nome "${linha.name}" ≠ "${nome}"`
+  if ((linha.declaredBytes ?? null) !== (entrada.declaredBytes ?? null)) return 'tamanho declarado diferente'
+  if (linha.mode !== entrada.mode) return 'modo diferente'
+  if (linha.scope !== entrada.scope) return 'escopo diferente'
+  const raizPedido = raizWorkspace
+  const raizLinha = linha.workspaceRoot ? path.resolve(linha.workspaceRoot) : null
+  if (raizPedido !== raizLinha) return 'pasta de destino diferente'
+  if ((linha.mime ?? '') !== (entrada.mime ?? '')) return 'tipo declarado diferente'
+  return null
+}
+
+/**
+ * Admissão: valida política/escopo/quota/concorrência e grava a reserva numa
+ * transação única (B11). Replay do MESMO pedido devolve o recibo; pedido
+ * divergente no mesmo id vira 409 `upload_conflict` (B09) — antes de quota.
+ */
 export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
   const politica = politicaOuBloqueio()
   const agora = opcoes.agora?.() ?? Date.now()
@@ -107,68 +192,105 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
   if (entrada.mode === 'copy' && entrada.declaredBytes == null) {
     throw new PersistenceProblem(400, 'size_mismatch', 'Cópia exige tamanho declarado antes da admissão.')
   }
-  if (entrada.mode === 'reference' && !entrada.workspaceRoot) {
-    throw new PersistenceProblem(400, 'reference_out_of_scope', 'Referência de projeto exige a pasta do workspace.')
+  if (entrada.mode === 'reference') {
+    throw new PersistenceProblem(400, 'invalid_field',
+      'Referência de projeto é registrada pela rota de referências, não pela admissão de transferência.')
   }
-
-  const ativos = uploadsAtivos()
-  if (ativos.length >= politica.concorrencia) {
-    throw new PersistenceProblem(429, 'too_many_uploads',
-      `Já existem ${ativos.length} transferências ativas (limite ${politica.concorrencia}). Conclua uma antes de iniciar outra.`)
-  }
-
-  if (entrada.mode === 'copy' && entrada.scope === 'chat') {
-    const publicados = bytesPublicadosChat(entrada.sessionId, entrada.chatId)
-    const emVoo = ativos
-      .filter((linha) => linha.sessionId === entrada.sessionId && linha.chatId === entrada.chatId)
-      .reduce((total, linha) => total + (linha.declaredBytes ?? 0), 0)
-    if (publicados + emVoo + (entrada.declaredBytes ?? 0) > politica.quotaChatBytes) {
-      throw new PersistenceProblem(507, 'quota_exceeded',
-        'A quota privada desta conversa foi excedida pela soma dos arquivos armazenados. Nada foi transferido.')
-    }
-  }
-
-  // Retomada (R11): mesmo identificador local reutiliza a linha — sem duplicar.
   const uploadId = entrada.uploadId && /^[0-9a-f-]{36}$/i.test(entrada.uploadId) ? entrada.uploadId : uuid
-  const artifactId = uploadId
-  const stagePath = caminhoStage(opcoes.appDir, entrada.sessionId, entrada.chatId, uploadId)
-  const finalPath = entrada.mode === 'reference' || entrada.scope === 'workspace'
-    ? caminhoFinalWorkspace(entrada.workspaceRoot!, nome)
-    : caminhoFinalChat(opcoes.appDir, entrada.sessionId, entrada.chatId, artifactId, nome)
-  const existenteUpload = obterUpload(entrada.sessionId, entrada.chatId, uploadId)
-  if (existenteUpload) {
-    if (existenteUpload.state === 'pronto') return reciboDe(existenteUpload)
-    if (existenteUpload.state === 'recebendo' || existenteUpload.state === 'preparado') {
-      throw new PersistenceProblem(409, 'upload_in_flight', 'Esta transferência já está em andamento.')
-    }
-    // falhou/cancelado/admitido → nova tentativa no MESMO id (sem duplicar).
-    atualizarUpload(entrada.sessionId, entrada.chatId, uploadId, {
-      state: 'admitido', name: nome, declaredBytes: entrada.declaredBytes, mime: entrada.mime ?? '',
-      receivedBytes: 0, digest: null, errorCode: null, stagePath, finalPath,
+  const artifactId = artifactIdDe({ sessionId: entrada.sessionId, chatId: entrada.chatId, name: nome, declaredBytes: entrada.declaredBytes })
+  // Raiz do projeto CANÔNICA (realpath): build e checagens usam a mesma forma,
+  // e um link no caminho da raiz nunca é aceito como destino.
+  const raizWorkspace = entrada.scope === 'workspace' && entrada.workspaceRoot
+    ? await raizCanonica(entrada.workspaceRoot)
+    : null
+
+  return filaDe(entrada.sessionId, opcoes)(async () => {
+    exigirDonoVivo(entrada.sessionId)
+    const reserva = reservarAdmissao(entrada.sessionId, entrada.chatId, (ativos) => {
+      const existente = obterUpload(entrada.sessionId, entrada.chatId, uploadId)
+      if (existente) {
+        const divergencia = pedidoIncompativel(existente, entrada, nome, raizWorkspace)
+        if (divergencia) {
+          return { recusar: new PersistenceProblem(409, 'upload_conflict',
+            `Esta transferência já existe com outro pedido (${divergencia}). Envie um identificador novo em vez de reescrever a tentativa.`) }
+        }
+        if (existente.state === 'pronto') return { reutilizar: existente }
+        if (existente.state === 'recebendo' || existente.state === 'preparado') {
+          return { recusar: new PersistenceProblem(409, 'upload_in_flight', 'Esta transferência já está em andamento.') }
+        }
+        return { reutilizar: existente }
+      }
+
+      if (ativos.length >= politica.concorrencia) {
+        return { recusar: new PersistenceProblem(429, 'too_many_uploads',
+          `Já existem ${ativos.length} transferências ativas (limite ${politica.concorrencia}). Conclua uma antes de iniciar outra.`) }
+      }
+      if (entrada.scope === 'chat') {
+        const publicados = bytesPublicadosChat(entrada.sessionId, entrada.chatId)
+        const emVoo = ativos
+          .filter((linha) => linha.sessionId === entrada.sessionId && linha.chatId === entrada.chatId)
+          .reduce((total, linha) => total + (linha.declaredBytes ?? 0), 0)
+        if (publicados + emVoo + (entrada.declaredBytes ?? 0) > politica.quotaChatBytes) {
+          return { recusar: new PersistenceProblem(507, 'quota_exceeded',
+            'A quota privada desta conversa foi excedida pela soma dos arquivos armazenados. Nada foi transferido.') }
+        }
+      }
+      const finalPath = raizWorkspace
+        ? caminhoFinalWorkspace(raizWorkspace, artifactId, nome)
+        : caminhoFinalChat(opcoes.appDir, entrada.sessionId, entrada.chatId, artifactId, nome)
+      return {
+        inserir: {
+          sessionId: entrada.sessionId, chatId: entrada.chatId, uploadId, artifactId,
+          name: nome, declaredBytes: entrada.declaredBytes, mime: entrada.mime ?? '',
+          receivedBytes: 0, digest: null, state: 'admitido' as const,
+          stagePath: caminhoStagePara(finalPath, uploadId), finalPath,
+          mode: entrada.mode, scope: entrada.scope,
+          workspaceRoot: raizWorkspace,
+          createdAt: agora, updatedAt: agora, errorCode: null,
+        },
+      }
     })
-    const reatualizado = obterUpload(entrada.sessionId, entrada.chatId, uploadId)!
-    return reciboDe(reatualizado)
-  }
 
-  await garantirVolume(finalPath, entrada.declaredBytes ?? 0, politica)
+    const existente = reserva.existente ?? obterUpload(entrada.sessionId, entrada.chatId, uploadId)!
+    if (existente.state === 'pronto') return reciboDe(existente)
+    // Retomada no MESMO id (falhou/cancelado): o pedido já foi provado igual;
+    // só reabre a tentativa, sem tocar em nome/tamanho/escopo.
+    const reaberta = reserva.criado ? existente : (() => {
+      atualizarUpload(entrada.sessionId, entrada.chatId, uploadId, {
+        state: 'admitido', receivedBytes: 0, digest: null, errorCode: null,
+      })
+      return obterUpload(entrada.sessionId, entrada.chatId, uploadId)!
+    })()
 
-  inserirUpload({
-    sessionId: entrada.sessionId, chatId: entrada.chatId, uploadId, artifactId,
-    name: nome, declaredBytes: entrada.declaredBytes, mime: entrada.mime ?? '',
-    state: 'admitido', stagePath, finalPath, mode: entrada.mode, scope: entrada.scope,
-    workspaceRoot: entrada.workspaceRoot ?? null, createdAt: agora, updatedAt: agora,
+    await garantirVolume(reaberta.finalPath!, entrada.declaredBytes ?? 0, politica)
+    return reciboDe(reaberta)
   })
-  return {
-    uploadId, artifactId, name: nome, bytes: entrada.declaredBytes ?? 0,
-    sha256: null, state: 'admitido', mode: entrada.mode, scope: entrada.scope, errorCode: null,
+}
+
+/** Bytes/hash reais de um arquivo, sem confiar em metadados. */
+async function medirArquivo(caminho: string): Promise<{ bytes: number; sha256: string } | null> {
+  const hash = createHash('sha256')
+  let bytes = 0
+  try {
+    for await (const pedaco of createReadStream(caminho)) {
+      hash.update(pedaco as Buffer)
+      bytes += (pedaco as Buffer).length
+    }
+  } catch {
+    return null
   }
+  return { bytes, sha256: hash.digest('hex') }
+}
+
+export async function hashDeArquivo(caminho: string): Promise<string | null> {
+  const medido = await medirArquivo(caminho)
+  return medido?.sha256 ?? null
 }
 
 /**
  * Recebe o corpo binário em stream (nunca JSON/base64), conta bytes e grava o
- * hash em uma passada só. Acima do máximo declarado/policy → falha de
- * transferência (T07): stage removido, nenhum estado pronto, mensagem nunca
- * publicada com aquele conteúdo.
+ * hash em uma passada só. Stage EXCLUSIVO (`wx`): duas transmissões na mesma
+ * tentativa não escrevem no mesmo arquivo (R06/B11).
  */
 export async function receberConteudo(
   sessionId: string, chatId: string, uploadId: string,
@@ -178,31 +300,59 @@ export async function receberConteudo(
   if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
   if (linha.state === 'pronto') throw new PersistenceProblem(409, 'upload_already_finalized', 'Esta transferência já foi publicada.')
   if (linha.state === 'cancelado') throw new PersistenceProblem(409, 'upload_cancelled', 'Esta transferência foi cancelada.')
+  if (linha.state === 'recebendo') {
+    throw new PersistenceProblem(409, 'upload_in_flight',
+      'Esta transferência já está recebendo bytes agora. Uma transmissão por tentativa.')
+  }
+  exigirDonoVivo(sessionId)
   const politica = politicaOuBloqueio()
   const limite = Math.min(linha.declaredBytes ?? politica.maxUploadBytes, politica.maxUploadBytes)
 
-  atualizarUpload(sessionId, chatId, uploadId, { state: 'recebendo' })
-  const stagePath = linha.stagePath ?? caminhoStage(opcoes.appDir, sessionId, chatId, uploadId)
+  const stagePath = linha.stagePath ?? caminhoStagePara(linha.finalPath!, uploadId)
   await mkdir(path.dirname(stagePath), { recursive: true })
+
+  // Reserva do escritor ANTES do stream: a linha fica `recebendo` e um
+  // segundo PUT concorrente é recusado (acima) em vez de disputar o arquivo.
+  atualizarUpload(sessionId, chatId, uploadId, { state: 'recebendo', stagePath })
 
   const hash = createHash('sha256')
   let bytes = 0
   await new Promise<void>((resolve, reject) => {
-    const destino = createWriteStream(stagePath, { flags: 'w' })
+    const destino = createWriteStream(stagePath, { flags: 'wx', mode: 0o600 })
+    let encerrado = false
+    const finalizar = (erro?: Error) => {
+      if (encerrado) return
+      encerrado = true
+      if (erro) reject(erro)
+      else resolve()
+    }
+    destino.on('error', (erro) => {
+      // `EEXIST` = another writer owns this stage: nunca truncar o alheio.
+      fonte.destroy()
+      finalizar(erro)
+    })
+    fonte.on('error', (erro) => {
+      destino.destroy()
+      finalizar(erro)
+    })
+    destino.on('finish', () => finalizar())
     fonte.on('data', (pedaco: Buffer | string) => {
-      bytes += typeof pedaco === 'string' ? Buffer.byteLength(pedaco) : pedaco.length
+      const bloco = typeof pedaco === 'string' ? Buffer.from(pedaco) : pedaco
+      bytes += bloco.length
       if (bytes > limite) {
         fonte.destroy()
         destino.destroy()
-        reject(new PayloadGrandeError(limite))
+        finalizar(new PayloadGrandeError(limite))
+        return
       }
+      hash.update(bloco)
     })
-    fonte.on('error', (erro) => { destino.destroy(); reject(erro) })
-    destino.on('error', (erro) => { fonte.destroy(); reject(erro) })
-    destino.on('finish', () => resolve())
     fonte.pipe(destino)
-    fonte.on('data', (pedaco: Buffer | string) => hash.update(typeof pedaco === 'string' ? Buffer.from(pedaco) : pedaco))
   }).catch(async (erro) => {
+    if (erro instanceof PayloadGrandeError && (erro as PayloadGrandeError).disputaStage) {
+      falhaUpload(linha, 'upload_in_flight',
+        'Outra transmissão desta tentativa está escrevendo agora. Aguarde o resultado dela antes de reenviar.', 409)
+    }
     await unlink(stagePath).catch(() => undefined)
     if (erro instanceof PayloadGrandeError) {
       falhaUpload(linha, 'file_too_large',
@@ -221,132 +371,173 @@ export async function receberConteudo(
   const handle = await open(stagePath, 'r+')
   try { await handle.sync() } finally { await handle.close() }
 
-
   const digest = hash.digest('hex')
+  // Revalidação de bytes/hash do que ficou no disco: o stream pode ter sido
+  // truncado por um erro de sistema depois do 'finish'.
+  const medido = await medirArquivo(stagePath)
+  if (!medido || medido.bytes !== bytes || medido.sha256 !== digest) {
+    await unlink(stagePath).catch(() => undefined)
+    falhaUpload(linha, 'verification_failed',
+      'O arquivo gravado não confere com o que foi recebido (bytes/hash). Nada foi publicado.', 500)
+  }
   atualizarUpload(sessionId, chatId, uploadId, { receivedBytes: bytes, digest, stagePath, state: 'preparado' })
   return publicarPreparado(sessionId, chatId, uploadId, opcoes)
 }
 
-class PayloadGrandeError extends Error { constructor(public readonly limite: number) { super('payload') } }
-
-/**
- * Journal → link → commit. Ordem garante que a confirmação de publicação só
- * chega depois de stage íntegro, intenção durável e commit (R04/T18).
- * Colisão de destino preserva os bytes anteriores (T11): nunca sobrescrever.
- */
-export async function publicarPreparado(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
-  const linha = obterUpload(sessionId, chatId, uploadId)
-  if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
-  if (linha.state === 'pronto') return reciboDe(linha)
-  if (linha.state !== 'preparado') {
-    throw new PersistenceProblem(409, 'upload_not_prepared', 'A transferência ainda não está preparada para publicação.')
-  }
-  const stagePath = linha.stagePath!
-  const stage = await stat(stagePath).catch(() => null)
-  let destinoFinal = linha.finalPath!
-  if (!stage) {
-    // Fronteira T15 — a publicação (link) aconteceu ANTES do crash e o commit
-    // do SQLite ficou pendente: o arquivo final é a prova; conclui o commit.
-    const finalPreExistente = linha.finalPath ? await stat(linha.finalPath).catch(() => null) : null
-    if (finalPreExistente?.isFile() && linha.digest && linha.receivedBytes > 0) {
-      atualizarUpload(sessionId, chatId, uploadId, { state: 'pronto' })
-      const concluido = obterUpload(sessionId, chatId, uploadId)!
-      upsertArtigo({
-        artifactId: concluido.artifactId!, sessionId, chatId, uploadId, name: concluido.name,
-        modalidade: modalidadeDe(concluido.mime, concluido.name),
-        papel: concluido.scope === 'workspace' ? 'upload-workspace' : 'upload-chat',
-        mode: concluido.mode, locator: caminhoRelativoRaiz(concluido, opcoes.appDir),
-        rootKind: concluido.scope === 'workspace' ? 'workspace' : 'appdir',
-        workspaceRoot: concluido.workspaceRoot, bytes: concluido.receivedBytes, sha256: concluido.digest ?? '',
-        state: 'pronto', messageId: null, partId: null, createdAt: Date.now(),
-      })
-      return reciboDe(concluido)
-    }
-    atualizarUpload(sessionId, chatId, uploadId, { state: 'falhou', errorCode: 'stage_missing' })
-    throw new PersistenceProblem(410, 'stage_missing', 'O stage desta transferência não existe mais. Retome o envio do mesmo identificador.')
-  }
-
-  const existente = await stat(destinoFinal).catch(() => null)
-  if (existente) {
-    const mesmoInode = existente.ino === stage.ino && existente.dev === stage.dev
-    if (!mesmoInode) {
-      // Colisão: bytes anteriores preservados; nosso stage ganha nome único.
-      const dir = path.dirname(destinoFinal)
-      const base = path.basename(destinoFinal)
-      const ponto = base.lastIndexOf('.')
-      const stem = ponto > 0 ? base.slice(0, ponto) : base
-      const sufixo = ponto > 0 ? base.slice(ponto) : ''
-      let candidato = ''
-      // Só slot LIVRE: reusar arquivo alheio amarraria ownerships de chats
-      // diferentes (a exclusão de um apagaria o arquivo do outro).
-      for (let indice = 1; indice <= 50; indice += 1) {
-        const tentativa = path.join(dir, `${stem} (${indice})${sufixo}`)
-        const ocupado = await stat(tentativa).catch(() => null)
-        if (!ocupado) { candidato = tentativa; break }
-      }
-      if (!candidato) {
-        falhaUpload(linha, 'destination_exists',
-          'O destino já contém um arquivo diferente e não pôde ser nomeado sem tocar nos bytes existentes.', 409)
-      }
-      destinoFinal = candidato
-      await mkdir(path.dirname(destinoFinal), { recursive: true })
-    }
-  }
-
-  // Intenção durável já gravada (state=preparado + stage/final/digest no SQLite).
-  // O link é decidido pelo destino ESCOLHIDO: nome único da colisão ainda não
-  // existe e precisa do link; o mesmo-inode já está publicado.
-  const destinoAtual = await stat(destinoFinal).catch(() => null)
-  if (!destinoAtual) {
-    await mkdir(path.dirname(destinoFinal), { recursive: true })
-    try {
-      await link(stagePath, destinoFinal)
-    } catch (erro) {
-      const codigo = (erro as NodeJS.ErrnoException).code
-      if (codigo !== 'EEXIST') {
-        falhaUpload(linha, 'publish_failed', `Publicação interrompida antes do commit: ${String(erro)}`, 500)
-      }
-      // Perda de corrida na colisão: preserva bytes e tenta nome único.
-      const dir = path.dirname(destinoFinal)
-      const base = path.basename(destinoFinal)
-      const tentativa = path.join(dir, `${base} (${Date.now()})`)
-      await link(stagePath, tentativa)
-      destinoFinal = tentativa
-    }
-  }
-  await unlink(stagePath).catch(() => undefined)
-
-  atualizarUpload(sessionId, chatId, uploadId, { state: 'pronto', finalPath: destinoFinal })
-  const depois = obterUpload(sessionId, chatId, uploadId)!
-  // Registro no ledger (ownership provado antes de qualquer mensagem).
-  upsertArtigo({
-    artifactId: depois.artifactId!, sessionId, chatId, uploadId, name: depois.name,
-    modalidade: modalidadeDe(depois.mime, depois.name), papel: depois.scope === 'workspace' ? 'upload-workspace' : 'upload-chat',
-    mode: depois.mode, locator: caminhoRelativoRaiz(depois, opcoes.appDir), rootKind: depois.scope === 'workspace' ? 'workspace' : 'appdir',
-    workspaceRoot: depois.workspaceRoot, bytes: depois.receivedBytes, sha256: depois.digest ?? '',
-    state: 'pronto', messageId: null, partId: null, createdAt: Date.now(),
-  })
-  return reciboDe(depois)
+class PayloadGrandeError extends Error {
+  disputaStage = false
+  constructor(public readonly limite: number) { super('payload') }
 }
 
-function caminhoRelativoRaiz(linha: LinhaUpload, appDir?: string): string {
-  const finalPath = linha.finalPath!
+/** Nome final único quando o destino já tem outro conteúdo (B04: durável). */
+async function destinoLivre(desejado: string): Promise<string> {
+  const existente = await lstat(desejado).catch(() => null)
+  if (!existente) return desejado
+  const dir = path.dirname(desejado)
+  const base = path.basename(desejado)
+  const ponto = base.lastIndexOf('.')
+  const stem = ponto > 0 ? base.slice(0, ponto) : base
+  const sufixo = ponto > 0 ? base.slice(ponto) : ''
+  for (let indice = 1; indice <= 200; indice += 1) {
+    const tentativa = path.join(dir, `${stem} (${indice})${sufixo}`)
+    if (!(await lstat(tentativa).catch(() => null))) return tentativa
+  }
+  throw new PersistenceProblem(409, 'destination_exists',
+    'O destino já contém arquivos com o mesmo nome e não foi possível nomear a cópia sem tocar nos bytes existentes.')
+}
+
+/**
+ * Publica o stage preparado. Verifica ANTES de publicar:
+ *  - lifecycle (tombstone) sob a fila do dono (B05);
+ *  - stage presente e com bytes/hash iguais à intenção (B03);
+ *  - destino: se já existe com o MESMO hash, é o mesmo conteúdo — o artefato
+ *    ganha nome próprio e os bytes alheios não são tocados (T11/T16); se
+ *    existe com hash diferente, nunca é aceito como prova (H5);
+ *  - nome final escolhido é gravado ANTES do link (B04), sem retarget em
+ *    memória.
+ */
+export async function publicarPreparado(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
+  return filaDe(sessionId, opcoes)(() => publicarPreparadoSemFila(sessionId, chatId, uploadId, opcoes))
+}
+
+/** Corpo da publicação — JÁ sob a fila do dono (nunca reentra na fila). */
+async function publicarPreparadoSemFila(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
+  {
+    exigirDonoVivo(sessionId)
+    const linha = obterUpload(sessionId, chatId, uploadId)
+    if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
+    if (linha.state === 'pronto') return reciboDe(linha)
+    if (linha.state !== 'preparado') {
+      throw new PersistenceProblem(409, 'upload_not_prepared', 'A transferência ainda não está preparada para publicação.')
+    }
+    const stagePath = linha.stagePath ?? caminhoStagePara(linha.finalPath!, uploadId)
+    let destinoFinal = linha.finalPath!
+    const stage = await lstat(stagePath).catch(() => null)
+    let medidoStage: { bytes: number; sha256: string } | null = null
+    if (stage?.isFile()) medidoStage = await medirArquivo(stagePath)
+
+    const digestEsperado = linha.digest
+
+    if (!stage) {
+      // Fronteira T15 — o link aconteceu antes do crash. Só conclui o commit
+      // se o destino EXISTIR e bater com o digest da intenção (H5: existência
+      // sozinha não é prova).
+      const finalInfo = destinoFinal ? await lstat(destinoFinal).catch(() => null) : null
+      if (!finalInfo || !finalInfo.isFile() || !digestEsperado) {
+        atualizarUpload(sessionId, chatId, uploadId, { state: 'falhou', errorCode: 'stage_missing' })
+        throw new PersistenceProblem(410, 'stage_missing',
+          'O stage desta transferência não existe mais. Retome o envio do mesmo identificador.')
+      }
+      const medidoFinal = await medirArquivo(destinoFinal)
+      if (!medidoFinal || medidoFinal.sha256 !== digestEsperado) {
+        atualizarUpload(sessionId, chatId, uploadId, { state: 'falhou', errorCode: 'integrity_mismatch' })
+        throw new PersistenceProblem(409, 'recovery_verification_failed',
+          'O destino encontrado não confere com o hash registrado desta transferência. Nada foi anunciado como pronto; os bytes existentes continuam intactos.')
+      }
+      return concluirCommit(linha, destinoFinal, medidoFinal, opcoes)
+    }
+
+    if (!medidoStage) {
+      falhaUpload(linha, 'verification_failed', 'O stage desta transferência não pôde ser lido. Nada foi publicado.', 500)
+    }
+    if (digestEsperado && medidoStage.sha256 !== digestEsperado) {
+      // B03 — stage em disco divergente do digest registrado: bloqueia,
+      // PRESERVA o stage para diagnóstico e não anuncia pronto.
+      atualizarUpload(sessionId, chatId, uploadId, { state: 'falhou', errorCode: 'integrity_mismatch' })
+      throw new PersistenceProblem(409, 'integrity_mismatch',
+        'O conteúdo do stage não confere com o hash registrado (stage alterado depois do recebimento). Nada foi publicado; os bytes foram preservados para diagnóstico.')
+    }
+    if (linha.declaredBytes != null && medidoStage.bytes !== linha.declaredBytes) {
+      falhaUpload(linha, 'size_mismatch', 'O stage não tem o tamanho declarado. Nada foi publicado.', 409)
+    }
+
+    // Destino já ocupado por arquivo ESTRANGEIRO (T11/T16): bytes alheios são
+    // preservados e o nosso stage ganha nome próprio. Nome ou conteúdo igual
+    // NÃO provam que o arquivo existente é nosso — ownership é o inode.
+    const existente = await lstat(destinoFinal).catch(() => null)
+    if (existente) {
+      const mesmoInode = stage.ino === existente.ino && stage.dev === existente.dev
+      if (!mesmoInode) destinoFinal = await destinoLivre(destinoFinal)
+    }
+    // Intenção durável com o NOME FINAL já decidido (antes do link).
+    if (destinoFinal !== linha.finalPath) atualizarUpload(sessionId, chatId, uploadId, { finalPath: destinoFinal })
+
+    const destinoAtual = await lstat(destinoFinal).catch(() => null)
+    if (!destinoAtual) {
+      await mkdir(path.dirname(destinoFinal), { recursive: true })
+      try {
+        await link(stagePath, destinoFinal)
+      } catch (erro) {
+        const codigo = (erro as NodeJS.ErrnoException).code
+        if (codigo === 'EEXIST') {
+          destinoFinal = await destinoLivre(destinoFinal)
+          atualizarUpload(sessionId, chatId, uploadId, { finalPath: destinoFinal })
+          await mkdir(path.dirname(destinoFinal), { recursive: true })
+          await link(stagePath, destinoFinal)
+        } else if (codigo === 'EXDEV') {
+          // Stage no volume errado nunca vira cópia parcial visível como
+          // pronto: falha de capacidade honesta (B11).
+          falhaUpload(linha, 'storage_capacity',
+            'O stage e o destino estão em volumes diferentes e não há publicação atômica disponível. Nada foi publicado.', 507)
+        } else {
+          falhaUpload(linha, 'publish_failed', `Publicação interrompida antes do commit: ${String(erro)}`, 500)
+        }
+      }
+    }
+
+    // O destino publicado tem de ser byte a byte o stage verificado.
+    const medidoPublicado = await medirArquivo(destinoFinal)
+    if (!medidoPublicado || medidoPublicado.sha256 !== medidoStage.sha256) {
+      await unlink(destinoFinal).catch(() => undefined)
+      atualizarUpload(sessionId, chatId, uploadId, { state: 'falhou', errorCode: 'verification_failed' })
+      throw new PersistenceProblem(500, 'verification_failed',
+        'O arquivo publicado não confere com o stage verificado. Ele foi removido e nada foi anunciado como pronto.')
+    }
+    await unlink(stagePath).catch(() => undefined)
+    return concluirCommit(linha, destinoFinal, medidoPublicado, opcoes)
+  }
+}
+
+/** Commit único (B04): estado pronto + ledger na MESMA transação. */
+function concluirCommit(linha: LinhaUpload, destinoFinal: string, medido: { bytes: number; sha256: string }, opcoes: OpcoesEstoque): ReciboUpload {
+  const finalizado = finalizarPublicacao(linha, {
+    finalPath: destinoFinal,
+    bytes: medido.bytes,
+    sha256: medido.sha256,
+    locator: caminhoRelativoRaiz(linha, destinoFinal, opcoes.appDir),
+    modalidade: modalidadeDe(linha.mime, linha.name),
+    papel: linha.scope === 'workspace' ? 'upload-workspace' : 'upload-chat',
+    createdAt: Date.now(),
+  })
+  return reciboDe(finalizado)
+}
+
+function caminhoRelativoRaiz(linha: LinhaUpload, finalPath: string, appDir?: string): string {
   if (linha.scope === 'workspace' && linha.workspaceRoot) {
     return path.relative(linha.workspaceRoot, finalPath).split(path.sep).join('/')
   }
   const base = path.join(raiz(appDir), 'uploads')
   return path.relative(base, finalPath).split(path.sep).join('/')
-}
-
-export async function hashDeArquivo(caminho: string): Promise<string | null> {
-  const hash = createHash('sha256')
-  const fluxo = createReadStream(caminho)
-  try {
-    for await (const pedaco of fluxo) hash.update(pedaco as Buffer)
-    return hash.digest('hex')
-  } catch {
-    return null
-  }
 }
 
 function modalidadeDe(mime: string, nome: string): string {
@@ -372,42 +563,76 @@ export function consultarUpload(sessionId: string, chatId: string, uploadId: str
   return reciboDe(linha)
 }
 
-/** Cancelamento: remove APENAS o stage desta identidade (nunca o destino). */
-export async function cancelarUpload(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<void> {
-  const linha = obterUpload(sessionId, chatId, uploadId)
-  if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
-  if (linha.state === 'pronto') {
-    throw new PersistenceProblem(409, 'upload_already_finalized', 'A transferência já foi publicada; use a exclusão da conversa para removê-la.')
+/** Recibo por ID (ACK perdido) — só para o dono informado na chamada. */
+export function consultarUploadPorId(uploadId: string, dono?: { sessionId: string; chatId: string }): ReciboUpload {
+  const linha = obterUploadPorId(uploadId)
+  if (!linha || (dono && (linha.sessionId !== dono.sessionId || linha.chatId !== dono.chatId))) {
+    throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
   }
-  if (linha.stagePath) await unlink(linha.stagePath).catch(() => undefined)
-  atualizarUpload(sessionId, chatId, uploadId, { state: 'cancelado', errorCode: 'cancelled_by_user' })
-  void opcoes
+  return reciboDe(linha)
 }
 
 /**
- * Reconciliação por identidade (R06/T29): idempotente, reexecuta as ações
- * oficiais — stage completo antes do commit finaliza; commit sem SQLite
- * conclui o preparado; arquivo idêntico já existente preserva o artefato.
+ * Cancelamento idempotente: remove APENAS o stage desta identidade e nunca o
+ * destino. Recusar um upload já pronto virou resposta estável de estado
+ * (R11/contrato DELETE), não erro.
  */
-export async function reconciliarIdentidade(sessionId: string, chatId: string, opcoes: OpcoesEstoque = {}): Promise<void> {
-  politicaOuBloqueio()
+export async function cancelarUpload(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
+  return filaDe(sessionId, opcoes)(async () => {
+    const linha = obterUpload(sessionId, chatId, uploadId)
+    if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
+    if (linha.state === 'pronto') return reciboDe(linha)
+    if (linha.state === 'cancelado') return reciboDe(linha)
+    if (linha.stagePath) await unlink(linha.stagePath).catch(() => undefined)
+    atualizarUpload(sessionId, chatId, uploadId, { state: 'cancelado', errorCode: 'cancelled_by_user' })
+    return reciboDe(obterUpload(sessionId, chatId, uploadId)!)
+  })
+}
+
+/**
+ * Reconciliação por identidade (R06). Invariantes:
+ *  - `recebendo` NÃO é tratado como morto por padrão: um GET concorrente não
+ *    pode matar o PUT que está escrevendo (B05). Só o chamador que PROVOU a
+ *    morte do escritor (processo novo após crash) limpa, via
+ *    `escritoresInterrompidos`;
+ *  - stage ausente + destino com hash da intenção finaliza (T15);
+ *  - stage presente com hash divergente NUNCA publica (B03);
+ *  - linha `pronto` sem artefato (estado legado do B04) é reparada.
+ */
+export async function reconciliarIdentidade(
+  sessionId: string, chatId: string,
+  opcoes: OpcoesEstoque = {},
+  escritoresInterrompidos: { todos?: boolean; limiteMs?: number } = {},
+): Promise<void> {
+  const politica = politicaOuBloqueio()
   const agora = opcoes.agora?.() ?? Date.now()
-  for (const linha of listarUploads(sessionId, chatId)) {
-    if (['admitido', 'recebendo', 'preparado'].includes(linha.state)) {
-      const stagePath = linha.stagePath ?? caminhoStage(opcoes.appDir, sessionId, chatId, linha.uploadId)
-      const stage = await stat(stagePath).catch(() => null)
-      const expirou = agora - linha.updatedAt > politicaOuBloqueio().prazoAbandonoMs
-      if (!stage) {
-        if (linha.state === 'preparado' && linha.digest && linha.finalPath) {
-          // Publicação antes do commit (T15): o final é a prova; conclui o commit.
-          const final = await stat(linha.finalPath).catch(() => null)
-          if (final?.isFile()) {
-            await publicarPreparado(sessionId, chatId, linha.uploadId, opcoes).catch(() => undefined)
-            continue
+  const limite = escritoresInterrompidos.limiteMs ?? politica.prazoAbandonoMs
+  await filaDe(sessionId, opcoes)(async () => {
+    for (const linha of listarUploads(sessionId, chatId)) {
+      if (linha.state === 'pronto') {
+        if (linha.artifactId && !obterArtigo(linha.artifactId) && linha.finalPath && linha.digest) {
+          const medido = await medirArquivo(linha.finalPath)
+          if (medido && medido.sha256 === linha.digest) {
+            try { concluirCommit(linha, linha.finalPath, medido, opcoes) } catch { /* fica visível na lista */ }
           }
         }
+        continue
+      }
+      if (!['admitido', 'recebendo', 'preparado'].includes(linha.state)) continue
+      if (consultarDelecao(sessionId)) continue
+
+      const stagePath = linha.stagePath ?? (linha.finalPath ? caminhoStagePara(linha.finalPath, linha.uploadId) : null)
+      const stage = stagePath ? await lstat(stagePath).catch(() => null) : null
+      const expirou = agora - linha.updatedAt > limite
+      const interrompido = escritoresInterrompidos.todos === true && linha.state === 'recebendo'
+
+      if (!stage) {
+        if (linha.state === 'preparado' && linha.digest && linha.finalPath) {
+          await publicarPreparadoSemFila(sessionId, chatId, linha.uploadId, opcoes).catch(() => undefined)
+          continue
+        }
+        if (linha.state === 'recebendo' && !interrompido && !expirou) continue // escritor pode estar vivo
         if (linha.state === 'recebendo') {
-          // Escritor morreu antes de criar o stage: falha honesta (T17).
           atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'interrupted' })
           continue
         }
@@ -415,68 +640,116 @@ export async function reconciliarIdentidade(sessionId: string, chatId: string, o
           atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'stage_missing' })
           continue
         }
-        // admitido sem bytes: a transferência pode ainda começar — abandono só
-        // depois da janela da política (D141), nunca no primeiro F5.
-        if (expirou) {
-          atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'abandoned' })
+        if (expirou) atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'abandoned' })
+        continue
+      }
+
+      if (expirou && linha.state !== 'preparado' && !interrompido) {
+        // Janela de abandono vencida: o escritor não pode mais estar ativo.
+        await unlink(stagePath!).catch(() => undefined)
+        atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'abandoned' })
+        continue
+      }
+      if (linha.state === 'recebendo' && !interrompido) continue // escritor ATIVO (B05)
+
+      const completo = linha.declaredBytes != null && stage.size === linha.declaredBytes
+      if (linha.state === 'preparado' || completo) {
+        const medido = await medirArquivo(stagePath!)
+        if (!medido) {
+          await unlink(stagePath!).catch(() => undefined)
+          atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'interrupted' })
+          continue
         }
-        continue
-      }
-      if (expirou && linha.state !== 'preparado') {
-        await unlink(stagePath).catch(() => undefined)
-        atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'abandoned' })
-        continue
-      }
-      if (linha.state === 'preparado' || (stage.size > 0 && linha.declaredBytes != null && stage.size === linha.declaredBytes)) {
-        // Stage completo → finalizar (mesmo caminho da publicação).
-        const digest = linha.digest ?? await hashDeArquivo(stagePath)
+        if (linha.digest && linha.digest !== medido.sha256) {
+          // B03 — stage divergente: falha honesta, bytes PRESERVADOS.
+          atualizarUpload(sessionId, chatId, linha.uploadId, {
+            receivedBytes: medido.bytes, state: 'falhou', errorCode: 'integrity_mismatch',
+          })
+          continue
+        }
         atualizarUpload(sessionId, chatId, linha.uploadId, {
-          receivedBytes: stage.size, digest, state: 'preparado', stagePath,
+          receivedBytes: medido.bytes, digest: medido.sha256, state: 'preparado', stagePath,
         })
-        await publicarPreparado(sessionId, chatId, linha.uploadId, opcoes).catch(() => undefined)
-      } else if (linha.state === 'recebendo') {
-        // Stage parcial antes do commit com escritor morto: evidência da falha (T17).
-        await unlink(stagePath).catch(() => undefined)
-        atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'interrupted' })
-      } else if (expirou) {
-        // admitido com stage parcial e sem escritor vivo: abandono pela janela (D141).
-        await unlink(stagePath).catch(() => undefined)
-        atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'abandoned' })
+        await publicarPreparadoSemFila(sessionId, chatId, linha.uploadId, opcoes).catch(() => undefined)
+        continue
       }
+      // `recebendo` interrompido com stage parcial: evidência da queda (T17).
+      await unlink(stagePath!).catch(() => undefined)
+      atualizarUpload(sessionId, chatId, linha.uploadId, { state: 'falhou', errorCode: 'interrupted' })
     }
-    // Linhas 'pronto' sem arquivo (apagado fora do produto) seguem no ledger;
-    // a listagem calcula presença honesta (T22) sem forçar estado falso.
-  }
-  await limparStagesAbandonados(sessionId, chatId, opcoes)
+    await limparStagesAbandonados(sessionId, chatId, opcoes)
+  })
 }
 
-/** Limpeza própria dos stages órfãos desta identidade (área/journal do chat). */
+/**
+ * Limpeza de stage (R12): só stages de identidades DESTE dono que já
+ * terminaram (`pronto`/`falhou`/`cancelado`) ou venceram a janela de abandono.
+ * Nunca varredura cega por mtime em pasta de projeto: o stage só é removido
+ * quando o ledger localiza a tentativa.
+ */
 export async function limparStagesAbandonados(sessionId: string, chatId: string, opcoes: OpcoesEstoque = {}): Promise<void> {
   const politica = politicaOuBloqueio()
-  const dir = path.join(raiz(opcoes.appDir), 'uploads', 'stages', sessionId, chatId)
   const agora = opcoes.agora?.() ?? Date.now()
-  const arquivos = await readdir(dir).catch(() => [] as string[])
-  for (const arquivo of arquivos) {
-    const caminho = path.join(dir, arquivo)
-    const info = await stat(caminho).catch(() => null)
-    if (!info) continue
-    if (agora - info.mtimeMs > politica.prazoAbandonoMs) await unlink(caminho).catch(() => undefined)
+  for (const linha of listarUploads(sessionId, chatId)) {
+    if (!linha.stagePath) continue
+    const encerrada = ['pronto', 'falhou', 'cancelado'].includes(linha.state)
+    const abandonada = agora - linha.updatedAt > politica.prazoAbandonoMs
+    if (!encerrada && !abandonada) continue
+    await unlink(linha.stagePath).catch(() => undefined)
   }
+  // Área legada desta identidade: só o diretório VAZIO (nunca recursive).
+  const dir = path.join(raiz(opcoes.appDir), 'uploads', 'stages', sessionId, chatId)
+  const restantes = await readdir(dir).catch(() => null)
+  if (restantes && restantes.length === 0) await rm(dir, { recursive: false }).catch(() => undefined)
 }
 
-/** Bytes íntegros do artefato para o dono (download). */
-export async function lerArtigo(artifactId: string): Promise<{ caminho: string; name: string; bytes: number }> {
+export interface ArtigoServivel {
+  caminho: string
+  name: string
+  bytes: number
+  sha256: string
+}
+
+/**
+ * Resolve os bytes do artefato para o dono com a MESMA validação da metadata
+ * (R08/R09/B07): contenção de pais, presença, tamanho E hash. Referência
+ * alterada não é servida — 409 `reference_changed` honesto, nunca bytes novos
+ * sob hash antigo.
+ */
+export async function lerArtigo(artifactId: string): Promise<ArtigoServivel> {
   const artigo = obterArtigo(artifactId)
   if (!artigo) throw new PersistenceProblem(404, 'attachment_not_found', 'Artefato não encontrado.')
   const absoluto = artigo.rootKind === 'workspace' && artigo.workspaceRoot
     ? path.resolve(artigo.workspaceRoot, artigo.locator)
     : path.join(raiz(undefined), 'uploads', artigo.locator)
-  const info = await stat(absoluto).catch(() => null)
+  if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
+    await garantirDentroDaRaiz(artigo.workspaceRoot, absoluto, {
+      code: 'reference_out_of_scope',
+      mensagem: 'O caminho registrado para este arquivo do projeto não é mais válido. Nada foi entregue.',
+    }).catch(() => {
+      throw new PersistenceProblem(410, 'attachment_absent',
+        'O caminho registrado para este arquivo do projeto não está mais disponível. O registro da conversa foi preservado.')
+    })
+  }
+  const info = await lstat(absoluto).catch(() => null)
   if (!info || !info.isFile()) {
     throw new PersistenceProblem(410, 'attachment_absent',
       'O arquivo armazenado não está mais disponível. O registro da conversa foi preservado.')
   }
-  return { caminho: absoluto, name: artigo.name, bytes: info.size }
+  const medido = await medirArquivo(absoluto)
+  if (!medido) {
+    throw new PersistenceProblem(410, 'attachment_absent',
+      'O arquivo armazenado não pôde ser lido. O registro da conversa foi preservado.')
+  }
+  const divergente = medido.bytes !== artigo.bytes || (artigo.sha256 !== '' && medido.sha256 !== artigo.sha256)
+  if (divergente) {
+    throw new PersistenceProblem(409,
+      artigo.mode === 'reference' ? 'reference_changed' : 'attachment_changed',
+      artigo.mode === 'reference'
+        ? 'Este arquivo do projeto foi alterado depois de anexado. Atualize a referência explicitamente para usar o conteúdo novo; o registro antigo foi preservado.'
+        : 'O arquivo armazenado foi alterado fora do produto. O registro da conversa foi preservado e nada foi entregue.')
+  }
+  return { caminho: absoluto, name: artigo.name, bytes: medido.bytes, sha256: medido.sha256 }
 }
 
 export async function removerVazioDescendente(caminho: string, raizLimpa: string): Promise<void> {
@@ -491,4 +764,17 @@ export async function removerVazioDescendente(caminho: string, raizLimpa: string
   }
 }
 
-export { rm as removerArquivoSeguro }
+/** Move um stage órfão para a área de quarentena (nunca delete cego). */
+export async function quarentenarStage(stagePath: string, motivo: string): Promise<string | null> {
+  const destino = `${stagePath}.orfa-${Date.now()}.${motivo.replace(/[^a-z0-9_-]/gi, '')}`
+  return rename(stagePath, destino).then(() => destino).catch(() => null)
+}
+
+export { retomarUpload, type ReciboRetomada } from './recuperacao'
+
+/** Concorrência efetiva do perfil (diagnóstico honesto de política). */
+export function transferenciasAtivas(porDono?: { sessionId: string; chatId?: string }): number {
+  return uploadsAtivos(porDono).length
+}
+
+export { lstat as inspecionarCaminho }

@@ -43,6 +43,7 @@ import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional 
 import { criarMemoriaAutomatica, selecionarMemorias, type EscopoMemoria, type FonteMemoria } from './memoriaAutomatica'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
+import { withSessionPersistenceQueue } from './filaSessao'
 import { tratarRotasAnexos } from './attachments/rotas'
 import { validarAnexosPublicados } from './attachments/publicacao'
 
@@ -52,21 +53,8 @@ const WORKTREES_ENDPOINT = '/api/worktrees'
 // Serialize mutations and reads for one session in this single server process.
 // Besides protecting JSONL replacement, this keeps the SQLite catalog and its
 // transcript from being observed half-way through one save/delete operation.
-const sessionPersistenceQueues = new Map<string, Promise<void>>()
-
-function withSessionPersistenceQueue<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
-  const previous = sessionPersistenceQueues.get(sessionId) ?? Promise.resolve()
-  let release!: () => void
-  const gate = new Promise<void>((resolve) => { release = resolve })
-  const tail = previous.then(() => gate, () => gate)
-  sessionPersistenceQueues.set(sessionId, tail)
-
-  const result = previous.catch(() => undefined).then(operation)
-  void tail.then(() => {
-    if (sessionPersistenceQueues.get(sessionId) === tail) sessionPersistenceQueues.delete(sessionId)
-  })
-  return result.finally(release)
-}
+// A fila vive em `filaSessao.ts` (C-3a/B05) porque os anexos a reutilizam —
+// continua sendo UMA só fila por dono, nunca uma fila paralela.
 const WORKSPACES_VALIDATE_ENDPOINT = '/api/workspaces/validate'
 const WORKSPACES_PICK_ENDPOINT = '/api/workspaces/pick'
 const WORKSPACES_RECENT_ENDPOINT = '/api/workspaces/recent'
