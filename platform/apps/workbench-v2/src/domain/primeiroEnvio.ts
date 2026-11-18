@@ -162,13 +162,13 @@ export async function executarPrimeiroEnvio(opcoes: {
     try {
       // — criando —
       if (snapshot.contexto === 'chat') {
-        sessao = construirSessaoChat(id, snapshot.texto)
+        sessao = construirSessaoChat(id, snapshot.texto || snapshot.anexos?.[0]?.name || '')
       } else {
         if (!portas.criarWorktree) {
           return { ok: false, fase: 'criando', motivo: 'Criação de pasta indisponível neste ambiente.' }
         }
         const worktree = await portas.criarWorktree(snapshot.workspacePath!, id)
-        sessao = construirSessaoWorkspace(id, snapshot.texto, worktree)
+        sessao = construirSessaoWorkspace(id, snapshot.texto || snapshot.anexos?.[0]?.name || '', worktree)
       }
       // — persistindo (ACK antes de qualquer efeito remoto) —
       await Promise.resolve(portas.persistir(sessao))

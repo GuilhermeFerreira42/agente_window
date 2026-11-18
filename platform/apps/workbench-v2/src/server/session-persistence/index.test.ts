@@ -208,7 +208,7 @@ describe('session persistence HTTP contract', () => {
     Object.assign(session.chats[0], { rawOutput: 'PRIVATE_CHAT_EXTENSION', approval: 'PRIVATE_CHAT_APPROVAL' })
     touched.push({ id, slug: id })
     const messages = session.chats[0].messages
-    const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytes: 'PRIVATE_ATTACHMENT' }
+    const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytesPrivate: 'PRIVATE_ATTACHMENT' }
     messages[0].attachments = [local]
     messages[1].ferramentas = [
       { id: 'cmd', ferramenta: 'executar', alvo: 'PRIVATE_COMMAND', status: 'ok', progresso: 'PRIVATE_STDOUT', resumo: 'PRIVATE_RESULT' },

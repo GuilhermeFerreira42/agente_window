@@ -15,6 +15,7 @@ import {
   type RascunhoLanding,
 } from '../domain/landingDraft'
 import type { SnapshotPrimeiroEnvio } from '../domain/landingDraft'
+import type { Attachment } from '../types'
 import type { TentativaConfirmada } from '../domain/primeiroEnvio'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
@@ -101,10 +102,14 @@ export function useLandingSubmission(
   const setModo = (modo: ModoAgir) => patch({ modo })
   const setPermissao = (permissao: NivelPermissaoAgir) => patch({ permissao })
 
+  /** C-3a — anexos do rascunho da landing (metadados; Files em arquivosVivos). */
+  const setAnexos = (anexos: Attachment[]) => patch({ anexos })
+
   const submit = async (): Promise<boolean> => {
     const rascunhoAtual = rascunhoRef.current
     const mensagem = rascunhoAtual.texto.trim()
-    if (inFlight.current || !mensagem) return false
+    // C-3a — arquivo sem texto também admite o primeiro envio (E01).
+    if (inFlight.current || (!mensagem && !(rascunhoAtual.anexos?.length))) return false
     inFlight.current = true
     setPending(true)
     try {
@@ -143,6 +148,7 @@ export function useLandingSubmission(
     setSelecaoModelo,
     setModo,
     setPermissao,
+    setAnexos,
     pending,
     submit,
   }

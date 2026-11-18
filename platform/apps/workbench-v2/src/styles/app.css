@@ -5436,3 +5436,62 @@ svg {
 .sessions-filter-panel { position: absolute; z-index: 12; top: 39px; right: 7px; left: 7px; max-height: calc(100% - 48px); overflow: auto; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border)); border-radius: 6px; background: var(--vscode-menu-background, var(--vscode-editorWidget-background)); box-shadow: 0 4px 12px var(--vscode-widget-shadow); }
 .sessions-filter-panel label { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 4px; font-size: 12px; }
 .sessions-filter-panel select { min-width: 0; width: 100%; margin: 0; padding: 3px; background: var(--vscode-dropdown-background, var(--vscode-input-background)); color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground)); border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border)); }
+
+/* ===== C-3a — anexos: estado real nos chips + cópia explícita no projeto ===== */
+.attachment-chip-estado {
+  flex: 0 0 auto;
+  font-size: var(--vscode-fontSize-label3);
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.9;
+}
+
+.attachment-modocopia {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: var(--vscode-fontSize-label3);
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.attachment-modocopia input {
+  margin: 0;
+  accent-color: var(--vscode-focusBorder);
+}
+
+.chat-message-attachment-estado {
+  flex: 0 0 auto;
+  font-size: var(--vscode-fontSize-label3);
+  opacity: 0.85;
+}
+
+.chat-message-attachment-download {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chat-message-attachment-download:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.session-landing-anexos {
+  padding: 4px 12px 0;
+}
+
+.session-landing-input.is-drop-target {
+  outline: 1px dashed var(--vscode-focusBorder);
+  outline-offset: 2px;
+}

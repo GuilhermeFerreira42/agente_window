@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import type { Attachment, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
+import { apagarArquivoVivo, guardarArquivoVivo } from '../domain/arquivosVivos'
 import { sessaoSemPasta } from '../domain/sessionState'
 import { workspaceFiles } from '../data'
 import { DragTypes } from '../domain/dragAndDrop'
@@ -35,7 +36,8 @@ interface ChatInputProps {
   onChangeModel: (model: string) => void
   onChangeMode: (mode: string) => void
   onChangePermission?: (permission: NivelPermissaoAgir) => Promise<void>
-  onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void
+  /** C-3a — com anexos devolve Promise: rascunho só limpa após aceitação (R02). */
+  onSend: (text: string, attachments: Attachment[], modelSelection: SelecaoModelo) => void | 'abortado' | Promise<'publicado' | 'abortado'>
   onStop: () => void
   onApprove: (chatId?: string) => void
   composerDrafts?: Record<string, ComposerDraft>
@@ -163,12 +165,33 @@ function attachmentTypeLabel(attachment: Attachment): string {
   return attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'
 }
 
+/** C-3a — estado exibido no chip do rascunho (nunca mente: sem File = falhou). */
+function estadoEfetivoRascunho(attachment: Attachment, enviando: boolean): string {
+  if (enviando && attachment.estado !== 'pronto' && attachment.estado !== 'referencia') return 'transferindo'
+  if (attachment.estado === 'pronto') return 'salvo'
+  if (attachment.estado === 'referencia') return 'no workspace'
+  if (attachment.estado === 'falhou') return 'falhou'
+  if (attachment.estado === 'transferindo') return 'transferindo'
+  return 'selecionado'
+}
+
+function rotuloEstadoRascunho(attachment: Attachment): string {
+  const estado = attachment.estado
+  if (!estado || estado === 'legado' || estado === 'selecionado') return ''
+  if (estado === 'pronto') return ' · salvo'
+  if (estado === 'referencia') return ' · no workspace'
+  if (estado === 'transferindo') return ' · transferindo'
+  if (estado === 'falhou') return ' · falhou'
+  return ''
+}
+
 function createLocalAttachment(file: File): Attachment {
   // The browser does not expose a stable path. Name plus file metadata gives the
   // mock payload a deterministic identity and prevents repeated picker events from
   // adding the same file twice while still allowing a changed file to be selected.
   const identity = [file.name, file.size, file.lastModified, file.type].join(':')
-  return { id: `local:${identity}`, name: file.name, kind: 'local' }
+  // C-3a — uploadId estável (R11: a retentativa reutiliza ESTE identificador).
+  return { id: `local:${identity}`, name: file.name, kind: 'local', uploadId: crypto.randomUUID(), estado: 'selecionado' }
 }
 
 export function ChatInput({
@@ -212,6 +235,8 @@ export function ChatInput({
     return () => abort.abort()
   }, [session.id, activeChat.id, draftKey])
   const [localDrafts, setLocalDrafts] = useState<Record<string, ComposerDraft>>({})
+  // C-3a — preparação assíncrona: edição bloqueada, texto visível (R02).
+  const [enviando, setEnviando] = useState(false)
   const drafts = composerDrafts ?? localDrafts
   const draft = drafts[draftKey] ?? createEmptyDraft()
   const text = draft.text
@@ -456,17 +481,39 @@ export function ChatInput({
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
-    if (!hasSendableContent || isWorking || submitLockRef.current) return
+    if (!hasSendableContent || isWorking || submitLockRef.current || enviando) return
 
     submitLockRef.current = true
     appendHistoryEntry(getCurrentHistoryEntry())
-    onSend(text.trim(), attachments.map((attachment) => ({ ...attachment })), selecaoDoToken(model))
+    const copia = attachments.map((attachment) => ({ ...attachment }))
+    const resultado = onSend(text.trim(), copia, selecaoDoToken(model))
+    // C-3a (R02) — com anexos o envio é assíncrono: o rascunho (texto+chips)
+    // permanece visível e intacto até a aceitação; `abortado` preserva tudo.
+    if (resultado && typeof (resultado as Promise<'publicado' | 'abortado'>).then === 'function') {
+      setEnviando(true)
+      void (resultado as Promise<'publicado' | 'abortado'>)
+        .then((estado) => {
+          setEnviando(false)
+          submitLockRef.current = false
+          if (estado === 'publicado') updateDraft(() => createEmptyDraft())
+        })
+        .catch(() => {
+          setEnviando(false)
+          submitLockRef.current = false
+        })
+      return
+    }
+    if (resultado === 'abortado') {
+      submitLockRef.current = false
+      return
+    }
     updateDraft(() => createEmptyDraft())
   }
 
   const addWorkspaceFile = (path: string) => {
     const name = path.split('/').pop() ?? path
-    const attachment: Attachment = { id: `workspace:${path}`, name, kind: 'workspace' }
+    // Referência de projeto (R03): sem File — o servidor valida caminho+fingerprint.
+    const attachment: Attachment = { id: `workspace:${path}`, name, kind: 'workspace', estado: 'selecionado' }
     setDraftAttachments((current) => current.some((item) => item.id === attachment.id) ? current : [...current, attachment])
     setDraftText((current) => current.replace(/(^|\s)@[^\s]*$/, '$1'))
     closeAttachmentPicker()
@@ -494,6 +541,22 @@ export function ChatInput({
   const handleComposerDrop = (event: React.DragEvent) => {
     const path = event.dataTransfer.getData(DragTypes.FILE)
     setIsFileDropTarget(false)
+    // Arquivo do SO arrastado para o composer (E03 — drag/drop real).
+    const soltos = Array.from(event.dataTransfer.files ?? [])
+    if (soltos.length > 0) {
+      event.preventDefault()
+      setDraftAttachments((current) => {
+        const next = [...current]
+        for (const file of soltos) {
+          const attachment = createLocalAttachment(file)
+          if (next.some((item) => item.id === attachment.id)) continue
+          if (attachment.uploadId) guardarArquivoVivo(attachment.uploadId, file)
+          next.push(attachment)
+        }
+        return next
+      })
+      return
+    }
     if (!path) return
     event.preventDefault()
     addWorkspaceFile(path)
@@ -504,6 +567,8 @@ export function ChatInput({
     if (index < 0) return
 
     const nextFocusId = attachments[index + 1]?.id ?? attachments[index - 1]?.id
+    const removido = attachments[index]
+    if (removido?.uploadId) apagarArquivoVivo(removido.uploadId)
     setDraftAttachments((current) => current.filter((attachment) => attachment.id !== id))
 
     if (nextFocusId) {
@@ -682,7 +747,7 @@ export function ChatInput({
       )}
       <div
         className={`chat-input-container${isWorking ? ' is-working' : ''}${needsInput ? ' has-stack-banner' : ''}${isFileDropTarget ? ' is-drop-target' : ''}`}
-        aria-busy={isWorking}
+        aria-busy={isWorking || enviando}
         onDragOver={handleComposerDragOver}
         onDragLeave={handleComposerDragLeave}
         onDrop={handleComposerDrop}
@@ -694,8 +759,9 @@ export function ChatInput({
             className="chat-input-textarea"
             rows={1}
             value={text}
+            readOnly={enviando}
             onChange={(event) => setDraftText(event.target.value)}
-            placeholder={inputPlaceholder}
+            placeholder={enviando ? 'Preparando os anexos… o texto continua visível.' : inputPlaceholder}
             aria-label="Mensagem para o agente"
             aria-keyshortcuts="Enter Control+Enter Meta+Enter ArrowUp ArrowDown Control+/ Meta+/"
             enterKeyHint="send"
@@ -731,6 +797,22 @@ export function ChatInput({
         </div>
         {attachments.length > 0 && (
           <div className="attachments-row" role="list" aria-label="Arquivos anexados">
+            {attachments.some((attachment) => attachment.kind === 'local') && Boolean(session.workspacePath) && (
+              <label className="attachment-modocopia" title="R03 — cópia na pasta do projeto só por escolha explícita">
+                <input
+                  type="checkbox"
+                  checked={attachments.filter((a) => a.kind === 'local').length > 0
+                    && attachments.filter((a) => a.kind === 'local').every((a) => a.modoCopia === 'projeto')}
+                  disabled={enviando}
+                  onChange={(event) => {
+                    const marcado = event.target.checked
+                    setDraftAttachments((current) => current.map((attachment) => attachment.kind === 'local'
+                      ? { ...attachment, modoCopia: marcado ? 'projeto' : 'privado' } : attachment))
+                  }}
+                />
+                Salvar cópia na pasta do projeto
+              </label>
+            )}
             {attachments.map((attachment) => (
               <span
                 className="attachment-chip"
@@ -741,13 +823,14 @@ export function ChatInput({
                   if (element) chipRefs.current.set(attachment.id, element)
                   else chipRefs.current.delete(attachment.id)
                 }}
-                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}. Só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10). Pressione Delete para remover.`}
-                title={`${attachment.name} · ${attachmentTypeLabel(attachment)} · só o nome vai junto (conteúdo lido na FATIA 10)`}
+                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}${rotuloEstadoRascunho(attachment)}. Armazenado; não enviado ao modelo (sem codec nesta fase). Pressione Delete para remover.`}
+                title={`${attachment.name} · ${attachmentTypeLabel(attachment)}${rotuloEstadoRascunho(attachment)} · armazenado; não enviado ao modelo`}
                 onKeyDown={(event) => handleAttachmentChipKeyDown(attachment.id, event)}
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span className="attachment-chip-name">{attachment.name}</span>
                 <span className="attachment-chip-kind" aria-hidden="true">{attachment.kind === 'local' ? 'local' : 'workspace'}</span>
+                <span className="attachment-chip-estado" aria-hidden="true">{estadoEfetivoRascunho(attachment, enviando)}</span>
                 <button
                   className="attachment-remove"
                   type="button"
@@ -884,7 +967,10 @@ export function ChatInput({
                 const next = [...current]
                 for (const file of files) {
                   const attachment = createLocalAttachment(file)
-                  if (!next.some((item) => item.id === attachment.id)) next.push(attachment)
+                  if (next.some((item) => item.id === attachment.id)) continue
+                  // D140 — o File vive no repositório transitório, fora do estado serializado.
+                  if (attachment.uploadId) guardarArquivoVivo(attachment.uploadId, file)
+                  next.push(attachment)
                 }
                 return next
               })
@@ -970,7 +1056,7 @@ export function ChatInput({
             aria-label={isWorking ? 'Parar execução' : 'Enviar mensagem'}
             title={isWorking ? 'Parar execução' : 'Enviar'}
             aria-keyshortcuts={isWorking ? 'Control+Escape Meta+Escape Alt+Backspace' : undefined}
-            disabled={!isWorking && !hasSendableContent}
+            disabled={!isWorking && (!hasSendableContent || enviando)}
             onClick={isWorking ? onStop : undefined}
           >
             {isWorking ? <Square size={11} fill="currentColor" /> : hasSendableContent ? <Send size={12} /> : <Plus size={13} />}

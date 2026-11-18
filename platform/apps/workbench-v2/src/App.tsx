@@ -45,6 +45,8 @@ import {
   shouldShowCustomViewGrid,
   type CustomViewId,
 } from './domain/customView'
+import { enviarMensagemComAnexos, portasEnvioApp, prepararAnexosDaLanding } from './services/sessions/enviarComAnexos'
+import { useFusaoAnexos } from './hooks/useFusaoAnexos'
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
 import type { MedicaoContexto, EstadoCompactacao } from './domain/usoContexto'
 import {
@@ -116,6 +118,7 @@ import {
   seedCreatedFromNewSession,
   type NewSessionViewState,
 } from './domain/newSessionViewState'
+
 
 const BOOT_SESSION_ID = 'draft-empty'
 // 4.8-B3 (hotfix): o Browser NÃO abre por padrão — começar com uma aba Browser
@@ -1432,7 +1435,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     layoutSyncRef.current?.setPreviousResource(sessao.id)
     setMobilePane('chat')
   }
-
+  useFusaoAnexos({ sessions, activeSessionId, newSessionLanding, setSessions }) // C-3a F5/offline
   // C-2 — primeiro envio: guardas + controlador de fases (domain), sem timer pós-create.
   const handleLandingSubmit = async (entrada: EntradaSubmitLanding): Promise<boolean> => {
     const { snapshot, confirmada, aoConfirmar, aoEncerrar } = entrada
@@ -1463,6 +1466,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         },
         persistir: async (sessao) => { await persistSession(sessao) },
         publicar: async (sessao, chatId, snap) => {
+          const anexosLanding = await prepararAnexosDaLanding({ sessionId: sessao.id, chatId, texto: snap.texto, anexos: [...(snap.anexos ?? [])], workspaceRoot: snap.contexto === 'workspace' ? snap.workspacePath : null, escolhaJaFeita: true }) // C-3a — escolha+transferência antes de abrir a conversa
           abrirSessaoCriada(sessao)
           // C2-RV01 — admissão grava par/modo/permissão por runKey (composer+F5).
           const runKey = `${sessao.id}:${chatId}`
@@ -1470,9 +1474,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           setModeByChat((current) => ({ ...current, [runKey]: snap.modo }))
           if (snap.contexto === 'workspace') setPermissionByChat((current) => ({ ...current, [`${runKey}:${sessao.worktreePath ?? sessao.workspacePath}`]: snap.permissao }))
           // C2-RV02 — publicação DURÁVEL (ACK da fila P) antes do efeito remoto.
-          await handleSend(snap.texto, [], { sessionId: sessao.id, chatId }, snap.selecaoModelo, {
-            modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true,
-          })
+          const resultadoEnvio = await handleSend(snap.texto, anexosLanding, { sessionId: sessao.id, chatId }, snap.selecaoModelo, { modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true, escolhaJaFeita: true })
+          if (resultadoEnvio === 'abortado') throw new Error('O envio não foi concluído; o rascunho foi preservado.')
         },
       },
     })
@@ -2065,22 +2068,24 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     attachments: Attachment[],
     target?: { sessionId: string; chatId: string },
     modelSelection: SelecaoModelo = { tipo: 'auto' },
-    // C-2: opções EXPLÍCITAS do snapshot; `esperarPublicacao` = ACK antes do run.
-    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean },
-  ) => {
+    // C-2: opções EXPLÍCITAS do snapshot; `esperarPublicacao` = ACK; C-3a: com anexos devolve Promise (R02).
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean },
+  ): void | 'abortado' | Promise<'publicado' | 'abortado'> => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
     // P-C §2 — durante `excluindo`, novas mensagens ficam suspensas nesse alvo
     // (o servidor também recusa via ciclo de vida; aqui é a barreira honesta).
     if (excluindo.has(sessionId)) {
       notify('A conversa está sendo excluída; envio de mensagens suspenso até a conclusão.')
-      return
+      return attachments.length > 0 ? Promise.resolve('abortado' as const) : undefined
     }
-    const attachmentText = attachments.length > 0 ? `Arquivos anexados: ${attachments.map((item) => item.name).join(', ')}` : ''
-    const messageContent = [text.trim(), attachmentText].filter(Boolean).join('\n\n')
+    if (attachments.length > 0) return enviarMensagemComAnexos({ sessionId, chatId, text, attachments, modelSelection, opcoes, portas: portasEnvioApp({ sessions, sessionId, chatId, setSessions: (u) => setSessions((c) => u(c)), persistir: (r) => persistSession(r), notify, setComposerDrafts: (u) => setComposerDrafts((c) => u(c)), management, commitDraft: commitDraft as never, updateSessionAndChatStatus, iniciarAgirReal, timeLabel, selectedMode, montarHistorico }) }) // C-3a — anexos: fluxo fora do App (R11)
+    const messageContent = text.trim() // C-3a T23 — só o texto; nomes nunca disfarçados no modelo
     const requestLabel = text.trim() || attachments.map((item) => item.name).join(', ')
     const responseId = `response-${Date.now()}`
     const requestedModel = modelSelection.tipo === 'auto' ? 'Auto' : `${modelSelection.providerId} / ${modelSelection.modelId}`
+    const sessaoOrigem = sessions.find((session) => session.id === sessionId)
+    const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
     const userMessage = {
       id: `message-${Date.now()}`,
       role: 'user' as const,
@@ -2099,13 +2104,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       inicioEm: Date.now(),
     }
     // Histórico da conversa atual (G5) + a mensagem nova — o que SAI para o servidor.
-    const sessaoOrigem = sessions.find((session) => session.id === sessionId)
-    const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
     const historico: MensagemSimples[] = [
       ...montarHistorico(chatOrigem?.messages ?? []),
       { id: userMessage.id, role: 'user', content: messageContent },
     ]
-
     // C2-RV02 — primeiro envio: ACK da fila P antes do run (nada remoto antes).
     if (opcoes?.esperarPublicacao && opcoes.sessao) {
       return (async () => {
@@ -2113,6 +2115,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         setSessions((current) => current.map((session) => session.id === atualizada.id ? atualizada : session))
         await persistSession(atualizada)
         iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
+        return 'publicado' as const
       })()
     }
     updateSession(sessionId, (session) => {
@@ -2139,7 +2142,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         } : chat),
       }
     })
-
     // FATIA 10 — AGIR real com o provedor ativo (cartões com aprovação do dono).
     iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
   }

@@ -2,6 +2,7 @@ import type { SessionRecord, TombstoneDelecao } from './database'
 import { consultarDelecao, deleteSessionRecord, getSessionRecordRaw, getDatabase, problemaSessaoExcluida } from './database'
 import { PersistenceProblem } from './persistenceErrors'
 import { deleteTranscript } from './transcripts'
+import { executarPlanoAnexos, registrarPlanoAnexos } from './attachments/limpeza'
 import { removeWorktree, WorktreeDirtyError } from './worktrees'
 
 // O tombstone mora no dono do catálogo (mesmo SQLite, primeira conexão);
@@ -46,6 +47,9 @@ export function iniciarOuConsultarDelecao(input: { sessionId: string; deletionId
   if (!tombstone) throw new PersistenceProblem(503, 'session_cleanup_failed',
     'Não foi possível registrar a exclusão. Tente novamente.')
   if (tombstone.revision !== input.expectedRevision) throw divergente()
+  // C-3a (T27) — plano de anexos registrado ANTES de qualquer operação
+  // destrutiva; sobrevive a reinício e é retomável em `executarLimpezaDelecao`.
+  registrarPlanoAnexos(input.sessionId)
   return tombstone
 }
 
@@ -116,6 +120,9 @@ export async function executarLimpezaDelecao(sessionId: string, force: boolean):
   try {
     if (record) await deleteTranscript(record.slug, sessionId)
     deleteSessionRecord(sessionId)
+    // C-3a (T27–T29) — arquivos por plano (ownership já capturado); o ledger
+    // sai depois; referências nunca tocam o original do usuário.
+    await executarPlanoAnexos(sessionId)
     concluirLimpeza(sessionId)
   } catch (error) {
     // Falha de limpeza NUNCA vira sucesso: estado fica `limpeza_pendente`,

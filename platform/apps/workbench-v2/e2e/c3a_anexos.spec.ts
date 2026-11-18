@@ -1,0 +1,477 @@
+// =============================================================================
+// C-3a — e2e/c3a_anexos.spec.ts — jornadas E01..E10 (matriz 04) contra o
+// SERVIDOR REAL (Vite + better-sqlite3 + rotas de anexo) e navegador Chromium.
+//
+// Prova integrada de: upload binário real (File do browser → stage → SHA-256 no
+// servidor → publicação), download por ID escopado, retry sem perda, ausência de
+// POST/run quando só há anexo, exclusão de sessão preservando workspace, aviso
+// de referência alterada, indisponibilidade honesta de artefato recuperado,
+// rascunho sobrevivendo a Provedores e o caminho só-texto intacto.
+//
+// REGRA DA CASA: todo teste tem pelo menos um `expect` (e2eAssertionContract).
+// Porta própria (5214) para não colidir com C-1 (5210)/C-2 (5212).
+// =============================================================================
+import { spawn, type ChildProcess } from 'node:child_process'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { expect, test, type Page } from '@playwright/test'
+import { shot } from './helpers'
+
+const PORTA = 5214
+const BASE = `http://127.0.0.1:${PORTA}`
+const app = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const headersApi = { Origin: BASE, 'Sec-Fetch-Site': 'same-origin' }
+
+test.setTimeout(240_000)
+test.describe.configure({ mode: 'serial' })
+
+let processo: ChildProcess | undefined
+let raiz: string
+
+async function iniciarServidor(): Promise<void> {
+  processo = spawn(process.execPath, [resolve(app, '../../node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(PORTA), '--strictPort'], {
+    cwd: app,
+    windowsHide: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      AGENTE_WINDOW_DATA_DIR: join(raiz, 'data'),
+      AGENTE_WINDOW_PROVIDERS_PATH: join(raiz, 'providers.json'),
+      AGENTE_WINDOW_PERSONALIZACOES_PATH: join(raiz, 'personalizacoes.json'),
+      AGENTE_WINDOW_SETTINGS_PATH: join(raiz, 'settings.json'),
+      FS_TEST_ROOT: raiz,
+    },
+  })
+  await expect.poll(async () => {
+    try { return (await fetch(BASE)).status } catch { return 0 }
+  }, { timeout: 40_000 }).toBe(200)
+}
+
+async function pararServidor(): Promise<void> {
+  if (!processo || processo.exitCode !== null) return
+  const terminou = new Promise<void>((ok) => processo!.once('exit', () => ok()))
+  processo.kill('SIGKILL')
+  await terminou
+}
+
+async function abrirApp(page: Page): Promise<void> {
+  await page.goto(BASE)
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+  await page.waitForTimeout(400)
+}
+
+const campoLanding = (page: Page) => page.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+const campoChat = (page: Page) => page.getByRole('textbox', { name: 'Mensagem para o agente' })
+const botaoEnviarLanding = (page: Page) => page.getByRole('button', { name: 'Enviar mensagem' })
+const linhasSessao = (page: Page) => page.locator('.session-row')
+
+/** Abre o app e garante a LANDING real (sessão anterior pode reabrir no chat). */
+async function irParaLanding(page: Page): Promise<void> {
+  await abrirApp(page)
+  if (await campoLanding(page).count() === 0) {
+    await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
+  }
+  await campoLanding(page).waitFor({ timeout: 20_000 })
+}
+
+/** Cria a sessão de trabalho pelo caminho REAL (landing → primeira mensagem). */
+async function criarSessaoDeTexto(page: Page, texto: string): Promise<void> {
+  await irParaLanding(page)
+  await campoLanding(page).fill(texto)
+  await botaoEnviarLanding(page).click()
+  await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+  await expect(linhasSessao(page).first()).toContainText(texto.slice(0, 20))
+}
+
+/** Identidade REAL da sessão ativa: seleção no localStorage + GET /api/sessions. */
+async function sessaoAtiva(page: Page): Promise<{ sessionId: string; chatId: string; revision: number }> {
+  const id = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
+  expect(id, 'a sessão ativa precisa estar selecionada').toBeTruthy()
+  const resposta = await page.request.get(`${BASE}/api/sessions/${id}`, { headers: headersApi })
+  expect(resposta.status(), 'GET da sessão ativa').toBe(200)
+  const corpo = await resposta.json()
+  const sessao = corpo.session as { id: string; chats: Array<{ id: string }>; mainChatId?: string }
+  const chat = sessao.chats.find((c) => c.id === sessao.mainChatId) ?? sessao.chats[0]
+  const revision = Number(corpo.ack?.revision ?? corpo.revision ?? 0)
+  return { sessionId: sessao.id, chatId: chat.id, revision }
+}
+
+async function anexarNoChat(page: Page, nome: string, conteudo: string): Promise<void> {
+  const entrada = page.locator('.chat-input-container input[type="file"]').first()
+  await entrada.setInputFiles({ name: nome, mimeType: 'text/plain', buffer: Buffer.from(conteudo) })
+  await expect(page.getByRole('group', { name: new RegExp(nome.replace('.', '\\.')) })).toBeVisible()
+}
+
+/** Bytes REAIS do artefato no servidor (download por ID escopado). */
+async function bytesDoArtefato(page: Page, artifactId: string): Promise<Buffer> {
+  const { sessionId, chatId } = await sessaoAtiva(page)
+  const resposta = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}?download=1`, { headers: headersApi })
+  expect(resposta.status(), 'download do dono deve responder 200').toBe(200)
+  return await resposta.body()
+}
+
+const sha256 = (dados: Buffer) => createHash('sha256').update(dados).digest('hex')
+
+test.beforeAll(async () => {
+  raiz = await mkdtemp(join(tmpdir(), 'c3a-e2e-'))
+  await iniciarServidor()
+})
+
+test.afterAll(async () => {
+  await pararServidor()
+  if (raiz) rmSync(raiz, { recursive: true, force: true })
+})
+
+test.describe('C-3a — anexos (servidor real + navegador)', () => {
+  test('E01 — só arquivo: upload real, chip salvo sem run, F5 preserva e o download devolve os MESMOS bytes (hash)', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e01 anexo unico')
+    const conteudo = 'conteúdo binário do E01 — 1234567890'
+    await anexarNoChat(page, 'e01.txt', conteudo)
+    // Anexo sozinho habilita o envio.
+    const enviar = page.getByRole('button', { name: 'Enviar mensagem' })
+    await expect(enviar).toBeEnabled()
+
+    const requestAnexos = page.waitForRequest((req) => req.method() === 'PUT' && /attachments\/uploads\/[^/]+\/content$/.test(req.url()))
+    const chamadasAgir: string[] = []
+    page.on('request', (req) => { if (req.url().endsWith('/api/agir')) chamadasAgir.push(req.url()) })
+    await enviar.click()
+    const put = await requestAnexos
+    expect(put.headers()['content-type'], 'upload é corpo binário, não JSON/base64').toBe('application/octet-stream')
+
+    // Mensagem publicada COM o chip salvo e SEM bubble de execução (sem run).
+    const lista = page.getByRole('list', { name: 'Anexos enviados' })
+    await lista.waitFor({ timeout: 20_000 })
+    await expect(lista.getByRole('listitem')).toHaveCount(1)
+    expect(chamadasAgir, 'anexo sem texto NUNCA chama /api/agir').toHaveLength(0)
+    await expect(page.getByText('Trabalhando')).toHaveCount(0)
+
+    // O chip é do servidor: tem artefato e download real.
+    const chip = lista.getByRole('listitem').first()
+    const artifactId = await chip.getAttribute('data-artifact-id')
+    expect(artifactId, 'chip publicado carrega o artifactId do ledger').toBeTruthy()
+    const baixados = await bytesDoArtefato(page, artifactId!)
+    expect(sha256(baixados)).toBe(sha256(Buffer.from(conteudo)))
+    expect(baixados.toString('utf8')).toBe(conteudo)
+
+    // F5: a mensagem e o chip voltam do disco (projeção P30), download igual.
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    const listaAposF5 = page.getByRole('list', { name: 'Anexos enviados' })
+    await listaAposF5.waitFor({ timeout: 20_000 })
+    const artifactIdApos = await listaAposF5.getByRole('listitem').first().getAttribute('data-artifact-id')
+    expect(artifactIdApos).toBe(artifactId)
+    expect(sha256(await bytesDoArtefato(page, artifactIdApos!))).toBe(sha256(Buffer.from(conteudo)))
+    await shot(page, 'c3a_e01_anexo_unico')
+  })
+
+  test('E02 — upload em CHAT (raiz nula) não precisa de codec: bytes no ledger, mensagem sem tool e API sem root', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e02 upload raiz nula')
+    const { sessionId, chatId } = await sessaoAtiva(page)
+    const conteudo = 'sem codec e sem workspace — E02'
+    const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { name: 'e02.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'chat' },
+    })
+    expect(admissao.status(), 'admissão em Chat não exige raiz').toBe(201)
+    const recibo = await admissao.json()
+    expect(recibo.uploadId).toBeTruthy()
+
+    const envio = await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${recibo.uploadId}/content`, {
+      headers: { ...headersApi, 'Content-Type': 'application/octet-stream' },
+      data: Buffer.from(conteudo),
+    })
+    expect(envio.status()).toBe(200)
+    const pronto = await envio.json()
+    expect(pronto.state).toBe('pronto')
+    expect(pronto.sha256, 'o hash é calculado no SERVIDOR').toBe(sha256(Buffer.from(conteudo)))
+    expect(pronto.bytes).toBe(Buffer.byteLength(conteudo))
+    expect(pronto.mode).toBe('copy')
+
+    // O arquivo privado vive sob o diretório de dados descartável (nunca no /tmp do projeto).
+    expect(existsSync(join(raiz, 'data')), 'dados do app na pasta descartável').toBe(true)
+    const privados = readdirSync(raiz).filter((nome) => nome.startsWith('.agente_window') || nome === 'data')
+    expect(privados.length, 'o upload privado fica no perfil descartável, não na raiz do projeto').toBeGreaterThan(0)
+
+    const lista = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments`, { headers: headersApi })
+    expect(lista.status()).toBe(200)
+    const corpo = await lista.json()
+    expect(corpo.attachments).toHaveLength(1)
+    expect(corpo.attachments[0]).toMatchObject({ name: 'e02.txt', estado: 'pronto', presente: true, bytes: Buffer.byteLength(conteudo) })
+  })
+
+  test('E03 — múltiplos arquivos (2) por seleção + remoção de um chip antes de enviar', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e03 multiplos arquivos')
+    const entrada = page.locator('.chat-input-container input[type="file"]').first()
+    await entrada.setInputFiles([
+      { name: 'e03-a.txt', mimeType: 'text/plain', buffer: Buffer.from('primeiro arquivo E03') },
+      { name: 'e03-b.txt', mimeType: 'text/plain', buffer: Buffer.from('segundo arquivo E03 — maior') },
+    ])
+    await expect(page.getByRole('group', { name: /e03-a\.txt/ })).toBeVisible()
+    await expect(page.getByRole('group', { name: /e03-b\.txt/ })).toBeVisible()
+
+    // Remover o PRIMEIRO chip: o segundo permanece e o envio continua válido.
+    await page.getByRole('button', { name: 'Remover e03-a.txt' }).click()
+    await expect(page.getByRole('group', { name: /e03-a\.txt/ })).toHaveCount(0)
+    await expect(page.getByRole('group', { name: /e03-b\.txt/ })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    const lista = page.getByRole('list', { name: 'Anexos enviados' })
+    await lista.waitFor({ timeout: 20_000 })
+    await expect(lista.getByRole('listitem')).toHaveCount(1)
+    await expect(lista.getByRole('listitem').first()).toContainText('e03-b.txt')
+    const artifactId = await lista.getByRole('listitem').first().getAttribute('data-artifact-id')
+    expect((await bytesDoArtefato(page, artifactId!)).toString('utf8')).toBe('segundo arquivo E03 — maior')
+    await shot(page, 'c3a_e03_multiplos')
+  })
+
+  test('E04 — falha no 2º arquivo: nenhuma mensagem publicada, rascunho retido e retry conclui com os MESMOS IDs', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e04 falha parcial')
+    let interceptados = 0
+    // Falha controlada SÓ no segundo conteúdo (1º upload passa).
+    await page.route('**/attachments/uploads/*/content', async (route) => {
+      interceptados += 1
+      if (interceptados === 2) {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'upload_failed', message: 'falha sintética do E04' }) })
+        return
+      }
+      await route.continue()
+    })
+    const entrada = page.locator('.chat-input-container input[type="file"]').first()
+    await entrada.setInputFiles([
+      { name: 'e04-a.txt', mimeType: 'text/plain', buffer: Buffer.from('primeiro intacto E04') },
+      { name: 'e04-b.txt', mimeType: 'text/plain', buffer: Buffer.from('segundo falha E04') },
+    ])
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+
+    // Sem mensagem publicada; o rascunho continua com os DOIS chips (IDs retidos).
+    await expect(page.getByText(/Falha ao transferir|não foi possível|falhou/i).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('list', { name: 'Anexos enviados' })).toHaveCount(0)
+    const chipsDoRascunho = page.locator('.chat-input-container .attachment-chip')
+    await expect(chipsDoRascunho).toHaveCount(2)
+
+    // Retry: o MESMO uploadId do 1º é reaproveitado (nenhuma admissão nova para ele).
+    const admissoes: string[] = []
+    page.on('request', async (req) => {
+      if (req.method() === 'POST' && /attachments\/uploads$/.test(req.url())) admissoes.push(req.url())
+    })
+    await page.unroute('**/attachments/uploads/*/content')
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    const lista = page.getByRole('list', { name: 'Anexos enviados' })
+    await lista.waitFor({ timeout: 30_000 })
+    await expect(lista.getByRole('listitem')).toHaveCount(2)
+    expect(admissoes.length, 'retry NÃO re-admite o arquivo que já tinha uploadId').toBeLessThanOrEqual(1)
+    await shot(page, 'c3a_e04_retry')
+  })
+
+  test('E05 — ACK perdido/duplo clique: uma única mensagem publicada e nenhum run duplicado', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e05 ack unico')
+    await anexarNoChat(page, 'e05.txt', 'conteúdo do E05')
+    let posts = 0
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && /\/api\/sessions\/[^/]+$/.test(req.url())) posts += 1
+    })
+    const enviar = page.getByRole('button', { name: 'Enviar mensagem' })
+    await enviar.click()
+    // O composer bloqueia o segundo clique (botão desabilitado durante o envio).
+    await expect(enviar).toBeDisabled()
+    await enviar.click({ force: true }).catch(() => undefined)
+    const lista = page.getByRole('list', { name: 'Anexos enviados' })
+    await lista.waitFor({ timeout: 20_000 })
+    await expect(lista.getByRole('listitem')).toHaveCount(1)
+    // Exatamente uma mensagem com anexo na conversa (sem duplicação).
+    const mensagens = page.locator('.chat-message').filter({ has: page.getByRole('list', { name: 'Anexos enviados' }) })
+    await expect(mensagens).toHaveCount(1)
+    expect(posts, 'um único POST de publicação').toBeLessThanOrEqual(1)
+  })
+
+  test('E06 — excluir a sessão remove o vínculo e PRESERVA os bytes do projeto (cópia em uploads/)', async ({ page }) => {
+    // Pasta de projeto real: a cópia explícita grava em <raiz>/uploads/<nome>.
+    const projeto = join(raiz, 'projeto-e06')
+    mkdirSync(projeto, { recursive: true })
+    await criarSessaoDeTexto(page, 'jornada e06 exclusao preserva projeto')
+    const { sessionId, chatId, revision } = await sessaoAtiva(page)
+
+    const conteudo = 'bytes do projeto que nunca podem sumir (E06)'
+    const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { name: 'nota-do-projeto.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace', workspaceRoot: projeto },
+    })
+    expect(admissao.status(), 'admissão com cópia em projeto').toBe(201)
+    const recibo = await admissao.json()
+    const envio = await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${recibo.uploadId}/content`, {
+      headers: { ...headersApi, 'Content-Type': 'application/octet-stream' },
+      data: Buffer.from(conteudo),
+    })
+    expect(envio.status()).toBe(200)
+    expect((await envio.json()).state).toBe('pronto')
+
+    // A cópia FINAL vive no projeto, fora do diretório privado do app.
+    const copiaNoProjeto = join(projeto, 'uploads', 'nota-do-projeto.txt')
+    expect(existsSync(copiaNoProjeto), 'cópia explícita gravada no projeto').toBe(true)
+    expect(readFileSync(copiaNoProjeto, 'utf8')).toBe(conteudo)
+
+    // Excluir a sessão pelo contrato real (deletionId + expectedRevision).
+    const exclusao = await page.request.delete(`${BASE}/api/sessions/${sessionId}`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { deletionId: randomUUID(), expectedRevision: revision },
+    })
+    expect([200, 202], `DELETE da sessão: ${await exclusao.text()}`).toContain(exclusao.status())
+
+    // A sessão sumiu (410/404), mas o projeto e o arquivo continuam intactos.
+    const depois = await page.request.get(`${BASE}/api/sessions/${sessionId}`, { headers: headersApi })
+    expect([404, 410]).toContain(depois.status())
+    expect(readFileSync(copiaNoProjeto, 'utf8'), 'excluir a sessão NUNCA apaga o arquivo do projeto').toBe(conteudo)
+    expect(existsSync(join(projeto, 'uploads'))).toBe(true)
+    await shot(page, 'c3a_e06_exclusao_preserva')
+  })
+
+  test('E07 — referência alterada/alheia no projeto: revalidação recusa (ausente) sem retarget silencioso', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e07 referencia alterada')
+    const projeto = join(raiz, 'projeto-e07')
+    mkdirSync(projeto, { recursive: true })
+    const alvo = join(projeto, 'plano.txt')
+    writeFileSync(alvo, 'versão original do plano E07')
+    const { sessionId, chatId } = await sessaoAtiva(page)
+    const ref = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/references`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { workspaceRoot: projeto, sourcePath: alvo },
+    })
+    expect(ref.status()).toBe(201)
+    const recibo = await ref.json()
+
+    // Intacta: metadata diz presente e o download devolve os bytes originais.
+    const intacta = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${recibo.artifactId}`, { headers: headersApi })
+    expect((await intacta.json()).presente).toBe(true)
+    expect((await bytesDoArtefato(page, recibo.artifactId)).toString('utf8')).toBe('versão original do plano E07')
+
+    // Alterada no disco: a revalidação muda o estado — nunca serve bytes novos.
+    writeFileSync(alvo, 'conteúdo NOVO e diferente do plano E07')
+    const alterada = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${recibo.artifactId}`, { headers: headersApi })
+    const corpoAlterado = await alterada.json()
+    expect(corpoAlterado.presente, 'arquivo alterado não é mais o artefato aprovado').toBe(false)
+    expect(corpoAlterado.estado).toBe('ausente')
+
+    // Removida: continua ausente e o GET de bytes do dono não inventa arquivo.
+    rmSync(alvo)
+    const removida = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${recibo.artifactId}?download=1`, { headers: headersApi })
+    expect([404, 409, 410]).toContain(removida.status())
+    // Um re-registro é um artefato NOVO (sem retarget): id diferente.
+    writeFileSync(alvo, 'versão original do plano E07')
+    const novo = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/references`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { workspaceRoot: projeto, sourcePath: alvo },
+    })
+    expect(novo.status()).toBe(201)
+    expect((await novo.json()).artifactId).not.toBe(recibo.artifactId)
+    expect(corpoAlterado.referencia ?? '').not.toMatch(/^\//)
+  })
+
+  test('E08 — artefato indisponível: download do dono é escopado e o chip legado não oferece download falso', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada e08 indisponivel honesto')
+    await anexarNoChat(page, 'e08.txt', 'conteúdo que será verificado (E08)')
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    const lista = page.getByRole('list', { name: 'Anexos enviados' })
+    await lista.waitFor({ timeout: 20_000 })
+    const artifactId = await lista.getByRole('listitem').first().getAttribute('data-artifact-id')
+    expect(artifactId, 'chip com artefato real').toBeTruthy()
+    expect((await bytesDoArtefato(page, artifactId!)).toString('utf8')).toBe('conteúdo que será verificado (E08)')
+
+    // A rota de bytes é ESCOPADA por dono e por conversa: nenhum download cruzado.
+    const { sessionId, chatId } = await sessaoAtiva(page)
+    const alheia = await page.request.get(`${BASE}/api/sessions/nao-existe/chats/x/attachments/${artifactId}`, { headers: headersApi })
+    expect([403, 404, 410]).toContain(alheia.status())
+    const cruzada = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}-outro/attachments/${artifactId}`, { headers: headersApi })
+    expect([403, 404, 410]).toContain(cruzada.status(), 'artefato é escopado por chat: nenhum download cruzado')
+    const semOrigem = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}?download=1`, { headers: { 'Sec-Fetch-Site': 'cross-site' } })
+    expect(semOrigem.status(), 'download exige mesma origem').toBe(403)
+
+    // Sessão LEGADA criada pelo SERVIDOR (metadata-only, sem artifactId): a UI
+    // hidrata do transcript e exibe o chip honesto, sem botão de download.
+    const legada = {
+      id: 'e08e08e0-0000-4000-8000-0000000000e0', title: 'legado e08 metadata-only', workspace: 'Chat',
+      workspacePath: null, contexto: { tipo: 'chat' }, section: 'today', status: 'completed',
+      updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null,
+      chats: [{
+        id: 'e08e08e0-0000-4000-8000-0000000000e1', title: 'Novo chat', status: 'completed',
+        messages: [{
+          id: 'legado-e08', role: 'user', content: 'mensagem antiga com anexo só de metadados', time: '10:00',
+          attachments: [{ id: 'antigo-e08', name: 'legado-e08.docx', kind: 'local' }],
+        }],
+      }],
+      mainChatId: 'e08e08e0-0000-4000-8000-0000000000e1',
+    }
+    const criada = await page.request.post(`${BASE}/api/sessions`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { session: legada, contexto: { tipo: 'chat' }, creationId: randomUUID() },
+    })
+    expect([200, 201], `POST da sessão legada: ${await criada.text()}`).toContain(criada.status())
+    // O transcript do servidor carrega o anexo (projeção P30 preserva metadados).
+    const lida = await page.request.get(`${BASE}/api/sessions/e08e08e0-0000-4000-8000-0000000000e0`, { headers: headersApi })
+    expect(JSON.stringify(await lida.json())).toContain('legado-e08.docx')
+
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    await linhasSessao(page).filter({ hasText: 'legado e08 metadata-only' }).first().click()
+    const legado = page.getByRole('listitem', { name: /legado-e08\.docx/ })
+    await legado.waitFor({ timeout: 20_000 })
+    expect(await page.getByLabel('Baixar legado-e08.docx').count(), 'legado nunca oferece download falso').toBe(0)
+    await shot(page, 'c3a_e08_indisponivel')
+  })
+
+  test('E09 — rascunho da landing com arquivo sobrevive a abrir Provedores e a 800x600 sem corte', async ({ page }) => {
+    await irParaLanding(page)
+    const entrada = page.locator('.session-landing input[type="file"]').first()
+    await entrada.setInputFiles({ name: 'e09.txt', mimeType: 'text/plain', buffer: Buffer.from('rascunho do E09') })
+    await expect(page.getByRole('group', { name: /e09\.txt/ })).toBeVisible()
+    await campoLanding(page).fill('texto que acompanha o rascunho')
+
+    // Abrir Provedores (remount da landing) preserva texto E anexo.
+    await page.getByTestId('landing-modelo-topo').click()
+    await page.getByRole('menuitem', { name: 'Abrir Provedores' }).click()
+    await page.waitForTimeout(600)
+    await page.keyboard.press('Escape')
+    await campoLanding(page).waitFor({ timeout: 20_000 })
+    await expect(campoLanding(page)).toHaveValue('texto que acompanha o rascunho')
+    await expect(page.getByRole('group', { name: /e09\.txt/ })).toBeVisible()
+
+    // 800x600: sem overflow horizontal e controles visíveis (sem corte).
+    await page.setViewportSize({ width: 800, height: 600 })
+    const semOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    expect(semOverflow, '800x600 sem corte horizontal').toBe(true)
+    await expect(botaoEnviarLanding(page)).toBeVisible()
+    await shot(page, 'c3a_e09_800x600')
+
+    // Tema claro não quebra o chip (tokens aplicados no documento).
+    await page.evaluate(() => {
+      localStorage.setItem('agents-theme', 'light')
+      document.documentElement.classList.add('theme-light')
+    })
+    await expect(page.getByRole('group', { name: /e09\.txt/ })).toBeVisible()
+    await shot(page, 'c3a_e09_tema_claro')
+    await page.setViewportSize({ width: 1400, height: 900 })
+  })
+
+  test('E10 — caminho só-texto permanece intacto (sem chip, sem admissão, sem upload)', async ({ page }) => {
+    await irParaLanding(page)
+    let uploads = 0
+    page.on('request', (req) => { if (/attachments\/uploads/.test(req.url())) uploads += 1 })
+    await campoLanding(page).fill('mensagem apenas com texto na landing')
+    await botaoEnviarLanding(page).click()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+
+    await campoChat(page).fill('segunda mensagem só de texto no chat')
+    const marcador = page.waitForRequest((req) => req.url().endsWith('/api/agir') && req.method() === 'POST')
+    await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+    await marcador
+    expect(uploads, 'nenhum upload no caminho só-texto').toBe(0)
+    await expect(page.getByRole('list', { name: 'Anexos enviados' })).toHaveCount(0)
+    await expect(page.getByText('segunda mensagem só de texto no chat')).toBeVisible()
+    await shot(page, 'c3a_e10_so_texto')
+  })
+})

@@ -205,5 +205,28 @@ export interface Attachment {
   id: string
   name: string
   kind: 'workspace' | 'local'
+  /** C-3a: artefato publicado no ledger do dono (sessão/chat atuais). */
+  artifactId?: string
+  /** C-3a: identificador estável LOCAL da transferência (R11 — retry reutiliza). */
+  uploadId?: string
+  /** C-3a: modalidade MM-0 do artefato (aditiva, sem bytes/locator). */
+  modalidade?: 'texto' | 'imagem' | 'audio' | 'video' | 'arquivo'
+  bytes?: number
+  sha256?: string
+  /**
+   * C-3a: estado real exibido no chip (F5/offline). `legado` = metadado
+   * antigo sem artefato publicado; `referencia` = projeto apontado.
+   */
+  estado?: 'selecionado' | 'transferindo' | 'pronto' | 'falhou' | 'referencia' | 'legado'
+  /** C-3a: modo do artefato — cópia privada ou referência de projeto. */
+  mode?: 'copy' | 'reference'
+  /** C-3a: escolha EXPLÍCITA de cópia na pasta do projeto (R03; default privado). */
+  modoCopia?: 'privado' | 'projeto'
+  /** C-3a: destino de envio ao modelo registrado na publicação (R10). */
+  envioModelo?: 'excluido-sem-codec'
+  /** C-3a: referência de projeto como caminho relativo ao workspace. */
+  referencia?: string
+  /** C-3a: marcador de item publicado sem artefato da C-3a. */
+  legado?: boolean
 }
 

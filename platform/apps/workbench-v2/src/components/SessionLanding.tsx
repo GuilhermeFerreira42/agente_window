@@ -34,6 +34,9 @@ import { isNavigationKey, nextRovingIndex } from '../domain/keyboardNavigation'
 import { MODEL_AUTO, rotuloDaSelecao, tokenDaSelecao, tokenDoPar } from '../domain/selecaoModelo'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { RascunhoLanding } from '../domain/landingDraft'
+import type { Attachment } from '../types'
+import { apagarArquivoVivo, guardarArquivoVivo } from '../domain/arquivosVivos'
+import { nomeSeguroArquivo } from '../domain/anexosRascunho'
 
 interface SessionLandingProps {
   workspace: string
@@ -60,7 +63,6 @@ interface SessionLandingProps {
   onOpenProvedores?: () => void
 }
 
-const MOTIVO_ANEXOS = 'Anexos ainda não estão disponíveis nesta versão.'
 const MOTIVO_VOZ = 'Ditado por voz ainda não está disponível nesta versão.'
 function useCliqueFora(
   aberto: boolean,
@@ -95,7 +97,7 @@ export function SessionLanding({
   onChangeRascunho,
   tentativaControlada,
 }: SessionLandingProps) {
-  const { rascunho, setText, setSelecaoModelo, setModo, setPermissao, pending: submitPending, submit: enviar } =
+  const { rascunho, setText, setSelecaoModelo, setModo, setPermissao, setAnexos, pending: submitPending, submit: enviar } =
     useLandingSubmission(onSubmit, {
       contexto,
       workspacePath: contexto === 'chat' ? null : workspacePath,
@@ -149,6 +151,34 @@ export function SessionLanding({
 
   const semPasta = contexto === 'chat'
 
+  // — C-3a: seletor real de arquivos da landing —
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [arrastando, setArrastando] = useState(false)
+
+  const adicionarArquivos = (files: FileList | File[]) => {
+    const atuais = [...(rascunho.anexos ?? [])]
+    for (const file of Array.from(files)) {
+      const uploadId = crypto.randomUUID()
+      const anexo: Attachment = {
+        id: `local:${file.name}:${file.size}:${file.lastModified}`,
+        name: nomeSeguroArquivo(file.name),
+        kind: 'local',
+        uploadId,
+        estado: 'selecionado',
+      }
+      if (atuais.some((item) => item.id === anexo.id)) continue
+      guardarArquivoVivo(uploadId, file)
+      atuais.push(anexo)
+    }
+    setAnexos(atuais)
+  }
+
+  const removerAnexo = (id: string) => {
+    const alvo = (rascunho.anexos ?? []).find((item) => item.id === id)
+    if (alvo?.uploadId) apagarArquivoVivo(alvo.uploadId)
+    setAnexos((rascunho.anexos ?? []).filter((item) => item.id !== id))
+  }
+
   // — textarea: cresce com o conteúdo até 200px (e à área útil), depois rola —
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
@@ -200,7 +230,7 @@ export function SessionLanding({
     void enviar()
   }
 
-  const enviarDisponivel = Boolean(rascunho.texto.trim()) && !submitPending && !selecionadoIndisponivel
+  const enviarDisponivel = (Boolean(rascunho.texto.trim()) || Boolean(rascunho.anexos?.length)) && !submitPending && !selecionadoIndisponivel
 
   // Menu do seletor: renderizado SOMENTE na âncora clicada (topo ou resumo).
   const menuModelos = modeloAberto ? (
@@ -290,7 +320,26 @@ export function SessionLanding({
         </div>
 
         {/* card do composer */}
-        <form className="session-landing-input" onSubmit={submit} aria-busy={submitPending}>
+        <form
+          className={`session-landing-input${arrastando ? ' is-drop-target' : ''}`}
+          onSubmit={submit}
+          aria-busy={submitPending}
+          onDragOver={(event) => {
+            if (Array.from(event.dataTransfer.types).includes('Files')) {
+              event.preventDefault()
+              setArrastando(true)
+            }
+          }}
+          onDragLeave={() => setArrastando(false)}
+          onDrop={(event) => {
+            setArrastando(false)
+            const files = Array.from(event.dataTransfer.files ?? [])
+            if (files.length > 0 && !submitPending) {
+              event.preventDefault()
+              adicionarArquivos(files)
+            }
+          }}
+        >
           <textarea
             ref={textareaRef}
             className="session-landing-textarea"
@@ -306,17 +355,51 @@ export function SessionLanding({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={handleKeyDown}
           />
+          {(rascunho.anexos?.length ?? 0) > 0 && (
+            <div className="attachments-row session-landing-anexos" role="list" aria-label="Arquivos anexados">
+              {(rascunho.anexos ?? []).map((anexo) => (
+                <span
+                  className="attachment-chip"
+                  key={anexo.id}
+                  role="group"
+                  aria-label={`${anexo.name}, arquivo local${anexo.estado === 'transferindo' ? ' · transferindo' : anexo.estado === 'pronto' ? ' · salvo' : anexo.estado === 'falhou' ? ' · falhou' : ' · selecionado'} — armazenado; não enviado ao modelo`}
+                  title={`${anexo.name} · local · armazenado; não enviado ao modelo`}
+                >
+                  <span className="attachment-chip-name">{anexo.name}</span>
+                  <span className="attachment-chip-kind" aria-hidden="true">local</span>
+                  <button
+                    className="attachment-remove"
+                    type="button"
+                    aria-label={`Remover ${anexo.name}`}
+                    onClick={() => removerAnexo(anexo.id)}
+                  ><span aria-hidden="true">×</span></button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="session-landing-toolbar">
             <div className="session-landing-toolbar-left">
               <button
                 type="button"
                 className="session-landing-icon-button"
                 aria-label="Adicionar contexto"
-                title={MOTIVO_ANEXOS}
-                aria-disabled="true"
-                disabled
-                data-testid="landing-anexos-indisponivel"
+                title="Anexar arquivo"
+                disabled={submitPending}
+                data-testid="landing-anexos"
+                onClick={() => fileInputRef.current?.click()}
               ><Plus size={15} /></button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                aria-label="Selecionar arquivos para anexar"
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? [])
+                  if (files.length > 0) adicionarArquivos(files)
+                  event.target.value = ''
+                }}
+              />
 
               <LandingExecutionControls modo={rascunho.modo} permissao={rascunho.permissao}
                 semPasta={semPasta} pending={submitPending} onModo={setModo} onPermissao={setPermissao} />

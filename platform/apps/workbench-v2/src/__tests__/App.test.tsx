@@ -454,8 +454,41 @@ describe('App session flows', () => {
     await waitFor(() => expect(payload?.modelSelection).toEqual({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5' }))
   })
 
-  it('envia o payload com anexo local, exibe o contexto e limpa o chip após submit', async () => {
+  it('C3A-T23 — anexo sem texto publica a mensagem com chip salvo e NÃO inicia run (R10)', async () => {
+    // Fronteira de transporte mockada AQUI (a prova de armazenamento real é o
+    // E2E c3a_anexos); o fluxo do produto — admitir → PUT binário → publicar —
+    // roda inteiro com o servidor do App simulado nesta fronteira.
     const user = userEvent.setup()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const metodo = (init?.method ?? 'GET').toUpperCase()
+      if (url.includes('/attachments/uploads') && metodo === 'POST') {
+        return new Response(JSON.stringify({
+          uploadId: '11111111-1111-4111-8111-111111111111',
+          artifactId: '11111111-1111-4111-8111-111111111111',
+          name: 'app.ts', bytes: 8, sha256: null, state: 'admitido', mode: 'copy', scope: 'chat', errorCode: null,
+        }), { status: 201, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/content') && metodo === 'PUT') {
+        return new Response(JSON.stringify({
+          uploadId: '11111111-1111-4111-8111-111111111111',
+          artifactId: '11111111-1111-4111-8111-111111111111',
+          name: 'app.ts', bytes: 8, sha256: 'a'.repeat(64), state: 'pronto', mode: 'copy', scope: 'chat', errorCode: null,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/attachments') && metodo === 'GET') {
+        return new Response(JSON.stringify({ attachments: [], uploads: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url === '/api/sessions' || url.startsWith('/api/sessions/')) {
+        // Publicação da mensagem (CAS) — devolve a própria sessão enviada.
+        const corpo = init?.body ? JSON.parse(String(init.body)) : null
+        if (corpo?.session) {
+          return new Response(JSON.stringify({ session: { ...corpo.session, persistenceRevision: (corpo.session.persistenceRevision ?? 0) + 1 }, mutationId: corpo.mutationId ?? null, revision: (corpo.session.persistenceRevision ?? 0) + 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify({ sessions: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
     const { container } = render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
@@ -469,14 +502,15 @@ describe('App session flows', () => {
 
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
-    expect(screen.getByRole('list', { name: 'Anexos enviados' })).toBeInTheDocument()
+    // Publicação com chips: sem texto sintético "Arquivos anexados" (T23) e
+    // SEM bubble "Trabalhando" — anexo sem texto nunca dispara run.
+    expect(await screen.findByRole('list', { name: 'Anexos enviados' })).toBeInTheDocument()
     expect(screen.getByRole('listitem', { name: /app\.ts, arquivo local/ })).toBeInTheDocument()
-    expect(screen.getByText('Arquivos anexados: app.ts')).toBeInTheDocument()
+    expect(screen.queryByText(/Arquivos anexados/)).not.toBeInTheDocument()
     expect(screen.getByText('· Editar')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: /app\.ts, arquivo local/ })).not.toBeInTheDocument()
-    expect(screen.getByText('Trabalhando')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
+    expect(screen.queryByText('Trabalhando')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Parar execução' })).not.toBeInTheDocument()
   })
 
   it('preserva o anexo do rascunho ao alternar a superfície mobile', async () => {

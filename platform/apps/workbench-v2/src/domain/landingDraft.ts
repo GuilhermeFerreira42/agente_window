@@ -7,6 +7,7 @@
 
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
+import type { Attachment } from '../types'
 import { mesmaSelecao } from './selecaoModelo'
 
 /**
@@ -25,6 +26,8 @@ export interface RascunhoLanding {
   permissao: NivelPermissaoAgir
   /** Geração do texto: incrementa a cada edição — invalida tentativas velhas. */
   geracao: number
+  /** C-3a — anexos do rascunho (metadados; os Files vivem em arquivosVivos). */
+  anexos?: Attachment[]
 }
 
 /** Snapshot imutável capturado no admitir do envio (02 §1). */
@@ -39,6 +42,8 @@ export interface SnapshotPrimeiroEnvio {
   readonly geracao: number
   /** Identidade estável da tentativa lógica (deduplicação de clique duplo). */
   readonly tentativaId: string
+  /** C-3a — anexos junto do primeiro envio (nunca bytes/base64). */
+  readonly anexos?: readonly Attachment[]
 }
 
 export function rascunhoInicial(): RascunhoLanding {
@@ -96,12 +101,13 @@ export function snapshotDoRascunho(
     permissao: permissaoEfetiva(contexto, rascunho.permissao),
     geracao: rascunho.geracao,
     tentativaId,
+    anexos: Object.freeze([...(rascunho.anexos ?? [])]),
   })
 }
 
 /** Recusa honesta do snapshot antes de qualquer efeito (nenhum motivo vira sucesso). */
 export function recusarSnapshot(snapshot: SnapshotPrimeiroEnvio): string | null {
-  if (!snapshot.texto.trim()) return 'Escreva uma mensagem antes de enviar.'
+  if (!snapshot.texto.trim() && !snapshot.anexos?.length) return 'Escreva uma mensagem ou anexe um arquivo antes de enviar.'
   if (snapshot.contexto === 'workspace' && !snapshot.workspacePath) {
     return 'Escolha uma pasta real do disco para começar uma conversa workspace.'
   }
@@ -113,6 +119,8 @@ export function snapshotAtual(snapshot: SnapshotPrimeiroEnvio, rascunho: Rascunh
   return (
     snapshot.geracao === rascunho.geracao &&
     snapshot.texto === rascunho.texto.trim() &&
-    mesmaSelecao(snapshot.selecaoModelo, rascunho.selecaoModelo)
+    mesmaSelecao(snapshot.selecaoModelo, rascunho.selecaoModelo) &&
+    (snapshot.anexos ?? []).length === (rascunho.anexos ?? []).length &&
+    (snapshot.anexos ?? []).every((anexo, indice) => anexo.id === rascunho.anexos?.[indice]?.id)
   )
 }

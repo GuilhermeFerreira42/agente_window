@@ -43,6 +43,8 @@ import { conferirArquivosOperacionais, revisarOperacao, ultimoReciboOperacional 
 import { criarMemoriaAutomatica, selecionarMemorias, type EscopoMemoria, type FonteMemoria } from './memoriaAutomatica'
 import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
+import { tratarRotasAnexos } from './attachments/rotas'
+import { validarAnexosPublicados } from './attachments/publicacao'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -597,6 +599,9 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
     // P-C §2 — estado durável de exclusão recusa PUT e POST tardios: nem a
     // gravação pendente nem um reenvio de criação reabrem a conversa.
     if (sessaoExcluida(session.id)) throw problemaSessaoExcluida()
+    // C-3a — R04/T18: anexos resolvidos no ledger do dono ANTES de qualquer
+    // gravação; DTO `pronto` sem respaldo ou com hash divergente é recusado.
+    session = validarAnexosPublicados(session.id, session)
     const existing = getSessionRecord(session.id)
     const existingSession = existing ? JSON.parse(existing.sessionJson) as Session : undefined
     const storedRevision = existingSession?.persistenceRevision ?? 0
@@ -698,6 +703,10 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
+
+  // C-3a — rotas de anexo (subrotas de sessão; o byId ancorado em `$` não as
+  // cobre). Despacho próprio ANTES do caminho genérico de sessão.
+  if (await tratarRotasAnexos(request, response, url)) return true
 
   if (url.pathname === '/api/sessions/history-access' && request.method === 'POST') {
     try {

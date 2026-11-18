@@ -5,6 +5,7 @@ import { getDatabasePath } from './paths'
 import type { Checkpoint } from './checkpoint'
 import type { MemoriaProjeto } from '../../domain/memoriaProjeto'
 import { PersistenceProblem } from './persistenceErrors'
+import { criarTabelasAnexos } from './attachments/schemaAnexos'
 
 export interface SessionRecord {
   id: string
@@ -179,6 +180,9 @@ export function getDatabase(): Database.Database {
       cleanup_state TEXT NOT NULL CHECK (cleanup_state IN ('preparado', 'limpeza_pendente', 'concluido'))
     );
   `)
+  // C-3a — ledger de anexos (migração aditiva na MESMA conexão; sem FK de
+  // propósito: as linhas de ownership sobrevivem até o plano de limpeza T27).
+  criarTabelasAnexos(database)
   return database
 }
 

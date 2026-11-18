@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import {
+import { Download,
   Check,
   Clipboard,
   FileCode2,
@@ -20,6 +20,7 @@ import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
+import { baixarAnexo } from '../services/sessions/anexosClient'
 import type { FonteEntreChats } from '../domain/consultaEntreChats'
 import { ChatInput, selecaoDoToken } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
@@ -186,9 +187,37 @@ function createMarkdownComponents(onCopy: () => void): Components {
   }
 }
 
+function rotuloEstadoAnexo(estado: NonNullable<Attachment['estado']>): string {
+  if (estado === 'pronto') return ' · salvo'
+  if (estado === 'referencia') return ' · no workspace'
+  if (estado === 'transferindo') return ' · transferindo'
+  if (estado === 'falhou') return ' · indisponível'
+  if (estado === 'selecionado') return ' · selecionado'
+  return ''
+}
+
+function estadoAnexoLabel(attachment: Attachment): string {
+  return attachment.estado && attachment.estado !== 'legado' ? rotuloEstadoAnexo(attachment.estado) : ''
+}
+
+/** Download real do bytes armazenados (E01 — hash conferido no E2E). */
+async function baixarAnexoComNome(sessionId: string, chatId: string, artifactId: string, name: string): Promise<void> {
+  const blob = await baixarAnexo(sessionId, chatId, artifactId)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function MessageRow({
   onAbrirFonteHistorica,
   onEscolherHistorico,
+  sessionId,
+  chatId,
   message,
   onCopy,
   onCopyAll,
@@ -203,6 +232,9 @@ function MessageRow({
 }: {
   onAbrirFonteHistorica?: (referencia: string) => Promise<void>
   onEscolherHistorico?: (referencia: string) => void
+  /** C-3a — dono para download do artefato armazenado. */
+  sessionId?: string
+  chatId?: string
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onDecidirAguardarComando: (ferramentaId: string, decisao: 'continuar' | 'parar') => void
@@ -234,11 +266,25 @@ function MessageRow({
                 className="chat-message-attachment"
                 key={attachment.id}
                 role="listitem"
-                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
-                title={`${attachment.name} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
+                data-artifact-id={attachment.artifactId ?? undefined}
+                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'}${estadoAnexoLabel(attachment)} — armazenado; não enviado ao modelo (sem codec nesta fase)`}
+                title={`${attachment.name} · ${attachment.kind === 'local' ? 'local' : 'workspace'}${estadoAnexoLabel(attachment)} · armazenado; não enviado ao modelo`}
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>
+                {attachment.estado && attachment.estado !== 'legado' && (
+                  <span className="chat-message-attachment-estado" aria-hidden="true">{rotuloEstadoAnexo(attachment.estado)}</span>
+                )}
+                {sessionId && chatId && attachment.artifactId
+                  && (attachment.estado === 'pronto' || attachment.estado === 'referencia') && (
+                  <button
+                    className="chat-message-attachment-download"
+                    type="button"
+                    aria-label={`Baixar ${attachment.name}`}
+                    title="Baixar o arquivo armazenado"
+                    onClick={() => { void baixarAnexoComNome(sessionId, chatId, attachment.artifactId!, attachment.name) }}
+                  ><Download size={11} aria-hidden="true" /></button>
+                )}
               </span>
             ))}
           </div>
@@ -427,6 +473,8 @@ export function ChatPanel({
           {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [], { tipo: 'auto' })} /> : activeChat.messages.map((message) => (
             <MessageRow
               key={message.id}
+              sessionId={session.id}
+              chatId={activeChat.id}
               message={message}
               onAbrirFonteHistorica={onAbrirFonteHistorica}
               onEscolherHistorico={activeChat.status === 'working' ? undefined : referencia => onSend(`/chats selecionar ${referencia}`, [], selecaoDoToken(model))}
