@@ -18,7 +18,7 @@ Data da execução: 2026-11-18 · SO `linux/x64` · Node **26.13.0** (runtime ca
 | Lint (delta) | `eslint src --format json` vs `/tmp/lint-base.json` | **novos = 0, resolvidos = 0** (111 = 111) |
 | Build | `NODE_OPTIONS=--max-old-space-size=1408 npx vite build` | **✓ built in 40.20s** |
 | Foco | `VALIDAR_C3A.mjs --mode foco` | **194 aprovados · 0 falhas · 0 pulados · missingCriteria = []** |
-| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json …/vitest.json` | **2060 aprovados · 3 falhas nominais · 33 pulados · newFailures = [] · newSkips = []** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json …/vitest.json` | **2061 aprovados · 3 falhas nominais · 33 pulados · newFailures = [] · newSkips = [] · missingCriteria = []** |
 | E2E | `sh platform/scripts/e2e-c3a.sh` (porta 5214) | **10/10** (E01–E10) |
 
 Baseline usada: `/home/user/c3a-base-run/vitest.json` (HEAD exato `3a78ca0`, árvore limpa,
@@ -145,8 +145,8 @@ testes aprovados, não por declaração.
 | Artefato | Caminho |
 |---|---|
 | Preflight | `/home/user/c3a-validacao/01-preflight/preflight.json` |
-| Foco (nominais/critérios/log) | `/home/user/c3a-validacao/03-foco/{nominais,criterios,execucao}.json` |
-| Ampla (comparação/log) | `/home/user/c3a-validacao/04-ampla/{comparacao,execucao}.json` |
+| Foco (nominais/critérios/log) | `/home/user/c3a-validacao/05-foco/{nominais,criterios,execucao}.json` |
+| Ampla (comparação/log) | `/home/user/c3a-validacao/06-ampla/{comparacao,execucao}.json` |
 | Baseline | `/home/user/c3a-base-run/{vitest,nominais,execucao}.json` |
 | Lint base/atual | `/tmp/lint-base.json`, `/tmp/lint-c3a-new.json` |
 | E2E | `sh platform/scripts/e2e-c3a.sh` → `platform/apps/workbench-v2/test-results/` |
@@ -161,8 +161,8 @@ npx tsc -b --force
 npx eslint src --format json > /tmp/lint-c3a-new.json
 NODE_OPTIONS=--max-old-space-size=1408 npx vite build
 cd /home/user/memoria-de-projeto/C-3a/pacote/C-3a
-node VALIDAR_C3A.mjs --repo /home/user/agente_window --mode foco --out /home/user/c3a-validacao/05-foco
+node VALIDAR_C3A.mjs --repo /home/user/agente_window --mode foco --out /home/user/c3a-validacao/07-foco
 node VALIDAR_C3A.mjs --repo /home/user/agente_window --mode ampla \
-  --out /home/user/c3a-validacao/06-ampla --baseline-json /home/user/c3a-base-run/vitest.json
+  --out /home/user/c3a-validacao/08-ampla --baseline-json /home/user/c3a-base-run/vitest.json
 cd /home/user/agente_window && sh platform/scripts/e2e-c3a.sh
 ```
