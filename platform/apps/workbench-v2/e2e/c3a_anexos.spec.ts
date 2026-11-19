@@ -715,6 +715,14 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     expect(primeiro.corpo.artifactId).not.toBe(segundo.corpo.artifactId)
     expect((await bytesDoArtefato(page, primeiro.corpo.artifactId)).toString('utf8')).toBe('CONTEUDO UM')
     expect((await bytesDoArtefato(page, segundo.corpo.artifactId)).toString('utf8')).toBe('CONTEUDO DOIS')
+    // As asserções acima são a prova do conteúdo; a captura é do estado da
+    // conversa (o Explorer não é o contrato deste teste e não é sincronizado
+    // por escrito externo durante a jornada). O log abaixo é um artefato da
+    // execução REAL, não uma reconstrução à mão.
+    const listagem = copias.map((nome) => `${nome}  (${readFileSync(join(uploads, nome), 'utf8')})`)
+    mkdirSync(join(process.cwd(), 'test-results'), { recursive: true })
+    writeFileSync(join(process.cwd(), 'test-results', 'c3a_e13_listagem_real.txt'),
+      `diretório real: ${uploads}\n${listagem.join('\n')}\n`)
     await shot(page, 'c3a_e13_dois_mesmo_nome')
   })
 
