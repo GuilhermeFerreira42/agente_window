@@ -15,8 +15,9 @@ import { validarAnexosPublicados } from './publicacao'
 import { tratarRotasAnexos } from './rotas'
 import { registrarReferencia } from './referencias'
 import { admitirUpload, receberConteudo, caminhoFinalChat } from './estoque'
-import { obterArtigo } from './catalogo'
-import { registerWriteIntent } from '../writeIntents'
+import { obterArtigo, obterUpload } from './catalogo'
+import { clearWriteIntent, registerWriteIntent } from '../writeIntents'
+import { withSessionPersistenceQueue } from '../filaSessao'
 import { lerArtigo } from './estoque'
 
 const SID = '33333333-3333-4333-8333-333333333333'
@@ -96,6 +97,29 @@ function resposta(): ServerResponse & RespostaFake {
     fluxo.binario = Buffer.concat(pedacos)
   })
   return fluxo as unknown as ServerResponse & RespostaFake
+}
+
+function requisicaoBinaria(metodo: string, caminho: string, bytes: Buffer): IncomingMessage {
+  const fluxo = Readable.from([bytes]) as Readable & Record<string, unknown>
+  fluxo.method = metodo
+  fluxo.url = caminho
+  fluxo.headers = {
+    host: '127.0.0.1:5174',
+    origin: 'http://127.0.0.1:5174',
+    'sec-fetch-site': 'same-origin',
+    'content-type': 'application/octet-stream',
+  }
+  fluxo.socket = { localPort: 5174, encrypted: false }
+  return fluxo as unknown as IncomingMessage
+}
+
+async function chamarBinario(metodo: string, caminho: string, bytes: Buffer) {
+  const req = requisicaoBinaria(metodo, caminho, bytes)
+  const res = resposta()
+  const tratado = await tratarRotasAnexos(req, res, new URL(caminho, 'http://127.0.0.1:5174'))
+  let json: unknown = null
+  if (res.body) { try { json = JSON.parse(res.body) } catch { json = null } }
+  return { tratado, status: res.statusCode, corpo: json as Record<string, string> | null, body: res.binario }
 }
 
 async function chamar(metodo: string, caminho: string, corpo?: unknown, headers: Record<string, string> = {}) {
@@ -284,8 +308,8 @@ describe('C-3a rotas de anexo', () => {
  * HTTP real da rota (não no serviço). A intenção de escrita é criada de forma
  * explícita: sem espera, sem retry, sem autosave.
  */
-describe('C-3a W3 — leitura de anexo sob intenção de escrita viva', () => {
-  function intencaoViva(mutationId: string): void {
+/** Intenção de escrita VIVA desta sessão (journal durável, sem operação em voo). */
+function intencaoViva(mutationId: string): void {
     registerWriteIntent({
       sessionId: SID, mutationId, criacao: false, baseRevision: 0, nextRevision: 1,
       targetPath: join(base, 'transcript.jsonl'), stagedPath: join(base, 'staged.jsonl'),
@@ -299,8 +323,9 @@ describe('C-3a W3 — leitura de anexo sob intenção de escrita viva', () => {
         creationId: null, creationDigest: null, creationRevision: null },
       checkpointCleanup: null,
     })
-  }
+}
 
+describe('C-3a W3 — leitura de anexo sob intenção de escrita viva', () => {
   it('W3 — download de anexo publicado responde 200 (nunca 503) com escrita pendente viva', async () => {
     const publicado = await publicarExemplo()
     intencaoViva('22222222-2222-4222-8222-222222222222')
@@ -337,5 +362,63 @@ describe('C-3a W3 — leitura de anexo sob intenção de escrita viva', () => {
     // A fronteira de escrita NÃO foi afrouxada: 503 ou 409 de publicação.
     expect(admissao.status).toBeGreaterThanOrEqual(400)
     expect(admissao.status).not.toBe(200)
+  })
+})
+
+/**
+ * U2 — o 503 do trace anterior foi no **PUT** de bytes, não no GET.
+ *
+ * `resolverDonoAnexos` roda fora da fila do dono: uma publicação viva da mesma
+ * sessão vence a corrida e o PUT responde 503 antes de esperar. Aqui a escrita
+ * viva ocupa a fila ANTES do PUT entrar; depois ela termina e o PUT precisa
+ * concluir — sem enfraquecer a guarda (pendência REAL continua recusando).
+ */
+describe('C-3a U2 — PUT de anexo durante publicação viva da mesma conversa', () => {
+  it('U2 — PUT espera a operação viva terminar e conclui com 200 (nunca 503 de publicação)', async () => {
+    // Upload admitido ANTES de a escrita ocupar a fila.
+    const bytes = Buffer.from('conteudo do PUT durante escrita viva', 'utf8')
+    const admissao = await admitirUpload({
+      sessionId: SID, chatId: CID, name: 'u2.txt', declaredBytes: bytes.length,
+      mode: 'copy', scope: 'chat',
+    })
+
+    // Operação viva ocupando a fila do dono (publicação legítima da sessão):
+    // intenção registrada + gate explícito, como no reteste.
+    let liberar!: () => void
+    const portao = new Promise<void>((resolve) => { liberar = resolve })
+    let intencaoRegistrada!: () => void
+    const intencaoVisivel = new Promise<void>((resolve) => { intencaoRegistrada = resolve })
+    const escritaViva = withSessionPersistenceQueue(SID, async () => {
+      intencaoViva('88888888-8888-4888-8888-888888888888')
+      intencaoRegistrada()
+      await portao
+      clearWriteIntent(SID, '88888888-8888-4888-8888-888888888888')
+    })
+    // Determinístico: só segue quando a intenção ESTÁ no journal.
+    await intencaoVisivel
+
+    // PUT entra com a escrita AINDA viva: deve esperar, não responder 503.
+    const putPendente = chamarBinario('PUT', rota(`/uploads/${admissao.uploadId}/content`), bytes)
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    liberar()
+    await escritaViva
+
+    const put = await putPendente
+    expect(put.corpo?.code).not.toBe('session_publication_pending')
+    expect(put.status).toBe(200)
+    expect(obterUpload(SID, CID, admissao.uploadId)!.state).toBe('pronto')
+  })
+
+  it('U2b — pendência REAL (intenção órfã, sem operação viva) continua recusando escrita', async () => {
+    const bytes = Buffer.from('nao deve passar', 'utf8')
+    const admissao = await admitirUpload({
+      sessionId: SID, chatId: CID, name: 'u2b.txt', declaredBytes: bytes.length,
+      mode: 'copy', scope: 'chat',
+    })
+    // Intenção registrada sem operação em voo: publicação abandonada.
+    intencaoViva('77777777-7777-4777-8777-777777777777')
+    const put = await chamarBinario('PUT', rota(`/uploads/${admissao.uploadId}/content`), bytes)
+    expect(put.status).toBe(503)
+    expect(put.corpo?.code).toBe('session_publication_pending')
   })
 })

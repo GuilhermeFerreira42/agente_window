@@ -12,6 +12,7 @@ import { createReadStream } from 'node:fs'
 import { validateLocalRequest } from '../../../../server/local-boundary.mjs'
 import { PersistenceProblem } from '../persistenceErrors'
 import { consultarDelecao } from '../deletions'
+import { withSessionPersistenceQueue } from '../filaSessao'
 import { obterArtigo, listarArtigosChat, listarUploads } from './catalogo'
 import { projetarArtigoSeguro } from './dtoAnexo'
 import {
@@ -118,11 +119,19 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
     // Leitura (F5) tolera pasta offline com estado honesto; escrita nunca —
     // o 409 de pasta inacessível continua valendo para admissão/conteúdo.
     const somenteLeitura = metodo === 'GET'
-    const dono = resolverDonoAnexos(sessionId, chatId, {
-      permitirRaizOffline: somenteLeitura,
-      // W3 — GET não herda o journal de publicação de outra operação.
-      leitura: somenteLeitura,
-    })
+    // U2 — ESCRITA resolve o dono DENTRO da fila do próprio dono.
+    //
+    // Resolver fora da fila criava a corrida do trace anterior: uma publicação
+    // viva da mesma sessão ainda estava em voo, o journal tinha intenção, e o
+    // PUT recebia 503 `session_publication_pending` SEM esperar — apesar de a
+    // operação ser conhecida e legítima. Serializando só a RESOLUÇÃO (a seção
+    // crítica é curta; o stream não fica na fila), a escrita espera a operação
+    // viva terminar e então prossegue. Pendência ABANDONADA (intenção sem
+    // operação em voo) continua recebendo 503 — a guarda não foi afrouxada.
+    const dono = somenteLeitura
+      ? resolverDonoAnexos(sessionId, chatId, { permitirRaizOffline: true, leitura: true })
+      : await withSessionPersistenceQueue(sessionId, async () =>
+        resolverDonoAnexos(sessionId, chatId, { permitirRaizOffline: false }))
 
     // GET /attachments — lista segura (F5/offline): artefatos publicados +
     // transferências ainda em voo (estado honesto dos chips).

@@ -1,3 +1,11 @@
+# 19/11/2026 — C-3a: U1/U3 e U2 corrigidos após segundo reteste
+
+O reteste independente sobre `bb96389` reconheceu o progresso (foco 202/202 no Windows, anexos 81/81, E2E 10/10, S01–S05 5/5) e manteve dois bloqueios de dados e uma pendência de explicação. **U1**: a identidade do artefato derivava só do `uploadId` do cliente, e o upsert global atualizava locator/bytes sem conferir o dono — o mesmo `uploadId` em duas conversas fazia A ler os bytes de B. Correção: dono na derivação da identidade e `WHERE` de dono no `ON CONFLICT`. **U3**: falha na gravação do progresso depois de materializar a cópia selava o plano; o retry devolvia mapa vazio com o arquivo pronto. Correção: adoção da cópia já materializada pelo mesmo `newId`, gravação de progresso que não propaga falha e selo do plano apenas quando tudo está durável. **U2**: o trace de `554f400` foi de **PUT**, não de GET; a resolução de dono rodava fora da fila e uma publicação viva vencia a corrida, devolvendo 503 sem esperar. Correção: resolução de escrita dentro da fila do próprio dono, com pendência abandonada ainda recusando 503. O relato anterior de “causa comprovada do E05” foi corrigido: o GET era um defeito real e distinto, mas não explicava o PUT.
+
+Cada achado foi reproduzido vermelho antes (U1 e U3 com `expected [] to have a length of 1`; U2 com `expected 'session_publication_pending' not to be ...`) e verificado de novo revertendo a correção. Gates no Linux/Node 26.13.0: reteste 12/12, anexos 78/78, persistência 317/1 pulado, foco 204/0/0, ampla 2102 com `newFailures=[]`/`newSkips=[]`, E2E C-3a 10/10 + C-1 6/6 + C-2 17/17, tipos 0, lint dos alterados 0/0, build ok. Sondas não reexecutadas; Windows não executado nesta rodada. Sem merge, sem C-3b, sem homologação; `08` intacto.
+
+---
+
 # 19/11/2026 — C-3a: correção de R1–R5 e W1/W2/W3 após reteste
 
 Reteste independente sobre `554f400` reprovou a C-3a: cinco reprodutores (R1 identidade por nome/tamanho; R2 disputa de escritor; R3 limpeza por chat sem efeito e apagando a sessão; R4 confirmação simultânea duplicando cópia; R5 origem tombstoned ainda servindo bytes) e três achados W1–W3. As cinco reproduções foram portadas para `attachments/reteste.test.ts` e **falharam antes** das correções; depois, 10/10.

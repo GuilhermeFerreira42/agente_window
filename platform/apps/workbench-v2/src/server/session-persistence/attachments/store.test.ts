@@ -426,7 +426,7 @@ describe('C-3a armazenamento e publicação', () => {
     mkdirSync(join(stage, '..'), { recursive: true })
     writeFileSync(stage, Buffer.alloc(8, 5))
     inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: artifactIdDe({ uploadId }),
+      sessionId: SID, chatId: CID, uploadId, artifactId: artifactIdDe({ sessionId: SID, chatId: CID, uploadId }),
       name: 'parcial.bin', declaredBytes: 16, mime: '', receivedBytes: 8, digest: null, state: 'recebendo',
       stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
       createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,

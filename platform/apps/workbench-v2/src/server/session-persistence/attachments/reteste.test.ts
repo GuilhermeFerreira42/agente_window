@@ -27,6 +27,9 @@ const CID = `${SID}-main`
 const CID2 = `${SID}-segundo`
 const DEST = '88888888-8888-4888-8888-888888888888'
 const DCID = `${DEST}-main`
+// U1 — segundo dono para provar isolamento por dono.
+const OUTRO = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const OUTRO_CHAT = `${OUTRO}-main`
 
 let base = ''
 
@@ -38,6 +41,16 @@ function seed(id: string, chats: string[], slug = id): void {
       id, workspacePath: null, worktreePath: null, chats: chats.map((chat) => ({ id: chat, messages: [] })),
     }),
   })
+}
+
+/** U1 — envio com `uploadId` EXPLÍCITO (o cliente controla esse id). */
+async function enviar(sessionId: string, chatId: string, uploadId: string, nome: string, conteudo: string) {
+  await admitirUpload({
+    sessionId, chatId, uploadId, name: nome, declaredBytes: Buffer.byteLength(conteudo),
+    mode: 'copy', scope: 'chat',
+  })
+  const pronto = await receberConteudo(sessionId, chatId, uploadId, Readable.from([Buffer.from(conteudo)]))
+  return { ...pronto, finalPath: obterUpload(sessionId, chatId, uploadId)!.finalPath! }
 }
 
 async function adicionarUploadIndependente(nome: string, conteudo: string, chatId = CID) {
@@ -75,6 +88,7 @@ beforeEach(() => {
   resetDatabase()
   seed(SID, [CID, CID2])
   seed(DEST, [DCID])
+  seed(OUTRO, [OUTRO_CHAT])
 })
 
 afterEach(() => {
@@ -285,12 +299,17 @@ describe('C-3a reteste 554f400 — R1..R5', () => {
 })
 
 /**
- * W3 — o 503 `session_publication_pending` do E2E (E05, `GET
- * …/attachments/uploads/<id>/content`) reproduzido DETERMINISTICAMENTE.
+ * W3 — o 503 `session_publication_pending` do E2E (E05) no nível de SERVIÇO:
+ * bytes já publicados continuam legíveis enquanto há intenção de escrita viva.
  *
- * Nada de espera, sleep ou retry: a intenção de escrita é registrada de forma
- * explícita e o upload acontece enquanto ela está viva. Se o produto devolver
- * 503 aqui, o defeito é determinístico e o teste o exibe.
+ * PRECISÃO DO MÉTODO (reteste de `bb96389`): o trace registrado foi de **PUT**
+ * `…/attachments/uploads/<id>/content` (envio de bytes), não de GET de
+ * download. O GET foi um problema REAL e distinto, corrigido em `dono.ts` /
+ * `agirContext.ts`; o PUT é coberto em `routes.test.ts` (U2/U2b), que reproduz
+ * a corrida contra a operação viva. Este bloco prova o contrato de LEITURA e
+ * não substitui a prova do PUT.
+ *
+ * Nada de espera, sleep ou retry: a intenção é registrada explicitamente.
  */
 describe('C-3a W3 — anexo sob intenção de escrita pendente', () => {
   function intencaoViva(mutationId: string): void {
@@ -342,5 +361,71 @@ describe('C-3a W3 — anexo sob intenção de escrita pendente', () => {
     expect(capturado).toBeInstanceOf(PersistenceProblem)
     expect((capturado as PersistenceProblem).status).toBe(404)
     expect((capturado as PersistenceProblem).code).toBe('session_not_found')
+  })
+})
+
+/**
+ * U — achados do RETESTE de `bb96389` (segunda rodada independente).
+ *
+ * U1: a identidade da tentativa não estava isolada pelo dono — o mesmo
+ * `uploadId` em duas conversas caía no MESMO artifactId e o upsert global
+ * redirecionava o locator/bytes do primeiro dono (A passava a ler os bytes
+ * de B). U3: falha ao gravar o progresso depois de materializar a cópia
+ * selava o plano e o retry devolvia mapa vazio, com o arquivo pronto no
+ * destino. Ambos reproduzidos antes da correção e mantidos como regressão.
+ */
+describe('C-3a U — achados do reteste bb96389', () => {
+  it('U1 — mesmo uploadId em dois donos não pode redirecionar o artefato do primeiro', async () => {
+    const idCompartilhado = '0f0f0f0f-1111-4222-8333-444455556666'
+    const a = await enviar(SID, CID, idCompartilhado, 'nota.txt', 'AAA')
+    const b = await enviar(OUTRO, OUTRO_CHAT, idCompartilhado, 'nota.txt', 'BBB')
+
+    // O dono A continua lendo os SEUS bytes.
+    const artigoA = obterArtigo(a.artifactId)
+    if (artigoA) {
+      expect(artigoA.sessionId).toBe(SID)
+      expect(artigoA.chatId).toBe(CID)
+      expect(readFileSync((await lerArtigo(a.artifactId)).caminho, 'utf8')).toBe('AAA')
+    }
+    // O dono B tem artefato PRÓPRIO e lê os bytes dele.
+    expect(listarArtigosChat(OUTRO, OUTRO_CHAT)).toHaveLength(1)
+    expect(readFileSync((await lerArtigo(b.artifactId)).caminho, 'utf8')).toBe('BBB')
+    // E os artefatos são distintos.
+    expect(b.artifactId).not.toBe(a.artifactId)
+  })
+
+  it('U3 — progresso falho depois da materialização é retomado sem item falso indisponível', async () => {
+    const origem = await enviar(SID, CID, '99999999-1111-4111-8111-111111111111', 'origem.bin', 'AAA')
+    await writeTranscript(SID, SID, [{
+      type: 'user', chatId: CID, uuid: 'm-1', timestamp: 1,
+      message: {
+        id: 'm-1', role: 'user', content: 'arquivo', time: '00:00',
+        attachments: [{ id: origem.artifactId, artifactId: origem.artifactId, name: 'origem.bin', kind: 'local', estado: 'pronto' }],
+      },
+    }] as never)
+    const plano = await prepareRecovery({ origemSessionId: SID, destinoSessionId: DEST, destinoChatId: DCID })
+    const entrada = { destinoSessionId: DEST, destinoChatId: DCID, recoveryId: plano.recoveryId, token: plano.token }
+
+    // Trigger: recusa a gravação do progresso DEPOIS de materializar o item.
+    const db = getDatabase()
+    // Só falha na gravação do CONSUMO (depois de a cópia existir), como no
+    // reteste: a primeira gravação do newId passa, a do recibo não.
+    db.exec(`CREATE TRIGGER falha_progresso BEFORE UPDATE OF mapa ON attachment_recovery_plans
+             WHEN NEW.mapa LIKE '%consumidoEm%'
+             BEGIN SELECT RAISE(ABORT, 'falha sintética no progresso'); END;`)
+    // A gravação do progresso falha DEPOIS de o arquivo existir no destino.
+    // O aceitável é rejeitar (503/erro honesto) ou concluir; o inaceitável é
+    // selar o item como indisponível tendo a cópia pronta no disco.
+    await confirmRecovery(entrada).catch(() => undefined)
+    // O arquivo do destino JÁ existe (materialização aconteceu).
+    expect(listarArtigosChat(DEST, DCID).length).toBeGreaterThanOrEqual(1)
+
+    // Remove o trigger, reabre a conexão e retenta.
+    db.exec('DROP TRIGGER falha_progresso')
+    resetDatabase()
+    const retry = await confirmRecovery(entrada)
+    expect(retry.mapa).toHaveLength(1)
+    expect(retry.indisponiveis).toHaveLength(0)
+    expect(listarArtigosChat(DEST, DCID).filter((artigo) => artigo.name === 'origem.bin')).toHaveLength(1)
   })
 })

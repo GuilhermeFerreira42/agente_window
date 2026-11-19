@@ -151,16 +151,21 @@ async function garantirVolume(alvo: string, bytes: number, politica: PoliticaAne
 
 /**
  * IDENTIDADE do artefato (R1): é a identidade da TENTATIVA (`uploadId`), nunca
- * uma derivação de sessão+chat+nome+tamanho. Dois arquivos diferentes com o
- * mesmo nome e o mesmo tamanho são tentativas distintas e recebem artefatos
- * distintos; o replay do MESMO `uploadId` reusa o mesmo registro.
+ * uma derivação de nome+tamanho. Dois arquivos diferentes com o mesmo nome e o
+ * mesmo tamanho são tentativas distintas e recebem artefatos distintos; o
+ * replay do MESMO `uploadId` reusa o mesmo registro.
  *
- * `derive` existe só para preservar a forma determinística que os testes da
- * admissão usam ao montar uma linha manual — a admissão real sempre passa o
- * `uploadId` da tentativa.
+ * U1 — a identidade é da tentativa **no dono**. O `uploadId` é fornecido pelo
+ * cliente e o banco admite o mesmo valor em sessões/chats diferentes; sem o
+ * dono no hash, a tentativa de B caía no artifactId de A e o upsert global
+ * redirecionava o locator/bytes da linha de A (A passava a ler os bytes de B).
+ * Incluir `sessionId`/`chatId` mantém o replay idempotente no MESMO dono e
+ * isola donos distintos — que também não compartilham diretório de destino.
  */
-export function artifactIdDe(entrada: { uploadId: string }): string {
-  const hex = createHash('sha256').update(`tentativa\u0000${entrada.uploadId}`).digest('hex')
+export function artifactIdDe(entrada: { sessionId: string; chatId: string; uploadId: string }): string {
+  const hex = createHash('sha256')
+    .update(`tentativa\u0000${entrada.sessionId}\u0000${entrada.chatId}\u0000${entrada.uploadId}`)
+    .digest('hex')
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
@@ -206,7 +211,7 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
   }
   const uploadId = entrada.uploadId && /^[0-9a-f-]{36}$/i.test(entrada.uploadId) ? entrada.uploadId : uuid
   // R1 — identidade do artefato = identidade da tentativa (estável no replay).
-  const artifactId = artifactIdDe({ uploadId })
+  const artifactId = artifactIdDe({ sessionId: entrada.sessionId, chatId: entrada.chatId, uploadId })
   // Raiz do projeto CANÔNICA (realpath): build e checagens usam a mesma forma,
   // e um link no caminho da raiz nunca é aceito como destino.
   const raizWorkspace = entrada.scope === 'workspace' && entrada.workspaceRoot

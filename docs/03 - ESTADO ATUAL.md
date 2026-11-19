@@ -1,3 +1,15 @@
+# Estado vigente — 19/11/2026 — C-3a: U1/U3 e U2 corrigidos após segundo reteste
+
+O reteste independente sobre `bb96389` aprovou o avanço (foco 202/202 no Windows, anexos 81/81, E2E 10/10, S01–S05 5/5) mas manteve dois bloqueios de dados e uma pendência de explicação. Corrigidos **somente na C-3a**, sem merge, sem C-3b e sem homologação.
+
+**U1** — a identidade do artefato derivava só do `uploadId` (fornecido pelo cliente) e o upsert global redirecionava a linha de outro dono: a conversa A passava a ler os bytes de B. `artifactIdDe` passou a incluir `sessionId`/`chatId` (replay idempotente no mesmo dono, donos isolados) e o `ON CONFLICT` ganhou `WHERE` de dono, para nunca redirecionar linha alheia. **U3** — falha ao gravar o progresso depois de materializar a cópia selava o plano e o retry devolvia mapa vazio com o arquivo pronto. Agora `adotarCopiaExistente` adota a cópia já publicada pelo mesmo `newId` (sem recopiar/inserir), `gravarProgresso` não propaga falha e o plano só é selado quando tudo está durável. **U2/W3** — o trace de `554f400` foi de **PUT**, não de GET: a resolução de dono rodava fora da fila, então uma publicação viva vencia a corrida e o PUT recebia 503 sem esperar. A resolução de escrita passou a rodar dentro da fila do próprio dono (o stream não fica na fila); pendência abandonada continua 503. O comentário que tratava `/content` como GET foi corrigido: o GET foi um problema real e distinto, já corrigido, mas não explica o PUT.
+
+Gates no Debian/Node 26.13.0: `reteste.test.ts` **12/12** (U1/U3 incorporados), anexos **78/78**, persistência **317 aprovados / 1 pulado**, foco **204/0/0**, ampla **2102 · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10 + C-1 6/6 + C-2 17/17**, tipos 0, lint dos alterados 0/0, build ✓ 41,0 s. Sondas **não reexecutadas** nesta rodada (registrado como não executado). **Windows não executado** aqui: os números Windows do revisor são de `bb96389` e não valem para o novo commit até reexecução; comando isolado e esperados na entrega extensa.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md`.
+
+---
+
 # Estado vigente — 19/11/2026 — C-3a: R1–R5 e W1/W2/W3 corrigidos após reteste REPROVADA
 
 O reteste independente sobre `554f400` reprovou a C-3a com cinco reprodutores (R1–R5) e três achados de plataforma/teste (W1–W3). As correções foram feitas **exclusivamente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.

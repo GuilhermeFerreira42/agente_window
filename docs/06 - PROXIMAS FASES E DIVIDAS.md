@@ -1,3 +1,13 @@
+# C-3a — dívidas e limites após U1/U3/U2 (19/11/2026)
+
+A C-3a foi corrigida após o segundo reteste, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.
+
+Dívidas abertas e honestas: (1) **validação Windows pendente sobre o novo commit** — os números Windows medidos pelo revisor (foco 202/202, anexos 81/81, E2E 10/10) são de `bb96389` e não valem para a rodada atual até reexecução; (2) **sondas não reexecutadas** nesta rodada — o runner canônico segue 10/13 por defeito de template e 13/13 na v2 do revisor; não são declaradas verdes aqui; (3) **decisão de política em U2** — escrita concorrente a uma publicação longa agora **espera** em vez de falhar rápido com 503; pendência abandonada continua 503 (`U2b`). Se a preferência for resposta imediata, é ajuste de política, não de correção; (4) **`artifactId` de tentativas novas muda** (o dono entra no hash); tentativas já publicadas continuam legíveis pelo id gravado, mas fixtures de desenvolvimento devem ser recriadas; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md`.
+
+---
+
 # C-3a — dívidas e limites após a correção de R1–R5/W1–W3 (19/11/2026)
 
 A C-3a foi corrigida após o reteste REPROVADA sobre `554f400`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.

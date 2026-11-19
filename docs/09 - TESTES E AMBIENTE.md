@@ -1,3 +1,25 @@
+# 19/11/2026 — C-3a U1/U3/U2: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <7 arquivos> --format json` | **0 erros / 0 avisos** |
+| Persistência | `vitest run …/session-persistence` | **317 aprovados · 1 pulado** |
+| Anexos | `vitest run …/attachments` | **78/78** (store 20, probes 19, reteste 12, routes 10, recovery 6, policy 6, lifecycle 5) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/31-foco` | **204 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/32-ampla` | **2102 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.0s |
+| Sondas | runner canônico / v2 do revisor | **não reexecutadas nesta rodada** (antes: 10/13 e 13/13) |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Foco e anexos se sobrepõem — não somar como únicos.
+
+**Windows:** não executado nesta rodada. Os números Windows do revisor (foco 202/202, anexos 81/81, E2E 10/10, S01–S05 5/5) são de `bb96389` e **não** se aplicam ao novo commit até reexecução; comando isolado e esperados em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md` (§5). Nada aqui atribui homologação ou execução Windows.
+
+---
+
 # 19/11/2026 — C-3a correção R1–R5/W1–W3: ambiente e gates (Linux/Debian, Node 26.13.0)
 
 Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.

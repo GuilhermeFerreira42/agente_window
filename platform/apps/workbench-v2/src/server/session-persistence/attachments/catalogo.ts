@@ -133,6 +133,12 @@ export function upsertArtigo(linha: LinhaArtigo): void {
       sha256 = excluded.sha256,
       message_id = COALESCE(excluded.message_id, attachment_artifacts.message_id),
       part_id = COALESCE(excluded.part_id, attachment_artifacts.part_id)
+    -- U1 — NUNCA redireciona a linha de outro dono. A identidade já inclui
+    -- dono, então este ramo só existe como cinto de segurança: se algum dia
+    -- duas origens colidirem, a linha existente (e seus bytes) permanece
+    -- intacta em vez de passar a apontar para o arquivo de terceiro.
+    WHERE attachment_artifacts.session_id = excluded.session_id
+      AND attachment_artifacts.chat_id = excluded.chat_id
   `).run(linha.artifactId, linha.sessionId, linha.chatId, linha.uploadId, linha.name, linha.modalidade, linha.papel,
     linha.mode, linha.locator, linha.rootKind, linha.workspaceRoot, linha.bytes, linha.sha256, linha.state,
     linha.messageId, linha.partId, linha.createdAt)

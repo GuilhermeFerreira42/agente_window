@@ -146,11 +146,22 @@ function progressoDoPlano(plano: LinhaPlano): ProgressoPlano {
   }
 }
 
-function gravarProgresso(recoveryId: string, progresso: ProgressoPlano): void {
-  emTransacao(() => {
-    getDatabase().prepare('UPDATE attachment_recovery_plans SET mapa = ? WHERE recovery_id = ?')
-      .run(JSON.stringify({ __itens: progresso }), recoveryId)
-  })
+/**
+ * Grava o progresso durável. U3 — devolve `false` quando a gravação falha, em
+ * vez de propagar: uma falha de PROGRESSO não pode apagar o que está no disco
+ * nem transformar um item materializado em "indisponível". O chamador decide
+ * (o recibo continua sendo derivado do que foi comprovado).
+ */
+function gravarProgresso(recoveryId: string, progresso: ProgressoPlano): boolean {
+  try {
+    emTransacao(() => {
+      getDatabase().prepare('UPDATE attachment_recovery_plans SET mapa = ? WHERE recovery_id = ?')
+        .run(JSON.stringify({ __itens: progresso }), recoveryId)
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Recibo derivado do progresso durável — mesma resposta para qualquer retry. */
@@ -307,6 +318,36 @@ export async function prepareRecovery(entrada: {
   }
 }
 
+/**
+ * U3 — reconhece a cópia já publicada por ESTA tentativa (mesmo `newId`, mesmo
+ * dono) e devolve o artifactId, sem copiar nem inserir de novo. Só aceita a
+ * adoção quando o artefato do destino pertence ao dono esperado e os bytes
+ * conferem com o hash da origem; qualquer divergência cai no fluxo normal.
+ */
+async function adotarCopiaExistente(
+  destino: { sessionId: string; chatId: string }, novoId: string, nome: string, shaOrigem: string,
+): Promise<string | null> {
+  const linha = obterUpload(destino.sessionId, destino.chatId, novoId)
+  if (!linha || !linha.artifactId || !linha.finalPath) return null
+  if (linha.state !== 'pronto' && linha.state !== 'preparado') return null
+  if (linha.digest && linha.digest !== shaOrigem) return null
+  const artigo = obterArtigo(linha.artifactId)
+  if (!artigo) return null
+  if (artigo.sessionId !== destino.sessionId || artigo.chatId !== destino.chatId) return null
+  if (artigo.sha256 && artigo.sha256 !== shaOrigem) return null
+  const medido = await hashDeArquivo(linha.finalPath).catch(() => null)
+  if (!medido || medido !== shaOrigem) return null
+  if (linha.state === 'preparado') {
+    // Publicado no disco mas não finalizado: conclui pelo mesmo caminho da
+    // publicação (recuperação de "publicado antes do commit"). Já sob a fila.
+    const recibo = await publicarPreparadoSemFila(destino.sessionId, destino.chatId, novoId).catch(() => null)
+    if (!recibo) return null
+    return recibo.artifactId
+  }
+  void nome
+  return artigo.artifactId
+}
+
 async function copiarItem(
   oldId: string, artigo: NonNullable<ReturnType<typeof obterArtigo>>,
   destino: { sessionId: string; chatId: string }, novoId: string, opcoes: OpcoesEstoque,
@@ -337,6 +378,14 @@ async function copiarItem(
   const nome = nomeSeguroArquivo(artigo.name, politica.maxNomeBytes)
   const finalPath = path.join(raizPrivadaChat(opcoes.appDir), destino.sessionId, destino.chatId, novoId, nome)
   const stagePath = caminhoStagePara(finalPath, novoId)
+
+  // U3 — RETOMADA da própria operação. Se a tentativa anterior materializou a
+  // cópia e só falhou ao gravar o recibo, a tentativa já existe no destino
+  // (linha do próprio dono + artefato pronto + bytes com o hash da origem).
+  // Nesse caso ADOTA-se o que está publicado; nunca se refaz INSERT/cópia nem
+  // se rebaixa o item a "indisponível".
+  const adotado = await adotarCopiaExistente(destino, novoId, nome, shaOrigem)
+  if (adotado) return adotado
   await mkdir(path.dirname(stagePath), { recursive: true })
   await copyFile(origemAbsoluta, stagePath)
   const shaCopia = await hashDeArquivo(stagePath)
@@ -433,6 +482,9 @@ export async function confirmRecovery(entrada: {
         await copiarItem(item.oldId, artigo, {
           sessionId: entrada.destinoSessionId, chatId: entrada.destinoChatId,
         }, newId, opcoes)
+        // A cópia ESTÁ no destino: o recibo desta execução a inclui mesmo que a
+        // gravação durável falhe (U3). O retry a adota pelo mesmo `newId`.
+        delete progresso[item.oldId]?.motivo
         progresso[item.oldId] = { newId, consumidoEm: Date.now() }
         gravarProgresso(atual.recoveryId, progresso)
       } catch (erro) {
@@ -448,10 +500,22 @@ export async function confirmRecovery(entrada: {
     }
 
     const recibo = reciboDoProgresso(atual.recoveryId, itens, progresso)
-    emTransacao(() => {
-      getDatabase().prepare("UPDATE attachment_recovery_plans SET state = 'consumido', mapa = ? WHERE recovery_id = ?")
-        .run(JSON.stringify({ __itens: progresso }), atual.recoveryId)
-    })
+    // U3 — o plano só é selado quando TODOS os itens do plano estão duráveis.
+    // Se a gravação do progresso falhou, o plano permanece `preparado` e o
+    // retry retoma pelo mesmo `newId` (adotando a cópia já materializada).
+    const completo = itens.every((item) => !item.disponivel
+      || (progresso[item.oldId]?.consumidoEm && progresso[item.oldId]?.newId))
+    if (completo && gravarProgresso(atual.recoveryId, progresso)) {
+      try {
+        emTransacao(() => {
+          getDatabase().prepare("UPDATE attachment_recovery_plans SET state = 'consumido', mapa = ? WHERE recovery_id = ?")
+            .run(JSON.stringify({ __itens: progresso }), atual.recoveryId)
+        })
+      } catch {
+        // Selo falhou: plano segue retomável; o recibo devolvido continua
+        // refletindo o que foi comprovadamente materializado.
+      }
+    }
     return { recoveryId: atual.recoveryId, ...recibo }
   })
 }
