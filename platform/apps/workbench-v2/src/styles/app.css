@@ -5495,3 +5495,204 @@ svg {
   outline: 1px dashed var(--vscode-focusBorder);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   C-3b — apresentação multimodal (cards de artefato e diálogo).
+   Só tokens do tema: nada de cor fixa, para claro/escuro funcionarem sem
+   uma segunda folha de estilo.
+   ========================================================================== */
+
+.artifact-card {
+  max-width: 100%;
+  min-width: 0;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: var(--vscode-strokeThickness) solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-small);
+  background: var(--vscode-editorWidget-background);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.artifact-card-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label2);
+}
+
+.artifact-card-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
+
+.artifact-card-meta {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+.artifact-card-acoes {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.artifact-card-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border: var(--vscode-strokeThickness) solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-small);
+  background: transparent;
+  color: var(--vscode-foreground);
+  font-size: var(--vscode-fontSize-label2);
+  cursor: pointer;
+}
+
+.artifact-card-botao:hover,
+.artifact-card-botao:focus-visible {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.artifact-card-botao-texto {
+  padding: 2px 8px;
+  border: var(--vscode-strokeThickness) solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-small);
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font-size: var(--vscode-fontSize-label2);
+  cursor: pointer;
+}
+
+/* Miniatura contida na coluna: nunca estoura a largura da conversa. */
+.artifact-card-imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--vscode-cornerRadius-small);
+}
+
+.artifact-card-video {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: var(--vscode-cornerRadius-small);
+}
+
+.artifact-card-midia {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.artifact-card-midia audio {
+  width: 100%;
+  max-width: 360px;
+}
+
+.artifact-card-estado-midia {
+  font-size: var(--vscode-fontSize-label2);
+  color: var(--vscode-descriptionForeground);
+}
+
+.artifact-card-motivo {
+  margin: 0;
+  font-size: var(--vscode-fontSize-label2);
+  color: var(--vscode-descriptionForeground);
+}
+
+.artifact-card-fallback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border: var(--vscode-strokeThickness) dashed var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-small);
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label2);
+}
+
+.message-part-diagnostico {
+  margin: 4px 0;
+  padding: 4px 6px;
+  border-left: 2px solid var(--vscode-editorWarning-foreground);
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-fontSize-label2);
+}
+
+/* Diálogo ampliado (role=dialog): fundo escurecido + alvo de clique para fechar. */
+.midia-dialogo-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+}
+
+.midia-dialogo {
+  max-width: min(90vw, 900px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+  border: var(--vscode-strokeThickness) solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-medium);
+  background: var(--vscode-editorWidget-background);
+  color: var(--vscode-foreground);
+}
+
+.midia-dialogo-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.midia-dialogo-cabecalho .artifact-card-nome {
+  flex: 1 1 auto;
+}
+
+.midia-dialogo-corpo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.midia-dialogo-imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.midia-dialogo-video {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+/* Janela pequena (800×600): cards não cortam composer nem mensagens. */
+@media (max-width: 900px), (max-height: 650px) {
+  .artifact-card-imagem { max-height: 160px; }
+  .artifact-card-video { max-height: 180px; }
+  .midia-dialogo-fundo { padding: 8px; }
+  .midia-dialogo { max-width: 96vw; max-height: 94vh; }
+}

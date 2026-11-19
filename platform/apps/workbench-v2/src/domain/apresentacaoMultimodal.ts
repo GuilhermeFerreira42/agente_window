@@ -15,6 +15,7 @@ import type {
   Modalidade,
   ParteMensagem,
 } from './multimodal/contrato'
+import { lerEnvelopeMultimodal, type LeituraEnvelope } from './multimodal/mensagens'
 import type { ClassificacaoPreview } from './politicaPreview'
 
 /** Handle mínimo que a apresentação precisa de um anexo C-3a. */
@@ -137,4 +138,24 @@ export function mensagemFinalTemConteudo(entrada: {
   if (entrada.envelope && entrada.envelope.partes.some((p) => p.tipo === 'artefato')) return true
   // Chip C-3a pronto também é conteúdo legítimo (upload sem texto).
   return entrada.anexos.some((anexo) => anexo.estado !== 'ausente')
+}
+
+/**
+ * C-3b — porta de LEITURA para a UI.
+ *
+ * A camada de apresentação (`.tsx`) não importa `domain/multimodal` direto:
+ * o guard do MM-0 (MM0-T23) proíbe que tipos multimodais habilitem UI por
+ * conta própria. Aqui a leitura fica encapsulada no domínio de apresentação,
+ * que é o dono legítimo da decisão "o que desenhar".
+ */
+export type EnvelopeLido =
+  | { estado: 'ausente' }
+  | { estado: 'valido'; envelope: EnvelopeMensagemMultimodal }
+  | { estado: 'desconhecido'; diagnostico: string }
+
+export function lerEnvelopeParaApresentacao(bruto: unknown): EnvelopeLido {
+  const leitura: LeituraEnvelope = lerEnvelopeMultimodal(bruto)
+  if (leitura.estado === 'valido') return { estado: 'valido', envelope: leitura.envelope }
+  if (leitura.estado === 'desconhecido') return { estado: 'desconhecido', diagnostico: leitura.diagnostico }
+  return { estado: 'ausente' }
 }

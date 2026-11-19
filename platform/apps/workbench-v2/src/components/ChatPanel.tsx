@@ -18,12 +18,12 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
 import { MessageParts } from './MessageParts'
 import {
+  lerEnvelopeParaApresentacao,
   montarApresentacao,
   type CardArtefato,
   type ItemApresentacao,
 } from '../domain/apresentacaoMultimodal'
 import { classificarPreview } from '../domain/politicaPreview'
-import { lerEnvelopeMultimodal } from '../domain/multimodal/mensagens'
 import { baixarArtefato, urlDeMidia } from '../services/sessions/artefatosMediaClient'
 import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
@@ -234,7 +234,7 @@ function itensDaMensagem(mensagem: ChatMessage): {
   envelopeValido: boolean
   diagnostico?: string
 } {
-  const leitura = lerEnvelopeMultimodal(mensagem.multimodal)
+  const leitura = lerEnvelopeParaApresentacao(mensagem.multimodal)
   // Só usa o caminho novo quando o envelope é VÁLIDO; qualquer outro estado
   // cai no legado, que já funciona (inclusive `desconhecido`, com diagnóstico).
   const envelope = leitura.estado === 'valido' ? leitura.envelope : undefined
