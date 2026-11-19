@@ -20,6 +20,8 @@ Gates no Debian/Node 26.13.0: `ajustes.test.ts` **5/5** (A1/A2 vermelhos antes),
 
 Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/ajustes-usabilidade/ENTREGA_C3A_AJUSTES.md`.
 
+**Arrumação do workspace (19/11):** ~1,65 GB liberados — perfis efêmeros de teste, saídas de gate, dois worktrees já contidos na história e `node_modules` versionado dentro do snapshot P-A da memória. Evidências JSON dos gates finais preservadas em `memoria-de-projeto/C-3a/ajustes-usabilidade/evidencias/`. Detalhe do que saiu e do que ficou: `…/ajustes-usabilidade/ARRUMACAO_WORKSPACE.md`. `git status` limpo antes e depois; nenhum artefato de produto afetado.
+
 # Estado vigente — 19/11/2026 — C-3a: U4 corrigido; correções anteriores confirmadas
 
 A revisão independente de `b5cb48d` confirmou U1, U2/W3 e U3 (e manteve foco 204/204, anexos 85/85 e E2E 10/10 no Windows) e apontou **um** bloqueio de recuperação: **U4**. Corrigido **somente na C-3a**, sem merge, sem C-3b e sem homologação.
