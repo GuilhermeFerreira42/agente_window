@@ -40,6 +40,11 @@ export function projetarMensagemPersistida(mensagem: ChatMessage): ChatMessage {
       referencia: anexo.referencia,
       legado: anexo.legado,
     })),
+    // C-3b — o envelope multimodal PRECISA atravessar a projeção. Sem esta
+    // linha o campo é descartado silenciosamente ao gravar/restaurar, e a
+    // mensagem reabriria sem ordem de partes (provado em c3bMensagens).
+    // Só metadados: IDs, ordem e modalidade — nunca bytes/URL/path.
+    multimodal: mensagem.multimodal,
     ferramentas: mensagem.ferramentas?.map(ferramentaPersistida),
     continuar: mensagem.continuar?.map(({ id, status, iteracoes, teto, ordem }) => ({ id, status, iteracoes, teto, ordem })),
   }

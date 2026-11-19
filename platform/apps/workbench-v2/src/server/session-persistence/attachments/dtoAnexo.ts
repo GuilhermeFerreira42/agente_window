@@ -3,7 +3,7 @@
 import path from 'node:path'
 import type { LinhaArtigo } from './schemaAnexos'
 import { getAppDir } from '../paths'
-import { lerArtigo } from './estoque'
+import { caminhoAbsolutoDeArtigo, lerArtigo } from './estoque'
 
 export interface AnexoSeguro {
   artifactId: string
@@ -18,10 +18,8 @@ export interface AnexoSeguro {
 }
 
 export async function caminhoAbsolutoArtigo(artigo: LinhaArtigo): Promise<string> {
-  if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
-    return path.resolve(artigo.workspaceRoot, artigo.locator)
-  }
-  return path.join(getAppDir(), 'uploads', artigo.locator)
+  // C-3b — delega à resolução ÚNICA (uploads, project copy e artifacts/).
+  return caminhoAbsolutoDeArtigo(artigo)
 }
 
 export async function projetarArtigoSeguro(artigo: LinhaArtigo): Promise<AnexoSeguro> {

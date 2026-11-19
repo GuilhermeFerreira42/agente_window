@@ -6,6 +6,7 @@ import { getDatabase } from '../database'
 import { PersistenceProblem } from '../persistenceErrors'
 import { obterArtigo, obterUpload } from './catalogo'
 import { validarSchemaAnexos } from './schemaAnexos'
+import { lerEnvelopeMultimodal, validarMensagemMultimodal } from '../../../domain/multimodal/mensagens'
 
 function exigirArtigoBackeado(sessionId: string, chatId: string, artifactId: string, claim: { bytes?: number; sha256?: string }): void {
   const artigo = obterArtigo(artifactId)
@@ -27,6 +28,44 @@ function exigirArtigoBackeado(sessionId: string, chatId: string, artifactId: str
 }
 
 /**
+ * C-3b (T02/T03/T10) — valida o envelope multimodal de uma mensagem contra o
+ * ledger do dono.
+ *
+ * Por que aqui: `attachments` é a lista de chips; o envelope é a ORDEM
+ * canônica. Se as partes não passarem pela mesma autoridade, um cliente
+ * poderia citar um `artifactId` de outro dono — ou inexistente — e a UI
+ * tentaria resolver bytes que ele não possui.
+ *
+ * Escrita inválida (versão errada, partId duplicado, artefato sem lastro)
+ * falha. Envelope de versão FUTURA desconhecida é preservado e não bloqueia:
+ * descartar seria perda de dados de uma conversa já gravada.
+ */
+function validarEnvelopeDaMensagem(sessionId: string, chatId: string, mensagem: ChatMessage): void {
+  const bruto = (mensagem as ChatMessage & { multimodal?: unknown }).multimodal
+  const leitura = lerEnvelopeMultimodal(bruto)
+  if (leitura.estado !== 'valido') return
+
+  const envelope = leitura.envelope
+  if (envelope.messageId !== mensagem.id) {
+    throw new PersistenceProblem(409, 'multimodal_message_mismatch',
+      'O envelope multimodal não corresponde a esta mensagem. Nada foi publicado com esse conteúdo.')
+  }
+  // Revalidação explícita: `lerEnvelopeMultimodal` já validou, mas a fronteira
+  // de escrita precisa do erro estruturado, não de um caminho tolerante.
+  const revalidado = validarMensagemMultimodal(bruto)
+  if (!revalidado.ok) {
+    throw new PersistenceProblem(409, 'multimodal_invalid',
+      `O envelope multimodal desta mensagem é inválido (${revalidado.codigo}). Nada foi publicado.`)
+  }
+  for (const parte of envelope.partes) {
+    if (parte.tipo !== 'artefato') continue
+    // `exigirArtigoBackeado` já garante dono + pronto + hash quando há claim;
+    // aqui a claim é vazia porque a parte não carrega bytes.
+    exigirArtigoBackeado(sessionId, chatId, parte.artifactId, {})
+  }
+}
+
+/**
  * Enriquece a sessão projetada com a verdade do ledger e recusa DTOs
  * forjados. Regras:
  *  - claim de `pronto`/`referencia` exige artefato publicado do dono;
@@ -42,6 +81,9 @@ export function validarAnexosPublicados(sessionId: string, session: Session): Se
     chats: session.chats.map((chat) => ({
       ...chat,
       messages: chat.messages.map((mensagem: ChatMessage): ChatMessage => {
+        // Antes do early-return: mensagem SÓ com partes (sem chips) também
+        // precisa passar pela autoridade do ledger.
+        validarEnvelopeDaMensagem(sessionId, chat.id, mensagem)
         if (!mensagem.attachments?.length) return mensagem
         return {
           ...mensagem,

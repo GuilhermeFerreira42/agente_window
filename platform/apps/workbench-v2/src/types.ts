@@ -1,3 +1,4 @@
+import type { EnvelopeMensagemMultimodal } from './domain/multimodal/contrato'
 import type { FerramentaEntreChats, FonteEntreChats, EscolhaEntreChats } from './domain/consultaEntreChats'
 export type SessionStatus = 'untitled' | 'working' | 'needs-input' | 'completed' | 'error'
 export type SessionSection = 'pinned' | 'today' | 'yesterday' | 'lastWeek' | 'older' | 'archived'
@@ -48,6 +49,12 @@ export interface ChatMessage {
   erro?: boolean
   vote?: ChatVote
   reported?: boolean
+  /**
+   * C-3b (R07) — envelope MM-0 com a ORDEM canônica de partes (texto e
+   * artefatos). Aditivo e opcional: mensagens da C-3a continuam sem ele e a
+   * apresentação cai no adapter legado. `multimodal.messageId === id`.
+   */
+  multimodal?: EnvelopeMensagemMultimodal
   /** Cartões de ferramenta do agente (FATIA 10) — presos a esta resposta. */
   ferramentas?: FerramentaNoChat[]
   /** Cartões "continuar?" do teto (FATIA 11) — presos a esta resposta. */

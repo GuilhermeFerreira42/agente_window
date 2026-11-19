@@ -746,6 +746,28 @@ export interface ArtigoServivel {
 }
 
 /**
+ * C-3b — caminho absoluto de QUALQUER artefato do ledger, por raiz declarada.
+ *
+ * Antes desta função havia duas fórmulas (upload privado e cópia de projeto) e
+ * cada consumidor repetia uma delas. Com a saída gerenciada existe uma terceira
+ * (`artifacts/`), então a resolução passa a ser UM lugar só — resolver, DTO,
+ * limpeza e reconciliação chamam isto em vez de montar path por conta própria.
+ *
+ * `rootKind` continua sendo a autoridade: `workspace` = território do usuário;
+ * `appdir` cobre upload privado (`uploads/…`) e gerado (`artifacts/…`).
+ */
+export function caminhoAbsolutoDeArtigo(
+  artigo: { rootKind: 'appdir' | 'workspace'; workspaceRoot: string | null; locator: string; papel?: string },
+  appDir?: string,
+): string {
+  if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
+    return path.resolve(artigo.workspaceRoot, artigo.locator)
+  }
+  const base = artigo.papel === 'gerado-gerenciado' ? 'artifacts' : 'uploads'
+  return path.join(raiz(appDir), base, artigo.locator)
+}
+
+/**
  * Resolve os bytes do artefato para o dono com a MESMA validação da metadata
  * (R08/R09/B07): contenção de pais, presença, tamanho E hash. Referência
  * alterada não é servida — 409 `reference_changed` honesto, nunca bytes novos
@@ -754,9 +776,7 @@ export interface ArtigoServivel {
 export async function lerArtigo(artifactId: string): Promise<ArtigoServivel> {
   const artigo = obterArtigo(artifactId)
   if (!artigo) throw new PersistenceProblem(404, 'attachment_not_found', 'Artefato não encontrado.')
-  const absoluto = artigo.rootKind === 'workspace' && artigo.workspaceRoot
-    ? path.resolve(artigo.workspaceRoot, artigo.locator)
-    : path.join(raiz(undefined), 'uploads', artigo.locator)
+  const absoluto = caminhoAbsolutoDeArtigo(artigo)
   if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
     await garantirDentroDaRaiz(artigo.workspaceRoot, absoluto, {
       code: 'reference_out_of_scope',
