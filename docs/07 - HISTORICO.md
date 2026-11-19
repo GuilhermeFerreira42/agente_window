@@ -1,3 +1,9 @@
+# 19/11/2026 — registro do aceite humano da C-3a
+
+Proprietário informou pull concluído e processo homologado após os ajustes da Arena (`693051a` e `a49cc6c`). Conferidos HEAD, árvore inicialmente limpa e presença do nome original no destino/checkbox na landing. Aceite registrado em `08`, estado/limites em `03`/`06`/`09`. Nenhuma implementação, teste automatizado, commit, push, merge ou início da C-3b nesta rodada. A revisão Windows anterior cobriu `8af269e`; os gates Debian da usabilidade são relatados pela Arena e não foram tratados como execução local.
+
+---
+
 # 19/11/2026 — C-3a: ajustes de usabilidade (nome original + opção na tela inicial)
 
 Dois ajustes de usabilidade pedidos antes da homologação. **Ajuste 1:** a cópia explícita no projeto passa a preservar o nome original (`uploads/relatorio final.txt`) em vez de `<artifactId>-<nome>`; colisão vira `arquivo (1).ext` na publicação, sem sobrescrever, e arquivos já existentes **não** foram renomeados. Reprodução vermelha antes em `ajustes.test.ts` A1/A2 (e nos dois casos de `lifecycle.test.ts` que replicavam a fórmula antiga — agora leem o caminho do produto). **Ajuste 2:** a landing ganhou o checkbox "Salvar cópia na pasta do projeto", desmarcado por padrão, só com Pasta selecionada, respeitado no primeiro envio e preservado na retentativa pelo estado do anexo (`modoCopia`). Gates Linux/Node 26.13.0: ajustes 5/5, SessionLanding 18/18, anexos 79/79, persistência 321/1 pulado, foco 207/0/0, ampla 2111 (3 nominais, 33 pulados), E2E C-3a 15/15 + C-1 6/6 + C-2 17/17, tipos 0, lint dos alterados 0/0, build ok. Sondas não reexecutadas; Windows não executado nesta rodada. Sem merge, sem C-3b, sem homologação; `08` intacto.

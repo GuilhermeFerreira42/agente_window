@@ -1,3 +1,15 @@
+# Homologação C-3a — aceite explícito do proprietário, 19/11/2026
+
+**O proprietário declarou: “Eu já fiz o pull e já homologuei o processo.”** Aceite da C-3a, incluindo os ajustes de nome original na cópia do projeto e opção “Salvar cópia na pasta do projeto” na tela inicial. Versão local conferida: `a49cc6c`, após `693051a`, na branch `0f2e5de2-agente-window`.
+
+Proveniência: homologação humana relatada pelo proprietário no Windows. Durante o roteiro anterior, confirmou arquivo baixado idêntico ao original, persistência do anexo e preservação da cópia explícita em `uploads/` após excluir a conversa. Solicitou então os dois ajustes de usabilidade; após receber a reentrega e fazer pull, declarou o aceite acima. Não se atribui ao proprietário uma execução automatizada nem cenários adicionais que não descreveu.
+
+Limites preservados: C-3a armazena e disponibiliza anexos para download; não envia o conteúdo ao modelo sem codec, não gera mídia e não implementa C-3b. O LightLLM foi mantido desligado intencionalmente no ensaio anterior; o aviso de indisponibilidade da IA não indica falha de armazenamento. Testes técnicos e versões cobertas estão em `09`.
+
+Sem aceite de outras fatias por consequência, sem merge ou autorização automática para iniciar C-3b. Este registro não é autorização de commit/push. Entradas abaixo são históricas.
+
+---
+
 # Homologação MM-0 — aceite explícito do proprietário, 16/11/2026
 
 **O proprietário declarou a MM-0 homologada nesta conversa e autorizou registrar o aceite e fazer push para a branch de trabalho 0f2e5de2-agente-window.** Alcance: contratos neutros multimodais e compatibilidade textual implementados até d1dd69d, com a correção pontual de transporte sem ferramentas em **055bbd4**. Publicação sem merge na base e sem autorização automática para a próxima fatia.

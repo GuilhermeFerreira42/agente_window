@@ -1,3 +1,13 @@
+# Estado vigente — 19/11/2026 — C-3a homologada pelo proprietário
+
+O proprietário informou que já fez pull e homologou o processo. HEAD local `a49cc6c` (`693051a` + evidência E13 em `a49cc6c`), branch `0f2e5de2-agente-window`. Aceite registrado em `08`: inclui nome original da cópia no projeto com sufixo em colisão e opção de cópia na landing; armazenamento privado segue padrão, arquivos antigos não são renomeados. Código e presença dos dois ajustes conferidos nesta sessão; sem mudança de implementação.
+
+Proveniência das verificações: revisão independente Windows de `8af269e` aprovada (foco 204/204, anexos+borda 86/86, sondas 9/9 e 13/13, E2E C-3a 10/10 + C-1 6/6 + C-2 17/17, tipos/lint/build exit 0). Na reentrega de usabilidade, números Debian são da Arena: foco 207/0/0, ampla 2111 aprovados + 3 nominais + 33 pulados, E2E C-3a 15/15, C-1 6/6 e C-2 17/17. **Automação Windows não reexecutada neste HEAD pelo Codex**; o aceite atual é relato humano do proprietário, não extensão dos números de `8af269e` à versão nova.
+
+C-3b segue não iniciada e depende de autorização própria. Sem merge, commit ou push nesta rodada de registro. Limites de codecs e dívidas fora da C-3a permanecem; estados anteriores abaixo são históricos.
+
+---
+
 # Estado vigente — 19/11/2026 — C-3a: ajustes de usabilidade (nome original + opção na tela inicial)
 
 Dois ajustes pedidos **antes da homologação**, ambos só na C-3a: sem merge, sem C-3b, sem homologação automática.

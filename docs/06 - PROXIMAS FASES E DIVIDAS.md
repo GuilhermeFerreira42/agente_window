@@ -1,3 +1,11 @@
+# C-3a — encerramento por homologação humana, 19/11/2026
+
+C-3a homologada explicitamente pelo proprietário após pull da reentrega de usabilidade (HEAD local `a49cc6c`); aceite em `08`, estado e proveniência em `03`/`09`. Opção de cópia na landing e nome original em `uploads/` entregues, sem sobrescrever colisões e sem renomear arquivos antigos. Não há pendência de aceite humano da C-3a no estado vigente.
+
+A automação Windows da última mudança de usabilidade não foi reexecutada pelo Codex; números locais de `8af269e` não são prova automatizada de `a49cc6c`. Isso permanece como limite da evidência, sem desfazer o aceite informado. C-3b é a próxima etapa desta frente, ainda sem autorização de implementação. Codecs/MM-I/MM-O, C1-EXCLUSAO-01 e demais frentes continuam separados. Entradas abaixo preservam o histórico das rodadas, não reabrem o aceite atual.
+
+---
+
 # C-3a — dívidas e limites após U4 (19/11/2026)
 
 A C-3a foi corrigida após a revisão de `b5cb48d`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.

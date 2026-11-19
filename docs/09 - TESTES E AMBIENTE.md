@@ -1,3 +1,15 @@
+# 19/11/2026 — proveniência no encerramento humano da C-3a
+
+Aceite humano informado pelo proprietário após pull, HEAD local `a49cc6c`; registro em `08`. **Nenhum teste automatizado reexecutado nesta rodada documental.** Código dos dois ajustes conferido; sem implementação local.
+
+- **Executado pelo Codex no Windows em `8af269e`:** foco 204/204, anexos 79/79 + fronteira HTTP 7/7, sondas independentes 9/9 e 13v2 13/13, E2E C-3a 10/10, C-1 6/6, C-2 17/17; tipos, lint dos alterados e build exit 0. Ampla não repetida. Evidência externa: `memoria-de-projeto/validacao-c3a-8af269e-2026-11-19/` (raiz operacional acordada, fora do repositório).
+- **Relatado pela Arena na reentrega de usabilidade até `a49cc6c`, Debian/Node 26.13.0:** A1–A5 5/5, SessionLanding 18/18, persistência 321 aprovados/1 pulado, foco 207/0/0, ampla 2111 aprovados/3 nominais/33 pulados, E2E C-3a 15/15 + C-1 6/6 + C-2 17/17, tipos 0, lint dos alterados 0/0 e build aprovado. Não foi execução Windows; sondas independentes não repetidas pela Arena nessa rodada.
+- **Relato humano:** testes de anexar/baixar/preservar e aceite da reentrega, conforme `08`. Não converte a automação de `8af269e` em automação da versão posterior, nem comprova codecs/geração/IA ligada.
+
+Os registros anteriores de “Windows pendente” referem-se às versões e rodadas ali descritas. A última mudança de usabilidade tem aceite humano, com automação local não repetida declarada. Sem merge ou avanço automático para C-3b.
+
+---
+
 ## Rodada 19/11/2026 — ajustes de usabilidade da C-3a (Linux/Node 26.13.0)
 
 | Suíte | Comando | Resultado |
