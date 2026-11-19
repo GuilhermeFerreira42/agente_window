@@ -1,3 +1,13 @@
+# C-3a — dívidas e limites após U4 (19/11/2026)
+
+A C-3a foi corrigida após a revisão de `b5cb48d`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.
+
+Dívidas abertas e honestas: (1) **validação Windows pendente sobre o novo commit** — os números da revisão (foco 204/204, anexos 85/85, E2E 10/10, oito reprodutores 8/8) são de `b5cb48d`; (2) **E2E C-1/C-2 e sondas não reexecutados** nesta rodada — não são declarados verdes; (3) **política de espera em U2 mantida** por recomendação da revisão (escrita concorrente a publicação longa espera); mudar para falha imediata exigiria tratamento explícito de draft/retomada e é escolha separada; (4) **`artifactId` de tentativas novas muda** com o dono no hash; tentativas já publicadas continuam legíveis pelo id gravado, mas fixtures de desenvolvimento devem ser recriadas; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md`.
+
+---
+
 # C-3a — dívidas e limites após U1/U3/U2 (19/11/2026)
 
 A C-3a foi corrigida após o segundo reteste, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.

@@ -1,3 +1,15 @@
+# Estado vigente — 19/11/2026 — C-3a: U4 corrigido; correções anteriores confirmadas
+
+A revisão independente de `b5cb48d` confirmou U1, U2/W3 e U3 (e manteve foco 204/204, anexos 85/85 e E2E 10/10 no Windows) e apontou **um** bloqueio de recuperação: **U4**. Corrigido **somente na C-3a**, sem merge, sem C-3b e sem homologação.
+
+**U4** — a reserva **inicial** do `newId` ignorava o retorno de `gravarProgresso` antes de `copiarItem`: se a primeira gravação falhasse, a cópia era materializada sem vínculo durável no plano e, após reabrir o banco, o retry sorteava outro `newId` e **duplicava o arquivo**. Agora o chamador distingue as duas fronteiras: reserva inicial **indispensável** (falhou e o id não veio do plano → `503 recovery_progress_pending`, nada copiado) e atualização posterior **recuperável** (id já persistido → a cópia prossegue e é adotada no retry, como em U3). A procedência do id é a própria prova de durabilidade — sem flag nova, fila, tabela ou job.
+
+Gates no Debian/Node 26.13.0: `reteste.test.ts` **13/13** (U4 incorporado), anexos **79/79**, persistência **318 aprovados / 1 pulado**, foco **204/0/0**, ampla **2103 · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10**, tipos 0, lint dos alterados 0/0, build ✓ 41,8 s. E2E C-1/C-2 e sondas **não reexecutados** nesta rodada (registrado como não executado). **Windows não executado** aqui: os números Windows da revisão são de `b5cb48d` e não valem para o novo commit até reexecução.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md`.
+
+---
+
 # Estado vigente — 19/11/2026 — C-3a: U1/U3 e U2 corrigidos após segundo reteste
 
 O reteste independente sobre `bb96389` aprovou o avanço (foco 202/202 no Windows, anexos 81/81, E2E 10/10, S01–S05 5/5) mas manteve dois bloqueios de dados e uma pendência de explicação. Corrigidos **somente na C-3a**, sem merge, sem C-3b e sem homologação.

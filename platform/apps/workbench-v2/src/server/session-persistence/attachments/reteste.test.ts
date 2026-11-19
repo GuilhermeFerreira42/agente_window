@@ -394,6 +394,45 @@ describe('C-3a U — achados do reteste bb96389', () => {
     expect(b.artifactId).not.toBe(a.artifactId)
   })
 
+  it('U4 — falha no registro INICIAL do newId não pode materializar cópia sem vínculo durável', async () => {
+    const origem = await enviar(SID, CID, '88888888-1111-4111-8111-111111111111', 'u4.bin', 'CCC')
+    await writeTranscript(SID, SID, [{
+      type: 'user', chatId: CID, uuid: 'm-u4', timestamp: 1,
+      message: {
+        id: 'm-u4', role: 'user', content: 'arquivo', time: '00:00',
+        attachments: [{ id: origem.artifactId, artifactId: origem.artifactId, name: 'u4.bin', kind: 'local', estado: 'pronto' }],
+      },
+    }] as never)
+    const plano = await prepareRecovery({ origemSessionId: SID, destinoSessionId: DEST, destinoChatId: DCID })
+    const entrada = { destinoSessionId: DEST, destinoChatId: DCID, recoveryId: plano.recoveryId, token: plano.token }
+
+    // Trigger recusa QUALQUER gravação de progresso (inclusive a do newId).
+    const db = getDatabase()
+    db.exec(`CREATE TRIGGER recusa_progresso_u4 BEFORE UPDATE OF mapa ON attachment_recovery_plans
+             BEGIN SELECT RAISE(ABORT, 'falha sintética no progresso'); END;`)
+    await confirmRecovery(entrada).catch(() => undefined)
+
+    // Sem identidade durável no plano, NENHUMA cópia pode ter sido criada.
+    const planoApos = db.prepare('SELECT mapa FROM attachment_recovery_plans WHERE recovery_id = ?')
+      .get(plano.recoveryId) as { mapa: string | null } | undefined
+    expect(planoApos?.mapa ?? null).toBeNull()
+    expect(listarArtigosChat(DEST, DCID).filter((artigo) => artigo.name === 'u4.bin')).toHaveLength(0)
+
+    // Remove a falha, reabre a conexão e retenta: exatamente UMA cópia, e um
+    // segundo retry devolve o MESMO recibo (nenhuma duplicata tardia).
+    db.exec('DROP TRIGGER recusa_progresso_u4')
+    resetDatabase()
+    const retry = await confirmRecovery(entrada)
+    expect(retry.mapa).toHaveLength(1)
+    expect(retry.indisponiveis).toHaveLength(0)
+    const copias = listarArtigosChat(DEST, DCID).filter((artigo) => artigo.name === 'u4.bin')
+    expect(copias).toHaveLength(1)
+
+    const retry2 = await confirmRecovery(entrada)
+    expect(retry2.mapa).toEqual(retry.mapa)
+    expect(listarArtigosChat(DEST, DCID).filter((artigo) => artigo.name === 'u4.bin')).toHaveLength(1)
+  })
+
   it('U3 — progresso falho depois da materialização é retomado sem item falso indisponível', async () => {
     const origem = await enviar(SID, CID, '99999999-1111-4111-8111-111111111111', 'origem.bin', 'AAA')
     await writeTranscript(SID, SID, [{

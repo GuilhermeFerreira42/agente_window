@@ -1,3 +1,26 @@
+# 19/11/2026 — C-3a U4: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; trigger SQLite para falha determinística; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <arquivos> --format json` | **0 erros / 0 avisos** |
+| Persistência | `vitest run …/session-persistence` | **318 aprovados · 1 pulado** |
+| Anexos | `vitest run …/attachments` | **79/79** (store 20, probes 19, reteste 13, routes 10, recovery 6, policy 6, lifecycle 5) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/41-foco` | **204 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/42-ampla` | **2103 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E C-3a | `sh platform/scripts/e2e-c3a.sh` | **10/10** |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.8s |
+| E2E C-1/C-2 | — | **não reexecutados** (última execução `b5cb48d`: 6/6, 17/17) |
+| Sondas | — | **não reexecutadas** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Foco e anexos se sobrepõem — não somar.
+
+**Windows:** não executado nesta rodada. Os números Windows da revisão são de `b5cb48d` e não se aplicam ao novo commit até reexecução; comando isolado e esperados em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md` (§4). Nada aqui atribui homologação ou execução Windows.
+
+---
+
 # 19/11/2026 — C-3a U1/U3/U2: ambiente e gates (Linux/Debian, Node 26.13.0)
 
 Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; nenhuma API externa nem dado pessoal.

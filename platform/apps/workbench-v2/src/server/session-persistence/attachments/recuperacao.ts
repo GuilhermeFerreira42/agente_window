@@ -474,9 +474,26 @@ export async function confirmRecovery(entrada: {
 
       // Identidade de cópia estável: sorteada uma vez e GRAVADA antes de
       // materializar; um retry após reinício reusa o mesmo id.
-      const newId = progresso[item.oldId]?.newId ?? randomUUID()
+      // A procedência do id É a prova de durabilidade: `progresso` foi lido do
+      // plano no banco agora, então um `newId` presente nele já foi gravado
+      // numa execução anterior (inclusive por versão anterior a esta).
+      const newIdPersistido = progresso[item.oldId]?.newId
+      const newId = newIdPersistido ?? randomUUID()
+      const identidadeJaDuravel = Boolean(newIdPersistido)
       progresso[item.oldId] = { ...progresso[item.oldId], newId }
-      gravarProgresso(atual.recoveryId, progresso)
+      if (!gravarProgresso(atual.recoveryId, progresso)) {
+        // U4 — a RESERVA INICIAL da identidade é indispensável: sem ela, uma
+        // resposta perdida faria o retry sortear outro `newId` e materializar
+        // uma SEGUNDA cópia. Falhar aqui (antes de copiar) mantém plano e
+        // artefatos intactos e é recuperável no retry.
+        if (!identidadeJaDuravel) {
+          delete progresso[item.oldId]
+          throw new PersistenceProblem(503, 'recovery_progress_pending',
+            'A identidade desta cópia ainda não pôde ser registrada. Nada foi copiado; repita a confirmação em instantes.')
+        }
+        // Já registrada em tentativa anterior: a cópia pode prosseguir e ser
+        // adotada no retry (fluxo U3).
+      }
 
       try {
         await copiarItem(item.oldId, artigo, {
