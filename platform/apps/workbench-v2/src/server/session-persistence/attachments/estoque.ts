@@ -26,7 +26,7 @@ import { consultarDelecao } from '../deletions'
 import { withSessionPersistenceQueue } from '../filaSessao'
 import {
   atualizarUpload, bytesPublicadosChat, finalizarPublicacao, listarUploads, obterArtigo, obterUpload,
-  obterUploadPorId, reservarAdmissao, uploadsAtivos,
+  obterUploadPorId, reivindicarEscritor, reservarAdmissao, uploadsAtivos,
 } from './catalogo'
 import type { EscopoAnexo, LinhaUpload, ModoAnexo } from './schemaAnexos'
 import { carregarPolitica, problemaPolitica, type PoliticaAnexos } from './politica'
@@ -104,6 +104,13 @@ function falhaUpload(linha: LinhaUpload, code: string, message: string, status =
   throw new PersistenceProblem(status, code, message)
 }
 
+/** R2 — só marca falha se este fluxo ainda for o dono do stage (nunca pisa no vencedor). */
+function marcarComoFalhaSeAindaForEscritor(linha: LinhaUpload, code: string): void {
+  const atual = obterUpload(linha.sessionId, linha.chatId, linha.uploadId)
+  if (!atual || atual.state !== 'recebendo') return
+  atualizarUpload(linha.sessionId, linha.chatId, linha.uploadId, { state: 'falhou', errorCode: code })
+}
+
 /** B05 — revalidação de lifecycle na fronteira final (nunca só na entrada). */
 function exigirDonoVivo(sessionId: string): void {
   if (consultarDelecao(sessionId)) {
@@ -143,16 +150,17 @@ async function garantirVolume(alvo: string, bytes: number, politica: PoliticaAne
 }
 
 /**
- * IDENTIDADE do artefato (B09): nunca o id do cliente. Derivado dos dados do
- * pedido (sessão, chat, nome normalizado e conteúdo declarado), estável entre
- * retries do MESMO pedido e distinto entre donos/clientes — um id forjado não
- * colide com o artefato de outra conversa.
+ * IDENTIDADE do artefato (R1): é a identidade da TENTATIVA (`uploadId`), nunca
+ * uma derivação de sessão+chat+nome+tamanho. Dois arquivos diferentes com o
+ * mesmo nome e o mesmo tamanho são tentativas distintas e recebem artefatos
+ * distintos; o replay do MESMO `uploadId` reusa o mesmo registro.
+ *
+ * `derive` existe só para preservar a forma determinística que os testes da
+ * admissão usam ao montar uma linha manual — a admissão real sempre passa o
+ * `uploadId` da tentativa.
  */
-export function artifactIdDe(entrada: { sessionId: string; chatId: string; name: string; declaredBytes: number | null }): string {
-  const hash = createHash('sha256')
-    .update(`${entrada.sessionId}\u0000${entrada.chatId}\u0000${entrada.name}\u0000${entrada.declaredBytes ?? ''}`)
-    .digest('hex')
-  const hex = hash.slice(0, 32)
+export function artifactIdDe(entrada: { uploadId: string }): string {
+  const hex = createHash('sha256').update(`tentativa\u0000${entrada.uploadId}`).digest('hex')
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
@@ -197,7 +205,8 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
       'Referência de projeto é registrada pela rota de referências, não pela admissão de transferência.')
   }
   const uploadId = entrada.uploadId && /^[0-9a-f-]{36}$/i.test(entrada.uploadId) ? entrada.uploadId : uuid
-  const artifactId = artifactIdDe({ sessionId: entrada.sessionId, chatId: entrada.chatId, name: nome, declaredBytes: entrada.declaredBytes })
+  // R1 — identidade do artefato = identidade da tentativa (estável no replay).
+  const artifactId = artifactIdDe({ uploadId })
   // Raiz do projeto CANÔNICA (realpath): build e checagens usam a mesma forma,
   // e um link no caminho da raiz nunca é aceito como destino.
   const raizWorkspace = entrada.scope === 'workspace' && entrada.workspaceRoot
@@ -309,11 +318,17 @@ export async function receberConteudo(
   const limite = Math.min(linha.declaredBytes ?? politica.maxUploadBytes, politica.maxUploadBytes)
 
   const stagePath = linha.stagePath ?? caminhoStagePara(linha.finalPath!, uploadId)
-  await mkdir(path.dirname(stagePath), { recursive: true })
 
-  // Reserva do escritor ANTES do stream: a linha fica `recebendo` e um
-  // segundo PUT concorrente é recusado (acima) em vez de disputar o arquivo.
-  atualizarUpload(sessionId, chatId, uploadId, { state: 'recebendo', stagePath })
+  // R2 — CLAIM ATÔMICO do escritor, antes do primeiro `await` de filesystem.
+  // A leitura acima é só diagnóstico amigável; quem decide é o UPDATE
+  // condicional: dois PUTs que entram juntos nunca passam ambos.
+  if (!reivindicarEscritor(sessionId, chatId, uploadId, stagePath)) {
+    const atual = obterUpload(sessionId, chatId, uploadId)
+    if (atual?.state === 'pronto') throw new PersistenceProblem(409, 'upload_already_finalized', 'Esta transferência já foi publicada.')
+    throw new PersistenceProblem(409, 'upload_in_flight',
+      'Esta transferência já está recebendo bytes agora. Uma transmissão por tentativa.')
+  }
+  await mkdir(path.dirname(stagePath), { recursive: true })
 
   const hash = createHash('sha256')
   let bytes = 0
@@ -349,9 +364,13 @@ export async function receberConteudo(
     })
     fonte.pipe(destino)
   }).catch(async (erro) => {
-    if (erro instanceof PayloadGrandeError && (erro as PayloadGrandeError).disputaStage) {
-      falhaUpload(linha, 'upload_in_flight',
-        'Outra transmissão desta tentativa está escrevendo agora. Aguarde o resultado dela antes de reenviar.', 409)
+    // R2 — `EEXIST`: a exclusividade do stage provou que outro escritor é o
+    // dono do arquivo. Este fluxo NÃO remove nada e responde conflito; assim o
+    // stage do vencedor sobrevive e continua publicável.
+    if ((erro as NodeJS.ErrnoException)?.code === 'EEXIST') {
+      marcarComoFalhaSeAindaForEscritor(linha, 'upload_in_flight')
+      throw new PersistenceProblem(409, 'upload_in_flight',
+        'Outra transmissão desta tentativa está escrevendo agora. Aguarde o resultado dela antes de reenviar.')
     }
     await unlink(stagePath).catch(() => undefined)
     if (erro instanceof PayloadGrandeError) {
@@ -421,7 +440,7 @@ export async function publicarPreparado(sessionId: string, chatId: string, uploa
 }
 
 /** Corpo da publicação — JÁ sob a fila do dono (nunca reentra na fila). */
-async function publicarPreparadoSemFila(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
+export async function publicarPreparadoSemFila(sessionId: string, chatId: string, uploadId: string, opcoes: OpcoesEstoque = {}): Promise<ReciboUpload> {
   {
     exigirDonoVivo(sessionId)
     const linha = obterUpload(sessionId, chatId, uploadId)

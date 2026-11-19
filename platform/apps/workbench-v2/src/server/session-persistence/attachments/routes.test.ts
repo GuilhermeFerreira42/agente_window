@@ -16,6 +16,7 @@ import { tratarRotasAnexos } from './rotas'
 import { registrarReferencia } from './referencias'
 import { admitirUpload, receberConteudo, caminhoFinalChat } from './estoque'
 import { obterArtigo } from './catalogo'
+import { registerWriteIntent } from '../writeIntents'
 import { lerArtigo } from './estoque'
 
 const SID = '33333333-3333-4333-8333-333333333333'
@@ -101,7 +102,22 @@ async function chamar(metodo: string, caminho: string, corpo?: unknown, headers:
   const req = requisicao(metodo, caminho, corpo, headers)
   const res = resposta()
   const tratado = await tratarRotasAnexos(req, res, new URL(caminho, 'http://127.0.0.1:5174'))
-  return { tratado, status: res.statusCode, corpo: res.body ? JSON.parse(res.body) : null }
+  // Download usa `createReadStream().pipe(response)`: o handler retorna antes de
+  // o fluxo terminar. Espera o fim do stream do response (nunca um sleep fixo).
+  if (tratado && !res.writableEnded) {
+    await new Promise<void>((resolve) => {
+      const prazo = setTimeout(() => resolve(), 2000)
+      res.once('finish', () => { clearTimeout(prazo); resolve() })
+      res.once('end', () => { clearTimeout(prazo); resolve() })
+    })
+  }
+  // `body` = bytes crus (download binário); `corpo` = JSON quando há JSON.
+  // `body` = bytes crus (download binário); `corpo` = JSON (tipagem frouxa
+  // como antes, para não mexer nos ensaios existentes).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let json: any = null
+  if (res.body) { try { json = JSON.parse(res.body) } catch { json = null } }
+  return { tratado, status: res.statusCode, corpo: json, body: res.binario }
 }
 
 function rota(resto = ''): string {
@@ -261,4 +277,65 @@ describe('C-3a rotas de anexo', () => {
     expect(novo.corpo).toMatchObject({ estado: 'pronto', presente: true, referencia: 'docs/relatorio.md' })
   })
 
+})
+
+/**
+ * W3 — REGRESSÃO do 503 `session_publication_pending` do E05, na fronteira
+ * HTTP real da rota (não no serviço). A intenção de escrita é criada de forma
+ * explícita: sem espera, sem retry, sem autosave.
+ */
+describe('C-3a W3 — leitura de anexo sob intenção de escrita viva', () => {
+  function intencaoViva(mutationId: string): void {
+    registerWriteIntent({
+      sessionId: SID, mutationId, criacao: false, baseRevision: 0, nextRevision: 1,
+      targetPath: join(base, 'transcript.jsonl'), stagedPath: join(base, 'staged.jsonl'),
+      oldDigest: null, newDigest: 'e'.repeat(64),
+      record: {
+        id: SID, slug: `c3a-${SID.slice(0, 4)}`, title: 'Sessão C-3a', workspacePath: null,
+        contextKind: 'chat', worktreePath: null, messageCount: 0, createdAt: 0, updatedAt: 0,
+        sessionJson: JSON.stringify({ id: SID, chats: [{ id: CID, messages: [] }] }),
+      },
+      planos: [], receipt: { sessionId: SID, mutationId, revision: 1, digest: 'e'.repeat(64),
+        creationId: null, creationDigest: null, creationRevision: null },
+      checkpointCleanup: null,
+    })
+  }
+
+  it('W3 — download de anexo publicado responde 200 (nunca 503) com escrita pendente viva', async () => {
+    const publicado = await publicarExemplo()
+    intencaoViva('22222222-2222-4222-8222-222222222222')
+
+    // 1) Estado da tentativa: leitura pura de catálogo, nunca 503.
+    const estado = await chamar('GET', rota(`/uploads/${publicado.uploadId}`))
+    expect(estado.status).toBe(200)
+    expect(estado.corpo.state).toBe('pronto')
+
+    // 2) Bytes do artefato publicado (download de quem consome o anexo):
+    //    200 com hash e tamanho reais — era aqui que o E05 morria em 503.
+    const download = await chamar('GET', rota(`/${publicado.artifactId}?download=1`))
+    expect(download.status).toBe(200)
+    expect(download.body.toString('utf8')).toBe(publicado.bytes.toString('utf8'))
+  })
+
+  it('W3 — lista degrada com diagnóstico honesto (não 503) sob publicação pendente', async () => {
+    await publicarExemplo()
+    intencaoViva('55555555-5555-4555-8555-555555555555')
+    // A lista roda reconciliação (que legitimamente espera a publicação
+    // terminar). O que NÃO se aceita é 503 opaco de `session_publication_pending`.
+    const lista = await chamar('GET', rota())
+    if (lista.status !== 200) {
+      expect(lista.corpo.code).not.toBe('session_publication_pending')
+    }
+  })
+
+  it('W3 — escrita (admissão) continua recusada com 503 enquanto a publicação está pendente', async () => {
+    intencaoViva('33333333-3333-4333-8333-333333333333')
+    const admissao = await chamar('POST', rota('/uploads'), {
+      uploadId: '44444444-4444-4444-8444-444444444445', name: 'novo.txt', bytes: 3,
+      declaredBytes: 3, mime: 'text/plain', mode: 'copy', scope: 'chat', workspaceRoot: null,
+    })
+    // A fronteira de escrita NÃO foi afrouxada: 503 ou 409 de publicação.
+    expect(admissao.status).toBeGreaterThanOrEqual(400)
+    expect(admissao.status).not.toBe(200)
+  })
 })

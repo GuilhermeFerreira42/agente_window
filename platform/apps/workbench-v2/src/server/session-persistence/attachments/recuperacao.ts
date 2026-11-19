@@ -23,9 +23,10 @@ import { consultarDelecao } from '../deletions'
 import { PersistenceProblem } from '../persistenceErrors'
 import { readTranscript } from '../transcripts'
 import type { ChatMessage } from '../../../types'
+import { withSessionPersistenceQueue } from '../filaSessao'
 import { emTransacao, obterArtigo, obterUpload, upsertArtigo } from './catalogo'
 import {
-  caminhoStagePara, hashDeArquivo, publicarPreparado, raizPrivadaChat, type OpcoesEstoque,
+  caminhoStagePara, hashDeArquivo, publicarPreparado, publicarPreparadoSemFila, raizPrivadaChat, type OpcoesEstoque,
 } from './estoque'
 import { carregarPolitica, problemaPolitica } from './politica'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
@@ -125,6 +126,52 @@ export interface ReciboRecovery {
   mapa: Array<{ oldId: string; newId: string }>
   indisponiveis: Array<{ oldId: string; name: string; motivo: string }>
   consumidoEm: number
+}
+
+/**
+ * R4 — progresso DURÁVEL por item. `newId` é a identidade de cópia, sorteada
+ * UMA vez e gravada ANTES de materializar; `consumidoEm` marca o item pronto.
+ * O recibo final é sempre derivado destes itens, nunca recalculado.
+ */
+interface ProgressoItem { newId?: string; consumidoEm?: number; motivo?: string }
+type ProgressoPlano = Record<string, ProgressoItem>
+
+function progressoDoPlano(plano: LinhaPlano): ProgressoPlano {
+  if (!plano.mapa) return {}
+  try {
+    const bruto = JSON.parse(plano.mapa) as ProgressoPlano & { __itens?: ProgressoPlano }
+    return bruto.__itens ?? {}
+  } catch {
+    return {}
+  }
+}
+
+function gravarProgresso(recoveryId: string, progresso: ProgressoPlano): void {
+  emTransacao(() => {
+    getDatabase().prepare('UPDATE attachment_recovery_plans SET mapa = ? WHERE recovery_id = ?')
+      .run(JSON.stringify({ __itens: progresso }), recoveryId)
+  })
+}
+
+/** Recibo derivado do progresso durável — mesma resposta para qualquer retry. */
+function reciboDoProgresso(recoveryId: string, itens: PlanoRecovery['itens'], progresso: ProgressoPlano): Omit<ReciboRecovery, 'recoveryId'> {
+  const mapa: ReciboRecovery['mapa'] = []
+  const indisponiveis: ReciboRecovery['indisponiveis'] = []
+  let consumidoEm = 0
+  for (const item of itens) {
+    const progressoItem = progresso[item.oldId]
+    if (progressoItem?.consumidoEm && progressoItem.newId) {
+      mapa.push({ oldId: item.oldId, newId: progressoItem.newId })
+      consumidoEm = Math.max(consumidoEm, progressoItem.consumidoEm)
+      continue
+    }
+    indisponiveis.push({
+      oldId: item.oldId, name: item.name,
+      motivo: progressoItem?.motivo
+        ?? (item.disponivel ? 'cópia ainda não concluída' : 'fonte indisponível'),
+    })
+  }
+  return { mapa, indisponiveis, consumidoEm: consumidoEm || Date.now() }
 }
 
 const VALIDADE_PLANO_MS = 10 * 60_000
@@ -262,7 +309,7 @@ export async function prepareRecovery(entrada: {
 
 async function copiarItem(
   oldId: string, artigo: NonNullable<ReturnType<typeof obterArtigo>>,
-  destino: { sessionId: string; chatId: string }, opcoes: OpcoesEstoque,
+  destino: { sessionId: string; chatId: string }, novoId: string, opcoes: OpcoesEstoque,
 ): Promise<string> {
   const politicaResultado = carregarPolitica()
   if (!politicaResultado.ok) {
@@ -285,8 +332,8 @@ async function copiarItem(
     throw new PersistenceProblem(409, 'recovery_item_changed',
       'O arquivo de origem mudou desde o registro. Nada foi copiado; atualize a referência ou reenvie o arquivo.')
   }
-  // Cópia PRIVADA INDEPENDENTE: novos bytes no âmbito do chat de destino.
-  const novoId = randomUUID()
+  // Cópia PRIVADA INDEPENDENTE: novos bytes no âmbito do chat de destino. A
+  // identidade vem do progresso durável do plano (R4), nunca sorteada de novo.
   const nome = nomeSeguroArquivo(artigo.name, politica.maxNomeBytes)
   const finalPath = path.join(raizPrivadaChat(opcoes.appDir), destino.sessionId, destino.chatId, novoId, nome)
   const stagePath = caminhoStagePara(finalPath, novoId)
@@ -306,7 +353,8 @@ async function copiarItem(
     `).run(destino.sessionId, destino.chatId, novoId, novoId, nome, info.size, info.size, shaCopia,
       stagePath, finalPath, agora, agora)
   })
-  const recibo = await publicarPreparado(destino.sessionId, destino.chatId, novoId, opcoes)
+  // Já estamos sob a fila do dono (R4): usa o corpo sem fila, nunca reentra.
+  const recibo = await publicarPreparadoSemFila(destino.sessionId, destino.chatId, novoId, opcoes)
   return recibo.artifactId
 }
 
@@ -330,48 +378,82 @@ export async function confirmRecovery(entrada: {
   if (plano.tokenHash !== hashToken(entrada.token)) {
     throw new PersistenceProblem(403, 'recovery_token_invalid', 'O plano de recuperação não confere. Prepare novamente.')
   }
-  const agora = entrada.agora?.() ?? Date.now()
-  if (plano.state === 'consumido') {
-    // Retry idempotente: mesmo recibo, sem segunda cópia (R13).
-    return { recoveryId: plano.recoveryId, ...(JSON.parse(plano.mapa ?? '{}') as Omit<ReciboRecovery, 'recoveryId'>), consumidoEm: JSON.parse(plano.mapa ?? '{}').consumidoEm ?? agora }
-  }
-  if (agora > plano.expiraEm) {
-    throw new PersistenceProblem(409, 'recovery_plan_expired',
-      'O plano de recuperação expirou. Repita o gesto de recuperação para gerar outro.')
-  }
-  if (consultarDelecao(entrada.destinoSessionId)) {
-    throw new PersistenceProblem(410, 'session_deleted', 'A conversa de destino foi excluída; nada foi copiado.')
-  }
 
-  const itens = JSON.parse(plano.itens) as PlanoRecovery['itens']
-  const mapa: ReciboRecovery['mapa'] = []
-  const indisponiveis: ReciboRecovery['indisponiveis'] = []
-  for (const item of itens) {
-    if (!item.disponivel) {
-      indisponiveis.push({ oldId: item.oldId, name: item.name, motivo: 'fonte indisponível' })
-      continue
+  // R4 — as confirmações do MESMO plano são SERIALIZADAS pela fila do dono de
+  // destino (a mesma fila da persistência; sem fila por módulo). Assim duas
+  // chamadas simultâneas não leem "preparado" ao mesmo tempo: a segunda entra
+  // depois da primeira e só vê o progresso durável.
+  return withSessionPersistenceQueue(entrada.destinoSessionId, async () => {
+    // Releitura DENTRO da seção crítica: o plano pode ter mudado enquanto
+    // esperávamos a fila.
+    const atual = obterPlano(entrada.recoveryId)!
+    const agora = entrada.agora?.() ?? Date.now()
+    const itens = JSON.parse(atual.itens) as PlanoRecovery['itens']
+    const progresso = progressoDoPlano(atual)
+
+    if (atual.state === 'consumido') {
+      // Retry idempotente: mesmo recibo derivado do progresso, sem nova cópia.
+      return { recoveryId: atual.recoveryId, ...reciboDoProgresso(atual.recoveryId, itens, progresso) }
     }
-    const artigo = obterArtigo(item.oldId)
-    if (!artigo || artigo.sessionId !== plano.origemSessionId) {
-      indisponiveis.push({ oldId: item.oldId, name: item.name, motivo: 'registro de origem ausente' })
-      continue
+    if (agora > atual.expiraEm) {
+      throw new PersistenceProblem(409, 'recovery_plan_expired',
+        'O plano de recuperação expirou. Repita o gesto de recuperação para gerar outro.')
     }
-    try {
-      const newId = await copiarItem(item.oldId, artigo, { sessionId: entrada.destinoSessionId, chatId: entrada.destinoChatId }, opcoes)
-      mapa.push({ oldId: item.oldId, newId })
-    } catch (erro) {
-      indisponiveis.push({
-        oldId: item.oldId, name: item.name,
-        motivo: erro instanceof PersistenceProblem ? erro.message : 'falha ao copiar o arquivo',
-      })
+    if (consultarDelecao(entrada.destinoSessionId)) {
+      throw new PersistenceProblem(410, 'session_deleted', 'A conversa de destino foi excluída; nada foi copiado.')
     }
-  }
-  const recibo: Omit<ReciboRecovery, 'recoveryId'> = { mapa, indisponiveis, consumidoEm: agora }
-  emTransacao(() => {
-    getDatabase().prepare("UPDATE attachment_recovery_plans SET state = 'consumido', mapa = ? WHERE recovery_id = ?")
-      .run(JSON.stringify(recibo), plano.recoveryId)
+    // R5 — lifecycle da ORIGEM revalidado no confirm (o prepare pode ter sido
+    // feito com a origem viva; o tombstone não pode liberar bytes depois).
+    if (consultarDelecao(atual.origemSessionId)) {
+      throw new PersistenceProblem(410, 'recovery_source_unavailable',
+        'A conversa de origem foi excluída depois da preparação: os anexos dela não podem ser copiados. O histórico textual pode ser recuperado e os arquivos exigem reenvio explícito.')
+    }
+
+    for (const item of itens) {
+      // Item já concluído em tentativa anterior: nada a refazer (R4).
+      if (progresso[item.oldId]?.consumidoEm && progresso[item.oldId]?.newId) continue
+      if (!item.disponivel) continue
+
+      // R5 — fonte revalidada ANTES de materializar CADA item (o tombstone
+      // pode chegar entre um item e outro da mesma confirmação).
+      if (consultarDelecao(atual.origemSessionId)) {
+        throw new PersistenceProblem(410, 'recovery_source_unavailable',
+          'A conversa de origem foi excluída durante a recuperação: nenhuma cópia nova será feita. O histórico textual pode ser recuperado e os arquivos exigem reenvio explícito.')
+      }
+      const artigo = obterArtigo(item.oldId)
+      if (!artigo || artigo.sessionId !== atual.origemSessionId) continue
+
+      // Identidade de cópia estável: sorteada uma vez e GRAVADA antes de
+      // materializar; um retry após reinício reusa o mesmo id.
+      const newId = progresso[item.oldId]?.newId ?? randomUUID()
+      progresso[item.oldId] = { ...progresso[item.oldId], newId }
+      gravarProgresso(atual.recoveryId, progresso)
+
+      try {
+        await copiarItem(item.oldId, artigo, {
+          sessionId: entrada.destinoSessionId, chatId: entrada.destinoChatId,
+        }, newId, opcoes)
+        progresso[item.oldId] = { newId, consumidoEm: Date.now() }
+        gravarProgresso(atual.recoveryId, progresso)
+      } catch (erro) {
+        if (erro instanceof PersistenceProblem && erro.code === 'recovery_source_unavailable') throw erro
+        // Falha de UM item não apaga o progresso dos outros; o motivo real fica
+        // durável e o retry pode retomá-lo pelo mesmo newId.
+        progresso[item.oldId] = {
+          newId,
+          motivo: erro instanceof PersistenceProblem ? erro.message : 'falha ao copiar o arquivo',
+        }
+        gravarProgresso(atual.recoveryId, progresso)
+      }
+    }
+
+    const recibo = reciboDoProgresso(atual.recoveryId, itens, progresso)
+    emTransacao(() => {
+      getDatabase().prepare("UPDATE attachment_recovery_plans SET state = 'consumido', mapa = ? WHERE recovery_id = ?")
+        .run(JSON.stringify({ __itens: progresso }), atual.recoveryId)
+    })
+    return { recoveryId: atual.recoveryId, ...recibo }
   })
-  return { recoveryId: plano.recoveryId, ...recibo }
 }
 
 /** Reexport para quem já usava o helper de publicação do módulo. */

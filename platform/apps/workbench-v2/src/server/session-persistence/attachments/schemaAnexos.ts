@@ -64,7 +64,7 @@ const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
     'mode', 'locator', 'root_kind', 'workspace_root', 'bytes', 'sha256', 'state',
     'message_id', 'part_id', 'created_at',
   ],
-  attachment_cleanup_plan: ['session_id', 'artifact_id', 'alvo', 'locator', 'root_kind', 'workspace_root', 'sha256', 'state', 'created_at', 'destino', 'motivo'],
+  attachment_cleanup_plan: ['session_id', 'chat_id', 'artifact_id', 'alvo', 'locator', 'root_kind', 'workspace_root', 'sha256', 'state', 'created_at', 'destino', 'motivo'],
   attachment_recovery_plans: [
     'recovery_id', 'origem_session_id', 'origem_chat_id', 'destino_session_id', 'destino_chat_id',
     'token_hash', 'itens', 'state', 'mapa', 'criado_em', 'expira_em',
@@ -118,6 +118,9 @@ export function criarTabelasAnexos(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS attachment_artifacts_owner_idx ON attachment_artifacts (session_id, chat_id);
     CREATE TABLE IF NOT EXISTS attachment_cleanup_plan (
       session_id TEXT NOT NULL,
+      -- R3 — DONO do plano (chat de origem). Ownership vem do catálogo, nunca
+      -- de prefixo de string do locator.
+      chat_id TEXT,
       artifact_id TEXT NOT NULL,
       alvo TEXT NOT NULL CHECK (alvo IN ('chat-copy','workspace-copy','referencia')),
       locator TEXT NOT NULL,
@@ -146,7 +149,7 @@ export function criarTabelasAnexos(db: Database.Database): void {
   `)
   // Migração ADITIVA da própria C-3a (T32): bancos criados antes de o plano
   // registrar o destino da Lixeira recebem as colunas sem perder dados.
-  for (const coluna of ['destino', 'motivo']) {
+  for (const coluna of ['destino', 'motivo', 'chat_id']) {
     const presentes = new Set((db.prepare('PRAGMA table_info(attachment_cleanup_plan)').all() as Array<{ name: string }>).map((c) => c.name))
     if (!presentes.has(coluna)) db.exec(`ALTER TABLE attachment_cleanup_plan ADD COLUMN ${coluna} TEXT`)
   }

@@ -1,3 +1,26 @@
+# 19/11/2026 — C-3a correção R1–R5/W1–W3: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <13 arquivos> --format json` | **0 erros / 0 avisos** |
+| Lint (repo) | `npx eslint src --format json` | 84 erros / 27 avisos — **iguais à base** (pré-existentes, intocados) |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.5s |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/25-foco` | **202 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/22-ampla` | **2097 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| Anexos | `vitest run …/session-persistence/attachments` | **74/74** (store 20, probes 19, reteste 10, routes 8, recovery 6, policy 6, lifecycle 5) |
+| Persistência | `vitest run …/session-persistence` | **313 aprovados · 1 pulado** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Sondas | runner canônico / cópia portátil | **10/13** (defeito do template) / **13/13** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Build exigiu liberar o code-server do sandbox (OOM global em 3,9 GB; o processo foi morto por `oom-kill`, não por erro de código).
+
+**Windows:** não executado (sem SO Windows neste ambiente). W1 e W2 foram corrigidos nos testes; comando isolado e resultados esperados em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md` (§6). Nada aqui atribui homologação ou execução Windows.
+
+---
+
 # 19/11/2026 — C-3a reentrega: ambiente e gates (Linux/Debian, Node 26.13.0)
 
 Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.

@@ -7,7 +7,7 @@
 //     do parecer B01 desaparece);
 //   - deriva a raiz REAL do contexto (`contextKind`), validada no filesystem;
 //   - recusa declaração de workspace que o catálogo não confirma.
-import { getDatabase, getSessionRecord } from '../database'
+import { getDatabase, getSessionRecord, getSessionRecordRaw } from '../database'
 import { consultarDelecao } from '../deletions'
 import { resolverContextoAgir } from '../agirContext'
 import { PersistenceProblem } from '../persistenceErrors'
@@ -30,7 +30,16 @@ export interface DonoAnexos {
 }
 
 /** Operações de leitura toleram pasta offline; escritas, nunca. */
-export interface OpcoesDono { permitirRaizOffline?: boolean }
+export interface OpcoesDono {
+  permitirRaizOffline?: boolean
+  /**
+   * W3 — requisição de LEITURA (`GET`). O que a rota serve nesse caso já está
+   * commitado no catálogo (arquivo publicado é imutável); não depende do
+   * journal de publicação de OUTRA operação. Escrita continua exigindo a
+   * fronteira completa. Tombstone (410) continua valendo em ambos.
+   */
+  leitura?: boolean
+}
 
 /** Sessão excluída responde 410 (P-C), nunca 404 ambíguo. */
 export function exigirVivo(sessionId: string): void {
@@ -47,11 +56,25 @@ export function exigirVivo(sessionId: string): void {
 export function resolverDonoAnexos(sessionId: string, chatId: string, opcoes: OpcoesDono = {}): DonoAnexos {
   validarSchemaAnexos(getDatabase())
   exigirVivo(sessionId)
-  const registro = getSessionRecord(sessionId)
+  // W3 — CAUSA do 503 `session_publication_pending` intermitente do E05.
+  //
+  // `assertSessionPublicationReadable` recusa a sessão inteira enquanto
+  // existir QUALQUER intenção de escrita viva — inclusive a de um autosave da
+  // própria conversa. Como este resolver roda antes do despacho de TODA rota
+  // de anexo, um `GET` de bytes já publicados (arquivo imutável, recibo já
+  // commitado) devolvia 503 por causa do journal de OUTRA operação.
+  //
+  // Regra corrigida, sem afrouxar escrita: LEITURA lê o registro COMMITADO
+  // (`getSessionRecordRaw`, mesmo dado que `getSessionRecord` devolve quando a
+  // sessão está limpa); ESCRITA continua passando pela fronteira completa
+  // (journal → 503, tombstone → 410).
+  const registro = opcoes.leitura
+    ? getSessionRecordRaw(sessionId)
+    : getSessionRecord(sessionId)
   if (!registro) {
     throw new PersistenceProblem(404, 'session_not_found', 'Sessão não encontrada.')
   }
-  const contexto = resolverContextoAgir(sessionId, chatId)
+  const contexto = resolverContextoAgir(sessionId, chatId, { leitura: opcoes.leitura })
   if (!contexto.ok) {
     // Pasta fora do ar NÃO é incoerência de contexto: é estado operacional.
     // Leitura degrada (lista honesta); escrita continua 409.

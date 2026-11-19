@@ -1,3 +1,13 @@
+# C-3a — dívidas e limites após a correção de R1–R5/W1–W3 (19/11/2026)
+
+A C-3a foi corrigida após o reteste REPROVADA sobre `554f400`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.
+
+Dívidas abertas e honestas desta correção: (1) **validação Windows pendente** — W1 (caminho nativo do vitest) e W2 (Lixeira injetada) foram corrigidos no teste, mas não há SO Windows neste ambiente; comando isolado e resultados esperados na entrega extensa; (2) **sondas: 10/13 pelo runner canônico** — as três falhas são do template (fixture de `sessionJson` sem `workspacePath` e H3/H4 chamando sem capturar a rejeição do contrato), não do produto; 13/13 na cópia portátil corrigida, sem afrouxar expectativa; (3) **migração R3 é aditiva** e planos legados com `chat_id IS NULL` continuam executáveis apenas pela via sem `chatId` — bancos de desenvolvimento com plano em voo devem ser descartados, não migrados; (4) **W3 muda contrato observável** (`GET` de anexo publicado não herda journal de escrita) e está isolado em `OpcoesDono.leitura`, pendente de homologação; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa e evidências em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md`.
+
+---
+
 # C-3a — dívidas e limites após a reentrega técnica (19/11/2026)
 
 A C-3a foi corrigida após parecer REPROVADA (B01–B11 + seção 3), sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção (apresentação/geração de mídia), Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.

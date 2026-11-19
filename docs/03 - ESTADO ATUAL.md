@@ -1,3 +1,15 @@
+# Estado vigente — 19/11/2026 — C-3a: R1–R5 e W1/W2/W3 corrigidos após reteste REPROVADA
+
+O reteste independente sobre `554f400` reprovou a C-3a com cinco reprodutores (R1–R5) e três achados de plataforma/teste (W1–W3). As correções foram feitas **exclusivamente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.
+
+Antes de corrigir, as cinco reproduções foram portadas para `attachments/reteste.test.ts` e **falharam** no Debian (S01 ids iguais, S02 `calls=0`, S03 mapas divergentes, S04 uma cópia indevida, S05 nenhum vencedor). Correções: identidade de artefato derivada da **tentativa** (`uploadId`), não de nome/tamanho (R1); **claim atômico** do escritor por `UPDATE … WHERE state IN (…)` antes do primeiro `await`, perdedor em 409 e sem `unlink` de stage alheio (R2); plano de limpeza com **dono (`chat_id`)** vindo do catálogo e remoções restritas ao chat (R3); `confirmRecovery` sob a fila existente com **progresso durável por item** e `newId` estável (R4); lifecycle da origem revalidado no confirm e antes de cada item (R5). W1: caminho nativo do vitest no launcher (a suíte de store coletava 0 no Windows). W2: Lixeira injetada no `lifecycle.test.ts`, sem ramo `win32`. W3: **causa comprovada** do 503 `session_publication_pending` do E05 — `resolverDonoAnexos` aplicava o journal de publicação à **leitura**; `GET` de arquivo já publicado passou a ler o registro commitado, e **toda escrita continua na fronteira completa** (regressão em `routes.test.ts`, que volta a falhar com 503 se a correção for revertida).
+
+Provas no Debian/Node 26.13.0: `reteste.test.ts` **10/10**, anexos **74/74**, `session-persistence` **313 aprovados / 1 pulado**, foco **202 aprovados · 0 falhas · 0 pulados** (era 177/2 com `store.test.ts` sem coletar), ampla **2097 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10 (inclui E05/E07) + C-1 6/6 + C-2 17/17**, tipos exit 0, lint dos 13 arquivos alterados 0/0, build `✓ built in 41.5s`, sondas 13/13 na cópia portátil (runner canônico: 10/13 por defeito de fixture/captura de rejeição do template, registrado). **Windows não foi executado** aqui: comando isolado e resultados esperados na entrega extensa.
+
+Fora do escopo preservado: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md`.
+
+---
+
 # Estado vigente — 19/11/2026 — C-3a corrigida após parecer REPROVADA (reentrega técnica)
 
 O parecer de revisão independente sobre `df86f6d` reprovou a C-3a (13 sondas vermelhas, 5 falhas de foco no Windows). A reentrega corrige B01–B11 e a seção 3 do parecer **somente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.

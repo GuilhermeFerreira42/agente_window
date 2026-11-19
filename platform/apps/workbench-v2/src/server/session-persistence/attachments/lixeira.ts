@@ -10,7 +10,7 @@
 // temporário e a plataforma é explícita, sem tocar a Lixeira real do usuário.
 import { moverParaLixeira, type OpcoesLixeira, type ResultadoLixeira } from '../../../bairros/2-inteligencia/casas/agir/server/lixeira'
 
-export type { ResultadoLixeira }
+export type { OpcoesLixeira, ResultadoLixeira }
 
 export interface PortaLixeira {
   mover(absoluto: string, opcoes?: OpcoesLixeira): Promise<ResultadoLixeira>

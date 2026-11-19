@@ -47,7 +47,7 @@ export function registrarPlanoAnexos(sessionId: string, chatId?: string): void {
         : artigo.rootKind === 'workspace' ? 'workspace-copy' as const
         : 'chat-copy' as const
       inserirPlanoLimpeza({
-        sessionId, artifactId: artigo.artifactId, alvo, locator: artigo.locator,
+        sessionId, chatId: alvoChat, artifactId: artigo.artifactId, alvo, locator: artigo.locator,
         rootKind: artigo.rootKind, workspaceRoot: artigo.workspaceRoot, sha256: artigo.sha256,
       })
     }
@@ -104,8 +104,12 @@ async function moverParaLixeiraSeConfirmado(
  * alvo privado foi resolvido; qualquer falha mantém o plano e o ledger.
  */
 export async function executarPlanoAnexos(sessionId: string, opcoes: OpcoesLimpeza = {}): Promise<boolean> {
+  // R3 — seleção por DONO registrado no plano (vem do catálogo na captura):
+  // nunca por prefixo de string do locator (o locator começa em `chats/…`).
+  // Referências e cópias de projeto não têm blob privado a mover e pertencem
+  // ao mesmo dono da captura.
   const linhas = opcoes.chatId
-    ? planosPendentes(sessionId).filter((item) => item.locator.startsWith(`${opcoes.chatId}/`) || item.alvo !== 'chat-copy')
+    ? planosPendentes(sessionId, { chatId: opcoes.chatId })
     : planosPendentes(sessionId)
   let completo = true
   for (const linha of linhas) {
@@ -132,12 +136,19 @@ export async function executarPlanoAnexos(sessionId: string, opcoes: OpcoesLimpe
   if (planosDefinitivamenteFalhos(sessionId) > 0) completo = false
   if (!completo) return false
 
-  // Plano completo: agora o ledger do dono pode sair.
-  if (opcoes.chatId) removerLedgerDoChat(sessionId, opcoes.chatId)
-  else getDatabase().prepare('DELETE FROM attachment_artifacts WHERE session_id = ?').run(sessionId)
-  getDatabase().prepare('DELETE FROM attachment_uploads WHERE session_id = ?').run(sessionId)
-  getDatabase().prepare('DELETE FROM attachment_cleanup_plan WHERE session_id = ? AND state = ?')
-    .run(sessionId, 'concluido')
+  // Plano completo: agora o ledger do DONO pode sair — e só dele.
+  if (opcoes.chatId) {
+    // `removerLedgerDoChat` já apaga artefatos E tentativas SÓ deste chat; o
+    // vizinho permanece intacto (R3).
+    removerLedgerDoChat(sessionId, opcoes.chatId)
+    getDatabase().prepare('DELETE FROM attachment_cleanup_plan WHERE session_id = ? AND chat_id = ? AND state = ?')
+      .run(sessionId, opcoes.chatId, 'concluido')
+  } else {
+    getDatabase().prepare('DELETE FROM attachment_artifacts WHERE session_id = ?').run(sessionId)
+    getDatabase().prepare('DELETE FROM attachment_uploads WHERE session_id = ?').run(sessionId)
+    getDatabase().prepare('DELETE FROM attachment_cleanup_plan WHERE session_id = ? AND state = ?')
+      .run(sessionId, 'concluido')
+  }
   return true
 }
 

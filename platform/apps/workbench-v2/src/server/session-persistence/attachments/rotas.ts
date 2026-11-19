@@ -118,7 +118,11 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
     // Leitura (F5) tolera pasta offline com estado honesto; escrita nunca —
     // o 409 de pasta inacessível continua valendo para admissão/conteúdo.
     const somenteLeitura = metodo === 'GET'
-    const dono = resolverDonoAnexos(sessionId, chatId, { permitirRaizOffline: somenteLeitura })
+    const dono = resolverDonoAnexos(sessionId, chatId, {
+      permitirRaizOffline: somenteLeitura,
+      // W3 — GET não herda o journal de publicação de outra operação.
+      leitura: somenteLeitura,
+    })
 
     // GET /attachments — lista segura (F5/offline): artefatos publicados +
     // transferências ainda em voo (estado honesto dos chips).

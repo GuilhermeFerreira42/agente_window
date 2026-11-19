@@ -1,3 +1,13 @@
+# 19/11/2026 — C-3a: correção de R1–R5 e W1/W2/W3 após reteste
+
+Reteste independente sobre `554f400` reprovou a C-3a: cinco reprodutores (R1 identidade por nome/tamanho; R2 disputa de escritor; R3 limpeza por chat sem efeito e apagando a sessão; R4 confirmação simultânea duplicando cópia; R5 origem tombstoned ainda servindo bytes) e três achados W1–W3. As cinco reproduções foram portadas para `attachments/reteste.test.ts` e **falharam antes** das correções; depois, 10/10.
+
+Correções: identidade do artefato derivada da tentativa (`uploadId`) com `ON CONFLICT` atualizando locator/bytes/sha (R1); claim atômico do escritor antes do primeiro `await`, 409 para o perdedor e nenhum `unlink` alheio (R2); `chat_id` no plano de limpeza com seleção por ownership do catálogo e remoções restritas ao chat (R3); `confirmRecovery` sob a fila existente, progresso durável por item e `newId` estável (R4); revalidação de lifecycle da origem no confirm e por item (R5). W1: caminho nativo do vitest (a suíte de store não coletava no Windows). W2: Lixeira injetada no `lifecycle.test.ts`, sem seletor de plataforma. W3: **causa comprovada** do 503 `session_publication_pending` do E05 — a leitura de anexo herdava o journal de publicação de outra operação; a hipótese de autosave não era a causa, e a correção não usou espera nem retry.
+
+Gates no Linux/Node 26.13.0: `reteste.test.ts` 10/10, anexos 74/74, foco 202/0/0 (era 177/2 com `store.test.ts` sem coletar), ampla 2097 com `newFailures=[]`/`newSkips=[]`, E2E C-3a 10/10 (E05 e E07 na suíte completa) + C-1 6/6 + C-2 17/17, tipos 0, lint dos alterados 0/0, build ok, sondas 13/13 na cópia portátil (10/13 no runner canônico por defeito do template). Windows não executado; comando isolado e esperados na entrega extensa. Sem merge, sem C-3b, sem homologação; canônicos 03/06/07/09 atualizados, `08` intacto.
+
+---
+
 # 19/11/2026 — C-3a reentregue após parecer REPROVADA
 
 Parecer independente sobre `df86f6d` reprovou a C-3a: 13 sondas vermelhas (B01–B11) e cinco falhas de foco no Windows (T14–T17 e T32). Corrigido o núcleo servidor (dono/contexto do catálogo, fila por dono, transação única estado+ledger com intenção durável, Lixeira como porta única, contenção canônica, admissão atômica com stage no volume do destino e `flags:'wx'`, recuperação com plano durável) e o cliente (recibo antes do `File`, prontos preservados, chip “salvo sem mensagem”). As 13 sondas viraram regressões do projeto em `attachments/probes.test.ts` (19 casos); T15/T28/T29/T36 foram corrigidos no cenário em vez de oficializar o defeito; T14–T17 passaram a interromper escritor real e reconciliar em processo novo.

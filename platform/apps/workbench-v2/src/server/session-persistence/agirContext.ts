@@ -1,5 +1,5 @@
 import type { Session } from '../../types'
-import { getSessionRecord, listSessionToolGrants } from './database'
+import { getSessionRecord, getSessionRecordRaw, listSessionToolGrants } from './database'
 import { sessaoExcluida } from './deletions'
 import { validateWorkspacePath } from './workspaces'
 
@@ -11,8 +11,18 @@ export type ContextoAgirPersistido =
   | { ok: true; raiz: string; permissoes: string[] }
   | { ok: true; raiz: null; permissoes: never[] }
 
+/** Opções de leitura do contexto (W3). Escrita não tem opção: usa a fronteira. */
+export interface OpcoesContextoAgir {
+  /**
+   * W3 — operação de LEITURA de artefato já publicado. O registro COMMITADO
+   * basta para derivar dono/raiz; o journal de publicação de OUTRA operação
+   * (autosave da mesma conversa) não pode transformar um download em 503.
+   */
+  leitura?: boolean
+}
+
 /** Resolve authority only from the persisted session and its catalog kind. */
-export function resolverContextoAgir(sessionId: string, chatId: string):
+export function resolverContextoAgir(sessionId: string, chatId: string, opcoes: OpcoesContextoAgir = {}):
   | ContextoAgirPersistido
   | { ok: false; message: string } {
   if (!sessionId || sessionId.length > 200 || !chatId || chatId.length > 200) {
@@ -23,7 +33,7 @@ export function resolverContextoAgir(sessionId: string, chatId: string):
   if (sessaoExcluida(sessionId)) {
     return { ok: false, message: 'A conversa foi excluída; nenhuma ação foi iniciada.' }
   }
-  const record = getSessionRecord(sessionId)
+  const record = opcoes.leitura ? getSessionRecordRaw(sessionId) : getSessionRecord(sessionId)
   if (!record) {
     return { ok: false, message: 'A sessão não está registrada no servidor. Recarregue a sessão e tente novamente.' }
   }

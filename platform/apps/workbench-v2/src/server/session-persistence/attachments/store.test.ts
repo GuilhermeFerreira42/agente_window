@@ -28,9 +28,15 @@ import {
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
 
 const meuArquivo = fileURLToPath(import.meta.url)
-// No Windows `vitest/vitest.mjs` resolve como caminho com `\\` e o Node executa
-// o shim `.mjs`; a forma absoluta nativa é a que funciona nos dois SOs.
-const vitestMjs = fileURLToPath(new URL(createRequire(import.meta.url).resolve('vitest/vitest.mjs'), 'file:'))
+/**
+ * W1 — caminho NATIVO do vitest, sem passar por URL.
+ *
+ * `require.resolve` devolve `C:\...\vitest.mjs` no Windows; `new URL(esse
+ * caminho, 'file:')` interpreta `c:` como ESQUEMA e `fileURLToPath` lança
+ * “The URL must be of scheme file” antes da coleta — a suíte inteira sumia.
+ * `createRequire(...).resolve` já é absoluto e nativo nos dois SOs.
+ */
+const vitestMjs = createRequire(import.meta.url).resolve('vitest/vitest.mjs')
 
 /**
  * Raiz do projeto do app (onde vivem `vitest.config`/`package.json`): o filho
@@ -420,7 +426,7 @@ describe('C-3a armazenamento e publicação', () => {
     mkdirSync(join(stage, '..'), { recursive: true })
     writeFileSync(stage, Buffer.alloc(8, 5))
     inserirUpload({
-      sessionId: SID, chatId: CID, uploadId, artifactId: artifactIdDe({ sessionId: SID, chatId: CID, name: 'parcial.bin', declaredBytes: 16 }),
+      sessionId: SID, chatId: CID, uploadId, artifactId: artifactIdDe({ uploadId }),
       name: 'parcial.bin', declaredBytes: 16, mime: '', receivedBytes: 8, digest: null, state: 'recebendo',
       stagePath: stage, finalPath: final, mode: 'copy', scope: 'chat', workspaceRoot: null,
       createdAt: Date.now(), updatedAt: Date.now(), errorCode: null,

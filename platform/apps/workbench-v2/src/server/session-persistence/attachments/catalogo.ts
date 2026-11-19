@@ -87,6 +87,20 @@ export function atualizarUpload(sessionId: string, chatId: string, uploadId: str
     .run(...valores)
 }
 
+/**
+ * R2 — CLAIM do escritor numa única instrução condicional (atômica no SQLite).
+ * Devolve `true` só para quem realmente transicionou `admitido|falhou|cancelado`
+ * -> `recebendo`. Dois PUTs concorrentes nunca "veem" o mesmo estado livre:
+ * exatamente um ganha, antes de qualquer `await` de filesystem.
+ */
+export function reivindicarEscritor(sessionId: string, chatId: string, uploadId: string, stagePath: string): boolean {
+  const resultado = getDatabase().prepare(`
+    UPDATE attachment_uploads SET state = 'recebendo', stage_path = ?, updated_at = ?
+    WHERE session_id = ? AND chat_id = ? AND upload_id = ? AND state IN ('admitido', 'falhou', 'cancelado')
+  `).run(stagePath, Date.now(), sessionId, chatId, uploadId)
+  return Number(resultado.changes) === 1
+}
+
 export function obterUpload(sessionId: string, chatId: string, uploadId: string): LinhaUpload | undefined {
   const bruto = getDatabase().prepare('SELECT * FROM attachment_uploads WHERE session_id = ? AND chat_id = ? AND upload_id = ?')
     .get(sessionId, chatId, uploadId) as Record<string, unknown> | undefined
@@ -111,6 +125,12 @@ export function upsertArtigo(linha: LinhaArtigo): void {
       mode, locator, root_kind, workspace_root, bytes, sha256, state, message_id, part_id, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(artifact_id) DO UPDATE SET
+      -- R1 — o MESMO artefato (mesma tentativa) sempre tem os MESMOS bytes:
+      -- locator/hash/tamanho acompanham o commit, nunca ficam presos ao
+      -- primeiro registro. Vínculo de mensagem só é preenchido, não apagado.
+      locator = excluded.locator,
+      bytes = excluded.bytes,
+      sha256 = excluded.sha256,
       message_id = COALESCE(excluded.message_id, attachment_artifacts.message_id),
       part_id = COALESCE(excluded.part_id, attachment_artifacts.part_id)
   `).run(linha.artifactId, linha.sessionId, linha.chatId, linha.uploadId, linha.name, linha.modalidade, linha.papel,
@@ -236,18 +256,30 @@ export function emTransacao<T>(operacao: () => T): T {
   return getDatabase().transaction(operacao).immediate()
 }
 
-export function inserirPlanoLimpeza(linha: { sessionId: string; artifactId: string; alvo: 'chat-copy' | 'workspace-copy' | 'referencia'; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null }): void {
+export function inserirPlanoLimpeza(linha: { sessionId: string; chatId?: string | null; artifactId: string; alvo: 'chat-copy' | 'workspace-copy' | 'referencia'; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null }): void {
   getDatabase().prepare(`
-    INSERT INTO attachment_cleanup_plan (session_id, artifact_id, alvo, locator, root_kind, workspace_root, sha256, state, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', ?)
-    ON CONFLICT(session_id, artifact_id) DO NOTHING
-  `).run(linha.sessionId, linha.artifactId, linha.alvo, linha.locator, linha.rootKind, linha.workspaceRoot, linha.sha256, Date.now())
+    INSERT INTO attachment_cleanup_plan (session_id, chat_id, artifact_id, alvo, locator, root_kind, workspace_root, sha256, state, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', ?)
+    ON CONFLICT(session_id, artifact_id) DO UPDATE SET
+      chat_id = COALESCE(attachment_cleanup_plan.chat_id, excluded.chat_id),
+      locator = excluded.locator,
+      sha256 = COALESCE(attachment_cleanup_plan.sha256, excluded.sha256)
+  `)
+    .run(linha.sessionId, linha.chatId ?? null, linha.artifactId, linha.alvo, linha.locator, linha.rootKind,
+      linha.workspaceRoot, linha.sha256, Date.now())
 }
 
-export function planosPendentes(sessionId: string): Array<{ artifactId: string; alvo: string; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null; state: string; destino: string | null }> {
-  const brutos = getDatabase().prepare('SELECT * FROM attachment_cleanup_plan WHERE session_id = ? ORDER BY created_at').all(sessionId) as Array<Record<string, unknown>>
+export function planosPendentes(
+  sessionId: string,
+  opcoes: { chatId?: string } = {},
+): Array<{ artifactId: string; chatId: string | null; alvo: string; locator: string; rootKind: string; workspaceRoot: string | null; sha256: string | null; state: string; destino: string | null }> {
+  const brutos = (opcoes.chatId
+    ? getDatabase().prepare('SELECT * FROM attachment_cleanup_plan WHERE session_id = ? AND chat_id = ? ORDER BY created_at')
+      .all(sessionId, opcoes.chatId)
+    : getDatabase().prepare('SELECT * FROM attachment_cleanup_plan WHERE session_id = ? ORDER BY created_at').all(sessionId)) as Array<Record<string, unknown>>
   return brutos.map((bruto) => ({
     artifactId: bruto.artifact_id as string,
+    chatId: (bruto.chat_id as string | null) ?? null,
     alvo: bruto.alvo as string,
     locator: bruto.locator as string,
     rootKind: bruto.root_kind as string,

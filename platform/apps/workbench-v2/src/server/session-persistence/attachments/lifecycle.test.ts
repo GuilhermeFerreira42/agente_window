@@ -1,14 +1,15 @@
 // C-3a — ciclo de vida na exclusão e migração (T27/T28/T29/T32/R12/R04).
 import Database from 'better-sqlite3'
 import { createHash } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { PassThrough, Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getDatabase, resetDatabase, upsertSessionRecord } from '../database'
 import { getDatabasePath } from '../paths'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao, sessaoExcluida } from '../deletions'
+import type { PortaLixeira, ResultadoLixeira } from './lixeira'
 import { receipt } from '../sessionMutations'
 import { readTranscript, writeTranscript, type TranscriptEntry } from '../transcripts'
 import { atualizarUpload, listarArtigosChat, obterArtigo, obterUpload, planosPendentes } from './catalogo'
@@ -43,12 +44,42 @@ function seedWorkspace(id: string, chatId: string, slug: string, raiz: string): 
   })
 }
 
-/** Lixeira dos ensaios: XDG temporário, plataforma explícita, nada real tocado. */
-async function lixeiraTemporaria(): Promise<{ pastaTrash: string; opcoes: { plataforma: NodeJS.Platform; pastaTrash: string } }> {
+/**
+ * W2 — Lixeira dos ensaios: porta INJETADA com destino temporário controlado.
+ *
+ * A fixture antiga escolhia `plataforma: 'win32'` no Windows e depois asseria o
+ * arquivo em `pastaTrash/files` (layout XDG): no Windows o adapter nativo usa a
+ * Lixeira do SO, então o arquivo saía do lugar certo e a asserção falhava por
+ * plataforma — não por defeito do produto. Aqui a porta é explícita e
+ * independente de SO; o adapter nativo tem seu próprio teste (`lixeira.ts`).
+ */
+async function lixeiraTemporaria(): Promise<{
+  pastaTrash: string
+  opcoes: { plataforma: NodeJS.Platform; pastaTrash: string }
+  lixeira: PortaLixeira
+}> {
   const pastaTrash = join(base, 'lixeira-xdg')
   mkdirSync(join(pastaTrash, 'files'), { recursive: true })
   mkdirSync(join(pastaTrash, 'info'), { recursive: true })
-  return { pastaTrash, opcoes: { plataforma: process.platform === 'win32' ? 'win32' : 'linux', pastaTrash } }
+  // Porta injetada: move para o destino controlado (nunca apaga) e informa o
+  // caminho final — é a MESMA forma contratual de `moverParaLixeira`.
+  let sequencia = 0
+  const lixeira = {
+    mover: async (absoluto: string): Promise<ResultadoLixeira> => {
+      sequencia += 1
+      // Destino controlado da fixture (sempre a pasta temporária do ensaio).
+      const alvo = join(pastaTrash, 'files', basename(absoluto))
+      mkdirSync(dirname(alvo), { recursive: true })
+      try {
+        renameSync(absoluto, alvo)
+        return { ok: true, destino: alvo }
+      } catch {
+        void sequencia
+        return { ok: false, motivo: 'fixture recusou a movimentação' }
+      }
+    },
+  }
+  return { pastaTrash, opcoes: { plataforma: 'linux', pastaTrash }, lixeira }
 }
 
 async function publicarCopia(
@@ -149,7 +180,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
     expect(existsSync(finalWs.final)).toBe(true)
     expect(existsSync(original)).toBe(true)
 
-    const concluido = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes })
+    const concluido = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes, lixeira: lixeira.lixeira })
     expect(concluido.cleanupState).toBe('concluido')
 
     // Privado exclusivo da conversa sai (para a LIXEIRA, não `rm`) e o
@@ -183,7 +214,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
     iniciarOuConsultarDelecao({ sessionId: SID, deletionId: 'del-t28', expectedRevision: 0 })
     // B06/H3 — arquivo divergente NÃO pode resultar em exclusão "concluída":
     // o plano falha, o blob fica, o LEDGER fica e a limpeza continua pendente.
-    await expect(executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes }))
+    await expect(executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes, lixeira: lixeira.lixeira }))
       .rejects.toMatchObject({ status: 503, code: 'session_cleanup_pending' })
     expect(sessaoExcluida(SID)).toBe(true)
     const falhas = planosPendentes(SID).filter((item) => item.state === 'falhou')
@@ -200,7 +231,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
 
     // Restaurar a versão íntegra (ação humana) permite retomar e CONCLUIR.
     writeFileSync(divergente.final, 'conteúdo B antes da adulteração', 'utf8')
-    const retry = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes })
+    const retry = await executarLimpezaDelecao(SID, false, { lixeiraOpcoes: lixeira.opcoes, lixeira: lixeira.lixeira })
     expect(retry.cleanupState).toBe('concluido')
     expect(existsSync(exclusivo.final)).toBe(false)
     expect(existsSync(divergente.final)).toBe(false)
