@@ -1,3 +1,11 @@
+# Leitura vigente do roadmap — 19/11/2026
+
+**Ponto atual: C-3a homologada; C-3b não iniciada e ainda sem pacote executável consolidado.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20. Esta atualização é documental, não inicia especificação ou implementação.
+
+As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
+
+---
+
 # Estado vigente — 19/11/2026 — C-3a homologada pelo proprietário
 
 O proprietário informou que já fez pull e homologou o processo. HEAD local `a49cc6c` (`693051a` + evidência E13 em `a49cc6c`), branch `0f2e5de2-agente-window`. Aceite registrado em `08`: inclui nome original da cópia no projeto com sufixo em colisão e opção de cópia na landing; armazenamento privado segue padrão, arquivos antigos não são renomeados. Código e presença dos dois ajustes conferidos nesta sessão; sem mudança de implementação.

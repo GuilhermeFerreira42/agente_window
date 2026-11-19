@@ -1,3 +1,9 @@
+# 19/11/2026 — sequência de microfatias consolidada antes da Fatia 16
+
+A pedido do proprietário, corrigida a portabilidade do planejamento: 06 reúne ordem, objetivo, situação e dependências P-A→persistência/centro/multimodalidade/configurações→extensibilidade→retomada da Fatia 16; 01 aponta para essa fonte e deixa de apresentar C-1 como próxima; 03 identifica ponto atual e precedência das entradas históricas. Esclarecido o caráter progressivo de MM-I/MM-O, a discussão reservada e a ausência de aceite humano explícito próprio localizado para P-B/C-2. Sem novas decisões de produto, aceites inferidos, código alterado ou testes repetidos. Nenhum décimo documento canônico criado. Publicação autorizada pelo proprietário nesta conversa.
+
+---
+
 # 19/11/2026 — registro do aceite humano da C-3a
 
 Proprietário informou pull concluído e processo homologado após os ajustes da Arena (`693051a` e `a49cc6c`). Conferidos HEAD, árvore inicialmente limpa e presença do nome original no destino/checkbox na landing. Aceite registrado em `08`, estado/limites em `03`/`06`/`09`. Nenhuma implementação, teste automatizado, commit, push, merge ou início da C-3b nesta rodada. A revisão Windows anterior cobriu `8af269e`; os gates Debian da usabilidade são relatados pela Arena e não foram tratados como execução local.

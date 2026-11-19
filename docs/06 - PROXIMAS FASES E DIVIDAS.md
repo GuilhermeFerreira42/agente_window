@@ -1,3 +1,44 @@
+# Sequencia vigente ate a Fatia 16
+
+**Mapa canônico consolidado em 19/11/2026, por solicitação do proprietário.** Este é o ponto de consulta da ordem e do objetivo das fatias; `03` indica o trabalho atual, `08` registra os aceites humanos e `09` as provas. Os números 13–20 continuam sendo a trilha original, mas **não descrevem sozinhos o planejamento atual**. As microfatias abaixo foram intercaladas antes da retomada da Fatia 16, sem renumerar a trilha antiga.
+
+## Como ler a sequência
+
+Antecedentes: Fatia 13 (terminal para o agente), MICRO-FATIA DELETE, Fatias 14 e 15; o programa M1–M8/MC1 é uma frente distinta de memória do produto. As Fatias 14/15 têm aceite informado registrado em `08`/D186; M1–M8/MC1 continuam com homologação humana própria pendente. O replanejamento de 13/11 introduziu persistência, centro, multimodalidade e configurações antes de retomar extensibilidade e a Fatia 16. A skill de memória operacional **não é** uma fatia nem requisito funcional desse programa.
+
+| Ordem de referência | Fatia | Objetivo | Situação confirmada nesta consolidação |
+| --- | --- | --- | --- |
+| 1 | **P-A — gravação e recuperação** | CAS/revisões, mutationId/ACK, fila de saves e rascunhos preservados em falhas/conflitos. | Concluída tecnicamente; homologação humana confirmada pelo proprietário. |
+| 2 | **P-B — publicação recuperável** | Manter JSONL e catálogo SQLite coerentes após interrupção; reconciliar intenções e diagnosticar sessões indisponíveis. | Concluída tecnicamente e validada no Windows; não foi localizado aceite humano explícito próprio em 08. Não inferir aceite pela P-C. |
+| 3 | **P-C — exclusão segura** | Exclusão idempotente, tombstone e limpeza retomável, sem gravação tardia recriar a conversa. | Homologada pelo proprietário em 15/11. |
+| 4 | **C-1 — Chat e workspace imutáveis** | Separar Chat sem pasta de conversa com pasta real; preservar a raiz original e o alcance das ferramentas. | Homologada em 16/11; dívida aceita C1-EXCLUSAO-01 permanece separada. |
+| 5 | **MM-0 — base multimodal neutra** | Contratos de mensagens/partes/artefatos/capacidades, avaliação conservadora e compatibilidade com texto. | Homologada em 16/11. Não implementa codecs nem geração por si só. |
+| 6 | **C-2 — tela inicial e seletores reais** | Composer inicial, modelo/provedor exatos, modos/permissões, Chat/pastas recentes, estado e navegação coerentes. | Implementação encerrada e publicada, com validação Windows; registro de 17/11 ainda distingue encerramento técnico de aceite humano final não explicitado em 08. Não reabrir implementação nem conceder aceite por consequência da C-3a. |
+| 7 | **C-3a — anexar, armazenar e baixar** | Upload de qualquer formato em Chat/Pasta, identidade/recuperação/lifecycle, download e cópia explícita em `uploads/` do projeto. | Homologada em 19/11, incluindo nome original com sufixo em colisão e opção de cópia na tela inicial. |
+| 8 | **C-3b — apresentar conteúdo e respostas multimodais** | Partes/eventos de saída, artefatos gerenciados, apresentação passiva de imagem/áudio/vídeo/arquivo, Abrir/Salvar/reabrir e retenção, usando a mesma porta C-3a. | Não iniciada. Próxima preparação desta frente: consolidar SPEC executável contra o código atual. Existe alinhamento de fronteiras, não pacote de execução completo. Não confundir apresentação com IA interpretar/gerar mídia. |
+| 9 | **U-1 — Configurações unificadas** | Reunir Configurações, Provedores e Personalizações reais no modal aprovado, reutilizando views e seus donos. | Planejada; requer pacote executável atualizado antes da implementação. Não depende de concluir todos os codecs nem de E1. |
+| 10 | **MM-I — entrada multimodal por adapter** | Enviar ao modelo conteúdos/representações realmente suportados, com limites e capacidades comprovados. | Planejada, progressiva; sem implementação/aceite atribuído por MM-0 ou C-3a. |
+| 11 | **MM-O — saída multimodal por adapter** | Integrar geração/saídas de mídia dos provedores e publicá-las como artefatos/partes persistidos. | Planejada, progressiva; não é geração já entregue pela C-3b. |
+| 12 | **Discussão futura reservada pelo proprietário** | Reavaliar prioridade antes da retomada da extensibilidade. | Conteúdo e resultado ainda não definidos. Não inventar requisito nem pular a discussão por autonomia técnica. |
+| 13 | **E0 → E1–E6 — extensibilidade** | Retomar investigação/recortes de agentes personalizados, skills, instruções, hooks, MCP, plugins, instalações, configurações e permissões na estrutura existente. | E0 tem investigação externa; E1–E6 são propostas a reavaliar e especificar, não arquitetura definitiva nem implementação autorizada. Ruflo permanece integração opcional, não runtime obrigatório. |
+| 14 | **Fatia 16 — Terminal 2.0** | Retomar o plano original: paridade visual/comportamental do terminal, posicionamento/painéis, sessões preservadas e dívidas do terminal conforme SPEC própria. | Adiada até as prioridades anteriores serem tratadas e o proprietário confirmar a retomada. Não confundir com a Fatia 13 (terminal para o agente). |
+
+**Dependências e prioridade:** P-A → P-B → P-C → C-1 → MM-0 → C-2 → C-3a → C-3b. Depois, U-1 é a prioridade de produto aprovada. MM-I/MM-O são subentregas progressivas com autorização/homologação individual; as posições da tabela não exigem concluir todas as modalidades/codecs para retomar extensibilidade. A discussão reservada vem após o centro/Configurações e antes da eventual retomada E1–E6; sua relação com cada subentrega MM-I/MM-O depende da priorização do proprietário, sem reordenamento automático. As setas C-3b→U-1 e U-1→discussão representam prioridade, não acoplamento técnico entre módulos.
+
+**O que já existe não precisa ser reinventado:** persistência/fila/SQLite/JSONL, contratos MM-0, UI Personalizações e porta de artefatos C-3a são bases de reaproveitamento. A partir da C-3b, preparar uma SPEC executável por vez contra o código real, com critérios de aceite, testes Debian/Windows e parada para homologação. Não criar segundo store/composer, runtime externo obrigatório ou novas responsabilidades de domínio no App.
+
+## Suficiência e proveniência
+
+Esta tabela resume o replanejamento do proprietário de 13/11 e suas entregas posteriores, confrontadas com `03`/`08`/`09`, sem inferir implementação por existência de uma SPEC. O detalhamento e as evidências externas ficam em `memoria-de-projeto/replanejamento-2026-11-13/` (F/H/C/E), `especificacoes/C-3a/` e nas entregas de cada microfatia. **Quem recebe apenas este repositório já consegue recuperar ordem, propósito, situação e próxima preparação.** Os pacotes externos continuam necessários para executar os critérios detalhados que ainda não foram consolidados em SPEC da próxima fatia; sua ausência não autoriza inventá-los.
+
+Esta consolidação não cria aceite humano para P-B/C-2/M1–M8/MC1, não invalida entregas posteriores já autorizadas pelo proprietário e não autoriza implementar ou fazer merge de outra fatia.
+
+## Registros anteriores — histórico, não próxima ação vigente
+
+As seções abaixo preservam decisões, descrições de dívidas e fotografias de cada rodada. Frases como “próxima C-1”, “MM-0 não iniciada”, “C-3 não iniciada” e títulos “Estado vigente” ou “Próximas fases” nas entradas datadas descrevem **aquela data**, não substituem esta tabela. A D133 e o mapa antigo 13–20 continuam referência da trilha original; o replanejamento intercalado acima prevalece para decidir o que consultar antes da Fatia 16. Uma dívida citada abaixo só é atual quando não sucedida por resolução/aceite posterior; não considerar toda anotação histórica uma pendência aberta.
+
+---
+
 # C-3a — encerramento por homologação humana, 19/11/2026
 
 C-3a homologada explicitamente pelo proprietário após pull da reentrega de usabilidade (HEAD local `a49cc6c`); aceite em `08`, estado e proveniência em `03`/`09`. Opção de cópia na landing e nome original em `uploads/` entregues, sem sobrescrever colisões e sem renomear arquivos antigos. Não há pendência de aceite humano da C-3a no estado vigente.
