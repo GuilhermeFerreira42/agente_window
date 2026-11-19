@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Download,
   Check,
   Clipboard,
@@ -16,6 +16,15 @@ import { Download,
 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
+import { MessageParts } from './MessageParts'
+import {
+  montarApresentacao,
+  type CardArtefato,
+  type ItemApresentacao,
+} from '../domain/apresentacaoMultimodal'
+import { classificarPreview } from '../domain/politicaPreview'
+import { lerEnvelopeMultimodal } from '../domain/multimodal/mensagens'
+import { baixarArtefato, urlDeMidia } from '../services/sessions/artefatosMediaClient'
 import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
@@ -213,6 +222,66 @@ async function baixarAnexoComNome(sessionId: string, chatId: string, artifactId:
   URL.revokeObjectURL(url)
 }
 
+/**
+ * C-3b — itens de apresentação de UMA mensagem.
+ *
+ * A ORDEM vem do domínio (`montarApresentacao`); aqui só traduzimos anexo →
+ * card. Card sem `estado` conhecido assume `pronto`: a C-3a já gravou o estado
+ * real no anexo, e inventar "ausente" esconderia arquivo que existe.
+ */
+function itensDaMensagem(mensagem: ChatMessage): {
+  itens: ItemApresentacao[]
+  envelopeValido: boolean
+  diagnostico?: string
+} {
+  const leitura = lerEnvelopeMultimodal(mensagem.multimodal)
+  // Só usa o caminho novo quando o envelope é VÁLIDO; qualquer outro estado
+  // cai no legado, que já funciona (inclusive `desconhecido`, com diagnóstico).
+  const envelope = leitura.estado === 'valido' ? leitura.envelope : undefined
+  const diagnostico = leitura.estado === 'desconhecido' ? leitura.diagnostico : undefined
+
+  const cardPara = (artifactId: string): CardArtefato => {
+    const anexo = mensagem.attachments?.find((a) => a.artifactId === artifactId)
+    // Sem bytes no DTO não há como classificar: fica `arquivo` com download,
+    // que é o comportamento honesto (não inventamos preview).
+    const classificacao = anexo?.bytes !== undefined
+      ? classificarPreview(undefined)
+      : classificarPreview(undefined)
+    return {
+      artifactId,
+      name: anexo?.name ?? 'arquivo',
+      bytes: anexo?.bytes,
+      modalidade: anexo?.modalidade ?? 'arquivo',
+      // `pronto`/`referencia` = bytes servíveis. `transferindo`/`selecionado`
+      // ainda não têm arquivo final; `legado` já existia antes da C-3a.
+      estado: anexo?.estado === 'pronto' || anexo?.estado === 'referencia'
+        ? 'pronto'
+        : anexo?.estado === 'transferindo' || anexo?.estado === 'legado' || anexo?.estado === undefined
+          ? 'indisponivel'
+          : 'pronto',
+      preview: classificacao,
+    }
+  }
+
+  return {
+    itens: montarApresentacao({
+      conteudo: mensagem.content,
+      anexos: (mensagem.attachments ?? []).map((a) => ({
+        id: a.artifactId ?? a.id,
+        name: a.name,
+        bytes: a.bytes,
+        estado: a.estado === 'referencia' ? 'pronto' : (a.estado as 'pronto' | 'ausente' | undefined),
+      })),
+      ...(envelope ? { envelope } : {}),
+      cardPara: (artifactId: string) => cardPara(artifactId),
+    }),
+    // Envelope válido = caminho novo. Qualquer outro estado usa o legado,
+    // que a C-3a já entregou e continua igual.
+    envelopeValido: envelope !== undefined,
+    ...(diagnostico ? { diagnostico } : {}),
+  }
+}
+
 function MessageRow({
   onAbrirFonteHistorica,
   onEscolherHistorico,
@@ -247,6 +316,9 @@ function MessageRow({
   onReport: (messageId: string) => void
   canRegenerate: boolean
 }) {
+  // C-3b — memo do que desenhar. `montarApresentacao` é puro e barato; o memo
+  // evita refazer a classificação a cada tecla digitada no composer.
+  const apresentacao = useMemo(() => itensDaMensagem(message), [message])
   return (
     <article className={`chat-message ${message.role === 'user' ? 'is-request' : 'is-response'}${message.running ? ' is-running' : ''}${message.cancelled ? ' is-cancelled' : ''}`} data-message-id={message.id} tabIndex={0}>
       <div className="chat-message-header">
@@ -259,7 +331,20 @@ function MessageRow({
         </div>
       </div>
       <div className="chat-message-body">
-        {message.attachments && message.attachments.length > 0 && (
+        {/* C-3b — quando a mensagem tem envelope válido, as PARTES mandam na
+            ordem e o bloco legado sai de cena (senão o mesmo arquivo apareceria
+            duas vezes). Sem envelope, tudo abaixo continua exatamente como era. */}
+        {apresentacao.envelopeValido ? (
+          <MessageParts
+            itens={apresentacao.itens.filter((item) => item.tipo !== 'texto' || item.texto.length > 0)}
+            urlPara={(artifactId) => urlDeMidia(sessionId ?? null, chatId ?? null, artifactId) ?? ''}
+            aoBaixar={(card) => {
+              if (!sessionId || !chatId) return
+              void baixarArtefato(sessionId, chatId, card.artifactId, card.name)
+            }}
+            {...(apresentacao.diagnostico ? { diagnosticoEnvelope: apresentacao.diagnostico } : {})}
+          />
+        ) : message.attachments && message.attachments.length > 0 && (
           <div className="chat-message-attachments" role="list" aria-label="Anexos enviados">
             {message.attachments.map((attachment) => (
               <span
