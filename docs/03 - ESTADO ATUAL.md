@@ -1,3 +1,15 @@
+# Estado vigente — 19/11/2026 — C-3a: ajustes de usabilidade (nome original + opção na tela inicial)
+
+Dois ajustes pedidos **antes da homologação**, ambos só na C-3a: sem merge, sem C-3b, sem homologação automática.
+
+**Ajuste 1 — nome original na cópia do projeto.** `caminhoFinalWorkspace` montava `<raiz>/uploads/<artifactId>-<nome>`. Reproduzido vermelho antes (`A1` via `bb113d6e-…-relatorio final.txt`; `A2` dois `nota.txt` sem `nota (1).txt`) e corrigido: o destino agora é `<raiz>/uploads/<nome>`. A identidade interna continua sendo o `artifactId` (ledger, recibos, recuperação) — nada foi renomeado do lado do banco. Colisão nunca sobrescreve: o sufixo `arquivo (1).ext` é decidido na publicação por `destinoLivre` + `EEXIST` + posse por inode, que já existia. **Arquivos antigos com prefixo continuam intactos e acessíveis** (o ledger guarda o caminho; nada foi migrado nesta tarefa).
+
+**Ajuste 2 — "Salvar cópia na pasta do projeto" na tela inicial.** A opção existia só no composer da conversa. Agora a landing renderiza o mesmo `label.attachment-modocopia` junto aos chips, **só** com Pasta selecionada e anexo local, **desmarcado por padrão**. O estado vive no anexo (`modoCopia`), portanto o primeiro envio o respeita (`enviarAnexos` → `scope: 'workspace'`) e a retentativa o preserva sem código novo. Chat sem pasta continua sem a opção. `App.tsx` não ganhou responsabilidade: o componente já recebia `workspacePath`/`contexto` e `setAnexos` já persistia no rascunho.
+
+Gates no Debian/Node 26.13.0: `ajustes.test.ts` **5/5** (A1/A2 vermelhos antes), `SessionLanding.test.tsx` **18/18** (3 novos, 2 vermelhos sem a correção), anexos **79/79**, persistência **321 aprovados / 1 pulado**, foco **207/0/0**, ampla **2111 · 3 nominais · 33 pulados**, E2E **C-3a 15/15** (E11–E15 novos) **+ C-1 6/6 + C-2 17/17**, tipos 0, lint dos alterados 0/0, build ✓ 44,5 s. Sondas **não reexecutadas**. **Windows não executado** aqui: os números Windows anteriores são de `b5cb48d` e **não** valem para este commit até reexecução.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/ajustes-usabilidade/ENTREGA_C3A_AJUSTES.md`.
+
 # Estado vigente — 19/11/2026 — C-3a: U4 corrigido; correções anteriores confirmadas
 
 A revisão independente de `b5cb48d` confirmou U1, U2/W3 e U3 (e manteve foco 204/204, anexos 85/85 e E2E 10/10 no Windows) e apontou **um** bloqueio de recuperação: **U4**. Corrigido **somente na C-3a**, sem merge, sem C-3b e sem homologação.

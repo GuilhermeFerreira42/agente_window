@@ -86,8 +86,19 @@ export function caminhoFinalChat(appDir: string | undefined, sessionId: string, 
   return path.join(raizPrivadaChat(appDir), sessionId, chatId, artifactId, nome)
 }
 
-export function caminhoFinalWorkspace(workspaceRoot: string, artifactId: string, nome: string): string {
-  return path.join(workspaceRoot, 'uploads', `${artifactId}-${nome}`)
+/**
+ * Destino da cópia EXPLÍCITA no projeto.
+ *
+ * O nome original é preservado (`<raiz>/uploads/relatorio final.txt`). A
+ * identidade interna continua sendo o `artifactId` (ledger/recibos), não o
+ * nome do arquivo. Colisões NUNCA sobrescrevem: `destinoLivre` publica como
+ * `arquivo (1).ext`, na publicação (que é quem prova ownership por inode).
+ *
+ * Arquivos antigos (`<artifactId>-<nome>`) permanecem intactos e acessíveis:
+ * nada é renomeado, e o ledger continua apontando para o caminho gravado.
+ */
+export function caminhoFinalWorkspace(workspaceRoot: string, _artifactId: string, nome: string): string {
+  return path.join(workspaceRoot, 'uploads', nome)
 }
 
 function politicaOuBloqueio(): PoliticaAnexos {

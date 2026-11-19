@@ -13,7 +13,7 @@ import type { PortaLixeira, ResultadoLixeira } from './lixeira'
 import { receipt } from '../sessionMutations'
 import { readTranscript, writeTranscript, type TranscriptEntry } from '../transcripts'
 import { atualizarUpload, listarArtigosChat, obterArtigo, obterUpload, planosPendentes } from './catalogo'
-import { admitirUpload, caminhoFinalChat, cancelarUpload, receberConteudo } from './estoque'
+import { admitirUpload, cancelarUpload, receberConteudo } from './estoque'
 import { registrarReferencia } from './referencias'
 import { tratarRotasAnexos } from './rotas'
 import { validarSchemaAnexos } from './schemaAnexos'
@@ -90,10 +90,10 @@ async function publicarCopia(
     sessionId, chatId, name, declaredBytes: bytes.length, mode: 'copy', scope: escopo, workspaceRoot,
   })
   await receberConteudo(sessionId, chatId, recibo.uploadId, Readable.from([bytes]))
-  // Nome final do workspace: `<uploads>/<artifactId>-<nome>` (R03/B04).
-  const final = escopo === 'workspace'
-    ? join(workspaceRoot!, 'uploads', `${recibo.artifactId}-${name}`)
-    : caminhoFinalChat(undefined, sessionId, chatId, recibo.artifactId, name)
+  // O caminho final vem do PRODUTO (linha do upload), não de uma fórmula
+  // replicada no teste: no projeto o nome original é preservado e uma colisão
+  // gera sufixo (`arquivo (1).ext`) já decidido na publicação.
+  const final = obterUpload(sessionId, chatId, recibo.uploadId)!.finalPath!
   return { uploadId: recibo.uploadId, artifactId: recibo.artifactId, final }
 }
 
@@ -337,7 +337,7 @@ describe('C-3a ciclo de vida na exclusão', () => {
     writeFileSync(stageWs, Buffer.alloc(4, 9))
     await cancelarUpload(SID, CID, emVooWs.uploadId)
     expect(existsSync(stageWs)).toBe(false)
-    expect(existsSync(join(ws, 'uploads', `${emVooWs.uploadId}-parcial-ws.bin`))).toBe(false)
+    expect(existsSync(join(ws, 'uploads', 'parcial-ws.bin'))).toBe(false)
     expect(existsSync(finalWs.final)).toBe(antes)
     expect(obterUpload(SID, CID, emVooWs.uploadId)!.state).toBe('cancelado')
   })

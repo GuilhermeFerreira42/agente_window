@@ -401,9 +401,10 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     expect(envio.status()).toBe(200)
     expect((await envio.json()).state).toBe('pronto')
 
-    // A cópia FINAL vive no projeto, fora do diretório privado do app, no
-    // formato do contrato R03: <workspaceRoot>/uploads/<artifactId>-<nome>.
-    const copiaNoProjeto = join(projeto, 'uploads', `${recibo.artifactId}-nota-do-projeto.txt`)
+    // A cópia FINAL vive no projeto, fora do diretório privado do app, com o
+    // NOME ORIGINAL preservado: <workspaceRoot>/uploads/<nome>. A identidade
+    // interna continua sendo o artifactId (recibo/ledger), não o nome.
+    const copiaNoProjeto = join(projeto, 'uploads', 'nota-do-projeto.txt')
     expect(existsSync(copiaNoProjeto), 'cópia explícita gravada no projeto').toBe(true)
     expect(readFileSync(copiaNoProjeto, 'utf8')).toBe(conteudo)
 
@@ -605,5 +606,199 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await expect(page.getByRole('list', { name: 'Anexos enviados' })).toHaveCount(0)
     await expect(page.getByText('segunda mensagem só de texto no chat')).toBeVisible()
     await shot(page, 'c3a_e10_so_texto')
+  })
+
+  // ── Ajustes de usabilidade (C-3a): nome original + opção na tela inicial ──
+
+  /** Anexa um arquivo na LANDING (tela inicial, antes do primeiro envio). */
+  async function anexarNaLanding(page: Page, nome: string, conteudo: string): Promise<void> {
+    const entrada = page.locator('.session-landing input[type="file"]').first()
+    await entrada.setInputFiles({ name: nome, mimeType: 'text/plain', buffer: Buffer.from(conteudo) })
+    await expect(page.getByRole('group', { name: new RegExp(nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).first())
+      .toBeVisible()
+  }
+
+  const opcaoCopia = (page: Page) => page.getByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
+
+  test('E11 — tela inicial com "Salvar cópia" MARCADA: cópia em uploads/ com nome original e conteúdo correto', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e11')
+    mkdirSync(projeto, { recursive: true })
+    await irParaLanding(page)
+    // Pasta escolhida ANTES do primeiro envio (seletor real, caminho validado).
+    const seletor = page.getByTestId('landing-contexto')
+    await seletor.click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(projeto)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
+    await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
+
+    const conteudo = 'conteudo salvo no projeto pela landing (E11)'
+    await anexarNaLanding(page, 'relatorio final.txt', conteudo)
+
+    // A opção EXISTE antes do primeiro envio, e começa DESMARCADA.
+    const caixa = opcaoCopia(page)
+    await expect(caixa).toBeVisible()
+    await expect(caixa).not.toBeChecked()
+    await caixa.check()
+    await expect(caixa).toBeChecked()
+
+    await campoLanding(page).fill('primeiro envio com copia explicita')
+    await botaoEnviarLanding(page).click()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+
+    // A cópia está no PROJETO, com o nome ORIGINAL e os bytes corretos.
+    const copia = join(projeto, 'uploads', 'relatorio final.txt')
+    await expect.poll(() => existsSync(copia), { timeout: 20_000 }).toBe(true)
+    expect(readFileSync(copia, 'utf8')).toBe(conteudo)
+    // E o download do dono devolve os mesmos bytes.
+    const lista = await page.request.get(`${BASE}/api/sessions/${(await sessaoAtiva(page)).sessionId}/chats/${(await sessaoAtiva(page)).chatId}/attachments`, { headers: headersApi })
+    const corpo = await lista.json()
+    const artigo = (corpo.attachments as Array<{ artifactId: string; name: string }>).find((item) => item.name === 'relatorio final.txt')!
+    expect(artigo).toBeTruthy()
+    await expect.poll(async () => (await bytesDoArtefato(page, artigo.artifactId)).toString('utf8')).toBe(conteudo)
+    await shot(page, 'c3a_e11_landing_copia_marcada')
+  })
+
+  test('E12 — tela inicial com a opção DESMARCADA: armazenamento privado, sem cópia no projeto', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e12')
+    mkdirSync(projeto, { recursive: true })
+    await irParaLanding(page)
+    const seletor = page.getByTestId('landing-contexto')
+    await seletor.click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(projeto)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
+    await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
+
+    await anexarNaLanding(page, 'privado.txt', 'nao deve ir para o projeto (E12)')
+    await expect(opcaoCopia(page)).not.toBeChecked()
+    await campoLanding(page).fill('primeiro envio privado')
+    await botaoEnviarLanding(page).click()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+
+    // Nenhum arquivo do projeto foi criado; a pasta uploads/ nem precisa existir.
+    const uploads = join(projeto, 'uploads')
+    const arquivos = existsSync(uploads) ? readdirSync(uploads).filter((nome) => nome !== '.stages') : []
+    expect(arquivos, 'sem escolha explícita, nada é copiado para o projeto').toHaveLength(0)
+    await shot(page, 'c3a_e12_landing_privado')
+  })
+
+  test('E13 — dois arquivos DIFERENTES com o mesmo nome: ambos preservados, sem sobrescrita', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e13')
+    mkdirSync(projeto, { recursive: true })
+    await criarSessaoDePasta(page, projeto, 'jornada e13 mesmo nome')
+    const { sessionId, chatId } = await sessaoAtiva(page)
+
+    const enviar = async (conteudo: string) => {
+      const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
+        headers: { ...headersApi, 'Content-Type': 'application/json' },
+        data: { name: 'duplicado.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace' },
+      })
+      expect(admissao.status()).toBe(201)
+      const recibo = await admissao.json()
+      const envio = await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${recibo.uploadId}/content`, {
+        headers: { ...headersApi, 'Content-Type': 'application/octet-stream' },
+        data: Buffer.from(conteudo),
+      })
+      expect(envio.status()).toBe(200)
+      return { recibo, corpo: await envio.json() }
+    }
+
+    const primeiro = await enviar('CONTEUDO UM')
+    const segundo = await enviar('CONTEUDO DOIS')
+
+    const uploads = join(projeto, 'uploads')
+    const copias = readdirSync(uploads).filter((nome) => nome !== '.stages').sort()
+    // O primeiro mantém o nome original; o segundo ganha sufixo simples.
+    expect(copias).toEqual(['duplicado (1).txt', 'duplicado.txt'])
+    expect(readFileSync(join(uploads, 'duplicado.txt'), 'utf8')).toBe('CONTEUDO UM')
+    expect(readFileSync(join(uploads, 'duplicado (1).txt'), 'utf8')).toBe('CONTEUDO DOIS')
+    // Identidades internas distintas e ambos os downloads corretos.
+    expect(primeiro.corpo.artifactId).not.toBe(segundo.corpo.artifactId)
+    expect((await bytesDoArtefato(page, primeiro.corpo.artifactId)).toString('utf8')).toBe('CONTEUDO UM')
+    expect((await bytesDoArtefato(page, segundo.corpo.artifactId)).toString('utf8')).toBe('CONTEUDO DOIS')
+    await shot(page, 'c3a_e13_dois_mesmo_nome')
+  })
+
+  test('E14 — retentativa e F5: nenhuma cópia adicional; excluir a conversa preserva a cópia explícita', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e14')
+    mkdirSync(projeto, { recursive: true })
+    await criarSessaoDePasta(page, projeto, 'jornada e14 retentativa e exclusao')
+    const { sessionId, chatId } = await sessaoAtiva(page)
+    const conteudo = 'copia explicita que sobrevive a tudo (E14)'
+
+    const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { name: 'preservar.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace' },
+    })
+    const recibo = await admissao.json()
+    const urlConteudo = `${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${recibo.uploadId}/content`
+    const envio = await page.request.put(urlConteudo, {
+      headers: { ...headersApi, 'Content-Type': 'application/octet-stream' },
+      data: Buffer.from(conteudo),
+    })
+    expect(envio.status()).toBe(200)
+    const copia = join(projeto, 'uploads', 'preservar.txt')
+    await expect.poll(() => existsSync(copia), { timeout: 20_000 }).toBe(true)
+
+    // Retentativa do MESMO pedido (ACK perdido): não cria cópia adicional.
+    const retryAdmissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { uploadId: recibo.uploadId, name: 'preservar.txt', bytes: Buffer.byteLength(conteudo), mime: 'text/plain', mode: 'copy', scope: 'workspace' },
+    })
+    expect([200, 201]).toContain(retryAdmissao.status())
+    const retryCorpo = await retryAdmissao.json()
+    expect(retryCorpo.artifactId).toBe(recibo.artifactId)
+    const copias = readdirSync(join(projeto, 'uploads')).filter((nome) => nome !== '.stages')
+    expect(copias).toEqual(['preservar.txt'])
+
+    // F5 mantém o anexo acessível na conversa.
+    await page.reload()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+    await expect(page.getByRole('list', { name: 'Anexos enviados' }).first()).toBeVisible({ timeout: 20_000 })
+
+    // Excluir a conversa preserva a cópia EXPLÍCITA no projeto. A revisão é
+    // relida AGORA: anexar/tentar já avançou a revisão da sessão.
+    const { revision: revisaoAtual } = await sessaoAtiva(page)
+    const exclusao = await page.request.delete(`${BASE}/api/sessions/${sessionId}`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { deletionId: randomUUID(), expectedRevision: revisaoAtual },
+    })
+    expect([200, 202], `DELETE da sessão: ${await exclusao.text()}`).toContain(exclusao.status())
+    expect(readFileSync(copia, 'utf8'), 'excluir a conversa nunca apaga a cópia do projeto').toBe(conteudo)
+    await shot(page, 'c3a_e14_retry_f5_exclusao')
+  })
+
+  test('E15 — a opção funciona na tela inicial e na conversa aberta, nos dois temas', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e15')
+    mkdirSync(projeto, { recursive: true })
+    await irParaLanding(page)
+    const seletor = page.getByTestId('landing-contexto')
+    await seletor.click()
+    await page.getByLabel('Buscar ou digitar caminho da pasta').fill(projeto)
+    await page.getByLabel('Buscar ou digitar caminho da pasta').press('Enter')
+    await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
+
+    const temas = ['Mudar para tema claro', 'Mudar para tema escuro'] as const
+    for (const tema of temas) {
+      // LANDING: opção presente com Pasta selecionada.
+      await anexarNaLanding(page, `landing-${tema.includes('claro') ? 'claro' : 'escuro'}.txt`, 'x')
+      await expect(opcaoCopia(page)).toBeVisible()
+      await page.getByRole('button', { name: tema }).click()
+      await expect(opcaoCopia(page)).toBeVisible()
+      await shot(page, `c3a_e15_landing_${tema.includes('claro') ? 'claro' : 'escuro'}`)
+      // remove o anexo para o próximo laço
+      await page.getByRole('button', { name: /^Remover / }).last().click()
+    }
+
+    // CONVERSA ABERTA: a mesma opção continua disponível nos dois temas.
+    await anexarNaLanding(page, 'chat.txt', 'conteudo do chat')
+    await campoLanding(page).fill('abre a conversa com pasta')
+    await botaoEnviarLanding(page).click()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+    await anexarNoChat(page, 'dentro-do-chat.txt', 'conteudo')
+    for (const tema of temas) {
+      await page.getByRole('button', { name: tema }).click()
+      await expect(opcaoCopia(page)).toBeVisible()
+      await shot(page, `c3a_e15_chat_${tema.includes('claro') ? 'claro' : 'escuro'}`)
+    }
   })
 })

@@ -1,3 +1,20 @@
+## Rodada 19/11/2026 — ajustes de usabilidade da C-3a (Linux/Node 26.13.0)
+
+| Suíte | Comando | Resultado |
+|---|---|---|
+| Ajustes (novos A1–A5) | `vitest run src/server/session-persistence/attachments/ajustes.test.ts` | **5/5** (A1/A2 vermelhos antes da correção) |
+| Landing (3 novos casos) | `vitest run src/__tests__/SessionLanding.test.tsx` | **18/18** (2 dos novos vermelhos sem a correção) |
+| Persistência | `vitest run src/server/session-persistence` | **321 aprovados / 1 pulado** |
+| Foco | `VALIDAR_C3A.mjs --mode foco` | **207 · 0 · 0** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla` | **2111 · 3 nominais · 33 pulados** |
+| E2E C-3a | `sh platform/scripts/e2e-c3a.sh` | **15/15** (E11–E15 novos) |
+| E2E C-1 / C-2 | `e2e-c1.sh` / `e2e-c2.sh` | **6/6 · 17/17** |
+| Tipos / lint / build | `tsc -b --force` / `eslint` alterados / `vite build` | **0 · 0/0 · ✓ 44,5 s** |
+
+Novos E2E: E11 (landing marcada → `uploads/` com nome original e bytes certos), E12 (desmarcada → privado, nada no projeto), E13 (dois arquivos com o mesmo nome → `duplicado.txt` + `duplicado (1).txt`, downloads distintos), E14 (retentativa sem cópia extra, F5, exclusão preserva a cópia), E15 (landing e conversa nos temas claro/escuro).
+
+**Não executado:** sondas portáteis e Windows (aqui não executável). Os números Windows anteriores são de `b5cb48d` e não valem para este commit. Prova de reversão: sem a correção do Ajuste 1, A1/A2 voltam a falhar; sem o checkbox na landing, os 2 casos novos de `SessionLanding` falham com `Unable to find role="checkbox"`.
+
 # 19/11/2026 — C-3a U4: ambiente e gates (Linux/Debian, Node 26.13.0)
 
 Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; trigger SQLite para falha determinística; nenhuma API externa nem dado pessoal.

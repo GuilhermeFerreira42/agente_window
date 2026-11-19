@@ -357,6 +357,28 @@ export function SessionLanding({
           />
           {(rascunho.anexos?.length ?? 0) > 0 && (
             <div className="attachments-row session-landing-anexos" role="list" aria-label="Arquivos anexados">
+              {/* C-3a — a MESMA escolha da conversa, antes do primeiro envio.
+                  Só existe com Pasta selecionada (Chat sem pasta não copia);
+                  padrão desmarcado = armazenamento privado. A escolha vive no
+                  anexo (`modoCopia`), então sobrevive a F5 e à retentativa, e
+                  o primeiro envio já a respeita (`enviarAnexos`). */}
+              {(rascunho.anexos ?? []).some((anexo) => anexo.kind === 'local') && Boolean(workspacePath) && contexto !== 'chat' && (
+                <label className="attachment-modocopia" title="R03 — cópia na pasta do projeto só por escolha explícita">
+                  <input
+                    type="checkbox"
+                    aria-label="Salvar cópia na pasta do projeto"
+                    checked={(rascunho.anexos ?? []).filter((a) => a.kind === 'local').length > 0
+                      && (rascunho.anexos ?? []).filter((a) => a.kind === 'local').every((a) => a.modoCopia === 'projeto')}
+                    disabled={submitPending}
+                    onChange={(event) => {
+                      const marcado = event.target.checked
+                      setAnexos((rascunho.anexos ?? []).map((anexo) => anexo.kind === 'local'
+                        ? { ...anexo, modoCopia: marcado ? 'projeto' : 'privado' } : anexo))
+                    }}
+                  />
+                  Salvar cópia na pasta do projeto
+                </label>
+              )}
               {(rascunho.anexos ?? []).map((anexo) => (
                 <span
                   className="attachment-chip"
