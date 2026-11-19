@@ -13,6 +13,7 @@ import { validateLocalRequest } from '../../../../server/local-boundary.mjs'
 import { PersistenceProblem } from '../persistenceErrors'
 import { consultarDelecao } from '../deletions'
 import { withSessionPersistenceQueue } from '../filaSessao'
+import { servirMidia } from './midia'
 import { obterArtigo, listarArtigosChat, listarUploads } from './catalogo'
 import { projetarArtigoSeguro } from './dtoAnexo'
 import {
@@ -243,6 +244,23 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
         token: texto(corpo.token, 'token'),
       })
       sendJson(response, 200, recibo)
+      return true
+    }
+
+    // GET|HEAD /attachments/:artifactId/media — mídia passiva com Range (C-3b).
+    //
+    // Fica ANTES do casamento genérico de artefato para `media` não virar
+    // artifactId. Ownership/tombstone continuam vindo do `dono` resolvido
+    // acima; `servirMidia` reusa `lerArtigo` (hash + contenção), então não há
+    // segundo caminho de autoridade sobre os bytes.
+    const casarMidia = /^([^/]+)\/media$/.exec(resto)
+    if (casarMidia && (metodo === 'GET' || metodo === 'HEAD')) {
+      const artifactId = casarMidia[1]
+      const artigo = obterArtigo(artifactId)
+      if (!artigo || artigo.sessionId !== sessionId || artigo.chatId !== chatId) {
+        throw new PersistenceProblem(404, 'attachment_not_found', 'Artefato não encontrado nesta conversa.')
+      }
+      await servirMidia(response, artifactId, request.headers.range, { somenteCabecalhos: metodo === 'HEAD' })
       return true
     }
 

@@ -171,3 +171,43 @@ export function projetarTextoLegado(entrada: unknown): ResultadoValidacao<string
   }
   return okValido(saida)
 }
+
+// ----------------------------------------------------------------------------
+// C-3b — Leitura TOLERANTE (o caminho de reabertura, não o de escrita)
+// ----------------------------------------------------------------------------
+
+/**
+ * Resultado da leitura de um envelope que veio do disco/rede.
+ *
+ * `diagnostico` não é erro fatal: é o estado honesto de "não entendi este
+ * envelope, mas preservo o que existe". A UI mostra o texto legado e os chips
+ * que houver; NADA é apagado (SPEC C-3b R01/T03).
+ */
+export type LeituraEnvelope =
+  | { estado: 'ausente' }
+  | { estado: 'valido'; envelope: EnvelopeMensagemMultimodal }
+  | { estado: 'desconhecido'; diagnostico: string; original: unknown }
+
+/**
+ * Lê um envelope vindo de persistência SEM lançar. Versão futura/desconhecida
+ * devolve `original` intacto para o chamador poder preservá-lo ao regravar —
+ * reescrever com `undefined` seria perda de dados silenciosa.
+ *
+ * Diferente de `validarMensagemMultimodal`: aquela é a fronteira de ESCRITA e
+ * recusa; esta é a de LEITURA e degrada com diagnóstico.
+ */
+export function lerEnvelopeMultimodal(entrada: unknown): LeituraEnvelope {
+  if (entrada === undefined || entrada === null) return { estado: 'ausente' }
+  if (!ehObjetoPlano(entrada)) {
+    return { estado: 'desconhecido', diagnostico: 'envelope_malformado', original: entrada }
+  }
+  // Versão à frente desta build: preserva em vez de tentar adivinhar.
+  if (temChavePropria(entrada, 'versao') && entrada.versao !== 1) {
+    return { estado: 'desconhecido', diagnostico: 'versao_desconhecida', original: entrada }
+  }
+  const validado = validarMensagemMultimodal(entrada)
+  if (!validado.ok) {
+    return { estado: 'desconhecido', diagnostico: validado.codigo, original: entrada }
+  }
+  return { estado: 'valido', envelope: validado.valor }
+}
