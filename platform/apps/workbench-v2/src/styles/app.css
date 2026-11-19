@@ -298,7 +298,7 @@ svg {
   flex: 0 0 var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  background: var(--vscode-agents-background);
+  background: var(--vscode-sideBar-background);
   border-right: var(--vscode-strokeThickness) solid var(--vscode-sideBar-border);
   overflow: hidden;
   transition: width 160ms ease, min-width 160ms ease, flex-basis 160ms ease, opacity 120ms ease;
@@ -368,8 +368,8 @@ svg {
 .sessions-sidebar-title {
   flex: 1;
   min-width: 0;
-  font-size: var(--vscode-fontSize-label1);
-  font-weight: var(--vscode-fontWeight-semiBold);
+  font-size: 11px;
+  font-weight: 700;
   color: var(--vscode-sideBar-foreground);
 }
 
@@ -483,10 +483,10 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--vscode-spacing-size60);
-  padding: 0 12px;
+  padding: 0 10px;
   color: var(--vscode-descriptionForeground);
-  font-size: var(--vscode-fontSize-label2);
-  font-weight: var(--vscode-fontWeight-semiBold);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .session-section-header {
@@ -533,12 +533,12 @@ svg {
 
 .session-row {
   position: relative;
-  min-height: 54px;
-  margin: 0 10px;
-  padding: 8px 6px 8px 12px;
+  min-height: 56px;
+  margin: 0 4px;
+  padding: 8px 6px 8px 6px;
   display: flex;
   align-items: flex-start;
-  border-radius: var(--vscode-cornerRadius-medium);
+  border-radius: var(--vscode-cornerRadius-small);
   color: var(--vscode-foreground);
   cursor: pointer;
   transition: background-color 100ms ease-out;
@@ -1281,6 +1281,9 @@ svg {
    (.app-frame.is-empty-landing) foi aposentado na Onda 1 (E5). ===== */
 .session-landing {
   flex: 1 1 auto;
+  /* 08 §viewport: em 800x600 a coluna é estreita; sem min-width:0 a landing
+     usa a min-content da toolbar e transborda para os dois lados (corte). */
+  min-width: 0;
   /* A1/DEBT-04 (17/10): era `min-height: 0`. A landing tem só a altura do conteúdo, e
      quem a centraliza é o PAI. Fechada (sem aba de editor), o pai é a faixa central com
      `chat-centered` (align-items:center) → centraliza. Abrindo uma aba global (ex.:
@@ -1299,11 +1302,11 @@ svg {
 
 .session-landing-center {
   width: 100%;
-  max-width: 768px;
+  max-width: 800px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 14px;
+  gap: 0;
   /* Empurra o bloco levemente acima do centro geométrico, como no original. */
   margin-bottom: 6vh;
 }
@@ -1314,10 +1317,12 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--vscode-descriptionForeground);
+  /* Fidelidade ao mockup: 26px/600, lh 36.4px, 40px até a faixa. */
+  margin: 0 0 40px;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 36.4px;
+  color: var(--vscode-foreground);
 }
 
 .session-landing-title-lead {
@@ -1328,18 +1333,29 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--vscode-foreground);
-  font-weight: 600;
+  height: 24px;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border-radius: var(--vscode-cornerRadius-small);
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
 }
 
 .session-landing-input {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--vscode-agentsChatInput-background, var(--vscode-input-background));
-  border: 1px solid var(--vscode-widget-border);
+  gap: 0;
+  min-height: 86px;
+  height: auto;
+  box-sizing: border-box;
+  padding: 0 6px 6px;
+  background: var(--vscode-agentsChatInput-background);
+  border: 1px solid var(--vscode-input-border);
   border-radius: var(--vscode-cornerRadius-large);
+  /* 08 §viewport: o textarea não pode impor a min-content (cols) na coluna estreita. */
+  min-width: 0;
 }
 
 .session-landing-input:focus-within {
@@ -1348,7 +1364,9 @@ svg {
 
 .session-landing-textarea {
   width: 100%;
-  min-height: 24px;
+  flex: 0 0 auto;
+  min-height: 50px;
+  box-sizing: border-box;
   max-height: 200px;
   resize: none;
   border: none;
@@ -1356,8 +1374,9 @@ svg {
   background: transparent;
   color: var(--vscode-foreground);
   font-family: inherit;
-  font-size: var(--vscode-fontSize-label1);
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 20px;
+  min-width: 0;
 }
 
 .session-landing-textarea::placeholder {
@@ -1369,6 +1388,10 @@ svg {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 22px;
+  margin-top: 4px;
+  /* 08 §viewport: quebra em vez de cortar quando a coluna é estreita. */
+  flex-wrap: wrap;
 }
 
 .session-landing-toolbar-left,
@@ -1376,6 +1399,10 @@ svg {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 08 §viewport: cada lado quebra a própria linha em coluna estreita; sem isto
+     a min-content do grupo (Perguntar+Interativo+Permissões) estoura 800x600. */
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .session-landing-icon-button,
@@ -1383,14 +1410,15 @@ svg {
 .session-landing-send {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   border: none;
   background: transparent;
   color: var(--vscode-descriptionForeground);
   border-radius: var(--vscode-cornerRadius-small);
   cursor: pointer;
-  padding: 4px 6px;
-  font-size: var(--vscode-fontSize-label2);
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 18.2px;
 }
 
 .session-landing-icon-button:hover,
@@ -1402,7 +1430,10 @@ svg {
 .session-landing-send {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
-  padding: 5px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  justify-content: center;
 }
 
 .session-landing-send:disabled {
@@ -3182,6 +3213,12 @@ svg {
   /* 420 px de chat + 2 px de borda do .main-surface */
   min-width: max(422px, 50%);
 }
+/* FATIA-C-2 08 §viewport ("adaptar em 800x600 sem corte"): em janela estreita o
+   piso de 420 px do chat (regra A+2/420 da 05) excede a coluna útil e a landing
+   é cortada na direita. O piso continua valendo para desktop (>=960 px). */
+@media (max-width: 960px) {
+  .top-right-section > .main-surface { min-width: 0; }
+}
 /* FATIA 15 Onda 3 (D158): o bloco que governava a faixa [chat][auxiliary-bar] saiu.
    A coluna não existe mais (2c-ii); o centro ocupa a faixa e o chat é o seu par no
    PanelGroup. `.main-surface` continua com o piso de 420 px acima, que ainda vale. */
@@ -4619,22 +4656,55 @@ svg {
 /* SessionLanding chip clicável (06:13 original) */
 .session-landing-chip.is-clickable {
   cursor: pointer;
-  border: 1px solid var(--vscode-panel-border);
-  background: var(--vscode-editor-background);
-  transition: all 120ms ease;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background-color 120ms ease;
 }
 .session-landing-chip.is-clickable:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-  border-color: var(--vscode-focusBorder);
-  transform: translateY(-1px);
+  background: var(--vscode-list-hoverBackground);
+  border-color: transparent;
+  color: var(--vscode-foreground);
+  transform: none;
 }
 .session-landing-chip.is-clickable:active {
-  transform: translateY(0px);
+  transform: none;
 }
 .session-landing-chip:disabled {
   cursor: not-allowed;
   opacity: 0.72;
   transform: none;
+}
+/* C-1 (SPEC C §2) — seletor de modalidade Chat/Pasta na landing; Chat é o default. */
+.session-landing-contexto {
+  display: inline-flex;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.session-landing-contexto-option {
+  height: 24px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--vscode-cornerRadius-small);
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  cursor: pointer;
+}
+.session-landing-contexto-option:hover {
+  background: var(--vscode-agentsTab-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.session-landing-contexto-option.is-active {
+  background: var(--vscode-agentsTab-activeBackground);
+  border-color: var(--vscode-input-border);
+  color: var(--vscode-foreground);
 }
 .session-landing-workspace-hint {
   margin: 0 0 16px;
@@ -4903,6 +4973,152 @@ svg {
 .session-landing-directory-options small { overflow: hidden; color: var(--vscode-descriptionForeground); text-overflow: ellipsis; white-space: nowrap; }
 .session-landing-directory-loading { padding: 7px 8px; color: var(--vscode-descriptionForeground); font-size: 11px; }
 
+/* ── C2-RV07 — entradas superiores da lateral, SEPARADAS do cabeçalho/lista ── */
+.sessions-sidebar-topentries {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid transparent;
+}
+.sessions-topentry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  text-align: left;
+  cursor: pointer;
+}
+.sessions-personalizacoes { color: var(--vscode-descriptionForeground); }
+.sessions-topentry:hover { background: var(--vscode-list-hoverBackground); }
+.sessions-topentry:focus-visible { outline: var(--vscode-strokeThickness) solid var(--vscode-focusBorder); outline-offset: -1px; }
+.sessions-topentry svg { color: var(--vscode-descriptionForeground); flex: none; }
+.sessions-topentry span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── C-2 (08_LAYOUT): faixa Chat/Pasta + seletor REAL de LLM na posição do
+   Copilot; toolbar do card; dica/estado. Reproduz a aparência VS Code 1.146
+   com tokens existentes — nada novo é inventado, nenhum mock é estilizado. ── */
+.session-landing-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Fidelidade ao mockup: pílula fit-content à esquerda, h38, mt12 do título,
+     COLADA ao topo do card (raio 8 só em cima, inset 11px, sem borda). */
+  justify-content: flex-start;
+  align-self: flex-start;
+  gap: 8px;
+  height: 38px;
+  box-sizing: border-box;
+  margin: 12px 0 -1px 11px;
+  max-width: calc(100% - 11px);
+  padding: 6px 8px;
+  position: relative;
+  z-index: 1;
+  background: var(--vscode-agentsLandingPicker-background);
+  border: none;
+  border-radius: 8px 8px 0 0;
+}
+.session-landing-modelo-wrap,
+.session-landing-menu-wrap { position: relative; }
+.session-landing-modelo-topo { font-weight: 500; }
+.session-landing-menu,
+.session-landing-modelo-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 264px;
+  max-height: 320px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--vscode-menu-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: var(--vscode-cornerRadius-medium, 6px);
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+}
+.session-landing-modelo-resumo-wrap .session-landing-menu,
+.session-landing-modelo-resumo-wrap .session-landing-modelo-menu { left: auto; right: 0; }
+.session-landing-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--vscode-foreground);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 18.2px;
+}
+.session-landing-menu-item:hover,
+.session-landing-menu-item:focus-visible { background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground)); outline: none; }
+.session-landing-menu-item > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.session-landing-menu-item small { color: var(--vscode-descriptionForeground); font-size: 11px; }
+.session-landing-menu-item[aria-checked='true']::after { content: '✓'; margin-left: auto; color: var(--vscode-focusBorder); font-weight: 700; }
+.landing-execution-popup { z-index: 10000; min-width: 0; box-sizing: border-box; font-size: 13px; }
+.landing-execution-popup .landing-execution-heading { align-items: center; justify-content: space-between; border-bottom: 1px solid var(--vscode-widget-border); border-radius: 0; }
+.landing-execution-popup button:disabled { opacity: .45; cursor: default; }
+.landing-execution-popup .session-landing-menu-item:disabled:hover { background: transparent; }
+.session-landing-menu-erro { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 8px; color: var(--vscode-errorForeground); font-size: 12px; }
+.session-landing-menu-erro button { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; }
+.session-landing-menu-vazio { margin: 0; padding: 6px 8px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+.session-landing-menu-acoes { margin-top: 2px; padding: 6px 8px; border: none; border-top: 1px solid var(--vscode-dropdown-border); background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; text-align: left; font-size: 12px; }
+.session-landing-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border-radius: var(--vscode-cornerRadius-small);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18.2px;
+}
+.session-landing-pill.is-risky { color: var(--vscode-inputValidation-errorForeground); }
+.session-landing-modelo-resumo { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-landing-aviso {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: var(--vscode-inputValidation-errorForeground);
+  font-size: 12px;
+  text-align: center;
+}
+.session-landing-aviso button { border: none; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font-size: 12px; text-decoration: underline; }
+.session-landing-context-menu { position: relative; min-width: 0; }
+.session-landing-context-menu > button { max-width: 260px; }
+.session-landing-context-menu > button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-landing-context-dialog { box-sizing: border-box; width: 500px; max-width: min(500px, calc(100vw - 32px)); min-width: 0; }
+.session-landing-context-dialog > input { box-sizing: border-box; width: 100%; padding: 5px 8px; margin-bottom: 4px; border: 1px solid var(--vscode-input-border, var(--vscode-widget-border)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); font: inherit; }
+.session-landing-context-recents { max-height: min(230px, 30vh); overflow: auto; border-block: 1px solid var(--vscode-widget-border); }
+.session-landing-directory-suggestions { max-height: min(180px, 25vh); overflow: auto; border-top: 1px solid var(--vscode-widget-border); }
+.session-landing-context-dialog p { margin: 6px 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+.session-landing-context-dialog p[role='alert'] { color: var(--vscode-errorForeground); }
+.session-landing-context-dialog .session-landing-menu-item small { overflow-wrap: anywhere; }
+.session-landing-context-dialog button:disabled { opacity: .5; cursor: default; }
+.session-landing-context-dialog .session-landing-menu-acoes { display: flex; align-items: center; gap: 8px; width: 100%; }
+.session-landing-motivo { margin: 8px 0 0; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
+
 /* ── FATIA 14 (SPEC 2H v1): acréscimos da tela REAL de Personalizações ────────
    Reutiliza os tokens e a linguagem visual das classes .customizations-* que já
    existiam (E16). Nada aqui redefine o que já estava definido — são só as peças
@@ -5140,7 +5356,7 @@ svg {
 .workspace-file-search { padding: 3px 8px; font-size: 12px; }
 .workspace-file-search > span { text-overflow: clip; overflow-x: auto; scrollbar-width: none; }
 .workspace-file-search kbd { display: none; }
-.workspace-command-options { width: 300px; left: auto; right: 0; border-radius: 5px; background: var(--vscode-menu-background, #252526); box-shadow: 0 3px 12px #0006; }
+.workspace-command-options { width: 300px; left: auto; right: 0; border-radius: 5px; background: var(--vscode-menu-background); box-shadow: 0 3px 12px var(--vscode-widget-shadow); }
 .workspace-command-options button { padding: 6px 14px; }
 .sessions-sidebar-header { min-height: 40px; border-bottom: 0; padding: 8px 10px; }
 .sessions-count { margin-left: 4px; padding: 1px 5px; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 10px; font-weight: 400; }
@@ -5149,7 +5365,7 @@ svg {
 .personalizations-shortcuts > div { padding: 1px 0 0; }
 .personalizations-shortcuts > div button { gap: 9px; min-height: 28px; padding: 4px 10px; border-radius: 4px; }
 .personalizations-shortcuts-header { min-height: 31px; font-size: 12px; }
-.personalizations-modal-backdrop { position: fixed; inset: 0; z-index: 10010; background: rgb(0 0 0 / 50%); display: grid; place-items: center; }
+.personalizations-modal-backdrop { position: fixed; inset: 0; z-index: 10010; background: var(--vscode-agentsOverlay-background); display: grid; place-items: center; }
 /* D183: proporção de ModalEditorPart e coluna do ManagementEditor (1.135.0). */
 .personalizations-modal {
   width: min(80vw, 1400px);
@@ -5163,9 +5379,9 @@ svg {
   padding: 0 4px 16px;
   background: var(--vscode-agents-background);
   color: var(--vscode-foreground);
-  border: 1px solid var(--vscode-widget-border, #454545);
+  border: 1px solid var(--vscode-widget-border);
   border-radius: 8px;
-  box-shadow: 0 8px 30px #0006;
+  box-shadow: 0 8px 30px var(--vscode-widget-shadow);
   overflow: hidden;
   resize: both;
   outline: none;
@@ -5217,6 +5433,65 @@ svg {
 /* D183: a busca usa a própria linha do cabeçalho. Os filtros sobrepõem a lista. */
 .sessions-inline-search { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; }
 .sessions-inline-search input { width: 100%; min-width: 0; height: 24px; padding: 2px 6px; border: 1px solid var(--vscode-input-border); border-radius: 3px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); }
-.sessions-filter-panel { position: absolute; z-index: 12; top: 39px; right: 7px; left: 7px; max-height: calc(100% - 48px); overflow: auto; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border)); border-radius: 6px; background: var(--vscode-menu-background, var(--vscode-editorWidget-background)); box-shadow: 0 4px 12px #0005; }
+.sessions-filter-panel { position: absolute; z-index: 12; top: 39px; right: 7px; left: 7px; max-height: calc(100% - 48px); overflow: auto; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border)); border-radius: 6px; background: var(--vscode-menu-background, var(--vscode-editorWidget-background)); box-shadow: 0 4px 12px var(--vscode-widget-shadow); }
 .sessions-filter-panel label { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 4px; font-size: 12px; }
 .sessions-filter-panel select { min-width: 0; width: 100%; margin: 0; padding: 3px; background: var(--vscode-dropdown-background, var(--vscode-input-background)); color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground)); border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border)); }
+
+/* ===== C-3a — anexos: estado real nos chips + cópia explícita no projeto ===== */
+.attachment-chip-estado {
+  flex: 0 0 auto;
+  font-size: var(--vscode-fontSize-label3);
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.9;
+}
+
+.attachment-modocopia {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: var(--vscode-fontSize-label3);
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.attachment-modocopia input {
+  margin: 0;
+  accent-color: var(--vscode-focusBorder);
+}
+
+.chat-message-attachment-estado {
+  flex: 0 0 auto;
+  font-size: var(--vscode-fontSize-label3);
+  opacity: 0.85;
+}
+
+.chat-message-attachment-download {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 0;
+  border-radius: var(--vscode-cornerRadius-small);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chat-message-attachment-download:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.session-landing-anexos {
+  padding: 4px 12px 0;
+}
+
+.session-landing-input.is-drop-target {
+  outline: 1px dashed var(--vscode-focusBorder);
+  outline-offset: 2px;
+}

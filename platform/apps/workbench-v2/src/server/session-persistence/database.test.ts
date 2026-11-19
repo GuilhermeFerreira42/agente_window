@@ -33,7 +33,7 @@ run('server-side session tool grants (runs only with AGENTE_WINDOW_TEST_HOME set
       title: 'F1 test',
       workspacePath: workspace,
       worktreePath: null,
-      messageCount: 0,
+      messageCount: 0, contextKind: 'workspace',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       sessionJson: JSON.stringify({ id: sessionId, workspacePath: workspace, worktreePath: null, chats: [] }),
@@ -55,7 +55,7 @@ run('server-side session tool grants (runs only with AGENTE_WINDOW_TEST_HOME set
       title: 'F1 test',
       workspacePath: workspace,
       worktreePath: null,
-      messageCount: 0,
+      messageCount: 0, contextKind: 'workspace',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       sessionJson: JSON.stringify({ id: sessionId, workspacePath: workspace, worktreePath: null, chats: [] }),
@@ -68,7 +68,7 @@ run('server-side session tool grants (runs only with AGENTE_WINDOW_TEST_HOME set
   it('keeps the old checkpoint on storage failure, detects corruption and deletes derived state with its owner', () => {
     upsertSessionRecord({
       id: sessionId, slug: 'f1-test', title: 'Checkpoint fixture', workspacePath: workspace, worktreePath: null,
-      messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ id: sessionId, chats: [] }),
+      messageCount: 0, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ id: sessionId, chats: [] }),
     })
     const checkpoint: Checkpoint = { version: 1, estrategia: 'manual', escopo: 'fixture', resumo: 'Anterior',
       providerId: 'fixture', modelId: 'm', criadoEm: 1, quantidade: 2, ultimoId: 'm2', digest: 'digest' }

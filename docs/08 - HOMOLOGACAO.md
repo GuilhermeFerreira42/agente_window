@@ -1,3 +1,53 @@
+# Homologação C-3a — aceite explícito do proprietário, 19/11/2026
+
+**O proprietário declarou: “Eu já fiz o pull e já homologuei o processo.”** Aceite da C-3a, incluindo os ajustes de nome original na cópia do projeto e opção “Salvar cópia na pasta do projeto” na tela inicial. Versão local conferida: `a49cc6c`, após `693051a`, na branch `0f2e5de2-agente-window`.
+
+Proveniência: homologação humana relatada pelo proprietário no Windows. Durante o roteiro anterior, confirmou arquivo baixado idêntico ao original, persistência do anexo e preservação da cópia explícita em `uploads/` após excluir a conversa. Solicitou então os dois ajustes de usabilidade; após receber a reentrega e fazer pull, declarou o aceite acima. Não se atribui ao proprietário uma execução automatizada nem cenários adicionais que não descreveu.
+
+Limites preservados: C-3a armazena e disponibiliza anexos para download; não envia o conteúdo ao modelo sem codec, não gera mídia e não implementa C-3b. O LightLLM foi mantido desligado intencionalmente no ensaio anterior; o aviso de indisponibilidade da IA não indica falha de armazenamento. Testes técnicos e versões cobertas estão em `09`.
+
+Sem aceite de outras fatias por consequência, sem merge ou autorização automática para iniciar C-3b. Este registro não é autorização de commit/push. Entradas abaixo são históricas.
+
+---
+
+# Homologação MM-0 — aceite explícito do proprietário, 16/11/2026
+
+**O proprietário declarou a MM-0 homologada nesta conversa e autorizou registrar o aceite e fazer push para a branch de trabalho 0f2e5de2-agente-window.** Alcance: contratos neutros multimodais e compatibilidade textual implementados até d1dd69d, com a correção pontual de transporte sem ferramentas em **055bbd4**. Publicação sem merge na base e sem autorização automática para a próxima fatia.
+
+Proveniência do aceite: após a correção, o proprietário confirmou que o Google voltou a responder e apresentou um resumo de teste das sete ferramentas (listar, criar, ler, escrever, excluir para a Lixeira, buscar e executar), seguido do aceite explícito. Esse resumo é relato trazido pelo proprietário, não inspeção independente pelo Codex dos arquivos ou da Lixeira. Não se atribui a mesma conta/modelo a cada operação sem evidência. Os testes automatizados e suas limitações estão em 09.
+
+**Ressalvas técnicas preservadas no aceite:** ampla Windows com 42 falhas comuns à base e dois timeouts extras no App, ambos aprovados no reteste dirigido e na regressão focada; causa exata não isolada. A rejeição 404 do Gemini 2.5 Flash mostrada no teste é indisponibilidade do modelo para a conta/destino, não defeito corrigido por esta entrega. A dívida C1-EXCLUSAO-01 permanece aberta.
+
+A MM-0 não disponibiliza upload, armazenamento de anexos, apresentação/geração de mídia ou codecs de produção. O aceite não homologa M1–M8/MC1, P-B ou outras frentes por consequência. C-2 é a próxima fatia planejada, ainda sem autorização de implementação. Entradas seguintes são históricas.
+
+---
+
+# Registro de homologação — C-1 com dívida aceita, 16/11/2026
+
+**Aceite humano confirmado pelo proprietário nesta conversa:** após testar, informou que o funcionamento está correto, considerou a fatia finalizada e autorizou commit/push na branch de trabalho. Alcance: C-1 e correções locais R2-1/R2-2 sobre `7ac8260`, com os gates Windows registrados em `09` (91 testes aprovados, 6 cenários integrados, build/lint passando).
+
+**Ressalva aceita expressamente para ajuste futuro:** primeira exclusão pode mostrar aviso de revisão alterada; segundo o relato, após recarregar a página a exclusão funciona. Registrada como **C1-EXCLUSAO-01** em `06`, sem causa confirmada e sem correção nesta rodada. O aceite não afirma ausência desse defeito nem substitui a investigação futura.
+
+Este registro não atribui aceite à P-B, M1–M8/MC1 ou outras frentes; os respectivos estados permanecem próprios. Publicação autorizada somente na branch `0f2e5de2-agente-window`; sem merge na base e sem início automático de MM-0. Entradas abaixo são históricas.
+
+---
+# Registro de homologação — P-C (aceite do proprietário, 15/11/2026)
+
+**Aceite humano da P-C registrado pelo proprietário**, após validação no Windows (Codex) da versão **`69f4510`**. Comportamentos comprovados na validação (relato do proprietário):
+
+1. Ao salvar a cópia da identidade excluída, a UI passa do aviso de conteúdo local preservado para a confirmação **“Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.”**
+2. A confirmação **preserva após F5** (recibo estruturado — não recai no texto genérico de alterações não salvas).
+3. **Retentativa sem duplicação**: devolve a mesma cópia, sem novo POST e sem linha duplicada na lista.
+4. **Conteúdo local preservado** durante todo o fluxo.
+5. **Identidade original permanece excluída** (nunca reanexada) após a cópia.
+6. **30 testes focados** da rodada Windows passaram; as correções **PC-R1/PC-R2** já haviam sido confirmadas na rodada anterior.
+
+**Proveniência:** a validação Windows foi executada pelo Codex e **comunicada pelo proprietário** — não foi executada por esta sessão (Debian) e os artefatos externos correspondentes não estão neste ambiente; a Arena não afirma ter rodado esses testes. **Aprovação técnica ≠ homologação:** gates Debian, pareceres e retestes ficam em `09` e nas entregas (`ENTREGA_P_C.md` / `ENTREGA_P_C_REENTREGA.md`); este registro é o aceite humano.
+
+**Alcance deste aceite:** somente a **P-C**. O proprietário confirmou também o **aceite humano da P-A** (registrado em `03`). **P-B:** aceite humano **não declarado** — permanece conclusão técnica, com o teste original B1 **6/6 em `c581bfa`** (informado). **M1–M8, DEBT-25 e MC1:** sem homologação por consequência desta entrega (D197 segue vigente). **C-1:** não homologada (não implementada; sem autorização nesta mensagem).
+
+---
+
 # Homologação integrada M1–M8 — aceite humano pendente (11/11/2026)
 
 ## MC1 — consultar outro chat, aceite humano pendente

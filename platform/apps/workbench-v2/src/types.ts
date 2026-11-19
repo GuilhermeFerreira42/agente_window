@@ -57,6 +57,12 @@ export interface ChatMessage {
   tetoAtual?: number
   /** Quando a corrida começou (pós-11) — o contador "há Xs" do dono. */
   inicioEm?: number
+  /**
+   * C-3a (R11/B10) — chip de artefato PRONTO que ainda não tem mensagem
+   * (upload publicado, publicação da mensagem falhou). Nunca vai ao modelo e
+   * não participa do histórico enviado à IA.
+   */
+  salvoSemMensagem?: boolean
 }
 
 export interface ContinuarNoChat {
@@ -84,6 +90,12 @@ export interface ComposerHistoryEntry {
   attachments: Attachment[]
   model: string
   mode: string
+  /**
+   * C-3a (R11/B10) — chip de artefato PRONTO que ainda não tem mensagem
+   * (upload publicado, publicação da mensagem falhou). Nunca vai ao modelo e
+   * não participa do histórico enviado à IA.
+   */
+  salvoSemMensagem?: boolean
 }
 
 export interface NestedChat {
@@ -96,11 +108,19 @@ export interface NestedChat {
   messages: ChatMessage[]
 }
 
+/** C-1 (SPEC C §3) — modalidade EXPLÍCITA da sessão. `chat` não tem raiz;
+   * `workspace` carrega a pasta original canônica. Catálogo SQLite é autoridade. */
+export type ContextoSessao = { tipo: 'chat' } | { tipo: 'workspace'; path?: string }
+
 export interface Session {
   id: string
   title: string
   workspace: string
-  workspacePath: string
+  /** C-1 — raiz REAL da conversa; `null` somente em modalidade `chat`
+   * (nunca `''`, repoRoot, cwd ou outro fallback). Legados preservam a pasta. */
+  workspacePath: string | null
+  /** Modalidade explícita; ausente em snapshots legados — o catálogo materializa na leitura. */
+  contexto?: ContextoSessao
   /** Stable filesystem-safe project key used by SQLite and JSONL storage. */
   slug?: string
   /** Optional isolated directory; null/absent means direct workspace mode. */
@@ -197,5 +217,28 @@ export interface Attachment {
   id: string
   name: string
   kind: 'workspace' | 'local'
+  /** C-3a: artefato publicado no ledger do dono (sessão/chat atuais). */
+  artifactId?: string
+  /** C-3a: identificador estável LOCAL da transferência (R11 — retry reutiliza). */
+  uploadId?: string
+  /** C-3a: modalidade MM-0 do artefato (aditiva, sem bytes/locator). */
+  modalidade?: 'texto' | 'imagem' | 'audio' | 'video' | 'arquivo'
+  bytes?: number
+  sha256?: string
+  /**
+   * C-3a: estado real exibido no chip (F5/offline). `legado` = metadado
+   * antigo sem artefato publicado; `referencia` = projeto apontado.
+   */
+  estado?: 'selecionado' | 'transferindo' | 'pronto' | 'falhou' | 'referencia' | 'legado'
+  /** C-3a: modo do artefato — cópia privada ou referência de projeto. */
+  mode?: 'copy' | 'reference'
+  /** C-3a: escolha EXPLÍCITA de cópia na pasta do projeto (R03; default privado). */
+  modoCopia?: 'privado' | 'projeto'
+  /** C-3a: destino de envio ao modelo registrado na publicação (R10). */
+  envioModelo?: 'excluido-sem-codec'
+  /** C-3a: referência de projeto como caminho relativo ao workspace. */
+  referencia?: string
+  /** C-3a: marcador de item publicado sem artefato da C-3a. */
+  legado?: boolean
 }
 

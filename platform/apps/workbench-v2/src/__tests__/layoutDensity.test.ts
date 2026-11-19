@@ -16,8 +16,8 @@ describe('Agents window density and layout contracts', () => {
   it('centralizes the restored workbench geometry tokens', () => {
     expect(themeSource).toMatch(/--vscode-agents-layout-floatingPanelGap\s*:\s*4px/)
     expect(themeSource).toMatch(/--vscode-agents-centered-content-max-width\s*:\s*950px/)
-    expect(themeSource).toMatch(/--sidebar-width\s*:\s*300px/)
-    expect(themeSource).toMatch(/--auxiliary-width\s*:\s*340px/)
+    expect(themeSource).toMatch(/--sidebar-width\s*:\s*270px/)
+    expect(themeSource).toMatch(/--auxiliary-width\s*:\s*315px/)
     expect(themeSource).toMatch(/--terminal-height\s*:\s*300px/)
   })
 
@@ -58,7 +58,7 @@ describe('Agents window density and layout contracts', () => {
   })
 
   it('preserves the protected session row heights and nested connector inset', () => {
-    expect(rule('.session-row')).toContain('min-height: 54px')
+    expect(rule('.session-row')).toContain('min-height: 56px')
     expect(rule('.nested-chat-row')).toContain('min-height: 28px')
     expect(rule('.nested-chat-row')).toContain('padding: 0 12px 0 36px')
     expect(rule('.nested-chat-title-row')).toContain('height: 28px')

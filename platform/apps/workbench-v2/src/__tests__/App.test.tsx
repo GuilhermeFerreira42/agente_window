@@ -1,14 +1,16 @@
 import type * as SessionsClientModule from '../services/sessions/sessionsClient'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { testSessions } from './fixtures/sessions'
+import * as sessionsClient from '../services/sessions/sessionsClient'
+import { SIDEBAR_WIDTH_DEFAULT } from '../domain/layoutPersistence'
 
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
-  loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
+  loadPersistedSessions: vi.fn(async () => ({ sessions: (await import('./fixtures/sessions')).testSessions, unavailable: [], state: 'ok' as const })),
   persistSession: vi.fn(async () => undefined),
   pickSessionWorkspace: vi.fn(async () => undefined),
   createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
@@ -26,6 +28,9 @@ let streamsAgirAbertos: Set<ReadableStreamDefaultController<Uint8Array>>
 
 beforeEach(() => {
   window.localStorage.clear()
+  // P-C: todo DELETE pede confirmação de alvo+consequência antes da solicitação.
+  // Padrão "dono aceita"; testes podem sobrescrever para recusar.
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
   streamsAgirAbertos = new Set()
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -98,8 +103,14 @@ function responderChatComSSE(
   })
 }
 
+const terminalPropsCapturadas = vi.hoisted(() => [] as Array<{ visible: boolean; sessionId: string; workspace?: string | null }>)
 vi.mock('../components/TerminalPanel', () => ({
-  TerminalPanel: () => null,
+  // Continua sem montar o xterm em jsdom; as props ficam capturadas para os
+  // testes de contrato C-1/F4 (o que o App ENTREGA ao terminal).
+  TerminalPanel: (props: { visible: boolean; sessionId: string; workspace?: string | null }) => {
+    terminalPropsCapturadas.push(props)
+    return null
+  },
 }))
 
 function sessionRow(title: string): HTMLElement {
@@ -443,8 +454,41 @@ describe('App session flows', () => {
     await waitFor(() => expect(payload?.modelSelection).toEqual({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5' }))
   })
 
-  it('envia o payload com anexo local, exibe o contexto e limpa o chip após submit', async () => {
+  it('C3A-T23 — anexo sem texto publica a mensagem com chip salvo e NÃO inicia run (R10)', async () => {
+    // Fronteira de transporte mockada AQUI (a prova de armazenamento real é o
+    // E2E c3a_anexos); o fluxo do produto — admitir → PUT binário → publicar —
+    // roda inteiro com o servidor do App simulado nesta fronteira.
     const user = userEvent.setup()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const metodo = (init?.method ?? 'GET').toUpperCase()
+      if (url.includes('/attachments/uploads') && metodo === 'POST') {
+        return new Response(JSON.stringify({
+          uploadId: '11111111-1111-4111-8111-111111111111',
+          artifactId: '11111111-1111-4111-8111-111111111111',
+          name: 'app.ts', bytes: 8, sha256: null, state: 'admitido', mode: 'copy', scope: 'chat', errorCode: null,
+        }), { status: 201, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/content') && metodo === 'PUT') {
+        return new Response(JSON.stringify({
+          uploadId: '11111111-1111-4111-8111-111111111111',
+          artifactId: '11111111-1111-4111-8111-111111111111',
+          name: 'app.ts', bytes: 8, sha256: 'a'.repeat(64), state: 'pronto', mode: 'copy', scope: 'chat', errorCode: null,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/attachments') && metodo === 'GET') {
+        return new Response(JSON.stringify({ attachments: [], uploads: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url === '/api/sessions' || url.startsWith('/api/sessions/')) {
+        // Publicação da mensagem (CAS) — devolve a própria sessão enviada.
+        const corpo = init?.body ? JSON.parse(String(init.body)) : null
+        if (corpo?.session) {
+          return new Response(JSON.stringify({ session: { ...corpo.session, persistenceRevision: (corpo.session.persistenceRevision ?? 0) + 1 }, mutationId: corpo.mutationId ?? null, revision: (corpo.session.persistenceRevision ?? 0) + 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        }
+        return new Response(JSON.stringify({ sessions: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
     const { container } = render(<App initialSessionSnapshot={testSessions} />)
 
     await user.click(sessionRow('Ajustar layout single-pane'))
@@ -458,14 +502,15 @@ describe('App session flows', () => {
 
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
 
-    expect(screen.getByRole('list', { name: 'Anexos enviados' })).toBeInTheDocument()
+    // Publicação com chips: sem texto sintético "Arquivos anexados" (T23) e
+    // SEM bubble "Trabalhando" — anexo sem texto nunca dispara run.
+    expect(await screen.findByRole('list', { name: 'Anexos enviados' })).toBeInTheDocument()
     expect(screen.getByRole('listitem', { name: /app\.ts, arquivo local/ })).toBeInTheDocument()
-    expect(screen.getByText('Arquivos anexados: app.ts')).toBeInTheDocument()
+    expect(screen.queryByText(/Arquivos anexados/)).not.toBeInTheDocument()
     expect(screen.getByText('· Editar')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: /app\.ts, arquivo local/ })).not.toBeInTheDocument()
-    expect(screen.getByText('Trabalhando')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Parar execução' }))
+    expect(screen.queryByText('Trabalhando')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Parar execução' })).not.toBeInTheDocument()
   })
 
   it('preserva o anexo do rascunho ao alternar a superfície mobile', async () => {
@@ -1633,9 +1678,9 @@ describe('App session flows', () => {
     expect(handle).not.toBeNull()
     expect(body.style.getPropertyValue('--sidebar-width')).toBe('360px')
 
-    // Duplo-clique restaura o padrão (280px) e avisa.
+    // Duplo-clique restaura o padrão (270px — fidelidade ao mockup) e avisa.
     fireEvent.doubleClick(handle as HTMLElement)
-    expect(body.style.getPropertyValue('--sidebar-width')).toBe('280px')
+    expect(body.style.getPropertyValue('--sidebar-width')).toBe(`${SIDEBAR_WIDTH_DEFAULT}px`)
     const toast = await screen.findByRole('status')
     expect(toast).toHaveTextContent('Largura da barra de sessões restaurada')
   })
@@ -1937,3 +1982,596 @@ describe('App session flows', () => {
 
 })
 
+describe('P-B hidratação parcial (SPEC §4)', () => {
+  it('mostra o banner parcial distinto do erro total e mantém as conversas saudáveis na lista', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'conversa-quebrada', code: 'transcript_missing' }],
+      state: 'partial',
+    })
+    render(<App />)
+    // diagnóstico parcial visível e explícito (indisponível ≠ vazia)
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText(/não é uma conversa vazia ou inexistente/)).toBeInTheDocument()
+    // as conversas saudáveis seguem listadas — indisponível não esvazia a lista
+    expect(await screen.findByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+    // distinto do estado de falha total
+    expect(screen.queryByText(/a lista do servidor está indisponível/)).not.toBeInTheDocument()
+  })
+
+  // H5 — abertura SEM cache local: cada item indisponível aparece por título
+  // (quando o servidor envia) ou por identidade — nunca como conversa vazia.
+  it('H5: identifica cada conversa indisponível por título ou identidade, sem cache local', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [
+        { sessionId: 'conversa-xyz', code: 'transcript_missing', titulo: 'Conversa com problema' },
+        { sessionId: 'outra-sem-titulo', code: 'session_publication_pending' },
+      ],
+      state: 'partial',
+    })
+    render(<App />)
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent('Não foi possível carregar 2 conversas salvas.')
+    // título identifica a primeira; sem título, a própria identidade identifica a segunda
+    expect(banner).toHaveTextContent('Conversa com problema')
+    expect(banner).toHaveTextContent('outra-sem-titulo')
+    // a lista NÃO recebe uma conversa vazia para o item indisponível
+    expect(screen.queryByText('conversa-xyz')).not.toBeInTheDocument()
+    expect(screen.getByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+  })
+
+  // H5 — retentativa no fluxo existente + retorno após recuperação no servidor.
+  it('H5: retentativa remove o banner e restaura a conversa recuperada no servidor', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    const user = userEvent.setup()
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'conversa-recuperavel', code: 'transcript_missing', titulo: 'Conversa recuperável' }],
+      state: 'partial',
+    })
+    render(<App />)
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText('Conversa recuperável')).toBeInTheDocument()
+
+    // Retentativa (botão do fluxo existente) → servidor já reconciliou → retorno íntegro.
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: [...testSessions, { ...testSessions[0], id: 'conversa-recuperavel', title: 'Conversa recuperável' }],
+      unavailable: [],
+      state: 'ok',
+    })
+    await user.click(screen.getByRole('button', { name: 'Tentar carregar conversas novamente' }))
+    await screen.findByText('Conversa recuperável')
+    expect(screen.queryByText(/Não foi possível carregar/)).not.toBeInTheDocument()
+    expect(screen.getByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+  })
+
+  // H5 — edições locais: a cópia de recuperação local sobrevive à hidratação
+  // parcial e vira a conversa ativa com o conteúdo editado visível.
+  it('H5: preserva edições locais durante a hidratação parcial', async () => {
+    const { loadPersistedSessions } = await import('../services/sessions/sessionsClient')
+    const local: typeof testSessions[number] = {
+      ...testSessions[0],
+      id: 'local-edições-1',
+      title: 'Rascunho local',
+      chats: testSessions[0].chats.map((chat, index) => index === 0
+        ? { ...chat, messages: [{ ...chat.messages[0], content: 'rascunho local editado' }] }
+        : chat),
+    }
+    window.localStorage.setItem('workbench.sessions.unsaved.v1', JSON.stringify([
+      { session: local, message: 'A conversa possui alterações locais não salvas.', kind: 'local' },
+    ]))
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: [],
+      unavailable: [{ sessionId: 'outra-indisponivel', code: 'session_publication_pending', titulo: 'Outra conversa' }],
+      state: 'partial',
+    })
+    render(<App />)
+    // a edição local está visível (a cópia local foi restaurada, não apagada)
+    expect(await screen.findByText('Rascunho local')).toBeInTheDocument()
+    expect(await screen.findByText('rascunho local editado')).toBeInTheDocument()
+    // e o banner continua identificando a indisponível do servidor
+    await screen.findByText(/Não foi possível carregar uma conversa salva/)
+    expect(screen.getByText('Outra conversa')).toBeInTheDocument()
+  })
+})
+
+describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', () => {
+  beforeEach(async () => {
+    // Isola os mocks de DELETE entre testes (nenhum once pendente vaza).
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    vi.mocked(removePersistedSession).mockReset()
+    vi.mocked(removePersistedSession).mockImplementation(async () => 'concluido' as const)
+  })
+  afterEach(() => {
+    // Nenhum spy (ex.: Storage.setItem injetado) vaza para o teste seguinte.
+    vi.restoreAllMocks()
+  })
+  it('confirma alvo+consequência, mostra `excluindo`, suspende envio e só remove após confirmação', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    const confirmacoes: string[] = []
+    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
+    let liberar!: () => void
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
+    render(<App initialSessionSnapshot={testSessions} />)
+    // Sessão concluída é ativada primeiro: o composer fica em modo de ENVIO
+    // (sessão em working mostraria 'Parar execução' no mesmo botão).
+    await user.click(sessionRow('Ajustar layout single-pane'))
+    await user.click(within(sessionRow('Ajustar layout single-pane')).getByRole('button', { name: 'Excluir sessão' }))
+    // Confirmação ANTES da solicitação, nomeando o alvo e a consequência.
+    await waitFor(() => expect(confirmacoes).toHaveLength(1))
+    expect(confirmacoes[0]).toContain('Ajustar layout single-pane')
+    expect(confirmacoes[0]).toContain('outras conversas')
+    // Estado visível; a conversa NÃO sai da lista como sucesso antes da confirmação.
+    expect(await screen.findByText(/Excluindo conversa: Ajustar layout single-pane/)).toBeInTheDocument()
+    expect(screen.getByText('Ajustar layout single-pane')).toBeInTheDocument()
+    // Envio de mensagens fica suspenso neste alvo durante a exclusão.
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'mensagem durante exclusão')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    expect(await screen.findByText(/envio de mensagens suspenso/)).toBeInTheDocument()
+    liberar()
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    expect(() => sessionRow('Ajustar layout single-pane')).toThrow('Session row not found')
+    expect(vi.mocked(removePersistedSession)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(removePersistedSession).mock.calls[0][1]).toMatchObject({ expectedRevision: expect.any(Number) })
+  })
+
+  it('falha de exclusão fica visível e retomável — nunca vira sucesso silencioso (P-T10)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(new Error('Não foi possível concluir a exclusão (falha injetada).')))
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+    expect(screen.getAllByText('Não foi possível concluir a exclusão (falha injetada).').length).toBeGreaterThan(0)
+    // Retomada do MESMO alvo depois da falha.
+    await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+    expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('abort do run que não termina (pending) falha SEM remover: controle mantido e `excluindo`→`falha_exclusao` (PC-R1)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    render(<App initialSessionSnapshot={testSessions} />)
+    // Run VIVO no mesmo alvo que será excluído: o stream padrão nunca encerra
+    // e o controle fica registrado em `agirAtivas`.
+    const anterior = vi.mocked(globalThis.fetch).getMockImplementation()!
+    let postsAgir = 0
+    const cancels: string[] = []
+    let liberarCancel!: () => void
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/agir') postsAgir += 1
+      if (url.endsWith('/api/agir/cancel')) {
+        // O servidor RECEBE o cancelamento, mas o run nunca chega a estado
+        // terminal — é o cenário pending/erro do achado PC-R1.
+        cancels.push(url)
+        return new Promise<Response>((resolve) => {
+          liberarCancel = () => resolve(new Response(JSON.stringify({ status: 'pending' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+        })
+      }
+      return anterior(input, init)
+    })
+    await user.click(sessionRow('Revisar alterações do workbench'))
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para o agente' }), 'rodando enquanto exclui')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await screen.findByRole('button', { name: 'Parar execução' })
+    // POST /api/agir disparou ⇒ controle real publicou identidade para o cancel.
+    await waitFor(() => expect(postsAgir).toBeGreaterThanOrEqual(1))
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    // A tentativa fica visível EnQuanto o abort não termina…
+    expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
+    liberarCancel()
+    // …e vira FALHA honesta e retomável no MESMO alvo: sem run parado, nada é removido.
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(screen.queryByText(/Excluindo conversa: Revisar alterações do workbench/)).not.toBeInTheDocument()
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+    expect(vi.mocked(removePersistedSession)).not.toHaveBeenCalled()
+    expect(cancels.length).toBeGreaterThanOrEqual(1)
+    // Controle MANTIDO em `agirAtivas`: a retomada ainda enxerga o run vivo e
+    // falha de novo em vez de partir para o DELETE às cegas.
+    await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
+    liberarCancel()
+    expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
+    expect(vi.mocked(removePersistedSession)).not.toHaveBeenCalled()
+    expect(cancels.length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
+  })
+
+  it('edição de OUTRA conversa durante a exclusão não é perdida (atualização funcional, SPEC §6)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession } = await import('../services/sessions/sessionsClient')
+    let liberar!: () => void
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Excluindo conversa/)).toBeInTheDocument()
+    // Enquanto a exclusão espera, o DONO arquiva outra conversa (muda o estado).
+    await user.click(within(sessionRow('Replicar a Janela de Agentes')).getByRole('button', { name: 'Arquivar' }))
+    liberar()
+    expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
+    // A edição concorrente sobrevive à remoção (sem array capturado pré-await):
+    // a conversa arquivada continua arquivada após a exclusão concluir.
+    await user.click(screen.getByRole('button', { name: /Arquivadas/ }))
+    expect(sessionRow('Replicar a Janela de Agentes')).toHaveClass('is-archived')
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+
+  it('falha de storage local não impede a exclusão nem esconde o aviso (SPEC §5)', async () => {
+    const user = userEvent.setup()
+    const { storeSessionRecovery } = await import('../services/sessions/sessionRecovery')
+    const alvo = testSessions.find((sessao) => sessao.title === 'Revisar alterações do workbench')!
+    storeSessionRecovery({ session: alvo, message: 'fixture', kind: 'unavailable' })
+    // removeSessionRecovery persiste via setItem; a falha só é injetada depois
+    // do hidratar (nenhuma outra gravação local é vítima da injeção).
+    const setItemOriginal = Storage.prototype.setItem
+    let storageQuebrado = false
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
+      if (storageQuebrado) throw new Error('storage indisponível')
+      setItemOriginal.call(localStorage, String(key), String(value))
+    })
+    render(<App initialSessionSnapshot={testSessions} />)
+    await screen.findByText('Revisar alterações do workbench')
+    storageQuebrado = true
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    expect(await screen.findByText(/Sessão excluída; não foi possível limpar a cópia de recuperação/)).toBeInTheDocument()
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+
+  it('worktree sujo: recusa, confirmação específica de descarte e force explícito (P-T08)', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession, SessionPersistenceError } = await import('../services/sessions/sessionsClient')
+    const sujo = new SessionPersistenceError('worktree sujo', 409)
+    ;(sujo as { code?: string }).code = 'worktree_dirty'
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(sujo))
+    const confirmacoes: string[] = []
+    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    // fluxo: recusa → confirmação específica → force (nunca force implícito)
+    await waitFor(() => expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2))
+    expect(confirmacoes.some((mensagem) => mensagem.includes('alterações locais'))).toBe(true)
+    expect(vi.mocked(removePersistedSession).mock.calls[1][1]).toMatchObject({ force: true, expectedRevision: expect.any(Number) })
+    await screen.findByText('Sessão excluída')
+    expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+})
+
+describe('P-C ressalva 15/11 — aviso e cópia da identidade excluída (PC-R2 UI)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('clique após 410: ACK troca o aviso por confirmação, sobrevive a F5 e a retentativa não duplica', async () => {
+    const user = userEvent.setup()
+    const { MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO, MENSAGEM_EXCLUIDA_COPIA_SALVA, storeSessionRecovery } = await import('../services/sessions/sessionRecovery')
+    const excluida = { ...testSessions[0], id: crypto.randomUUID(), title: 'Origem excluída pc-ressalva', persistenceRevision: 1 }
+    storeSessionRecovery({ session: excluida, message: 'fixture bruta que não pode vazar', kind: 'excluida' })
+
+    // Fronteira real do contrato: origem GET → 410; cópia GET → 404 antes do
+    // POST (cria+ACK) e 200+ack depois — é isso que impede duplicar na
+    // retentativa pós-F5, mesmo sem memória de fila.
+    const anterior = vi.mocked(globalThis.fetch).getMockImplementation()!
+    const posts: Array<{ creationId: string; sessionId: string }> = []
+    const copias = new Map<string, { session: typeof testSessions[number]; creationId: string }>()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const metodo = init?.method ?? 'GET'
+      if (metodo === 'POST' && url === '/api/sessions') {
+        const corpo = JSON.parse(String(init?.body)) as { session: typeof testSessions[number]; creationId: string }
+        posts.push({ creationId: corpo.creationId, sessionId: corpo.session.id })
+        const salva = { ...corpo.session, persistenceRevision: 1 }
+        copias.set(salva.id, { session: salva, creationId: corpo.creationId })
+        return Promise.resolve(new Response(JSON.stringify({ sessionId: salva.id, mutationId: corpo.creationId, revision: 1, session: salva }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (metodo === 'GET' && url.startsWith('/api/sessions/')) {
+        const id = decodeURIComponent(url.slice('/api/sessions/'.length))
+        if (id === excluida.id) return Promise.resolve(new Response(JSON.stringify({ message: 'A conversa foi excluída.', code: 'session_deleted' }), { status: 410, headers: { 'Content-Type': 'application/json' } }))
+        const criada = copias.get(id)
+        if (criada) return Promise.resolve(new Response(JSON.stringify({ session: criada.session, ack: { creationId: criada.creationId, mutationId: criada.creationId, revision: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+        return Promise.resolve(new Response(JSON.stringify({ message: 'A conversa não existe.', code: 'session_not_found' }), { status: 404, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return anterior(input, init)
+    })
+
+    const { unmount } = render(<App initialSessionSnapshot={testSessions} />)
+    // Estado A (pré-cópia): projeção distingue conteúdo preservado — e a
+    // mensagem bruta do armazenamento NUNCA aparece na UI.
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(screen.queryByText('fixture bruta que não pode vazar')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Conversa excluída: Origem excluída pc-ressalva')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Salvar uma cópia separada' })).toHaveLength(1)
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+
+    await user.click(screen.getByRole('button', { name: 'Salvar uma cópia separada' }))
+    // Estado B (ACK): confirmação ESPECÍFICA substitui o aviso genérico; a
+    // cópia entra na lista; a origem continua fora (bloqueada).
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    expect(screen.queryByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).not.toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(() => sessionRow('Origem excluída pc-ressalva (cópia recuperada)')).not.toThrow()
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+    expect(posts).toHaveLength(1)
+
+    // F5: o RECIBO estruturado sobrevive — a confirmação não volta ao texto
+    // genérico de "alterações locais não salvas". Isolamento do ruído: no boot
+    // por snapshot (sem hidratação real) o autosave grava backups das fixtures;
+    // aqui só a ORIGEM exclusa atravessa o F5, como no servidor (410).
+    const CHAVE_RECOVERY = 'workbench.sessions.unsaved.v1'
+    const guardadas = JSON.parse(window.localStorage.getItem(CHAVE_RECOVERY) ?? '[]') as Array<{ session: { id: string } }>
+    window.localStorage.setItem(CHAVE_RECOVERY, JSON.stringify(guardadas.filter((item) => item.session.id === excluida.id)))
+    unmount()
+    render(<App initialSessionSnapshot={testSessions} />)
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    expect(screen.queryByText(MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)).not.toBeInTheDocument()
+    expect(screen.getByText('Conversa excluída: Origem excluída pc-ressalva')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Salvar uma cópia separada' })).toHaveLength(1)
+
+    // Retentativa pós-F5: GET+ack devolve a MESMA cópia → nenhum POST novo e
+    // nenhuma duplicata na lista.
+    await user.click(screen.getByRole('button', { name: 'Salvar uma cópia separada' }))
+    expect(await screen.findByText(MENSAGEM_EXCLUIDA_COPIA_SALVA)).toBeInTheDocument()
+    await waitFor(() => expect(posts).toHaveLength(1))
+    const linhasDeCopia = () => Array.from(document.querySelectorAll('.session-title-text'))
+      .filter((elemento) => elemento.textContent === 'Origem excluída pc-ressalva (cópia recuperada)')
+    expect(linhasDeCopia()).toHaveLength(1)
+    expect(() => sessionRow('Origem excluída pc-ressalva')).toThrow('Session row not found')
+  })
+})
+
+// C-1 (SPEC C §2/§4) — landing: Chat é o DEFAULT e nasce sem worktree, sem
+// /fs/workspace e sem Git; Pasta exige pasta escolhida (sem fallback
+// 'workspace-local' escondido).
+describe('C-T05 — landing Chat/Pasta (App)', () => {
+  it('default é Chat: chip pressionado e NENHUM seletor de pasta visível', async () => {
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    expect(screen.getByTestId('landing-contexto')).toHaveTextContent('Chat')
+    expect(screen.getByTestId('landing-chat-chip')).toHaveTextContent('Chat')
+    expect(screen.queryByRole('button', { name: /Workspace atual/ })).not.toBeInTheDocument()
+  })
+
+  it('enviar em Chat cria sessão sem raiz e NÃO chama createSessionWorktree', async () => {
+    vi.mocked(sessionsClient.persistSession).mockClear()
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'conversa somente chat')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nova sessão' })).not.toBeInTheDocument())
+    expect(sessionRow('conversa somente chat')).toBeInTheDocument()
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    const salva = vi.mocked(sessionsClient.persistSession).mock.calls.at(-1)?.[0]
+    expect(salva?.contexto).toEqual({ tipo: 'chat' })
+    expect(salva?.workspacePath).toBeNull()
+  })
+
+  it('caminho inválido não cria sessão e preserva o rascunho', async () => {
+    vi.spyOn(sessionsClient, 'validateSessionWorkspace').mockRejectedValueOnce(new Error('Pasta inexistente'))
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'preciso escolher pasta')
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.type(screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' }), '/inexistente{Enter}')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pasta inexistente')
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('preciso escolher pasta')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+  })
+
+  it('erro nativo do seletor: aviso honesto, rascunho preservado e nada criado', async () => {
+    vi.mocked(sessionsClient.persistSession).mockClear()
+    vi.mocked(sessionsClient.createSessionWorktree).mockClear()
+    vi.mocked(sessionsClient.pickSessionWorkspace).mockRejectedValueOnce(new Error('native dialog failed'))
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'rascunho preservado')
+    await user.click(screen.getByTestId('landing-contexto'))
+    await user.click(screen.getByRole('button', { name: 'Abrir pasta…' }))
+    // C-T05 — erro nativo: estado/foco preservados, sem fallback de raiz.
+    expect((await screen.findAllByText(/Seletor nativo indisponível/)).length).toBeGreaterThan(0)
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('rascunho preservado')
+    expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
+    const titulos = vi.mocked(sessionsClient.persistSession).mock.calls.map((chamada) => chamada[0]?.title)
+    expect(titulos).not.toContain('rascunho preservado')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    // O caminho manual fica disponível como saída honesta.
+    expect(screen.getByRole('textbox', { name: 'Buscar ou digitar caminho da pasta' })).toBeInTheDocument()
+  })
+})
+
+
+// Registro de chamadas com stub SSE — usado pelos testes B2/B3 (sem mock
+// permissivo: cada URL é capturada; o que não é do teste segue o fetch real).
+function instalarFetchComRegistro(opcoes: { aoValidarWorkspace?: Promise<void>; responderWorkspace?: boolean } = {}): Array<{ url: string; corpo?: Record<string, unknown> }> {
+  const chamadas: Array<{ url: string; corpo?: Record<string, unknown> }> = []
+  const codificar = new TextEncoder()
+  const frames = [
+    codificar.encode(`data: ${JSON.stringify({ type: 'chunk', text: 'Resposta do modelo em Chat.' })}\n\n`),
+    codificar.encode(`data: ${JSON.stringify({ type: 'done', model: 'stub-model' })}\n\n`),
+  ]
+  const fetchOriginal = globalThis.fetch.bind(globalThis)
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    let corpo: Record<string, unknown> | undefined
+    if (typeof init?.body === 'string') {
+      try { corpo = JSON.parse(init.body) as Record<string, unknown> } catch { /* não-JSON */ }
+      chamadas.push({ url, corpo })
+    } else { chamadas.push({ url }) }
+    if (url === '/api/workspaces/validate') {
+      // Gate determinístico da rodada 2: segura a validação até o teste liberar.
+      if (opcoes.aoValidarWorkspace) await opcoes.aoValidarWorkspace
+      const caminho = typeof corpo?.path === 'string' ? corpo.path : '/tmp/c1-rodada2'
+      return new Response(JSON.stringify({ workspace: { path: caminho, slug: 'c1-rodada2', name: 'c1-rodada2', isGit: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (url === '/fs/workspace' && opcoes.responderWorkspace) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir/mode' || url === '/api/agir/permission') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir/instruction') return new Response(JSON.stringify({ token: 'human-fixture' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/providers') return new Response(JSON.stringify({ provedores: [], ativo: null, storage: 'fixture', catalogo: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url === '/api/agir') {
+      const fio = new ReadableStream<Uint8Array>({
+        start(controller) {
+          let indice = 0
+          const passo = () => {
+            if (indice >= frames.length) { controller.close(); return }
+            controller.enqueue(frames[indice]); indice += 1; setTimeout(passo, 5)
+          }
+          setTimeout(passo, 5)
+        },
+      })
+      return new Response(fio, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'X-Agir-Run-Id': 'run-c1', 'X-Agir-Generation': '1' } })
+    }
+    return fetchOriginal(input, init)
+  })
+  return chamadas
+}
+
+// ============================================================================
+// C-1/B2 (revisão Codex) — a preparação do run resolve a modalidade: em Chat
+// o App NÃO chama as rotas de permissão/instrução de pasta (que o servidor
+// recusa com 409), o modo do payload é o efetivo `ask` e o run completa até o
+// modelo. Espião de URL por cima do stub de SSE — nada de mock permissivo.
+// ============================================================================
+describe('C-1/B2 — envio em Chat sem sincronização de pasta', () => {
+  it('1º envio em Chat: zero chamadas a /permission e /instruction, modo ask e resposta completa', async () => {
+    const chamadas = instalarFetchComRegistro()
+
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'mensagem em Chat puro')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+
+    // O run completa e a resposta do modelo aparece (chegou ao fluxo).
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    const urls = chamadas.map((chamada) => chamada.url)
+    expect(urls).not.toContain('/api/agir/permission')
+    expect(urls).not.toContain('/api/agir/instruction')
+    expect(urls).toContain('/api/agir/mode')
+    expect(urls).toContain('/api/agir')
+    const modo = chamadas.find((chamada) => chamada.url === '/api/agir/mode')
+    expect(modo?.corpo).toMatchObject({ mode: 'ask' })
+    const run = chamadas.find((chamada) => chamada.url === '/api/agir')
+    expect(run?.corpo?.mode).toBe('ask')
+    expect(run?.corpo?.instructionToken).toBeUndefined()
+  })
+})
+
+// ============================================================================
+// C-1/B3 (revisão Codex) — Explorer em sessão Chat: sem raiz implícita. O
+// gating `explorerEnabled = !!explorerWorkspacePath` desliga o boot do módulo
+// (nenhum /fs/workspace, nenhum discoverRoot) e a vista fica no estado vazio
+// existente, sem o botão "Abrir pasta" (que é da landing).
+// ============================================================================
+describe('C-1/B3 — Explorer em sessão Chat', () => {
+  it('sem workspace: zero chamadas /fs/*, vista vazia e sem "Abrir pasta"', async () => {
+    const chamadas = instalarFetchComRegistro()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    // A sessão fixture s1 (workspace) ativa o Explorer dela no boot — legítimo.
+    // O que B3 proíbe é NOVA atividade de /fs ao entrar na sessão Chat.
+    const marcas = chamadas.length
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'sessão chat sem explorer')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    // Nenhuma operação de filesystem DEPOIS de a sessão Chat ser criada —
+    // nem ativação (/fs/workspace) nem descoberta de raiz (/fs/root) sobre a
+    // raiz global implícita.
+    const urlsFs = chamadas.slice(marcas).map((chamada) => chamada.url).filter((url) => url.startsWith('/fs/'))
+    expect(urlsFs).toEqual([])
+
+    // Vista Explorer (view padrão da Side Bar): estado vazio existente, sem
+    // botão de abrir pasta dentro da sessão.
+    expect(screen.getByText('Nenhuma pasta aberta.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Abrir pasta' })).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// C-1/F4 (revisão Codex) — abrir o terminal dentro de uma sessão Chat: o
+// painel fica indisponível e NENHUM `open` de PTY é emitido (sem shell
+// implícito na raiz global). A sessão com pasta continua com o terminal
+// normal (coberta pelos testes existentes de toggle em s1).
+// ============================================================================
+describe('C-1/F4 — terminal em sessão Chat', () => {
+  it('Chat: o App entrega o terminal SEM raiz (nada de `\'\'`/caminho implícito) e o painel é aberto', async () => {
+    terminalPropsCapturadas.length = 0
+    instalarFetchComRegistro()
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'chat sem terminal com raiz')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 4000 })
+
+    const terminalToggle = screen.getByRole('button', { name: 'Alternar terminal' })
+    if (!terminalToggle.classList.contains('is-active')) await user.click(terminalToggle)
+
+    // O painel (mockado como null aqui) recebeu a prop `workspace` — em Chat
+    // ela é SEM raiz (`null`, nunca `\'\'`, raiz global ou caminho artificial).
+    // Quem prova que sem raiz não nasce shell é TerminalPanel.test (C-1/F4).
+    const ultima = await waitFor(() => {
+      const entrega = terminalPropsCapturadas.at(-1)
+      expect(entrega).toBeDefined()
+      return entrega!
+    })
+    expect(ultima.visible).toBe(true)
+    expect(ultima.workspace).toBeNull()
+  })
+})
+
+// ============================================================================
+// Ressalva do reteste independente (16/11) — "tentativa de envio antecipado em
+// Pasta": causa isolada no código como `SessionLanding.submit` limpava o campo
+// sem handshake + `handleLandingSubmit` recusando EM SILENCIO com
+// `workspaceChangePending` durante a validação da pasta. Garantia exigida:
+// ACEITAR E CONCLUIR ou BLOQUEAR VISIVELMENTE MANTENDO O TEXTO. O gate abaixo
+// é determinístico (o teste segura a resposta real da validação) — sem espera
+// arbitrária.
+// ============================================================================
+describe('C-1/rodada2 — envio durante a validação da pasta', () => {
+  it('com validação em voo: bloqueio visível com texto mantido; ao liberar, aceita e conclui', async () => {
+    let liberarValidacao = () => {}
+    const validacaoLiberada = new Promise<void>((liberar) => { liberarValidacao = liberar })
+    const chamadas = instalarFetchComRegistro({ aoValidarWorkspace: validacaoLiberada, responderWorkspace: true })
+    const user = userEvent.setup()
+    render(<App initialSessionSnapshot={testSessions} />)
+    await user.click(screen.getAllByRole('button', { name: 'Nova sessão' })[0])
+    await user.click(screen.getByTestId('landing-contexto'))
+    const campoCaminho = screen.getByLabelText('Buscar ou digitar caminho da pasta')
+    await user.type(campoCaminho, '/tmp/c1-rodada2-ws')
+    await user.type(campoCaminho, '{Enter}')
+
+    // Enquanto a validação está SEGURADA pelo teste, o envio chega à landing.
+    await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'envio durante validação')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+
+    // ★ Garantia: bloqueio VISÍVEL e texto MANTIDO (RED: sumia sem aviso).
+    expect(await screen.findByText(/ainda está sendo validada/, {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })).toHaveValue('envio durante validação')
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).not.toHaveBeenCalled()
+    expect(chamadas.filter((c) => c.url === '/api/worktrees')).toEqual([])
+
+    // Libera a validação → workspace selecionado → reenvio ACEITO E CONCLUÍDO.
+    liberarValidacao()
+    expect(await screen.findByText(/Workspace selecionado/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    await waitFor(() => expect(screen.getByText('Resposta do modelo em Chat.')).toBeInTheDocument(), { timeout: 6000 })
+    expect(vi.mocked(sessionsClient.createSessionWorktree)).toHaveBeenCalledTimes(1)
+  })
+})

@@ -1,21 +1,39 @@
 import type { Session } from '../../types'
-import { getSessionRecord, listSessionToolGrants } from './database'
+import { getSessionRecord, getSessionRecordRaw, listSessionToolGrants } from './database'
+import { sessaoExcluida } from './deletions'
 import { validateWorkspacePath } from './workspaces'
 
-export interface ContextoAgirPersistido {
-  ok: true
-  raiz: string
-  permissoes: string[]
+/** C-1 (SPEC C §3/§4) — união de contexto:
+ *  - workspace: raiz real + grants da pasta;
+ *  - Chat: `raiz: null` e NENHUM grant (nenhum filesystem é inspecionado);
+ *  - `ok: false`: registro ausente/incoerente (nada é deduzido). */
+export type ContextoAgirPersistido =
+  | { ok: true; raiz: string; permissoes: string[] }
+  | { ok: true; raiz: null; permissoes: never[] }
+
+/** Opções de leitura do contexto (W3). Escrita não tem opção: usa a fronteira. */
+export interface OpcoesContextoAgir {
+  /**
+   * W3 — operação de LEITURA de artefato já publicado. O registro COMMITADO
+   * basta para derivar dono/raiz; o journal de publicação de OUTRA operação
+   * (autosave da mesma conversa) não pode transformar um download em 503.
+   */
+  leitura?: boolean
 }
 
-/** Resolve authority only from the persisted session and its canonical workspace. */
-export function resolverContextoAgir(sessionId: string, chatId: string):
+/** Resolve authority only from the persisted session and its catalog kind. */
+export function resolverContextoAgir(sessionId: string, chatId: string, opcoes: OpcoesContextoAgir = {}):
   | ContextoAgirPersistido
   | { ok: false; message: string } {
   if (!sessionId || sessionId.length > 200 || !chatId || chatId.length > 200) {
     return { ok: false, message: 'Contexto da sessão ou conversa inválido.' }
   }
-  const record = getSessionRecord(sessionId)
+  // P-C §2 — todos os leitores/callbacks conferem o ciclo de vida: um run
+  // (início, instrução, aprovação, stream) não nasce em conversa excluída.
+  if (sessaoExcluida(sessionId)) {
+    return { ok: false, message: 'A conversa foi excluída; nenhuma ação foi iniciada.' }
+  }
+  const record = opcoes.leitura ? getSessionRecordRaw(sessionId) : getSessionRecord(sessionId)
   if (!record) {
     return { ok: false, message: 'A sessão não está registrada no servidor. Recarregue a sessão e tente novamente.' }
   }
@@ -31,7 +49,18 @@ export function resolverContextoAgir(sessionId: string, chatId: string):
   if (!Array.isArray(session.chats) || !session.chats.some((chat) => chat.id === chatId)) {
     return { ok: false, message: 'A conversa não pertence à sessão persistida.' }
   }
+  // C-1 — a modalidade vem do CATÁLOGO (coluna explícita), não do snapshot:
+  // Chat resolve sem raiz, sem FS e sem grants.
+  if (record.contextKind === 'chat') {
+    if (session.workspacePath !== null || (session.worktreePath ?? null) !== null) {
+      return { ok: false, message: 'O contexto persistido da sessão não corresponde ao registro do servidor.' }
+    }
+    return { ok: true, raiz: null, permissoes: [] }
+  }
   const activePath = session.worktreePath || session.workspacePath
+  if (!activePath) {
+    return { ok: false, message: 'O contexto persistido da sessão não corresponde ao registro do servidor.' }
+  }
   const checked = validateWorkspacePath(activePath)
   if (!checked.valid || !checked.exists || !checked.isDir) {
     return { ok: false, message: 'A pasta de trabalho da sessão não está acessível. Escolha a pasta de novo.' }

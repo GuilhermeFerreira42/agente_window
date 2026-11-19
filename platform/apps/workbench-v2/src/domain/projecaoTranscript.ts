@@ -23,7 +23,23 @@ export function projetarMensagemPersistida(mensagem: ChatMessage): ChatMessage {
   return {
     id, role, time, model, mode, running, cancelled, erro, vote, reported, iteracaoAtual, tetoAtual, inicioEm,
     content: erro ? 'A execução terminou com erro. Os detalhes não foram armazenados.' : mensagem.content,
-    attachments: mensagem.attachments?.map(({ id, name, kind }) => ({ id, name, kind })),
+    // C-3a (P30 aditiva): metadados seguros do anexo junto da mensagem —
+    // nunca bytes, base64, locator físico ou token.
+    attachments: mensagem.attachments?.map((anexo) => ({
+      id: anexo.id,
+      name: anexo.name,
+      kind: anexo.kind,
+      artifactId: anexo.artifactId,
+      modalidade: anexo.modalidade,
+      bytes: anexo.bytes,
+      sha256: anexo.sha256,
+      estado: anexo.estado,
+      mode: anexo.mode,
+      modoCopia: anexo.modoCopia,
+      envioModelo: anexo.envioModelo,
+      referencia: anexo.referencia,
+      legado: anexo.legado,
+    })),
     ferramentas: mensagem.ferramentas?.map(ferramentaPersistida),
     continuar: mensagem.continuar?.map(({ id, status, iteracoes, teto, ordem }) => ({ id, status, iteracoes, teto, ordem })),
   }
@@ -31,11 +47,11 @@ export function projetarMensagemPersistida(mensagem: ChatMessage): ChatMessage {
 
 /** Campos extensíveis recebidos do navegador nunca viram um store paralelo. */
 export function projetarSessaoPersistida(session: Session): Session {
-  const { id, title, workspace, workspacePath, slug, worktreePath, section, status, updated,
+  const { id, title, workspace, workspacePath, contexto, slug, worktreePath, section, status, updated,
     diffAdded, diffRemoved, branch, pinned, unread, archived, ciFailure, mainChatId,
     isQuickChat, automation, customGroup, provider, isDraft, createdSeq, updatedSeq, persistenceRevision } = session
   return {
-    id, title, workspace, workspacePath, slug, worktreePath, section, status, updated,
+    id, title, workspace, workspacePath, contexto, slug, worktreePath, section, status, updated,
     diffAdded, diffRemoved, branch, pinned, unread, archived, ciFailure, mainChatId,
     isQuickChat, automation, customGroup, provider, isDraft, createdSeq, updatedSeq, persistenceRevision,
     approval: session.approval ? 'Aprovação anterior expirada.' : undefined,

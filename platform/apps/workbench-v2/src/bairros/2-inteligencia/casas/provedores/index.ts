@@ -7,6 +7,15 @@
 // ============================================================================
 
 export type {
+  EnvelopeMensagemMultimodal,
+  EvidenciaCapacidade,
+  IdentidadeAlvoMultimodal,
+  Modalidade,
+  ParteMensagem,
+  PerfilMultimodal,
+} from './contract'
+
+export type {
   ArquivoProvedores,
   CategoriaTeste,
   Descritor,

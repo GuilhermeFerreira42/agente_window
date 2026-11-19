@@ -265,3 +265,13 @@ export function assertWorkbenchInvariants(
   }
 }
 
+
+/**
+ * C-1 (SPEC C §2/§4) — regra ÚNICA de modalidade no cliente: a sessão não tem
+ * pasta quando o catálogo diz `chat` (contexto explícito) ou quando o snapshot
+ * já não guarda raiz. Espelho da autoridade do servidor (`context_kind`); nunca
+ * deduzida de rótulo/título e nunca representada por `''`.
+ */
+export function sessaoSemPasta(session: Pick<Session, 'contexto' | 'workspacePath'>): boolean {
+  return session.workspacePath === null || session.contexto?.tipo === 'chat'
+}

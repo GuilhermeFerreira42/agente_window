@@ -61,9 +61,13 @@ export function validateLocalRequest(request, { requireOrigin = false } = {}) {
   if (!safeMethod && sensitivePath) {
     if (fetchSite !== null && fetchSite !== 'same-origin') return { ok: false, reason: 'fetch_site' }
     const contentType = request.headers?.['content-type']
-    if (typeof contentType !== 'string' || !/^application\/json(?:\s*;|\s*$)/i.test(contentType.trim())) {
-      return { ok: false, reason: 'json_required' }
-    }
+    const tipo = typeof contentType === 'string' ? contentType.trim() : ''
+    const jsonOk = /^application\/json(?:\s*;|\s*$)/i.test(tipo)
+    // C-3a: o ÚNICO corpo binário aceito é o stream do upload de anexo
+    // (mesma origem + Host exato + Fetch Metadata continuam obrigatórios).
+    const binarioOk = /^application\/octet-stream(?:\s*;|\s*$)/i.test(tipo)
+      && /^\/api\/sessions\/[^/]+\/chats\/[^/]+\/attachments\/uploads\/[^/]+\/content$/.test(pathname)
+    if (!jsonOk && !binarioOk) return { ok: false, reason: 'json_required' }
   }
   return { ok: true }
 }

@@ -535,3 +535,60 @@ describe('ChatInput', () => {
   })
 })
 
+
+// C-1 (SPEC C §4/§5.3) — conversa Chat sem pasta: Agent/Edit e "Permitir
+// tudo" ficam indisponíveis com motivo honesto; o modo efetivo é "Perguntar".
+describe('ChatInput — C-1 conversa Chat sem pasta', () => {
+  const chatSession: Session = { ...session, workspace: 'Chat', workspacePath: null, contexto: { tipo: 'chat' }, branch: null }
+  const itemPorTexto = (texto: string): HTMLButtonElement => {
+    const achado = Array.from(document.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes(texto))
+    expect(achado, `botão com texto "${texto}"`).toBeTruthy()
+    return achado as HTMLButtonElement
+  }
+
+  it('C-T08 — menu de modo: Agente e Editar desabilitados com motivo; Perguntar/Planejar disponíveis', async () => {
+    const user = userEvent.setup()
+    renderInput({ session: chatSession, mode: 'agent' })
+    // O trigger já mostra o modo EFETIVO (Perguntar), não a seleção armazenada.
+    const trigger = screen.getByRole('button', { name: 'Perguntar' })
+    await user.click(trigger)
+    expect(screen.getByRole('menu', { name: 'Selecionar modo' })).toBeInTheDocument()
+    const agente = itemPorTexto('AgenteConversa Chat não tem pasta')
+    expect(agente).toBeDisabled()
+    expect(agente).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+    const editar = itemPorTexto('EditarConversa Chat não tem pasta')
+    expect(editar).toBeDisabled()
+    expect(editar).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+    expect(itemPorTexto('Explore e entenda o código')).not.toBeDisabled()
+    expect(itemPorTexto('Descreva o plano de execução')).not.toBeDisabled()
+  })
+
+  it('C-T08 — seleção de Agent em Chat é ignorada (nenhum onChangeMode com modo de pasta)', async () => {
+    const user = userEvent.setup()
+    const onChangeMode = vi.fn()
+    renderInput({ session: chatSession, mode: 'ask', onChangeMode })
+    await user.click(screen.getByRole('button', { name: 'Perguntar' }))
+    await user.click(itemPorTexto('AgenteConversa Chat não tem pasta'))
+    expect(onChangeMode).not.toHaveBeenCalled()
+  })
+
+  it('C-T08 — picker de permissão: Permitir tudo desabilitado com motivo em Chat', async () => {
+    const user = userEvent.setup()
+    renderInput({ session: chatSession, permission: 'manual' })
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    const allowAll = itemPorTexto('Permitir tudo')
+    expect(allowAll).toBeDisabled()
+    expect(allowAll).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+  })
+
+  it('C-T08 — regressão: sessão workspace mantém Agent/Edit e Permitir tudo habilitados', async () => {
+    const user = userEvent.setup()
+    renderInput({ mode: 'agent', permission: 'manual' })
+    await user.click(screen.getByRole('button', { name: 'Agente' }))
+    expect(itemPorTexto('Descreva o que construir')).not.toBeDisabled()
+    expect(itemPorTexto('Descreva as alterações')).not.toBeDisabled()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    expect(itemPorTexto('Permitir tudo')).not.toBeDisabled()
+  })
+})

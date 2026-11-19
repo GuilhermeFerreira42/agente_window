@@ -65,6 +65,8 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir, permitidas?: reado
     : catalogoFerramentas
   if (permitidas?.includes('historico')) ferramentas.push(ferramentaHistorico)
   if (permitidas) ferramentas.push(...ferramentasEntreChats.filter(f => permitidas.includes(f.id)))
+  // Gemini não recebe um grupo de funções vazio em conversas sem tools.
+  if (protocolo === 'gemini' && ferramentas.length === 0) return {}
   if (protocolo === 'anthropic') {
     return {
       tools: ferramentas.map((f) => ({

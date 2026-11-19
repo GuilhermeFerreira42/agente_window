@@ -11,9 +11,9 @@ function fixture(texto = '') {
   const id = `mc1-origin-${randomUUID()}`; ids.push(id)
   const session = { id, title: 'Investigação de plugins', workspacePath: '/synthetic/A', mainChatId: 'main', chats: [{ id: 'main', title: 'Main', messages: texto ? [{ id: 'm1', role: 'user', content: texto }] : [] }] } as Session
   const entries = (s: Session): TranscriptEntry[] => s.chats[0].messages.map(m => ({ chatId: 'main', uuid: m.id, type: m.role, timestamp: 1, message: m }))
-  const record = (s: Session): SessionRecord => ({ id, slug: id, title: s.title, workspacePath: s.workspacePath, worktreePath: null, messageCount: s.chats[0].messages.length, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(s) })
-  const publish = (s: Session, anterior?: Session, antigos: TranscriptEntry[] = [], raiz = s.workspacePath) => {
-    const plans = prepararOrigens(s, anterior, antigos, raiz, raiz)
+  const record = (s: Session): SessionRecord => ({ id, slug: id, title: s.title, workspacePath: s.workspacePath, worktreePath: null, messageCount: s.chats[0].messages.length, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify(s) })
+  const publish = (s: Session, anterior?: Session, antigos: TranscriptEntry[] = [], raiz: string | null = s.workspacePath) => {
+    const plans = prepararOrigens(s, anterior, antigos, raiz, raiz ?? undefined)
     publicarCatalogoComOrigens(record(s), plans, entries(s))
     return origemChat(id, 'main')!
   }

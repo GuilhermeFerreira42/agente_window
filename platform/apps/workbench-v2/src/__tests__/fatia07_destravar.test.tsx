@@ -28,7 +28,7 @@ vi.mock('../services/sessions/sessionsClient', async (importOriginal) => {
   const { testSessions: sessions } = await import('./fixtures/sessions')
   return {
     ...actual,
-    loadPersistedSessions: vi.fn(async () => sessions),
+    loadPersistedSessions: vi.fn(async () => ({ sessions, unavailable: [], state: 'ok' as const })),
     persistSession: vi.fn(async () => undefined),
     pickSessionWorkspace: vi.fn(async () => undefined),
     createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
@@ -100,6 +100,9 @@ describe('FATIA 07 — Destravar', () => {
 
     const before = workspacePosts.length
     const landing = within(screen.getByRole('region', { name: 'Nova sessão' }))
+    // C-1: a landing nasce em Chat; a pasta (e o caminho manual) aparecem
+    // somente após a escolha explícita da modalidade Pasta.
+    await user.click(landing.getByTestId('contexto-workspace'))
     await user.click(landing.getByRole('button', { name: 'Digitar caminho' }))
     const input = landing.getByRole('combobox', { name: 'Caminho manual do workspace' })
     await user.type(input, '/tmp/pasta-nova')

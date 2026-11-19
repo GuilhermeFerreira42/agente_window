@@ -9,7 +9,8 @@ import { gerarResumo, limitesDeResumo } from './compactacao'
 import type { TranscriptEntry } from './transcripts'
 import type { ChatMessage } from '../../types'
 
-export interface EscopoMemoria { sessionId: string; chatId: string; raiz: string }
+/** C-1 — Chat tem escopo sem raiz: `raiz: null` nunca vira caminho de pasta. */
+export interface EscopoMemoria { sessionId: string; chatId: string; raiz: string | null }
 export interface FonteMemoria { escopo: string; entries: TranscriptEntry[]; checkpoint: Checkpoint | null | undefined }
 export interface PortasMemoria {
   ler: (escopo: EscopoMemoria) => Promise<FonteMemoria>

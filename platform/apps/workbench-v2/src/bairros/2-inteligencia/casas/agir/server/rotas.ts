@@ -44,7 +44,8 @@ export function rotaPertenceAoModuloAgir(pathname: string): boolean {
 
 export interface ContextoAgir {
   ok: true
-  raiz: string
+  /** C-1 — `null` = conversa Chat: sem pasta, sem grant, sem filesystem. */
+  raiz: string | null
   permissoes: string[]
 }
 
@@ -71,14 +72,14 @@ export interface DependenciasAgir {
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
   gravarExecucao?: (registro: RegistroExecucaoAgir) => Promise<void>
-  restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
+  restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, mensagens: MensagemSimples[]) =>
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
-  recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
-  recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string }, consulta: string) => Promise<ResultadoRecuperacao>
+  recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
+  recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, consulta: string) => Promise<ResultadoRecuperacao>
   criarConsultaEntreChats?: (contexto: ContextoEntreChats, sinal: AbortSignal, orcamentoBytes: number, textoHumano: string) => (pedido: PedidoEntreChats) => Promise<ResultadoEntreChats>
-  prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemAgir[], alvo: AlvoConversa,
+  prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, mensagens: MensagemAgir[], alvo: AlvoConversa,
     sinal: AbortSignal, emitir: (evento: EventoAgir) => void, forcar?: boolean, medir?: (mensagens: MensagemAgir[]) => number) => Promise<MensagemAgir[]>
-  planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string }, runId: string) => Promise<string>
+  planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, runId: string) => Promise<string>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -103,7 +104,8 @@ interface AprovacaoPendente {
 interface ContextoFluxo {
   sessionId: string
   chatId: string
-  raiz: string
+  /** C-1 — Chat: `null`; a raiz nunca é deduzida de cwd/repoRoot. */
+  raiz: string | null
   modo: ModoAgir
   modoSelecionadoNoServidor: boolean
   permissao: NivelPermissaoAgir
@@ -152,6 +154,13 @@ export function conversaEmExecucao(sessionId: string, chatId: string): boolean {
 }
 export function conversaTemPausa(sessionId: string, chatId: string): boolean {
   return [...retomarPorFluxo.values()].some(({ contexto }) => contexto.sessionId === sessionId && contexto.chatId === chatId)
+}
+/** P-C (PC-R1) — guarda para fronteiras que não podem seguir com a identidade
+ * (ex.: DELETE) enquanto um run NÃO-TERMINAL da sessão ainda vive no mapa.
+ * Cancelamento já concluído (`estado` terminal) não bloqueia: o ACK veio e o
+ * `finally` do fio só limpa o mapa em seguida. */
+export function sessaoEmExecucao(sessionId: string): boolean {
+  return [...execucaoPorFluxo.values()].some((execucao) => execucao.sessionId === sessionId && !execucaoTerminal(execucao))
 }
 function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
@@ -216,8 +225,17 @@ async function concluirCancelamento(execucao: ExecucaoAgir): Promise<'cancelled'
 const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa; runId: string }>()
 const MAX_RETOMADAS = 20
 
-function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string): NivelPermissaoAgir {
+function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string | null): NivelPermissaoAgir {
+  // C-1 — Chat não tem permissão de pasta: sempre manual, sem ler nem gravar grant.
+  if (raiz === null) return 'manual'
   return deps.lerPermissao?.(sessionId, chatId, raiz) ?? 'manual'
+}
+
+/** C-1 — modo efetivo da execução: Chat é sempre "Perguntar" (sem ferramentas);
+ * workspace usa a seleção do servidor com default conservador Agent. */
+function resolverModoEfetivo(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string | null): ModoAgir {
+  if (raiz === null) return 'ask'
+  return deps.lerModo(sessionId, chatId) ?? 'agent'
 }
 
 /** Guarda a retomada quando o teto pausou OU um erro transitório
@@ -239,6 +257,30 @@ function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: Cont
   }
 }
 
+/** C-1 (SPEC C §4) — recusa honesta das ferramentas de pasta em conversa Chat:
+ * sem filesystem, sem permissão implícita, mensagem que explica a modalidade. */
+function recusarSemPasta(ferramenta: FerramentaId): ExecutorFerramenta {
+  return async () => ({
+    ok: false,
+    resumo: `Conversa Chat não tem pasta: "${ferramenta}" indisponível. Inicie uma conversa workspace para usar esta ferramenta.`,
+  })
+}
+
+function executoresSemPasta(): ExecutoresDisco {
+  return {
+    ler: recusarSemPasta('ler'),
+    listar: recusarSemPasta('listar'),
+    buscar: recusarSemPasta('buscar'),
+    criar: recusarSemPasta('criar'),
+    escrever: recusarSemPasta('escrever'),
+    excluir: recusarSemPasta('excluir'),
+    fechar: () => {},
+    prepararExclusao: async () => {
+      throw new Error('Conversa Chat não tem pasta: exclusão indisponível.')
+    },
+  }
+}
+
 interface FioAgir {
   execucao: ExecucaoAgir
   anterior?: string
@@ -248,7 +290,7 @@ interface FioAgir {
   sessionId: string
   chatId: string
   mensagens: MensagemAgir[]
-  raiz: string
+  raiz: string | null
   permissoes: string[]
   alvo: AlvoConversa
   teto: number
@@ -309,7 +351,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   let recuperouLimite = false
   const orcamentoMC1 = Math.min(24_000, Math.floor((orcamentoContexto(fio.alvo.capacidade, fio.alvo.maxSaida || 2048, fio.alvo.limiteContexto)?.preventivo ?? 24_000) / 4))
   let consultarOutroChat: ReturnType<NonNullable<DependenciasAgir['criarConsultaEntreChats']>> | undefined
-  try { consultarOutroChat = fio.execucao.entreChats ? deps.criarConsultaEntreChats?.(fio, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
+  // C-1 — MC1 exige raiz: Chat nunca cria consulta entre chats (tratarAgir
+  // já recusa `entreChats` sem raiz; aqui o estreitamento é explícito p/ TS).
+  try { consultarOutroChat = fio.execucao.entreChats && fio.raiz !== null ? deps.criarConsultaEntreChats?.({ sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz }, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
   catch { consultarOutroChat = async () => ({ status: 'scope_unverifiable', reason: 'catalog_unavailable', results: [], partial: true, sources: [], aviso: 'O catálogo histórico não está acessível.' }) }
   let consultasOutros = 0
   const executarConsultaOutroChat: ExecutorFerramenta = async pedido => {
@@ -330,14 +374,22 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const assinaturaEfeito = (pedido: PedidoFerramenta) => {
     const args = { ...pedido.argumentos }
     if (typeof args.caminho === 'string') {
-      const path = nodePath.resolve(fio.raiz, args.caminho).normalize('NFC')
+      // C-1 — Chat não tem raiz: a assinatura usa o caminho como veio (sem base).
+      const path = fio.raiz !== null ? nodePath.resolve(fio.raiz, args.caminho).normalize('NFC') : args.caminho.normalize('NFC')
       args.caminho = process.platform === 'win32' ? path.toLowerCase() : path
     }
     return `${pedido.ferramenta}:${JSON.stringify(Object.keys(args).sort().map((chave) => [chave, args[chave as keyof typeof args]]))}`
   }
   const efeitosTentados = new Set(fio.mensagens.flatMap((m) => m.pedidos ?? []).filter((p) => ehMexida(p.ferramenta)).map(assinaturaEfeito))
-  const executoresDisco = fio.instrucao?.executores ?? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
-  const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
+  // C-1 (SPEC C §4) — Chat: nenhum executor de disco/comando nasce (a fábrica
+  // `criarExecutores` NUNCA é chamada com raiz nula) e qualquer chamada recebe
+  // recusa honesta sem tocar filesystem.
+  const executoresDisco = fio.instrucao?.executores ?? (fio.raiz !== null
+    ? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
+    : executoresSemPasta())
+  const executorComandoBase = fio.raiz !== null
+    ? criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
+    : recusarSemPasta('executar')
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
     buscar_chats: executarConsultaOutroChat,
@@ -421,7 +473,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     }
   }
   const autorizacoesAutomaticas = new WeakSet<PedidoFerramenta>()
-  const automaticaAtiva = (): boolean => lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all' && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
+  const automaticaAtiva = (): boolean => fio.raiz !== null
+    && lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all'
+    && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
   let instrucaoConsumida = false
   const reconfirmacoes = fio.execucao.exclusoesTentadas ?? new Set<string>()
   fio.execucao.exclusoesTentadas = reconfirmacoes
@@ -429,7 +483,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     const permissoesAtuais = permissoesPorFluxo.get(fluxo)
     const usouGrantDeSessao = pedido && permiteSessao(pedido.ferramenta) && permissoesAtuais?.has(pedido.ferramenta)
     const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
-    if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
+    if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || resolverModoEfetivo(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
     if (pedido && usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido.ferramenta)) return false
     permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
     return true
@@ -488,7 +542,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+      // C-1 (SPEC C §4) — Chat: catálogo vazio no provedor (nenhuma ferramenta
+      // de workspace é anunciada); a conversa roda somente com texto.
+      ferramentasPermitidas: fio.raiz === null ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
         deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
@@ -511,6 +567,8 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         else escreverEvento(res, evento)
       },
       pedirAprovacao: async (pedido) => {
+        // C-1 — Chat não tem pasta: nenhuma aprovação de arquivo/comando nasce.
+        if (fio.raiz === null) return false
         const exigeReconfirmacao = recuperouLimite && efeitosTentados.size > 0
         const concedidas = permissoesPorFluxo.get(fluxo)
         const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
@@ -578,6 +636,11 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       bloquearFerramenta: (pedido) => {
         if (fio.execucao.entreChats) return (FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta) ? null : 'Esta consulta é somente de outros chats: não autoriza arquivos, comandos, memórias de projeto ou outras ferramentas.'
         if ((FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta)) return 'Consulte outros chats somente mediante pedido humano explícito atual; use /chats seguido da consulta se necessário.'
+        // C-1 (SPEC C §4) — guarda da conversa Chat: nenhuma ferramenta de
+        // pasta/comando executa, mesmo com "Permitir tudo" ou grant antigo.
+        if (fio.raiz === null && ['ler', 'listar', 'buscar', 'criar', 'escrever', 'excluir', 'executar'].includes(pedido.ferramenta)) {
+          return `Conversa Chat não tem pasta: "${pedido.ferramenta}" indisponível. Inicie uma conversa workspace para usar esta ferramenta.`
+        }
         if (recuperouLimite && ehMexida(pedido.ferramenta) && efeitosTentados.has(assinaturaEfeito(pedido))) {
           return 'Ação já tentada antes da recuperação de contexto; não será repetida. Confira o resultado e peça nova autorização em uma tarefa nova se precisar repeti-la.'
         }
@@ -589,7 +652,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
         }
-        if ((pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever') && typeof pedido.argumentos.caminho === 'string') {
+        if (fio.raiz !== null && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever') && typeof pedido.argumentos.caminho === 'string') {
           const caminho = nodePath.resolve(fio.raiz, pedido.argumentos.caminho)
           if (/[\\/]docs[\\/]0[1-9] - [^\\/]+\.md$/iu.test(caminho)) {
             const texto = fio.execucao.instrucaoAtual ?? ''
@@ -679,7 +742,7 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     return true
   }
   const contextoAtual = deps.resolverContexto(execucao.sessionId, execucao.chatId)
-  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || (deps.lerModo(execucao.sessionId, execucao.chatId) ?? 'agent') !== execucao.modo || lerPermissaoEfetiva(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.permissao) {
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || resolverModoEfetivo(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.modo || lerPermissaoEfetiva(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
     return true
   }
@@ -695,6 +758,10 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
         ? 'Comandos de alto risco não aceitam grant de sessão; sempre exigem aprovação individual.'
         : 'Esta ferramenta não aceita grant de sessão; o cartão sempre pergunta antes de executar.'
       sendErro(res, 400, 'configuracao', motivo)
+      return true
+    }
+    if (execucao.raiz === null) {
+      sendErro(res, 400, 'configuracao', 'Conversa Chat não aceita grants de pasta.')
       return true
     }
     const ferramenta = pendente.pedido.ferramenta as 'criar' | 'escrever' | 'executar'
@@ -767,6 +834,12 @@ async function tratarInstrucaoHumana(req: IncomingMessage, res: ServerResponse, 
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
   if (!contexto.ok) { sendErro(res, 409, 'fluxo', contexto.message); return true }
+  // C-1 (SPEC C §4) — Chat não recebe instrução humana de arquivo/comando:
+  // sem raiz não há preparação de exclusão nem executores de pasta.
+  if (contexto.raiz === null) {
+    sendErro(res, 409, 'configuracao', 'Conversa Chat não tem pasta: instruções de arquivo e comando exigem uma conversa workspace.')
+    return true
+  }
   for (const [id, instrucao] of instrucoes) {
     if (Date.now() - instrucao.criada > 300_000 || (instrucao.sessionId === sessionId && instrucao.chatId === chatId) || instrucoes.size >= 20) {
       instrucao.executores.fechar(); instrucoes.delete(id)
@@ -816,7 +889,7 @@ async function tratarAgir(
   // Default conservador é Agent + aprovação manual. A seleção explícita do
   // servidor aplica a política do modo e ignora o `mode` de /api/agir.
   const modoSelecionado = deps.lerModo(validacao.pedido.sessionId, validacao.pedido.chatId)
-  const modoEfetivo = modoSelecionado ?? 'agent'
+  const modoEfetivo = resolverModoEfetivo(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
   const permissaoEfetiva = lerPermissaoEfetiva(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
 
   const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
@@ -848,7 +921,7 @@ async function tratarAgir(
   }
   instrucoes.delete(token)
   const textoAtual = validacao.pedido.mensagens.at(-1)
-  const consultaEntreChats = !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
+  const consultaEntreChats = contexto.raiz !== null && !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
     instrucao.texto === textoAtual.content && pedidoHumanoEntreChats(instrucao.texto)
   if (textoAtual?.role === 'user' && /^\/chats(?:\s|$)/iu.test(textoAtual.content.trim()) && !consultaEntreChats) {
     sendErro(res, 400, 'configuracao', 'Envie /chats seguido da consulta por uma nova mensagem humana. Nenhuma consulta foi iniciada.'); return true
@@ -944,7 +1017,7 @@ async function tratarContinuar(
     return true
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
-  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || (deps.lerModo(sessionId, chatId) ?? 'agent') !== retomada.contexto.modo || lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz) !== retomada.contexto.permissao) {
+  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || resolverModoEfetivo(deps, sessionId, chatId, retomada.contexto.raiz) !== retomada.contexto.modo || lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz) !== retomada.contexto.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; a continuação foi invalidada.')
     return true
   }
@@ -1024,6 +1097,11 @@ async function tratarSelecionarPermissao(req: IncomingMessage, res: ServerRespon
   const contexto = deps.resolverContexto(sessionId, chatId)
   if (!contexto.ok) {
     sendErro(res, 409, 'fluxo', contexto.message)
+    return true
+  }
+  // C-1 — Chat não tem permissões de pasta: o seletor permanece em manual.
+  if (contexto.raiz === null) {
+    sendErro(res, 409, 'fluxo', 'Conversa Chat não tem permissões de pasta; a permissão permanece em modo manual.')
     return true
   }
   if (!deps.definirPermissao) {
