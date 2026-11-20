@@ -2744,3 +2744,12 @@ Base 36cba54; Node/npm oficiais, Windows/Chromium fixado. Artefatos externos em 
 7. lint-final.json: 21 erros herdados idênticos à base 36cba54 (App 17, index 3, outlineCandidates 1), nenhum novo; 10 avisos no perímetro alterado. Não comparar este perímetro ao anterior de 26 erros como se fossem a mesma seleção. Canceled/Delayer do Monaco nativo segue nos PAGEERRORS, sem perda demonstrada.
 
 Comando: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/scripts/project.ps1 test [19 caminhos completos em gate-final.log] --maxWorkers=1 --minWorkers=1 --reporter=verbose --reporter=json --outputFile=[revisao]/gate.json. AGENTE_WINDOW_TEST_ROOT=[feedback]/unitarios. Typecheck pelo mesmo launcher. Testes de navegador são scripts Playwright locais via Node fixado. Fixtures só no workspace descartável do perfil 5199. Nenhuma inferência IA/chave real, build de produção ou homologação de terminal. A integral histórica 36 falhas/30 ignorados não foi repetida. Recuperação existente atualizada após commit com clone/HEAD/tree/fsck e extração/SHA256; metadados finais no operacional.
+
+## C-3b — como validar (Linux)
+
+- Gate de critérios: `node VALIDAR_C3B.mjs --repo <repo> --mode foco --out <NOVO>` — exige cada ID T01–T32 **no nome do teste**, sem skip.
+- Comparação nominal: `--mode ampla --baseline-json <baseline>/vitest.json` — reprova em `newFailures`, `newSkips` e `missingCriteria`.
+- Jornadas: `node VALIDAR_E2E_C3B.mjs --repo <repo> --out <NOVO>` (porta 5216, `--retries=0`, sem skip).
+- **Pegadinha de ambiente (C-1):** `e2e/c1_correcoes.spec.ts` sobe o servidor na porta 5211, mas `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174). Sem `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5211` o spec falha com `ERR_CONNECTION_REFUSED`. Isso **não** é regressão: acontece igual na base homologada `a49cc6c`.
+- **Chromium no sandbox:** `LD_LIBRARY_PATH=/tmp/al2023/lib` e `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium`.
+- O produtor de teste só existe com `C3B_SAIDA_DE_TESTE=1` na composição; em produção a fábrica recusa.
