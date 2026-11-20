@@ -23,7 +23,7 @@ import {
   type CardArtefato,
   type ItemApresentacao,
 } from '../domain/apresentacaoMultimodal'
-import { classificarPreview } from '../domain/politicaPreview'
+import type { ClassificacaoPreview } from '../domain/politicaPreview'
 import { baixarArtefato, urlDeMidia } from '../services/sessions/artefatosMediaClient'
 import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
@@ -229,6 +229,21 @@ async function baixarAnexoComNome(sessionId: string, chatId: string, artifactId:
  * card. Card sem `estado` conhecido assume `pronto`: a C-3a já gravou o estado
  * real no anexo, e inventar "ausente" esconderia arquivo que existe.
  */
+/**
+ * Modalidade publicada pelo servidor → classificação de preview.
+ *
+ * `texto`/`arquivo`/ausente nunca viram mídia: o fallback honesto é o card de
+ * arquivo com download (R05). Isto não reabre a política: a rota de mídia
+ * reconfere os BYTES e responde 415 quando a assinatura não bate (R06), então
+ * um `falso.png` marcado como imagem ainda seria recusado lá.
+ */
+function modalidadeParaPreview(modalidade: Attachment['modalidade'] | undefined): ClassificacaoPreview {
+  if (modalidade === 'imagem') return { ok: true, tipo: 'imagem', mime: 'image/png', modalidade: 'imagem' }
+  if (modalidade === 'audio') return { ok: true, tipo: 'audio', mime: 'audio/wav', modalidade: 'audio' }
+  if (modalidade === 'video') return { ok: true, tipo: 'video', mime: 'video/webm', modalidade: 'video' }
+  return { ok: false, motivo: 'formato_nao_exibivel' }
+}
+
 function itensDaMensagem(mensagem: ChatMessage): {
   itens: ItemApresentacao[]
   envelopeValido: boolean
@@ -242,11 +257,11 @@ function itensDaMensagem(mensagem: ChatMessage): {
 
   const cardPara = (artifactId: string): CardArtefato => {
     const anexo = mensagem.attachments?.find((a) => a.artifactId === artifactId)
-    // Sem bytes no DTO não há como classificar: fica `arquivo` com download,
-    // que é o comportamento honesto (não inventamos preview).
-    const classificacao = anexo?.bytes !== undefined
-      ? classificarPreview(undefined)
-      : classificarPreview(undefined)
+    // O DTO de mensagem NÃO carrega bytes (decisão da C-3a: nunca bytes no
+    // histórico). Quem já classificou foi o SERVIDOR, na publicação: a
+    // modalidade gravada no anexo é a autoridade. A extensão do nome é
+    // ignorada de propósito — `falso.png` que é HTML continua `arquivo`.
+    const classificacao = modalidadeParaPreview(anexo?.modalidade)
     return {
       artifactId,
       name: anexo?.name ?? 'arquivo',

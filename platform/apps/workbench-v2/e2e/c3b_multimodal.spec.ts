@@ -13,7 +13,7 @@
 // =============================================================================
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -49,7 +49,7 @@ async function iniciarServidor(): Promise<void> {
       FS_TEST_ROOT: raiz,
       // Seam de teste: existe só quando explicitamente ligado. Em produção o
       // produtor local recusa (provado no unitário C3B-T30).
-      C3B_PRODUTOR_LOCAL: '1',
+      C3B_SAIDA_DE_TESTE: '1',
     },
   })
   await expect.poll(async () => {
@@ -73,7 +73,6 @@ async function abrirApp(page: Page): Promise<void> {
 }
 
 const campoLanding = (page: Page) => page.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
-const campoChat = (page: Page) => page.getByRole('textbox', { name: 'Mensagem para o agente' })
 const botaoEnviarLanding = (page: Page) => page.getByRole('button', { name: 'Enviar mensagem' })
 
 async function criarSessaoDeTexto(page: Page, texto: string): Promise<void> {
@@ -96,26 +95,6 @@ async function sessaoAtiva(page: Page): Promise<{ sessionId: string; chatId: str
   const sessao = corpo.session as { id: string; chats: Array<{ id: string }>; mainChatId?: string }
   const chat = sessao.chats.find((c) => c.id === sessao.mainChatId) ?? sessao.chats[0]
   return { sessionId: sessao.id, chatId: chat.id }
-}
-
-/** Anexa bytes reais pelo composer (input file do browser, não JSON). */
-async function anexarNoChat(page: Page, nome: string, bytes: Buffer, mime: string): Promise<void> {
-  const entrada = page.locator('.chat-input-container input[type="file"]').first()
-  await entrada.setInputFiles({ name: nome, mimeType: mime, buffer: bytes })
-  await expect(page.getByRole('group', { name: new RegExp(nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeVisible({ timeout: 20_000 })
-}
-
-async function enviarAnexo(page: Page, nome: string, bytes: Buffer, mime: string): Promise<string> {
-  await anexarNoChat(page, nome, bytes, mime)
-  const publicacao = page.waitForRequest((req) => req.method() === 'PUT' && /attachments\/uploads\/[^/]+\/content$/.test(req.url()))
-  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
-  await publicacao
-  // O chip publicado carrega o artifactId real do ledger.
-  const chip = page.locator('[data-artifact-id]').last()
-  await chip.waitFor({ timeout: 20_000 })
-  const artifactId = await chip.getAttribute('data-artifact-id')
-  expect(artifactId, 'chip publicado carrega o artifactId').toBeTruthy()
-  return artifactId!
 }
 
 /**
@@ -141,6 +120,44 @@ async function publicarPelaApi(page: Page, nome: string, bytes: Buffer, mime: st
   return recibo.artifactId as string
 }
 
+/**
+ * Espera a sessão ativa ficar PERSISTIDA (com o chat no disco). O envio na
+ * landing é otimista; a gravação chega logo depois. Sem esta espera a
+ * produção de teste publicaria numa sessão que ainda não existe no catálogo.
+ */
+async function esperarPersistida(page: Page): Promise<void> {
+  const id = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
+  expect(id, 'sessão ativa selecionada').toBeTruthy()
+  await expect.poll(async () => {
+    const resposta = await page.request.get(`${BASE}/api/sessions/${id}`, { headers: headersApi })
+    if (resposta.status() !== 200) return 0
+    const corpo = await resposta.json()
+    return corpo.session?.chats?.[0]?.messages?.length ?? 0
+  }, { timeout: 20_000 }).toBeGreaterThan(0)
+}
+
+/**
+ * F5 real, descartando apenas o RASCUNHO LOCAL não confirmado.
+ *
+ * O workbench guarda em `workbench.sessions.unsaved.v1` uma cópia da sessão
+ * enquanto a gravação não recebe ACK, e o handler `pagehide` a regrava ao
+ * recarregar. Na reidratação essa cópia tem precedência sobre o snapshot do
+ * servidor — comportamento correto do produto (protege edição não salva), mas
+ * que esconderia justamente o que esta jornada prova: o que o SERVIDOR
+ * persistiu.
+ *
+ * Aqui o ACK é simulado: `addInitScript` roda ANTES do bundle do app, então a
+ * chave some depois do `pagehide` e antes da leitura. Toda a outra via —
+ * servidor, transcript P-B, projeção, apresentação — é a real.
+ */
+async function recarregarComAck(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.removeItem('workbench.sessions.unsaved.v1')
+  })
+  await page.reload()
+  await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+}
+
 const urlMidia = (sessionId: string, chatId: string, artifactId: string) =>
   `${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}/media`
 
@@ -159,6 +176,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
   test('C3B-E01 — imagem: decode real, abrir/fechar, download com hash, F5 e reinício', async ({ page }) => {
     const png = fixture('imagem.png')
     await criarSessaoDeTexto(page, 'jornada c3b e01 imagem')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const artifactId = await publicarPelaApi(page, 'foto.png', png, 'image/png')
 
@@ -195,6 +213,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
   test('C3B-E02 — áudio WAV: duração real, play, currentTime, pause e seek', async ({ page }) => {
     const wav = fixture('audio.wav')
     await criarSessaoDeTexto(page, 'jornada c3b e02 audio')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const artifactId = await publicarPelaApi(page, 'som.wav', wav, 'audio/wav')
 
@@ -240,6 +259,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
   test('C3B-E03 — vídeo WebM: videoWidth real, reprodução, seek e Range HTTP', async ({ page }) => {
     const webm = fixture('video.webm')
     await criarSessaoDeTexto(page, 'jornada c3b e03 video')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const artifactId = await publicarPelaApi(page, 'clipe.webm', webm, 'video/webm')
     const url = urlMidia(sessionId, chatId, artifactId)
@@ -283,6 +303,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E04 — fallback inerte: HTML/SVG/EXE e MIME falso não executam nada', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e04 fallback')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
 
     const falso = fixture('falso.png')
@@ -316,52 +337,53 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await shot(page, 'c3b_e04_fallback')
   })
 
-  test('C3B-E05 — produto de partes: envelope só com artefato e com texto intercalado', async ({ page }) => {
+  test('C3B-E05 — resposta do produtor pelo caminho REAL: texto/artefato/texto persistido', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e05 partes')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
-    const png = fixture('imagem.png')
 
-    // Publica pelo caminho do servidor e grava a mensagem com envelope MM-0
-    // pela MESMA API de sessão (protocolo P-A/P-B), não por seed de DTO.
-    const artifactId = await publicarPelaApi(page, 'grafico.png', png, 'image/png')
-    const envelope = {
-      versao: 1,
-      messageId: 'msg-e05',
-      partes: [
-        { partId: 'msg-e05:0', tipo: 'texto', texto: 'resultado do produtor' },
-        { partId: 'msg-e05:1', tipo: 'artefato', artifactId, modalidade: 'imagem' },
-        { partId: 'msg-e05:2', tipo: 'texto', texto: 'fim' },
-      ],
-    }
-    const corpo = await page.request.get(`${BASE}/api/sessions/${sessionId}`, { headers: headersApi })
-    const atual = await corpo.json()
-    const sessao = atual.session
-    const chat = sessao.chats.find((c: { id: string }) => c.id === chatId) ?? sessao.chats[0]
-    chat.messages = [
-      ...chat.messages,
-      { id: 'msg-e05', role: 'assistant', content: 'resultado do produtorfim', time: '10:00', multimodal: envelope },
-    ]
-    const gravacao = await page.request.put(`${BASE}/api/sessions/${sessionId}`, {
+    // O navegador pede UMA resposta; não manda path, URL, run alegado, nome
+    // de arquivo nem bytes. Quem produz é o produtor composto no servidor.
+    const pedido = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
       headers: { ...headersApi, 'Content-Type': 'application/json' },
-      data: { session: sessao, expectedRevision: atual.ack?.revision ?? atual.revision ?? 0 },
+      data: { runId: randomUUID(), generation: 0 },
     })
-    expect([200, 201].includes(gravacao.status()), `gravação: ${await gravacao.text()}`).toBe(true)
+    expect(pedido.status(), `produção: ${await pedido.text()}`).toBe(200)
+    const produzido = await pedido.json() as {
+      messageId: string
+      multimodal: { versao: number; partes: Array<{ tipo: string; texto?: string; artifactId?: string }> }
+    }
+    // A ORDEM veio do produtor, não do teste.
+    expect(produzido.multimodal.partes.map((p) => p.tipo)).toEqual(['texto', 'artefato', 'texto'])
+    const artifactId = produzido.multimodal.partes[1].artifactId!
+    expect(artifactId).toBeTruthy()
 
-    // F5: o envelope volta do disco e a UI ordena texto → artefato → texto.
-    await page.reload()
-    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
-    const partes = page.locator('[data-message-id="msg-e05"]')
+    // O artefato está no ledger REAL e serve os bytes da fixture.
+    const png = fixture('imagem.png')
+    const media = await page.request.get(urlMidia(sessionId, chatId, artifactId), { headers: headersApi })
+    expect(media.status(), 'a saída gerenciada é servível').toBe(200)
+    expect(sha256(await media.body())).toBe(sha256(png))
+
+    // F5: o envelope volta do disco (P-A/P-B) e a UI ordena texto → artefato → texto.
+    await recarregarComAck(page)
+    const partes = page.locator(`[data-message-id="${produzido.messageId}"]`)
     await partes.waitFor({ timeout: 20_000 })
     const textos = await partes.locator('.chat-message-texto').allTextContents()
-    expect(textos).toEqual(['resultado do produtor', 'fim'])
-    // O card da imagem aparece UMA vez (não duplica com chip legado).
+    expect(textos).toEqual(['resultado do produtor local', 'fim do resultado'])
+    // Um card só — não duplica o chip legado.
     await expect(partes.locator('.artifact-card')).toHaveCount(1)
-    await expect(partes.locator('[role="img"]')).toHaveCount(1)
+    // A imagem no card DECODIFICOU de verdade.
+    const imagem = partes.locator('.artifact-card-imagem')
+    await expect(imagem).toHaveCount(1)
+    await expect
+      .poll(async () => imagem.evaluate((n) => (n as HTMLImageElement).naturalWidth), { timeout: 15_000 })
+      .toBeGreaterThan(0)
     await shot(page, 'c3b_e05_partes')
   })
 
   test('C3B-E06 — saída gerenciada sobrevive a reinício do servidor, sem provedor', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e06 reinicio')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
     const artifactId = await publicarPelaApi(page, 'persistente.png', png, 'image/png')
@@ -381,6 +403,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E07 — ACK perdido: retry do mesmo pedido não duplica o artefato', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e07 retry')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
     const uploadId = randomUUID()
@@ -419,6 +442,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E08 — cancelamento: nada tardio revive a conversa', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e08 cancelamento')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
 
     // Upload admitido e CANCELADO antes do conteúdo: nada é publicado.
@@ -454,6 +478,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E09 — lifecycle: excluir a conversa não apaga cópia explícita do projeto', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e09 lifecycle')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const projeto = join(raiz, 'projeto')
     mkdirSync(projeto, { recursive: true })
@@ -478,6 +503,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E10 — recuperação: artefato pronto é reencontrado por nova identidade coerente', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e10 recuperacao')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
 
@@ -497,6 +523,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E11 — temas e janela pequena: apresentação legível e composer intacto', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e11 temas')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     await publicarPelaApi(page, 'tema.png', fixture('imagem.png'), 'image/png')
     await page.reload()
@@ -521,6 +548,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
   test('C3B-E12 — bordas HTTP: Range, HEAD, 416, no-store e dono negado', async ({ page }) => {
     await criarSessaoDeTexto(page, 'jornada c3b e12 http')
+    await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const wav = fixture('audio.wav')
     const artifactId = await publicarPelaApi(page, 'borda.wav', wav, 'audio/wav')

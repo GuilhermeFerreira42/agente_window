@@ -45,6 +45,8 @@ import { LIMITE_CONSULTA_TRANSCRIPT } from '../../domain/buscaTranscript'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, pareceCredencial, TIPOS_MEMORIA, type TipoMemoria } from '../../domain/memoriaProjeto'
 import { withSessionPersistenceQueue } from './filaSessao'
 import { tratarRotasAnexos } from './attachments/rotas'
+import { tratarConversaDeTeste } from './attachments/rotaConversaDeTeste'
+import type { SaidaDeTeste } from './attachments/saidaDeTeste'
 import { validarAnexosPublicados } from './attachments/publicacao'
 
 const API_PREFIX = '/api/sessions'
@@ -88,6 +90,12 @@ const prepararChamadaAutomatica = criarMemoriaAutomatica({
 
 export interface SessionPersistencePluginOptions {
   repoRoot: string
+  /**
+   * C-3b — saída de TESTE (E05/E06). Só a composição de teste a fornece; sem
+   * ela a rota `conversa-de-teste` responde 404. Nunca é alcançável em
+   * produção, e o produtor recusa criar sob NODE_ENV=production.
+   */
+  saidaDeTeste?: SaidaDeTeste
 }
 
 interface PersistedSessionPayload {
@@ -522,7 +530,45 @@ async function listSessions(): Promise<SessionIndex> {
   return { sessions, unavailable, state: unavailable.length ? 'partial' : 'ok' }
 }
 
-async function saveSession(input: PersistedSessionPayload & { expectedRevision?: number; mutationId?: string; creationId?: string }, create: boolean): Promise<{ session: Session; mutationId: string; revision: number }> {
+/**
+ * C-3b — publica UMA mensagem produzida pela saída de teste, reaproveitando a
+ * fila por dono, a restauração do transcript e o `saveSession` (P-A/P-B).
+ * Não existe segundo store: é a mesma escrita de qualquer mensagem.
+ */
+function publicarMensagemDeTeste(origem: string) {
+  return async (sessionId: string, chatId: string, mensagem: ChatMessage): Promise<{ duplicou: boolean }> => {
+    const resultado = await withSessionPersistenceQueue(sessionId, async () => {
+      const record = getSessionRecord(sessionId)
+      if (!record) throw new PersistenceProblem(404, 'session_not_found', 'A conversa não existe.')
+      const entries = await readTranscript(record.slug, sessionId)
+      const sessao = restoreMessages(JSON.parse(record.sessionJson) as Session, entries)
+      const chat = sessao.chats.find((item) => item.id === chatId)
+      if (!chat) throw new PersistenceProblem(404, 'chat_not_found', 'Esta conversa não existe na sessão.')
+      // `receipt` pode não existir para uma sessão que nunca escreveu neste
+      // processo: base 0, como no caminho HTTP normal.
+      const revisaoAtual = receipt(sessionId)?.revision ?? 0
+      // Replay idêntico devolve o mesmo recibo; nada é duplicado.
+      if (chat.messages.some((item) => item.id === mensagem.id)) return { sessao, duplicou: false, revision: revisaoAtual }
+      chat.messages = [...chat.messages, mensagem]
+      // Já estamos DENTRO da fila: o executor direto evita reentrar e travar.
+      const salvo = await saveSession({
+        session: sessao,
+        expectedRevision: revisaoAtual,
+        mutationId: randomUUID(),
+      }, false, (tarefa) => tarefa())
+      return { sessao: salvo.session, duplicou: true, revision: salvo.revision }
+    })
+    void origem
+    return { duplicou: resultado.duplicou }
+  }
+}
+
+async function saveSession(
+  input: PersistedSessionPayload & { expectedRevision?: number; mutationId?: string; creationId?: string },
+  create: boolean,
+  /** C-3b — executor injetável: quem JÁ está na fila passa o corpo direto. */
+  executar: (tarefa: () => Promise<{ session: Session; mutationId: string; revision: number }>) => Promise<{ session: Session; mutationId: string; revision: number }> = (tarefa) => withSessionPersistenceQueue(input.session.id, tarefa),
+): Promise<{ session: Session; mutationId: string; revision: number }> {
   const raw = input.session
   if (!raw || typeof raw.id !== 'string' || !raw.id.trim() || raw.id.length > 512
     || !Array.isArray(raw.chats) || !raw.chats.length || raw.chats.some(c => !c) || typeof raw.mainChatId !== 'string'
@@ -580,7 +626,10 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
       ? { ...session, contexto: { tipo: 'chat' }, workspacePath: null, worktreePath: null, branch: null }
       : { ...session, contexto: { tipo: 'workspace' }, ...(caminhoResolvido ? { workspacePath: caminhoResolvido } : {}) }
   }
-  return withSessionPersistenceQueue(session.id, async () => {
+  // C-3b — corpo travado reutilizável: a saída de teste precisa publicar
+  // DENTRO da mesma trava. Chamar `saveSession` de dentro dela reentraria a
+  // fila e travaria o processo para sempre.
+  const gravarNaFila = async () => {
     // P-B step 6: resolve a journal left by an interrupted publication BEFORE
     // anything else, so CAS/receipt decisions see the reconciled truth.
     await reconciliarPublicacao(session.id)
@@ -681,20 +730,26 @@ async function saveSession(input: PersistedSessionPayload & { expectedRevision?:
       throw error
     }
     return { session: committed, revision, mutationId }
-  })
+  }
+  return executar(gravarNaFila)
 }
 
 /**
  * FATIA 10 — o território do agente: a prefeitura valida a pasta informada
  * pela sessão e entrega a RAIZ real (o navegador nunca define território).
  */
-async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string): Promise<boolean> {
+async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string, saidaDeTeste?: SaidaDeTeste): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   // C-3a — rotas de anexo (subrotas de sessão; o byId ancorado em `$` não as
   // cobre). Despacho próprio ANTES do caminho genérico de sessão.
   if (await tratarRotasAnexos(request, response, url)) return true
+
+  // C-3b — resposta multimodal pelo caminho REAL (E05/E06). Só é registrada
+  // quando a composição de teste injeta `saidaDeTeste`; sem ela, 404.
+  if (await tratarConversaDeTeste(request, response, url, saidaDeTeste, publicarMensagemDeTeste(url.origin)))
+    return true
 
   if (url.pathname === '/api/sessions/history-access' && request.method === 'POST') {
     try {
@@ -1007,7 +1062,7 @@ export function sessionPersistencePlugin(options: SessionPersistencePluginOption
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        void handleRequest(request, response, options.repoRoot)
+        void handleRequest(request, response, options.repoRoot, options.saidaDeTeste)
           .then((handled) => { if (!handled) next() })
           .catch((error: unknown) => {
             sendJson(response, error instanceof PersistenceProblem ? error.status : error instanceof SnapshotGrandeError ? 413 : error instanceof WorktreeRequiresGitError ? 400 : 500, {

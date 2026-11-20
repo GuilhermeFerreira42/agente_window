@@ -317,13 +317,46 @@ export async function hashDeArquivo(caminho: string): Promise<string | null> {
  * hash em uma passada só. Stage EXCLUSIVO (`wx`): duas transmissões na mesma
  * tentativa não escrevem no mesmo arquivo (R06/B11).
  */
+/**
+ * Lê o corpo reenviado e decide se ele é o MESMO da publicação registrada.
+ * Compara SHA-256 e tamanho; descarta os bytes (nada é gravado de novo).
+ */
+async function conferirReplay(
+  sessionId: string, chatId: string, uploadId: string,
+  linha: LinhaUpload, fonte: Readable,
+): Promise<boolean> {
+  const hash = createHash('sha256')
+  let bytes = 0
+  try {
+    for await (const pedaco of fonte) {
+      const bloco = typeof pedaco === 'string' ? Buffer.from(pedaco) : pedaco as Buffer
+      bytes += bloco.length
+      hash.update(bloco)
+    }
+  } catch {
+    return false
+  }
+  const registro = obterArtigo(linha.artifactId ?? '')
+  if (!registro) return false
+  return bytes === registro.bytes && hash.digest('hex') === registro.sha256
+}
+
 export async function receberConteudo(
   sessionId: string, chatId: string, uploadId: string,
   fonte: Readable, opcoes: OpcoesEstoque = {},
 ): Promise<ReciboUpload> {
   const linha = obterUpload(sessionId, chatId, uploadId)
   if (!linha) throw new PersistenceProblem(404, 'upload_not_found', 'Transferência não encontrada.')
-  if (linha.state === 'pronto') throw new PersistenceProblem(409, 'upload_already_finalized', 'Esta transferência já foi publicada.')
+  // R09 — replay de uma tentativa JÁ publicada devolve o MESMO recibo, não um
+  // conflito. O cliente que perdeu a resposta (ACK perdido) reenvia o corpo
+  // inteiro; recusar com 409 o obrigaria a inventar um segundo artefato.
+  // Um corpo DIFERENTE para a mesma identidade continua sendo conflito.
+  if (linha.state === 'pronto') {
+    const mesmo = await conferirReplay(sessionId, chatId, uploadId, linha, fonte)
+    if (mesmo) return reciboDe(linha)
+    throw new PersistenceProblem(409, 'upload_payload_conflict',
+      'Esta transferência já foi publicada com outro conteúdo.')
+  }
   if (linha.state === 'cancelado') throw new PersistenceProblem(409, 'upload_cancelled', 'Esta transferência foi cancelada.')
   if (linha.state === 'recebendo') {
     throw new PersistenceProblem(409, 'upload_in_flight',

@@ -3,11 +3,30 @@ import react from '@vitejs/plugin-react'
 import { ptyPlugin } from './vite-plugin-pty'
 import { fsPlugin } from './src/modules/explorer-search/server'
 import { sessionPersistencePlugin } from './src/server/session-persistence'
+import { montarSaidaDeTeste } from './src/server/session-persistence/attachments/saidaDeTeste'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
+
+/**
+ * C-3b — saída de TESTE (E05/E06) injetada na porta REAL de servidor.
+ *
+ * Só existe quando `C3B_SAIDA_DE_TESTE=1`; nenhuma rota pública a cria, e o
+ * produtor recusa sob `NODE_ENV=production`. Os bytes vêm de uma fixture
+ * local lida NO SERVIDOR — o navegador só pede "uma resposta".
+ */
+const saidaDeTeste = process.env.C3B_SAIDA_DE_TESTE === '1'
+  ? montarSaidaDeTeste({
+    fixturesDir: path.join(__dirname, 'src/__tests__/fixtures/midia'),
+    arquivo: 'imagem.png',
+    nome: 'resultado.png',
+    modalidade: 'imagem',
+    textoAntes: 'resultado do produtor local',
+    textoDepois: 'fim do resultado',
+  })
+  : undefined
 
 function localBoundaryPlugin(): Plugin {
   return {
@@ -41,7 +60,7 @@ export default defineConfig({
     localBoundaryPlugin(),
     react(),
     ptyPlugin(),
-    sessionPersistencePlugin({ repoRoot }),
+    sessionPersistencePlugin({ repoRoot, ...(saidaDeTeste ? { saidaDeTeste } : {}) }),
     // FATIA-04 (4.3): FileSystemPort no Single Port (Q7). Raiz = repo
     // (relativa ao próprio config — NUNCA hardcoded); FS_TEST_ROOT E2E ganha.
     fsPlugin({ root: repoRoot }),
