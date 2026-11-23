@@ -16,13 +16,14 @@
 import { lstat } from 'node:fs/promises'
 import path from 'node:path'
 import { getAppDir } from '../paths'
+import { PersistenceProblem } from '../persistenceErrors'
 import { getDatabase } from '../database'
 import {
-  inserirPlanoLimpeza, listarArtigosChat, marcarPlano, planosDefinitivamenteFalhos, planosPendentes,
+  inserirPlanoLimpeza, listarArtigosChat, marcarPlano, obterArtigo, planosDefinitivamenteFalhos, planosPendentes,
   removerLedgerDoChat,
 } from './catalogo'
-import { hashDeArquivo, raizPrivadaChat } from './estoque'
-import { garantirDentroDaRaiz } from './contencao'
+import { caminhoAbsolutoDeArtigo, hashDeArquivo, raizPrivadaChat } from './estoque'
+import { garantirDiretorioReal, garantirDentroDaRaiz } from './contencao'
 import { lixeiraDoSistema, recusaDefinitiva, type PortaLixeira } from './lixeira'
 
 export interface OpcoesLimpeza {
@@ -58,13 +59,19 @@ export function registrarPlanoAnexos(sessionId: string, chatId?: string): void {
  * Resolve o alvo privado do plano com contenção real: precisa estar sob a raiz
  * privada da conversa, cada pai sem link, e não pode ser link.
  */
-async function alvoPrivadoDe(linha: ReturnType<typeof planosPendentes>[number], appDir?: string): Promise<string | null> {
-  const raizChats = raizPrivadaChat(appDir)
-  const absoluto = path.join(appDir ?? getAppDir(), 'uploads', linha.locator)
+async function alvoPrivadoDe(linha: ReturnType<typeof planosPendentes>[number], appDir?: string): Promise<string | null | 'ausente'> {
+  const artigo = obterArtigo(linha.artifactId)
+  if (!artigo || artigo.chatId !== linha.chatId || artigo.rootKind !== 'appdir' || artigo.locator !== linha.locator) return null
+  const raizChats = artigo.papel === 'gerado-gerenciado'
+    ? path.join(appDir ?? getAppDir(), 'artifacts', artigo.sessionId, artigo.chatId, artigo.artifactId)
+    : raizPrivadaChat(appDir)
+  const absoluto = caminhoAbsolutoDeArtigo(artigo, appDir)
   try {
+    await garantirDiretorioReal(raizChats)
     const contido = await garantirDentroDaRaiz(raizChats, absoluto, { code: 'cleanup_out_of_scope' })
     return contido.alvo
-  } catch {
+  } catch (erro) {
+    if (erro instanceof PersistenceProblem && erro.status === 404) return 'ausente'
     return null
   }
 }
@@ -77,6 +84,7 @@ async function moverParaLixeiraSeConfirmado(
     return linha.alvo
   }
   const absoluto = await alvoPrivadoDe(linha, opcoes.appDir)
+  if (absoluto === 'ausente') return 'concluido'
   if (!absoluto) {
     // Fora da raiz privada: nunca mover/apagar; o ledger fica como evidência.
     return 'falhou'

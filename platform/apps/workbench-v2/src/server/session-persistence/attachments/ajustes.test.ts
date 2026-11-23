@@ -1,7 +1,7 @@
 // Reprodução dos dois ajustes de usabilidade pedidos na C-3a.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetDatabase, upsertSessionRecord } from '../database'
@@ -46,7 +46,7 @@ async function enviarNoProjeto(nome: string, conteudo: string) {
 describe('Ajustes de usabilidade C-3a', () => {
   it('A1 — a cópia no projeto mantém o nome original', async () => {
     const linha = await enviarNoProjeto('relatorio final.txt', 'CONTEUDO')
-    const nomeArquivo = linha.finalPath!.split('/').pop()!
+    const nomeArquivo = basename(linha.finalPath!)
     expect(nomeArquivo).toBe('relatorio final.txt')
     expect(readFileSync(linha.finalPath!, 'utf8')).toBe('CONTEUDO')
   })

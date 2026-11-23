@@ -42,6 +42,7 @@ export interface ProdutorLocal {
     chatId: string
     runId: string
     generation: number
+    signal?: AbortSignal
     messageId: string
     parts: PartsDoProdutor
   }): Promise<ResultadoDoProdutor>
@@ -87,6 +88,7 @@ export function criarProdutorLocal(opcoes: {
         name: parts.nome,
       }
       const publicado = await publicar(identidade, parts.bytes, {
+        signal: entrada.signal,
         ...(opcoes.appDir === undefined ? {} : { appDir: opcoes.appDir }),
       })
 

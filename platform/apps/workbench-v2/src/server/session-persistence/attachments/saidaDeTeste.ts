@@ -30,6 +30,7 @@ export interface SaidaDeTeste {
     /** Identidade da tentativa: reentrega do mesmo pedido não duplica artefato. */
     runId: string
     generation: number
+    signal?: AbortSignal
   }): Promise<ChatMessage>
 }
 
@@ -83,6 +84,7 @@ export function montarSaidaDeTeste(opcoes: OpcoesSaidaDeTeste, ambiente: string 
         chatId: entrada.chatId,
         runId: entrada.runId,
         generation: entrada.generation,
+        signal: entrada.signal,
         messageId,
         parts: {
           ...(opcoes.textoAntes ? { textoAntes: opcoes.textoAntes } : {}),

@@ -23,10 +23,11 @@ import { consultarDelecao } from '../deletions'
 import { PersistenceProblem } from '../persistenceErrors'
 import { readTranscript } from '../transcripts'
 import type { ChatMessage } from '../../../types'
+import { lerEnvelopeMultimodal } from '../../../domain/multimodal/mensagens'
 import { withSessionPersistenceQueue } from '../filaSessao'
 import { emTransacao, obterArtigo, obterUpload, upsertArtigo } from './catalogo'
 import {
-  caminhoStagePara, hashDeArquivo, publicarPreparado, publicarPreparadoSemFila, raizPrivadaChat, type OpcoesEstoque,
+  caminhoAbsolutoDeArtigo, caminhoStagePara, hashDeArquivo, publicarPreparado, publicarPreparadoSemFila, raizPrivadaChat, type OpcoesEstoque,
 } from './estoque'
 import { carregarPolitica, problemaPolitica } from './politica'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
@@ -237,6 +238,13 @@ async function artifactsCitadosNaOrigem(sessionId: string): Promise<Map<string, 
     for (const anexo of mensagem?.attachments ?? []) {
       if (anexo.artifactId) citados.set(anexo.artifactId, { chatId: entrada.chatId, name: anexo.name })
     }
+    const leitura = lerEnvelopeMultimodal(mensagem?.multimodal)
+    if (leitura.estado !== 'valido') continue
+    for (const parte of leitura.envelope.partes) {
+      if (parte.tipo === 'artefato' && !citados.has(parte.artifactId)) {
+        citados.set(parte.artifactId, { chatId: entrada.chatId, name: 'Arquivo da conversa' })
+      }
+    }
   }
   return citados
 }
@@ -358,9 +366,7 @@ async function copiarItem(
     throw new PersistenceProblem(problema.status, problema.code, problema.message)
   }
   const politica = politicaResultado.politica
-  const origemAbsoluta = artigo.rootKind === 'workspace' && artigo.workspaceRoot
-    ? path.resolve(artigo.workspaceRoot, artigo.locator)
-    : path.join(path.dirname(raizPrivadaChat(opcoes.appDir)), artigo.locator)
+  const origemAbsoluta = caminhoAbsolutoDeArtigo(artigo, opcoes.appDir)
   const info = await stat(origemAbsoluta).catch(() => null)
   if (!info || !info.isFile()) {
     throw new PersistenceProblem(410, 'recovery_item_unavailable', 'O arquivo de origem não está mais disponível.')

@@ -14,13 +14,17 @@
 // em modo Pasta. Cópia explícita do usuário no projeto continua em `uploads/`
 // do workspace e é território do usuário (limpeza não toca).
 // ============================================================================
-import { createHash } from 'node:crypto'
-import { lstat, mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { link, lstat, mkdir, readdir, rm } from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
 import path from 'node:path'
 import { Transform, Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { getAppDir } from '../paths'
+import { consultarDelecao, problemaSessaoExcluida } from '../database'
+import { withSessionPersistenceQueue } from '../filaSessao'
+import { garantirDiretorioReal } from './contencao'
+import { hashDeArquivo } from './estoque'
 import { PersistenceProblem } from '../persistenceErrors'
 import { upsertArtigo, obterArtigo, listarArtigosChat } from './catalogo'
 import type { LinhaArtigo } from './schemaAnexos'
@@ -101,6 +105,7 @@ async function gravarStream(
   destino: string,
   origem: Readable,
   limite: number,
+  signal?: AbortSignal,
 ): Promise<{ bytes: number; sha256: string }> {
   const hash = createHash('sha256')
   let bytes = 0
@@ -116,7 +121,7 @@ async function gravarStream(
       aoPronto(null, pedaco)
     },
   })
-  await pipeline(origem, medidor, createWriteStream(destino))
+  await pipeline(origem, medidor, createWriteStream(destino, { flags: 'wx' }), { signal })
   return { bytes, sha256: hash.digest('hex') }
 }
 
@@ -132,98 +137,106 @@ async function gravarStream(
 export async function publicarArtefatoGerenciado(
   identidade: IdentidadeGeracao,
   conteudo: Buffer | Readable,
-  opcoes: { appDir?: string; limiteBytes?: number } = {},
+  opcoes: { appDir?: string; limiteBytes?: number; signal?: AbortSignal } = {},
 ): Promise<ArtefatoGerenciado> {
   const artifactId = artifactIdDeGeracao(identidade)
   const limite = opcoes.limiteBytes ?? LIMITE_BYTES_GERADO
-  const existente = obterArtigo(artifactId)
-
-  if (existente) {
-    // Só é replay se for do MESMO dono. Outro dono nunca é redirecionado.
-    if (existente.sessionId !== identidade.sessionId || existente.chatId !== identidade.chatId) {
-      throw new PersistenceProblem(409, 'artifact_identity_conflict',
-        'Esta identidade de artefato já pertence a outra conversa.')
+  function exigirAtiva(): void {
+    if (opcoes.signal?.aborted) {
+      throw new PersistenceProblem(409, 'artifact_cancelled', 'A produção do arquivo foi cancelada.')
     }
-    // Replay com os mesmos bytes: devolve o recibo, sem tocar no arquivo.
-    if (Buffer.isBuffer(conteudo)) {
-      const sha = createHash('sha256').update(conteudo).digest('hex')
-      if (existente.sha256 && sha !== existente.sha256) {
-        throw new PersistenceProblem(409, 'artifact_payload_conflict',
-          'A mesma identidade foi reenviada com conteúdo diferente. O artefato anterior foi preservado.')
-      }
-      return {
-        artifactId, name: existente.name, bytes: existente.bytes,
-        sha256: existente.sha256, locator: existente.locator, replay: true,
-      }
-    }
-    // Stream no replay não dá para comparar antes de ler: recusa explícita em
-    // vez de sobrescrever às cegas.
-    throw new PersistenceProblem(409, 'artifact_payload_conflict',
-      'Identidade já publicada não aceita novo stream. O artefato anterior foi preservado.')
+    const tombstone = consultarDelecao(identidade.sessionId)
+    if (tombstone) throw problemaSessaoExcluida()
   }
 
+  exigirAtiva()
   const diretorio = raizGerada(opcoes.appDir, identidade.sessionId, identidade.chatId, artifactId)
   const nome = nomeSeguro(identidade.name)
   const destino = path.join(diretorio, nome)
-  const temporario = path.join(diretorio, `.${nome}.part`)
+  const temporario = path.join(diretorio, `.${randomUUID()}.part`)
+  const fluxo = Buffer.isBuffer(conteudo) ? Readable.from([conteudo]) : conteudo
 
-  await mkdir(diretorio, { recursive: true })
-  let medido: { bytes: number; sha256: string }
   try {
-    const fluxo = Buffer.isBuffer(conteudo) ? Readable.from([conteudo]) : conteudo
-    medido = await gravarStream(temporario, fluxo, limite)
+    await garantirDiretorioReal(diretorio)
+    await mkdir(diretorio, { recursive: true })
+    const medido = await gravarStream(temporario, fluxo, limite, opcoes.signal)
+    return await withSessionPersistenceQueue(identidade.sessionId, async () => {
+      exigirAtiva()
+      const existente = obterArtigo(artifactId)
+      if (existente) {
+        if (existente.sessionId !== identidade.sessionId || existente.chatId !== identidade.chatId) {
+          throw new PersistenceProblem(409, 'artifact_identity_conflict', 'Esta identidade pertence a outra conversa.')
+        }
+        if (existente.sha256 !== medido.sha256 || existente.bytes !== medido.bytes || existente.name !== identidade.name) {
+          throw new PersistenceProblem(409, 'artifact_payload_conflict', 'A tentativa já foi publicada com outro conteúdo.')
+        }
+        return {
+          artifactId, name: existente.name, bytes: existente.bytes,
+          sha256: existente.sha256, locator: existente.locator, replay: true,
+        }
+      }
+
+      let criouDestino = false
+      try {
+        await link(temporario, destino)
+        criouDestino = true
+      } catch (erro) {
+        if ((erro as NodeJS.ErrnoException).code !== 'EEXIST') throw erro
+        // Queda após publicar o arquivo e antes de confirmar o catálogo.
+        const info = await lstat(destino)
+        if (!info.isFile() || info.size !== medido.bytes || await hashDeArquivo(destino) !== medido.sha256) {
+          throw new PersistenceProblem(409, 'artifact_payload_conflict', 'Já existem bytes diferentes para esta tentativa.')
+        }
+      }
+
+      try {
+        exigirAtiva()
+      } catch (erro) {
+        if (criouDestino) await rm(destino, { force: true })
+        throw erro
+      }
+      const artigo: LinhaArtigo = {
+        artifactId,
+        sessionId: identidade.sessionId,
+        chatId: identidade.chatId,
+        uploadId: `${artifactId}-gerado`,
+        name: identidade.name,
+        modalidade: 'arquivo',
+        // `gerado-gerenciado` distingue no ledger o que a limpeza pode remover
+        // como artefato gerado (ao contrário de cópia de projeto do usuário).
+        papel: 'gerado-gerenciado',
+        mode: 'copy',
+        locator: locatorDe(identidade.sessionId, identidade.chatId, artifactId, identidade.name),
+        // Raiz `appdir`: o resolver/cleanup existentes já entendem essa raiz;
+        // `artifacts/` é uma subárvore dela, não um segundo store.
+        rootKind: 'appdir',
+        workspaceRoot: null,
+        bytes: medido.bytes,
+        sha256: medido.sha256,
+        state: 'pronto',
+        messageId: identidade.messageId,
+        partId: identidade.partId,
+        createdAt: Date.now(),
+      }
+      upsertArtigo(artigo)
+
+      const relido = obterArtigo(artifactId)
+      if (!relido || relido.sha256 !== medido.sha256) {
+        throw new PersistenceProblem(503, 'artifact_commit_failed',
+          'O artefato foi gravado mas não foi possível confirmar o ledger. Ele fica preservado para reconciliação.')
+      }
+
+      return {
+        artifactId, name: identidade.name, bytes: medido.bytes,
+        sha256: medido.sha256, locator: artigo.locator, replay: false,
+      }
+    })
   } catch (erro) {
-    // Nenhum arquivo parcial fica anunciado; o temporário é descartado.
-    await rm(temporario, { force: true }).catch(() => undefined)
+    exigirAtiva()
     if (erro instanceof PersistenceProblem) throw erro
-    throw new PersistenceProblem(500, 'artifact_write_failed',
-      `A gravação da saída falhou e nada foi publicado: ${String(erro)}`)
-  }
-
-  // Publicação atômica no destino final: rename no mesmo diretório.
-  await rename(temporario, destino)
-
-  const confirmado = await lstat(destino).catch(() => null)
-  if (!confirmado?.isFile()) {
-    await rm(destino, { force: true }).catch(() => undefined)
-    throw new PersistenceProblem(500, 'artifact_publish_failed',
-      'O arquivo publicado não pôde ser confirmado. Nada foi anunciado como pronto.')
-  }
-
-  const artigo: LinhaArtigo = {
-    artifactId,
-    sessionId: identidade.sessionId,
-    chatId: identidade.chatId,
-    uploadId: `${artifactId}-gerado`,
-    name: identidade.name,
-    modalidade: 'arquivo',
-    // `gerado-gerenciado` distingue no ledger o que a limpeza pode remover
-    // como artefato gerado (ao contrário de cópia de projeto do usuário).
-    papel: 'gerado-gerenciado',
-    mode: 'copy',
-    locator: locatorDe(identidade.sessionId, identidade.chatId, artifactId, identidade.name),
-    // Raiz `appdir`: o resolver/cleanup existentes já entendem essa raiz;
-    // `artifacts/` é uma subárvore dela, não um segundo store.
-    rootKind: 'appdir',
-    workspaceRoot: null,
-    bytes: medido.bytes,
-    sha256: medido.sha256,
-    state: 'pronto',
-    messageId: identidade.messageId,
-    partId: identidade.partId,
-    createdAt: Date.now(),
-  }
-  upsertArtigo(artigo)
-
-  const relido = obterArtigo(artifactId)
-  if (!relido || relido.sha256 !== medido.sha256) {
-    throw new PersistenceProblem(503, 'artifact_commit_failed',
-      'O artefato foi gravado mas não foi possível confirmar o ledger. Ele fica preservado para reconciliação.')
-  }
-
-  return {
-    artifactId, name: identidade.name, bytes: medido.bytes,
-    sha256: medido.sha256, locator: artigo.locator, replay: false,
+    throw new PersistenceProblem(500, 'artifact_write_failed', 'Não foi possível gravar a saída.')
+  } finally {
+    await rm(temporario, { force: true }).catch(() => undefined)
   }
 }
 

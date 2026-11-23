@@ -10,7 +10,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, readdirSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import path from 'node:path'
-import { Readable } from 'node:stream'
+import { PassThrough, Readable } from 'node:stream'
+import { iniciarOuConsultarDelecao } from '../deletions'
 import { spawnSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { upsertSessionRecord, resetDatabase } from '../database'
@@ -145,8 +146,10 @@ describe('C-3b — C3B-T16 replay e conflito', () => {
     expect(sha(readFileSync(servivel.caminho))).toBe(sha(original))
   })
 
-  it('C3B-T16 stream novo sobre identidade publicada é recusado, não sobrescreve', async () => {
-    await publicarArtefatoGerenciado(identidade(), Buffer.from('primeiro'))
+  it('C3B-T16 stream idêntico retorna o mesmo recibo e stream divergente é recusado', async () => {
+    const primeiro = await publicarArtefatoGerenciado(identidade(), Buffer.from('primeiro'))
+    await expect(publicarArtefatoGerenciado(identidade(), Readable.from([Buffer.from('pri'), Buffer.from('meiro')])))
+      .resolves.toEqual({ ...primeiro, replay: true })
     await expect(publicarArtefatoGerenciado(identidade(), Readable.from([Buffer.from('segundo')])))
       .rejects.toMatchObject({ code: 'artifact_payload_conflict' })
   })
@@ -293,5 +296,38 @@ describe('C-3b — C3B-T19 quota e liberação', () => {
     const artigo = obterArtigo(resultado.artifactId)!
     expect(artigo.bytes).toBe(dados.length)
     expect(artigo.sha256).toBe(sha(dados))
+  })
+})
+
+describe('C-3b — produção em voo', () => {
+  it('C3B-T16 commits concorrentes idênticos convergem em um arquivo e dois recibos compatíveis', async () => {
+    const dados = Buffer.from('mesmo conteúdo')
+    const resultados = await Promise.all([
+      publicarArtefatoGerenciado(identidade(), dados),
+      publicarArtefatoGerenciado(identidade(), Readable.from([dados])),
+    ])
+    expect(resultados[0].artifactId).toBe(resultados[1].artifactId)
+    expect(resultados.map(item => item.replay).sort()).toEqual([false, true])
+    expect(readdirSync(raizGerada(undefined, SID, CID, resultados[0].artifactId))).toEqual(['saida.png'])
+    expect(readFileSync((await lerArtigo(resultados[0].artifactId)).caminho)).toEqual(dados)
+  })
+
+  it.each(['cancelamento', 'exclusão'])('C3B-T18 %s durante a produção não publica bytes tardios', async (acao) => {
+    const fluxo = new PassThrough()
+    const controle = new AbortController()
+    const iniciou = new Promise<void>(resolve => fluxo.once('resume', resolve))
+    const resultado = publicarArtefatoGerenciado(identidade(), fluxo, { signal: controle.signal })
+    const rejeitou = expect(resultado).rejects.toMatchObject(acao === 'cancelamento'
+      ? { code: 'artifact_cancelled' }
+      : { status: 410 })
+    fluxo.write(Buffer.from('primeira parte'))
+    await iniciou
+    if (acao === 'cancelamento') controle.abort()
+    else iniciarOuConsultarDelecao({ sessionId: SID, deletionId: crypto.randomUUID(), expectedRevision: 0 })
+    fluxo.end(Buffer.from('parte tardia'))
+    await rejeitou
+    const id = artifactIdDeGeracao(identidade())
+    expect(obterArtigo(id)).toBeUndefined()
+    expect(readdirSync(raizGerada(undefined, SID, CID, id))).toEqual([])
   })
 })

@@ -5,8 +5,8 @@
 // e some no caminho. Cada caso abaixo percorre uma fronteira REAL (projeção de
 // transcript, SQLite, ledger, planos de limpeza).
 // ============================================================================
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import path from 'node:path'
@@ -19,6 +19,10 @@ import { resetDatabase, upsertSessionRecord, getDatabase } from '../database'
 import { obterArtigo } from './catalogo'
 import { lerArtigo } from './estoque'
 import { publicarArtefatoGerenciado, raizGerada } from './gerados'
+import { writeTranscript } from '../transcripts'
+import { executarLimpezaDelecao, iniciarOuConsultarDelecao } from '../deletions'
+import { confirmRecovery, prepareRecovery } from './recuperacao'
+import { criarProdutorLocal, envelopeDoResultado } from './produtorLocal'
 import { validarAnexosPublicados } from './publicacao'
 
 const SID = '99999999-9999-4999-8999-999999999999'
@@ -223,4 +227,51 @@ describe('C-3b — C3B-T23/T24 lifecycle do gerenciado', () => {
     const planos = getDatabase().prepare('SELECT COUNT(*) AS n FROM attachment_cleanup_plan').get() as { n: number }
     expect(planos.n).toBe(0)
   })
+})
+
+it('C3B-T23/T24 recupera saída do produtor em outro chat e leva só o original à Lixeira', async () => {
+  const destino = randomUUID()
+  const chatDestino = `${destino}-main`
+  upsertSessionRecord({
+    id: destino, slug: 'c3b-destino', title: 'Destino', workspacePath: null,
+    contextKind: 'chat', worktreePath: null, messageCount: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    sessionJson: JSON.stringify({ id: destino, chats: [{ id: chatDestino, messages: [] }] }),
+  })
+  const bytes = Buffer.from('arquivo gerado')
+  const gerado = await criarProdutorLocal().produzir({
+    sessionId: SID, chatId: CID, runId: 'ciclo', generation: 0, messageId: 'resposta-ciclo',
+    parts: { bytes, nome: 'saida.txt', modalidade: 'arquivo' },
+  })
+  const original = gerado.artefatos[0].artifactId
+  await writeTranscript(`c3b-${SID.slice(0, 4)}`, SID, [{
+    type: 'assistant', chatId: CID, uuid: randomUUID(), timestamp: 1,
+    message: { id: gerado.messageId, role: 'assistant', time: '10:00', content: '', multimodal: envelopeDoResultado(gerado) },
+  }])
+  const alvo = { destinoSessionId: destino, destinoChatId: chatDestino }
+  const plano = await prepareRecovery({ ...alvo, origemSessionId: SID })
+  const pedido = { ...alvo, recoveryId: plano.recoveryId, token: plano.token }
+  const recibo = await confirmRecovery(pedido)
+  expect(recibo.indisponiveis).toEqual([])
+  expect(recibo.mapa).toEqual([{ oldId: original, newId: expect.any(String) }])
+  expect((await confirmRecovery(pedido)).mapa).toEqual(recibo.mapa)
+  const copia = recibo.mapa[0].newId
+  expect(copia).not.toBe(original)
+  const origemDisco = (await lerArtigo(original)).caminho
+  iniciarOuConsultarDelecao({ sessionId: SID, deletionId: randomUUID(), expectedRevision: 0 })
+  await expect(executarLimpezaDelecao(SID, false, { lixeira: {
+    async mover() { return { ok: false, efeitoIniciado: false, motivo: 'Lixeira indisponível no teste' } },
+  } })).rejects.toMatchObject({ code: 'session_cleanup_pending' })
+  expect(readFileSync(origemDisco)).toEqual(bytes)
+  const lixeira = join(base, 'arquivo-na-lixeira')
+  expect(await executarLimpezaDelecao(SID, false, { lixeira: {
+    async mover(caminho) {
+      expect(caminho).toBe(origemDisco)
+      renameSync(caminho, lixeira)
+      return { ok: true, destino: lixeira }
+    },
+  } })).toMatchObject({ cleanupState: 'concluido' })
+  expect(obterArtigo(original)).toBeUndefined()
+  expect(existsSync(origemDisco)).toBe(false)
+  expect(readFileSync(lixeira)).toEqual(bytes)
+  expect(readFileSync((await lerArtigo(copia)).caminho)).toEqual(bytes)
 })

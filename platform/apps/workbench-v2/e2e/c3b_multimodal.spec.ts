@@ -75,12 +75,20 @@ async function abrirApp(page: Page): Promise<void> {
 const campoLanding = (page: Page) => page.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
 const botaoEnviarLanding = (page: Page) => page.getByRole('button', { name: 'Enviar mensagem' })
 
-async function criarSessaoDeTexto(page: Page, texto: string): Promise<void> {
+async function criarSessaoDeTexto(page: Page, texto: string, pasta?: string): Promise<void> {
   await abrirApp(page)
   if (await campoLanding(page).count() === 0) {
     await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
   }
   await campoLanding(page).waitFor({ timeout: 20_000 })
+  if (pasta) {
+    const seletor = page.getByTestId('landing-contexto')
+    await seletor.click()
+    const busca = page.getByLabel('Buscar ou digitar caminho da pasta')
+    await busca.fill(pasta)
+    await busca.press('Enter')
+    await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
+  }
   await campoLanding(page).fill(texto)
   await botaoEnviarLanding(page).click()
   await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
@@ -386,9 +394,15 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
-    const artifactId = await publicarPelaApi(page, 'persistente.png', png, 'image/png')
+    const producao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
+      headers: headersApi, data: { runId: randomUUID(), generation: 0 },
+    })
+    expect(producao.status()).toBe(200)
+    const { multimodal } = await producao.json()
+    const artifactId = multimodal.partes.find((parte: { tipo: string }) => parte.tipo === 'artefato').artifactId
 
-    // Reinício REAL do servidor (mesma pasta de dados).
+    // Fecha a conexão HMR antiga antes de reiniciar para ela não disputar a navegação com o Playwright.
+    await page.goto('about:blank')
     await pararServidor()
     await iniciarServidor()
 
@@ -409,14 +423,29 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
 
     // Mesma tentativa reenviada: é o cliente que perdeu a confirmação.
     const runId = randomUUID()
-    const pedir = () => page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
-      headers: { ...headersApi, 'Content-Type': 'application/json' },
-      data: { runId, generation: 0 },
-    })
+    const rota = `${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`
+    const pedido = { runId, generation: 0 }
+    const pedir = () => page.request.post(rota, { headers: headersApi, data: pedido })
 
-    const primeira = await pedir()
-    expect(primeira.status(), `primeira produção: ${await primeira.text()}`).toBe(200)
-    const r1 = await primeira.json() as {
+    let reciboPerdido: unknown
+    let statusPrimeira: number | undefined
+    await page.route(rota, async (interceptada) => {
+      const resposta = await interceptada.fetch({ headers: { ...interceptada.request().headers(), ...headersApi } })
+      statusPrimeira = resposta.status()
+      reciboPerdido = await resposta.json()
+      await interceptada.abort()
+    }, { times: 1 })
+    const clienteRecebeu = await page.evaluate(async ({ rota, pedido }) => {
+      try {
+        await fetch(rota, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedido) })
+        return true
+      } catch {
+        return false
+      }
+    }, { rota, pedido })
+    expect(clienteRecebeu).toBe(false)
+    expect(statusPrimeira, 'o servidor publicou antes da perda do recibo').toBe(200)
+    const r1 = reciboPerdido as {
       messageId: string
       multimodal: { partes: Array<{ tipo: string; artifactId?: string }> }
     }
@@ -424,7 +453,9 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     expect(artifactId1).toBeTruthy()
 
     // A confirmação se perde: o MESMO pedido é repetido.
-    const segunda = await pedir()
+    const [segunda, simultanea] = await Promise.all([pedir(), pedir()])
+    expect(simultanea.status()).toBe(200)
+    expect(await simultanea.json()).toEqual(await segunda.json())
     expect(segunda.status(), `replay: ${await segunda.text()}`).toBe(200)
     const r2 = await segunda.json() as {
       messageId: string
@@ -442,13 +473,13 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     const detalhe = await (await page.request.get(`${BASE}/api/sessions/${sessionId}`, { headers: headersApi })).json()
     const chat = detalhe.session.chats.find((c: { id: string }) => c.id === chatId)
     const respostas = (chat.messages as Array<{ id: string; role: string; attachments?: unknown[] }>)
-      .filter((m) => m.id === r1.messageId)
+      .filter((m) => (m.attachments?.length ?? 0) > 0)
     expect(respostas, 'uma única mensagem de resposta').toHaveLength(1)
+    expect(respostas[0].id).toBe(r1.messageId)
     expect(respostas[0].attachments ?? [], 'um único arquivo na mensagem').toHaveLength(1)
     const ledger = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments`, { headers: headersApi })
-    const meus = ((await ledger.json()).attachments as Array<{ artifactId: string }>)
-      .filter((a) => a.artifactId === artifactId1)
-    expect(meus, 'um único artefato no ledger').toHaveLength(1)
+    const meus = (await ledger.json()).attachments as Array<{ artifactId: string }>
+    expect(meus.map(a => a.artifactId), 'um único artefato no ledger').toEqual([artifactId1])
 
     // E os bytes continuam íntegros e servíveis depois do retry.
     const media = await page.request.get(urlMidia(sessionId, chatId, artifactId1), { headers: headersApi })
@@ -504,28 +535,37 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await shot(page, 'c3b_e08_cancelamento')
   })
 
-  test('C3B-E09 — lifecycle: excluir a conversa não apaga cópia explícita do projeto', async ({ page }) => {
-    await criarSessaoDeTexto(page, 'jornada c3b e09 lifecycle')
+  test('C3B-E09 — excluir a conversa preserva a cópia explícita no projeto', async ({ page }) => {
+    const projeto = join(raiz, 'projeto-e09')
+    mkdirSync(projeto, { recursive: true })
+    await criarSessaoDeTexto(page, 'jornada c3b e09 lifecycle', projeto)
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
-    const projeto = join(raiz, 'projeto')
-    mkdirSync(projeto, { recursive: true })
+    const sessao = `${BASE}/api/sessions/${sessionId}`
+    const anexos = `${sessao}/chats/${chatId}/attachments`
     const conteudo = Buffer.from('copia explicita que sobrevive')
     const uploadId = randomUUID()
 
-    const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
-      headers: { ...headersApi, 'Content-Type': 'application/json' },
-      data: { uploadId, name: 'meu.txt', bytes: conteudo.length, declaredBytes: conteudo.length, mime: 'text/plain', mode: 'copy', scope: 'chat' },
+    const admissao = await page.request.post(`${anexos}/uploads`, {
+      headers: headersApi,
+      data: { uploadId, name: 'meu.txt', bytes: conteudo.length, mime: 'text/plain', mode: 'copy', scope: 'workspace' },
     })
     expect(admissao.status()).toBe(201)
-    await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${uploadId}/content`, {
+    const enviado = await page.request.put(`${anexos}/uploads/${uploadId}/content`, {
       headers: { ...headersApi, 'Content-Type': 'application/octet-stream' }, data: conteudo,
     })
+    expect(enviado.status()).toBe(200)
+    const arquivo = join(projeto, 'uploads', 'meu.txt')
+    expect(readFileSync(arquivo)).toEqual(conteudo)
 
-    // Upload privado do chat é gerenciado pela conversa; o conteúdo é íntegro
-    // antes da exclusão.
-    const antes = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments`, { headers: headersApi })
-    expect(((await antes.json()).attachments as unknown[]).length).toBeGreaterThan(0)
+    const atual = await (await page.request.get(sessao, { headers: headersApi })).json()
+    const exclusao = await page.request.delete(sessao, {
+      headers: headersApi,
+      data: { deletionId: randomUUID(), expectedRevision: atual.ack?.revision ?? atual.revision ?? 0 },
+    })
+    expect(exclusao.status(), await exclusao.text()).toBe(200)
+    expect((await page.request.get(sessao, { headers: headersApi })).status()).toBe(410)
+    expect(readFileSync(arquivo)).toEqual(conteudo)
     await shot(page, 'c3b_e09_lifecycle')
   })
 
@@ -535,17 +575,37 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
 
-    // Dois uploads distintos com o MESMO nome: nenhuma sobrescrita (C-3a).
-    const primeiro = await publicarPelaApi(page, 'repetido.png', png, 'image/png')
-    const segundo = await publicarPelaApi(page, 'repetido.png', Buffer.concat([png, Buffer.from([0x00])]), 'image/png')
-    expect(primeiro).not.toBe(segundo)
+    const gerado = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
+      headers: headersApi, data: { runId: randomUUID(), generation: 0 },
+    })
+    expect(gerado.status()).toBe(200)
+    const { multimodal } = await gerado.json()
+    const original = multimodal.partes.find((p: { tipo: string }) => p.tipo === 'artefato').artifactId
 
-    const r1 = await page.request.get(urlMidia(sessionId, chatId, primeiro), { headers: headersApi })
-    const r2 = await page.request.get(urlMidia(sessionId, chatId, segundo), { headers: headersApi })
-    expect(r1.status()).toBe(200)
-    expect(r2.status()).toBe(200)
-    // Bytes distintos, sem sobrescrita do primeiro.
-    expect(sha256(await r1.body())).toBe(sha256(png))
+    await criarSessaoDeTexto(page, 'destino da recuperação')
+    await esperarPersistida(page)
+    const destino = await sessaoAtiva(page)
+    const rota = `${BASE}/api/sessions/${destino.sessionId}/chats/${destino.chatId}/attachments`
+    const preparo = await page.request.post(`${rota}/recovery/prepare`, {
+      headers: headersApi, data: { origemSessionId: sessionId },
+    })
+    expect(preparo.status()).toBe(200)
+    const { recoveryId, token } = await preparo.json()
+    const confirmar = () => page.request.post(`${rota}/recovery/confirm`, { headers: headersApi, data: { recoveryId, token } })
+    const resposta = await confirmar()
+    expect(resposta.status()).toBe(200)
+    const recibo = await resposta.json()
+    expect(recibo.indisponiveis).toEqual([])
+    expect(recibo.mapa).toEqual([{ oldId: original, newId: expect.any(String) }])
+    const copia = recibo.mapa[0].newId
+    expect(copia).not.toBe(original)
+    expect((await (await confirmar()).json()).mapa).toEqual(recibo.mapa)
+
+    for (const url of [urlMidia(sessionId, chatId, original), urlMidia(destino.sessionId, destino.chatId, copia)]) {
+      const midia = await page.request.get(url, { headers: headersApi })
+      expect(midia.status()).toBe(200)
+      expect(sha256(await midia.body())).toBe(sha256(png))
+    }
     await shot(page, 'c3b_e10_recuperacao')
   })
 

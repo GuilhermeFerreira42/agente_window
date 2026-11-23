@@ -1,12 +1,21 @@
 # Leitura vigente do roadmap — 20/11/2026
 
-**Ponto atual: C-3a homologada; C-3b IMPLEMENTADA e validada em Debian, aguardando revisão/homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
+**Ponto atual: C-3a homologada; C-3b implementada, em revisão e aguardando homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
 
 As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
 
 ---
 
-# Estado vigente — 20/11/2026 — C-3b implementada, aguardando revisão
+# Revisão da C-3b após a rodada da Arena
+
+- Exclusão e recuperação consultam o caminho do arquivo gerado no catálogo. A falha da Lixeira deixa a exclusão pendente e a retentativa pode concluir sem tocar uma cópia recuperada em outra sessão.
+- A saída gerenciada compara tamanho e hash também no reenvio por stream. Tentativas simultâneas publicam sob a fila da sessão, com estágios independentes. O cancelamento e a exclusão são revalidados antes de confirmar a saída.
+- Os testes Windows foram ajustados para usar o separador de caminho do sistema e preservar LF no script Linux em novos checkouts. A jornada de recuperação do Playwright verifica a cópia pelas rotas de anexos e lê o arquivo nos dois donos. A ação de recuperação do aviso de persistência na interface tem fluxo próprio e ainda não consome esse mapa de anexos.
+- Reteste local no Windows com Node 26.13.0 sobre `7082c38` mais as correções desta rodada: foco 431/431, Playwright 12/12, zero testes pulados, checagem de tipos, lint dos arquivos alterados e build Vite aprovados. A homologação humana segue pendente. Os números Debian abaixo são da rodada da Arena.
+
+---
+
+# Estado anterior — 20/11/2026 — entrega da Arena antes desta revisão
 
 **Autorizada pelo proprietário, executada com autonomia técnica, sem merge e sem iniciar a próxima fatia.** Base `069dc3f`; commits `165a221`, `0784778`, `e4f31ed`, `0920c6e`, `e1af802` (+ correções desta rodada) na branch `0f2e5de2-agente-window`, com push. Pacote executável: existe e roda (`VALIDAR_C3B.mjs`, `VALIDAR_E2E_C3B.mjs` no pacote; runners versionados `platform/scripts/e2e-c3b.{sh,ps1}`).
 

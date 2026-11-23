@@ -12,6 +12,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ChatMessage } from '../../../types'
 import { PersistenceProblem } from '../persistenceErrors'
+import { resolverDonoAnexos } from './dono'
 import type { SaidaDeTeste } from './saidaDeTeste'
 
 function sendJson(response: ServerResponse, status: number, valor: unknown): void {
@@ -64,7 +65,17 @@ export async function tratarConversaDeTeste(
 
   // Produzir ANTES de abrir a fila: o artefato já está no ledger quando a
   // mensagem é publicada (R09 — nunca mensagem apontando para nada).
-  const mensagem = await saida.produzirResposta({ sessionId, chatId, runId, generation })
+  resolverDonoAnexos(sessionId, chatId, { permitirRaizOffline: true, leitura: true })
+  const cancelamento = new AbortController()
+  const cancelar = () => cancelamento.abort()
+  resposta.once('close', cancelar)
+  let mensagem: ChatMessage
+  try {
+    if (resposta.destroyed) cancelar()
+    mensagem = await saida.produzirResposta({ sessionId, chatId, runId, generation, signal: cancelamento.signal })
+  } finally {
+    resposta.off('close', cancelar)
+  }
 
   const publicado = await publicar(sessionId, chatId, mensagem)
   sendJson(resposta, 200, { ok: true, messageId: mensagem.id, duplicou: publicado.duplicou, multimodal: mensagem.multimodal })
