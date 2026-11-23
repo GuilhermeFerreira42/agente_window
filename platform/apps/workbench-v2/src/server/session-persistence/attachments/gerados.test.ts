@@ -166,6 +166,32 @@ describe('C-3b — C3B-T16 replay e conflito', () => {
   })
 })
 
+/**
+ * C3B-T17 — encerramento forçado POR PLATAFORMA.
+ *
+ * POSIX registra `signal='SIGKILL'`. Windows não tem sinais POSIX: o observado
+ * é `{code: 1, signal: null}` (ou `signal: 'SIGKILL'` em algumas versões).
+ * Exigir SIGKILL reprovaria o Windows injustamente — mas um exit genérico
+ * NUNCA basta sozinho: as provas de fronteira (arquivo no disco, ledger sem
+ * registro, reconciliação em processo novo) continuam obrigatórias abaixo.
+ * Mesmo padrão do B1 da C-3a (`reinicioProcessoPb.test.ts`).
+ */
+function verificarEncerramentoForcado(
+  plataforma: NodeJS.Platform,
+  morte: { status: number | null; signal: NodeJS.Signals | null },
+): void {
+  expect(morte.status !== null || morte.signal !== null,
+    `o processo filho não registrou nenhuma saída: ${JSON.stringify(morte)}`).toBe(true)
+  if (plataforma === 'win32') {
+    // Windows: término reconhecido = SIGKILL explícito OU código numérico.
+    const terminoReconhecido = morte.signal === 'SIGKILL' || typeof morte.status === 'number'
+    expect(terminoReconhecido,
+      `Windows sem término reconhecido: ${JSON.stringify(morte)}`).toBe(true)
+  } else {
+    expect(morte.signal, `filho não morreu com SIGKILL: ${JSON.stringify(morte)}`).toBe('SIGKILL')
+  }
+}
+
 describe('C-3b — C3B-T17 falha e retomada', () => {
   it('C3B-T17 falha no stream não deixa arquivo parcial nem sucesso falso', async () => {
     const fluxo = new Readable({
@@ -206,8 +232,9 @@ describe('C-3b — C3B-T17 falha e retomada', () => {
       process.kill(process.pid, 'SIGKILL')
     `)
     const filho = spawnSync(process.execPath, [script], { env: { ...process.env } })
-    // Morreu de verdade por sinal (não por erro tratado).
-    expect(filho.signal).toBe('SIGKILL')
+    // Morreu de verdade por encerramento forçado (não por erro tratado).
+    // A representação varia por plataforma; o SIGKILL do script é o mesmo.
+    verificarEncerramentoForcado(process.platform, { status: filho.status, signal: filho.signal })
 
     // O arquivo existe no disco, mas o ledger NÃO sabe dele: estado retomável.
     const anterior = process.env.AGENTE_WINDOW_DATA_DIR

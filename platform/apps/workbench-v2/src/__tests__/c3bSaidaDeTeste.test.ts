@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { produtorLocalPermitido } from '../server/session-persistence/attachments/produtorLocal'
+import { idDaTentativa } from '../server/session-persistence/attachments/saidaDeTeste'
 
 const SERVIDOR = join(process.cwd(), 'src/server/session-persistence')
 const ANEXOS = join(SERVIDOR, 'attachments')
@@ -66,5 +67,17 @@ describe('C3B-T33 — a saída de teste não vaza para o produto', () => {
     expect(trecho).toContain('upload_payload_conflict')
     // E o caminho de falha não inventa artefato: é erro, não recibo.
     expect(estoque).toContain('async function conferirReplay(')
+  })
+
+  it('C3B-T33 identidade da resposta DERIVA da tentativa (retry não duplica)', () => {
+    // Mesma tentativa → mesmo id: o replay reencontra a mensagem publicada.
+    expect(idDaTentativa('run-abc', 0)).toBe(idDaTentativa('run-abc', 0))
+    // Tentativa ou geração diferente → outro resultado.
+    expect(idDaTentativa('run-abc', 0)).not.toBe(idDaTentativa('run-abc', 1))
+    expect(idDaTentativa('run-abc', 0)).not.toBe(idDaTentativa('run-xyz', 0))
+    // A fonte não pode voltar a sorte­ar o id.
+    const saida = semComentarios(join(ANEXOS, 'saidaDeTeste.ts'))
+    expect(saida).not.toContain('randomUUID')
+    expect(saida).toContain('idDaTentativa(')
   })
 })

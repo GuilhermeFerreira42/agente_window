@@ -18,7 +18,7 @@
 //     path, URL, run, geração nem nome de arquivo.
 // ============================================================================
 import { readFileSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import type { Attachment, ChatMessage } from '../../../types'
 import { criarProdutorLocal, envelopeDoResultado, produtorLocalPermitido } from './produtorLocal'
 
@@ -31,6 +31,16 @@ export interface SaidaDeTeste {
     runId: string
     generation: number
   }): Promise<ChatMessage>
+}
+
+/**
+ * Identidade determinística da resposta a partir da tentativa.
+ * Mesma tentativa → mesmo id → replay devolve o MESMO recibo (R09).
+ * Tentativa diferente → id diferente → geração nova é outro artefato.
+ */
+export function idDaTentativa(runId: string, generation: number): string {
+  const digest = createHash('sha256').update(`${runId}\u0000${generation}`).digest('hex')
+  return `resposta-${digest.slice(0, 32)}`
 }
 
 export interface OpcoesSaidaDeTeste {
@@ -63,7 +73,10 @@ export function montarSaidaDeTeste(opcoes: OpcoesSaidaDeTeste, ambiente: string 
 
   return {
     async produzirResposta(entrada) {
-      const messageId = `resposta-${randomUUID()}`
+      // R09 — a identidade da mensagem DERIVA da tentativa. Com UUID aleatório
+      // um retry criaria uma segunda mensagem e um segundo artefato; derivando,
+      // o mesmo pedido reencontra exatamente o que já foi publicado.
+      const messageId = idDaTentativa(entrada.runId, entrada.generation)
       const bytes = readFileSync(`${opcoes.fixturesDir}/${opcoes.arquivo}`)
       const resultado = await produtor.produzir({
         sessionId: entrada.sessionId,

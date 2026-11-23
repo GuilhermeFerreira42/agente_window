@@ -2748,6 +2748,9 @@ Comando: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/script
 ## C-3b — como validar (Linux)
 
 - Gate de critérios: `node VALIDAR_C3B.mjs --repo <repo> --mode foco --out <NOVO>` — exige cada ID T01–T32 **no nome do teste**, sem skip.
+- Jornadas pelos runners da casa: `sh platform/scripts/e2e-c3b.sh` (Linux) e `powershell -File platform\scripts\e2e-c3b.ps1` (Windows) — mesma spec, porta 5216, `--retries=0`. Irmãos de `e2e-c3a.{sh,ps1}`.
+- **Portabilidade exigida nos testes:** nenhum `.test.ts` da C-3b pode gravar caminho absoluto de SO (`/home/...`, `/tmp/...`, `C:\`); a suíte roda em Debian e Windows. Caminho de recurso externo ao repo não é testável — os recursos precisam estar versionados.
+- **Encerramento forçado por plataforma:** POSIX registra `signal='SIGKILL'`; Windows devolve `{code:1, signal:null}`. Teste que exige SIGKILL reprova o Windows injustamente; usar o helper `verificarEncerramentoForcado` (padrão do B1 da C-3a), mantendo as provas de fronteira.
 - Comparação nominal: `--mode ampla --baseline-json <baseline>/vitest.json` — reprova em `newFailures`, `newSkips` e `missingCriteria`.
 - Jornadas: `node VALIDAR_E2E_C3B.mjs --repo <repo> --out <NOVO>` (porta 5216, `--retries=0`, sem skip).
 - **Pegadinha de ambiente (C-1):** `e2e/c1_correcoes.spec.ts` sobe o servidor na porta 5211, mas `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174). Sem `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5211` o spec falha com `ERR_CONNECTION_REFUSED`. Isso **não** é regressão: acontece igual na base homologada `a49cc6c`.

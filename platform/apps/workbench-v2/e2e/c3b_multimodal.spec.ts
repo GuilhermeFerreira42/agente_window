@@ -401,43 +401,71 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await shot(page, 'c3b_e06_reinicio')
   })
 
-  test('C3B-E07 — ACK perdido: retry do mesmo pedido não duplica o artefato', async ({ page }) => {
-    await criarSessaoDeTexto(page, 'jornada c3b e07 retry')
+  test('C3B-E07 — ACK perdido na RESPOSTA gerada: retry devolve a mesma mensagem e o mesmo arquivo', async ({ page }) => {
+    await criarSessaoDeTexto(page, 'jornada c3b e07 retry da resposta')
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
     const png = fixture('imagem.png')
-    const uploadId = randomUUID()
 
-    const pedido = {
-      uploadId, name: 'unico.png', bytes: png.length, declaredBytes: png.length,
-      mime: 'image/png', mode: 'copy', scope: 'chat',
+    // Mesma tentativa reenviada: é o cliente que perdeu a confirmação.
+    const runId = randomUUID()
+    const pedir = () => page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { runId, generation: 0 },
+    })
+
+    const primeira = await pedir()
+    expect(primeira.status(), `primeira produção: ${await primeira.text()}`).toBe(200)
+    const r1 = await primeira.json() as {
+      messageId: string
+      multimodal: { partes: Array<{ tipo: string; artifactId?: string }> }
     }
-    const primeira = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
-      headers: { ...headersApi, 'Content-Type': 'application/json' }, data: pedido,
-    })
-    expect(primeira.status()).toBe(201)
-    await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${uploadId}/content`, {
-      headers: { ...headersApi, 'Content-Type': 'application/octet-stream' }, data: png,
-    })
+    const artifactId1 = r1.multimodal.partes.find((p) => p.tipo === 'artefato')!.artifactId!
+    expect(artifactId1).toBeTruthy()
 
-    // Retry do MESMO uploadId (confirmação perdida).
-    const retry = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
-      headers: { ...headersApi, 'Content-Type': 'application/json' }, data: pedido,
-    })
-    expect([200, 201]).toContain(retry.status())
-    const reciboRetry = await retry.json()
-    const envioRetry = await page.request.put(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads/${uploadId}/content`, {
-      headers: { ...headersApi, 'Content-Type': 'application/octet-stream' }, data: png,
-    })
-    expect(envioRetry.status()).toBe(200)
-    expect((await envioRetry.json()).artifactId).toBe(reciboRetry.artifactId)
+    // A confirmação se perde: o MESMO pedido é repetido.
+    const segunda = await pedir()
+    expect(segunda.status(), `replay: ${await segunda.text()}`).toBe(200)
+    const r2 = await segunda.json() as {
+      messageId: string
+      duplicou: boolean
+      multimodal: { partes: Array<{ tipo: string; artifactId?: string }> }
+    }
+    const artifactId2 = r2.multimodal.partes.find((p) => p.tipo === 'artefato')!.artifactId!
 
-    // UM artefato só, com os bytes corretos.
-    const lista = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments`, { headers: headersApi })
-    const corpo = await lista.json()
-    const meus = (corpo.attachments as Array<{ artifactId: string; name: string }>).filter((a) => a.name === 'unico.png')
-    expect(meus).toHaveLength(1)
-    await shot(page, 'c3b_e07_retry')
+    // MESMA mensagem e MESMO arquivo — nada duplicado.
+    expect(r2.messageId, 'o retry precisa devolver a MESMA mensagem').toBe(r1.messageId)
+    expect(artifactId2, 'o retry precisa devolver o MESMO arquivo').toBe(artifactId1)
+    expect(r2.duplicou, 'o replay não publica de novo').toBe(false)
+
+    // Prova no DISCO: a conversa tem exatamente UMA resposta gerada.
+    const detalhe = await (await page.request.get(`${BASE}/api/sessions/${sessionId}`, { headers: headersApi })).json()
+    const chat = detalhe.session.chats.find((c: { id: string }) => c.id === chatId)
+    const respostas = (chat.messages as Array<{ id: string; role: string; attachments?: unknown[] }>)
+      .filter((m) => m.id === r1.messageId)
+    expect(respostas, 'uma única mensagem de resposta').toHaveLength(1)
+    expect(respostas[0].attachments ?? [], 'um único arquivo na mensagem').toHaveLength(1)
+    const ledger = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments`, { headers: headersApi })
+    const meus = ((await ledger.json()).attachments as Array<{ artifactId: string }>)
+      .filter((a) => a.artifactId === artifactId1)
+    expect(meus, 'um único artefato no ledger').toHaveLength(1)
+
+    // E os bytes continuam íntegros e servíveis depois do retry.
+    const media = await page.request.get(urlMidia(sessionId, chatId, artifactId1), { headers: headersApi })
+    expect(media.status()).toBe(200)
+    expect(sha256(await media.body())).toBe(sha256(png))
+
+    // Geração DIFERENTE é outro resultado (não reusa o anterior).
+    const outra = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/conversa-de-teste`, {
+      headers: { ...headersApi, 'Content-Type': 'application/json' },
+      data: { runId, generation: 1 },
+    })
+    expect(outra.status()).toBe(200)
+    const r3 = await outra.json() as { messageId: string; multimodal: { partes: Array<{ tipo: string; artifactId?: string }> } }
+    expect(r3.messageId, 'geração nova é outra mensagem').not.toBe(r1.messageId)
+    expect(r3.multimodal.partes.find((p) => p.tipo === 'artefato')!.artifactId,
+      'geração nova é outro artefato').not.toBe(artifactId1)
+    await shot(page, 'c3b_e07_retry_resposta')
   })
 
   test('C3B-E08 — cancelamento: nada tardio revive a conversa', async ({ page }) => {

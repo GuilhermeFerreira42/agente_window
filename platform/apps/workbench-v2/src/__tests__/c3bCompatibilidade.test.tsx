@@ -7,7 +7,7 @@
 // ============================================================================
 import { act, render, renderHook, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { ArtifactCard } from '../components/ArtifactCard'
@@ -135,13 +135,22 @@ describe('C-3b — C3B-T28 ciclo de vida na troca de conversa', () => {
 })
 
 describe('C-3b — C3B-T31 portabilidade dos comandos', () => {
-  it('C3B-T31 os wrappers .sh e .ps1 do pacote existem e chamam o MESMO runner', () => {
-    const pacote = '/home/user/memoria-de-projeto/C-3b/C-3b'
-    const sh = readFileSync(join(pacote, 'VALIDAR_C3B.sh'), 'utf8')
-    const ps1 = readFileSync(join(pacote, 'VALIDAR_C3B.ps1'), 'utf8')
-    // Ambos delegam ao runner Node — não são suítes diferentes.
-    expect(sh).toContain('VALIDAR_C3B.mjs')
-    expect(ps1).toContain('VALIDAR_C3B.mjs')
+  it('C3B-T31 os runners .sh e .ps1 da C-3b existem no repo e chamam a MESMA spec', () => {
+    // O pacote de validação vive FORA do repositório, então teste que o lê não
+    // atravessa para outra máquina. A portabilidade que importa — e que fica
+    // versionada — são os runners da casa, irmãos de `e2e-c3a.{sh,ps1}`.
+    const scripts = join(process.cwd(), '..', '..', 'scripts')
+    const sh = readFileSync(join(scripts, 'e2e-c3b.sh'), 'utf8')
+    const ps1 = readFileSync(join(scripts, 'e2e-c3b.ps1'), 'utf8')
+    // Mesma spec, mesma porta, sem retry — nos dois sistemas.
+    for (const fonte of [sh, ps1]) {
+      expect(fonte).toContain('e2e/c3b_multimodal.spec.ts')
+      expect(fonte).toContain('5216')
+      expect(fonte).toContain('--retries=0')
+    }
+    // O .sh usa LF; o .ps1 pode vir com CRLF (git autocrlf no Windows).
+    expect(sh).not.toContain('\r\n')
+    expect(ps1).not.toContain('LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:/tmp')
   })
 
   it('C3B-T31 o gerador de fixtures não depende de ffmpeg nem de SO específico', () => {
@@ -166,5 +175,25 @@ describe('C-3b — C3B-T31 portabilidade dos comandos', () => {
       expect(existsSync(join(FIXTURES, nome)), `${nome} precisa estar versionada`).toBe(true)
       expect(fixture(nome).length).toBeGreaterThan(0)
     }
+  })
+
+  it('C3B-T31 nenhum teste da C-3b usa caminho absoluto de Linux', () => {
+    // Regra da casa: a suíte roda em Linux E Windows. Caminho `/home/...`,
+    // `/tmp/...` ou `C:\\...` gravado no fonte só funciona numa máquina.
+    const raiz = join(process.cwd(), 'src')
+    const infratores: string[] = []
+    const visitar = (dir: string) => {
+      for (const nome of readdirSync(dir)) {
+        const caminho = join(dir, nome)
+        if (statSync(caminho).isDirectory()) { visitar(caminho); continue }
+        if (!/\.test\.tsx?$/.test(nome) || !/c3b/i.test(nome)) continue
+        const codigo = readFileSync(caminho, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+        if (/['"`]\/(home|tmp|Users)\/|['"`][A-Za-z]:\\\\/.test(codigo)) infratores.push(nome)
+      }
+    }
+    visitar(raiz)
+    expect(infratores, 'teste C-3b com caminho absoluto de SO').toEqual([])
   })
 })

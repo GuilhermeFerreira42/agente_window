@@ -1,8 +1,28 @@
-# Leitura vigente do roadmap — 19/11/2026
+# Leitura vigente do roadmap — 20/11/2026
 
-**Ponto atual: C-3a homologada; C-3b não iniciada e ainda sem pacote executável consolidado.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20. Esta atualização é documental, não inicia especificação ou implementação.
+**Ponto atual: C-3a homologada; C-3b IMPLEMENTADA e validada em Debian, aguardando revisão/homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
 
 As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
+
+---
+
+# Estado vigente — 20/11/2026 — C-3b implementada, aguardando revisão
+
+**Autorizada pelo proprietário, executada com autonomia técnica, sem merge e sem iniciar a próxima fatia.** Base `069dc3f`; commits `165a221`, `0784778`, `e4f31ed`, `0920c6e`, `e1af802` (+ correções desta rodada) na branch `0f2e5de2-agente-window`, com push. Pacote executável: existe e roda (`VALIDAR_C3B.mjs`, `VALIDAR_E2E_C3B.mjs` no pacote; runners versionados `platform/scripts/e2e-c3b.{sh,ps1}`).
+
+**O que foi entregue:** imagem/áudio/vídeo na conversa com card único, diálogo acessível, download com nome original, fallback inerte para arquivos não exibíveis, rota de mídia com `Range`/`HEAD`/`416` e MIME reconferido por bytes, envelope MM-0 persistido (ordem texto→artefato→texto, mensagem só de artefatos válida), porta interna de saída reusando ledger/quota/writer/journal da C-3a, e produtor de teste injetado na porta real de servidor (inacessível em produção). Nenhum provedor de IA foi conectado: nada de interpretação ou geração.
+
+**Gates executados em Debian (Arena):** foco **426/0/0**; ampla **2259 asserções** com `newFailures=[]`, `newSkips=[]` e falhas/pulados nominais idênticos à base (`2147` → `2259`, +112); E2E C-3b **12/12** na porta 5216 sem retry; C-3a **15/15**; C-1 **6/6**; C-2 **17/17**; `src/server/session-persistence/attachments` **128/128**; `tsc -b --force` zero; `eslint` zero nos arquivos tocados (um achado `_anterior` é pré-existente); `vite build` 46,33 s.
+
+**Dois defeitos reais encontrados pelos próprios testes, não pelo unitário:**
+- Replay de transferência já publicada respondia `409 upload_already_finalized`, obrigando o cliente que perdeu o ACK a inventar um segundo artefato (violava R09). Agora confere SHA-256 e tamanho: idêntico devolve o mesmo recibo; divergente é `409 upload_payload_conflict`.
+- A resposta gerada usava `messageId` aleatório, então o retry criava **segunda mensagem e segundo artefato**. A identidade passou a derivar da tentativa (`idDaTentativa(runId, generation)`); geração nova continua sendo outro resultado.
+
+**Ressalvas pendentes (não homologadas):**
+- **Windows:** a automação não roda no ambiente da Arena. Correções de portabilidade aplicadas nesta rodada (T31 não usa mais caminho absoluto de Linux; T17 aceita a representação de término por plataforma, como o B1 da C-3a), mas **a execução Windows continua pendente** e não há alegação de resultado nela.
+- **Homologação humana:** pendente. Esta fatia não se declara homologada.
+- **C-1 exige ambiente:** o spec sobe na porta 5211 e `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174); sem a variável falha por conexão recusada, igual em `a49cc6c`.
+- Entrega extensa desta fatia: `memoria-de-projeto/C-3b/ENTREGA_C3B.md` (fora dos nove canônicos). `08` intacto; nenhum aceite alterado.
 
 ---
 
@@ -12,7 +32,7 @@ O proprietário informou que já fez pull e homologou o processo. HEAD local `a4
 
 Proveniência das verificações: revisão independente Windows de `8af269e` aprovada (foco 204/204, anexos+borda 86/86, sondas 9/9 e 13/13, E2E C-3a 10/10 + C-1 6/6 + C-2 17/17, tipos/lint/build exit 0). Na reentrega de usabilidade, números Debian são da Arena: foco 207/0/0, ampla 2111 aprovados + 3 nominais + 33 pulados, E2E C-3a 15/15, C-1 6/6 e C-2 17/17. **Automação Windows não reexecutada neste HEAD pelo Codex**; o aceite atual é relato humano do proprietário, não extensão dos números de `8af269e` à versão nova.
 
-C-3b segue não iniciada e depende de autorização própria. Sem merge, commit ou push nesta rodada de registro. Limites de codecs e dívidas fora da C-3a permanecem; estados anteriores abaixo são históricos.
+Limites de codecs e dívidas fora da C-3a permanecem; estados anteriores abaixo são históricos. O estado da C-3b está na seção seguinte.
 
 ---
 
