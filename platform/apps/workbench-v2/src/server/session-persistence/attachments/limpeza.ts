@@ -36,6 +36,10 @@ export interface OpcoesLimpeza {
   chatId?: string
 }
 
+export function temAnexosPrivadosPendentes(sessionId: string): boolean {
+  return planosPendentes(sessionId).some(item => item.alvo === 'chat-copy' && item.state !== 'concluido')
+}
+
 /** Captura o ownership de TODOS os artefatos do dono no plano (antes de destruir). */
 export function registrarPlanoAnexos(sessionId: string, chatId?: string): void {
   const db = getDatabase()

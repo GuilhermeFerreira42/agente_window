@@ -11,12 +11,12 @@ Antecedentes: Fatia 13 (terminal para o agente), MICRO-FATIA DELETE, Fatias 14 e
 | 1 | **P-A — gravação e recuperação** | CAS/revisões, mutationId/ACK, fila de saves e rascunhos preservados em falhas/conflitos. | Concluída tecnicamente; homologação humana confirmada pelo proprietário. |
 | 2 | **P-B — publicação recuperável** | Manter JSONL e catálogo SQLite coerentes após interrupção; reconciliar intenções e diagnosticar sessões indisponíveis. | Concluída tecnicamente e validada no Windows; não foi localizado aceite humano explícito próprio em 08. Não inferir aceite pela P-C. |
 | 3 | **P-C — exclusão segura** | Exclusão idempotente, tombstone e limpeza retomável, sem gravação tardia recriar a conversa. | Homologada pelo proprietário em 15/11. |
-| 4 | **C-1 — Chat e workspace imutáveis** | Separar Chat sem pasta de conversa com pasta real; preservar a raiz original e o alcance das ferramentas. | Homologada em 16/11; dívida aceita C1-EXCLUSAO-01 permanece separada. |
+| 4 | **C-1 — Chat e workspace imutáveis** | Separar Chat sem pasta de conversa com pasta real; preservar a raiz original e o alcance das ferramentas. | Homologada em 16/11. C1-EXCLUSAO-01 corrigida e validada pelo proprietário em 24/11. |
 | 5 | **MM-0 — base multimodal neutra** | Contratos de mensagens/partes/artefatos/capacidades, avaliação conservadora e compatibilidade com texto. | Homologada em 16/11. Não implementa codecs nem geração por si só. |
 | 6 | **C-2 — tela inicial e seletores reais** | Composer inicial, modelo/provedor exatos, modos/permissões, Chat/pastas recentes, estado e navegação coerentes. | Implementação encerrada e publicada, com validação Windows; registro de 17/11 ainda distingue encerramento técnico de aceite humano final não explicitado em 08. Não reabrir implementação nem conceder aceite por consequência da C-3a. |
 | 7 | **C-3a — anexar, armazenar e baixar** | Upload de qualquer formato em Chat/Pasta, identidade/recuperação/lifecycle, download e cópia explícita em `uploads/` do projeto. | Homologada em 19/11, incluindo nome original com sufixo em colisão e opção de cópia na tela inicial. |
 | 8 | **C-3b — apresentar conteúdo e respostas multimodais** | Partes/eventos de saída, artefatos gerenciados, apresentação passiva de imagem/áudio/vídeo/arquivo, Abrir/Salvar/reabrir e retenção, usando a mesma porta C-3a. | Homologada pelo proprietário em 23/11/2026. O aceite manual e seus limites estão no documento 08. |
-| 9 | **U-1 — Configurações unificadas** | Reunir Configurações, Provedores e Personalizações reais no modal aprovado, reutilizando views e seus donos. | Planejada; requer pacote executável atualizado antes da implementação. Não depende de concluir todos os codecs nem de E1. |
+| 9 | **U-1 — Configurações unificadas** | Reunir Configurações, Provedores e Personalizações reais no modal aprovado, reutilizando views e seus donos. | Entregue e testada no Windows. Aguarda aceite final e a padronização dos diálogos antes da próxima fatia. |
 | 10 | **MM-I — entrada multimodal por adapter** | Enviar ao modelo conteúdos/representações realmente suportados, com limites e capacidades comprovados. | Planejada, progressiva; sem implementação/aceite atribuído por MM-0 ou C-3a. |
 | 11 | **MM-O — saída multimodal por adapter** | Integrar geração/saídas de mídia dos provedores e publicá-las como artefatos/partes persistidos. | Planejada, progressiva; não é geração já entregue pela C-3b. |
 | 12 | **Discussão futura reservada pelo proprietário** | Reavaliar prioridade antes da retomada da extensibilidade. | Conteúdo e resultado ainda não definidos. Não inventar requisito nem pular a discussão por autonomia técnica. |
@@ -26,6 +26,14 @@ Antecedentes: Fatia 13 (terminal para o agente), MICRO-FATIA DELETE, Fatias 14 e
 **Dependências e prioridade:** P-A → P-B → P-C → C-1 → MM-0 → C-2 → C-3a → C-3b. Depois, U-1 é a prioridade de produto aprovada. MM-I/MM-O são subentregas progressivas com autorização/homologação individual; as posições da tabela não exigem concluir todas as modalidades/codecs para retomar extensibilidade. A discussão reservada vem após o centro/Configurações e antes da eventual retomada E1–E6; sua relação com cada subentrega MM-I/MM-O depende da priorização do proprietário, sem reordenamento automático. As setas C-3b→U-1 e U-1→discussão representam prioridade, não acoplamento técnico entre módulos.
 
 **O que já existe não precisa ser reinventado:** persistência/fila/SQLite/JSONL, contratos MM-0, UI Personalizações e porta de artefatos C-3a são bases de reaproveitamento. A partir da C-3b, preparar uma SPEC executável por vez contra o código real, com critérios de aceite, testes Debian/Windows e parada para homologação. Não criar segundo store/composer, runtime externo obrigatório ou novas responsabilidades de domínio no App.
+
+## Pendente antes da próxima fatia — diálogos internos da aplicação
+
+Inventariar e substituir os usos de `window.confirm`, `window.alert` e `window.prompt` nos fluxos do produto. Começar por **Excluir conversa** e **Permitir tudo** na tela inicial e no chat. Reutilizar o padrão visual do diálogo de exclusão permanente do Explorer, que já usa `AttachDialog`. O inventário inclui, entre outros, descarte de alterações do worktree, recarga de versão salva, acesso ao histórico, diálogo de anexos, prompts da barra de sessões, compactação, revisão operacional e memória do projeto.
+
+Preservar textos de risco, escolhas, cancelamento e as regras existentes de permissão, gravação e exclusão. O aviso de exclusão pendente continua exigindo retentativa explícita. Se a Lixeira do Windows exibir uma janela própria ou recusar um arquivo, documentar o limite e preservar o arquivo. Seletores de arquivos e permissões próprios do navegador ou do sistema operacional seguem seus fluxos.
+
+Validar com Playwright nos temas claro e escuro, com teclado e devolução de foco. Testar confirmação e cancelamento sem executar a ação ao fechar o diálogo, além de confirmar que os fluxos migrados não abrem diálogos nativos do navegador. Usar dados descartáveis. Entregar a lista de fluxos migrados e as evidências antes de avançar.
 
 ## Suficiência e proveniência
 
@@ -163,13 +171,13 @@ Ajuste técnico implementado e validado conforme 03/09; aguarda inspeção visua
 
 **Dívidas mantidas:** C1-EXCLUSAO-01 (abaixo) e a dívida de tamanho do App (2889 linhas em `7ac8260` — MM-0 NÃO alterou o App) seguem intactas; MM-0 não as incorpora.
 
-## C1-EXCLUSAO-01 — primeira exclusão recusa por revisão alterada (aberta, 16/11/2026)
+## C1-EXCLUSAO-01 — primeira exclusão recusa por revisão alterada (corrigida em 24/11/2026)
 
 **Relato e aceite do proprietário:** após testar a C-1, confirmou o encerramento da fatia e pediu expressamente registrar este comportamento para ajuste posterior. Na primeira tentativa de excluir uma conversa, aparece **“Exclusão não concluída”** e **“A revisão dessa conversa mudou durante a exclusão. Recarregue e tente novamente.”**, com botão **“Tentar excluir novamente”**. Segundo o proprietário, recarregar a página e excluir novamente funciona. Captura fornecida preservada na memória operacional externa; não contém diagnóstico de causa.
 
-**Estado:** dívida aceita para investigação/correção futura, não corrigida nesta entrega e não impeditiva da homologação C-1 por decisão do proprietário. Hipótese a verificar: sincronização de revisão entre gravações pendentes, snapshot do cliente e pedido de exclusão; não afirmar causa ou código HTTP apenas pela captura. Não há evidência suficiente nesta observação para declarar perda de dados, exclusão incorreta ou comportamento reproduzido por teste automatizado.
+**Resolução:** a exclusão passa a usar a revisão confirmada depois de aguardar salvamentos pendentes. A recarga também deixa de acionar a Lixeira para anexos privados pendentes. O proprietário validou a correção no aplicativo. Veja `03` e `09`.
 
-**Critérios de fechamento:** reprodução com dados sintéticos isolados; capturar revisão/mutações/ACKs e ordem de save/delete na primeira tentativa; verificar se a recusa é legítima ou causada por estado local desatualizado; corrigir no módulo responsável, sem enfraquecer CAS/tombstone ou ocultar conflitos reais. Confirmar primeira exclusão após resposta/gravação, retentativa sem F5 quando aplicável, conflitos reais preservados, nenhuma recriação/duplicação e regressões P-A/P-B/P-C pertinentes. Homologação específica da correção quando executada. Esta dívida não autoriza implementação agora.
+**Critérios verificados:** exclusão usa a revisão confirmada, mantém conflitos reais e impede a recriação por gravações tardias. Recarregar preserva o anexo privado pendente até uma retentativa explícita. A automação simulou a recusa da Lixeira.
 
 **Atualização local Codex, 16/11, após a revisão de 7ac8260:** R2-1 corrigida com rascunho visível e bloqueio de edição/reenvio até confirmação; recusa/falha libera retentativa sem apagar texto. R2-2 corrigida por comparação dos campos JSON decodificados no E2E Windows. Teste integrado agora contém 6 cenários, incluindo falha assíncrona, recuperação do mesmo envio e F5. Resultados em `09`. Esta atualização sucede a resposta da Arena transcrita abaixo; foi seguida de aceite humano registrado em `08`, com dívida C1-EXCLUSAO-01; não autoriza MM-0.
 

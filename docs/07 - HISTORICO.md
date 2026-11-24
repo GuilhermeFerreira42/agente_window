@@ -1,3 +1,9 @@
+# 24/11/2026 — correção da exclusão de conversas
+
+A correção do commit `fix(sessions): usa revisão confirmada e retoma limpeza por ação explícita` foi validada pelo proprietário. Estado em `03`, testes em `09` e padronização dos diálogos registrada em `06` como pendência antes da próxima fatia.
+
+---
+
 # 19/11/2026 — sequência de microfatias consolidada antes da Fatia 16
 
 A pedido do proprietário, corrigida a portabilidade do planejamento: 06 reúne ordem, objetivo, situação e dependências P-A→persistência/centro/multimodalidade/configurações→extensibilidade→retomada da Fatia 16; 01 aponta para essa fonte e deixa de apresentar C-1 como próxima; 03 identifica ponto atual e precedência das entradas históricas. Esclarecido o caráter progressivo de MM-I/MM-O, a discussão reservada e a ausência de aceite humano explícito próprio localizado para P-B/C-2. Sem novas decisões de produto, aceites inferidos, código alterado ou testes repetidos. Nenhum décimo documento canônico criado. Publicação autorizada pelo proprietário nesta conversa.

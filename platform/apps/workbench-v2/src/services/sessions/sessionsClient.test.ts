@@ -72,6 +72,35 @@ describe('session write queue and HTTP boundary', () => {
       expect(String(url).endsWith(index === 1 ? '?force=true' : '')).toBe(true)
     })
   })
+  it('waits for the autosave ACK and deletes with its confirmed revision', async () => {
+    const session = { ...make(), persistenceRevision: 1 }
+    resumeSessionPersistence(session)
+    let release!: (response: Response) => void
+    fetchMock.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+      .mockResolvedValueOnce(json({ estado: 'concluido' }))
+    const saving = persistSession({ ...session, title: 'ultima resposta' })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const deleting = removePersistedSession(session.id, { expectedRevision: 1 })
+    await expect(persistSession(session)).rejects.toMatchObject({ code: 'session_deletion_in_progress' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    release(ack(fetchMock.mock.calls[0][1], 2))
+    await saving
+    await expect(deleting).resolves.toBe('concluido')
+    expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual(['PUT', 'DELETE'])
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({ expectedRevision: 2 })
+  })
+  it('preserves an unresolved autosave and leaves remote revision conflicts intact', async () => {
+    const session = { ...make(), persistenceRevision: 1 }
+    resumeSessionPersistence(session)
+    fetchMock.mockRejectedValueOnce(new TypeError('offline'))
+    await expect(persistSession({ ...session, title: 'edicao local' })).rejects.toThrow('offline')
+    await expect(removePersistedSession(session.id, { expectedRevision: 1 })).rejects.toMatchObject({ code: 'session_save_uncertain' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    resumeSessionPersistence(session)
+    fetchMock.mockResolvedValueOnce(json({ code: 'deletion_revision_mismatch', currentRevision: 5 }, 409))
+    await expect(removePersistedSession(session.id, { expectedRevision: 1 })).rejects.toMatchObject({ code: 'deletion_revision_mismatch' })
+    expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual(['PUT', 'DELETE'])
+  })
   it('never updates a previously created recovery copy with an older local snapshot after hydration', async () => {
     const copy = make(), creationId = randomUUID(), remote = { ...copy, title: 'edited elsewhere', persistenceRevision: 2 }
     resumeSessionPersistence(remote)

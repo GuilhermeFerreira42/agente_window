@@ -16,7 +16,7 @@ import { initialProviders, searchResults as allSearchResults } from './data'
 import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace } from './services/sessions/sessionsClient'
 import { useSessionPersistence, type SessionPersistenceIssue } from './services/sessions/useSessionPersistence'
 import { mergeRecoveredSessions, mergeHydratedSessions, readSessionRecoveries, removeSessionRecovery, restoreUnsavedSessions, descartarRecuperacoesExcluidas } from './services/sessions/sessionRecovery'
-import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
+import { SessionLoadNotices, SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
 import { manageHistoryAccess } from './services/sessions/historyAccessClient'
@@ -1555,18 +1555,30 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const descartar = window.confirm('Este worktree possui alterações locais. Excluir a conversa e descartar essas alterações?')
         if (!descartar) { limparExcluindo(id); return }
         try {
-          await removePersistedSession(id, { force: true, expectedRevision: alvo.persistenceRevision ?? 0 })
+          const estado = await removePersistedSession(id, { force: true, expectedRevision: alvo.persistenceRevision ?? 0 })
+          if (estado === 'limpeza_pendente') {
+            throw new Error('A exclusão foi registrada, mas a limpeza ainda não concluiu. Tente novamente para retomar.')
+          }
         } catch (forcedError) { falhaDeExclusao(id, forcedError); return }
       } else {
-        falhaDeExclusao(id, error)
+        if (error instanceof SessionPersistenceError && error.code === 'session_save_uncertain') {
+          limparExcluindo(id)
+          notify(error.message)
+        } else falhaDeExclusao(id, error)
         return
       }
     }
+    concluirExclusaoLocal(id)
+  }
+
+  const concluirExclusaoLocal = (id: string, preservarRecuperacao = false) => {
     limparExcluindo(id)
     // Aviso de storage entra no MESMO recibo final: a exclusão concluiu e a
     // falha de limpeza local não pode sumir atrás de um "sucesso" genérico.
     let avisoLocal: string | undefined
-    try { removeSessionRecovery(id) } catch { avisoLocal = 'Sessão excluída; não foi possível limpar a cópia de recuperação no navegador.' }
+    if (!preservarRecuperacao) {
+      try { removeSessionRecovery(id) } catch { avisoLocal = 'Sessão excluída; não foi possível limpar a cópia de recuperação no navegador.' }
+    }
     clearPendingTimersForSession(id)
     // (R-003) Excluir um draft abandonado descarta o rascunho pendente do
     // Management (deleteNewSession dispose — SESSIONS.md §Drafts).
@@ -1627,6 +1639,20 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       layoutSyncRef.current?.setPreviousResource(promoted || undefined)
     }
     notify(avisoLocal ?? 'Sessão excluída')
+  }
+
+  const retomarLimpezaExclusao = async (id: string, revision: number) => {
+    if (excluindo.has(id)) return
+    setExcluindo((current) => new Set(current).add(id))
+    setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
+    try {
+      const estado = await removePersistedSession(id, { expectedRevision: revision, resumeCleanup: true })
+      if (estado !== 'concluido') throw new Error('A limpeza dos anexos continua pendente.')
+      concluirExclusaoLocal(id, true)
+      setSessionLoadPartial((current) => current?.filter(item => item.sessionId !== id))
+    } catch (error) {
+      falhaDeExclusao(id, error)
+    }
   }
 
   const handleApprove = (sessionId: string, chatId?: string) => {
@@ -2636,9 +2662,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           ...persistence.issues.filter((issue) => !excluindo.has(issue.session.id) && !falhasExclusao.has(issue.session.id)),
           ...[...excluindo]
             .map((id) => sessions.find((session) => session.id === id))
-            .filter((session): session is Session => Boolean(session))
+            .filter((session): session is Session => Boolean(session) && !sessionLoadPartial?.some(item => item.sessionId === session?.id && item.deletionRevision !== undefined))
             .map((session): SessionPersistenceIssue => ({ session, kind: 'excluindo', message: 'Exclusão em andamento. O histórico desta conversa será removido; as outras conversas ficam intactas.', backupAvailable: false })),
           ...[...falhasExclusao.entries()]
+            .filter(([id]) => !sessionLoadPartial?.some(item => item.sessionId === id && item.deletionRevision !== undefined))
             .map(([id, message]) => sessions.find((session) => session.id === id) && { id, message, session: sessions.find((session) => session.id === id)! })
             .filter((entry): entry is { id: string; message: string; session: Session } => Boolean(entry))
             .map(({ session, message }): SessionPersistenceIssue => ({ session, kind: 'falha_exclusao', message, backupAvailable: false })),
@@ -2653,7 +2680,13 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         ]}
         recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} onExcluir={handleDelete} />
       {sessionLoadError && <div role="alert" className="session-persistence-notice"><p>{sessionLoadError}</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
-      {!sessionLoadError && sessionLoadPartial && <div role="alert" className="session-persistence-notice"><p>{sessionLoadPartial.length === 1 ? 'Não foi possível carregar uma conversa salva.' : `Não foi possível carregar ${sessionLoadPartial.length} conversas salvas.`} As demais conversas foram carregadas e nenhuma mensagem local foi apagada — uma conversa indisponível não é uma conversa vazia ou inexistente.</p><ul className="session-unavailable-list">{sessionLoadPartial.map(item => <li key={item.sessionId}>{item.titulo ?? item.sessionId}</li>)}</ul><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
+      {!sessionLoadError && <SessionLoadNotices
+        items={sessionLoadPartial}
+        deleting={excluindo}
+        failures={falhasExclusao}
+        onResumeDeletion={retomarLimpezaExclusao}
+        onReload={() => setHydrationAttempt(value => value + 1)}
+      />}
       {editorSurface.portal}
       {explorerModule && <EditorCommandsSlot module={explorerModule} />}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>

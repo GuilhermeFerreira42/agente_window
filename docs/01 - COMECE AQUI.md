@@ -139,4 +139,4 @@ Em dúvida entre criar artefato / derrubar serviço / assumir algo: **não criar
 
 ## 5. Estado em uma linha (detalhe no `03`)
 
-**C-3a homologada pelo proprietário em 19/11/2026; próxima preparação desta frente: SPEC executável C-3b, ainda não autorizada nesta atualização documental.** Sequência completa e situação das entregas na [tabela vigente de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16). P-B e C-2 têm conclusão técnica registrada, sem converter automaticamente isso em aceite humano; M1–M8/MC1 seguem com homologação própria pendente. A numeração 13–20 é a trilha original, complementada pelas microfatias anteriores à 16. Consulta de roadmap não autoriza execução.
+**C-3a e C-3b homologadas. A U-1 foi entregue e testada no Windows. A correção da exclusão foi validada pelo proprietário, e a padronização dos diálogos da aplicação deve ser concluída antes da próxima fatia.** Consulte o estado vigente em `03`, as evidências em `09` e a [tabela vigente de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16).

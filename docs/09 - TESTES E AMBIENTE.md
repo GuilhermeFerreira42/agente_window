@@ -1,3 +1,15 @@
+# 24/11/2026 — exclusão de conversas e reteste da U-1 no Windows
+
+Windows, Node 26.13.0, perfil isolado. **Vitest em 8 arquivos: 176 passaram, 13 pulados, 0 falhas.** A checagem de tipos (`tsc -b tsconfig.json --force`) passou. **Playwright U-1: 13/13**, via `platform/scripts/e2e-u1.ps1`, incluindo tamanho do modal, layout e desativação de provedores. Resultados da validação técnica das correções locais, confirmadas depois pelo proprietário no aplicativo.
+
+- `sessionsClient.test.ts` verifica a espera da confirmação de salvamento, a revisão usada no DELETE e a preservação de conflito real.
+- `deletions.test.ts` verifica por HTTP que dois recarregamentos não acionam a Lixeira nem removem os bytes. A retomada explícita conclui e preserva as demais conversas. A porta da Lixeira foi simulada com recusa e movimentação em diretório descartável.
+- `App.test.tsx` verifica o aviso próprio, a retomada por clique e seu desaparecimento após confirmação. As demais suítes cobrem recuperação, avisos de persistência, ciclo de anexos e as duas suítes da U-1.
+
+A automação desta correção não acionou a janela nativa da Lixeira do Windows. O aceite manual comunicado pelo proprietário se refere à correção da exclusão de conversas.
+
+---
+
 # 19/11/2026 — proveniência no encerramento humano da C-3a
 
 Aceite humano informado pelo proprietário após pull, HEAD local `a49cc6c`; registro em `08`. **Nenhum teste automatizado reexecutado nesta rodada documental.** Código dos dois ajustes conferido; sem implementação local.

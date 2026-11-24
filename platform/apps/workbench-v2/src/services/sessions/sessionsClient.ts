@@ -1,4 +1,4 @@
-import { expectOk, forgetSessionPersistence, resumeSessionPersistence } from './sessionWriteQueue'
+import { expectOk, forgetSessionPersistence, resumeSessionPersistence, withSessionDeletion } from './sessionWriteQueue'
 import type { Session } from '../../types'
 export { SessionPersistenceError, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, holdSessionPersistence, loadPersistedSessions, loadPersistedSession, retrySessionPersistence, isSessionDirty, sessionFingerprint, confirmedRecoveryRevision } from './sessionWriteQueue'
 export type { ResultadoHidratacao, SessaoIndisponivel } from './sessionWriteQueue'
@@ -56,13 +56,16 @@ export async function createSessionWorktree(workspacePath: string, slug: string,
 
 /** P-C §6 — exclusão idempotente com identidade da tentativa e revisão
  * esperada. `force` conserva a confirmação específica de worktree sujo. */
-export async function removePersistedSession(sessionId: string, options: { force?: boolean; expectedRevision: number }): Promise<'concluido' | 'limpeza_pendente'> {
-  const query = options.force ? '?force=true' : ''
-  const response = await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, {
-    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deletionId: crypto.randomUUID(), expectedRevision: options.expectedRevision }),
-  }))
-  const body = await response.json() as { estado?: unknown }
-  forgetSessionPersistence(sessionId)
-  return body.estado === 'limpeza_pendente' ? 'limpeza_pendente' : 'concluido'
+export function removePersistedSession(sessionId: string, options: { force?: boolean; expectedRevision: number; resumeCleanup?: boolean }): Promise<'concluido' | 'limpeza_pendente'> {
+  return withSessionDeletion(sessionId, options, async (expectedRevision) => {
+    const query = options.force ? '?force=true' : ''
+    const response = await expectOk(await fetch(`${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}${query}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deletionId: crypto.randomUUID(), expectedRevision,
+        ...(options.resumeCleanup ? { resumeCleanup: true } : {}) }),
+    }))
+    const body = await response.json() as { estado?: unknown }
+    forgetSessionPersistence(sessionId)
+    return body.estado === 'limpeza_pendente' ? 'limpeza_pendente' : 'concluido'
+  })
 }

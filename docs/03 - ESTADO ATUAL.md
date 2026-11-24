@@ -1,6 +1,12 @@
-# Leitura vigente do roadmap — 23/11/2026
+# Leitura vigente do roadmap — 24/11/2026
 
-**Ponto atual: C-3a e C-3b homologadas pelo proprietário. U-1 foi entregue duas vezes (v1 em `0fb29d0` e a reentrega com os 6 ajustes da revisão) e aguarda homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20. A correção da exclusão de chats fica **depois** da U-1.
+**Ponto atual:** C-3a e C-3b homologadas. A U-1 foi entregue e passou no Playwright no Windows. O proprietário validou manualmente a correção da exclusão de conversas. Antes do aceite final da U-1 e de avançar, a Arena deve padronizar os diálogos da aplicação conforme `06`. A [sequência canônica até a Fatia 16](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16) reúne o estado das demais frentes.
+
+## Correção da exclusão de conversas
+
+- A exclusão aguarda a fila de salvamento da própria conversa e usa a última revisão confirmada. Conflitos reais com outra gravação e salvamentos sem confirmação continuam protegidos.
+- Reabrir ou recarregar a lista não aciona a Lixeira para anexos privados pendentes. O aviso **Exclusão pendente** oferece **Retomar exclusão** e identifica a conversa. Se o sistema não conseguir mover o anexo para a Lixeira, mantém o arquivo e a pendência.
+- Os avisos de falha real ao salvar ou carregar e a possibilidade de recuperar uma cópia seguem disponíveis. Validação manual da correção informada pelo proprietário em 24/11/2026. Evidência automatizada e seus limites em `09`.
 
 As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
 

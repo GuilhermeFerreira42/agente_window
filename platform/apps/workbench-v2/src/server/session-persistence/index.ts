@@ -3,9 +3,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Plugin } from 'vite'
 import type { ChatMessage, Session } from '../../types'
-import { excluirMemoriaProjeto, getCheckpoint, getSessionRecord, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, saveCheckpoint, type SessionToolGrant } from './database'
+import { excluirMemoriaProjeto, getCheckpoint, getSessionRecord, getSessionRecordRaw, grantSessionTool, listarMemoriasProjeto, listSessionRecords, publicarMemoriaProjeto, saveCheckpoint, type SessionToolGrant } from './database'
 import { prepararAcessoHistorico, confirmarAcessoHistorico } from './acessoHistorico'
 import { resolverContextoAgir } from './agirContext'
+import { temAnexosPrivadosPendentes } from './attachments/limpeza'
 import { consultarDelecao, deletionsPendentes, executarLimpezaDelecao, iniciarOuConsultarDelecao, problemaSessaoExcluida, sessaoExcluida } from './deletions'
 import { sanitizePath } from './paths'
 import { readTranscript, transcriptPath, writeTranscript, type TranscriptEntry } from './transcripts'
@@ -441,7 +442,7 @@ function sanarStatusAposF5(session: Session): Session {
   })
 }
 
-export interface SessionUnavailable { sessionId: string; code: string; titulo?: string }
+export interface SessionUnavailable { sessionId: string; code: string; titulo?: string; deletionRevision?: number }
 export interface SessionIndex { sessions: Session[]; unavailable: SessionUnavailable[]; state: 'ok' | 'partial' }
 
 /** Stable diagnostics only — never transcript content or raw parser output. */
@@ -485,7 +486,14 @@ async function listSessions(): Promise<SessionIndex> {
   try { pendentes = deletionsPendentes() } catch { pendentes = [] }
   const retomadas = await Promise.all(pendentes.map((tombstone) => withSessionPersistenceQueue(tombstone.sessionId, async () => {
     try {
-      await executarLimpezaDelecao(tombstone.sessionId, false)
+      const atual = consultarDelecao(tombstone.sessionId)
+      if (!atual || atual.cleanupState === 'concluido') return undefined
+      // Abrir ou recarregar a lista não solicita novas operações à Lixeira.
+      if (temAnexosPrivadosPendentes(atual.sessionId)) {
+        const titulo = getSessionRecordRaw(atual.sessionId)?.title
+        return { sessionId: atual.sessionId, code: 'session_cleanup_pending', deletionRevision: atual.revision, titulo } satisfies SessionUnavailable
+      }
+      await executarLimpezaDelecao(atual.sessionId, false)
       return undefined
     } catch (error: unknown) {
       if (!consultarDelecao(tombstone.sessionId)) return undefined
@@ -1006,9 +1014,9 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     const id = decodeURIComponent(match[1])
     const force = url.searchParams.get('force') === 'true'
     // P-C §6 — o DELETE exige identidade da tentativa e revisão esperada.
-    let body: { deletionId?: unknown; expectedRevision?: unknown }
+    let body: { deletionId?: unknown; expectedRevision?: unknown; resumeCleanup?: unknown }
     try {
-      body = await readJson<{ deletionId?: unknown; expectedRevision?: unknown }>(request)
+      body = await readJson<typeof body>(request)
     } catch {
       body = {}
     }
@@ -1032,6 +1040,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         // publicação — os dois protocolos seguem íntegros.
         if (hasPendingWriteIntent(id)) throw new PersistenceProblem(409, 'session_publication_pending',
           'Há uma gravação desta conversa ainda em publicação. Aguarde a conclusão e tente novamente.')
+        if (body.resumeCleanup === true && !consultarDelecao(id)) {
+          throw new PersistenceProblem(409, 'deletion_state_missing',
+            'A exclusão pendente não está mais registrada. Atualize a lista de conversas.')
+        }
         iniciarOuConsultarDelecao({ sessionId: id, deletionId, expectedRevision })
         const tombstone = await executarLimpezaDelecao(id, force)
         // O eco é a identidade QUE VENCE no tombstone: um reenvio com outra

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -54,6 +54,8 @@ import { deleteTranscript, readTranscript } from './transcripts'
 import { createWorktree } from './worktrees'
 import { resolverContextoAgir } from './agirContext'
 import { consultarDelecao } from './deletions'
+import { lixeiraDoSistema } from './attachments/lixeira'
+import { publicarArtefatoGerenciado } from './attachments/gerados'
 import { sessionPersistencePlugin } from './index'
 
 interface HttpServerHandle { baseUrl: string; close: () => Promise<void> }
@@ -110,11 +112,11 @@ async function putSession(server: HttpServerHandle, session: Session, cache: Map
   return { status, revision: typeof parsed.persistenceRevision === 'number' ? parsed.persistenceRevision : undefined, body: parsed }
 }
 
-async function deleteSession(server: HttpServerHandle, id: string, expectedRevision: number, options: { force?: boolean; deletionId?: string } = {}) {
+async function deleteSession(server: HttpServerHandle, id: string, expectedRevision: number, options: { force?: boolean; deletionId?: string; resumeCleanup?: boolean } = {}) {
   const query = options.force ? '?force=true' : ''
   return fetch(`${server.baseUrl}/api/sessions/${encodeURIComponent(id)}${query}`, {
     method: 'DELETE', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ deletionId: options.deletionId ?? randomUUID(), expectedRevision }),
+    body: JSON.stringify({ deletionId: options.deletionId ?? randomUUID(), expectedRevision, resumeCleanup: options.resumeCleanup }),
   })
 }
 
@@ -157,6 +159,7 @@ describe('P-C — exclusão idempotente, limpeza retomável e proteção contra 
       try { deleteSessionRecord(id) } catch { /* idem */ }
     }
     resetDatabase()
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
   })
@@ -339,6 +342,40 @@ describe('P-C — exclusão idempotente, limpeza retomável e proteção contra 
     expect(retomada.status).toBe(200)
     expect((await retomada.json()).estado).toBe('concluido')
     expect(getSessionRecordRaw(alvo.id)).toBeUndefined()
+    expect((await loadIndex(server)).unavailable).toEqual([])
+  })
+
+  it('leaves private attachments untouched on repeated list refreshes and resumes only on explicit deletion', async () => {
+    const alvo = await criar(server, 'conversa com anexo')
+    const vizinha = await criar(server, 'conversa vizinha')
+    await publicarArtefatoGerenciado({
+      sessionId: alvo.id, chatId: 'chat-main', runId: 'run', generation: 1,
+      messageId: 'msg', partId: 'part', tentativa: '1', name: 'arquivo.txt',
+    }, Buffer.from('conteudo privado'))
+    const destino = join(mkdtempSync(join(tmpdir(), 'agent-pc-trash-')), 'arquivo.txt')
+    const mover = vi.spyOn(lixeiraDoSistema, 'mover')
+      .mockResolvedValueOnce({ ok: false, motivo: 'Lixeira indisponível' })
+      .mockImplementation(async (origem) => { renameSync(origem, destino); return { ok: true, destino } })
+
+    expect((await deleteSession(server, alvo.id, alvo.revision)).status).toBe(503)
+    expect(mover).toHaveBeenCalledTimes(1)
+    const origem = mover.mock.calls[0][0]
+    for (let i = 0; i < 2; i++) {
+      const indice = await loadIndex(server)
+      expect(indice.sessions.map(session => session.id)).toEqual([vizinha.id])
+      expect(indice.unavailable).toEqual([{
+        sessionId: alvo.id, code: 'session_cleanup_pending', deletionRevision: alvo.revision, titulo: 'conversa com anexo',
+      }])
+    }
+    expect(mover).toHaveBeenCalledTimes(1)
+    expect(readFileSync(origem, 'utf8')).toBe('conteudo privado')
+    expect((await deleteSession(server, vizinha.id, vizinha.revision, { resumeCleanup: true })).status).toBe(409)
+    expect(consultarDelecao(vizinha.id)).toBeUndefined()
+    const retomada = await deleteSession(server, alvo.id, alvo.revision, { resumeCleanup: true })
+    expect(retomada.status).toBe(200)
+    expect(await retomada.json()).toMatchObject({ estado: 'concluido' })
+    expect(mover).toHaveBeenCalledTimes(2)
+    expect(readFileSync(destino, 'utf8')).toBe('conteudo privado')
     expect((await loadIndex(server)).unavailable).toEqual([])
   })
 

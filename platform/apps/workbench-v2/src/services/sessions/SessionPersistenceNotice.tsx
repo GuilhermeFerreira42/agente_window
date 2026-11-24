@@ -1,5 +1,36 @@
+import type { SessaoIndisponivel } from './sessionWriteQueue'
 import type { SessionPersistenceIssue } from './useSessionPersistence'
 import './sessionPersistence.css'
+
+export function SessionLoadNotices({ items = [], deleting, failures, onResumeDeletion, onReload }: {
+  items?: SessaoIndisponivel[]
+  deleting: ReadonlySet<string>
+  failures: ReadonlyMap<string, string>
+  onResumeDeletion: (id: string, revision: number) => Promise<void>
+  onReload: () => void
+}) {
+  const unavailable = items.filter(item => item.deletionRevision === undefined)
+  return <>
+    {items.map(({ sessionId, titulo, deletionRevision }) => deletionRevision !== undefined && (
+      <div key={sessionId} role="alert" className="session-persistence-notice">
+        <div>
+          <strong>Exclusão pendente: {titulo ?? sessionId}</strong>
+          <p>{deleting.has(sessionId) ? 'Encaminhando os anexos privados à Lixeira…'
+            : failures.get(sessionId) ?? 'Ainda falta mover anexos privados para a Lixeira.'}</p>
+        </div>
+        <button type="button" disabled={deleting.has(sessionId)}
+          onClick={() => void onResumeDeletion(sessionId, deletionRevision)}>Retomar exclusão</button>
+      </div>
+    ))}
+    {unavailable.length > 0 && (
+      <div role="alert" className="session-persistence-notice">
+        <p>{unavailable.length === 1 ? 'Não foi possível carregar uma conversa salva.' : `Não foi possível carregar ${unavailable.length} conversas salvas.`} As demais conversas foram carregadas e nenhuma mensagem local foi apagada — uma conversa indisponível não é uma conversa vazia ou inexistente.</p>
+        <ul className="session-unavailable-list">{unavailable.map(item => <li key={item.sessionId}>{item.titulo ?? item.sessionId}</li>)}</ul>
+        <button type="button" onClick={onReload}>Tentar carregar conversas novamente</button>
+      </div>
+    )}
+  </>
+}
 
 interface Props {
   issues: SessionPersistenceIssue[]

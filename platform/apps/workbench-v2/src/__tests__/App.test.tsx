@@ -2017,6 +2017,26 @@ describe('P-B hidratação parcial (SPEC §4)', () => {
     expect(screen.queryByText(/a lista do servidor está indisponível/)).not.toBeInTheDocument()
   })
 
+  it('oferece retomada explícita de uma exclusão pendente após recarregar', async () => {
+    const { loadPersistedSessions, removePersistedSession } = await import('../services/sessions/sessionsClient')
+    vi.mocked(loadPersistedSessions).mockResolvedValueOnce({
+      sessions: testSessions,
+      unavailable: [{ sessionId: 'pendente-anexos', code: 'session_cleanup_pending', titulo: 'Anexo pendente', deletionRevision: 3 }],
+      state: 'partial',
+    })
+    const requests = vi.mocked(removePersistedSession)
+    requests.mockClear()
+    requests.mockResolvedValueOnce('concluido')
+    render(<App />)
+    const retomar = await screen.findByRole('button', { name: 'Retomar exclusão' })
+    expect(requests).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Não foi possível carregar uma conversa salva/)).not.toBeInTheDocument()
+    await userEvent.click(retomar)
+    expect(requests).toHaveBeenCalledWith('pendente-anexos', { expectedRevision: 3, resumeCleanup: true })
+    await waitFor(() => expect(screen.queryByText(/Exclusão pendente: Anexo pendente/)).not.toBeInTheDocument())
+    expect(screen.getByText('Replicar a Janela de Agentes')).toBeInTheDocument()
+  })
+
   // H5 — abertura SEM cache local: cada item indisponível aparece por título
   // (quando o servidor envia) ou por identidade — nunca como conversa vazia.
   it('H5: identifica cada conversa indisponível por título ou identidade, sem cache local', async () => {
