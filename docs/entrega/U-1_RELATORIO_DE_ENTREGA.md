@@ -305,6 +305,7 @@ disponível, `platform/node_modules` instalado.
 |---|---|
 | `/home/user/u1-gates/34-e2e-final/` | **61 PNG** gerados pela spec nesta rodada: 7 painéis × 1400×900/800×600 × claro/escuro × expandido/restaurado (de `U1-E09`) + os 5 de `U1-E07` |
 | `/home/user/u1-gates/28-layout-final/` e `/home/user/u1-gates/33-layout-final/` | **180 PNG** + `relatorio.json` (0 problemas) cada: 13 categorias + 3 subseções × 3 janelas × 2 temas × 2 modos — o segundo regravado depois da correção de Provedores em altura curta |
+| `/home/user/u1-gates/35-foco/` · `36-ampla/` | `vitest.json`, `nominais.json`, `criterios.json` e logs dos gates finais (foco 227/0/13 · ampla 2284/3/33) |
 | `/home/user/u1-gates/21-layout-depois/` | 180 PNG + `relatorio.json` com os **34** defeitos **antes** do CSS final (prova da correção) |
 | `/home/user/u1-gates/20-layout-antes/` | 90 PNG da v1 com o medidor antigo (menos estrito) |
 
