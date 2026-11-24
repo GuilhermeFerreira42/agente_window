@@ -1092,3 +1092,22 @@ Registros anteriores não são homologação. A integral global anterior continu
 - **Defeito real corrigido pelo E2E:** replay de uma transferência já publicada respondia `409 upload_already_finalized`. O cliente que perde o ACK reenvia o corpo; agora o servidor confere SHA-256 e tamanho — idêntico devolve **o mesmo recibo**, divergente é `409 upload_payload_conflict` (R09).
 - **Prova:** 12 jornadas Playwright na porta 5216 com **decodificação real** (`naturalWidth=8`, WAV `duration≈0.5` com `currentTime` avançando, WebM `videoWidth=64` com seek e `Range`), 112 asserções novas de unidade, e o produtor de teste injetado na porta real de servidor via `vite.config.ts` (recusa em produção, inalcançável por rota). Gate foco 426/0/0; ampla sem nenhuma falha ou skip novo. **Homologação humana pendente** — esta fatia não se declara homologada.
 - **Não executado:** Windows. Nenhuma interpretação/geração por IA foi conectada.
+
+## 2026-11-13 — U-1: um único modal de configurações
+
+Implementadas as dez exigências da U-1 sobre a base `24d686a`: uma porta de entrada
+para Configurações/Provedores/Personalizações, menu de 13 categorias em 3 grupos,
+painéis hospedados com rascunho próprio, confirmação de descarte com escrita em voo
+bloqueando o fechamento, tradução das abas legadas e do `aiCustomizations` antes de
+montar, foco devolvido ao acionador e categorias futuras sem ação fictícia.
+
+O App **não** recebeu um gerenciador paralelo: o wiring vive em
+`src/shell/useConfiguracoesUnificadas.ts`, a composição dos painéis em
+`src/shell/usePaineisConfiguracoes.tsx` e a montagem em
+`src/shell/ConfiguracoesUnificadasHost.tsx`; `App.tsx` terminou com 2885 linhas
+(teto do C-2: 2889).
+
+Provas: `u1ConfiguracoesShell` (22), `u1ConfiguracoesPaineis` (17),
+`e2e/u1_configuracoes_unificadas.spec.ts` (7), comparação nominal com a baseline
+sem nenhuma falha nova. **Entrega para revisão e homologação do proprietário —
+sem merge e sem iniciar a próxima fatia.**

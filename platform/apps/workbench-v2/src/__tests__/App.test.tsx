@@ -1525,11 +1525,17 @@ describe('App session flows', () => {
     await user.click(screen.getByRole('button', { name: 'Conta' }))
     await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
 
-    expect(await screen.findByRole('region', { name: 'Provedores' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Provedores' })).toHaveAttribute('data-tab-type', 'providers')
-    // FATIA 08: a tela nova mostra a lista de provedores e o formulário do primeiro.
-    expect(await screen.findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Provedores' })).not.toBeInTheDocument()
+    // U-1 R09: Provedores deixou de ser aba do editor e passou a ser a
+    // categoria "Provedores e modelos" do modal unificado. A prova agora é a
+    // moldura correta + o conteúdo real da Casa, e a AUSÊNCIA da aba antiga.
+    const dialogo = await screen.findByRole('dialog', { name: 'Configurações' })
+    expect(dialogo).toHaveAttribute('data-modo', 'expandido')
+    expect(
+      within(dialogo).getByRole('button', { name: 'Provedores e modelos' }),
+    ).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('tab', { name: 'Provedores' }), 'nada de aba legada').not.toBeInTheDocument()
+    // FATIA 08 preservada: a lista de provedores continua vindo da Casa.
+    expect(await within(dialogo).findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
   })
 
   it('maximiza e restaura a área do editor', async () => {
@@ -1950,17 +1956,26 @@ describe('App session flows', () => {
       await openInitialBrowser(user)
 
       await user.click(screen.getByRole('button', { name: 'Adicionar aba do editor' }))
-      // RNF14-4 / SPEC 2H (a): o rótulo visível é "Personalizações".
+      // RNF14-4 / SPEC 2H (a) + U-1: o rótulo visível segue "Personalizações",
+      // mas agora abre a CATEGORIA no modal unificado (nunca uma 2ª moldura).
       await user.click(screen.getByRole('menuitem', { name: 'Personalizações' }))
 
-      const surface = screen.getByRole('region', { name: 'Personalizações' })
-      expect(surface).toBeInTheDocument()
+      const dialogo = await screen.findByRole('dialog', { name: 'Configurações' })
+      expect(within(dialogo).getByRole('button', { name: 'Personalizações' }))
+        .toHaveAttribute('aria-current', 'page')
       expect(chamadas.some((url) => url.startsWith('/api/personalizacoes'))).toBe(true)
 
-      // v1 = Visão geral + Habilidades + Ferramentas, e nada além disso.
-      expect(within(surface).getByRole('button', { name: /^Visão geral$/ })).toBeInTheDocument()
-      expect(within(surface).getByText('Habilidades')).toBeInTheDocument()
-      expect(within(surface).getByText('Ferramentas')).toBeInTheDocument()
+      // v1 = Visão geral + Habilidades + Ferramentas na navegação COMUM (U-1 R02):
+      // uma única coluna de navegação, sem a nav interna da tela antiga.
+      const subnav = within(dialogo).getByRole('group', { name: 'Seções de Personalizações' })
+      expect(within(subnav).getByRole('button', { name: 'Visão geral' })).toBeInTheDocument()
+      expect(within(subnav).getByRole('button', { name: 'Habilidades' })).toBeInTheDocument()
+      expect(within(subnav).getByRole('button', { name: 'Ferramentas' })).toBeInTheDocument()
+      expect(
+        dialogo.querySelectorAll('.personalizations-navigation'),
+        'a tela não desenha a sua própria navegação',
+      ).toHaveLength(0)
+      const surface = within(dialogo).getByRole('region', { name: 'Visão geral' })
       for (const ausente of ['Configurar Hooks', 'Adicionar servidor MCP', 'Instructions', 'Prompts']) {
         expect(within(surface).queryByText(ausente), ausente).not.toBeInTheDocument()
       }
@@ -1971,7 +1986,9 @@ describe('App session flows', () => {
       // "Desligar". Um mock fixo não passaria nestas duas linhas.
       expect(within(surface).getByText('/commit')).toBeInTheDocument()
       expect(within(surface).getByText('Padroniza commits.')).toBeInTheDocument()
-      await user.click(within(surface).getByRole('button', { name: 'Ferramentas' }))
+      // A troca de seção agora acontece pela navegação COMUM do modal (U-1 R02),
+      // e continua mostrando os dados que o servidor devolveu.
+      await user.click(within(subnav).getByRole('button', { name: 'Ferramentas' }))
       expect(within(surface).getByRole('button', { name: 'Ligar Excluir' })).toBeVisible()
       expect(within(surface).getByRole('button', { name: 'Desligar Ler arquivo' })).toBeInTheDocument()
     } finally {

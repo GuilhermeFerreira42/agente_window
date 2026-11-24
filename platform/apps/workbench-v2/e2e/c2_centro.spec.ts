@@ -307,12 +307,20 @@ test.describe('C-2 — centro (servidor real + navegador + backend controlado)',
     await shot(page, 'c2_j6_sidebar_chats')
   })
 
-  test('J7 — Personalizações no topo abre o MESMO modal; atalhos da base ausentes', async ({ page }) => {
+  test('J7 — Personalizações no topo abre o MESMO modal (U-1: o unificado); atalhos da base ausentes', async ({ page }) => {
     await abrirApp(page)
     expect(await page.locator('.personalizations-shortcuts').count()).toBe(0)
     await page.getByTestId('sidebar-personalizacoes').click()
-    await page.getByRole('dialog', { name: 'Personalizações do Agent Window' }).waitFor()
-    expect(await page.getByRole('dialog', { name: 'Personalizações do Agent Window' }).isVisible()).toBe(true)
+    // U-1 R01/R02: a entrada de Personalizações passou a abrir o modal
+    // unificado — a MESMA moldura de Configurações, já na categoria certa.
+    // Continua sendo UM diálogo (a jornada de "não duplicar moldura" segue
+    // valendo, só mudou o nome e o recorte).
+    const modal = page.getByRole('dialog', { name: 'Configurações' })
+    await modal.waitFor()
+    expect(await modal.isVisible()).toBe(true)
+    await expect(modal.getByRole('button', { name: 'Personalizações' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    await expect(page.locator('.personalizations-navigation'), 'sem 2ª coluna de navegação').toHaveCount(0)
     await shot(page, 'c2_j7_personalizacoes_topo')
   })
 

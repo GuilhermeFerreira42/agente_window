@@ -29,7 +29,28 @@ function estadoLocalInicial(): EstadoProvedores {
   }
 }
 
-export function ProvidersView() {
+/**
+ * U-1: o painel informa a moldura sobre rascunho/save e permite que ela peça a
+ * limpeza do segredo revelado ao SAIR da categoria (R04). Nada de valores,
+ * chaves ou respostas de API atravessa este contrato.
+ */
+export interface EstadoPainelProvedores {
+  dirty: boolean
+  saving: boolean
+  canLeave: boolean
+}
+
+export interface ProvidersViewProps {
+  hospedado?: boolean
+  aoMudarEstado?: (estado: EstadoPainelProvedores) => void
+  /**
+   * Quando este número muda, a tela oculta as chaves reveladas. A moldura
+   * incrementa ao trocar de categoria/fechar; rascunhos digitados ficam.
+   */
+  limparReveal?: number
+}
+
+export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal = 0 }: ProvidersViewProps = {}) {
   const [estado, setEstado] = useState<EstadoProvedores>(estadoLocalInicial)
   const [carregando, setCarregando] = useState(true)
   const [estadoCarregado, setEstadoCarregado] = useState(false)
@@ -42,10 +63,22 @@ export function ProvidersView() {
   const [rascunhos, setRascunhos] = useState<Record<string, Partial<ProvedorConfig>>>({})
   const [chaveEditada, setChaveEditada] = useState<Record<string, string>>({})
   const [revelada, setRevelada] = useState<Record<string, boolean>>({})
+  // U-1 R04: sair da categoria oculta o que foi revelado. O rascunho digitado
+  // NÃO é descartado por isso (ele não é segredo revelado).
+  const primeiraLimpeza = useRef(limparReveal)
+  useEffect(() => {
+    if (primeiraLimpeza.current === limparReveal) return
+    primeiraLimpeza.current = limparReveal
+    setRevelada({})
+  }, [limparReveal])
   const [consultasModelos, setConsultasModelos] = useState<Record<string, ConsultaModelos>>({})
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null)
   const [ocupado, setOcupado] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const temRascunho = Object.keys(rascunhos).length > 0 || Object.values(chaveEditada).some((valor) => valor !== '')
+  useEffect(() => {
+    aoMudarEstado?.({ dirty: temRascunho, saving: salvando, canLeave: true })
+  }, [aoMudarEstado, temRascunho, salvando])
   const [salvo, setSalvo] = useState(false)
   const [erro, setErro] = useState('')
   const [descoberta, setDescoberta] = useState<{ chave: string; dados?: CapacidadeContexto; falhou?: boolean }>()

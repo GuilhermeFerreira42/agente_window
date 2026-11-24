@@ -2756,3 +2756,31 @@ Comando: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/script
 - **Pegadinha de ambiente (C-1):** `e2e/c1_correcoes.spec.ts` sobe o servidor na porta 5211, mas `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174). Sem `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5211` o spec falha com `ERR_CONNECTION_REFUSED`. Isso **não** é regressão: acontece igual na base homologada `a49cc6c`.
 - **Chromium no sandbox:** `LD_LIBRARY_PATH=/tmp/al2023/lib` e `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium`.
 - O produtor de teste só existe com `C3B_SAIDA_DE_TESTE=1` na composição; em produção a fábrica recusa.
+
+## U-1 — Configurações unificadas: como validar (Linux)
+
+- **Unitárias (critérios no NOME do teste, sem skip):**
+  `src/__tests__/u1ConfiguracoesShell.test.tsx` (U1-T01/T02/T08/T09/T10) e
+  `src/__tests__/u1ConfiguracoesPaineis.test.tsx` (U1-T03/T04/T05/T06/T07).
+- **Gate de critérios:** `node VALIDAR_U1.mjs --repo <repo> --mode foco --out <NOVO>`;
+  comparação nominal com `--mode ampla --baseline-json <baseline>/vitest.json`
+  (reprova em `newFailures`, `newSkips` e `missingCriteria`).
+- **E2E:** `node VALIDAR_E2E_U1.mjs --repo <repo> --out <NOVO>` (ou `sh platform/scripts/e2e-u1.sh`) — porta **5218**,
+  `--workers=1 --retries=0`, jornadas U1-E01…E07 exigidas pelo nome. Ambiente do
+  sandbox: `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium` e
+  `LD_LIBRARY_PATH=/tmp/al2023/lib`.
+- **Regressões nominais obrigatórias** (além da comparação ampla): App,
+  SessionLanding, customView, persistenciaNativas, useWorkbenchHistory,
+  stableEditorSurface, ConfigView/rotas config, ProvidersView/rotas provedores,
+  PersonalizacoesView/rotas personalizacoes; E2E `provedores_fatia08`,
+  `c1_correcoes` (porta 5211 via `PLAYWRIGHT_BASE_URL`), `c2_centro` (5212) e
+  `c3b_multimodal` (5216).
+- **Régua `provedores_fatia08`:** depende do stub canônico `uploads/stub_provider.cjs`
+  (porta 4599), que **não está no repo**. Neste sandbox ele foi reproduzido fora do
+  checkout; o contrato observado é catálogo de 5 modelos, 401 para chave inválida e
+  405 em `/sem-catalogo`. O `apiRequestContext` do Playwright precisa mandar
+  `Origin`/`sec-fetch-site` para o PUT de reset passar pela política local — isso é
+  **execução**, não mudança de spec.
+- **Falhas pré-existentes (não são regressão da U-1):** `fatia07_destravar` (DEBT-06),
+  `editorTabs` (breadcrumbs) e `monacoLoadFailure` (caminho feliz). Medidas iguais na
+  base `24d686a`.

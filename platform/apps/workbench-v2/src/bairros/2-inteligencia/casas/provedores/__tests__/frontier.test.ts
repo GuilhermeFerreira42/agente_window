@@ -117,6 +117,17 @@ describe('Fronteira da Casa Provedores (LEGO)', () => {
     const app = readFileSync(join(SRC_ROOT, 'App.tsx'), 'utf8')
     // O síndico monta a tela; não conhece os ids nem as URLs dos provedores.
     expect(app, 'App.tsx não deve listar ids de provedor').not.toMatch(/'openai'|"openai"|api\.openai\.com|integrate\.api\.nvidia\.com/)
-    expect(app, 'App.tsx fala com a casa só pelo barrel').toMatch(/from '\.\/bairros\/2-inteligencia\/casas\/provedores'/)
+    // U-1: a montagem da tela saiu do App para a composição do shell. A porta
+    // continua sendo o barrel — verificada onde a tela é montada, e verificada
+    // como AUSÊNCIA de acesso por baixo do barrel em qualquer arquivo de fora.
+    const composicao = readFileSync(join(SRC_ROOT, 'shell', 'usePaineisConfiguracoes.tsx'), 'utf8')
+    expect(composicao, 'a composição fala com a casa só pelo barrel')
+      .toMatch(/from '\.\.\/bairros\/2-inteligencia\/casas\/provedores'/)
+    // Nenhum arquivo fora da casa conhece id/URL de provedor (regra inalterada,
+    // agora medida em TODO o src e não apenas no App).
+    const infratores = arquivosDeSrc()
+      .filter((arquivo) => /'openai'|"openai"|api\.openai\.com|integrate\.api\.nvidia\.com/.test(readFileSync(arquivo, 'utf8')))
+      .map((arquivo) => relative(SRC_ROOT, arquivo))
+    expect(infratores, 'lista de provedores só na casa').toEqual([])
   })
 })

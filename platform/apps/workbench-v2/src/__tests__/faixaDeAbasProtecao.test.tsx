@@ -170,26 +170,33 @@ describe('R-040 / RF15-4 — reabrir pelo menu apos ocultar nao perde Browser', 
     await abrirBrowser(user)
     await user.click(screen.getByRole('button', { name: 'Recolher editor' }))
     await user.click(screen.getByRole('button', { name: 'Conta' }))
+    // U-1 R09: "Provedores" agora abre a categoria do modal unificado — nada de
+    // aba nativa. O que este teste protege continua igual: a aba Browser
+    // sobrevive ao modal aberto e ao F5.
     await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
+    expect(screen.getByRole('dialog', { name: 'Configurações' })).toBeInTheDocument()
     expect(abas().map(tituloDe)).toContain('Browser')
-    expect(abas().map(tituloDe)).toContain('Provedores')
+    expect(abas().map(tituloDe), 'Provedores não é mais aba').not.toContain('Provedores')
     mounted.unmount()
     render(<App initialSessionSnapshot={testSessions} />)
     expect(abas().map(tituloDe)).toContain('Browser')
-    expect(abas().map(tituloDe)).toContain('Provedores')
+    expect(abas().map(tituloDe)).not.toContain('Provedores')
   })
 })
 
 describe('P10 — o que o F5 realmente preserva (comportamento MEDIDO, nao suposto)', () => {
-  it('RF15-4: Provedores continua como aba nativa apos F5', async () => {
+  it('U-1/R09 (era RF15-4): Provedores deixou de ser aba e não volta depois do F5', async () => {
     const user = userEvent.setup()
     const mounted = render(<App initialSessionSnapshot={testSessions} />)
     await user.click(screen.getByRole('button', { name: 'Conta' }))
     await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
-    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(true)
+    // A prova mudou de lado com a U-1: a categoria é o destino, e a faixa
+    // nativa NÃO ganha uma aba `providers` que voltaria "morta" após o F5.
+    expect(screen.getByRole('dialog', { name: 'Configurações' })).toBeInTheDocument()
+    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(false)
     mounted.unmount()
     render(<App initialSessionSnapshot={testSessions} />)
-    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(true)
+    expect(abas().some((t) => tituloDe(t) === 'Provedores')).toBe(false)
   })
 
   it('RF15-4: remontar o App (F5) restaura Browser nativo e preserva a sessao ativa', async () => {

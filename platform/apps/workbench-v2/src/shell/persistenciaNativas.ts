@@ -2,6 +2,7 @@
 // O modulo persiste arquivos kind:code em persistenciaDeAbas.ts. Estes dados
 // nunca incluem texto editavel, data URL, cookies, tokens ou modelos Monaco.
 import type { BrowserViewState, EditorTab } from '../types'
+import { rotaDaSuperficieLegada, type RotaConfiguracoes } from '../domain/configuracoesUnificadas'
 
 export const NATIVE_TABS_KEY = 'workbench.nativeTabs.v1'
 export interface SnapshotNativas {
@@ -65,6 +66,43 @@ export function lerSnapshotNativas(storage: StoragePort = window.localStorage): 
     const raw = storage.getItem(NATIVE_TABS_KEY)
     return raw ? normalizar(JSON.parse(raw) as unknown) : vazio()
   } catch { return vazio() } // privado, storage indisponivel, JSON truncado
+}
+
+/**
+ * U-1 R09 — tradução das ABAS legadas antes de montar.
+ *
+ * `providers` e `config` deixaram de ser abas do editor: viraram categorias do
+ * modal unificado. Uma aba dessas restaurada de um snapshot antigo é drenada
+ * para a porta de configurações (uma vez) e NÃO volta para a faixa — assim o
+ * F5 antigo abre o modal em vez de uma superfície que não existe mais.
+ * `file`, `browser`, `diff` e `customizations` seguem donos das suas abas.
+ */
+export function drenarAbasLegadas(
+  snapshot: SnapshotNativas,
+): { snapshot: SnapshotNativas; rotas: RotaConfiguracoes[] } {
+  const rotas: RotaConfiguracoes[] = []
+  const tabs = snapshot.tabs.filter((tab) => {
+    const rota = rotaDaSuperficieLegada(tab.type)
+    if (!rota) return true
+    rotas.push(rota)
+    return false
+  })
+  if (tabs.length === snapshot.tabs.length) return { snapshot, rotas }
+  const ids = new Set(tabs.map((tab) => tab.id))
+  const activeBySession: Record<string, string> = {}
+  for (const [sessao, id] of Object.entries(snapshot.activeBySession)) {
+    if (ids.has(id)) activeBySession[sessao] = id
+  }
+  return {
+    snapshot: {
+      ...snapshot,
+      tabs,
+      activeBySession,
+      activeTabId: snapshot.activeTabId && ids.has(snapshot.activeTabId) ? snapshot.activeTabId : undefined,
+      activeGlobalTabId: snapshot.activeGlobalTabId && ids.has(snapshot.activeGlobalTabId) ? snapshot.activeGlobalTabId : undefined,
+    },
+    rotas,
+  }
 }
 
 export function salvarSnapshotNativas(snapshot: SnapshotNativas, storage: StoragePort = window.localStorage): void {

@@ -797,3 +797,26 @@ tela real ligada ao servidor) e sete commits.
 - **Aceite humano pendente** e três divergências relatadas: ver `docs/05`, D143.
 
 Próximo pela ordem da D133: **Fatia 15**.
+
+### Atualização 2026-11-13 — U-1 entregue para homologação (não homologada)
+
+As três superfícies de ajuste do produto agora são **uma só**: o modal
+"Configurações", aberto expandido, com uma navegação à esquerda (3 grupos,
+13 categorias) e o conteúdo da categoria à direita. Configurações, Provedores e
+Personalizações continuam sendo as MESMAS telas — foram hospedadas, não
+reescritas — e cada uma segue dona do seu estado, do seu rascunho e dos seus
+serviços. Decisão e consequências em `docs/05` D202; como validar em `docs/09`.
+
+- **Entradas:** conta (Provedores/Configurações), `Ctrl+,`, lateral
+  (Personalizações e seções) e os cards da própria tela. Todas passam por
+  `abrirConfiguracoes(rota)`; com o modal aberto, abrir outra categoria navega.
+- **Abas legadas `config`/`providers` e o id `aiCustomizations`** são traduzidos
+  antes da montagem: snapshot antigo abre a categoria equivalente; a faixa de abas
+  não ganha aba morta e o estado persistido é saneado.
+- **Placar medido neste Linux (Debian):** unitárias 2266 aprovadas / 3 reprovadas /
+  33 ignoradas — as 3 são exatamente as da base `24d686a` (0 novas, 0 skips novos);
+  U-1 foco 215 aprovadas / 0 falhas nominais; E2E U-1 7/7 (porta 5218, sem retry);
+  E2E nominais `provedores_fatia08` 6/6, `c1_correcoes` 6/6, `c2_centro` 17/17,
+  `c3b_multimodal` 12/12; typecheck 0.
+- **Não executado:** Windows (o ambiente é Linux), homologação humana e qualquer
+  teste com provedor real/conta/chave. **Não declarada homologada.**

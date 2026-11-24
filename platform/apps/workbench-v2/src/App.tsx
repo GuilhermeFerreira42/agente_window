@@ -22,14 +22,16 @@ import type { FonteEntreChats } from './domain/consultaEntreChats'
 import { manageHistoryAccess } from './services/sessions/historyAccessClient'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
-import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
-import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
+import { PersonalizacoesView, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
+import { useConfiguracoesUnificadas } from './shell/useConfiguracoesUnificadas'
+import { ConfiguracoesUnificadasHost } from './shell/ConfiguracoesUnificadasHost'
+import { rotaDaSecao, rotaDaSuperficieLegada } from './domain/configuracoesUnificadas'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { aplicarMensagemPrimeiroEnvio, executarPrimeiroEnvio } from './domain/primeiroEnvio'
 import { tokenDaSelecao } from './domain/selecaoModelo'
 import { rascunhoInicial, type RascunhoLanding } from './domain/landingDraft'
 import { useLandingTentativa, type EntradaSubmitLanding } from './hooks/useLandingSubmission'
-import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
+import { AUTOSCROLL_PADRAO, carregarConfig } from './bairros/2-inteligencia/casas/config'
 import { continuarAgir, enviarAgir, prepararExecucaoAgir, responderAguardarComando, responderAprovacao, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
@@ -39,11 +41,9 @@ import {
   dismissCustomViewOnBack,
   dismissCustomViewOnSessionOpen,
   loadCustomViewState,
-  openCustomView,
   restoredPartVisibility,
   saveCustomViewState,
   shouldShowCustomViewGrid,
-  type CustomViewId,
 } from './domain/customView'
 import { enviarMensagemComAnexos, portasEnvioApp, prepararAnexosDaLanding } from './services/sessions/enviarComAnexos'
 import { useFusaoAnexos } from './hooks/useFusaoAnexos'
@@ -95,7 +95,6 @@ import { COMPOSER_HISTORY_MAX_ENTRIES, sameComposerHistoryEntry } from './domain
 import {
   EMPTY_NAVIGATION_STACK,
   navigateBack,
-  dismissLayer,
   pushLayer,
   resetForSessionSwitch,
   topLayer,
@@ -399,7 +398,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (R-092 / LAYOUT.md §Custom View Grid) Superfície full-surface contribuída,
   // mutuamente exclusiva com Sessions Part, Editor, Auxiliary Bar e Panel.
   const [customView, setCustomView] = useState(() => loadCustomViewState())
+  // U-1 R09: `aiCustomizations` é categoria do modal, nunca superfície do grid.
   const customViewActive = shouldShowCustomViewGrid(customView) && customView.activeView !== 'aiCustomizations'
+
+  // U-1 — uma porta para Configurações/Provedores/Personalizações.
+  const config = useConfiguracoesUnificadas()
+  const abrirConfiguracoes = config.abrir
+  const openProviders = () => abrirConfiguracoes({ categoria: 'provedores' })
+  const openConfig = () => abrirConfiguracoes({ categoria: 'geral' })
+  const openCustomizations = useCallback(() => {
+    abrirConfiguracoes(rotaDaSuperficieLegada('aiCustomizations') ?? { categoria: 'personalizacoes' })
+  }, [abrirConfiguracoes])
 
 
   // FATIA 15 Onda 3 (D159): `handleOpenFileHandle` saiu daqui. Era o ÚNICO criador de aba
@@ -554,7 +563,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const {
     editorTabs, activeTabId, setActiveTabId, browserViews,
     activeGlobalTabId,
-    activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession,
+    activateEditorTab, acceptModuleNavigation, preferredEditorTabForSession, rotasLegadas,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
     reorderNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
@@ -725,6 +734,24 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     saveCustomViewState(customView)
   }, [customView])
 
+  // U-1 R09 — legado traduzido ANTES de montar (abas `config`/`providers` já
+  // drenadas no boot e `aiCustomizations` → Personalizações, nunca a moldura
+  // antiga). O `aiCustomizations` é traduzido pelo EFEITO DE BOOT também: assim
+  // o snapshot é saneado antes de qualquer pintura.
+  useEffect(() => {
+    const rotaLegada = rotasLegadas[0] ?? rotaDaSuperficieLegada(customView.activeView)
+    if (rotaLegada) config.abrir(rotaLegada)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot-only
+  }, [])
+  useEffect(() => {
+    if (customView.activeView !== 'aiCustomizations') return
+    const desejada = restoredPartVisibility(customView)
+    setTerminalVisible(desejada.panel)
+    setEditorHidden(!desejada.editor)
+    setCustomView((atual) => closeCustomView(atual))
+    config.abrir(rotaDaSuperficieLegada('aiCustomizations') ?? { categoria: 'personalizacoes' })
+  }, [customView, config])
+
   const activePartSizes = partSizesForSession({ shell: persistedLayout.current.shell, partSizesBySession }, activeSession.id)
   const unreadCount = sessions.filter((session) => session.unread).length
   const filteredSearchResults = useMemo(() => filterSearchResults(allSearchResults, searchQuery), [searchQuery])
@@ -801,7 +828,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissCustomViewOnSessionOpen(customView))
-      setNavStack((current) => dismissLayer(current, 'custom-view-aiCustomizations'))
     }
     if (id === activeSessionId) return
     // R-030 — a captura/restauração do layout por sessão NÃO é imperativa: flui
@@ -838,7 +864,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissed.state)
-      setNavStack((current) => dismissLayer(current, 'custom-view-aiCustomizations'))
       return true
     }
     const result = navigateBack(navStack)
@@ -1163,14 +1188,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     carregarConfig().then((config) => setAutoScrollChat(config.autoScroll)).catch(() => {})
   }, [])
 
-  const openProviders = () => {
-    openEditorTab('providers', { title: 'Provedores' })
-    revealEditor()
-  }
-  const openConfig = () => {
-    openEditorTab('config', { title: 'Configurações' })
-    revealEditor()
-  }
   // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
   // menu "+" ativam a view `search` (sem alternar) e pedem foco ao módulo. A aba "Search"
   // do editor central não é mais criada.
@@ -1190,30 +1207,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     revealEditor()
   }
 
-  // D182: Personalizações usa modal. O dono de rota/persistência R-092 continua
-  // guardando a visibilidade anterior; as superfícies permanecem montadas.
-  const openCustomViewGrid = useCallback((view: CustomViewId) => {
-    setCustomView((current) =>
-      openCustomView(current, view, {
-        sessionsPart: true,
-        editor: !editorHidden,
-        auxiliaryBar: auxiliaryVisible,
-        panel: terminalVisible,
-      }),
-    )
-  }, [auxiliaryVisible, editorHidden, terminalVisible])
-
-  const [personalizationsRoute, setPersonalizationsRoute] = useState<{ section: PersonalizationSection; serial: number }>({ section: 'visao', serial: 0 })
-  const openCustomizations = useCallback(() => {
-    openCustomViewGrid('aiCustomizations')
-    // (LAYOUT.md) No phone a custom view entra na pilha de navegação, para que o
-    // back da plataforma consiga dispensá-la.
-    if (isPhone) {
-      setNavStack((current) =>
-        pushLayer(current, { id: 'custom-view-aiCustomizations', kind: 'custom-view', label: 'Personalizações' }),
-      )
-    }
-  }, [isPhone, openCustomViewGrid])
 
   // Fechar restaura EXATAMENTE a visibilidade retida (desired), nunca um default.
   const closeCustomViewGrid = useCallback(() => {
@@ -1222,7 +1215,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       const desired = restoredPartVisibility(current)
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
-      setNavStack((stack) => dismissLayer(stack, 'custom-view-aiCustomizations'))
       return closeCustomView(current)
     })
   }, [])
@@ -1231,12 +1223,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // resolver a raiz de projeto. O caminho NUNCA é enviado pela tela (F1/D113).
   const alvoPersonalizacoes = { sessionId: activeSession.id, chatId: activeChatId }
 
+  // Seção viva = a ROTA do modal (uma fonte só); `serial` só reaplica o pedido.
+  const secaoLegada = { section: (config.rota.subsecao ?? 'visao') as PersonalizationSection, serial: 0 }
+
   const customizationsSurfaceEmbedded = (
-    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
+    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} sectionRequest={secaoLegada} />
   )
 
   const customizationsSurface = (
-    <PersonalizacoesView alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
+    <PersonalizacoesView alvo={alvoPersonalizacoes} sectionRequest={secaoLegada} />
   )
 
   // Hide/Show Editor (⌥⌘E). Par mutuamente exclusivo editor/detalhe: ocultar o
@@ -2522,8 +2517,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onNewDiff={() => openDiff(activeSession.id)}
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
-      providersSurface={hasNativeSurface('providers') ? <ProvidersView /> : undefined}
-      configSurface={hasNativeSurface('config') ? <ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} /> : undefined}
+      // U-1 R09: aba legada (`config`/`providers`) é traduzida para o modal.
+      providersSurface={undefined}
+      configSurface={undefined}
       frontierTabs={abasProjetadasDoModulo}
       codeEditorSlot={codeEditorSlot}
       changesSlot={changesSlot}
@@ -2587,15 +2583,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const historyTabs = (sessionId: string) => fundirAbas(getEditorTabsVisibleForSession(editorTabs, sessionId), explorerModule ? projetarAbasDoModulo(sessionId, explorerModule.attach.getTabs({ sessionId })) : [])
   const navigation = useWorkbenchHistory({
-    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: customView.activeView === 'aiCustomizations', section: personalizationsRoute.section, mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
+    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: customView.activeView === 'aiCustomizations', section: config.rota.subsecao ?? 'visao', mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
     valid: route => sessions.some(session => session.id === route.sessionId) && (!route.tabId || historyTabs(route.sessionId).some(tab => tab.id === route.tabId)),
     restore: route => {
       if (landingVisible && !editorFilesSaved()) return
       selectSession(route.sessionId)
       setActiveChatBySession(current => ({ ...current, [route.sessionId]: route.chatId }))
       setNewSessionLanding(route.landing)
-      setPersonalizationsRoute(current => ({ section: route.section, serial: current.serial + 1 }))
-      if (route.modal) openCustomizations(); else closeCustomViewGrid()
+      // U-1 R09: voltar/avançar navega, não repete mutação (rota traduzida).
+      if (route.modal) config.abrir(rotaDaSecao(route.section)); else config.fechar()
+      closeCustomViewGrid()
       activateEditorTab(historyTabs(route.sessionId).find(tab => tab.id === route.tabId))
       setEditorHidden(route.editorHidden); setMobilePane(route.mobilePane)
       layout.showView(route.sideBarView); layout.setSideBarVisible(route.sideBarVisible)
@@ -2678,7 +2675,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           onReorderSessions={handleReorderSessions}
           onAssignGroup={handleAssignGroup}
           onRemoveGroup={handleRemoveGroup}
-          onOpenPersonalizations={section => { setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 })); openCustomizations() }}
+          // U-1 R02/R05: seção de outra categoria vai para ela; nada inventado.
+          onOpenPersonalizations={section => abrirConfiguracoes(rotaDaSecao(section))}
           onOpenBeside={isSinglePane ? undefined : openSessionBeside}
         />
         {sidebarVisible && (
@@ -2859,7 +2857,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         </div>
       </div>
       {toast && <div className="toast" role="status"><Info size={14} /><span>{toast}</span><button type="button" aria-label="Fechar aviso" title="Fechar aviso" onClick={() => setToast(undefined)}><X size={13} /></button></div>}
-      {customView.activeView === 'aiCustomizations' && <PersonalizationsModal alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} onSectionChange={section => setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 }))} onClose={closeCustomViewGrid} />}
+      {config.aberta && <ConfiguracoesUnificadasHost wiring={config} alvo={alvoPersonalizacoes} workspaceAtual={activeSession.workspacePath ?? undefined}
+        tema={theme} onAlternarTema={handleToggleTheme} onConfigSalva={(salva) => setAutoScrollChat(salva.autoScroll)} onNovaSessaoComPasta={handleNewSession} />}
       {explorerContextMenu && (
         <ExplorerContextMenuHost
           state={explorerContextMenu}

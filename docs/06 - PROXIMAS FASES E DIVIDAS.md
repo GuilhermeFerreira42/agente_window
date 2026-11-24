@@ -1965,3 +1965,23 @@ Elas não foram escondidas nesta parte: quem ler só a SPEC precisa saber que a
 execução existe e que tem ressalvas registradas em outro lugar.
 
 A sequência da D133 segue: **Fatia 15** é a próxima.
+
+## U-1 — Configurações unificadas (entrega de 13/11/2026)
+
+**Estado:** implementada e provada tecnicamente; **aguardando revisão e homologação
+do proprietário**. Sem merge.
+
+**O que fica em aberto, por decisão de escopo:**
+
+- **Notificações, Agentes e instruções, MCP, Hooks, Plugins e Importação e backup**
+  existem no menu como categorias **futuras**: explicam o limite e não oferecem
+  ação. Implementá-las é fatia própria.
+- **Conversas e armazenamento** informa a localização apenas quando houver fonte
+  confiável; o App não conhece o diretório de dados no render, então o painel diz
+  isso em vez de mostrar caminho inventado. Expor a fonte é trabalho do dono da
+  persistência.
+- **Permissões** explica os controles existentes e aponta a conversa atual. Nenhum
+  grant novo, nenhum toggle global — a regra da C-1 continua valendo.
+- **Roteiro de homologação no Windows** acompanha a entrega escrita; rodar em
+  Windows segue pendente de plataforma (`platform/scripts/*.ps1`), assim como a
+  conferência humana das capturas.
