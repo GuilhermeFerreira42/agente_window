@@ -15,10 +15,10 @@ export const TEXTO_ESCOLHA_ANEXOS =
   'Os arquivos serão armazenados nesta conversa, mas NÃO serão enviados ao modelo nesta fase (sem codec). '
   + 'Continuar apenas com o texto? Os arquivos ficam disponíveis para download na conversa.'
 
-export function pedidoEscolhaAnexos(): PedidoDialogo {
+export function pedidoEscolhaAnexos(nomes: readonly string[] = []): PedidoDialogo {
   return pedidoDestrutivo({
     mensagem: 'Enviar só o texto e manter os arquivos anexados?',
-    detalhe: TEXTO_ESCOLHA_ANEXOS,
+    detalhe: TEXTO_ESCOLHA_ANEXOS + (nomes.length ? ` Apenas armazenados: ${nomes.join(', ')}.` : ''),
     confirmar: 'Continuar com o texto',
     rotuloAcessivel: 'Confirmar envio com anexos sem codec',
     testId: 'anexo-escolha-confirm',

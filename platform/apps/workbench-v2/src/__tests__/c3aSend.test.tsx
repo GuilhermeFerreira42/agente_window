@@ -463,7 +463,7 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
     fireEvent.click(within(dialogo).getByRole('button', { name: aceitar ? 'Continuar com o texto' : 'Cancelar' }))
   }
 
-  function portasRegistro(_opcoes: { confirmar: boolean }) {
+  function portasRegistro() {
     const registro = {
       runs: [] as Array<{ texto: string; historico: unknown; modelSelection: unknown }>,
       persistidas: [] as Session[],
@@ -505,7 +505,7 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
   }
 
   it('C3A-T23 — sem codec o texto exige ESCOLHA explícita: recusar aborta antes de qualquer transferência/publicação/run', async () => {
-    const { registro, portas, restaurar } = portasRegistro({ confirmar: false })
+    const { registro, portas, restaurar } = portasRegistro()
     try {
       // Rascunho ainda NÃO transferido: é exatamente o caso em que o produto
       // precisa da escolha explícita antes de continuar sem o conteúdo.
@@ -522,15 +522,14 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
     } finally { restaurar() }
   })
 
-  it('C3A-T23 — anexo já transferido não repergunta: só o TEXTO vai ao modelo e o chip declara excluído-sem-codec', async () => {
-    // A escolha só existe quando há o que transferir (anexo NÃO pronto). Com o
-    // recibo já pronto o fluxo segue direto — e nenhum diálogo aparece.
-    const { registro, portas, restaurar } = portasRegistro({ confirmar: true })
+  it('MMI — anexo já transferido também exige escolha; só o TEXTO vai ao modelo', async () => {
+    const { registro, portas, restaurar } = portasRegistro()
     try {
       const envio = enviarMensagemComAnexos({
         sessionId: 'sessao-t23', chatId: 'chat-t23', text: 'só este texto deve ir', attachments: [anexoPronto()],
         modelSelection: { tipo: 'auto' }, portas: portas as never,
       })
+      await escolherNoDialogo(true)
       expect(await envio).toBe('publicado')
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(registro.runs).toHaveLength(1)
@@ -546,8 +545,38 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
     } finally { restaurar() }
   })
 
+  it('MMI — cancelar anexo pronto não publica e mantém o recibo selecionado', async () => {
+    const { registro, portas } = portasRegistro()
+    const anexo = anexoPronto()
+    const envio = enviarMensagemComAnexos({ sessionId: 'sessao-t23', chatId: 'chat-t23', text: 'pergunta', attachments: [anexo], modelSelection: { tipo: 'auto' }, portas: portas as never })
+    const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados\?/ })
+    expect(dialogo).toHaveTextContent(NOME)
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(await envio).toBe('abortado')
+    expect(registro.runs).toEqual([])
+    expect(registro.persistidas).toEqual([])
+    expect(anexo.artifactId).toBe('art-t23')
+  })
+
+  it('MMI — cancelar na landing não cria sessão e preserva texto e arquivo', async () => {
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    const { container } = render(<SessionLanding workspace="Chat" onSubmit={onSubmit} />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await user.upload(input, new File(['imagem sintética'], 'rascunho.png', { type: 'image/png' }))
+    const campo = screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' })
+    await user.type(campo, 'Veja o arquivo')
+    await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados\?/ })
+    expect(dialogo).toHaveTextContent('rascunho.png')
+    await user.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(campo).toHaveValue('Veja o arquivo')
+    expect(screen.getByRole('group', { name: /rascunho\.png/ })).toBeInTheDocument()
+  })
+
   it('C3A-T23 — anexo sem texto: mensagem publicada, chip salvo e NENHUM run (nenhuma chamada de IA)', async () => {
-    const { registro, portas, restaurar } = portasRegistro({ confirmar: true })
+    const { registro, portas, restaurar } = portasRegistro()
     try {
       const resultado = await enviarMensagemComAnexos({
         sessionId: 'sessao-t23', chatId: 'chat-t23', text: '', attachments: [anexoPronto()],

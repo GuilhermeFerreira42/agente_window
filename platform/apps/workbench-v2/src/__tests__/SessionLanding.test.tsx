@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionLanding } from '../components/SessionLanding'
@@ -176,6 +176,8 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
     expect(caixa).toBeChecked()
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'primeiro envio')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
+    await user.click(within(dialogo).getByRole('button', { name: 'Continuar com o texto' }))
 
     expect(onSubmit).toHaveBeenCalledTimes(1)
     const snapshot = onSubmit.mock.calls[0][0].snapshot as { anexos: Array<{ modoCopia?: string }> }
@@ -208,6 +210,9 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
     await user.click(caixa)
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'vai falhar')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
+    const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
+    await user.click(within(dialogo).getByRole('button', { name: 'Continuar com o texto' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
 
     // Depois da falha a escolha continua marcada e o anexo permanece.
     const depois = await screen.findByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })

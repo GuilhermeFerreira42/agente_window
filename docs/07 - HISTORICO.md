@@ -1,6 +1,6 @@
-# MM-I — início da implementação
+# MM-I — checkpoints de implementação parcial
 
-Após atualizar a documentação de homologação, iniciados componentes isolados para leitura de cópia publicada, inspeção de imagens e corpo `openai-chat`, sem conexão ao fluxo real nem transmissão externa. Ainda não constitui a entrega de visão; estado em `03` e provas e pendências em `09`.
+Após o checkpoint isolado `5d344e1`, acrescentados um gate de capacidade ainda sem fonte/integração e um simulador HTTP local para provas. Corrigida a confirmação de envio sem mídia na landing e para anexos já prontos; o diálogo nomeia os arquivos guardados. Playwright cobriu esse fallback e cancelamento nas duas entradas, não o envio de visão. Ainda não constitui a entrega de visão; estado em `03` e provas e pendências em `09`.
 
 ---
 

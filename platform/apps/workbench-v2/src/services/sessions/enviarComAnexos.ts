@@ -42,7 +42,7 @@ export async function prepararAnexosDaLanding(entrada: {
   if (entrada.anexos.length === 0) return []
   if (entrada.texto.trim() && !entrada.escolhaJaFeita) {
     // Diálogo INTERNO (sem pop-up nativo): recusar preserva o rascunho inteiro.
-    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos())
+    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos(entrada.anexos.map((anexo) => anexo.name)))
     if (!escolha) throw new Error('Envio cancelado; o rascunho foi preservado.')
   }
   const transferencia = await transferirAnexos({
@@ -181,12 +181,11 @@ export async function enviarMensagemComAnexos(entrada: {
   const responseId = `response-${Date.now()}`
   const requestedModel = modelSelection.tipo === 'auto' ? 'Auto' : `${modelSelection.providerId} / ${modelSelection.modelId}`
   const base = opcoes?.sessao ?? portas.obterSessao()
-  const todosProntos = attachments.every((item) => item.estado === 'pronto' || item.estado === 'referencia')
 
-  // R10 — opção explícita ANTES de qualquer transferência; sem escolha,
-  // nada muda e o rascunho fica intacto.
-  if (text.trim() && !todosProntos && !opcoes?.escolhaJaFeita) {
-    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos())
+  // A escolha também é exigida quando os recibos já estão prontos: existência
+  // do arquivo não é consentimento para enviar uma mensagem sem sua mídia.
+  if (text.trim() && attachments.length && !opcoes?.escolhaJaFeita) {
+    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos(attachments.map((anexo) => anexo.name)))
     if (!escolha) return 'abortado'
   }
 

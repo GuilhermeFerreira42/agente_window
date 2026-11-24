@@ -619,6 +619,11 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
   }
 
   const opcaoCopia = (page: Page) => page.getByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
+  const confirmarSemMidia = async (page: Page) => {
+    const dialogo = page.getByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
+    await expect(dialogo).toBeVisible()
+    await dialogo.getByRole('button', { name: 'Continuar com o texto' }).click()
+  }
 
   test('E11 — tela inicial com "Salvar cópia" MARCADA: cópia em uploads/ com nome original e conteúdo correto', async ({ page }) => {
     const projeto = join(raiz, 'projeto-e11')
@@ -643,6 +648,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
 
     await campoLanding(page).fill('primeiro envio com copia explicita')
     await botaoEnviarLanding(page).click()
+    await confirmarSemMidia(page)
     await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
 
     // A cópia está no PROJETO, com o nome ORIGINAL e os bytes corretos.
@@ -672,6 +678,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await expect(opcaoCopia(page)).not.toBeChecked()
     await campoLanding(page).fill('primeiro envio privado')
     await botaoEnviarLanding(page).click()
+    await confirmarSemMidia(page)
     await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
 
     // Nenhum arquivo do projeto foi criado; a pasta uploads/ nem precisa existir.
@@ -801,6 +808,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await anexarNaLanding(page, 'chat.txt', 'conteudo do chat')
     await campoLanding(page).fill('abre a conversa com pasta')
     await botaoEnviarLanding(page).click()
+    await confirmarSemMidia(page)
     await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
     await anexarNoChat(page, 'dentro-do-chat.txt', 'conteudo')
     for (const tema of temas) {
