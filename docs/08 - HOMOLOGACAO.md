@@ -1,3 +1,11 @@
+# Homologação U-1 e diálogos internos (U-2) — 24/11/2026
+
+O proprietário homologou a U-1 (Configurações unificadas) e a padronização dos diálogos da aplicação, chamada U-2 no relatório da Arena. A validação considerou a versão `6a895ff`.
+
+Fica adiado, por decisão do proprietário, o ajuste de retorno do foco ao cancelar **Permitir tudo** no chat pelo teclado. Ao pressionar Esc, a permissão continua desativada. O foco deveria voltar ao botão de permissões. A automação e a reprodução nos dois temas estão registradas em `09`.
+
+---
+
 # Homologação C-3b — aceite explícito do proprietário, 23/11/2026
 
 O proprietário confirmou a homologação após testar o envio, a prévia de imagem no chat, o download e a jornada indicada pelo botão “Salvar uma cópia separada”. O teste do botão foi relatado pelo proprietário no próprio ambiente. O aceite cobre os cenários relatados.

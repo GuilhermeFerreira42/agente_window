@@ -1,6 +1,6 @@
 # Leitura vigente do roadmap — 24/11/2026
 
-**Ponto atual:** C-3a e C-3b homologadas. A U-1 foi entregue e passou no Playwright no Windows. O proprietário validou manualmente a correção da exclusão de conversas. Antes do aceite final da U-1 e de avançar, a Arena deve padronizar os diálogos da aplicação conforme `06`. A [sequência canônica até a Fatia 16](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16) reúne o estado das demais frentes.
+**Ponto atual:** C-3a e C-3b homologadas. O proprietário homologou a U-1 e a padronização dos diálogos que a Arena chamou de U-2, sobre `6a895ff`. O ajuste de retorno de foco no chat foi adiado a pedido do proprietário. Próxima fatia: [MM-I — entrada multimodal](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#mm-i--plano-de-execução), com plano preparado e implementação a cargo da Arena. Aceite em `08`, evidências em `09`.
 
 ## Correção da exclusão de conversas
 

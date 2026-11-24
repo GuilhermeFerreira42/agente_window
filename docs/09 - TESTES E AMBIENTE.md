@@ -1,3 +1,11 @@
+# 24/11/2026 — revisão da U-1 e dos diálogos internos (U-2)
+
+Windows, Node 26.13.0, base `6a895ff` e dados descartáveis. Checagem de tipos aprovada. Vitest focado em oito arquivos: **183 aprovados, 13 pulados, 0 falhas**. Playwright: **14 aprovados** (13 de U-1 e um da casca de diálogos). A revisão não repetiu a suíte ampla da Arena.
+
+Em testes adicionais no Chromium, **Excluir conversa** e **Permitir tudo** abriram dentro da aplicação e confirmaram ou cancelaram corretamente em ambos os temas. A navegação pelo teclado revelou que, no chat, o Esc fecha o diálogo sem ativar a permissão, mas o foco cai no corpo da página quando o menu desaparece. O proprietário adiou o ajuste e homologou as entregas. Veja `08`.
+
+---
+
 # 24/11/2026 — exclusão de conversas e reteste da U-1 no Windows
 
 Windows, Node 26.13.0, perfil isolado. **Vitest em 8 arquivos: 176 passaram, 13 pulados, 0 falhas.** A checagem de tipos (`tsc -b tsconfig.json --force`) passou. **Playwright U-1: 13/13**, via `platform/scripts/e2e-u1.ps1`, incluindo tamanho do modal, layout e desativação de provedores. Resultados da validação técnica das correções locais, confirmadas depois pelo proprietário no aplicativo.

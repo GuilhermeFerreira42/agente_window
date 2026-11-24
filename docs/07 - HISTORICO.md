@@ -1,3 +1,9 @@
+# 24/11/2026 — aceite da U-1 e dos diálogos e preparação da MM-I
+
+O proprietário aprovou as duas entregas e adiou o ajuste de foco no chat. Aceite em `08`, situação e pendência em `03` e `06`. O plano da MM-I foi preparado contra a base `6a895ff`.
+
+---
+
 # 24/11/2026 — correção da exclusão de conversas
 
 A correção do commit `fix(sessions): usa revisão confirmada e retoma limpeza por ação explícita` foi validada pelo proprietário. Estado em `03`, testes em `09` e padronização dos diálogos registrada em `06` como pendência antes da próxima fatia.
