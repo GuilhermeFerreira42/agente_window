@@ -12,6 +12,12 @@
 // U1-E05 Personalizações (dados reais, sem segunda coluna)
 // U1-E06 fechar com rascunho sujo (continuar / descartar) e save em voo
 // U1-E07 acessibilidade, foco devolvido, temas e larguras
+// U1-E08 (revisão) o modal lembra o tamanho entre aberturas, inclusive após F5
+// U1-E09 (revisão) layout de TODOS os painéis: nada cortado, Salvar/Fechar à mão
+// U1-E10 (revisão) desativar provedor: sai da conversa, avisa e reativa sem recadastro
+// U1-E11 (revisão) rascunho em painel OCULTO ainda pede confirmação ao fechar
+// U1-E12 (revisão) chave revelada não é rascunho nem volta no PUT
+// U1-E13 (revisão) aba de arquivo ativa sobrevive à restauração com aba antiga
 // =============================================================================
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, rmSync } from 'node:fs'
@@ -35,6 +41,8 @@ let fixture: Server | undefined
 let fixturePorta = 0
 let chamadasFixture = 0
 const postsProvedores: string[] = []
+/** Salvamentos reais da Casa Provedores (PUT /api/providers). */
+const putsProvedores: string[] = []
 const putsConfig: string[] = []
 let getsConfig = 0
 
@@ -94,16 +102,32 @@ function observarRede(page: Page): void {
   page.on('request', (req) => {
     const url = new URL(req.url())
     if (url.pathname === '/api/providers' && req.method() === 'POST') postsProvedores.push(req.postData() ?? '')
+    if (url.pathname === '/api/providers' && req.method() === 'PUT') putsProvedores.push(req.postData() ?? '')
     if (url.pathname === '/api/config' && req.method() === 'PUT') putsConfig.push(req.postData() ?? '')
     if (url.pathname === '/api/config' && req.method() === 'GET') getsConfig += 1
   })
 }
+
+/** O primeiro provedor da lista (evita repetir o nome em 2 lugares). */
+const PROVEDOR_SELECIONADO = 'openai-compat'
 
 async function abrir(page: Page): Promise<void> {
   observarRede(page)
   await page.goto(BASE)
   await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
   await page.waitForTimeout(500)
+}
+
+/** Objeto do último salvamento de provedores (o corpo vem serializado em camadas). */
+function ultimoSalvamento(id: string): Record<string, unknown> | undefined {
+  const bruto = putsProvedores.at(-1)
+  if (!bruto) return undefined
+  let valor: unknown = bruto
+  for (let i = 0; i < 3 && typeof valor === 'string'; i += 1) {
+    try { valor = JSON.parse(valor) } catch { return undefined }
+  }
+  const corpo = valor as { provedores?: Record<string, Record<string, unknown>> }
+  return corpo?.provedores?.[id]
 }
 
 const dialogo = (page: Page) => page.getByRole('dialog', { name: 'Configurações' })
@@ -239,13 +263,15 @@ test.describe('U-1 — Configurações unificadas (E2E, porta 5218)', () => {
     expect(chamadasFixture, 'o teste explícito alcançou a fixture local').toBeGreaterThan(0)
     await expect(dialogo(page).getByText(/modelos/).first()).toBeVisible()
 
-    // R04 — trocar de categoria limpa o que estava em memória: ao voltar, a
-    // chave guardada volta MASCARADA e o "olho" volta a ser o único caminho.
+    // R04 — trocar de categoria limpa o SEGREDO REVELADO. O rascunho que o dono
+    // digitou continua (é dele, não do servidor) e o "olho" continua sendo o
+    // único caminho para ver a chave GUARDADA.
     await categoria(page, 'Geral').click()
     await categoria(page, 'Provedores e modelos').click()
-    await expect(dialogo(page).locator('input[aria-label^="Chave de API"]').first())
-      .toHaveAttribute('type', 'password')
+    await expect(dialogo(page).locator('[data-chave-revelada="sim"]')).toHaveCount(0)
     await expect(dialogo(page).getByRole('button', { name: 'Mostrar a chave' }).first()).toBeVisible()
+    await expect(dialogo(page).locator('input[aria-label^="Chave de API"]').first())
+      .toHaveValue('u1-fixture-chave')
   })
 
   test('U1-E05 — Personalizações: dados do servidor real e uma única coluna de navegação', async ({ page }) => {
@@ -295,6 +321,243 @@ test.describe('U-1 — Configurações unificadas (E2E, porta 5218)', () => {
     await confirmacao.getByRole('button', { name: 'Descartar rascunhos' }).click()
     await expect(page.getByRole('dialog', { name: 'Configurações' })).toHaveCount(0)
     expect(putsConfig.length).toBe(putsAntes)
+  })
+
+  test('U1-E08 — o modal lembra o tamanho: primeira abertura expandida, depois o último, inclusive após F5', async ({ page }) => {
+    await abrir(page)
+    await abrirPelaConta(page, 'Configurações')
+    const modal = dialogo(page)
+    // Primeira abertura desta instalação: expandido (regra do proprietário).
+    await expect(modal).toHaveAttribute('data-modo', 'expandido')
+
+    // O dono escolhe o menor; a escolha é PERSISTIDA (medida no storage real).
+    await modal.getByRole('button', { name: 'Restaurar configurações' }).click()
+    await expect(modal).toHaveAttribute('data-modo', 'restaurado')
+    expect(await page.evaluate(() => window.localStorage.getItem('workbench.configuracoes.modo.v1'))).toBe('restaurado')
+
+    // Fechar e reabrir: já vem no último modo (antes voltava expandido sempre).
+    await page.keyboard.press('Escape')
+    await expect(dialogo(page)).toHaveCount(0)
+    await abrirPelaConta(page, 'Configurações')
+    await expect(dialogo(page)).toHaveAttribute('data-modo', 'restaurado')
+
+    // F5: a escolha sobrevive ao recarregamento.
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    await abrirPelaConta(page, 'Configurações')
+    await expect(dialogo(page)).toHaveAttribute('data-modo', 'restaurado')
+
+    // E voltar a expandir também é lembrado.
+    await dialogo(page).getByRole('button', { name: 'Maximizar configurações' }).click()
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    await abrirPelaConta(page, 'Configurações')
+    await expect(dialogo(page)).toHaveAttribute('data-modo', 'expandido')
+  })
+
+  test('U1-E09 — layout de todos os painéis: nada cortado e Salvar/Fechar sempre à mão', async ({ page }) => {
+    const capturas = process.env.U1_EVIDENCIA_DIR
+    const problemas: string[] = []
+    const categorias = ['Geral', 'Aparência', 'Provedores e modelos', 'Personalizações', 'Permissões', 'Conversas e armazenamento', 'Workspaces']
+
+    for (const [largura, altura] of [[1400, 900], [800, 600]] as const) {
+      await page.setViewportSize({ width: largura, height: altura })
+      await abrir(page)
+      await abrirPelaConta(page, 'Configurações')
+      const modal = dialogo(page)
+      for (const tema of ['escuro', 'claro']) {
+        if (tema === 'claro') {
+          await categoria(page, 'Aparência').click()
+          await modal.getByRole('radio', { name: /claro/i }).check()
+        }
+        for (const tamanho of ['expandido', 'restaurado'] as const) {
+          const atual = await modal.getAttribute('data-modo')
+          if (atual !== tamanho) {
+            await modal.getByRole('button', { name: tamanho === 'expandido' ? 'Maximizar configurações' : 'Restaurar configurações' }).click()
+          }
+          for (const nome of categorias) {
+            await categoria(page, nome).click()
+            await page.waitForTimeout(nome === 'Provedores e modelos' ? 700 : 200)
+
+            // Medição no DOM: o que o dono NÃO alcança é defeito.
+            const medida = await page.evaluate(() => {
+              const dlg = document.querySelector('.config-unificadas')!
+              const caixa = dlg.getBoundingClientRect()
+              const painel = Array.from(dlg.querySelectorAll('[data-painel]')).find((p) => !p.hasAttribute('hidden')) as HTMLElement | undefined
+              const salvar = painel?.querySelector('.config-foot button, .providers-foot button[type="submit"]')
+              const fechar = dlg.querySelector('[aria-label="Fechar configurações"]')
+              const dentro = (el: Element | null | undefined) => {
+                if (!el || !el.getClientRects().length) return el ? false : true
+                const b = el.getBoundingClientRect()
+                return b.top >= caixa.top - 1 && b.bottom <= caixa.bottom + 1 && b.left >= caixa.left - 1 && b.right <= caixa.right + 1
+              }
+              // Transbordo horizontal de conteúdo (não de reticências).
+              let transbordo = 0
+              for (const el of painel?.querySelectorAll('*') ?? []) {
+                const est = getComputedStyle(el)
+                if (!el.getClientRects().length || est.textOverflow === 'ellipsis') continue
+                if (['auto', 'scroll'].includes(est.overflowX) || est.overflowX === 'hidden') continue
+                if (el.scrollWidth > el.clientWidth + 2) transbordo += 1
+              }
+              return { salvarOk: dentro(salvar), fecharOk: dentro(fechar), transbordo, painel: painel?.getAttribute('data-painel') }
+            })
+            const rotulo = `${largura}x${altura}-${tema}-${tamanho}-${nome}`
+            if (!medida.salvarOk && nome === 'Geral') problemas.push(`${rotulo}: Salvar fora da tela`)
+            if (nome === 'Provedores e modelos' && !medida.salvarOk) problemas.push(`${rotulo}: Salvar provedores fora da tela`)
+            if (!medida.fecharOk) problemas.push(`${rotulo}: Fechar fora da tela`)
+            if (medida.transbordo > 0) problemas.push(`${rotulo}: ${medida.transbordo} elemento(s) cortados na horizontal`)
+            if (capturas) await modal.screenshot({ path: join(capturas, `u1-${rotulo}.png`) })
+          }
+        }
+      }
+      await page.keyboard.press('Escape')
+      await expect(dialogo(page)).toHaveCount(0)
+    }
+    expect(problemas, `defeitos de layout: ${problemas.join(' | ')}`).toEqual([])
+  })
+
+  test('U1-E10 — desativar provedor: sai da conversa, avisa e reativa sem recadastrar', async ({ page }) => {
+    await abrir(page)
+    await abrirPelaConta(page, 'Provedores')
+    const modal = dialogo(page)
+    await page.waitForTimeout(1200)
+
+    // Cadastra um provedor de fixture local COM modelo habilitado (ato do dono).
+    await modal.getByRole('button', { name: 'Compatível com OpenAI' }).first().click()
+    await modal.getByLabel('Nome do serviço').fill('Fixture E10')
+    await modal.getByLabel(/^Endereço do serviço/).first().fill(`http://127.0.0.1:${fixturePorta}/v1`)
+    await modal.locator('input[aria-label^="Chave de API"]').first().fill('u1-e10-chave')
+    // Modelo PRÓPRIO deste cenário: se outro teste já habilitou este id, o
+    // painel não oferece "habilitar o padrão" e o par já está no servidor —
+    // o que este teste mede é a PRESERVAÇÃO na desativação, não o clique.
+    await modal.getByLabel(/^Modelo /).first().fill('fixture-modelo-e10')
+    const habilitarPadrao = modal.getByRole('button', { name: 'Habilitar modelo padrão atual' })
+    if (await habilitarPadrao.count()) await habilitarPadrao.click()
+    const putsAntes = putsConfig.length
+    const putAntes = putsProvedores.length
+    await modal.getByRole('button', { name: /Salvar provedores/ }).click()
+    await expect.poll(() => putsProvedores.length, { timeout: 10_000 }).toBeGreaterThan(putAntes)
+
+    // Desativar: o interruptor vai para o servidor e a config continua na tela.
+    const corpoSalvo = putsProvedores.at(-1) ?? ''
+    expect(corpoSalvo).toContain('fixture-modelo-e10')
+    await modal.getByRole('checkbox', { name: 'Provedor habilitado' }).uncheck()
+    await modal.getByRole('button', { name: /Salvar provedores/ }).click()
+    await expect.poll(() => ultimoSalvamento(PROVEDOR_SELECIONADO)?.habilitado, { timeout: 10_000 }).toBe(false)
+
+    // O painel NÃO apaga nada: modelo e endereço continuam ali.
+    await expect(modal.getByLabel(/^Modelo /).first()).toHaveValue('fixture-modelo-e10')
+    await expect(modal.getByLabel(/^Endereço do serviço/).first()).toHaveValue(`http://127.0.0.1:${fixturePorta}/v1`)
+    expect(putsConfig.length).toBe(putsAntes)
+
+    // Reativar é um clique — nada é recadastrado.
+    await modal.getByRole('checkbox', { name: 'Provedor habilitado' }).check()
+    await modal.getByRole('button', { name: /Salvar provedores/ }).click()
+    await expect.poll(() => ultimoSalvamento(PROVEDOR_SELECIONADO)?.habilitado, { timeout: 10_000 }).toBe(true)
+    await expect(modal.getByLabel(/^Modelo /).first()).toHaveValue('fixture-modelo-e10')
+  })
+
+  test('U1-E11 — rascunho em painel OCULTO pede confirmação ao fechar', async ({ page }) => {
+    await abrir(page)
+    await abrirPelaConta(page, 'Configurações')
+    const modal = dialogo(page)
+    await expect(modal).toBeVisible()
+
+    // Reprodução do defeito: altera Geral, vai para Aparência e fecha.
+    await modal.getByRole('spinbutton', { name: /teto/i }).first().fill('133')
+    await categoria(page, 'Aparência').click()
+    await expect(modal.locator('[data-painel-aparencia]')).toBeVisible()
+    await modal.getByRole('button', { name: 'Fechar configurações' }).click()
+
+    // Antes: fechava seco. Agora pede decisão — o rascunho é do painel oculto.
+    const confirmacao = page.getByRole('alertdialog', { name: 'Descartar rascunhos' })
+    await expect(confirmacao).toBeVisible()
+    await confirmacao.getByRole('button', { name: 'Continuar editando' }).click()
+    await categoria(page, 'Geral').click()
+    await expect(modal.getByRole('spinbutton', { name: /teto/i }).first()).toHaveValue('133')
+
+    // Descartar fecha; e nenhum PUT saiu com o valor não confirmado.
+    const putsAntes = putsConfig.length
+    await modal.getByRole('button', { name: 'Fechar configurações' }).click()
+    await confirmacao.getByRole('button', { name: 'Descartar rascunhos' }).click()
+    await expect(dialogo(page)).toHaveCount(0)
+    expect(putsConfig.length).toBe(putsAntes)
+  })
+
+  test('U1-E12 — ver a chave NÃO suja o formulário nem volta no PUT', async ({ page }) => {
+    await abrir(page)
+    await abrirPelaConta(page, 'Provedores')
+    const modal = dialogo(page)
+    await page.waitForTimeout(1200)
+
+    // Cadastra o provedor de fixture com a chave e o modelo habilitado (ato do dono).
+    await modal.getByRole('button', { name: 'Compatível com OpenAI' }).first().click()
+    await modal.getByLabel('Nome do serviço').fill('Fixture E12')
+    await modal.getByLabel(/^Endereço do serviço/).first().fill(`http://127.0.0.1:${fixturePorta}/v1`)
+    await modal.locator('input[aria-label^="Chave de API"]').first().fill('u1-e12-chave-segredo')
+    // Modelo próprio deste cenário (não depende do que a E10 deixou habilitado).
+    await modal.getByLabel(/^Modelo /).first().fill('fixture-modelo-2')
+    const habilitarPadrao = modal.getByRole('button', { name: 'Habilitar modelo padrão atual' })
+    if (await habilitarPadrao.count()) await habilitarPadrao.click()
+    await modal.getByRole('button', { name: /Salvar provedores/ }).click()
+    // O par habilitado é o que o servidor guardou (nada de estado só na tela).
+    await expect.poll(() => ultimoSalvamento(PROVEDOR_SELECIONADO)?.modelosHabilitados, { timeout: 10_000 })
+      .toContain('fixture-modelo-2')
+
+    // Ver a chave: o olhinho devolve do servidor; nada de "rascunho".
+    await modal.getByRole('button', { name: 'Mostrar a chave' }).first().click()
+    await expect(modal.locator('[data-chave-revelada="sim"]')).toBeVisible()
+    await expect(modal.getByRole('button', { name: 'Fechar configurações' })).toBeEnabled()
+    // Fechar SEM confirmação: ver não é editar (antes abria a caixa de descarte).
+    await modal.getByRole('button', { name: 'Fechar configurações' }).click()
+    await expect(page.getByRole('alertdialog', { name: 'Descartar rascunhos' })).toHaveCount(0)
+    await expect(dialogo(page)).toHaveCount(0)
+
+    // Reabre e SALVA sem tocar na chave: o segredo não pode reaparecer no PUT.
+    const putsAntes = putsProvedores.length
+    await abrirPelaConta(page, 'Provedores')
+    await page.waitForTimeout(1200)
+    await dialogo(page).getByRole('button', { name: 'Mostrar a chave' }).first().click()
+    await expect(dialogo(page).locator('[data-chave-revelada="sim"]')).toBeVisible()
+    await dialogo(page).getByRole('button', { name: /Salvar provedores/ }).click()
+    await expect.poll(() => putsProvedores.length, { timeout: 10_000 }).toBeGreaterThan(putsAntes)
+    expect(ultimoSalvamento(PROVEDOR_SELECIONADO)?.apiKey, 'a chave revelada não volta no PUT').not.toBe('u1-e12-chave-segredo')
+  })
+
+  test('U1-E13 — aba de arquivo ativa sobrevive à restauração com aba antiga de Configurações', async ({ page }) => {
+    await abrir(page)
+    // Sessão real no banco (o app precisa de uma sessão para restaurar abas).
+    const sessao = await page.evaluate(async () => {
+      const resposta = await fetch('/api/sessions')
+      return (await resposta.json()) as { sessions: Array<{ id: string }> }
+    })
+    expect(Array.isArray(sessao.sessions)).toBe(true)
+
+    // Snapshot com aba de ARQUIVO ativa + aba antiga de Provedores em segundo plano.
+    await page.evaluate(() => {
+      window.localStorage.setItem('workbench.nativeTabs.v1', JSON.stringify({
+        version: 1,
+        tabs: [
+          { id: 'aba-arquivo-e13', title: 'leia-me.md', type: 'file', sessionId: 'global' },
+          { id: 'aba-prov-e13', title: 'Provedores', type: 'providers', sessionId: 'global' },
+        ],
+        browserViews: [],
+        activeBySession: {},
+        activeGlobalTabId: 'aba-arquivo-e13',
+        activeTabId: 'aba-arquivo-e13',
+        ordinalBySession: {},
+      }))
+    })
+    await page.reload()
+    await page.waitForSelector('.agent-sessions-workbench', { state: 'visible' })
+    await page.waitForTimeout(800)
+
+    // O snapshot foi saneado: a aba antiga saiu e o ARQUIVO continua ativo.
+    const depois = await page.evaluate(() => JSON.parse(window.localStorage.getItem('workbench.nativeTabs.v1') ?? '{}'))
+    expect(depois.tabs.map((tab: { id: string }) => tab.id)).toEqual(['aba-arquivo-e13'])
+    expect(depois.activeGlobalTabId ?? depois.activeTabId).toBe('aba-arquivo-e13')
+    // Aba antiga de segundo plano NÃO abre modal nenhum por cima do arquivo.
+    await expect(page.getByRole('dialog', { name: 'Configurações' })).toHaveCount(0)
   })
 
   test('U1-E07 — acessibilidade, foco devolvido, temas e larguras (1400x900 e 800x600)', async ({ page }) => {

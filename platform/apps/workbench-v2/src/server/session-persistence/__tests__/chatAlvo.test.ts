@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { obterAlvoDeConversa } from '../chatAlvo'
-import { salvarArquivo } from '../../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
+import { lerArquivo, salvarArquivo } from '../../../bairros/2-inteligencia/casas/provedores/server/providersRepo'
 
 let pastaFixture: string | null = null
 
@@ -84,6 +84,43 @@ describe('alvo de conversa — resolução F5-B', () => {
     const resultado = await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'anthropic', modelId: 'claude-fixture' })
     expect(resultado.alvo).toBeNull()
     expect(resultado.erro).toMatchObject({ code: 'model_disabled' })
+  })
+
+  it('R03 provedor ativo desabilitado também para o Auto (sem escolher substituto)', async () => {
+    await configurarFixture()
+    const caminho = process.env.AGENTE_WINDOW_PROVIDERS_PATH!
+    await salvarArquivo({
+      ativo: 'openai',
+      provedores: {
+        openai: { baseUrl: 'https://fixture.invalid/v1', modelo: 'gpt-5', modelosHabilitados: ['gpt-5'], habilitado: false, apiKey: 'sk-fixture-nao-real' },
+        anthropic: { baseUrl: 'https://fixture.invalid/v1', modelo: 'claude-fixture', modelosHabilitados: ['claude-fixture'], apiKey: 'fixture-nao-real' },
+      },
+    }, caminho)
+
+    const automatico = await obterAlvoDeConversa({ tipo: 'auto' })
+    // Auto NÃO troca para o outro provedor disponível: recusa e diz o motivo.
+    expect(automatico.alvo).toBeNull()
+    expect(automatico.erro).toMatchObject({ code: 'selection_unavailable' })
+    expect(automatico.erro?.message).toMatch(/desabilitado|indisponível/i)
+  })
+
+  it('R03 reativar devolve o mesmo par, com modelos e chave intactos (sem recadastro)', async () => {
+    await configurarFixture()
+    const caminho = process.env.AGENTE_WINDOW_PROVIDERS_PATH!
+    const par = { baseUrl: 'https://fixture.invalid/v1', modelo: 'gpt-5', modelosHabilitados: ['gpt-5', 'gpt-5-mini'], apiKey: 'sk-fixture-nao-real' }
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: { ...par, habilitado: false, temperatura: 0.7, maxSaida: 4096 } } }, caminho)
+
+    // Desabilitado: o par existe no arquivo (config preservada) mas não é alvo.
+    const antes = await lerArquivo(caminho)
+    expect(antes.provedores.openai).toMatchObject({ habilitado: false, modelo: 'gpt-5', modelosHabilitados: ['gpt-5', 'gpt-5-mini'], apiKey: 'sk-fixture-nao-real', temperatura: 0.7 })
+    expect((await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5' })).erro)
+      .toMatchObject({ code: 'selection_unavailable' })
+
+    // Reativar é um único campo — nada mais é recadastrado.
+    await salvarArquivo({ ativo: 'openai', provedores: { openai: { ...antes.provedores.openai, habilitado: true } } }, caminho)
+    const depois = await obterAlvoDeConversa({ tipo: 'explicita', providerId: 'openai', modelId: 'gpt-5-mini' })
+    expect(depois.alvo).toMatchObject({ providerId: 'openai', modelId: 'gpt-5-mini', apiKey: 'sk-fixture-nao-real' })
+    expect(depois.alvo).not.toBeNull()
   })
 
   it('provedor desabilitado torna indisponível a seleção explícita sem trocar o par', async () => {

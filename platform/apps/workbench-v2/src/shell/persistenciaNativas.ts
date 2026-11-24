@@ -17,7 +17,7 @@ const vazio = (): SnapshotNativas => ({ tabs: [], browserViews: [], activeBySess
 type StoragePort = Pick<Storage, 'getItem' | 'setItem'>
 const texto = (x: unknown, max = 300): x is string => typeof x === 'string' && x.length > 0 && x.length <= max
 const registro = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
-const tipos = new Set<EditorTab['type']>(['browser', 'providers', 'config', 'diff', 'customizations'])
+const tipos = new Set<EditorTab['type']>(['browser', 'providers', 'config', 'diff', 'customizations', 'file'])
 
 function normalizar(raw: unknown): SnapshotNativas {
   if (!registro(raw) || raw.version !== 1 || !Array.isArray(raw.tabs) || !Array.isArray(raw.browserViews)) return vazio()
@@ -54,10 +54,16 @@ function normalizar(raw: unknown): SnapshotNativas {
   if (registro(raw.ordinalBySession)) for (const [session, count] of Object.entries(raw.ordinalBySession).slice(0, 80)) {
     if (texto(session) && Number.isInteger(count) && Number(count) > 0 && Number(count) < 10000) ordinalBySession[session] = Number(count)
   }
+  // U-1 R09 — memória de aba ativa SEM aba correspondente é sujeira de snapshot
+  // antigo (a aba legada drenada ou uma aba que o dono fechou). Preservá-la
+  // fazia a faixa "lembrar" de uma aba inexistente e desativar a que o dono
+  // estava usando, inclusive a de arquivo. Aqui ela é descartada na leitura.
+  const existe = (id: string) => used.has(id)
   return {
-    tabs, browserViews, activeBySession, ordinalBySession,
-    activeTabId: texto(raw.activeTabId, 900) ? raw.activeTabId : undefined,
-    activeGlobalTabId: texto(raw.activeGlobalTabId, 900) ? raw.activeGlobalTabId : undefined,
+    tabs, browserViews, ordinalBySession,
+    activeBySession: Object.fromEntries(Object.entries(activeBySession).filter(([, id]) => existe(id))),
+    activeTabId: texto(raw.activeTabId) && existe(raw.activeTabId) ? raw.activeTabId : undefined,
+    activeGlobalTabId: texto(raw.activeGlobalTabId) && existe(raw.activeGlobalTabId) ? raw.activeGlobalTabId : undefined,
   }
 }
 
@@ -72,19 +78,41 @@ export function lerSnapshotNativas(storage: StoragePort = window.localStorage): 
  * U-1 R09 — tradução das ABAS legadas antes de montar.
  *
  * `providers` e `config` deixaram de ser abas do editor: viraram categorias do
- * modal unificado. Uma aba dessas restaurada de um snapshot antigo é drenada
- * para a porta de configurações (uma vez) e NÃO volta para a faixa — assim o
- * F5 antigo abre o modal em vez de uma superfície que não existe mais.
- * `file`, `browser`, `diff` e `customizations` seguem donos das suas abas.
+ * modal unificado. Uma aba dessas restaurada de um snapshot antigo é drenada e
+ * NÃO volta para a faixa — assim o F5 antigo abre a categoria em vez de uma
+ * superfície que não existe mais. `file`, `browser`, `diff` e `customizations`
+ * seguem donos das suas abas.
+ *
+ * R09 (correção da revisão): a exigência é dupla e a antiga versão só cumpria a
+ * primeira metade.
+ *   1. aba de ARQUIVO ativa + aba antiga de Provedores/Configurações em segundo
+ *      plano → o arquivo CONTINUA ativo (o modal pode até abrir, mas a aba que
+ *      o dono estava usando não pode ser trocada por acidente);
+ *   2. a aba antiga era a ATIVA → abre a categoria equivalente no modal.
+ * Por isso `rotas` agora devolve `{ rota, ativa }`: só é `ativa` a aba legada
+ * que ocupava o lugar de aba ativa (da sessão ou global). As demais são
+ * drenadas em silêncio.
  */
+export interface RotaLegadaDrenada {
+  rota: RotaConfiguracoes
+  /** true = era a aba ATIVA do seu escopo; a categoria deve abrir no modal. */
+  ativa: boolean
+}
+
 export function drenarAbasLegadas(
   snapshot: SnapshotNativas,
-): { snapshot: SnapshotNativas; rotas: RotaConfiguracoes[] } {
-  const rotas: RotaConfiguracoes[] = []
+): { snapshot: SnapshotNativas; rotas: RotaLegadaDrenada[] } {
+  const rotas: RotaLegadaDrenada[] = []
+  // Aba que ocupava o lugar de ativa: a da sessão (por `activeBySession`) ou a
+  // global (`activeGlobalTabId`/`activeTabId` quando a aba não é de sessão).
+  const eraAtiva = (tab: { id: string; sessionId?: string }): boolean => {
+    if (tab.sessionId) return snapshot.activeBySession[tab.sessionId] === tab.id
+    return snapshot.activeGlobalTabId === tab.id || snapshot.activeTabId === tab.id
+  }
   const tabs = snapshot.tabs.filter((tab) => {
     const rota = rotaDaSuperficieLegada(tab.type)
     if (!rota) return true
-    rotas.push(rota)
+    rotas.push({ rota, ativa: eraAtiva(tab) })
     return false
   })
   if (tabs.length === snapshot.tabs.length) return { snapshot, rotas }

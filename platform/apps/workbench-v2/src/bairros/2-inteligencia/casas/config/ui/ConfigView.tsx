@@ -32,9 +32,15 @@ export interface ConfigViewProps {
   aoMudarEstado?: (estado: EstadoPainelConfig) => void
   /** Teto de título próprio: a moldura fornece o `h2`. */
   semTitulo?: boolean
+  /**
+   * U-1 R07: quando a moldura unificada hospeda a tela, ela desenha a barra de
+   * ações no pé do diálogo. O botão é o MESMO (mesmo clique, mesmo dono do
+   * estado) — só muda de lugar, para não ficar escondido pela rolagem.
+   */
+  acoesNaMoldura?: boolean
 }
 
-export function ConfigView({ aoSalvar, hospedado = false, aoMudarEstado, semTitulo = false }: ConfigViewProps = {}) {
+export function ConfigView({ aoSalvar, hospedado = false, aoMudarEstado, semTitulo = false, acoesNaMoldura = false }: ConfigViewProps = {}) {
   const [config, setConfig] = useState<ConfigAgente | null>(null)
   const [erroCarregar, setErroCarregar] = useState('')
   // Rascunhos: só viram verdade no Salvar.
@@ -209,7 +215,7 @@ export function ConfigView({ aoSalvar, hospedado = false, aoMudarEstado, semTitu
         </div>
       )}
 
-      <div className="config-foot">
+      <div className="config-foot" data-na-moldura={acoesNaMoldura ? 'sim' : 'nao'}>
         <span className="config-saved" aria-live="polite">
           {salvo ? (<><Sparkles size={12} /> Configuração salva</>) : ''}
         </span>

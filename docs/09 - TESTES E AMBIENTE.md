@@ -2760,27 +2760,48 @@ Comando: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/script
 ## U-1 — Configurações unificadas: como validar (Linux)
 
 - **Unitárias (critérios no NOME do teste, sem skip):**
-  `src/__tests__/u1ConfiguracoesShell.test.tsx` (U1-T01/T02/T08/T09/T10) e
-  `src/__tests__/u1ConfiguracoesPaineis.test.tsx` (U1-T03/T04/T05/T06/T07).
+  `src/__tests__/u1ConfiguracoesShell.test.tsx` (**29**: U1-T01/T02/T08/T09/T10 +
+  R01/R04/R09) e `src/__tests__/u1ConfiguracoesPaineis.test.tsx` (**22**: U1-T03/T04/
+  T05/T06/T07 + R03/R04).
 - **Gate de critérios:** `node VALIDAR_U1.mjs --repo <repo> --mode foco --out <NOVO>`;
   comparação nominal com `--mode ampla --baseline-json <baseline>/vitest.json`
-  (reprova em `newFailures`, `newSkips` e `missingCriteria`).
+  (reprova em `newFailures`, `newSkips` e `missingCriteria`). O `--out` precisa
+  **não existir** — o runner recusa diretório já criado.
 - **E2E:** `node VALIDAR_E2E_U1.mjs --repo <repo> --out <NOVO>` (ou `sh platform/scripts/e2e-u1.sh`) — porta **5218**,
-  `--workers=1 --retries=0`, jornadas U1-E01…E07 exigidas pelo nome. Ambiente do
+  `--workers=1 --retries=0`, jornadas **U1-E01…U1-E13** (E01–E07 da matriz canônica;
+  E08–E13 dos seis ajustes da revisão) exigidas pelo nome. Para regerar as capturas,
+  `U1_EVIDENCIA_DIR=<pasta> sh platform/scripts/e2e-u1.sh` (61 PNG). Ambiente do
   sandbox: `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium` e
   `LD_LIBRARY_PATH=/tmp/al2023/lib`.
+- **Layout (medição no DOM, 180 cenários):** harness externo ao repo
+  (`/tmp/u1-pw/inspecao_layout3.cjs`, porta 5218) percorre as 13 categorias + as 3
+  subseções de Personalizações em 1400×900 / 1024×700 / 800×600 × claro/escuro ×
+  expandido/restaurado e mede clipping, sobreposição, rolagem e alcance de
+  Salvar/Fechar. Evidência: `/home/user/u1-gates/28-layout-final/` (**180/0**); o
+  antes, com 34 defeitos, em `21-layout-depois/`.
 - **Regressões nominais obrigatórias** (além da comparação ampla): App,
   SessionLanding, customView, persistenciaNativas, useWorkbenchHistory,
   stableEditorSurface, ConfigView/rotas config, ProvidersView/rotas provedores,
   PersonalizacoesView/rotas personalizacoes; E2E `provedores_fatia08`,
   `c1_correcoes` (porta 5211 via `PLAYWRIGHT_BASE_URL`), `c2_centro` (5212) e
   `c3b_multimodal` (5216).
+- **⚠️ Cada spec de regressão roda com o SEU runner** (`e2e-c1.sh` / `e2e-c2.sh` /
+  `e2e-c3b.sh`), que sobe o Vite e o banco descartável dela. Rodar `c1`/`c2` com
+  `PLAYWRIGHT_BASE_URL` apontando para a instância de outra suíte faz o `resetApp`
+  esperar `.session-row` num catálogo que não é o dela e o `C-1 B1` estoura por
+  timeout (240 s) — é ambiente, não regressão. Com o runner próprio: **c1 6/6,
+  c2 17/17, c3b 12/12**.
 - **Régua `provedores_fatia08`:** depende do stub canônico `uploads/stub_provider.cjs`
   (porta 4599), que **não está no repo**. Neste sandbox ele foi reproduzido fora do
   checkout; o contrato observado é catálogo de 5 modelos, 401 para chave inválida e
-  405 em `/sem-catalogo`. O `apiRequestContext` do Playwright precisa mandar
-  `Origin`/`sec-fetch-site` para o PUT de reset passar pela política local — isso é
-  **execução**, não mudança de spec.
+  405 em `/sem-catalogo`. O app precisa estar na **5174** com
+  `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` (a spec afirma
+  `storage:'fixture'` e esse caminho), e o banco dessa instância precisa ter **pelo
+  menos 1 sessão** (senão `resetApp` não acha `.session-row`). O `request` do
+  Playwright precisa mandar `Origin` (não `sec-fetch-site`: o header manual faz o
+  Chromium abortar as requisições do próprio app com `ERR_INVALID_ARGUMENT`) —
+  isso é **execução**, não mudança de spec.
 - **Falhas pré-existentes (não são regressão da U-1):** `fatia07_destravar` (DEBT-06),
   `editorTabs` (breadcrumbs) e `monacoLoadFailure` (caminho feliz). Medidas iguais na
   base `24d686a`.
+

@@ -18,11 +18,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { ConfiguracoesUnificadas, type ItemPainel } from '../shell/ConfiguracoesUnificadas'
 import {
   ALIASES_LEGADOS,
   CATEGORIAS_CONFIGURACOES,
+  MODO_STORAGE_KEY,
   MENU_CONFIGURACOES,
   MODO_INICIAL,
   ROTA_PADRAO,
@@ -31,7 +32,10 @@ import {
   categoriaDaSecaoLegada,
   categoriaImplementada,
   decidirFechamento,
+  decidirFechamentoDePaineis,
+  algumPainelSalvando,
   indiceNaNavegacao,
+  modoInicial,
   labelDaCategoria,
   mesmasRotas,
   normalizarRota,
@@ -270,6 +274,127 @@ describe('U-1 — U1-T09 legado e histórico', () => {
     await usuario.click(screen.getByRole('button', { name: labelDaCategoria('provedores') }))
     expect(navegacoes).toEqual([{ categoria: 'provedores' }])
     expect(escritas, 'navegar não grava nada').toEqual([])
+  })
+})
+
+
+// ============================================================================
+// U-1 — U1-R01..R06: regressões da REVISÃO (o que a v1 não cobria).
+//
+// Cada bloco reproduz o defeito relatado e só passa quando ele deixa de existir.
+// A v1 passou 7 jornadas e ainda assim perdia rascunho oculto, fechava sem
+// avisar e reenviava chave revelada — por isso cada caso aqui tem um "antes"
+// explícito no comentário.
+// ============================================================================
+describe('U-1 — R01 o modal lembra o TAMANHO entre aberturas', () => {
+  beforeEach(() => window.localStorage.clear())
+
+  it('R01 primeira abertura é expandida e a moldura alterna o tamanho', () => {
+    // Sessão nova: nada gravado → expandido (MODO_INICIAL).
+    expect(modoInicial(undefined)).toBe('expandido')
+    montar(ROTA_PADRAO)
+    expect(screen.getByRole('dialog').getAttribute('data-modo')).toBe('expandido')
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar configurações' }))
+    expect(screen.getByRole('dialog').getAttribute('data-modo')).toBe('restaurado')
+    fireEvent.click(screen.getByRole('button', { name: 'Maximizar configurações' }))
+    expect(screen.getByRole('dialog').getAttribute('data-modo')).toBe('expandido')
+  })
+
+  it('R01 o SHELL persiste a escolha: reabrir (e o F5) usa o último modo', async () => {
+    // Antes: `useState(MODO_INICIAL)` — toda abertura era expandida e o F5
+    // esquecia a escolha. Quem persiste é o shell (a moldura não grava nada).
+    const { renderHook, act } = await import('@testing-library/react')
+    const { useConfiguracoesUnificadas } = await import('../shell/useConfiguracoesUnificadas')
+    const primeira = renderHook(() => useConfiguracoesUnificadas())
+    expect(primeira.result.current.modo).toBe('expandido')
+    act(() => primeira.result.current.alternarModo())
+    expect(primeira.result.current.modo).toBe('restaurado')
+    expect(window.localStorage.getItem(MODO_STORAGE_KEY)).toBe('restaurado')
+    primeira.unmount()
+    // "F5": um shell novo lê o storage e já abre no modo escolhido.
+    const depois = renderHook(() => useConfiguracoesUnificadas())
+    expect(depois.result.current.modo).toBe('restaurado')
+    act(() => depois.result.current.alternarModo())
+    expect(window.localStorage.getItem(MODO_STORAGE_KEY)).toBe('expandido')
+    depois.unmount()
+  })
+
+  it('R01 valor corrompido no storage não vira modo inválido (cai no inicial)', () => {
+    window.localStorage.setItem(MODO_STORAGE_KEY, 'gigante')
+    expect(modoInicial(window.localStorage.getItem(MODO_STORAGE_KEY))).toBe('expandido')
+    window.localStorage.setItem(MODO_STORAGE_KEY, 'restaurado')
+    expect(modoInicial(window.localStorage.getItem(MODO_STORAGE_KEY))).toBe('restaurado')
+  })
+})
+
+describe('U-1 — R04 fechamento olha TODOS os painéis, inclusive os ocultos', () => {
+  it('R04 rascunho em painel oculto ainda pede confirmação (antes fechava seco)', () => {
+    // Antes: `decidirFechamento(estadoPainel[rota.categoria])` — só a ativa.
+    // Alterar Geral, ir para Aparência e fechar descartava o rascunho de Geral.
+    const paineis = {
+      geral: { dirty: true, saving: false, canLeave: true },
+      aparencia: { dirty: false, saving: false, canLeave: true },
+    }
+    expect(decidirFechamentoDePaineis(paineis)).toBe('confirmar')
+    expect(decidirFechamentoDePaineis({ geral: { dirty: false, saving: false, canLeave: true } })).toBe('fechar')
+    expect(decidirFechamentoDePaineis({})).toBe('fechar')
+    expect(decidirFechamentoDePaineis(undefined)).toBe('fechar')
+  })
+
+  it('R04 save em voo em qualquer painel manda AGUARDAR (nunca descarta)', () => {
+    // Antes: um save em Provedores (oculto) não bloqueava o fechamento em Geral.
+    expect(decidirFechamentoDePaineis({
+      geral: { dirty: false, saving: false, canLeave: true },
+      provedores: { dirty: false, saving: true, canLeave: true },
+    })).toBe('aguardar')
+    // Aguardar tem precedência sobre confirmar.
+    expect(decidirFechamentoDePaineis({
+      geral: { dirty: true, saving: false, canLeave: true },
+      provedores: { dirty: false, saving: true, canLeave: true },
+    })).toBe('aguardar')
+    expect(algumPainelSalvando({ geral: { dirty: false, saving: false, canLeave: true } })).toBe(false)
+    expect(algumPainelSalvando({ provedores: { dirty: false, saving: true, canLeave: true } })).toBe(true)
+  })
+})
+
+describe('U-1 — R09 histórico/restauração e abas legadas', () => {
+  it('R09 aba antiga em SEGUNDO PLANO não rouba a categoria ativa', async () => {
+    const { drenarAbasLegadas } = await import('../shell/persistenciaNativas')
+    const snapshot = {
+      tabs: [
+        { id: 'arquivo-1', title: 'app.ts', type: 'file' as const, sessionId: 's1' },
+        { id: 'provedores-1', title: 'Provedores', type: 'providers' as const, sessionId: 's1' },
+      ],
+      browserViews: [],
+      activeBySession: { s1: 'arquivo-1' },
+      ordinalBySession: {},
+    }
+    const { snapshot: limpo, rotas } = drenarAbasLegadas(snapshot)
+    // A aba de arquivo continua ativa; a antiga foi drenada e NÃO é "ativa".
+    expect(limpo.activeBySession.s1).toBe('arquivo-1')
+    expect(limpo.tabs.map((tab) => tab.id)).toEqual(['arquivo-1'])
+    expect(rotas).toEqual([{ rota: { categoria: 'provedores' }, ativa: false }])
+  })
+
+  it('R09 quando a aba antiga era a ATIVA, a categoria equivalente abre', async () => {
+    const { drenarAbasLegadas } = await import('../shell/persistenciaNativas')
+    const { snapshot, rotas } = drenarAbasLegadas({
+      tabs: [
+        { id: 'arquivo-1', title: 'app.ts', type: 'file' as const, sessionId: 's1' },
+        { id: 'config-1', title: 'Configurações', type: 'config' as const, sessionId: 's1' },
+      ],
+      browserViews: [],
+      activeBySession: { s1: 'config-1' },
+      ordinalBySession: {},
+    })
+    expect(snapshot.activeBySession.s1).toBeUndefined()
+    expect(rotas).toEqual([{ rota: { categoria: 'geral' }, ativa: true }])
+    // A aba global também conta: `config` sem sessão ativa abre a categoria.
+    const global = drenarAbasLegadas({
+      tabs: [{ id: 'providers-1', title: 'Provedores', type: 'providers' as const }],
+      browserViews: [], activeBySession: {}, ordinalBySession: {}, activeGlobalTabId: 'providers-1',
+    })
+    expect(global.rotas).toEqual([{ rota: { categoria: 'provedores' }, ativa: true }])
   })
 })
 

@@ -2249,6 +2249,23 @@ explícita). A seleção de modelo por conversa continua na lateral, como estava
 **Aceite.** U-1 **não homologada**: implementação e provas técnicas entregues ao
 proprietário em 13/11/2026. Ver `docs/09` (como validar) e o relatório de entrega.
 
+**Revisão pós-primeira entrega (mesma data).** A revisão independente aprovou as 7
+jornadas no Windows e reprovou dois pontos: **perda de rascunho fora dos cenários
+cobertos** e **layouts quebrados**. A correção manteve a decisão acima e acrescentou
+seis contratos, todos com prova nominal: (a) o **tamanho** do modal passa a ser
+lembrado entre aberturas e após F5 — primeira abertura expandida, depois o último
+modo, validado no domínio (valor corrompido cai no inicial); (b) **fechar olha todos
+os painéis já visitados**, não só a categoria ativa, e qualquer salvamento em voo
+manda aguardar; (c) **ver a chave não é editar** — o reveal vive em mapa separado,
+não suja o formulário, não volta no PUT e é descartado quando a resposta chega
+atrasada; (d) **desativar provedor preserva** configuração, modelos e chave, tira o
+provedor das opções/Auto e deixa a conversa existente como "Indisponível", com a
+troca decidida pelo dono; (e) **abas antigas** são saneadas no boot sem roubar a aba
+ativa, e a aba `file` volta a ser restaurada sem conteúdo/`isRealFile`; (f) o
+**layout** de todos os painéis é medido no DOM (Salvar e Fechar sempre dentro da
+caixa, sem corte nem sobreposição) em 1400×900/1024×700/800×600 × claro/escuro ×
+expandido/restaurado. `App.tsx` permanece em 2887 linhas (teto 2889).
+
 ## Consolidação documental do roadmap intercalado antes da Fatia 16 — 19/11/2026
 
 Por solicitação expressa do proprietário, a sequência operacional replanejada a partir de 13/11 está consolidada no topo de `06 - PROXIMAS FASES E DIVIDAS.md`, com entrada em `01` e ponto atual em `03`. A leitura isolada da D133 ou da numeração 13–20 é insuficiente para a próxima ação: persistência P-A/P-B/P-C, centro C-1/C-2/C-3a/C-3b, MM-0/MM-I/MM-O, U-1 e a discussão/retomada de E1–E6 intercalam-se antes da Fatia 16 conforme aquela tabela. Esta nota torna portátil o plano já discutido; não cria ordem rígida para todos os codecs, conteúdo para a discussão reservada, nova aprovação arquitetural E1–E6 ou aceite humano por inferência. Cada execução futura continua sujeita ao escopo/autorização e homologação individual acordados. Preservados D133 e registros anteriores como proveniência histórica.

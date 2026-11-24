@@ -5696,3 +5696,26 @@ svg {
   .midia-dialogo-fundo { padding: 8px; }
   .midia-dialogo { max-width: 96vw; max-height: 94vh; }
 }
+
+/* U-1 R03 — par escolhido que saiu do catálogo (provedor desativado ou modelo
+   removido): a conversa avisa e deixa a troca com o dono. Nada é trocado só. */
+.model-unavailable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 7px;
+  border: 1px solid var(--vscode-charts-yellow);
+  border-radius: 10px;
+  color: var(--vscode-charts-yellow);
+  font-size: var(--vscode-fontSize-label3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover-option.is-unavailable {
+  cursor: default;
+  color: var(--vscode-descriptionForeground);
+  border: 1px dashed var(--vscode-widget-border);
+}

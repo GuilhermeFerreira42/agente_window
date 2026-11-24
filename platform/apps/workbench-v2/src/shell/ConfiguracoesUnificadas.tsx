@@ -59,6 +59,12 @@ export interface ConfiguracoesUnificadasProps {
   onDescartarRascunhos?: () => void
   /** Save em curso: fechar aguarda o resultado em vez de descartar (R07). */
   salvando?: boolean
+  /**
+   * R01 — tamanho do modal CONTROLADO pelo shell (que persiste a escolha).
+   * Ausente: cai no modo inicial, para a moldura continuar utilizável sozinha.
+   */
+  modo?: ModoModal
+  onAlternarModo?: () => void
   /** R08 — acionador capturado na abertura; o foco volta para ele no fechamento. */
   focoDeRetorno?: () => HTMLElement | null
 }
@@ -68,9 +74,18 @@ const CHAVE_FOCO = 'button,[href],input,select,textarea,[tabindex]:not([tabindex
 export function ConfiguracoesUnificadas({
   rota, onNavegar, onFechar, paineis, subsecoes, tituloSubsecao,
   confirmacaoAberta = false, onContinuarEditando, onDescartarRascunhos, salvando = false,
+  modo: modoControlado, onAlternarModo,
   focoDeRetorno,
 }: ConfiguracoesUnificadasProps) {
-  const [modo, setModo] = useState<ModoModal>(MODO_INICIAL)
+  // R01 — o modo é CONTROLADO quando o shell passa `modo` (é ele quem persiste
+  // a escolha). Sem controle, a moldura lembra o modo na própria vida: assim ela
+  // continua testável sozinha, sem gravar nada.
+  const [modoLocal, setModoLocal] = useState<ModoModal>(MODO_INICIAL)
+  const modo = modoControlado ?? modoLocal
+  const alternarTamanho = () => {
+    if (onAlternarModo) onAlternarModo()
+    else setModoLocal((atual) => alternarModo(atual))
+  }
   const dialog = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const fechar = useRef(onFechar)
@@ -175,7 +190,7 @@ export function ConfiguracoesUnificadas({
               type="button"
               aria-label={modo === 'expandido' ? 'Restaurar configurações' : 'Maximizar configurações'}
               aria-pressed={modo === 'expandido'}
-              onClick={() => setModo(alternarModo)}
+              onClick={alternarTamanho}
             >
               {modo === 'expandido' ? <Minimize size={15} /> : <Maximize size={15} />}
             </button>

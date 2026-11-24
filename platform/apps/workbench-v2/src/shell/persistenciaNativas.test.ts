@@ -28,8 +28,12 @@ describe('RF15-4: snapshot da faixa NATIVA', () => {
     snapshot.tabs.push({ id: 'native-file', type: 'file', title: 'segredo', content: 'NAO GRAVAR', isRealFile: true })
     snapshot.tabs[1].content = 'NAO GRAVAR'
     salvarSnapshotNativas(snapshot, storage)
+    // A REGRA continua a mesma: nenhum conteúdo de arquivo vai para o storage.
     expect(storage.getItem(NATIVE_TABS_KEY)).not.toContain('NAO GRAVAR')
-    expect(lerSnapshotNativas(storage).tabs).toHaveLength(2)
+    // A ABA de arquivo é restaurada (U-1 R09: a aba ativa do dono não pode
+    // desaparecer no F5 por causa da aba legada ao lado); o CONTEÚDO dela não.
+    expect(lerSnapshotNativas(storage).tabs).toHaveLength(3)
+    expect(lerSnapshotNativas(storage).tabs.at(-1)).toEqual({ id: 'native-file', type: 'file', title: 'segredo' })
   })
   it('descarta aba Browser sem view e view sem aba, inclusive owner cruzado', () => {
     const storage = store(); const snapshot = exemplo()

@@ -1,8 +1,11 @@
-/* Casa Config — estilos da tela (v1: 2 ajustes; cresce nas próximas fatias). */
+/* Casa Config — estilos da tela (v1: 2 ajustes; cresce nas próximas fatias).
+   U-1 R02 (correção): as cores eram FIXAS do tema escuro (#cccccc sobre
+   #ffffff virava texto quase invisível no tema claro). Agora tudo vem dos
+   tokens do tema — uma folha, dois temas. */
 .config-view {
   padding: 20px 24px;
   max-width: 640px;
-  color: #cccccc;
+  color: var(--vscode-foreground);
 }
 .config-loading {
   opacity: 0.7;
@@ -10,7 +13,7 @@
 .config-head h1 {
   font-size: 20px;
   margin: 0 0 4px;
-  color: #ffffff;
+  color: var(--vscode-strongForeground, var(--vscode-foreground));
 }
 .config-head p {
   margin: 0 0 16px;
@@ -18,10 +21,10 @@
   opacity: 0.75;
 }
 .config-section {
-  border: 1px solid #3c3c3c;
+  border: 1px solid var(--vscode-widget-border);
   border-radius: 8px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--vscode-agentsPanel-background, var(--vscode-editor-background));
 }
 .config-section h2 {
   font-size: 13px;
@@ -46,14 +49,14 @@
 }
 .config-range-row input[type="range"] {
   flex: 1;
-  accent-color: #0e639c;
+  accent-color: var(--vscode-focusBorder);
 }
 .config-number input {
   width: 72px;
-  background: #3c3c3c;
-  border: 1px solid #555555;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border));
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--vscode-input-foreground);
   padding: 4px 6px;
   font-size: 13px;
 }
@@ -77,7 +80,7 @@
 }
 .config-check input {
   margin-top: 2px;
-  accent-color: #0e639c;
+  accent-color: var(--vscode-focusBorder);
 }
 .config-banner {
   display: flex;
@@ -89,9 +92,9 @@
   font-size: 13px;
 }
 .config-banner.is-error {
-  background: rgba(248, 113, 113, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  color: #fca5a5;
+  background: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  color: var(--vscode-foreground);
 }
 .config-foot {
   display: flex;
@@ -102,7 +105,7 @@
 }
 .config-saved {
   font-size: 12px;
-  color: #73c991;
+  color: var(--vscode-testing-iconPassed);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -115,12 +118,13 @@
   padding: 6px 14px;
   font-size: 13px;
   cursor: pointer;
-  border: 1px solid #0e639c;
+  border: 1px solid var(--vscode-button-background);
 }
 .config-btn.is-primary {
-  background: #0e639c;
-  color: #ffffff;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
 }
+.config-btn.is-primary:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
 .config-btn:disabled {
   opacity: 0.6;
   cursor: default;

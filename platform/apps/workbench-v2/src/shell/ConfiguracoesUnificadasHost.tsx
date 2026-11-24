@@ -50,6 +50,8 @@ export function ConfiguracoesUnificadasHost({
         : undefined}
       confirmacaoAberta={wiring.confirmacaoDescarte}
       salvando={wiring.salvando}
+      modo={wiring.modo}
+      onAlternarModo={wiring.alternarModo}
       onContinuarEditando={wiring.continuarEditando}
       onDescartarRascunhos={wiring.descartarRascunhosEFechar}
       focoDeRetorno={wiring.obterAcionador}

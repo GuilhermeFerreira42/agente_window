@@ -1,6 +1,6 @@
 # Leitura vigente do roadmap — 23/11/2026
 
-**Ponto atual: C-3a e C-3b homologadas pelo proprietário. U-1 é a próxima fatia planejada.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
+**Ponto atual: C-3a e C-3b homologadas pelo proprietário. U-1 foi entregue duas vezes (v1 em `0fb29d0` e a reentrega com os 6 ajustes da revisão) e aguarda homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20. A correção da exclusão de chats fica **depois** da U-1.
 
 As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
 
@@ -820,3 +820,27 @@ serviços. Decisão e consequências em `docs/05` D202; como validar em `docs/09
   `c3b_multimodal` 12/12; typecheck 0.
 - **Não executado:** Windows (o ambiente é Linux), homologação humana e qualquer
   teste com provedor real/conta/chave. **Não declarada homologada.**
+
+### Atualização 2026-11-13 — U-1, reentrega após a revisão independente
+
+A revisão aprovou as 7 jornadas no Windows mas **reproduziu perda de rascunho fora
+dos cenários cobertos**, e o proprietário encontrou **layouts quebrados**. Os seis
+ajustes pedidos foram entregues sobre `0fb29d0`, cada um com jornada E2E nominal:
+
+| Ajuste | Contrato agora provado | Jornada |
+|---|---|---|
+| Tamanho do modal | 1ª abertura expandida; depois o último modo, **inclusive após F5** | `U1-E08` |
+| Layout dos painéis | Salvar e Fechar dentro da caixa, sem corte/sobreposição, em 1400×900/1024×700/800×600 × claro/escuro × 2 modos — **180 cenários, 0 problemas**; cores por token (texto de Geral estava invisível no claro) | `U1-E09` |
+| Desativar provedor | preserva config, modelos e chave; sai do catálogo/Auto; conversa mostra "Indisponível"; reativar = 1 clique | `U1-E10` |
+| Rascunho oculto | fechar olha **todos** os painéis visitados; save em voo manda aguardar | `U1-E11` |
+| Chave revelada × editada | ver não suja o formulário, não volta no PUT; resposta tardia do olhinho é descartada | `U1-E12` |
+| Abas antigas | aba `file` restaurada sem conteúdo; aba antiga em 2º plano não rouba a ativa | `U1-E13` |
+
+- **Placar desta rodada:** E2E U-1 **13/13** (5218); foco **227 aprovadas / 0 falhas
+  nominais / 13 pulados**; ampla **2284 aprovadas / as mesmas 3 falhas da base / 33
+  pulados** (0 novas, 0 skips novos); nominais `provedores_fatia08` 6/6, `c1` 6/6,
+  `c2` 17/17, `c3b` 12/12; `tsc -b --force` 0; lint igual à base; `App.tsx` **2887**
+  linhas (teto 2889).
+- **Não executado:** Windows, homologação humana da conferência visual e qualquer
+  teste com provedor real/conta/chave. **Segue NÃO homologada; sem merge.** A
+  correção da exclusão de chats fica **depois** da U-1.

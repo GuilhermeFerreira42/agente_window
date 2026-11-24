@@ -75,6 +75,7 @@ export function usePaineisConfiguracoes(deps: DependenciasPaineis): PaineisCompo
         <ConfigView
           hospedado
           semTitulo
+          acoesNaMoldura
           aoMudarEstado={reportarGeral}
           aoSalvar={onConfigSalva}
         />
@@ -90,6 +91,7 @@ export function usePaineisConfiguracoes(deps: DependenciasPaineis): PaineisCompo
       conteudo: (
         <ProvidersView
           hospedado
+          acoesNaMoldura
           limparReveal={limpezaReveal}
           aoMudarEstado={reportarProvedores}
         />

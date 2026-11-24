@@ -11,12 +11,16 @@
 import { useCallback, useRef, useState } from 'react'
 import {
   ROTA_PADRAO,
-  decidirFechamento,
+  alternarModo as alternarModoPuro,
+  algumPainelSalvando,
+  decidirFechamentoDePaineis,
   normalizarRota,
   type CategoriaConfiguracoes,
   type EstadoPainel,
+  type ModoModal,
   type RotaConfiguracoes,
 } from '../domain/configuracoesUnificadas'
+import { lerModoModal, salvarModoModal } from './persistenciaModoModal'
 
 export interface ConfiguracoesUnificadasWiring {
   rota: RotaConfiguracoes
@@ -38,6 +42,9 @@ export interface ConfiguracoesUnificadasWiring {
    * Capturado na ABERTURA (antes de o menu/aba sumir do DOM).
    */
   obterAcionador: () => HTMLElement | null
+  /** R01 — tamanho atual do modal (lembrado entre aberturas e após F5). */
+  modo: ModoModal
+  alternarModo: () => void
 }
 
 export function useConfiguracoesUnificadas(): ConfiguracoesUnificadasWiring {
@@ -46,6 +53,8 @@ export function useConfiguracoesUnificadas(): ConfiguracoesUnificadasWiring {
   // R07 — o que a moldura sabe de cada painel: só FATO (dirty/saving/canLeave).
   const [estadoPainel, setEstadoPainel] = useState<Record<string, EstadoPainel>>({})
   const [confirmacaoDescarte, setConfirmacaoDescarte] = useState(false)
+  // R01 — primeira abertura expandida; depois o último modo escolhido.
+  const [modo, setModo] = useState<ModoModal>(() => lerModoModal())
   // R04 — sair da categoria Provedores oculta o segredo revelado; o rascunho fica.
   const [limpezaReveal, setLimpezaReveal] = useState(0)
   const acionador = useRef<HTMLElement | null>(null)
@@ -73,16 +82,27 @@ export function useConfiguracoesUnificadas(): ConfiguracoesUnificadasWiring {
   }, [])
 
   const fechar = useCallback(() => {
-    const decisao = decidirFechamento(estadoPainel[rota.categoria])
+    // R07 (correção): TODOS os painéis visitados contam, inclusive os ocultos.
+    // Antes só a categoria ativa era consultada e um rascunho em Geral morria
+    // em silêncio quando o dono fechava estando em Aparência.
+    const decisao = decidirFechamentoDePaineis(estadoPainel)
     if (decisao === 'aguardar') return // save em voo bloqueia o fechamento (R07)
     if (decisao === 'confirmar') {
       setConfirmacaoDescarte(true)
       return
     }
     setAberta(false)
-  }, [estadoPainel, rota.categoria])
+  }, [estadoPainel])
 
   const continuarEditando = useCallback(() => setConfirmacaoDescarte(false), [])
+
+  const alternarModoDoModal = useCallback(() => {
+    setModo((atual) => {
+      const proximo = alternarModoPuro(atual)
+      salvarModoModal(proximo) // F5 precisa lembrar a escolha
+      return proximo
+    })
+  }, [])
 
   const descartarRascunhosEFechar = useCallback(() => {
     // Descartar não desfaz o que o servidor confirmou: a moldura sai e os
@@ -112,7 +132,11 @@ export function useConfiguracoesUnificadas(): ConfiguracoesUnificadasWiring {
     reportarEstado,
     estadoPainel,
     limpezaReveal,
-    salvando: estadoPainel[rota.categoria]?.saving ?? false,
+    // Aguardar salvamento vale para qualquer painel: o descarte não pode
+    // acontecer enquanto uma escrita está em voo, mesmo a de um painel oculto.
+    salvando: algumPainelSalvando(estadoPainel),
     obterAcionador: () => acionador.current,
+    modo,
+    alternarModo: alternarModoDoModal,
   }
 }

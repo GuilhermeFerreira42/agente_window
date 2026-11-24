@@ -73,6 +73,13 @@ afterEach(() => {
 const chamadasDe = (metodo: string, trecho: string) =>
   chamadas.filter((item) => item.metodo === metodo && item.url.includes(trecho))
 
+/** Resposta de estado da Casa (o PUT devolve o que o servidor recebeu). */
+function estruturaEstado<T>(corpo: T): Resposta { return { status: 200, corpo } }
+function resseedar(resposta: Resposta): void {
+  respostas.push({ metodo: 'GET', trecho: '/api/providers', resposta })
+  respostas.push({ metodo: 'PUT', trecho: '/api/providers', resposta })
+}
+
 describe('U-1 — U1-T03 Geral: leitura, bloqueio e eco', () => {
   it('U1-T03 falha de GET não vira formulário com defaults e NÃO permite PUT', async () => {
     respostas.push({ metodo: 'GET', trecho: '/api/config', resposta: { status: 500, corpo: { code: 'config_unavailable' } } })
@@ -222,6 +229,129 @@ describe('U-1 — U1-T04 Provedores hospedado', () => {
     if (antes !== undefined && depois) expect(depois.value).toBe(antes)
     // E nenhum save foi disparado só por trocar de categoria.
     expect(chamadasDe('PUT', '/api/providers')).toHaveLength(0)
+  })
+})
+
+
+// ============================================================================
+// U-1 — R04/R03: regressões da revisão nos painéis das Casas.
+// ============================================================================
+describe('U-1 — R04 chave revelada NÃO é chave editada', () => {
+  const estadoComChave = {
+    storage: 'repo-home',
+    ativo: 'openai',
+    catalogo: [{ providerId: 'openai', modelId: 'gpt-x', label: 'OpenAI — gpt-x', protocol: 'openai' }],
+    provedores: [{
+      id: 'openai', nome: 'OpenAI', baseUrl: 'https://api.example/v1', modelo: 'gpt-x',
+      modelosHabilitados: ['gpt-x'], habilitado: true, contexto: 128000, maxSaida: 4096, temperatura: 0.2,
+      chaveMascarada: '••••••••a1b2', origemChave: 'salva', variavelAmbiente: 'OPENAI_API_KEY',
+    }],
+  }
+
+  const montarProvedores = async () => {
+    const estados: Array<{ dirty: boolean; saving: boolean }> = []
+    const usuario = userEvent.setup()
+    const vista = render(<ProvidersView aoMudarEstado={(estado) => estados.push({ dirty: estado.dirty, saving: estado.saving })} />)
+    await waitFor(() => expect(screen.getAllByText(/OpenAI/).length).toBeGreaterThan(0))
+    return { usuario, vista, estados }
+  }
+
+  it('R04 ver a chave não marca rascunho e não reenvia o segredo no Salvar', async () => {
+    respostas.push({ metodo: 'GET', trecho: '/api/providers', resposta: { status: 200, corpo: estadoComChave } })
+    respostas.push({ metodo: 'POST', trecho: '/api/providers/reveal', resposta: { status: 200, corpo: { chave: 'sk-real-do-servidor' } } })
+    respostas.push({ metodo: 'PUT', trecho: '/api/providers', resposta: { status: 200, corpo: estadoComChave } })
+    const { usuario, estados } = await montarProvedores()
+
+    // Antes: o reveal caía em `chaveEditada`, então ver a chave "sujava" o painel.
+    await usuario.click(screen.getByRole('button', { name: 'Mostrar a chave' }))
+    await waitFor(() => expect(chamadasDe('POST', '/api/providers/reveal')).toHaveLength(1))
+    const campo = screen.getByLabelText(/^Chave de API/) as HTMLInputElement
+    expect(campo.value, 'a chave revelada aparece').toBe('sk-real-do-servidor')
+    expect(campo.type).toBe('text')
+    expect(estados.at(-1)?.dirty, 'revelar NÃO é rascunho').toBe(false)
+
+    // Salvar sem ter digitado nada: o PUT não pode carregar a chave revelada.
+    await usuario.click(screen.getByRole('button', { name: /Salvar provedores/ }))
+    await waitFor(() => expect(chamadasDe('PUT', '/api/providers')).toHaveLength(1))
+    const enviado = JSON.stringify(chamadasDe('PUT', '/api/providers')[0].corpo)
+    expect(enviado, 'o segredo revelado NUNCA volta no PUT').not.toContain('sk-real-do-servidor')
+  })
+
+  it('R04 resposta do olhinho que chega DEPOIS da troca de categoria é descartada', async () => {
+    respostas.push({ metodo: 'GET', trecho: '/api/providers', resposta: { status: 200, corpo: estadoComChave } })
+    // Resposta lenta: a moldura troca de categoria antes dela chegar.
+    respostas.push({ metodo: 'POST', trecho: '/api/providers/reveal', resposta: { status: 200, corpo: { chave: 'sk-que-chegou-tarde' } } })
+    const { usuario, vista } = await montarProvedores()
+    await usuario.click(screen.getByRole('button', { name: 'Mostrar a chave' }))
+    vista.rerender(<ProvidersView limparReveal={1} />)
+    await waitFor(() => expect(chamadasDe('POST', '/api/providers/reveal')).toHaveLength(1))
+    const campo = screen.getByLabelText(/^Chave de API/) as HTMLInputElement
+    await waitFor(() => expect(campo.type).toBe('password'))
+    expect(campo.value, 'nada do reveal velho reaparece').not.toContain('sk-que-chegou-tarde')
+  })
+
+  it('R04 chave DIGITADA continua sendo rascunho e vai no PUT', async () => {
+    respostas.push({ metodo: 'GET', trecho: '/api/providers', resposta: { status: 200, corpo: estadoComChave } })
+    respostas.push({ metodo: 'PUT', trecho: '/api/providers', resposta: { status: 200, corpo: estadoComChave } })
+    const { usuario, estados } = await montarProvedores()
+    // A caixa mascarada mostra a chave guardada: digitar começa limpando (D84).
+    const campoChave = screen.getByLabelText(/^Chave de API/) as HTMLInputElement
+    await usuario.clear(campoChave)
+    await usuario.type(campoChave, 'sk-digitada-pelo-dono')
+    expect(estados.at(-1)?.dirty, 'digitar É rascunho').toBe(true)
+    await usuario.click(screen.getByRole('button', { name: /Salvar provedores/ }))
+    await waitFor(() => expect(chamadasDe('PUT', '/api/providers')).toHaveLength(1))
+    expect(JSON.stringify(chamadasDe('PUT', '/api/providers')[0].corpo)).toContain('sk-digitada-pelo-dono')
+  })
+})
+
+describe('U-1 — R03 desativar provedor preserva tudo e permite reativar', () => {
+  const base = {
+    storage: 'repo-home',
+    ativo: 'openai',
+    catalogo: [{ providerId: 'openai', modelId: 'gpt-x', label: 'OpenAI — gpt-x', protocol: 'openai' }],
+    provedores: [{
+      id: 'openai', nome: 'OpenAI', baseUrl: 'https://api.example/v1', modelo: 'gpt-x',
+      modelosHabilitados: ['gpt-x', 'gpt-y'], habilitado: true, contexto: 128000, maxSaida: 4096, temperatura: 0.2,
+      chaveMascarada: '••••••••a1b2', origemChave: 'salva', variavelAmbiente: 'OPENAI_API_KEY',
+    }],
+  }
+
+  it('R03 desmarcar "habilitado" envia habilitado=false e PRESERVA config, modelos e chave', async () => {
+    resseedar(estruturaEstado(base))
+    const usuario = userEvent.setup()
+    render(<ProvidersView />)
+    await waitFor(() => expect(screen.getAllByText(/OpenAI/).length).toBeGreaterThan(0))
+    await usuario.click(screen.getByRole('checkbox', { name: 'Provedor habilitado' }))
+    await usuario.click(screen.getByRole('button', { name: /Salvar provedores/ }))
+    await waitFor(() => expect(chamadasDe('PUT', '/api/providers')).toHaveLength(1))
+    const corpo = chamadasDe('PUT', '/api/providers')[0].corpo as { provedores: Record<string, Record<string, unknown>> }
+    const salvo = corpo.provedores.openai
+    expect(salvo.habilitado).toBe(false)
+    // Nada além do interruptor muda: configuração, modelos e chave continuam.
+    expect(salvo.baseUrl).toBe('https://api.example/v1')
+    expect(salvo.modelo).toBe('gpt-x')
+    expect(salvo.modelosHabilitados).toEqual(['gpt-x', 'gpt-y'])
+    expect(salvo.chaveMascarada ?? base.provedores[0].chaveMascarada).toBe('••••••••a1b2')
+  })
+
+  it('R03 reativar depois é um clique: sem recadastrar nada', async () => {
+    // O servidor já devolveu o provedor desabilitado, com a config preservada.
+    resseedar(estruturaEstado({ ...base, provedores: [{ ...base.provedores[0], habilitado: false }], catalogo: [] }))
+    const usuario = userEvent.setup()
+    render(<ProvidersView />)
+    await waitFor(() => expect(screen.getAllByText(/OpenAI/).length).toBeGreaterThan(0))
+    const caixa = screen.getByRole('checkbox', { name: 'Provedor habilitado' }) as HTMLInputElement
+    expect(caixa.checked, 'nasce desmarcado, com a config ainda na tela').toBe(false)
+    // A configuração está toda lá: nada a redigitar.
+    expect((screen.getByLabelText(/^Endereço do serviço/) as HTMLInputElement).value).toBe('https://api.example/v1')
+    expect((screen.getByLabelText(/^Modelo/) as HTMLInputElement).value).toBe('gpt-x')
+    await usuario.click(caixa)
+    await usuario.click(screen.getByRole('button', { name: /Salvar provedores/ }))
+    await waitFor(() => expect(chamadasDe('PUT', '/api/providers')).toHaveLength(1))
+    const corpo = chamadasDe('PUT', '/api/providers')[0].corpo as { provedores: Record<string, Record<string, unknown>> }
+    expect(corpo.provedores.openai.habilitado).toBe(true)
+    expect(corpo.provedores.openai.modelosHabilitados).toEqual(['gpt-x', 'gpt-y'])
   })
 })
 

@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Square,
   Sparkles,
+  TriangleAlert,
   X,
 } from 'lucide-react'
 import type { Attachment, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
@@ -296,6 +297,14 @@ export function ChatInput({
     })),
   ]
   const selectedModelLabel = modelOptions.find((item) => item.id === model)?.label ?? (model === MODEL_AUTO ? 'Auto' : `Indisponível — ${model}`)
+  // U-1 R03 (defeito pré-existente): ao desativar um provedor, o par escolhido
+  // sai do catálogo. A conversa NÃO troca de modelo sozinha — ela diz que o par
+  // ficou indisponível e deixa a escolha com o dono (o servidor também recusa,
+  // com mensagem própria, em vez de escolher um substituto).
+  const selecaoAtual = selecaoDoToken(model)
+  const parIndisponivel = selecaoAtual.tipo === 'explicita' && !modelOptions.some((item) => item.id === model)
+    ? { providerId: selecaoAtual.providerId, modelId: selecaoAtual.modelId }
+    : null
   const normalizedModelQuery = modelQuery.trim().toLocaleLowerCase()
   const filteredModels = modelOptions.filter((item) => `${item.label} ${item.description}`.toLocaleLowerCase().includes(normalizedModelQuery))
 
@@ -1027,6 +1036,15 @@ export function ChatInput({
                   onChange={(event) => setModelQuery(event.target.value)}
                 />
                 <div className="model-picker-list">
+                  {/* O par escolhido, quando saiu do catálogo, continua listado e
+                      marcado: sem isso o menu abriria sem explicar o rótulo. */}
+                  {parIndisponivel && modelQuery.trim() === '' && (
+                    <div className="popover-option is-selected is-unavailable" role="menuitem" aria-disabled="true" tabIndex={-1} data-modelo-fora-do-catalogo>
+                      <TriangleAlert size={12} aria-hidden="true" />
+                      <span>Indisponível — {parIndisponivel.providerId} / {parIndisponivel.modelId}</span>
+                      <span className="popover-option-description">fora do catálogo ativo</span>
+                    </div>
+                  )}
                   {filteredModels.length > 0 ? filteredModels.map((item) => (
                     <button
                       className={`popover-option${item.id === model ? ' is-selected' : ''}`}
@@ -1050,6 +1068,12 @@ export function ChatInput({
               </div>
             )}
           </div>
+          {parIndisponivel && (
+            <span className="model-unavailable" role="status" data-modelo-indisponivel={`${parIndisponivel.providerId}/${parIndisponivel.modelId}`}
+              title={`${parIndisponivel.providerId} / ${parIndisponivel.modelId} não está disponível (provedor desabilitado ou modelo removido). Nada foi trocado automaticamente: escolha outro modelo.`}>
+              <TriangleAlert size={12} aria-hidden="true" /> indisponível — escolha outro modelo
+            </span>
+          )}
           <button
             className={`send-button${isWorking ? ' is-stop' : ''}`}
             type={isWorking ? 'button' : 'submit'}

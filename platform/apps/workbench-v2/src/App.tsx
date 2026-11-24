@@ -25,7 +25,7 @@ import { manageHistoryAccess } from './services/sessions/historyAccessClient'
 import { PersonalizacoesView, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
 import { useConfiguracoesUnificadas } from './shell/useConfiguracoesUnificadas'
 import { ConfiguracoesUnificadasHost } from './shell/ConfiguracoesUnificadasHost'
-import { rotaDaSecao, rotaDaSuperficieLegada } from './domain/configuracoesUnificadas'
+import { ROTA_PERSONALIZACOES, rotaDaSecao } from './domain/configuracoesUnificadas'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { aplicarMensagemPrimeiroEnvio, executarPrimeiroEnvio } from './domain/primeiroEnvio'
 import { tokenDaSelecao } from './domain/selecaoModelo'
@@ -407,7 +407,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const openProviders = () => abrirConfiguracoes({ categoria: 'provedores' })
   const openConfig = () => abrirConfiguracoes({ categoria: 'geral' })
   const openCustomizations = useCallback(() => {
-    abrirConfiguracoes(rotaDaSuperficieLegada('aiCustomizations') ?? { categoria: 'personalizacoes' })
+    abrirConfiguracoes(ROTA_PERSONALIZACOES)
   }, [abrirConfiguracoes])
 
 
@@ -734,12 +734,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     saveCustomViewState(customView)
   }, [customView])
 
-  // U-1 R09 — legado traduzido ANTES de montar (abas `config`/`providers` já
-  // drenadas no boot e `aiCustomizations` → Personalizações, nunca a moldura
-  // antiga). O `aiCustomizations` é traduzido pelo EFEITO DE BOOT também: assim
-  // o snapshot é saneado antes de qualquer pintura.
+  // R09: só a aba legada ATIVA abre categoria; a de segundo plano não rouba o arquivo.
   useEffect(() => {
-    const rotaLegada = rotasLegadas[0] ?? rotaDaSuperficieLegada(customView.activeView)
+    const rotaLegada = rotasLegadas.find((entrada) => entrada.ativa)?.rota
+      ?? (customView.activeView === 'aiCustomizations' ? ROTA_PERSONALIZACOES : undefined)
     if (rotaLegada) config.abrir(rotaLegada)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- boot-only
   }, [])
@@ -749,7 +747,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setTerminalVisible(desejada.panel)
     setEditorHidden(!desejada.editor)
     setCustomView((atual) => closeCustomView(atual))
-    config.abrir(rotaDaSuperficieLegada('aiCustomizations') ?? { categoria: 'personalizacoes' })
+    config.abrir(ROTA_PERSONALIZACOES)
   }, [customView, config])
 
   const activePartSizes = partSizesForSession({ shell: persistedLayout.current.shell, partSizesBySession }, activeSession.id)
@@ -2583,15 +2581,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const historyTabs = (sessionId: string) => fundirAbas(getEditorTabsVisibleForSession(editorTabs, sessionId), explorerModule ? projetarAbasDoModulo(sessionId, explorerModule.attach.getTabs({ sessionId })) : [])
   const navigation = useWorkbenchHistory({
-    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: customView.activeView === 'aiCustomizations', section: config.rota.subsecao ?? 'visao', mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
+    // R09: `modal`/`categoria` entram no histórico como fato (o antes vinha de customView).
+    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: config.aberta, categoria: config.rota.categoria, section: config.rota.subsecao ?? 'visao', mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
     valid: route => sessions.some(session => session.id === route.sessionId) && (!route.tabId || historyTabs(route.sessionId).some(tab => tab.id === route.tabId)),
     restore: route => {
       if (landingVisible && !editorFilesSaved()) return
       selectSession(route.sessionId)
       setActiveChatBySession(current => ({ ...current, [route.sessionId]: route.chatId }))
       setNewSessionLanding(route.landing)
-      // U-1 R09: voltar/avançar navega, não repete mutação (rota traduzida).
-      if (route.modal) config.abrir(rotaDaSecao(route.section)); else config.fechar()
+      // R09: voltar/avançar NAVEGA (não repete mutação); a categoria vem da entrada.
+      if (route.modal) config.abrir(rotaDaSecao(route.categoria === 'personalizacoes' ? route.section : route.categoria))
+      else config.fechar()
       closeCustomViewGrid()
       activateEditorTab(historyTabs(route.sessionId).find(tab => tab.id === route.tabId))
       setEditorHidden(route.editorHidden); setMobilePane(route.mobilePane)

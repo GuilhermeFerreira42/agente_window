@@ -1111,3 +1111,31 @@ Provas: `u1ConfiguracoesShell` (22), `u1ConfiguracoesPaineis` (17),
 `e2e/u1_configuracoes_unificadas.spec.ts` (7), comparação nominal com a baseline
 sem nenhuma falha nova. **Entrega para revisão e homologação do proprietário —
 sem merge e sem iniciar a próxima fatia.**
+
+## 2026-11-13 — U-1, revisão da reentrega (6 ajustes)
+
+A revisão independente passou as 7 jornadas no Windows mas reproduziu perda de
+rascunho fora dos cenários cobertos, e o proprietário encontrou layouts quebrados.
+Sobre `0fb29d0`, seis contratos foram acrescentados, cada um com jornada E2E própria:
+
+1. **Tamanho do modal lembrado** — primeira abertura expandida, depois o último modo,
+   inclusive após F5 (`persistenciaModoModal.ts`; U1-E08).
+2. **Layout de todos os painéis medido no DOM** — Salvar e Fechar dentro da caixa,
+   sem corte nem sobreposição, em 1400×900/1024×700/800×600 × claro/escuro ×
+   expandido/restaurado: **180 cenários, 0 problemas**; cores 100% por token (o texto
+   de Geral ficava invisível no tema claro) (`U1-E09`, `28-layout-final`).
+3. **Desativar/reativar provedor** preserva nome, endereço, modelos e chave; sai do
+   catálogo/Auto; a conversa existente mostra "Indisponível"; reativar é um clique
+   (`U1-E10`, `ChatInput.tsx`).
+4. **Fechar olha todos os painéis**, inclusive os ocultos, e salvamento em voo manda
+   aguardar (`decidirFechamentoDePaineis`, `algumPainelSalvando`; `U1-E11`).
+5. **Ver ≠ editar** — o reveal não suja o formulário, não volta no PUT e é descartado
+   quando a resposta chega atrasada (`U1-E12`).
+6. **Abas antigas** saneadas no boot sem roubar a aba ativa; a aba `file` volta sem
+   conteúdo/`isRealFile` (`U1-E13`).
+
+Provas desta rodada: E2E U-1 **13/13** (5218), foco **227/0/13**, ampla
+**2284 aprovadas / as mesmas 3 falhas da base / 33 skips**, nominais
+`provedores_fatia08` 6/6, `c1` 6/6, `c2` 17/17, `c3b` 12/12, `tsc` 0, lint igual à
+base, `App.tsx` em **2887** linhas. **Entrega para revisão/homologação — sem merge.**
+A correção da exclusão de chats permanece **depois** da U-1.

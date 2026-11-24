@@ -48,9 +48,15 @@ export interface ProvidersViewProps {
    * incrementa ao trocar de categoria/fechar; rascunhos digitados ficam.
    */
   limparReveal?: number
+  /**
+   * U-1 R07: a moldura desenha a barra de ações no pé do diálogo. O botão é o
+   * MESMO (mesmo submit, mesmo dono do estado) — só não fica preso no fim de
+   * uma rolagem longa.
+   */
+  acoesNaMoldura?: boolean
 }
 
-export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal = 0 }: ProvidersViewProps = {}) {
+export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal = 0, acoesNaMoldura = false }: ProvidersViewProps = {}) {
   const [estado, setEstado] = useState<EstadoProvedores>(estadoLocalInicial)
   const [carregando, setCarregando] = useState(true)
   const [estadoCarregado, setEstadoCarregado] = useState(false)
@@ -61,20 +67,32 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
   const [busca, setBusca] = useState('')
   // Rascunhos: o que o dono está editando agora (chave só entra aqui se digitada/revelada).
   const [rascunhos, setRascunhos] = useState<Record<string, Partial<ProvedorConfig>>>({})
+  // U-1 R04 (correção): dois mapas, duas naturezas.
+  //   · chaveEditada = o que o DONO digitou → entra no rascunho e vai no PUT;
+  //   · chaveRevelada = o que o servidor devolveu no olhinho → é só exibição.
+  // Antes o reveal caía no mapa das digitadas: ver a chave "sujava" o formulário
+  // e reenviava o segredo num salvamento posterior sem o dono pedir.
   const [chaveEditada, setChaveEditada] = useState<Record<string, string>>({})
+  const [chaveRevelada, setChaveRevelada] = useState<Record<string, string>>({})
   const [revelada, setRevelada] = useState<Record<string, boolean>>({})
+  // R04: resposta do olhinho que chega DEPOIS de o dono trocar de categoria não
+  // pode aparecer na categoria errada. Guarda a época da última limpeza.
+  const epocaReveal = useRef(0)
   // U-1 R04: sair da categoria oculta o que foi revelado. O rascunho digitado
   // NÃO é descartado por isso (ele não é segredo revelado).
   const primeiraLimpeza = useRef(limparReveal)
   useEffect(() => {
     if (primeiraLimpeza.current === limparReveal) return
     primeiraLimpeza.current = limparReveal
+    epocaReveal.current += 1
     setRevelada({})
+    setChaveRevelada({})
   }, [limparReveal])
   const [consultasModelos, setConsultasModelos] = useState<Record<string, ConsultaModelos>>({})
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null)
   const [ocupado, setOcupado] = useState('')
   const [salvando, setSalvando] = useState(false)
+  // R04: ver a chave NÃO torna o formulário sujo (não é rascunho do dono).
   const temRascunho = Object.keys(rascunhos).length > 0 || Object.values(chaveEditada).some((valor) => valor !== '')
   useEffect(() => {
     aoMudarEstado?.({ dirty: temRascunho, saving: salvando, canLeave: true })
@@ -197,11 +215,17 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
       setRevelada((atual) => ({ ...atual, [selecionado]: false }))
       return
     }
+    const provedor = selecionado
+    const epoca = epocaReveal.current
     try {
-      const chave = await revelarChave(selecionado)
-      setChaveEditada((atual) => ({ ...atual, [selecionado]: chave }))
-      setRevelada((atual) => ({ ...atual, [selecionado]: true }))
+      const chave = await revelarChave(provedor)
+      // Resposta velha (troca de categoria no meio do caminho): descarta. A
+      // moldura já mandou limpar, e reaparecer aqui seria reabrir o segredo.
+      if (epoca !== epocaReveal.current) return
+      setChaveRevelada((atual) => ({ ...atual, [provedor]: chave }))
+      setRevelada((atual) => ({ ...atual, [provedor]: true }))
     } catch (motivo) {
+      if (epoca !== epocaReveal.current) return
       setErro(motivo instanceof Error ? motivo.message : String(motivo))
     }
   }
@@ -288,6 +312,8 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
       }, {}) ?? {}
     const merged: Record<string, ProvedorConfig> = { ...base }
     for (const [id, r] of Object.entries(rascunhos)) merged[id] = { ...(merged[id] ?? {}), ...r }
+    // R04: só a chave DIGITADA entra no PUT. `chaveRevelada` é exibição e nunca
+    // é enviada; `undefined` mantém a guardada ('' apaga de propósito — D84).
     for (const [id, digitada] of Object.entries(chaveEditada)) {
       if (digitada === undefined) continue
       merged[id] = { ...(merged[id] ?? {}), apiKey: digitada }
@@ -305,6 +331,7 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
       setSalvo(true)
       // Depois de salvar, a chave digitada vira "guardada": limpa o rascunho dela.
       setChaveEditada({})
+      setChaveRevelada({})
       setRevelada({})
       setRascunhos({})
     } catch (motivo) {
@@ -384,10 +411,16 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
         </nav>
 
         <form className="providers-form" onSubmit={(evento) => { evento.preventDefault(); void aoSalvar() }}>
+          {/* U-1 R07: o corpo é o que ROLA e o pé (Salvar/Testar) fica no
+              rodapé do cartão. Fora do modal hospedado o wrapper é `contents`,
+              então nem o layout nem a semântica da tela mudam. */}
+          <div className="providers-form-corpo">
           <div className="providers-form-head">
             <div>
               {/* No genérico (1 slot), o título mostra o serviço escolhido: "Compatível com OpenAI · Groq". */}
-              <h2>{descritor?.generico && daTela?.nome ? `${descritor.nome} · ${daTela.nome}` : descritor?.nome}</h2>
+              {/* O título mostra o que está na TELA (rascunho incluso): dizer o
+                  nome antigo enquanto o campo já tem outro confundiria o dono. */}
+              <h2>{descritor?.generico && (rascunho.nome ?? daTela?.nome) ? `${descritor.nome} · ${rascunho.nome ?? daTela?.nome}` : descritor?.nome}</h2>
               <span className="providers-sub">{descritor?.dica}</span>
             </div>
             <span className="providers-grow" />
@@ -430,10 +463,12 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
             <div className="providers-input-row">
               <input
                 className="providers-input is-mono"
-                type={chaveVisivel ? 'text' : 'password'}
+                type={chaveVisivel || chaveDigitada ? 'text' : 'password'}
                 aria-label={`Chave de API ${descritor?.nome}`}
                 placeholder={daTela?.chaveMascarada ?? 'cole a chave aqui'}
-                value={chaveVisivel ? (chaveEditada[selecionado] ?? daTela?.chaveMascarada ?? '') : chaveDigitada ?? ''}
+                /* Três estados, sem misturar: o que o dono DIGITOU (rascunho) >
+                   o que o olhinho REVELOU (exibição) > a máscara do servidor. */
+                value={chaveDigitada ?? (chaveVisivel ? (chaveRevelada[selecionado] ?? daTela?.chaveMascarada ?? '') : '')}
                 onChange={(e) => {
                   selecaoInteragida.current = true
                   setChaveEditada((atual) => ({ ...atual, [selecionado]: e.target.value }))
@@ -452,7 +487,15 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
                 {chaveVisivel ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
-            {daTela?.origemChave === 'salva' ? (
+            {chaveVisivel && !chaveDigitada ? (
+              <span className="providers-hint" data-chave-revelada="sim">
+                <CheckCircle2 size={12} /> mostrando a chave guardada — só nesta tela; o valor não será reenviado
+              </span>
+            ) : chaveVisivel && chaveDigitada ? (
+              <span className="providers-hint">
+                <CheckCircle2 size={12} /> esta é a chave que você digitou; ela será gravada ao salvar
+              </span>
+            ) : daTela?.origemChave === 'salva' ? (
               <span className="providers-hint is-ok">
                 <CheckCircle2 size={12} /> guardada em ~/.agente_window/providers.json (fora do projeto) — nunca entra no Git
               </span>
@@ -664,7 +707,8 @@ export function ProvidersView({ hospedado = false, aoMudarEstado, limparReveal =
             </div>
           ) : null}
 
-          <div className="providers-foot">
+          </div>
+          <div className="providers-foot" data-na-moldura={acoesNaMoldura ? 'sim' : 'nao'}>
             <label className="providers-radio">
               <input type="radio" name="provedor-ativo" checked={estado?.ativo === selecionado} disabled={!estadoCarregado} onChange={() => void aoDefinirAtivo()} />
               usar este provedor no chat

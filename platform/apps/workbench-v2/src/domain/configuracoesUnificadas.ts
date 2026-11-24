@@ -163,6 +163,9 @@ export const ALIASES_LEGADOS = {
 
 export type AliasLegado = keyof typeof ALIASES_LEGADOS
 
+/** Rota de Personalizações na subseção padrão (atalho usado pelo shell). */
+export const ROTA_PERSONALIZACOES: RotaConfiguracoes = { categoria: 'personalizacoes', subsecao: 'visao' }
+
 /**
  * Traduz uma superfície legada para rota do modal.
  * `undefined` = não é superfície de settings; a aba continua sendo o que é.
@@ -241,6 +244,37 @@ export function podeFecharSemConfirmar(estado: EstadoPainel | undefined): boolea
  */
 export type DecisaoFechamento = 'fechar' | 'confirmar' | 'aguardar'
 
+/**
+ * U-1 R07 (correção): a decisão olha TODOS os painéis já visitados, inclusive os
+ * que estão ocultos. Antes, alterar o teto em Geral, ir para Aparência e fechar
+ * fechava sem avisar — o rascunho de Geral se perdia em silêncio.
+ *
+ * Precedência: 'aguardar' > 'confirmar' > 'fechar'. Um salvamento em curso em
+ * QUALQUER painel manda esperar; um rascunho em QUALQUER painel pede decisão.
+ * O mapa inteiro é a entrada (o painel não precisa estar visível para contar).
+ */
+export function decidirFechamentoDePaineis(
+  paineis: Readonly<Record<string, EstadoPainel>> | undefined,
+): DecisaoFechamento {
+  if (!paineis) return 'fechar'
+  let rascunho = false
+  for (const estado of Object.values(paineis)) {
+    if (!estado) continue
+    if (estado.saving) return 'aguardar'
+    if (estado.dirty) rascunho = true
+  }
+  return rascunho ? 'confirmar' : 'fechar'
+}
+
+/** Há algum painel em salvamento (o botão de descartar precisa esperar)? */
+export function algumPainelSalvando(
+  paineis: Readonly<Record<string, EstadoPainel>> | undefined,
+): boolean {
+  if (!paineis) return false
+  return Object.values(paineis).some((estado) => estado?.saving === true)
+}
+
+/** Decisão de fechamento para UM painel (mantida: é o caso simples de 1 estado). */
 export function decidirFechamento(estado: EstadoPainel | undefined): DecisaoFechamento {
   if (!estado) return 'fechar'
   if (estado.saving) return 'aguardar'
@@ -255,6 +289,22 @@ export function decidirFechamento(estado: EstadoPainel | undefined): DecisaoFech
 /** O modal nasce EXPANDIDO; "restaurado" é o outro modo (R01). */
 export type ModoModal = 'expandido' | 'restaurado'
 export const MODO_INICIAL: ModoModal = 'expandido'
+
+/**
+ * R01 (correção): a PRIMEIRA abertura é sempre expandida; depois disso o modal
+ * reabre no ÚLTIMO modo escolhido, inclusive após F5 (quem persiste é o shell).
+ * O domínio diz qual modo vale para um valor lido — nunca confia no storage.
+ */
+export const MODO_STORAGE_KEY = 'workbench.configuracoes.modo.v1'
+
+export function ehModoModal(valor: unknown): valor is ModoModal {
+  return valor === 'expandido' || valor === 'restaurado'
+}
+
+/** Modo a usar na montagem: valor lido, senão o inicial. Lixo cai no inicial. */
+export function modoInicial(lido: unknown): ModoModal {
+  return ehModoModal(lido) ? lido : MODO_INICIAL
+}
 
 export function alternarModo(atual: ModoModal): ModoModal {
   return atual === 'expandido' ? 'restaurado' : 'expandido'

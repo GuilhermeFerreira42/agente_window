@@ -592,3 +592,28 @@ describe('ChatInput — C-1 conversa Chat sem pasta', () => {
     expect(itemPorTexto('Permitir tudo')).not.toBeDisabled()
   })
 })
+
+describe('ChatInput — R03 seleção indisponível', () => {
+  it('R03 par escolhido fora do catálogo aparece como INDISPONÍVEL e não é trocado', async () => {
+    // Provedor desativado: o catálogo não o devolve mais. A conversa não pode
+    // escolher outro modelo sozinha — ela avisa e deixa a troca com o dono.
+    const token = `pair:${encodeURIComponent('openai')}:${encodeURIComponent('gpt-aposentado')}`
+    const { props } = renderInput({ model: token })
+    const aviso = await screen.findByText(/indisponível — escolha outro modelo/i)
+    expect(aviso).toBeTruthy()
+    expect(aviso.closest('[data-modelo-indisponivel]')?.getAttribute('data-modelo-indisponivel'))
+      .toBe('openai/gpt-aposentado')
+    // Nenhuma troca automática: o modelo segue o que o dono escolheu.
+    expect(props.onChangeModel).not.toHaveBeenCalled()
+    // O menu explica o rótulo em vez de simplesmente sumir com o par.
+    await userEvent.setup().click(screen.getByRole('button', { name: /Indisponível/ }))
+    expect(await screen.findByText(/fora do catálogo ativo/)).toBeTruthy()
+  })
+
+  it('R03 par disponível NÃO mostra aviso de indisponível', async () => {
+    const token = `pair:${encodeURIComponent('openai')}:${encodeURIComponent('gpt-4o')}`
+    renderInput({ model: token })
+    await waitFor(() => expect(screen.getByRole('button', { name: /OpenAI — gpt-4o/ })).toBeTruthy())
+    expect(screen.queryByText(/indisponível — escolha outro modelo/i)).toBeNull()
+  })
+})
