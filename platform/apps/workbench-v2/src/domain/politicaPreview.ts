@@ -98,6 +98,24 @@ export function classificarPreview(bytes: Uint8Array | undefined): Classificacao
   return falha('formato_nao_exibivel')
 }
 
+/** Seleciona apenas o elemento nativo a tentar. O servidor valida os bytes e o MIME servido. */
+export function sugerirPreviewPorNome(nome: string): ClassificacaoPreview {
+  const extensao = /\.([^.]+)$/.exec(nome.toLowerCase())?.[1]
+  switch (extensao) {
+    case 'png': return { ok: true, tipo: 'imagem', modalidade: 'imagem', mime: 'image/png' }
+    case 'jpg':
+    case 'jpeg': return { ok: true, tipo: 'imagem', modalidade: 'imagem', mime: 'image/jpeg' }
+    case 'gif': return { ok: true, tipo: 'imagem', modalidade: 'imagem', mime: 'image/gif' }
+    case 'webp': return { ok: true, tipo: 'imagem', modalidade: 'imagem', mime: 'image/webp' }
+    case 'wav': return { ok: true, tipo: 'audio', modalidade: 'audio', mime: 'audio/wav' }
+    case 'ogg':
+    case 'oga': return { ok: true, tipo: 'audio', modalidade: 'audio', mime: 'audio/ogg' }
+    case 'mp3': return { ok: true, tipo: 'audio', modalidade: 'audio', mime: 'audio/mpeg' }
+    case 'webm': return { ok: true, tipo: 'video', modalidade: 'video', mime: 'video/webm' }
+    default: return falha('formato_nao_exibivel')
+  }
+}
+
 /** Conveniência para a UI: tipo do card a partir da classificação. */
 export function modalidadeDoPreview(classificacao: ClassificacaoPreview): Modalidade {
   return classificacao.ok ? classificacao.modalidade : 'arquivo'

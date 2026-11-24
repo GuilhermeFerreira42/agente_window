@@ -166,6 +166,14 @@ async function recarregarComAck(page: Page): Promise<void> {
   await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
 }
 
+async function anexarPeloChat(page: Page, name: string, buffer: Buffer, mimeType: string): Promise<string> {
+  await page.locator('.chat-input-container input[type="file"]').first().setInputFiles({ name, mimeType, buffer })
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  const item = page.getByRole('list', { name: 'Anexos enviados' }).getByRole('listitem')
+  await expect(item).toHaveAttribute('data-artifact-id', /.+/)
+  return (await item.getAttribute('data-artifact-id'))!
+}
+
 const urlMidia = (sessionId: string, chatId: string, artifactId: string) =>
   `${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}/media`
 
@@ -186,7 +194,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await criarSessaoDeTexto(page, 'jornada c3b e01 imagem')
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
-    const artifactId = await publicarPelaApi(page, 'foto.png', png, 'image/png')
+    const artifactId = await anexarPeloChat(page, 'foto.png', png, 'image/png')
 
     // A rota serve com o MIME REAL e nosniff.
     const resposta = await page.request.get(urlMidia(sessionId, chatId, artifactId), { headers: headersApi })
@@ -198,17 +206,13 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     // DECODE REAL no navegador: naturalWidth > 0 é decodificação, não tag.
     await page.reload()
     await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
-    const decodificada = await page.evaluate(async (url) => {
-      const img = new Image()
-      img.src = url
-      return await new Promise<{ ok: boolean; w: number; h: number }>((res) => {
-        img.onload = () => res({ ok: true, w: img.naturalWidth, h: img.naturalHeight })
-        img.onerror = () => res({ ok: false, w: 0, h: 0 })
-      })
-    }, urlMidia(sessionId, chatId, artifactId))
-    expect(decodificada.ok, 'o navegador precisa DECODIFICAR o PNG').toBe(true)
-    expect(decodificada.w).toBe(8)
-    expect(decodificada.h).toBe(8)
+    const imagem = page.getByRole('img', { name: 'foto.png', exact: true })
+    await expect(imagem).toBeVisible()
+    await expect.poll(() => imagem.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight])).toEqual([8, 8])
+    await page.getByRole('button', { name: 'Abrir foto.png em tela cheia' }).click()
+    await expect(page.getByRole('dialog', { name: 'Visualização de foto.png' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Visualização de foto.png' })).toHaveCount(0)
 
     // Download íntegro com nome original.
     const download = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}?download=1`, { headers: headersApi })
@@ -223,40 +227,17 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await criarSessaoDeTexto(page, 'jornada c3b e02 audio')
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
-    const artifactId = await publicarPelaApi(page, 'som.wav', wav, 'audio/wav')
+    const artifactId = await anexarPeloChat(page, 'som.wav', wav, 'audio/wav')
 
-    const resultado = await page.evaluate(async ({ url }) => {
-      const audio = document.createElement('audio')
-      audio.preload = 'metadata'
-      audio.src = url
-      document.body.appendChild(audio)
-      const metadata = await new Promise<{ ok: boolean; duracao: number; erro?: string }>((res) => {
-        const limite = setTimeout(() => res({ ok: false, duracao: 0, erro: 'timeout' }), 10_000)
-        audio.onloadedmetadata = () => { clearTimeout(limite); res({ ok: true, duracao: audio.duration }) }
-        audio.onerror = () => { clearTimeout(limite); res({ ok: false, duracao: 0, erro: `code ${audio.error?.code}` }) }
-      })
-      if (!metadata.ok) { audio.remove(); return { metadata, tocou: false, tempo: 0, pausou: false, buscou: 0 } }
-
-      // SEM autoplay: o elemento começa pausado.
-      const comecouPausado = audio.paused
-      await audio.play().catch(() => undefined)
-      await new Promise((r) => setTimeout(r, 350))
-      const tocou = !audio.paused && audio.currentTime > 0
-      const tempo = audio.currentTime
-      audio.pause()
-      const pausou = audio.paused
-      audio.currentTime = 0.25
-      const buscou = audio.currentTime
-      audio.remove()
-      return { metadata, comecouPausado, tocou, tempo, pausou, buscou }
-    }, { url: urlMidia(sessionId, chatId, artifactId) })
-
-    expect(resultado.metadata.ok, `metadata do WAV (${resultado.metadata.erro ?? 'ok'})`).toBe(true)
-    expect(resultado.metadata.duracao).toBeCloseTo(0.5, 1)
-    expect(resultado.comecouPausado, 'áudio NÃO toca sozinho').toBe(true)
-    expect(resultado.tocou, 'currentTime precisa avançar').toBe(true)
-    expect(resultado.pausou).toBe(true)
-    expect(resultado.buscou).toBeCloseTo(0.25, 2)
+    const audio = page.getByRole('group', { name: 'som.wav, áudio' }).locator('audio')
+    await expect(audio).toBeVisible()
+    await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration)).toBeCloseTo(0.5, 1)
+    expect(await audio.evaluate((el: HTMLAudioElement) => el.paused)).toBe(true)
+    await audio.evaluate((el: HTMLAudioElement) => el.play())
+    await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime)).toBeGreaterThan(0)
+    await audio.evaluate((el: HTMLAudioElement) => { el.pause(); el.currentTime = 0.25 })
+    expect(await audio.evaluate((el: HTMLAudioElement) => el.paused)).toBe(true)
+    await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime)).toBeCloseTo(0.25, 2)
 
     // Download íntegro.
     const download = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}?download=1`, { headers: headersApi })
@@ -269,7 +250,7 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     await criarSessaoDeTexto(page, 'jornada c3b e03 video')
     await esperarPersistida(page)
     const { sessionId, chatId } = await sessaoAtiva(page)
-    const artifactId = await publicarPelaApi(page, 'clipe.webm', webm, 'video/webm')
+    const artifactId = await anexarPeloChat(page, 'clipe.webm', webm, 'video/webm')
     const url = urlMidia(sessionId, chatId, artifactId)
 
     // Range real: o player busca assim.
@@ -278,34 +259,13 @@ test.describe('C-3b — mídia (servidor real + Chromium real)', () => {
     expect(parcial.headers()['content-range']).toBe(`bytes 0-1023/${webm.length}`)
     expect((await parcial.body()).length).toBe(1024)
 
-    const resultado = await page.evaluate(async (endereco) => {
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.muted = true
-      video.src = endereco
-      document.body.appendChild(video)
-      const metadata = await new Promise<{ ok: boolean; w: number; h: number; dur: number; erro?: string }>((res) => {
-        const limite = setTimeout(() => res({ ok: false, w: 0, h: 0, dur: 0, erro: 'timeout' }), 15_000)
-        video.onloadedmetadata = () => { clearTimeout(limite); res({ ok: true, w: video.videoWidth, h: video.videoHeight, dur: video.duration }) }
-        video.onerror = () => { clearTimeout(limite); res({ ok: false, w: 0, h: 0, dur: 0, erro: `code ${video.error?.code}` }) }
-      })
-      if (!metadata.ok) { video.remove(); return { metadata, tocou: false, buscou: 0 } }
-      await video.play().catch(() => undefined)
-      await new Promise((r) => setTimeout(r, 400))
-      const tocou = !video.paused && video.currentTime > 0
-      video.currentTime = Math.min(0.4, video.duration / 2)
-      await new Promise((r) => setTimeout(r, 150))
-      const buscou = video.currentTime
-      video.pause()
-      video.remove()
-      return { metadata, tocou, buscou }
-    }, url)
-
-    expect(resultado.metadata.ok, `metadata do WebM (${resultado.metadata.erro ?? 'ok'})`).toBe(true)
-    expect(resultado.metadata.w, 'videoWidth > 0 prova frame decodificado').toBeGreaterThan(0)
-    expect(resultado.metadata.h).toBeGreaterThan(0)
-    expect(resultado.tocou, 'o vídeo precisa reproduzir de verdade').toBe(true)
-    expect(resultado.buscou).toBeGreaterThan(0)
+    const video = page.getByRole('group', { name: 'clipe.webm, vídeo' }).locator('video')
+    await expect(video).toBeVisible()
+    await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.videoWidth)).toBeGreaterThan(0)
+    await video.evaluate(async (el: HTMLVideoElement) => { el.muted = true; await el.play() })
+    await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThan(0)
+    await video.evaluate((el: HTMLVideoElement) => { el.pause(); el.currentTime = el.duration / 2 })
+    await expect.poll(() => video.evaluate((el: HTMLVideoElement) => Math.abs(el.currentTime - el.duration / 2))).toBeLessThan(0.05)
     await shot(page, 'c3b_e03_video')
   })
 

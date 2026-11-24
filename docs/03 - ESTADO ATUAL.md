@@ -1,8 +1,14 @@
-# Leitura vigente do roadmap — 20/11/2026
+# Leitura vigente do roadmap — 23/11/2026
 
-**Ponto atual: C-3a homologada; C-3b implementada, em revisão e aguardando homologação do proprietário.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
+**Ponto atual: C-3a e C-3b homologadas pelo proprietário. U-1 é a próxima fatia planejada.** A [sequência canônica completa até a Fatia 16 está no topo de 06](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#sequencia-vigente-ate-a-fatia-16): inclui as microfatias intercaladas P-A/P-B/P-C, C-1, MM-0, C-2, C-3a/C-3b, U-1, MM-I/MM-O e a retomada condicionada da extensibilidade. Não responder ao roadmap apenas com o plano antigo 13–20.
 
 As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
+
+---
+
+# Reteste de prévias da C-3b no chat
+
+O teste manual mostrou que anexos enviados pelo usuário ainda apareciam só como download. A correção reaproveita o visualizador na lista de anexos, com formato conferido na rota de mídia. No Windows, o Playwright passou 12/12. Os testes agora enviam PNG, WAV e WebM pelo campo de mensagem e verificam a imagem após F5 e a reprodução nos próprios players da conversa. MP4, M4A e RAR continuam com download. Checagem de tipos e lint dos arquivos alterados passaram. O proprietário confirmou depois o teste manual por “Salvar uma cópia separada” e o aceite da C-3b, conforme 08. A automação de recuperação prova a cópia dos arquivos pela API. A integração do mapa de arquivos no fluxo da interface segue registrada como limitação técnica para outros cenários.
 
 ---
 

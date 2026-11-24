@@ -1,3 +1,13 @@
+# Homologação C-3b — aceite explícito do proprietário, 23/11/2026
+
+O proprietário confirmou a homologação após testar o envio, a prévia de imagem no chat, o download e a jornada indicada pelo botão “Salvar uma cópia separada”. O teste do botão foi relatado pelo proprietário no próprio ambiente. O aceite cobre os cenários relatados.
+
+No Windows, o Codex verificou o envio de PNG, WAV e WebM pelo campo de mensagem, a prévia e a reprodução no chat, com 12 de 12 jornadas do Playwright aprovadas. A cópia dos arquivos na recuperação foi automatizada pela API. O fluxo do botão tem caminho próprio e a falta de integração com o mapa de anexos permanece como limite técnico para cenários além do relato manual.
+
+MP4, M4A e RAR têm download nesta versão. Interpretação de anexos e geração de mídia pelo modelo pertencem às próximas fatias.
+
+---
+
 # Homologação C-3a — aceite explícito do proprietário, 19/11/2026
 
 **O proprietário declarou: “Eu já fiz o pull e já homologuei o processo.”** Aceite da C-3a, incluindo os ajustes de nome original na cópia do projeto e opção “Salvar cópia na pasta do projeto” na tela inicial. Versão local conferida: `a49cc6c`, após `693051a`, na branch `0f2e5de2-agente-window`.

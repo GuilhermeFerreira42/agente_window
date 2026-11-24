@@ -23,7 +23,7 @@ import {
   type CardArtefato,
   type ItemApresentacao,
 } from '../domain/apresentacaoMultimodal'
-import type { ClassificacaoPreview } from '../domain/politicaPreview'
+import { sugerirPreviewPorNome, type ClassificacaoPreview } from '../domain/politicaPreview'
 import { baixarArtefato, urlDeMidia } from '../services/sessions/artefatosMediaClient'
 import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
@@ -346,9 +346,8 @@ function MessageRow({
         </div>
       </div>
       <div className="chat-message-body">
-        {/* C-3b — quando a mensagem tem envelope válido, as PARTES mandam na
-            ordem e o bloco legado sai de cena (senão o mesmo arquivo apareceria
-            duas vezes). Sem envelope, tudo abaixo continua exatamente como era. */}
+        {/* A mensagem com envelope segue a ordem das partes. Os anexos das outras
+            mensagens mantêm a lista original e ganham prévia quando compatíveis. */}
         {apresentacao.envelopeValido ? (
           <MessageParts
             itens={apresentacao.itens.filter((item) => item.tipo !== 'texto' || item.texto.length > 0)}
@@ -361,8 +360,22 @@ function MessageRow({
           />
         ) : message.attachments && message.attachments.length > 0 && (
           <div className="chat-message-attachments" role="list" aria-label="Anexos enviados">
-            {message.attachments.map((attachment) => (
-              <span
+            {message.attachments.map((attachment) => {
+              const { artifactId, name, bytes, estado } = attachment
+              const preview = sugerirPreviewPorNome(name)
+              if (preview.ok && sessionId && chatId && artifactId && (estado === 'pronto' || estado === 'referencia')) {
+                const card: CardArtefato = { artifactId, name, bytes, estado: 'pronto', modalidade: preview.modalidade, preview }
+                return (
+                  <div key={attachment.id} role="listitem" data-artifact-id={artifactId}>
+                    <MessageParts
+                      itens={[{ tipo: 'artefato', chave: artifactId, card }]}
+                      urlPara={() => urlDeMidia(sessionId, chatId, artifactId)}
+                      aoBaixar={() => { void baixarAnexoComNome(sessionId, chatId, artifactId, name) }}
+                    />
+                  </div>
+                )
+              }
+              return <span
                 className="chat-message-attachment"
                 key={attachment.id}
                 role="listitem"
@@ -386,7 +399,7 @@ function MessageRow({
                   ><Download size={11} aria-hidden="true" /></button>
                 )}
               </span>
-            ))}
+            })}
           </div>
         )}
         {(message.ferramentas?.length ?? 0) + (message.continuar?.length ?? 0) > 0 && (
