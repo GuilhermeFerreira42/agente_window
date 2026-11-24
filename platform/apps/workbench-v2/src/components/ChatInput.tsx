@@ -25,6 +25,8 @@ import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 import { ocupacaoContexto, type MedicaoContexto, type EstadoCompactacao } from '../domain/usoContexto'
 import { orcamentoContexto } from '../domain/capacidadeContexto'
+import { pedidoCompactarContexto, pedidoExclusoesAutomaticas, pedidoPermitirTudo } from '../domain/pedidosPermissao'
+import { portaDialogos } from '../shell/portaDialogos'
 
 interface ChatInputProps {
   session: Session
@@ -106,7 +108,9 @@ function CompactarContexto({ sessionId, chatId, model, disabled, onEstado }: {
   const chamada = useRef<AbortController | null>(null)
   useEffect(() => () => chamada.current?.abort(), [])
   async function compactar() {
-    if (chamada.current || !window.confirm('A compactação faz uma chamada ao modelo selecionado. As mensagens originais ficam no histórico. Compactar agora?')) return
+    if (chamada.current) return
+    // Diálogo INTERNO (sem pop-up nativo): cancelar/Esc não gasta chamada ao modelo.
+    if (!(await portaDialogos().confirmar(pedidoCompactarContexto()))) return
     const controle = new AbortController()
     chamada.current = controle
     setEstado({ ativo: true })
@@ -631,8 +635,10 @@ export function ChatInput({
       return
     }
     if (nextPermission === 'allow-all') {
-      const aceitou = window.confirm('ATENÇÃO — Permitir tudo: tools e comandos de terminal poderão executar sem confirmações individuais, acessar arquivos fora do workspace e modificar ou apagar dados, limitados pelos privilégios da sua conta no sistema operacional. Perguntar e Planejar continuam somente leitura; proteções do servidor e da origem local permanecem ativas. Você pode voltar a Permissões manuais a qualquer momento. Ativar?')
-      if (!aceitou) return
+      // Texto de risco com UM dono (`domain/pedidosPermissao`); diálogo interno.
+      // Cancelar/Esc fecha o menu sem chamar o dono da permissão.
+      const aceitou = await portaDialogos().confirmar(pedidoPermitirTudo())
+      if (!aceitou) { setPermissionOpen(false); return }
     }
     setPermissionBusy(true)
     setPermissionError(undefined)
@@ -933,8 +939,9 @@ export function ChatInput({
                   <span className="popover-option-description">{semPasta ? MOTIVO_PERMISSAO_SEM_PASTA : 'Sem confirmações individuais; limitado à conta do SO. Perguntar/Planejar continuam somente leitura.'}</span>
                   {permission === 'allow-all' && <Check size={12} aria-hidden="true" />}
                 </button>
-                <button className="popover-option permission-risk-option" role="menuitemcheckbox" aria-checked={automaticDeletes} type="button" disabled={permissionBusy || (permission !== 'allow-all' && !automaticDeletes)} onClick={() => {
-                  if (!automaticDeletes && !window.confirm('Permitir exclusões automáticas nesta conversa e pasta? A IA poderá enviar alvos da tarefa à Lixeira sem cartão individual, inclusive caminhos externos mencionados na sua instrução atual. Não autoriza exclusão permanente. Você pode desativar esta opção a qualquer momento.')) return
+                <button className="popover-option permission-risk-option" role="menuitemcheckbox" aria-checked={automaticDeletes} data-testid="permitir-exclusoes-automaticas" type="button" disabled={permissionBusy || (permission !== 'allow-all' && !automaticDeletes)} onClick={async () => {
+                  // Ativar exige escolha explícita em diálogo INTERNO; desativar nunca pergunta.
+                  if (!automaticDeletes && !(await portaDialogos().confirmar(pedidoExclusoesAutomaticas()))) return
                   setPermissionBusy(true)
                   setPermissionError(undefined)
                   void onChangeAutomaticDeletes(!automaticDeletes).catch((erro: unknown) => setPermissionError(erro instanceof Error ? erro.message : 'Não foi possível alterar a opção.')).finally(() => setPermissionBusy(false))

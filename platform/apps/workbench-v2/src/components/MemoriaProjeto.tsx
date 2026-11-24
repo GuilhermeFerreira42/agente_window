@@ -1,3 +1,5 @@
+import { portaDialogos } from '../shell/portaDialogos'
+import { pedidoGravarMemoria, pedidoExcluirMemoria } from '../domain/pedidosArquivo'
 import { BookMarked, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { LIMITE_CONTEUDO_MEMORIA, LIMITE_MOTIVO_MEMORIA, type MemoriaProjeto as Registro, type TipoMemoria } from '../domain/memoriaProjeto'
@@ -67,9 +69,9 @@ export function MemoriaProjeto({ sessionId, chatId, messages }: {
     }
   }
 
-  function gravar(evento: FormEvent) {
+  async function gravar(evento: FormEvent) {
     evento.preventDefault()
-    if (!conteudo.trim() || !window.confirm('Guardar este texto na memória deste projeto? Confira se ele pode ser persistido.')) return
+    if (!conteudo.trim() || !(await portaDialogos().confirmar(pedidoGravarMemoria()))) return
     void operar({ operacao: 'gravar', confirmado: true, id: edicao?.id, revisao: edicao?.revisao ?? 0,
       tipo, conteudo, motivo, messageId: messageId || undefined })
   }
@@ -115,8 +117,8 @@ export function MemoriaProjeto({ sessionId, chatId, messages }: {
         {registro.motivo && <small>Motivo: {registro.motivo}</small>}
         {registro.vigente && <div>
           <button type="button" disabled={ocupada} onClick={() => { setEdicao(registro); setTipo(registro.tipo); setConteudo(registro.conteudo); setMotivo(''); setMessageId('') }}>Editar memória</button>
-          <button type="button" disabled={ocupada} onClick={() => {
-            if (window.confirm('Excluir esta memória e todas as suas revisões?')) void operar({ operacao: 'excluir', confirmado: true, id: registro.id, revisao: registro.revisao })
+          <button type="button" disabled={ocupada} onClick={async () => {
+            if (await portaDialogos().confirmar(pedidoExcluirMemoria())) void operar({ operacao: 'excluir', confirmado: true, id: registro.id, revisao: registro.revisao })
           }}>Excluir memória</button>
         </div>}
       </div>)}

@@ -26,11 +26,23 @@ const editorTab = (name: string | RegExp) => within(document.querySelector('.edi
 // outro — importante agora que a visibilidade da barra auxiliar é por sessão.
 let streamsAgirAbertos: Set<ReadableStreamDefaultController<Uint8Array>>
 
+/**
+ * U-2 — o produto NÃO usa mais pop-up nativo: a confirmação de exclusão é um
+ * diálogo da aplicação (`conversa-delete-confirm`). Os casos que antes só
+ * clicavam em "Excluir sessão" agora aceitam explicitamente, como o dono faria.
+ */
+async function aceitarDialogoExclusao(user: ReturnType<typeof userEvent.setup>, rotulo = 'Excluir conversa') {
+  const dialogo = await screen.findByRole('dialog', { name: /^Excluir a conversa/ })
+  await user.click(within(dialogo).getByRole('button', { name: rotulo }))
+}
+
 beforeEach(() => {
   window.localStorage.clear()
-  // P-C: todo DELETE pede confirmação de alvo+consequência antes da solicitação.
-  // Padrão "dono aceita"; testes podem sobrescrever para recusar.
-  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  // U-2: nenhum fluxo migrado pode chamar pop-up nativo. O spy existe para
+  // FALHAR se alguém reintroduzir um; os testes de recusa usam o diálogo.
+  vi.spyOn(window, 'confirm').mockImplementation(() => {
+    throw new Error('window.confirm não deve ser usado: use o diálogo interno da aplicação (U-2)')
+  })
   streamsAgirAbertos = new Set()
   const fetchOriginal = globalThis.fetch.bind(globalThis)
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -223,6 +235,7 @@ describe('App session flows', () => {
     expect(browserEditorTab()).not.toBeInTheDocument()
 
     await user.click(within(restoredRow).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     expect(() => sessionRow('Replicar a Janela de Agentes')).toThrow('Session row not found')
     expect(sessionRow('Revisar alterações do workbench')).toHaveAttribute('aria-current', 'true')
   })
@@ -888,6 +901,7 @@ describe('App session flows', () => {
     expect(editorTabs()).toHaveLength(1)
 
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     expect(editorTabs()).toHaveLength(0)
     expect(screen.queryByRole('textbox', { name: 'Endereço' })).not.toBeInTheDocument()
     expect(screen.queryByText('Revisar alterações do workbench')).not.toBeInTheDocument()
@@ -1708,6 +1722,9 @@ describe('App session flows', () => {
     let deleteButtons = screen.queryAllByRole('button', { name: 'Excluir sessão' })
     while (deleteButtons.length > 0 && guard < 20) {
       await user.click(deleteButtons[0])
+      // Cada exclusão pede o diálogo do alvo (U-2) antes de qualquer remoção.
+      const dialogo = await screen.findByRole('dialog', { name: /^Excluir a conversa/ })
+      await user.click(within(dialogo).getByRole('button', { name: 'Excluir conversa' }))
       guard += 1
       deleteButtons = screen.queryAllByRole('button', { name: 'Excluir sessão' })
     }
@@ -1742,6 +1759,9 @@ describe('App session flows', () => {
     let deleteButtons = screen.queryAllByRole('button', { name: 'Excluir sessão' })
     while (deleteButtons.length > 0 && guard < 20) {
       await user.click(deleteButtons[0])
+      // Cada exclusão pede o diálogo do alvo (U-2) antes de qualquer remoção.
+      const dialogo = await screen.findByRole('dialog', { name: /^Excluir a conversa/ })
+      await user.click(within(dialogo).getByRole('button', { name: 'Excluir conversa' }))
       guard += 1
       deleteButtons = screen.queryAllByRole('button', { name: 'Excluir sessão' })
     }
@@ -2129,8 +2149,6 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
   it('confirma alvo+consequência, mostra `excluindo`, suspende envio e só remove após confirmação', async () => {
     const user = userEvent.setup()
     const { removePersistedSession } = await import('../services/sessions/sessionsClient')
-    const confirmacoes: string[] = []
-    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
     let liberar!: () => void
     vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
     render(<App initialSessionSnapshot={testSessions} />)
@@ -2138,10 +2156,16 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     // (sessão em working mostraria 'Parar execução' no mesmo botão).
     await user.click(sessionRow('Ajustar layout single-pane'))
     await user.click(within(sessionRow('Ajustar layout single-pane')).getByRole('button', { name: 'Excluir sessão' }))
-    // Confirmação ANTES da solicitação, nomeando o alvo e a consequência.
-    await waitFor(() => expect(confirmacoes).toHaveLength(1))
-    expect(confirmacoes[0]).toContain('Ajustar layout single-pane')
-    expect(confirmacoes[0]).toContain('outras conversas')
+    // U-2 — confirmação em diálogo INTERNO, antes da solicitação: nomeia o
+    // alvo, a consequência e começa no botão seguro (Cancelar).
+    const dialogo = await screen.findByRole('dialog', { name: /^Excluir a conversa “Ajustar layout single-pane”/ })
+    expect(dialogo).toHaveTextContent('outras conversas e edições ficam intactas')
+    expect(dialogo).not.toHaveTextContent('window')
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus()
+    expect(vi.mocked(removePersistedSession)).not.toHaveBeenCalled()
+    // Nada acontece antes da escolha: nem "excluindo", nem remoção.
+    expect(screen.queryByText(/Excluindo conversa: Ajustar layout single-pane/)).not.toBeInTheDocument()
+    await user.click(within(dialogo).getByRole('button', { name: 'Excluir conversa' }))
     // Estado visível; a conversa NÃO sai da lista como sucesso antes da confirmação.
     expect(await screen.findByText(/Excluindo conversa: Ajustar layout single-pane/)).toBeInTheDocument()
     expect(screen.getByText('Ajustar layout single-pane')).toBeInTheDocument()
@@ -2162,11 +2186,14 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(new Error('Não foi possível concluir a exclusão (falha injetada).')))
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
     expect(screen.getByText('Revisar alterações do workbench')).toBeInTheDocument()
     expect(screen.getAllByText('Não foi possível concluir a exclusão (falha injetada).').length).toBeGreaterThan(0)
-    // Retomada do MESMO alvo depois da falha.
+    // Retomada do MESMO alvo depois da falha — e o pedido de confirmação se
+    // repete (nenhum DELETE sem escolha explícita, nem na retentativa).
     await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    await aceitarDialogoExclusao(user)
     expect(await screen.findByText('Sessão excluída')).toBeInTheDocument()
     expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
     expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2)
@@ -2202,6 +2229,7 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     // POST /api/agir disparou ⇒ controle real publicou identidade para o cancel.
     await waitFor(() => expect(postsAgir).toBeGreaterThanOrEqual(1))
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     // A tentativa fica visível EnQuanto o abort não termina…
     expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
     liberarCancel()
@@ -2214,6 +2242,7 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     // Controle MANTIDO em `agirAtivas`: a retomada ainda enxerga o run vivo e
     // falha de novo em vez de partir para o DELETE às cegas.
     await user.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+    await aceitarDialogoExclusao(user)
     expect(await screen.findByText(/Excluindo conversa: Revisar alterações do workbench/)).toBeInTheDocument()
     liberarCancel()
     expect(await screen.findByText(/Exclusão não concluída: Revisar alterações do workbench/)).toBeInTheDocument()
@@ -2229,6 +2258,7 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     vi.mocked(removePersistedSession).mockImplementationOnce(() => new Promise<'concluido'>((resolve) => { liberar = () => resolve('concluido') }))
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     expect(await screen.findByText(/Excluindo conversa/)).toBeInTheDocument()
     // Enquanto a exclusão espera, o DONO arquiva outra conversa (muda o estado).
     await user.click(within(sessionRow('Replicar a Janela de Agentes')).getByRole('button', { name: 'Arquivar' }))
@@ -2258,8 +2288,29 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     await screen.findByText('Revisar alterações do workbench')
     storageQuebrado = true
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
     expect(await screen.findByText(/Sessão excluída; não foi possível limpar a cópia de recuperação/)).toBeInTheDocument()
     expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')
+  })
+
+  it('recusar descarte do worktree libera a sessão para nova tentativa', async () => {
+    const user = userEvent.setup()
+    const { removePersistedSession, SessionPersistenceError } = await import('../services/sessions/sessionsClient')
+    const sujo = new SessionPersistenceError('worktree sujo', 409)
+    ;(sujo as { code?: string }).code = 'worktree_dirty'
+    vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(sujo))
+    render(<App initialSessionSnapshot={testSessions} />)
+    const titulo = 'Revisar alterações do workbench'
+    await user.click(within(sessionRow(titulo)).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
+    const descarte = await screen.findByRole('dialog', { name: /descartar as alterações locais/ })
+    await user.click(within(descarte).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(within(sessionRow(titulo)).getByRole('button', { name: 'Excluir sessão' })).toBeEnabled())
+    expect(vi.mocked(removePersistedSession)).toHaveBeenCalledTimes(1)
+    await user.click(within(sessionRow(titulo)).getByRole('button', { name: 'Excluir sessão' }))
+    await aceitarDialogoExclusao(user)
+    await screen.findByText('Sessão excluída')
+    expect(vi.mocked(removePersistedSession)).toHaveBeenCalledTimes(2)
   })
 
   it('worktree sujo: recusa, confirmação específica de descarte e force explícito (P-T08)', async () => {
@@ -2268,13 +2319,16 @@ describe('P-C — exclusão idempotente na UI (SPEC §6, P-T07/P-T08/P-T10)', ()
     const sujo = new SessionPersistenceError('worktree sujo', 409)
     ;(sujo as { code?: string }).code = 'worktree_dirty'
     vi.mocked(removePersistedSession).mockImplementationOnce(() => Promise.reject(sujo))
-    const confirmacoes: string[] = []
-    vi.mocked(window.confirm).mockImplementation((message) => { confirmacoes.push(String(message)); return true })
     render(<App initialSessionSnapshot={testSessions} />)
     await user.click(within(sessionRow('Revisar alterações do workbench')).getByRole('button', { name: 'Excluir sessão' }))
-    // fluxo: recusa → confirmação específica → force (nunca force implícito)
+    await aceitarDialogoExclusao(user)
+    // fluxo: recusa do servidor → confirmação ESPECÍFICA de descarte → force
+    // (nunca force implícito). O segundo pedido é outro diálogo, com o risco
+    // das alterações locais escrito por extenso.
+    const descarte = await screen.findByRole('dialog', { name: /descartar as alterações locais/ })
+    expect(descarte).toHaveTextContent('alterações locais')
+    await user.click(within(descarte).getByRole('button', { name: 'Excluir e descartar' }))
     await waitFor(() => expect(vi.mocked(removePersistedSession).mock.calls.length).toBeGreaterThanOrEqual(2))
-    expect(confirmacoes.some((mensagem) => mensagem.includes('alterações locais'))).toBe(true)
     expect(vi.mocked(removePersistedSession).mock.calls[1][1]).toMatchObject({ force: true, expectedRevision: expect.any(Number) })
     await screen.findByText('Sessão excluída')
     expect(() => sessionRow('Revisar alterações do workbench')).toThrow('Session row not found')

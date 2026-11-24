@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { useState } from 'react'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionLanding } from '../components/SessionLanding'
 import type { RascunhoLanding } from '../domain/landingDraft'
@@ -263,18 +263,25 @@ describe('c2Composer — C2-T18/RV06 menus com teclado e retorno ao acionador', 
     expect(screen.getByRole('menuitem', { name: /Autopilot/ })).toBeDisabled()
     await user.click(screen.getByRole('menuitemradio', { name: /Planejar/ }))
     expect(screen.getByTestId('landing-interativo')).toHaveTextContent('Planejar')
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    // U-2 — a tela inicial usa o MESMO diálogo interno do chat: recusar não
+    // aplica; aceitar aplica. Nenhum pop-up nativo.
+    const nativo = vi.spyOn(window, 'confirm')
     await user.click(screen.getByRole('button', { name: /^Permissão:/ }))
     expect(screen.getByRole('menuitem', { name: /Permissões assistidas/ })).toBeDisabled()
     await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    const recusa = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    expect(recusa).toHaveTextContent('privilégios da sua conta no sistema operacional')
+    await user.click(within(recusa).getByRole('button', { name: 'Cancelar' }))
     expect(screen.getByRole('button', { name: /^Permissão:/ })).toHaveTextContent('Permissões manuais')
+    // O menu já foi fechado antes da pergunta (o modal é do app inteiro).
     await user.click(screen.getByRole('button', { name: /^Permissão:/ }))
     await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    const aceite = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    await user.click(within(aceite).getByRole('button', { name: 'Ativar Permitir tudo' }))
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'planejar sem editar')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     expect(submit).toHaveBeenCalledWith(expect.objectContaining({ snapshot: expect.objectContaining({ modo: 'plan', permissao: 'allow-all' }) }))
-    expect(confirm).toHaveBeenCalledTimes(2)
-    confirm.mockRestore()
+    expect(nativo).not.toHaveBeenCalled()
   })
   it('Agente seleciona de fato; Escape e clique fora fecham o menu portado', async () => {
     const user = userEvent.setup(); montar(() => false)

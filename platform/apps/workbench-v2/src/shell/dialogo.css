@@ -1,0 +1,196 @@
+/* ============================================================================
+   shell/dialogo.css — tokens da casca dos diálogos internos da aplicação.
+
+   Medidas copiadas do diálogo homologado do Explorer (dialog.css via
+   `modules/explorer-search/ui/search/search.css`): 498 px, radius 12,
+   padding 8, botões de 26 px, fundo `editorWidget-background`, borda
+   `widget-border`, sombra `widget-shadow`, véu `dialog-modalBlockBackground`.
+   Copiar (em vez de importar) é exigência da fronteira LEGO: o shell não
+   importa caminhos internos do módulo `explorer-search` (FT-01).
+
+   Nenhuma cor literal: tudo vem dos tokens do tema (escuro em :root, claro em
+   `.theme-light`), então claro e escuro já funcionam sem regra extra.
+   ========================================================================= */
+
+.monaco-dialog-modal-block.dialogo-app {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--vscode-dialog-modalBlockBackground, rgba(0, 0, 0, 0.36));
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: 13px;
+}
+
+.dialogo-app .monaco-dialog-box {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  box-sizing: border-box;
+  width: 498px;
+  max-width: calc(100% - 40px);
+  padding: 8px;
+  border-radius: 12px;
+  color: var(--vscode-editorWidget-foreground);
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-widget-border);
+  box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+  outline: none;
+}
+
+.dialogo-app .dialog-message-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 24px 24px 20px 24px;
+}
+
+.dialogo-app .dialog-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-right: 24px;
+  color: var(--vscode-problemsWarningIcon-foreground);
+}
+
+.dialogo-app .dialog-icon--pergunta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: 600;
+  border: 2px solid currentColor;
+  color: var(--vscode-problemsInfoIcon-foreground, var(--vscode-focusBorder));
+}
+
+.dialogo-app .dialog-message-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.dialogo-app .dialog-message {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  word-wrap: break-word;
+}
+
+.dialogo-app .dialog-message-detail {
+  font-size: 12px;
+  line-height: 16px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  user-select: text;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dialogo-app .dialog-buttons-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 20px 16px 20px;
+}
+
+.dialogo-app .dialog-buttons { display: flex; overflow: hidden; }
+
+.dialogo-app .dialogo-botao {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 4px 10px;
+  margin-left: 8px;
+  border-radius: 2px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+}
+
+.dialogo-app .dialogo-botao:hover { background-color: var(--vscode-button-secondaryHoverBackground); }
+
+.dialogo-app .dialogo-botao--primario {
+  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background);
+}
+
+.dialogo-app .dialogo-botao--primario:hover { background-color: var(--vscode-button-hoverBackground); }
+
+/* Ação destrutiva: mesma família visual do erro do tema, texto sempre legível. */
+.dialogo-app .dialogo-botao--perigo {
+  color: var(--vscode-inputValidation-errorForeground, #ffffff);
+  background-color: var(--vscode-errorForeground);
+  border-color: var(--vscode-errorForeground);
+}
+
+.dialogo-app .dialogo-botao--perigo:hover { filter: brightness(1.1); }
+
+.dialogo-app .dialogo-botao:focus-visible,
+.dialogo-app .dialogo-fechar:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.dialogo-app .dialog-toolbar-row { position: absolute; top: 8px; right: 8px; }
+.dialogo-app .dialog-toolbar .actions-container { display: flex; margin: 0; padding: 0; list-style: none; }
+.dialogo-app .dialogo-fechar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  font-size: 13px;
+  background: transparent;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+}
+.dialogo-app .dialogo-fechar:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+
+/* Telas estreitas: o diálogo ocupa a largura útil e os botões quebram. */
+@media (max-width: 520px) {
+  .dialogo-app .dialog-buttons-row { padding: 0 12px 12px 12px; }
+  .dialogo-app .dialog-buttons { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .dialogo-app .dialogo-botao { margin-left: 0; }
+  .dialogo-app .dialog-message-row { padding: 20px 16px 12px 16px; }
+  .dialogo-app .dialog-icon { margin-right: 12px; }
+}
+
+/* Campo de texto (substitui `window.prompt`): mesma paleta de input do tema. */
+.dialogo-app .dialogo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.dialogo-app .dialogo-campo input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  padding: 3px 6px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border));
+  border-radius: 2px;
+  outline: none;
+}
+.dialogo-app .dialogo-campo input:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.dialogo-app .dialogo-botao:disabled { opacity: .5; cursor: default; }

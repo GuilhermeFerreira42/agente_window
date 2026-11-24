@@ -11,6 +11,8 @@ import {
   admitirAnexo, enviarConteudoAnexo, estadoAnexo, registrarReferenciaAnexo,
 } from './anexosClient'
 import { guardarRecibo } from '../../domain/rascunhoTransferencia'
+import { pedidoEscolhaAnexos, TEXTO_ESCOLHA_ANEXOS } from '../../domain/pedidosArquivo'
+import { portaDialogos } from '../../shell/portaDialogos'
 
 /** Transporte real dos anexos (mesmo origin, sem provedor de IA). */
 export const transporteAnexosHttp: TransporteAnexos = {
@@ -21,8 +23,9 @@ export const transporteAnexosHttp: TransporteAnexos = {
   estado: (sessionId, chatId, uploadId) => estadoAnexo(sessionId, chatId, uploadId),
 }
 
-const MENSAGEM_ESCOLHA = 'Os arquivos serão armazenados nesta conversa, mas NÃO serão enviados ao modelo nesta fase (sem codec). '
-  + 'Continuar apenas com o texto? Os arquivos ficam disponíveis para download na conversa.'
+/** U-2 — o texto tem UM dono (`domain/pedidosArquivo`); aqui só reexporta para
+ *  os consumidores antigos do serviço. */
+export const MENSAGEM_ESCOLHA = TEXTO_ESCOLHA_ANEXOS
 
 /**
  * Landing (primeiro envio): escolha + transferência ANTES de abrir a
@@ -38,7 +41,8 @@ export async function prepararAnexosDaLanding(entrada: {
 }): Promise<Attachment[]> {
   if (entrada.anexos.length === 0) return []
   if (entrada.texto.trim() && !entrada.escolhaJaFeita) {
-    const escolha = window.confirm(MENSAGEM_ESCOLHA)
+    // Diálogo INTERNO (sem pop-up nativo): recusar preserva o rascunho inteiro.
+    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos())
     if (!escolha) throw new Error('Envio cancelado; o rascunho foi preservado.')
   }
   const transferencia = await transferirAnexos({
@@ -182,7 +186,7 @@ export async function enviarMensagemComAnexos(entrada: {
   // R10 — opção explícita ANTES de qualquer transferência; sem escolha,
   // nada muda e o rascunho fica intacto.
   if (text.trim() && !todosProntos && !opcoes?.escolhaJaFeita) {
-    const escolha = window.confirm(MENSAGEM_ESCOLHA)
+    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos())
     if (!escolha) return 'abortado'
   }
 

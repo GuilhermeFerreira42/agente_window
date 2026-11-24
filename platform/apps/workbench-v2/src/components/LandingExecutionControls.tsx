@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, MessageSquare, ShieldCheck, Wand2 } from 'lucide-react'
 import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
 import { isNavigationKey, nextRovingIndex } from '../domain/keyboardNavigation'
+import { pedidoPermitirTudo } from '../domain/pedidosPermissao'
+import { portaDialogos } from '../shell/portaDialogos'
 
 interface Props {
   modo: ModoAgir
@@ -61,9 +63,17 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
   }, [open, close])
 
   const chooseMode = (value: ModoAgir) => { if (!locked && (!semPasta || value === 'ask')) { onModo(value); close() } }
-  const choosePermission = (value: NivelPermissaoAgir) => {
+  const choosePermission = async (value: NivelPermissaoAgir) => {
     if (locked || (semPasta && value !== 'manual')) return
-    if (value === 'allow-all' && !window.confirm('ATENÇÃO — Permitir tudo: tools e comandos de terminal poderão executar sem confirmações individuais, acessar arquivos fora do workspace e modificar ou apagar dados, limitados pelos privilégios da sua conta no sistema operacional. Perguntar e Planejar continuam somente leitura; proteções do servidor e da origem local permanecem ativas. Você pode voltar a Permissões manuais a qualquer momento. Ativar?')) { close(); return }
+    if (value === 'allow-all') {
+      // Mesmo texto de risco do chat (`domain/pedidosPermissao`), agora em
+      // diálogo interno. Fechar o menu antes é deliberado: o modal é do app
+      // inteiro e o menu não pode ficar "por cima" da pergunta.
+      close()
+      if (!(await portaDialogos().confirmar(pedidoPermitirTudo()))) return
+      onPermissao(value)
+      return
+    }
     onPermissao(value); close()
   }
   const label = modos.find((item) => item.id === mode)?.label ?? mode
@@ -115,11 +125,11 @@ export function LandingExecutionControls({ modo, permissao, semPasta, pending, o
           Permissões <small>{permissionLabel}</small>
         </button>
         {open === 'permissoes' && <>
-          <button type="button" role="menuitemradio" aria-checked={permission === 'manual'} className="session-landing-menu-item" disabled={locked} onClick={() => choosePermission('manual')}>
+          <button type="button" role="menuitemradio" aria-checked={permission === 'manual'} className="session-landing-menu-item" disabled={locked} onClick={() => void choosePermission('manual')}>
             <span><strong>Permissões manuais</strong><small>Solicita as aprovações necessárias</small></span></button>
           <button type="button" role="menuitem" className="session-landing-menu-item" disabled title="Permissões assistidas ainda não estão disponíveis.">
             <span>Permissões assistidas<small>Ainda não disponíveis</small></span></button>
-          <button type="button" role="menuitemradio" aria-checked={permission === 'allow-all'} className="session-landing-menu-item" disabled={locked || semPasta} onClick={() => choosePermission('allow-all')}>
+          <button type="button" role="menuitemradio" aria-checked={permission === 'allow-all'} className="session-landing-menu-item" disabled={locked || semPasta} onClick={() => void choosePermission('allow-all')}>
             <span><strong>Permitir tudo</strong><small>{semPasta ? 'Disponível apenas em conversa com pasta' : 'Requer confirmação a cada ativação'}</small></span></button>
           <button type="button" role="menuitem" className="session-landing-menu-item" disabled title="Sandbox de terminal ainda não está disponível.">
             <span>Sandbox de terminal<small>Ainda não disponível</small></span></button>

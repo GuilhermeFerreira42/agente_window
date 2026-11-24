@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { assertWorkbenchInvariants } from '../../domain/sessionState'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../types'
@@ -228,11 +228,11 @@ describe('visible persistence conflicts and safe recovery', () => {
   })
 
   it('reloads only after confirmation and resumes from the server base', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Harness />)
     await userEvent.click(await screen.findByRole('button', { name: 'Recarregar versão salva' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Recarregar a versão salva desta conversa?' })
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Recarregar versão salva' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(window.confirm).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('local-state')).toHaveTextContent('SERVER_NEWER_SNAPSHOT')
     expect(screen.getByTestId('local-state')).not.toHaveTextContent('UNSAVED_AFTER_409')
   })

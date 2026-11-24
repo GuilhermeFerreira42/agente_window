@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '../../types'
 import { isSessionDirty, loadPersistedSession, persistSession, persistRecoveryCopy, persistSessionNoUnload, resumeSessionPersistence, retrySessionPersistence, sessionFingerprint, SessionPersistenceError } from './sessionsClient'
 import { createRecoveryCopy, MENSAGEM_EXCLUIDA_COPIA_SALVA, readSessionRecoveries, removeSessionRecovery, sanitizarRecuperacao, storeSessionRecovery } from './sessionRecovery'
+import { pedidoRecarregarVersaoSalva } from '../../domain/pedidosArquivo'
+import { portaDialogos } from '../../shell/portaDialogos'
 
 type Kind = 'unavailable' | 'conflict' | 'local' | 'excluindo' | 'falha_exclusao' | 'excluida'
 interface PersistenceIssue { message: string; backupAvailable: boolean; kind?: Kind }
@@ -95,7 +97,8 @@ export function useSessionPersistence(sessions: Session[], hydrated: boolean, on
   const reload = useCallback(async (id: string) => {
     if (busy.current) return
     const source = latest.current.find(s => s.id === id); if (!source) return
-    if (!window.confirm('Recarregar a versão salva substituirá as edições locais desta conversa. Salve uma cópia antes se quiser mantê-las. Continuar?')) return
+    // U-2 — diálogo interno; fechar (Esc/✕/fundo) mantém as edições locais.
+    if (!(await portaDialogos().confirmar(pedidoRecarregarVersaoSalva()))) return
     busy.current = true; setRecovering(id)
     try {
       const remote = await loadPersistedSession(id)

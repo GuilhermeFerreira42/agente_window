@@ -16,8 +16,9 @@ import type { AlvoConversa, ObterAlvo } from '../bairros/2-inteligencia/casas/co
 import { transferirAnexos, type ReciboTransporte, type TransporteAnexos } from '../domain/enviarAnexos'
 import { arquivoVivo, guardarArquivoVivo, limparTodosArquivosVivos } from '../domain/arquivosVivos'
 import { fundirEstadoAnexos, type ListaAnexos } from '../services/sessions/anexosClient'
+import { esquecerPortaDialogos } from '../shell/portaDialogos'
 import { useState } from 'react'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionLanding } from '../components/SessionLanding'
 import { chatIdDaSessao, derivarTitulo, executarPrimeiroEnvio, type PortasPrimeiroEnvio, type TentativaConfirmada } from '../domain/primeiroEnvio'
@@ -138,7 +139,7 @@ function depsChat(opcoes: { obterAlvo: ObterAlvo; gravarExecucao?: DependenciasA
   }
 }
 
-afterEach(() => { vi.unstubAllGlobals() })
+afterEach(() => { esquecerPortaDialogos(); vi.unstubAllGlobals() })
 
 describe('c3aSend — T24: provedores simulados e storage independente de IA', () => {
   it('C3A-T24 — texto normal com Google e NVIDIA simulados: preservado no payload, Chat sem tools de workspace, storage gravado', async () => {
@@ -452,7 +453,17 @@ describe('c3aSend — T03: um dono fixo sob duplo clique/resposta atrasada/conte
 
 // --------------------------------------------------------------------- T23
 describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de modelo', () => {
-  function portasRegistro(opcoes: { confirmar: boolean }) {
+  /**
+   * U-2 — a escolha agora é o diálogo INTERNO da aplicação. O teste espera o
+   * diálogo abrir e responde como o dono; nada de `window.confirm`.
+   */
+  async function escolherNoDialogo(aceitar: boolean) {
+    const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados\?/ })
+    expect(dialogo).toHaveTextContent('NÃO serão enviados ao modelo nesta fase (sem codec)')
+    fireEvent.click(within(dialogo).getByRole('button', { name: aceitar ? 'Continuar com o texto' : 'Cancelar' }))
+  }
+
+  function portasRegistro(_opcoes: { confirmar: boolean }) {
     const registro = {
       runs: [] as Array<{ texto: string; historico: unknown; modelSelection: unknown }>,
       persistidas: [] as Session[],
@@ -460,8 +471,6 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
       notas: [] as string[],
       statusAplicados: [] as string[],
     }
-    const original = window.confirm
-    window.confirm = () => opcoes.confirmar
     const portas = {
       obterSessao: () => ({ ...sessaoParaT23(), chats: sessaoParaT23().chats }),
       obterHistorico: () => [],
@@ -475,7 +484,7 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
       tempo: () => '10:00',
       modoAtual: 'agent' as const,
     }
-    return { registro, portas, restaurar: () => { window.confirm = original } }
+    return { registro, portas, restaurar: () => {} }
   }
 
   function sessaoParaT23(): Session {
@@ -501,25 +510,29 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
       // Rascunho ainda NÃO transferido: é exatamente o caso em que o produto
       // precisa da escolha explícita antes de continuar sem o conteúdo.
       const rascunho: Attachment = { ...anexoPronto(), estado: 'selecionado', artifactId: undefined }
-      const resultado = await enviarMensagemComAnexos({
+      const envio = enviarMensagemComAnexos({
         sessionId: 'sessao-t23', chatId: 'chat-t23', text: 'mensagem com anexo', attachments: [rascunho],
         modelSelection: { tipo: 'auto' }, portas: portas as never,
       })
-      expect(resultado).toBe('abortado')
+      await escolherNoDialogo(false)
+      expect(await envio).toBe('abortado')
       expect(registro.persistidas).toEqual([])
       expect(registro.runs).toEqual([])
       expect(registro.notas).toEqual([])
     } finally { restaurar() }
   })
 
-  it('C3A-T23 — aceitar a exclusão: só o TEXTO vai ao modelo, o anexo fica excluído-sem-codec e nunca vira conteúdo', async () => {
+  it('C3A-T23 — anexo já transferido não repergunta: só o TEXTO vai ao modelo e o chip declara excluído-sem-codec', async () => {
+    // A escolha só existe quando há o que transferir (anexo NÃO pronto). Com o
+    // recibo já pronto o fluxo segue direto — e nenhum diálogo aparece.
     const { registro, portas, restaurar } = portasRegistro({ confirmar: true })
     try {
-      const resultado = await enviarMensagemComAnexos({
+      const envio = enviarMensagemComAnexos({
         sessionId: 'sessao-t23', chatId: 'chat-t23', text: 'só este texto deve ir', attachments: [anexoPronto()],
         modelSelection: { tipo: 'auto' }, portas: portas as never,
       })
-      expect(resultado).toBe('publicado')
+      expect(await envio).toBe('publicado')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(registro.runs).toHaveLength(1)
       // O run recebe SOMENTE o texto digitado — nenhum nome de arquivo disfarçado.
       expect(registro.runs[0].texto).toBe('só este texto deve ir')

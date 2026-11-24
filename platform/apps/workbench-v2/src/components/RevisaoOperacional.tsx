@@ -1,3 +1,5 @@
+import { portaDialogos } from '../shell/portaDialogos'
+import { pedidoRetomarPlanejamento } from '../domain/pedidosArquivo'
 import { RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { RevisaoOperacional as Revisao } from '../domain/retomadaOperacional'
@@ -54,8 +56,8 @@ export function RevisaoOperacional({ sessionId, chatId, interrompida, ocupada, p
         </div>)}
         {!revisao.podePlanejar && <p role="status">Inspecione a pasta e os resultados antes de iniciar uma nova tarefa.</p>}
         <button type="button" className="primary-button" disabled={!revisao.podePlanejar || estado?.ativa || ocupada}
-          onClick={() => {
-            if (window.confirm('Iniciar um novo planejamento, sem executar ferramentas?')) { setAberta(false); planejar(revisao.runId) }
+          onClick={async () => {
+            if (await portaDialogos().confirmar(pedidoRetomarPlanejamento())) { setAberta(false); planejar(revisao.runId) }
           }}>Retomar planejamento</button>
       </>}
     </div>}

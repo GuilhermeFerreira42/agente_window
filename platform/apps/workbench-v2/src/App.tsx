@@ -20,6 +20,10 @@ import { SessionLoadNotices, SessionPersistenceNotice } from './services/session
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
 import { manageHistoryAccess } from './services/sessions/historyAccessClient'
+import { excluirConversa } from './domain/exclusaoConversa'
+import { semSessao } from './domain/limpezaDeSessao'
+import { pedidoDeConfirmacao } from './domain/dialogoConfirmacao'
+import { portaDialogos } from './shell/portaDialogos'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
 import { PersonalizacoesView, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
@@ -1508,6 +1512,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const limparExcluindo = (id: string) => {
     setExcluindo((current) => { const next = new Set(current); next.delete(id); return next })
   }
+  const marcarExcluindo = (id: string) => setExcluindo((current) => new Set(current).add(id))
+  const limparFalhaExclusao = (id: string) => setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
   const falhaDeExclusao = (id: string, error: unknown) => {
     limparExcluindo(id)
     const message = error instanceof Error && error.message
@@ -1516,59 +1522,38 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setFalhasExclusao((current) => new Map(current).set(id, message))
     notify(message)
   }
+  // P-C §2 / P-T08 — a REGRA do fluxo mora em `domain/exclusaoConversa.ts`
+  // (alvo e consequência antes da solicitação; worktree sujo com confirmação
+  // própria; execução viva cancelada antes do DELETE; `limpeza_pendente`
+  // retomável). Aqui só conectamos as portas — nenhuma decisão de risco no App.
   const handleDelete = async (id: string) => {
     if (excluindo.has(id)) return
     const alvo = sessionsRef.current.find((s) => s.id === id)
     if (!alvo) return
-    // P-C §2 — alvo e consequência confirmados ANTES da solicitação; a lista
-    // não perde a conversa como sucesso antes da confirmação do servidor.
-    const confirmado = window.confirm(`Excluir a conversa "${alvo.title}"? O histórico e os dados dela serão removidos. As outras conversas e edições ficam intactas.`)
-    if (!confirmado) return
-    setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
-    // P-C §2/PC-R1 — o estado `excluindo` entra ANTES do cancelamento: o dono
-    // vê a tentativa enquanto o abort corre; uma falha desce para `falha_exclusao`.
-    setExcluindo((current) => new Set(current).add(id))
-    // Run vivo → cancelamento até estado terminal (P-T07/PC-R1). `pending` ou
-    // erro = run AINDA ATIVO: falha honesta e retomável SEM chamar o DELETE, e o
-    // controle permanece em `agirAtivas` (a retomada volta a enxergar o run).
-    // Um retorno tardio é recusado pelo servidor e não reabre a conversa.
-    const emVoo = [...agirAtivas.current.entries()].filter(([runKey]) => runKey.startsWith(`${id}:`))
-    const resultados = await Promise.all(emVoo.map(async ([runKey, controle]) => {
-      try { return { runKey, estado: await controle.abortar() } }
-      catch { return { runKey, estado: 'pending' as const } }
-    }))
-    const algumNaoTerminal = resultados.some(({ estado }) =>
-      estado !== 'cancelled' && estado !== 'cancelled_with_effects' && estado !== 'already_terminal')
-    if (algumNaoTerminal) {
-      falhaDeExclusao(id, new Error('A execução desta conversa ainda não terminou. Aguarde a parada terminar e tente excluir novamente.'))
-      return
-    }
-    for (const { runKey } of resultados) agirAtivas.current.delete(runKey)
-    try {
-      const estado = await removePersistedSession(id, { expectedRevision: alvo.persistenceRevision ?? 0 })
-      if (estado === 'limpeza_pendente') {
-        falhaDeExclusao(id, new Error('A exclusão foi registrada, mas a limpeza ainda não concluiu. Tente novamente para retomar.'))
-        return
-      }
-    } catch (error) {
-      if (error instanceof SessionPersistenceError && error.code === 'worktree_dirty') {
-        const descartar = window.confirm('Este worktree possui alterações locais. Excluir a conversa e descartar essas alterações?')
-        if (!descartar) { limparExcluindo(id); return }
-        try {
-          const estado = await removePersistedSession(id, { force: true, expectedRevision: alvo.persistenceRevision ?? 0 })
-          if (estado === 'limpeza_pendente') {
-            throw new Error('A exclusão foi registrada, mas a limpeza ainda não concluiu. Tente novamente para retomar.')
-          }
-        } catch (forcedError) { falhaDeExclusao(id, forcedError); return }
-      } else {
-        if (error instanceof SessionPersistenceError && error.code === 'session_save_uncertain') {
-          limparExcluindo(id)
-          notify(error.message)
-        } else falhaDeExclusao(id, error)
-        return
-      }
-    }
-    concluirExclusaoLocal(id)
+    // Só marca e limpa falhas após o aceite; captura execuções naquele momento,
+    // não antes do diálogo assíncrono, e conserva controles não terminais.
+    const resultado = await excluirConversa(
+      { id, titulo: alvo.title, persistenciaRevisao: alvo.persistenceRevision ?? 0 },
+      {
+        confirmar: (pedido) => portaDialogos().confirmar(pedido),
+        comecar: () => { limparFalhaExclusao(id); marcarExcluindo(id) },
+        solicitarRemocao: (opcoes) => removePersistedSession(id, opcoes),
+        cancelarExecucoes: async () => {
+          const emVoo = [...agirAtivas.current.entries()].filter(([runKey]) => runKey.startsWith(`${id}:`))
+          const estados = await Promise.all(emVoo.map(async ([, controle]) => {
+            try { return await controle.abortar() } catch { return 'pending' as const }
+          }))
+          if (estados.every((estado) => estado !== 'pending')) for (const [chave, controle] of emVoo) if (agirAtivas.current.get(chave) === controle) agirAtivas.current.delete(chave)
+          return estados
+        },
+        concluir: () => concluirExclusaoLocal(id),
+        // `session_save_uncertain`: nada foi pedido; a mensagem do dono da fila basta.
+        falhar: (erro) => erro instanceof SessionPersistenceError && erro.code === 'session_save_uncertain'
+          ? (limparExcluindo(id), notify(erro.message)) : falhaDeExclusao(id, erro),
+        codigoDoErro: (erro) => erro instanceof SessionPersistenceError ? erro.code : undefined,
+      },
+    )
+    if (resultado === 'cancelada') limparExcluindo(id)
   }
 
   const concluirExclusaoLocal = (id: string, preservarRecuperacao = false) => {
@@ -1589,49 +1574,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setSessions((current) => current.filter((session) => session.id !== id))
     const nextResources = removeSessionResources(id)
     sessionLayouts.current = forgetSessionLayout(sessionLayouts.current, id)
-    if (activeSessionId === id) {
-      // Ao excluir a última sessão, cai na tela inicial (landing) — não há
-      // próxima sessão para ativar.
-      const nextSessionId = restantes[0]?.id
-      const nextTab = nextSessionId
-        ? preferredEditorTabForSession(nextResources.editorTabs, nextSessionId, activeGlobalTabId.current)
-        : undefined
-      activateEditorTab(nextTab)
-      setTerminalVisible(false)
-    }
-    setActiveChatBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setModeByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setPermissionByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setModelByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setComposerDrafts((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setComposerHistoryByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setDiffFilesBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setSelectedDiffFileBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setChecksExpandedBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setExpandedFoldersBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    // restantes[0] pode não existir ao excluir a última sessão (→ landing).
+    // Registros por sessão (chave === id ou `id:` + chat/caminho): a regra de
+    // chave mora em `domain/limpezaDeSessao` — um lugar só, sem 9 cópias.
+    const semId = <T,>(atual: Record<string, T>) => semSessao(atual, id)
+    setActiveChatBySession(semId); setModeByChat(semId); setPermissionByChat(semId); setModelByChat(semId)
+    setComposerDrafts(semId); setComposerHistoryByChat(semId); setDiffFilesBySession(semId)
+    setSelectedDiffFileBySession(semId); setChecksExpandedBySession(semId); setExpandedFoldersBySession(semId)
+    // Promove a vizinha (ao excluir a ÚLTIMA, cai na landing: promoted = '').
     if (activeSessionId === id) {
       const promoted = restantes[0]?.id ?? ''
+      const nextTab = promoted ? preferredEditorTabForSession(nextResources.editorTabs, promoted, activeGlobalTabId.current) : undefined
+      activateEditorTab(nextTab)
+      setTerminalVisible(false)
       setActiveSessionId(promoted)
       // R-030 — excluir a sessão ativa é transição passiva: rebaseia o previous
       // para não capturar a sessão excluída (o que a re-adicionaria ao mapa após
@@ -1643,8 +1597,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const retomarLimpezaExclusao = async (id: string, revision: number) => {
     if (excluindo.has(id)) return
-    setExcluindo((current) => new Set(current).add(id))
-    setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
+    marcarExcluindo(id)
+    limparFalhaExclusao(id)
     try {
       const estado = await removePersistedSession(id, { expectedRevision: revision, resumeCleanup: true })
       if (estado !== 'concluido') throw new Error('A limpeza dos anexos continua pendente.')
@@ -2702,7 +2656,16 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           onToggleArchived={handleToggleArchived}
           onDelete={handleDelete}
           onRename={(id, title) => updateSession(id, (session) => ({ ...session, title }))}
-          onManageHistoryAccess={(id, chatId) => { void manageHistoryAccess(id, chatId, { confirm: text => window.confirm(text), notify: text => window.alert(text) }) }}
+          onManageHistoryAccess={(id, chatId) => { void manageHistoryAccess(id, chatId, {
+            // Diálogo interno; quem decide autorizar/revogar segue sendo o cliente.
+            confirm: text => portaDialogos().confirmar(pedidoDeConfirmacao({
+              texto: text, confirmar: 'Continuar', rotuloAcessivel: 'Confirmar acesso ao histórico',
+              testId: 'historico-acesso-confirm',
+              // Título na mensagem; projeto e consequências no detalhe.
+              detalhe: text.split('\n').slice(1).join('\n').replace(/\n{2,}/g, '\n\n').trim() || undefined,
+            })),
+            notify,
+          }) }}
           onApprove={handleApprove}
           onOpenDiff={openDiff}
           onReorderSessions={handleReorderSessions}

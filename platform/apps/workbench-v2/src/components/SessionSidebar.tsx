@@ -1,3 +1,5 @@
+import { portaDialogos } from '../shell/portaDialogos'
+import { pedidoGrupoDaSessao, pedidoRemoverDoGrupo } from '../domain/pedidosArquivo'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
@@ -415,28 +417,21 @@ export function SessionSidebar({
           id: 'move-group' as const,
           label: 'Mover para grupo' as const,
           icon: <Folder size={14} />,
-          onSelect: () => {
-            const choice = window.prompt(
-              `Mover "${session.title}" para qual grupo?\n\nGrupos existentes: ${existingGroups.join(', ')}\n\nDigite o nome do grupo (ou crie um novo):`,
-              session.customGroup ?? '',
-            )
-            if (choice !== null && choice.trim()) {
-              onRename(session.id, session.title) // no-op; group assignment below
-              onAssignGroup(session.id, choice.trim())
-            }
+          onSelect: async () => {
+            const choice = await portaDialogos().pedirTexto(pedidoGrupoDaSessao({
+              titulo: session.title, grupoAtual: session.customGroup, gruposExistentes: existingGroups, modo: 'mover',
+            }))
+            if (choice !== null && choice.trim()) onAssignGroup(session.id, choice.trim())
           },
         }] : []),
         {
           id: 'create-group',
           label: session.customGroup ? `Grupo: ${session.customGroup}` : 'Atribuir a grupo',
           icon: <Folder size={14} />,
-          onSelect: () => {
-            const name = window.prompt(
-              existingGroups.length > 0
-                ? `Nome do grupo (existentes: ${existingGroups.join(', ')}):`
-                : 'Nome do novo grupo:',
-              session.customGroup ?? '',
-            )
+          onSelect: async () => {
+            const name = await portaDialogos().pedirTexto(pedidoGrupoDaSessao({
+              titulo: session.title, grupoAtual: session.customGroup, gruposExistentes: existingGroups, modo: 'atribuir',
+            }))
             if (name !== null && name.trim()) onAssignGroup(session.id, name.trim())
           },
         },
@@ -445,7 +440,9 @@ export function SessionSidebar({
           label: `Remover do grupo "${session.customGroup}"` as const,
           icon: <Folder size={14} />,
           separatorBefore: true,
-          onSelect: () => onRemoveGroup(session.id),
+          onSelect: async () => {
+            if (await portaDialogos().confirmar(pedidoRemoverDoGrupo(session.title, session.customGroup!))) onRemoveGroup(session.id)
+          },
         }] : []),
         { id: 'delete', label: 'Excluir', icon: <Trash2 size={14} />, danger: true, separatorBefore: true, onSelect: () => onDelete(session.id) },
       ],

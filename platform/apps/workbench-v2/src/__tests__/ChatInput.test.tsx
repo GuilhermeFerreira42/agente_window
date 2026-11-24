@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../components/ChatInput'
+import { esquecerPortaDialogos } from '../shell/portaDialogos'
 import type { NestedChat, Session } from '../types'
 
 const chat: NestedChat = {
@@ -22,7 +23,7 @@ beforeEach(() => {
     ],
   }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { esquecerPortaDialogos(); vi.unstubAllGlobals() })
 
 const session: Session = {
   id: 'session-test',
@@ -93,21 +94,38 @@ describe('ChatInput', () => {
 
   it('exclusões automáticas exigem ação explícita adicional, consentimento próprio e são reversíveis', async () => {
     const user=userEvent.setup(), alterar=vi.fn(async()=>undefined)
-    const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)
+    // U-2 — o consentimento é um diálogo INTERNO (nunca `window.confirm`).
+    const nativo=vi.spyOn(window,'confirm')
     const view=renderInput({permission:'allow-all',onChangeAutomaticDeletes:alterar})
     await user.click(screen.getByRole('button',{name:'Permitir tudo ativo'}))
     const opcao=screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/})
     expect(opcao).toHaveAttribute('aria-checked','false')
+
+    // Cancelar: nada muda.
     await user.click(opcao)
+    const recusa=await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    expect(recusa).toHaveTextContent('Não autoriza exclusão permanente')
+    await user.click(within(recusa).getByRole('button',{name:'Cancelar'}))
     expect(alterar).not.toHaveBeenCalled()
-    confirm.mockReturnValue(true)
+
+    // Esc também não liga a opção.
     await user.click(opcao)
+    await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    await user.keyboard('{Escape}')
+    expect(alterar).not.toHaveBeenCalled()
+
+    // Aceitar liga.
+    await user.click(opcao)
+    const aceite=await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    await user.click(within(aceite).getByRole('button',{name:'Ativar exclusões automáticas'}))
     await waitFor(()=>expect(alterar).toHaveBeenCalledWith(true))
+
+    // Desligar NÃO pergunta (reversível por desenho).
     view.rerender(<ChatInput {...view.props} automaticDeletes={true} />)
     await user.click(screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/}))
     await waitFor(()=>expect(alterar).toHaveBeenCalledWith(false))
-    expect(confirm).toHaveBeenCalledTimes(2)
-    confirm.mockRestore()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(nativo).not.toHaveBeenCalled()
   })
 
   it('automação desativada em Manual não pode ser ativada pelo menu', async () => {
@@ -118,18 +136,41 @@ describe('ChatInput', () => {
   it('exige confirmação explícita para Permitir tudo e deixa Manual sem confirmação', async () => {
     const user = userEvent.setup()
     const onChangePermission = vi.fn(async () => undefined)
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const nativo = vi.spyOn(window, 'confirm')
     renderInput({ onChangePermission })
 
     await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
-    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
-    expect(confirm).toHaveBeenCalledOnce()
-    expect(confirm.mock.calls[0][0]).toContain('privilégios da sua conta no sistema operacional')
+    // Dois `menuitemradio` contêm "Permitir tudo" (o de permissão e o de
+    // exclusões automáticas) — o alvo é o primeiro, o da permissão.
+    const itemPermitirTudo = () => screen.getAllByRole('menuitemradio', { name: /Permitir tudo/ })[0]
+    await user.click(itemPermitirTudo())
+    // U-2 — diálogo INTERNO com o MESMO texto de risco de antes.
+    const dialogo = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    expect(dialogo).toHaveTextContent('ATENÇÃO — Permitir tudo')
+    expect(dialogo).toHaveTextContent('privilégios da sua conta no sistema operacional')
+    expect(dialogo).toHaveTextContent('Perguntar e Planejar continuam somente leitura')
+    expect(dialogo).toHaveTextContent('voltar a Permissões manuais')
     expect(onChangePermission).not.toHaveBeenCalled()
 
-    confirm.mockReturnValue(true)
-    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    // Cancelar (foco inicial) fecha sem aplicar.
+    await user.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onChangePermission).not.toHaveBeenCalled()
+
+    // Esc também não aplica (o menu de permissão é reaberto a cada tentativa).
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    await user.click(itemPermitirTudo())
+    await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    await user.keyboard('{Escape}')
+    expect(onChangePermission).not.toHaveBeenCalled()
+
+    // Aceitar aplica, como antes.
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    await user.click(itemPermitirTudo())
+    const aceite = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    await user.click(within(aceite).getByRole('button', { name: 'Ativar Permitir tudo' }))
     await waitFor(() => expect(onChangePermission).toHaveBeenCalledWith('allow-all'))
+    expect(nativo).not.toHaveBeenCalled()
   })
 
   it('envia texto e limpa o composer', async () => {
@@ -576,7 +617,9 @@ describe('ChatInput — C-1 conversa Chat sem pasta', () => {
     const user = userEvent.setup()
     renderInput({ session: chatSession, permission: 'manual' })
     await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
-    const allowAll = itemPorTexto('Permitir tudo')
+    // O item é `menuitemradio` (o texto inclui a descrição); o papel é o seletor
+    // estável — o mesmo que o teste de confirmação usa dois casos abaixo.
+    const allowAll = screen.getAllByRole('menuitemradio').find((item) => /^Permitir tudo/.test(item.textContent ?? '')) as HTMLButtonElement
     expect(allowAll).toBeDisabled()
     expect(allowAll).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
   })
