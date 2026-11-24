@@ -1,3 +1,9 @@
+# MM-I — início da implementação
+
+Após atualizar a documentação de homologação, iniciados componentes isolados para leitura de cópia publicada, inspeção de imagens e corpo `openai-chat`, sem conexão ao fluxo real nem transmissão externa. Ainda não constitui a entrega de visão; estado em `03` e provas e pendências em `09`.
+
+---
+
 # 24/11/2026 — aceite da U-1 e dos diálogos e preparação da MM-I
 
 O proprietário aprovou as duas entregas e adiou o ajuste de foco no chat. Aceite em `08`, situação e pendência em `03` e `06`. O plano da MM-I foi preparado contra a base `6a895ff`.

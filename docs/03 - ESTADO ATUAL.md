@@ -1,5 +1,7 @@
 # Leitura vigente do roadmap — 24/11/2026
 
+**MM-I em andamento — checkpoint técnico, ainda não entregue:** pacote `MM-I_ARENA.zip` extraído e lido; branch atualizada com a homologação de U-1/U-2. Há componentes isolados para serialização `openai-chat`, leitura limitada da cópia publicada, inspeção de PNG/JPEG e montagem com tetos locais provisórios. **Não estão conectados ao fluxo do produto** e não autorizam transmissão. Permanecem por implementar a decisão por capacidade comprovada do alvo e revisão da configuração, autorização explícita, integração nas duas entradas e no transporte ativo, revalidação na chamada/retentativa, estados persistidos e provas MMI-01–09. Os tetos precisam de ensaio e validação contra o alvo. Nenhuma imagem foi enviada a provedor externo. Detalhes operacionais do checkpoint em `09`.
+
 **Ponto atual:** C-3a e C-3b homologadas. O proprietário homologou a U-1 e a padronização dos diálogos que a Arena chamou de U-2, sobre `6a895ff`. O ajuste de retorno de foco no chat foi adiado a pedido do proprietário. Próxima fatia: [MM-I — entrada multimodal](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#mm-i--plano-de-execução), com plano preparado e implementação a cargo da Arena. Aceite em `08`, evidências em `09`.
 
 ## Correção da exclusão de conversas
