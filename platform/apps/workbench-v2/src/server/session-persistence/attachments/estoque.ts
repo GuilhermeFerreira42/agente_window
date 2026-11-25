@@ -32,6 +32,7 @@ import type { EscopoAnexo, LinhaUpload, ModoAnexo } from './schemaAnexos'
 import { carregarPolitica, problemaPolitica, type PoliticaAnexos } from './politica'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
 import { garantirDentroDaRaiz, garantirDiretorioReal, raizCanonica } from './contencao'
+import { preservarOriginalHistorico } from './originalHistorico'
 
 export interface OpcoesEstoque {
   appDir?: string
@@ -252,7 +253,8 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
         return { recusar: new PersistenceProblem(429, 'too_many_uploads',
           `Já existem ${ativos.length} transferências ativas (limite ${politica.concorrencia}). Conclua uma antes de iniciar outra.`) }
       }
-      if (entrada.scope === 'chat') {
+      // Uma cópia no projeto também reserva bytes privados para seu original.
+      if (entrada.scope === 'chat' || entrada.mode === 'copy') {
         const publicados = bytesPublicadosChat(entrada.sessionId, entrada.chatId)
         const emVoo = ativos
           .filter((linha) => linha.sessionId === entrada.sessionId && linha.chatId === entrada.chatId)
@@ -290,6 +292,9 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
     })()
 
     await garantirVolume(reaberta.finalPath!, entrada.declaredBytes ?? 0, politica)
+    if (reaberta.scope === 'workspace' && reaberta.mode === 'copy' && reaberta.artifactId) {
+      await garantirVolume(caminhoFinalChat(opcoes.appDir, reaberta.sessionId, reaberta.chatId, reaberta.artifactId, reaberta.name), entrada.declaredBytes ?? 0, politica)
+    }
     return reciboDe(reaberta)
   })
 }
@@ -541,6 +546,7 @@ export async function publicarPreparadoSemFila(sessionId: string, chatId: string
         throw new PersistenceProblem(409, 'recovery_verification_failed',
           'O destino encontrado não confere com o hash registrado desta transferência. Nada foi anunciado como pronto; os bytes existentes continuam intactos.')
       }
+      await preservarOriginalDoProjeto(linha, destinoFinal, medidoFinal, opcoes)
       return concluirCommit(linha, destinoFinal, medidoFinal, opcoes)
     }
 
@@ -600,9 +606,21 @@ export async function publicarPreparadoSemFila(sessionId: string, chatId: string
       throw new PersistenceProblem(500, 'verification_failed',
         'O arquivo publicado não confere com o stage verificado. Ele foi removido e nada foi anunciado como pronto.')
     }
+    // A cópia histórica independente deve existir ANTES do recibo pronto e
+    // antes de descartar o stage. Em falha, a intenção permanece recuperável.
+    await preservarOriginalDoProjeto(linha, stagePath, medidoPublicado, opcoes)
     await unlink(stagePath).catch(() => undefined)
     return concluirCommit(linha, destinoFinal, medidoPublicado, opcoes)
   }
+}
+
+async function preservarOriginalDoProjeto(linha: LinhaUpload, origem: string, medido: { bytes: number; sha256: string }, opcoes: OpcoesEstoque): Promise<void> {
+  if (linha.scope !== 'workspace' || linha.mode !== 'copy') return
+  if (!linha.workspaceRoot || !linha.artifactId) throw new PersistenceProblem(409, 'attachment_original_invalid', 'Identidade do original indisponível.')
+  await preservarOriginalHistorico({
+    sessionId: linha.sessionId, chatId: linha.chatId, artifactId: linha.artifactId,
+    name: linha.name, bytes: medido.bytes, sha256: medido.sha256,
+  }, origem, linha.workspaceRoot, opcoes.appDir)
 }
 
 /** Commit único (B04): estado pronto + ledger na MESMA transação. */
@@ -828,8 +846,19 @@ export function caminhoAbsolutoDeArtigo(
 export async function lerArtigo(artifactId: string): Promise<ArtigoServivel> {
   const artigo = obterArtigo(artifactId)
   if (!artigo) throw new PersistenceProblem(404, 'attachment_not_found', 'Artefato não encontrado.')
-  const absoluto = caminhoAbsolutoDeArtigo(artigo)
-  if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
+  const trabalho = caminhoAbsolutoDeArtigo(artigo)
+  const temOriginalSeparado = artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace' && artigo.workspaceRoot
+  // Legados ainda íntegros são preservados ao primeiro acesso; divergentes
+  // jamais são promovidos a original. Uma cópia já preservada independe do
+  // estado atual (ou disponibilidade) da pasta de trabalho.
+  const absoluto = temOriginalSeparado
+    ? await preservarOriginalHistorico(artigo, trabalho, artigo.workspaceRoot!)
+    : trabalho
+  if (temOriginalSeparado) {
+    await garantirDentroDaRaiz(path.join(getAppDir(), 'uploads', 'chats'), absoluto, {
+      code: 'attachment_absent', mensagem: 'O original não está disponível.',
+    })
+  } else if (artigo.rootKind === 'workspace' && artigo.workspaceRoot) {
     await garantirDentroDaRaiz(artigo.workspaceRoot, absoluto, {
       code: 'reference_out_of_scope',
       mensagem: 'O caminho registrado para este arquivo do projeto não é mais válido. Nada foi entregue.',

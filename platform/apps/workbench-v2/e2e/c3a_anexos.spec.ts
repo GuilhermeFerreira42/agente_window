@@ -630,14 +630,14 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
       .toBeVisible()
   }
 
-  const opcaoCopia = (page: Page) => page.getByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
+  const destinoCopia = (page: Page) => page.getByText('Arquivos novos serão salvos em uploads/ do projeto.')
   const confirmarSemMidia = async (page: Page) => {
     const dialogo = page.getByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
     await expect(dialogo).toBeVisible()
     await dialogo.getByRole('button', { name: 'Continuar com o texto' }).click()
   }
 
-  test('E11 — tela inicial com "Salvar cópia" MARCADA: cópia em uploads/ com nome original e conteúdo correto', async ({ page }) => {
+  test('E11 — upload automático em uploads/ com nome original e conteúdo correto', async ({ page }) => {
     const projeto = join(raiz, 'projeto-e11')
     mkdirSync(projeto, { recursive: true })
     await irParaLanding(page)
@@ -651,12 +651,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     const conteudo = 'conteudo salvo no projeto pela landing (E11)'
     await anexarNaLanding(page, 'relatorio final.txt', conteudo)
 
-    // A opção EXISTE antes do primeiro envio, e começa DESMARCADA.
-    const caixa = opcaoCopia(page)
-    await expect(caixa).toBeVisible()
-    await expect(caixa).not.toBeChecked()
-    await caixa.check()
-    await expect(caixa).toBeChecked()
+    await expect(destinoCopia(page)).toBeVisible()
 
     await campoLanding(page).fill('primeiro envio com copia explicita')
     await botaoEnviarLanding(page).click()
@@ -673,10 +668,18 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     const artigo = (corpo.attachments as Array<{ artifactId: string; name: string }>).find((item) => item.name === 'relatorio final.txt')!
     expect(artigo).toBeTruthy()
     await expect.poll(async () => (await bytesDoArtefato(page, artigo.artifactId)).toString('utf8')).toBe(conteudo)
+    // Mutação externa em pasta descartável: o download da mensagem não deve
+    // usar os bytes editados nem depender da existência do arquivo de trabalho.
+    writeFileSync(copia, 'edição sintética posterior')
+    await page.reload()
+    await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
+    expect((await bytesDoArtefato(page, artigo.artifactId)).toString('utf8')).toBe(conteudo)
+    rmSync(copia)
+    expect((await bytesDoArtefato(page, artigo.artifactId)).toString('utf8')).toBe(conteudo)
     await shot(page, 'c3a_e11_landing_copia_marcada')
   })
 
-  test('E12 — tela inicial com a opção DESMARCADA: armazenamento privado, sem cópia no projeto', async ({ page }) => {
+  test('E12 — upload de projeto usa uploads/ automaticamente', async ({ page }) => {
     const projeto = join(raiz, 'projeto-e12')
     mkdirSync(projeto, { recursive: true })
     await irParaLanding(page)
@@ -687,16 +690,13 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await expect(seletor).toHaveAttribute('aria-label', /Workspace atual:/, { timeout: 20_000 })
 
     await anexarNaLanding(page, 'privado.txt', 'nao deve ir para o projeto (E12)')
-    await expect(opcaoCopia(page)).not.toBeChecked()
+    await expect(destinoCopia(page)).toBeVisible()
     await campoLanding(page).fill('primeiro envio privado')
     await botaoEnviarLanding(page).click()
     await confirmarSemMidia(page)
     await page.waitForSelector('.chat-input-textarea', { state: 'visible' })
 
-    // Nenhum arquivo do projeto foi criado; a pasta uploads/ nem precisa existir.
-    const uploads = join(projeto, 'uploads')
-    const arquivos = existsSync(uploads) ? readdirSync(uploads).filter((nome) => nome !== '.stages') : []
-    expect(arquivos, 'sem escolha explícita, nada é copiado para o projeto').toHaveLength(0)
+    expect(readFileSync(join(projeto, 'uploads', 'privado.txt'), 'utf8')).toBe('nao deve ir para o projeto (E12)')
     await shot(page, 'c3a_e12_landing_privado')
   })
 
@@ -794,7 +794,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await shot(page, 'c3a_e14_retry_f5_exclusao')
   })
 
-  test('E15 — a opção funciona na tela inicial e na conversa aberta, nos dois temas', async ({ page }) => {
+  test('E15 — destino aparece na tela inicial e na conversa aberta, nos dois temas', async ({ page }) => {
     const projeto = join(raiz, 'projeto-e15')
     mkdirSync(projeto, { recursive: true })
     await irParaLanding(page)
@@ -808,9 +808,9 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     for (const tema of temas) {
       // LANDING: opção presente com Pasta selecionada.
       await anexarNaLanding(page, `landing-${tema.includes('claro') ? 'claro' : 'escuro'}.txt`, 'x')
-      await expect(opcaoCopia(page)).toBeVisible()
+      await expect(destinoCopia(page)).toBeVisible()
       await page.getByRole('button', { name: tema }).click()
-      await expect(opcaoCopia(page)).toBeVisible()
+      await expect(destinoCopia(page)).toBeVisible()
       await shot(page, `c3a_e15_landing_${tema.includes('claro') ? 'claro' : 'escuro'}`)
       // remove o anexo para o próximo laço
       await page.getByRole('button', { name: /^Remover / }).last().click()
@@ -825,7 +825,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await anexarNoChat(page, 'dentro-do-chat.txt', 'conteudo')
     for (const tema of temas) {
       await page.getByRole('button', { name: tema }).click()
-      await expect(opcaoCopia(page)).toBeVisible()
+      await expect(destinoCopia(page)).toBeVisible()
       await shot(page, `c3a_e15_chat_${tema.includes('claro') ? 'claro' : 'escuro'}`)
     }
   })

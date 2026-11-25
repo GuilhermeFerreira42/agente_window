@@ -246,6 +246,27 @@ beforeEach(() => {
 })
 afterEach(() => { limparTodosArquivosVivos() })
 
+describe('c3aSend — destino automático de uploads novos', () => {
+  it.each([{ raiz: '/projeto', scope: 'workspace' as const }, { raiz: null, scope: 'chat' as const }])(
+    'usa $scope para a raiz $raiz, mesmo com rascunho antigo privado', async ({ raiz, scope }) => {
+      const id = `auto-${scope}`
+      guardarArquivoVivo(id, new File(['texto'], 'nota.txt', { type: 'text/plain' }))
+      const admitir = vi.fn(async (entrada: Parameters<TransporteAnexos['admitir']>[0]) => ({
+        ...recibo(id, entrada.name, entrada.bytes), scope: entrada.scope, state: 'admitido' as const,
+      }))
+      const transporte: TransporteAnexos = {
+        admitir,
+        enviar: async () => ({ ...recibo(id, 'nota.txt', 5), scope }),
+        referencia: async () => { throw new Error('não é referência') },
+      }
+      const resultado = await transferirAnexos({ sessionId: `s-${scope}`, chatId: 'c', workspaceRoot: raiz,
+        anexos: [anexoLocal(id, 'nota.txt')], transporte })
+      expect(admitir).toHaveBeenCalledWith(expect.objectContaining({ scope, ...(raiz ? { workspaceRoot: raiz } : {}) }))
+      expect(resultado.anexos[0]).toMatchObject({ estado: 'pronto', modoCopia: raiz ? 'projeto' : 'privado' })
+    },
+  )
+})
+
 describe('c3aSend — T25: falha parcial preserva o primeiro, draft retém IDs e F5 lista sem mensagem', () => {
   it('C3A-T25 — 2º upload falha: 1º permanece pronto, draft retido com IDs; retry reutiliza os MESMOS IDs; F5 lista pronto sem mensagem', async () => {
     guardarArquivoVivo(ID1, new File(['conteúdo do primeiro'], 'primeiro.txt', { type: 'text/plain' }))

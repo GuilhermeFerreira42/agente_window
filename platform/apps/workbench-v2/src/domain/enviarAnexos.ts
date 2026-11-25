@@ -92,7 +92,7 @@ export async function transferirAnexos(entrada: {
         saida.push({
           ...anexo, artifactId: recibo.artifactId, uploadId: recibo.uploadId,
           bytes: recibo.bytes, sha256: recibo.sha256 ?? undefined,
-          estado: 'referencia', mode: 'reference', referencia: anexo.referencia ?? caminho,
+          estado: 'referencia', mode: 'reference', modoCopia: 'projeto', referencia: anexo.referencia ?? caminho,
         })
         continue
       }
@@ -124,9 +124,9 @@ export async function transferirAnexos(entrada: {
         saida.push(falha(anexo, uploadId))
         continue
       }
-      // R03: cópia privada é o DEFAULT; a cópia na pasta do projeto só
-      // acontece com escolha explícita (`modoCopia: 'projeto'`).
-      const escopo: 'chat' | 'workspace' = anexo.modoCopia === 'projeto' && workspaceRoot ? 'workspace' : 'chat'
+      // Um upload novo acompanha a raiz da conversa: projeto em uploads/;
+      // Chat sem pasta fica privado. Recibos prontos antigos nunca são movidos.
+      const escopo: 'chat' | 'workspace' = workspaceRoot ? 'workspace' : 'chat'
       const recibo = await transporte.admitir({
         sessionId, chatId, uploadId, name: file.name, bytes: file.size,
         mime: file.type, mode: 'copy', scope: escopo,
@@ -146,6 +146,7 @@ export async function transferirAnexos(entrada: {
         sha256: concluido.sha256 ?? undefined,
         estado: 'pronto',
         mode: 'copy',
+        modoCopia: concluido.scope === 'workspace' ? 'projeto' : 'privado',
         legado: false,
       })
       // O File transitório só sai DEPOIS de o recibo pronto ficar guardado

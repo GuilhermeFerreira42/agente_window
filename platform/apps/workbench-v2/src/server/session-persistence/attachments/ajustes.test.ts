@@ -6,7 +6,11 @@ import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetDatabase, upsertSessionRecord } from '../database'
 import { admitirUpload, lerArtigo, receberConteudo } from './estoque'
-import { obterUpload } from './catalogo'
+import { obterArtigo, obterUpload } from './catalogo'
+import { caminhoOriginalHistorico } from './originalHistorico'
+import { lerFonteConversa, listarFontesConversa } from './inspecaoConversa'
+import { prepararInspecaoAgente } from './ferramentaAnexos'
+import { POLITICA_PADRAO } from './politica'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao } from '../deletions'
 
 const SID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
@@ -85,17 +89,61 @@ describe('Ajustes de usabilidade C-3a', () => {
     expect(arquivos).toHaveLength(1)
   })
 
-  // Diagnóstico do formato legado ANTES da migração MM-I: o catálogo guarda
-  // só o caminho e hash da cópia de projeto, não outros bytes históricos. Este
-  // teste deve ser substituído por jornadas de migração quando ela existir.
-  it('legado pré-migração — alteração ou exclusão da única cópia não fornece o original', async () => {
+  it('originais privados de uploads de projeto contam na quota da conversa', async () => {
+    const pasta = join(process.env.AGENTE_WINDOW_DATA_DIR!, 'anexos')
+    mkdirSync(pasta, { recursive: true })
+    writeFileSync(join(pasta, 'politica.json'), JSON.stringify({ ...POLITICA_PADRAO, quotaChatBytes: 10, maxUploadBytes: 8 }))
+    await enviarNoProjeto('primeiro.txt', '12345678')
+    await expect(enviarNoProjeto('segundo.txt', '123')).rejects.toMatchObject({ code: 'quota_exceeded' })
+    expect(existsSync(join(ws, 'uploads', 'segundo.txt'))).toBe(false)
+  })
+
+  it('upload de projeto preserva original independente após editar ou excluir o arquivo de trabalho', async () => {
     const alterado = await enviarNoProjeto('alterado.txt', 'ORIGINAL')
     const excluido = await enviarNoProjeto('excluido.txt', 'ORIGINAL')
-    expect(readFileSync((await lerArtigo(alterado.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
     writeFileSync(alterado.finalPath!, 'ALTERADO')
     rmSync(excluido.finalPath!)
-    await expect(lerArtigo(alterado.artifactId!)).rejects.toMatchObject({ code: 'attachment_changed' })
+    expect(readFileSync((await lerArtigo(alterado.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync((await lerArtigo(excluido.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    rmSync(ws, { recursive: true })
+    expect(readFileSync((await lerArtigo(alterado.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+  })
+
+  it('ferramenta autorizada lê a edição do projeto sem trocar o original; exclusão não recorre ao histórico', async () => {
+    const linha = await enviarNoProjeto('trabalho.txt', 'ORIGINAL')
+    writeFileSync(linha.finalPath!, 'VERSÃO EDITADA')
+    expect((await listarFontesConversa(SID, CID))[0]).toMatchObject({ estado: 'trabalho', bytes: Buffer.byteLength('VERSÃO EDITADA') })
+    const mudado = await prepararInspecaoAgente({ sessionId: SID, chatId: CID }, { acao: 'ler', artifactId: linha.artifactId! })
+    writeFileSync(linha.finalPath!, 'VERSÃO POSTERIOR')
+    await expect(mudado.executar()).rejects.toThrow(/mudou/)
+    writeFileSync(linha.finalPath!, 'VERSÃO EDITADA')
+    const plano = await prepararInspecaoAgente({ sessionId: SID, chatId: CID }, { acao: 'ler', artifactId: linha.artifactId! })
+    expect(plano.previa).toContain('texto UTF-8')
+    const resultado = await plano.executar()
+    expect(JSON.parse(resultado.conteudo!).texto).toBe('VERSÃO EDITADA')
+    expect(readFileSync((await lerArtigo(linha.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    rmSync(linha.finalPath!)
+    expect((await listarFontesConversa(SID, CID))[0].estado).toBe('trabalho_ausente')
+    await expect(lerFonteConversa(SID, CID, linha.artifactId!, 100)).rejects.toThrow()
+    expect(readFileSync((await lerArtigo(linha.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+  })
+
+  it('legado preserva apenas original ainda verificável, sem promover bytes alterados', async () => {
+    const intacto = await enviarNoProjeto('intacto.txt', 'ORIGINAL')
+    const alterado = await enviarNoProjeto('alterado.txt', 'ORIGINAL')
+    const excluido = await enviarNoProjeto('excluido.txt', 'ORIGINAL')
+    // Recria o formato pré-migração: só há o arquivo no projeto e seu hash.
+    for (const linha of [intacto, alterado, excluido]) rmSync(caminhoOriginalHistorico(obterArtigo(linha.artifactId!)!))
+    writeFileSync(alterado.finalPath!, 'ALTERADO')
+    rmSync(excluido.finalPath!)
+    const original = (await lerArtigo(intacto.artifactId!)).caminho
+    writeFileSync(intacto.finalPath!, 'EDIÇÃO')
+    expect(readFileSync(original, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync((await lerArtigo(intacto.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    await expect(lerArtigo(alterado.artifactId!)).rejects.toThrow()
+    expect((await lerFonteConversa(SID, CID, alterado.artifactId!, 100)).bytes.toString()).toBe('ALTERADO')
     await expect(lerArtigo(excluido.artifactId!)).rejects.toThrow()
+    await expect(lerFonteConversa(SID, CID, excluido.artifactId!, 100)).rejects.toThrow()
   })
 
   it('A5 — excluir a conversa preserva a cópia explícita no projeto', async () => {

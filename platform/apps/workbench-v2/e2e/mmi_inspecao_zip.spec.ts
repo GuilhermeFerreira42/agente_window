@@ -14,7 +14,7 @@ const port = 5225, base = `http://127.0.0.1:${port}`, modelo = 'simulador-zip'
 const pergunta = 'Liste o conteúdo deste ZIP e leia o arquivo nota.txt.'
 const segredo = 'A resposta sintética é 742.'
 let server: Server, app: ChildProcess, raiz: string
-let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' = 'zip'
+let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' | 'texto-projeto' = 'zip'
 let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = ''
 
 function tool(acao: string, args: Record<string, unknown> = {}) {
@@ -74,6 +74,20 @@ test.beforeAll(async () => {
             const documento = JSON.parse(ultimo!) as { texto: string; representacao: string }
             if (documento.texto !== segredo || documento.representacao !== 'texto UTF-8') throw new Error('o provedor não recebeu o texto esperado')
             resposta = texto('Resposta baseada no arquivo: 742.')
+          }
+        } else if (cenario === 'texto-projeto') {
+          if (!resultados.length) {
+            if (JSON.stringify(corpo).includes('EDIÇÃO PROJETO 917')) throw new Error('texto de trabalho vazou antes da confirmação')
+            resposta = tool('listar')
+          } else if (resultados.length === 1) {
+            const fontes = JSON.parse(ultimo!) as Array<{ artifactId: string; nome: string; estado?: string }>
+            const fonte = fontes.find(f => f.nome === 'trabalho.txt')
+            if (!fonte || fonte.estado !== 'trabalho') throw new Error('versão de trabalho não identificada')
+            resposta = tool('ler', { artifactId: fonte.artifactId })
+          } else {
+            const resultado = JSON.parse(ultimo!) as { texto?: string; representacao?: string }
+            if (resultado.texto !== 'EDIÇÃO PROJETO 917' || resultado.representacao !== 'texto UTF-8') throw new Error('o modelo não recebeu a edição de trabalho')
+            resposta = texto('O arquivo de trabalho diz 917.')
           }
         } else if (cenario === 'pdf' || cenario === 'audio' || cenario === 'video') {
           if (!resultados.length) resposta = tool('listar')
@@ -265,6 +279,41 @@ for (const modalidade of ['pdf', 'audio', 'video'] as const) {
     expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
   })
 }
+
+test('edição do projeto chega ao agente somente após autorização, preservando o original', async ({ page }) => {
+  cenario = 'aguardar'; pedidos = []; erroFixture = ''
+  const workspace = join(raiz, 'projeto-texto'); mkdirSync(workspace)
+  await page.goto(base)
+  await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
+  await page.getByTestId('landing-contexto').click()
+  const caminho = page.getByLabel('Buscar ou digitar caminho da pasta')
+  await caminho.fill(workspace); await caminho.press('Enter')
+  await expect(page.getByTestId('landing-contexto')).toHaveAttribute('aria-label', /Workspace atual:/)
+  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Aguarde instruções.')
+  await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'trabalho.txt', mimeType: 'text/plain', buffer: Buffer.from('ORIGINAL 315') })
+  await expect(page.getByText('Arquivos novos serão salvos em uploads/ do projeto.')).toBeVisible()
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await expect(page.getByText('Aguardarei instruções.')).toBeVisible({ timeout: 30_000 })
+  const trabalho = join(workspace, 'uploads', 'trabalho.txt')
+  writeFileSync(trabalho, 'EDIÇÃO PROJETO 917')
+  cenario = 'texto-projeto'; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo de trabalho.')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await permitir(page, 'trabalho.txt', 1)
+  await permitir(page, 'texto UTF-8 do anexo trabalho.txt', 2)
+  await expect(page.getByText('O arquivo de trabalho diz 917.')).toBeVisible({ timeout: 30_000 })
+  expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
+  const sid = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
+  const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
+  const registro = await (await page.request.get(`${base}/api/sessions/${sid}`, { headers })).json()
+  const artigos = await (await page.request.get(`${base}/api/sessions/${sid}/chats/${registro.session.mainChatId}/attachments`, { headers })).json()
+  const original = (artigos.attachments as Array<{ artifactId: string; name: string }>).find(a => a.name === 'trabalho.txt')
+  expect(original).toBeTruthy()
+  const baixar = async () => (await (await page.request.get(`${base}/api/sessions/${sid}/chats/${registro.session.mainChatId}/attachments/${original!.artifactId}?download=1`, { headers })).body()).toString()
+  expect(await baixar()).toBe('ORIGINAL 315')
+  rmSync(trabalho)
+  expect(await baixar()).toBe('ORIGINAL 315')
+})
 
 test('ZIP no projeto usa fontes da conversa e extrai fora da árvore compartilhada', async ({ page }) => {
   cenario = 'zip'; pedidos = []; erroFixture = ''; extraido = ''; zipId = ''

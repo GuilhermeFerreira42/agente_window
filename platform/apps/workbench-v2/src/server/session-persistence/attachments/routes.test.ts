@@ -264,6 +264,44 @@ describe('C-3a rotas de anexo', () => {
     expect(existsSync(caminhoFinalChat(undefined, SID, CID, artifactId, 'exemplo.txt'))).toBe(true)
   })
 
+  it('download de upload de projeto conserva original mesmo após editar e excluir trabalho', async () => {
+    const ws = join(base, 'ws-original')
+    mkdirSync(ws, { recursive: true })
+    seedWorkspace(SID, CID, ws)
+    const bytes = Buffer.from('original sintético')
+    const recibo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'nota.txt', declaredBytes: bytes.length, mode: 'copy', scope: 'workspace', workspaceRoot: ws })
+    await receberConteudo(SID, CID, recibo.uploadId, Readable.from([bytes]))
+    const trabalho = obterUpload(SID, CID, recibo.uploadId)!.finalPath!
+    writeFileSync(trabalho, 'versão de trabalho editada')
+    const editado = await chamar('GET', rota(`/${recibo.artifactId}?download=1`))
+    expect(editado.status).toBe(200)
+    expect(editado.body).toEqual(bytes)
+    rmSync(trabalho)
+    const excluido = await chamar('GET', rota(`/${recibo.artifactId}?download=1`))
+    expect(excluido.status).toBe(200)
+    expect(excluido.body).toEqual(bytes)
+    const alheio = await chamar('GET', `/api/sessions/${OUTRO_SID}/chats/${OUTRO_CID}/attachments/${recibo.artifactId}?download=1`)
+    expect(alheio.status).toBe(404)
+  })
+
+  it('prévia de projeto usa a imagem histórica depois de editar e excluir o trabalho', async () => {
+    const ws = join(base, 'ws-imagem-original')
+    mkdirSync(ws, { recursive: true })
+    seedWorkspace(SID, CID, ws)
+    const bytes = readFileSync(join(__dirname, '../../../__tests__/fixtures/midia/imagem.png'))
+    const recibo = await admitirUpload({ sessionId: SID, chatId: CID, name: 'imagem.png', declaredBytes: bytes.length, mime: 'image/png', mode: 'copy', scope: 'workspace', workspaceRoot: ws })
+    await receberConteudo(SID, CID, recibo.uploadId, Readable.from([bytes]))
+    const trabalho = obterUpload(SID, CID, recibo.uploadId)!.finalPath!
+    writeFileSync(trabalho, 'edição que não é imagem')
+    const editado = await chamar('GET', rota(`/${recibo.artifactId}/media`))
+    expect(editado.status).toBe(200)
+    expect(editado.body).toEqual(bytes)
+    rmSync(trabalho)
+    const excluido = await chamar('GET', rota(`/${recibo.artifactId}/media`))
+    expect(excluido.status).toBe(200)
+    expect(excluido.body).toEqual(bytes)
+  })
+
   it('C3A-T22 — referência removida/alterada: revalidação impede uso; atualização explícita sem retarget silencioso', async () => {
     const ws = join(base, 'ws-t22')
     mkdirSync(join(ws, 'docs'), { recursive: true })

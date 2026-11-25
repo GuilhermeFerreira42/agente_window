@@ -17,6 +17,7 @@ import { admitirUpload, cancelarUpload, receberConteudo } from './estoque'
 import { registrarReferencia } from './referencias'
 import { tratarRotasAnexos } from './rotas'
 import { validarSchemaAnexos } from './schemaAnexos'
+import { caminhoOriginalHistorico } from './originalHistorico'
 
 const SID = '11111111-1111-4111-8111-111111111111'
 const CID = '22222222-2222-4222-8222-222222222222'
@@ -162,6 +163,8 @@ describe('C-3a ciclo de vida na exclusão', () => {
 
     const privado = await publicarCopia(SID, CID, 'privado-chat.txt', Buffer.from('cópia privada da conversa', 'utf8'))
     const finalWs = await publicarCopia(SID, CID, 'upload-final-ws.txt', Buffer.from('cópia na raiz do projeto', 'utf8'), 'workspace', ws)
+    const originalHistorico = caminhoOriginalHistorico(obterArtigo(finalWs.artifactId)!)
+    expect(existsSync(originalHistorico)).toBe(true)
     const referencia = await registrarReferencia({ sessionId: SID, chatId: CID, workspaceRoot: ws, sourcePath: 'docs/original-do-projeto.txt' })
     expect(referencia.mode).toBe('reference')
 
@@ -188,6 +191,9 @@ describe('C-3a ciclo de vida na exclusão', () => {
     expect(existsSync(privado.final)).toBe(false)
     expect(existsSync(join(lixeira.pastaTrash, 'files', 'privado-chat.txt'))).toBe(true)
     expect(readFileSync(join(lixeira.pastaTrash, 'files', 'privado-chat.txt'), 'utf8')).toBe('cópia privada da conversa')
+    // A cópia histórica privada segue a Lixeira; o trabalho do projeto fica.
+    expect(existsSync(originalHistorico)).toBe(false)
+    expect(readFileSync(join(lixeira.pastaTrash, 'files', 'upload-final-ws.txt'), 'utf8')).toBe('cópia na raiz do projeto')
     // upload final na raiz ORIGINAL do workspace (E06) nunca é limpo:
     expect(existsSync(finalWs.final)).toBe(true)
     // referência e o próprio original do projeto permanecem intactos:

@@ -25,6 +25,7 @@ import {
 import { caminhoAbsolutoDeArtigo, hashDeArquivo, raizPrivadaChat } from './estoque'
 import { garantirDiretorioReal, garantirDentroDaRaiz } from './contencao'
 import { lixeiraDoSistema, recusaDefinitiva, type PortaLixeira } from './lixeira'
+import { caminhoOriginalHistorico } from './originalHistorico'
 
 export interface OpcoesLimpeza {
   /** Porta da Lixeira injetável (ensaios usam pastaTrash temporária). */
@@ -37,7 +38,8 @@ export interface OpcoesLimpeza {
 }
 
 export function temAnexosPrivadosPendentes(sessionId: string): boolean {
-  return planosPendentes(sessionId).some(item => item.alvo === 'chat-copy' && item.state !== 'concluido')
+  // Workspace-copy também pode ter uma cópia histórica privada pendente.
+  return planosPendentes(sessionId).some(item => (item.alvo === 'chat-copy' || item.alvo === 'workspace-copy') && item.state !== 'concluido')
 }
 
 /** Captura o ownership de TODOS os artefatos do dono no plano (antes de destruir). */
@@ -83,9 +85,27 @@ async function alvoPrivadoDe(linha: ReturnType<typeof planosPendentes>[number], 
 async function moverParaLixeiraSeConfirmado(
   linha: ReturnType<typeof planosPendentes>[number], opcoes: OpcoesLimpeza,
 ): Promise<'concluido' | 'falhou' | 'referencia' | 'workspace-copy'> {
-  if (linha.alvo === 'referencia' || linha.alvo === 'workspace-copy') {
-    // O arquivo é território do usuário: só o registro sai (T27/E06).
-    return linha.alvo
+  if (linha.alvo === 'referencia') return 'referencia'
+  if (linha.alvo === 'workspace-copy') {
+    // O arquivo de trabalho pertence ao projeto e nunca é removido. A cópia
+    // histórica privada, quando existe, segue o mesmo plano de Lixeira dos
+    // demais anexos; uma falha mantém o ledger para retentativa.
+    const artigo = obterArtigo(linha.artifactId)
+    if (!artigo || artigo.chatId !== linha.chatId || artigo.rootKind !== 'workspace' || artigo.locator !== linha.locator) return 'falhou'
+    const original = caminhoOriginalHistorico(artigo, opcoes.appDir ?? getAppDir())
+    const info = await lstat(original).catch(() => null)
+    if (!info) return 'workspace-copy' // legado ainda não preservado
+    if (!info.isFile() || info.isSymbolicLink()) return 'falhou'
+    try {
+      await garantirDentroDaRaiz(raizPrivadaChat(opcoes.appDir), original, { code: 'cleanup_out_of_scope' })
+    } catch { return 'falhou' }
+    if (linha.sha256 && await hashDeArquivo(original) !== linha.sha256) return 'falhou'
+    const resultado = await (opcoes.lixeira ?? lixeiraDoSistema).mover(original, opcoes.lixeiraOpcoes)
+    if (!resultado.ok) {
+      marcarPlano(linha.artifactId, 'falhou', resultado.destino ?? null, resultado.motivo ?? null)
+      return 'falhou'
+    }
+    return 'workspace-copy'
   }
   const absoluto = await alvoPrivadoDe(linha, opcoes.appDir)
   if (absoluto === 'ausente') return 'concluido'

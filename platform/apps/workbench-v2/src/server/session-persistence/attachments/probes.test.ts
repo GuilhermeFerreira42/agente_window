@@ -378,7 +378,7 @@ describe('C-3a sondas da revisão (regressões)', () => {
     const resultado = await receberConteudo(SID, CID, recibo.uploadId, Readable.from([Buffer.from('AAAAA')]))
     expect(resultado.state).toBe('pronto')
     expect(readFileSync(linha.finalPath!, 'utf8')).toBe('AAAAA')
-    // Cópia no projeto não entra na quota privada do chat.
+    // O trabalho continua no projeto; o original privado agora conta na quota.
     expect(listarArtigosChat(SID, CID)[0]).toMatchObject({ rootKind: 'workspace' })
   })
 

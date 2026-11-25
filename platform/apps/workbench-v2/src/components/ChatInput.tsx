@@ -813,20 +813,7 @@ export function ChatInput({
         {attachments.length > 0 && (
           <div className="attachments-row" role="list" aria-label="Arquivos anexados">
             {attachments.some((attachment) => attachment.kind === 'local') && Boolean(session.workspacePath) && (
-              <label className="attachment-modocopia" title="R03 — cópia na pasta do projeto só por escolha explícita">
-                <input
-                  type="checkbox"
-                  checked={attachments.filter((a) => a.kind === 'local').length > 0
-                    && attachments.filter((a) => a.kind === 'local').every((a) => a.modoCopia === 'projeto')}
-                  disabled={enviando}
-                  onChange={(event) => {
-                    const marcado = event.target.checked
-                    setDraftAttachments((current) => current.map((attachment) => attachment.kind === 'local'
-                      ? { ...attachment, modoCopia: marcado ? 'projeto' : 'privado' } : attachment))
-                  }}
-                />
-                Salvar cópia na pasta do projeto
-              </label>
+              <span className="attachment-modocopia">Arquivos novos serão salvos em uploads/ do projeto.</span>
             )}
             {attachments.map((attachment) => (
               <span

@@ -31,6 +31,7 @@ import {
 } from './estoque'
 import { carregarPolitica, problemaPolitica } from './politica'
 import { nomeSeguroArquivo } from '../../../domain/anexosRascunho'
+import { preservarOriginalHistorico } from './originalHistorico'
 
 export interface ReciboRetomada {
   uploadId: string
@@ -366,7 +367,10 @@ async function copiarItem(
     throw new PersistenceProblem(problema.status, problema.code, problema.message)
   }
   const politica = politicaResultado.politica
-  const origemAbsoluta = caminhoAbsolutoDeArtigo(artigo, opcoes.appDir)
+  const trabalho = caminhoAbsolutoDeArtigo(artigo, opcoes.appDir)
+  const origemAbsoluta = artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace' && artigo.workspaceRoot
+    ? await preservarOriginalHistorico(artigo, trabalho, artigo.workspaceRoot, opcoes.appDir)
+    : trabalho
   const info = await stat(origemAbsoluta).catch(() => null)
   if (!info || !info.isFile()) {
     throw new PersistenceProblem(410, 'recovery_item_unavailable', 'O arquivo de origem não está mais disponível.')

@@ -15,6 +15,7 @@ import { obterArtigo } from './catalogo'
 import { resolverDonoAnexos } from './dono'
 import { caminhoAbsolutoDeArtigo } from './estoque'
 import { garantirDentroDaRaiz } from './contencao'
+import { preservarOriginalHistorico } from './originalHistorico'
 
 // Limite local provisório de leitura, independente da quota C-3a. O futuro
 // adaptador deve também aplicar os menores limites comprovados do alvo e do
@@ -67,8 +68,13 @@ export async function lerCopiaPublicadaParaVisao(pedido: PedidoLeituraVisao): Pr
     }
     // Reutiliza o resolver e a contenção da C-3a, mas evita o hash anterior de
     // arquivo potencialmente enorme: a leitura e o hash abaixo são limitados.
-    const caminho = caminhoAbsolutoDeArtigo(artigo)
-    const raiz = artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), artigo.papel === 'gerado-gerenciado' ? 'artifacts' : 'uploads')
+    const trabalho = caminhoAbsolutoDeArtigo(artigo)
+    const temOriginalSeparado = artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace' && artigo.workspaceRoot
+    const caminho = temOriginalSeparado
+      ? await preservarOriginalHistorico(artigo, trabalho, artigo.workspaceRoot!)
+      : trabalho
+    const raiz = temOriginalSeparado ? join(getAppDir(), 'uploads', 'chats')
+      : artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), artigo.papel === 'gerado-gerenciado' ? 'artifacts' : 'uploads')
     if (!raiz) return recusar('vision_attachment_unavailable', 'A cópia não está disponível.')
     await garantirDentroDaRaiz(raiz, caminho, { code: 'vision_attachment_unavailable', mensagem: 'A cópia não está disponível.' })
     const antes = await lstat(caminho).catch(() => null)

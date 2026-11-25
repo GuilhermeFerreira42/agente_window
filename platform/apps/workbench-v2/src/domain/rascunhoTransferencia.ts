@@ -81,6 +81,7 @@ export function itemSalvoSemMensagem(sessionId: string, chatId: string, uploadId
     sha256: estado.recibo.sha256 ?? undefined,
     estado: 'pronto',
     mode: estado.recibo.mode,
+    modoCopia: estado.recibo.scope === 'workspace' ? 'projeto' : 'privado',
   }
 }
 
@@ -100,6 +101,7 @@ export function aplicarRecibo(anexo: Attachment, recibo: ReciboGuardado): Attach
       sha256: recibo.sha256 ?? undefined,
       estado: recibo.mode === 'reference' ? 'referencia' : 'pronto',
       mode: recibo.mode,
+      modoCopia: recibo.scope === 'workspace' ? 'projeto' : 'privado',
     }
   }
   if (recibo.state === 'falhou' || recibo.state === 'cancelado') {

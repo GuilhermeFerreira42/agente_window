@@ -172,7 +172,8 @@ export function removerUploadsChat(sessionId: string, chatId: string): void {
 export function bytesPublicadosChat(sessionId: string, chatId: string): number {
   const linha = getDatabase().prepare(`
     SELECT COALESCE(SUM(bytes), 0) AS total FROM attachment_artifacts
-    WHERE session_id = ? AND chat_id = ? AND root_kind = 'appdir'
+    WHERE session_id = ? AND chat_id = ? AND
+      (root_kind = 'appdir' OR (root_kind = 'workspace' AND mode = 'copy' AND papel = 'upload-workspace'))
   `).get(sessionId, chatId) as { total: number }
   return linha.total
 }

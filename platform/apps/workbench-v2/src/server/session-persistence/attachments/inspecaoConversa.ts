@@ -16,48 +16,64 @@ import { extrairZipSeguro, listarZipSeguro, type EntradaZipSegura } from './zipS
 import { extrairTextoPdf } from './leitorPdf'
 
 export const TETO_FONTE_BYTES = 32 * 1024 * 1024
-export interface FonteConversa { artifactId: string; nome: string; bytes: number; modalidade: string }
+export interface FonteConversa { artifactId: string; nome: string; bytes: number; modalidade: string; estado?: 'trabalho' | 'trabalho_ausente' }
 function recusar(): never { throw new PersistenceProblem(409, 'source_unavailable', 'A fonte não está disponível nesta conversa ou foi alterada.') }
 
 export async function listarFontesConversa(sessionId: string, chatId: string): Promise<FonteConversa[]> {
   return withSessionPersistenceQueue(sessionId, async () => {
     resolverDonoAnexos(sessionId, chatId)
-    return listarArtigosChat(sessionId, chatId).filter(a => a.state === 'pronto' && a.papel !== 'gerado-gerenciado')
-      .map(a => ({ artifactId: a.artifactId, nome: a.name, bytes: a.bytes, modalidade: a.modalidade }))
+    const artigos = listarArtigosChat(sessionId, chatId).filter(a => a.state === 'pronto' && a.papel !== 'gerado-gerenciado')
+    return Promise.all(artigos.map(async a => {
+      const fonte: FonteConversa = { artifactId: a.artifactId, nome: a.name, bytes: a.bytes, modalidade: a.modalidade }
+      if (a.rootKind !== 'workspace' || a.mode !== 'copy' || a.papel !== 'upload-workspace' || !a.workspaceRoot) return fonte
+      const caminho = caminhoAbsolutoDeArtigo(a)
+      try {
+        await garantirDentroDaRaiz(a.workspaceRoot, caminho, { code: 'source_unavailable' })
+        const info = await lstat(caminho)
+        if (!info.isFile() || info.isSymbolicLink()) throw new Error('Arquivo de trabalho indisponível.')
+        return { ...fonte, bytes: info.size, estado: 'trabalho' as const }
+      } catch { return { ...fonte, estado: 'trabalho_ausente' as const } }
+    }))
   })
 }
 
-/** Confere dono, contenção e hash DOS MESMOS bytes limitados. Nunca retorna caminho. */
+/** Confere dono e conteúdo da versão de trabalho, sem retornar caminho. */
 export async function lerFonteConversa(sessionId: string, chatId: string, artifactId: string, maxBytes: number): Promise<{ nome: string; bytes: Buffer; sha256: string }> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > TETO_FONTE_BYTES) return recusar()
-  return withSessionPersistenceQueue(sessionId, async () => {
-    resolverDonoAnexos(sessionId, chatId)
-    const artigo = obterArtigo(artifactId)
-    if (!artigo || artigo.sessionId !== sessionId || artigo.chatId !== chatId || artigo.state !== 'pronto' || artigo.papel === 'gerado-gerenciado' ||
-        !Number.isSafeInteger(artigo.bytes) || artigo.bytes < 0 || artigo.bytes > maxBytes || !/^[a-f0-9]{64}$/.test(artigo.sha256)) return recusar()
-    const caminho = caminhoAbsolutoDeArtigo(artigo)
-    const raiz = artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
-    if (!raiz) return recusar()
-    await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable', mensagem: 'A fonte não está disponível nesta conversa.' })
-    const antes = await lstat(caminho).catch(() => null)
-    if (!antes?.isFile() || antes.isSymbolicLink()) return recusar()
-    const arquivo = await open(caminho, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)).catch(() => null)
-    if (!arquivo) return recusar()
-    try {
-      const info = await arquivo.stat()
-      if (!info.isFile() || info.size !== artigo.bytes || info.dev !== antes.dev || info.ino !== antes.ino) return recusar()
-      const buffer = Buffer.alloc(artigo.bytes + 1)
-      let total = 0
-      while (total < buffer.length) {
-        const resultado = await arquivo.read(buffer, total, buffer.length - total, total)
-        if (!resultado.bytesRead) break
-        total += resultado.bytesRead
-      }
-      const bytes = buffer.subarray(0, total), sha256 = createHash('sha256').update(bytes).digest('hex')
-      if (total !== artigo.bytes || sha256 !== artigo.sha256) return recusar()
-      return { nome: artigo.name, bytes, sha256 }
-    } finally { await arquivo.close() }
-  })
+  return withSessionPersistenceQueue(sessionId, () => lerFonteSobFila(sessionId, chatId, artifactId, maxBytes))
+}
+
+async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: string, maxBytes: number): Promise<{ nome: string; bytes: Buffer; sha256: string }> {
+  resolverDonoAnexos(sessionId, chatId)
+  const artigo = obterArtigo(artifactId)
+  if (!artigo || artigo.sessionId !== sessionId || artigo.chatId !== chatId || artigo.state !== 'pronto' || artigo.papel === 'gerado-gerenciado' ||
+      !Number.isSafeInteger(artigo.bytes) || artigo.bytes < 0 || !/^[a-f0-9]{64}$/.test(artigo.sha256)) return recusar()
+  // Cópia do projeto é trabalho mutável; anexos privados e referências
+  // continuam exigindo o hash original enquanto não houver outro vínculo.
+  const trabalhoMutavel = artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace'
+  if (!trabalhoMutavel && artigo.bytes > maxBytes) return recusar()
+  const caminho = caminhoAbsolutoDeArtigo(artigo)
+  const raiz = artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
+  if (!raiz) return recusar()
+  await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable', mensagem: 'A fonte não está disponível nesta conversa.' })
+  const antes = await lstat(caminho).catch(() => null)
+  if (!antes?.isFile() || antes.isSymbolicLink()) return recusar()
+  const arquivo = await open(caminho, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)).catch(() => null)
+  if (!arquivo) return recusar()
+  try {
+    const info = await arquivo.stat()
+    if (!info.isFile() || info.size < 0 || info.size > maxBytes || (!trabalhoMutavel && info.size !== artigo.bytes) || info.dev !== antes.dev || info.ino !== antes.ino) return recusar()
+    const buffer = Buffer.alloc(info.size + 1)
+    let total = 0
+    while (total < buffer.length) {
+      const resultado = await arquivo.read(buffer, total, buffer.length - total, total)
+      if (!resultado.bytesRead) break
+      total += resultado.bytesRead
+    }
+    const bytes = buffer.subarray(0, total), sha256 = createHash('sha256').update(bytes).digest('hex')
+    if (total !== info.size || (!trabalhoMutavel && sha256 !== artigo.sha256)) return recusar()
+    return { nome: artigo.name, bytes, sha256 }
+  } finally { await arquivo.close() }
 }
 
 /** A listagem pertence à conversa e valida o ZIP inteiro antes de retornar metadados. */
@@ -80,9 +96,10 @@ export async function extrairItemZipConversa(sessionId: string, chatId: string, 
   if (sinal?.aborted) throw new Error('Extração cancelada antes de começar.')
   const fila = <T>(operacao: () => Promise<T>): Promise<T> => withSessionPersistenceQueue(sessionId, async () => {
     resolverDonoAnexos(sessionId, chatId)
-    // Também confirma que a fonte ainda pertence ao dono; bytes originais já foram verificados.
-    const original = obterArtigo(artifactId)
-    if (!original || original.sessionId !== sessionId || original.chatId !== chatId || original.sha256 !== fonte.sha256) return recusar()
+    // A fonte de trabalho precisa continuar a mesma após a autorização. Não
+    // compara com o hash histórico, pois o arquivo pode ter sido editado.
+    const atual = await lerFonteSobFila(sessionId, chatId, artifactId, TETO_FONTE_BYTES)
+    if (atual.sha256 !== fonte.sha256 || atual.nome !== fonte.nome) return recusar()
     return operacao()
   })
   const filaAdmissao = <T>(operacao: () => Promise<T>): Promise<T> => fila(async () => {
@@ -117,7 +134,7 @@ export type ResultadoTextoConversa =
 /** Esta porta não concede envio ao modelo: o chamador deve pedir consentimento. */
 export async function inspecionarTextoConversa(sessionId: string, chatId: string, artifactId: string, sinal?: AbortSignal): Promise<ResultadoTextoConversa> {
   const fonte = await lerFonteConversa(sessionId, chatId, artifactId, TETO_FONTE_BYTES)
-  const indisponivel = (motivo: string): ResultadoTextoConversa => ({ disponivel: false, nome: fonte.nome, motivo: `${motivo} O original continua disponível para download.` })
+  const indisponivel = (motivo: string): ResultadoTextoConversa => ({ disponivel: false, nome: fonte.nome, motivo: `${motivo} O original pode ser baixado se estiver disponível.` })
   const nome = fonte.nome.toLowerCase()
   if (fonte.bytes.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
     const extraido = await extrairTextoPdf(fonte.bytes, sinal)

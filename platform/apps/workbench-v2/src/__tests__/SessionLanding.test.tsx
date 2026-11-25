@@ -156,7 +156,7 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
     return user.upload(input, file)
   }
 
-  it('aparece DESMARCADA com Pasta selecionada, e a escolha vale no primeiro envio', async () => {
+  it('informa o destino uploads/ antes do primeiro envio', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue(true)
     render(
@@ -169,20 +169,15 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
       />,
     )
     await anexar(user)
-    const caixa = await screen.findByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
-    expect(caixa).not.toBeChecked()
-
-    await user.click(caixa)
-    expect(caixa).toBeChecked()
+    expect(await screen.findByText('Arquivos novos serão salvos em uploads/ do projeto.')).toBeInTheDocument()
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'primeiro envio')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
     await user.click(within(dialogo).getByRole('button', { name: 'Continuar com o texto' }))
 
     expect(onSubmit).toHaveBeenCalledTimes(1)
-    const snapshot = onSubmit.mock.calls[0][0].snapshot as { anexos: Array<{ modoCopia?: string }> }
-    // A escolha explícita chega ao primeiro envio (é ela que decide o escopo).
-    expect(snapshot.anexos.every((anexo) => anexo.modoCopia === 'projeto')).toBe(true)
+    const snapshot = onSubmit.mock.calls[0][0].snapshot as { anexos: Array<{ name: string }> }
+    expect(snapshot.anexos[0].name).toBe('nota.txt')
   })
 
   it('NÃO aparece em Chat sem pasta', async () => {
@@ -193,7 +188,7 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
     expect(screen.queryByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })).toBeNull()
   })
 
-  it('falha no envio preserva a escolha para a retentativa', async () => {
+  it('falha no envio preserva o anexo para a retentativa', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockRejectedValueOnce(new Error('falha sintética')).mockResolvedValueOnce(true)
     render(
@@ -206,17 +201,15 @@ describe('SessionLanding — C-3a cópia na pasta do projeto (antes do 1º envio
       />,
     )
     await anexar(user)
-    const caixa = await screen.findByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
-    await user.click(caixa)
+    expect(await screen.findByText('Arquivos novos serão salvos em uploads/ do projeto.')).toBeInTheDocument()
     await user.type(screen.getByRole('textbox', { name: 'Mensagem para a nova sessão' }), 'vai falhar')
     await user.click(screen.getByRole('button', { name: 'Enviar mensagem' }))
     const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
     await user.click(within(dialogo).getByRole('button', { name: 'Continuar com o texto' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
 
-    // Depois da falha a escolha continua marcada e o anexo permanece.
-    const depois = await screen.findByRole('checkbox', { name: 'Salvar cópia na pasta do projeto' })
-    expect(depois).toBeChecked()
+    // Depois da falha o destino e o anexo permanecem.
+    expect(await screen.findByText('Arquivos novos serão salvos em uploads/ do projeto.')).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Arquivos anexados' })).toBeInTheDocument()
   })
 })
