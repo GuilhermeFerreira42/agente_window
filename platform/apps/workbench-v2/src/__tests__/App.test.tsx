@@ -360,7 +360,7 @@ describe('App session flows', () => {
     await screen.findByText('Trabalhando')
     await user.click(screen.getByRole('button', { name: 'Parar execução' }))
 
-    expect(screen.getAllByText(/alterações já concluídas foram mantidas/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/alterações podem ter sido concluídas/).length).toBeGreaterThan(0)
     expect(screen.queryByText(/interrompida antes da resposta/)).not.toBeInTheDocument()
   })
 

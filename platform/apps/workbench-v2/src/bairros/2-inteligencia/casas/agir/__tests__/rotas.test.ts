@@ -1142,6 +1142,24 @@ describe('MM-I — aprovação individual de anexos em Chat sem pasta', () => {
     resolverContexto: () => ({ ok: true as const, raiz: null, permissoes: [] }),
     prepararInspecaoAnexos: async () => ({ previa: 'Enviar texto privado do arquivo teste.txt.', executar }),
   })
+  it('pedido exclusivo de espera bloqueia até chamada indevida do provedor', async () => {
+    const executar = vi.fn(async () => ({ ok: true, resumo: 'lido', conteudo: 'SEGREDO FIXTURE' }))
+    const deps = criarDeps(alvoOk, executar)
+    const preparar = vi.fn(deps.prepararInspecaoAnexos!)
+    deps.prepararInspecaoAnexos = preparar
+    const corpos: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => {
+      corpos.push(String(init.body))
+      return new Response(corpos.length === 1 ? pedidoSse : SSE_TOOL_DEPOIS_DE_RESULTADO, { headers: { 'Content-Type': 'text/event-stream' } })
+    }))
+    const res = fakeRes()
+    const pedido = JSON.stringify({ fluxo: 'espera-anexos', sessionId: 'sessao-1', chatId: 'chat-1', messages: [{ role: 'user', content: 'Aguarde instruções.' }] })
+    await tratarRotasAgir(fakeReq(pedido), res, URL_AGIR, deps)
+    expect(preparar).not.toHaveBeenCalled(); expect(executar).not.toHaveBeenCalled()
+    expect(JSON.parse(corpos[0]).tools).toEqual([])
+    expect(corpos.join('')).not.toContain('SEGREDO FIXTURE')
+    expect(frames(res)).not.toContainEqual(expect.objectContaining({ type: 'approval' }))
+  })
   it('exige cartão mesmo em Chat, recusa grant de sessão e só transmite após confirmação', async () => {
     const executar = vi.fn(async () => ({ ok: true, resumo: 'lido', conteudo: 'SEGREDO FIXTURE' }))
     const deps = criarDeps(alvoOk, executar)
@@ -1162,6 +1180,25 @@ describe('MM-I — aprovação individual de anexos em Chat sem pasta', () => {
     await fio
     expect(aprovar.statusCode).toBe(200); expect(executar).toHaveBeenCalledTimes(1)
     expect(corpos).toHaveLength(2); expect(corpos[1]).toContain('SEGREDO FIXTURE')
+  })
+  it('Parar espera a extração em curso e informa conclusão quando publicação vence', async () => {
+    let avisar!: () => void, liberar!: () => void
+    const inicio = new Promise<void>(resolve => { avisar = resolve })
+    const barreira = new Promise<void>(resolve => { liberar = resolve })
+    const executar = vi.fn(async () => { avisar(); await barreira; return { ok: true, resumo: 'Item nota.txt extraído para a área privada da conversa.', conteudo: '{}', efeitoIniciado: true } })
+    const deps = criarDeps(alvoOk, executar)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(pedidoSse, { headers: { 'Content-Type': 'text/event-stream' } })))
+    const res = fakeRes(), fluxo = 'anexo-parada-publicacao'
+    const fio = tratarRotasAgir(fakeReq(corpo(fluxo)), res, URL_AGIR, deps)
+    await esperaFio(res, '"type":"approval"')
+    await tratarRotasAgir(fakeReq(approvalBody(res, { fluxo, id: 'anexo-1', decisao: 'permitir' })), fakeRes(), URL_APROVAR, deps)
+    await inicio
+    const ack = fakeRes(), parar = tratarRotasAgir(fakeReq(approvalBody(res, { fluxo })), ack, URL_CANCEL, deps)
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(ack.ended).toBe(false)
+    liberar(); await parar; await fio
+    expect(JSON.parse(ack.corpo()).status).toBe('cancelled_with_effects')
+    expect(frames(res)).toContainEqual(expect.objectContaining({ type: 'tool_result', ok: true, resumo: expect.stringContaining('extraído') }))
   })
   it('mudança de destino após execução impede a próxima chamada e a compactação', async () => {
     let alvo = ALVO

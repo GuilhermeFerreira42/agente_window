@@ -2153,7 +2153,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               messages: chat.messages.map((message) => message.running ? {
                 ...message,
                 content: chatsComEfeitosConfirmados.has(chat.id)
-                  ? `${message.content.trim() ? `${message.content.trim()}\n\n` : ''}Execução interrompida; alterações já concluídas foram mantidas. Confira os cartões das ferramentas.`
+                  ? `${message.content.trim() ? `${message.content.trim()}\n\n` : ''}Execução interrompida; alterações podem ter sido concluídas. Confira os cartões das ferramentas e as fontes antes de repetir.`
                   : message.content.trim()
                     ? message.content
                     : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
@@ -2176,7 +2176,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       return
     }
     clearPendingTimersForSession(sessionId)
-    if (chatsComEfeitosConfirmados.size > 0) notify('Execução interrompida; alterações já concluídas foram mantidas')
+    if (chatsComEfeitosConfirmados.size > 0) notify('Execução interrompida; alterações podem ter sido concluídas. Confira os cartões e as fontes.')
     else if (chatsCancelados.size > 0) notify('Execução interrompida')
   }
 

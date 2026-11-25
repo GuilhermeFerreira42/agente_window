@@ -3,9 +3,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as filaSessao from '../filaSessao'
 import { getSessionRecord, resetDatabase, upsertSessionRecord } from '../database'
-import { admitirUpload, lerArtigo, receberConteudo } from './estoque'
+import { admitirUpload, consultarUpload, lerArtigo, receberConteudo, reconciliarIdentidade } from './estoque'
+import { withSessionPersistenceQueue } from '../filaSessao'
 import { listarFontesConversa, lerFonteConversa, listarZipConversa, extrairItemZipConversa, inspecionarTextoConversa } from './inspecaoConversa'
 import { zipDeTeste } from './zipFixture.test-helper'
 import { prepararInspecaoAgente } from './ferramentaAnexos'
@@ -63,6 +65,70 @@ describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
     const extraidaImagem = await extrairItemZipConversa(sid, a, id, 1)
     expect((await lerFonteConversa(sid, a, extraidaImagem.artifactId, 4 * 1024 * 1024)).bytes.equals(imagem)).toBe(true)
     expect((await listarFontesConversa(sid, a)).map(x => x.nome)).toEqual(['teste.zip', 'nota.txt', 'video.webm', 'imagem.png'])
+  })
+  it('extração real cancelada na fronteira de gravação não aparece ao reabrir o catálogo', async () => {
+    const id = await anexar(a, 'origem.zip', zipDeTeste([{ nome: 'cancelado.txt', bytes: Buffer.from('não publicar') }]))
+    const filaReal = filaSessao.withSessionPersistenceQueue
+    let chegou!: () => void, continuar!: () => void, chamadas = 0
+    const gravado = new Promise<void>(resolve => { chegou = resolve })
+    const bloqueio = new Promise<void>(resolve => { continuar = resolve })
+    const spy = vi.spyOn(filaSessao, 'withSessionPersistenceQueue').mockImplementation(async (sidFila, operacao) => {
+      chamadas++
+      if (chamadas === 3) { chegou(); await bloqueio }
+      return filaReal(sidFila, operacao)
+    })
+    try {
+      const abort = new AbortController()
+      const extracao = extrairItemZipConversa(sid, a, id, 0, abort.signal)
+      await gravado
+      abort.abort()
+      await reconciliarIdentidade(sid, a)
+      continuar()
+      await expect(extracao).rejects.toThrow()
+      spy.mockRestore()
+      resetDatabase()
+      await reconciliarIdentidade(sid, a, {}, { todos: true })
+      expect((await listarFontesConversa(sid, a)).map(fonte => fonte.nome)).toEqual(['origem.zip'])
+    } finally { continuar(); spy.mockRestore() }
+  })
+  it('cancelamento ao terminar a gravação vence recuperação concorrente e não reaparece após reinício', async () => {
+    const bytes = Buffer.from('item cancelado')
+    const upload = await admitirUpload({ sessionId: sid, chatId: a, name: 'cancelado.txt', declaredBytes: bytes.length, mode: 'copy', scope: 'chat', workspaceRoot: null })
+    const sinal = new AbortController()
+    let chegou!: () => void, continuar!: () => void
+    const chegouNaPublicacao = new Promise<void>(resolve => { chegou = resolve })
+    const liberacao = new Promise<void>(resolve => { continuar = resolve })
+    const fila = async <T>(operacao: () => Promise<T>): Promise<T> => {
+      chegou(); await liberacao
+      return withSessionPersistenceQueue(sid, operacao)
+    }
+    const escrita = receberConteudo(sid, a, upload.uploadId, Readable.from([bytes]), { fila, sinalPublicacao: sinal.signal })
+    await chegouNaPublicacao
+    expect(consultarUpload(sid, a, upload.uploadId).state).toBe('recebendo')
+    sinal.abort()
+    await reconciliarIdentidade(sid, a)
+    continuar()
+    await expect(escrita).rejects.toThrow(/cancelada/)
+    expect(consultarUpload(sid, a, upload.uploadId).state).toBe('cancelado')
+    resetDatabase()
+    await reconciliarIdentidade(sid, a, {}, { todos: true })
+    expect(consultarUpload(sid, a, upload.uploadId).state).toBe('cancelado')
+    expect(await listarFontesConversa(sid, a)).toEqual([])
+  })
+  it('publicação concluída vence cancelamento tardio e permanece após reinício', async () => {
+    const bytes = Buffer.from('item concluído')
+    const upload = await admitirUpload({ sessionId: sid, chatId: a, name: 'concluido.txt', declaredBytes: bytes.length, mode: 'copy', scope: 'chat', workspaceRoot: null })
+    const sinal = new AbortController()
+    const fila = <T>(operacao: () => Promise<T>): Promise<T> => withSessionPersistenceQueue(sid, async () => {
+      const resultado = await operacao()
+      sinal.abort() // cancelamento antes do recibo, mas depois do commit
+      return resultado
+    })
+    const recibo = await receberConteudo(sid, a, upload.uploadId, Readable.from([bytes]), { fila, sinalPublicacao: sinal.signal })
+    expect(recibo.state).toBe('pronto')
+    resetDatabase()
+    await reconciliarIdentidade(sid, a, {}, { todos: true })
+    expect((await listarFontesConversa(sid, a)).map(fonte => fonte.nome)).toEqual(['concluido.txt'])
   })
   it('extrações simultâneas usam identidades separadas e preservam os dois resultados', async () => {
     const id = await anexar(a, 'concorrente.zip', zipDeTeste([{ nome: 'nota.txt', bytes: Buffer.from('mesmo conteúdo') }]))

@@ -39,6 +39,8 @@ export interface OpcoesEstoque {
   uuid?: () => string
   /** Fila do dono injetável nos ensaios (padrão: a fila real da sessão). */
   fila?: <T>(operacao: () => Promise<T>) => Promise<T>
+  /** Publicação cancelável: a decisão é tomada sob a fila, antes da intenção durável. */
+  sinalPublicacao?: AbortSignal
 }
 
 export interface EntradaAdmissao {
@@ -447,6 +449,23 @@ export async function receberConteudo(
     await unlink(stagePath).catch(() => undefined)
     falhaUpload(linha, 'verification_failed',
       'O arquivo gravado não confere com o que foi recebido (bytes/hash). Nada foi publicado.', 500)
+  }
+  if (opcoes.sinalPublicacao) {
+    // A recuperação usa a mesma fila. Enquanto recebendo, não pode publicar;
+    // sob a fila decidimos entre cancelamento durável e preparar+publicar.
+    // Uma vez iniciada a publicação, ela vence a corrida e deve terminar ou
+    // ser reportada como efeito incerto, nunca como cancelamento limpo.
+    return filaDe(sessionId, opcoes)(async () => {
+      const atual = obterUpload(sessionId, chatId, uploadId)
+      if (!atual || atual.state !== 'recebendo') throw new PersistenceProblem(409, 'upload_cancelled', 'A transferência não está mais ativa.')
+      if (opcoes.sinalPublicacao!.aborted) {
+        atualizarUpload(sessionId, chatId, uploadId, { state: 'cancelado', errorCode: 'cancelled_by_user' })
+        await unlink(stagePath).catch(() => undefined)
+        throw new PersistenceProblem(409, 'upload_cancelled', 'Extração cancelada antes da publicação.')
+      }
+      atualizarUpload(sessionId, chatId, uploadId, { receivedBytes: bytes, digest, stagePath, state: 'preparado' })
+      return publicarPreparadoSemFila(sessionId, chatId, uploadId, opcoes)
+    })
   }
   atualizarUpload(sessionId, chatId, uploadId, { receivedBytes: bytes, digest, stagePath, state: 'preparado' })
   return publicarPreparado(sessionId, chatId, uploadId, opcoes)

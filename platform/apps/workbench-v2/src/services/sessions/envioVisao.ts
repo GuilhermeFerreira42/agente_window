@@ -1,6 +1,7 @@
 import type { SelecaoModelo } from '../../bairros/2-inteligencia/casas/conversa'
 import type { ModoAgir } from '../../bairros/2-inteligencia/casas/agir'
 import { pedidoDeConfirmacao } from '../../domain/dialogoConfirmacao'
+import { pediuSomenteAguardar } from '../../domain/aguardarInstrucoes'
 import { pedidoEscolhaAnexos } from '../../domain/pedidosArquivo'
 import { portaDialogos } from '../../shell/portaDialogos'
 import type { Attachment, ChatMessage, Session } from '../../types'
@@ -19,7 +20,7 @@ async function consultarProposta(modelSelection: SelecaoModelo, messageId: strin
 }
 
 export async function escolherEnvioVisao(texto: string, anexos: readonly Attachment[], selecao: SelecaoModelo, modo: ModoAgir, messageId = `message-${crypto.randomUUID()}`, reenvio = false): Promise<EscolhaVisao | null | undefined> {
-  if (!texto.trim() || !anexos.length) return undefined
+  if (!texto.trim() || !anexos.length || pediuSomenteAguardar(texto)) return undefined
   const candidatas = anexos.flatMap((anexo, index) =>
     anexo.mode !== 'reference' && (!reenvio || (anexo.artifactId && (anexo.envioModelo === 'pendente' || anexo.envioModelo === 'enviado'))) &&
     /\.(png|jpe?g|webp)$/iu.test(anexo.name) ? [index] : [])

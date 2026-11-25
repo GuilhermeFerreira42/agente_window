@@ -35,6 +35,7 @@ import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, validarSel
 import { registrarExecucao, type RegistroExecucaoAgir } from './transcript'
 import { FERRAMENTAS_ENTRE_CHATS, pedidoHumanoEntreChats, type ContextoEntreChats, type PedidoEntreChats, type ResultadoEntreChats } from '../../../../../domain/consultaEntreChats'
 import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
+import { pediuSomenteAguardar } from '../../../../../domain/aguardarInstrucoes'
 
 import { comCorpoVisao, proporVisao, validarPedidoVisao, type FonteVisao, type LerImagemVisao, type PedidoVisao } from './admissaoVisao'
 import type { CodecImagemVisao } from './prepararImagemVisao'
@@ -532,6 +533,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     // já vai ao modelo — não existe segunda fonte de texto, então não há como a
     // invocação detectada divergir do que o modelo vai ver.
     const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
+    const somenteAguardar = pediuSomenteAguardar(textoDoDono)
     const composicao = !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
@@ -595,7 +597,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
       // Chat continua sem ferramentas de pasta/shell; a porta de anexos é isolada.
-      ferramentasPermitidas: fio.visao ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+      ferramentasPermitidas: fio.visao || somenteAguardar ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
         fio.raiz === null ? (deps.prepararInspecaoAnexos ? ['anexos'] : []) :
         [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), ...(deps.recuperarHistorico ? ['historico'] : []), ...(deps.prepararInspecaoAnexos ? ['anexos'] : [])],
       emitir: (evento) => {
@@ -724,6 +726,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (somenteAguardar) return 'O usuário pediu somente para aguardar instruções; nenhuma ferramenta será executada neste turno.'
         if (fio.execucao.entreChats) return (FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta) ? null : 'Esta consulta é somente de outros chats: não autoriza arquivos, comandos, memórias de projeto ou outras ferramentas.'
         if ((FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta)) return 'Consulte outros chats somente mediante pedido humano explícito atual; use /chats seguido da consulta se necessário.'
         // C-1 (SPEC C §4) — guarda da conversa Chat: nenhuma ferramenta de
@@ -1016,7 +1019,7 @@ async function tratarAgir(
   if (corpo.vision !== undefined) {
     try {
       visao = validarPedidoVisao(corpo.vision)
-      if (modoEfetivo !== 'ask' || textoAtual?.role !== 'user' || textoAtual.id !== visao.messageId || textoAtual.content.trim().startsWith('/')) {
+      if (modoEfetivo !== 'ask' || textoAtual?.role !== 'user' || textoAtual.id !== visao.messageId || textoAtual.content.trim().startsWith('/') || pediuSomenteAguardar(textoAtual.content)) {
         throw new Error('Imagens exigem uma pergunta publicada nesta conversa, no modo Perguntar.')
       }
     } catch (erro) {

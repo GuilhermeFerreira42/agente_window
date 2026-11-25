@@ -1,3 +1,9 @@
+# MM-I — cancelamento, espera e dois chats
+
+Após `01c6742`, a decisão de cancelar/publicar o item ZIP foi serializada com a recuperação; espera reconhecida não anuncia nem executa ferramentas e não envia anexos; testes cobrem uso posterior sem reenvio e escopo entre chats da mesma sessão. Áudio/vídeo continuam pendentes por ausência de runtime/modelo local ou capacidade comprovada de provedor para esse fluxo. Resultados, lacunas e comparação de auditoria em `09`; roteiro único em `VALIDACAO_MM-I_WINDOWS.md`. Não foi dado aceite humano e MM-O não foi iniciada.
+
+---
+
 # MM-I — integração para avaliação, com ressalvas
 
 Integrados preparação de imagens pela fronteira, Fontes por conversa e ferramenta de inspeção com autorização individual, ZIP privado e PDF local limitado; áudio e vídeo retornam motivo de indisponibilidade. O shell e caminhos externos permanecem. Testes locais com simulador, lacunas e risco de publicação ZIP em `09`; roteiro único para o proprietário em `VALIDACAO_MM-I_WINDOWS.md`. Não há aceite humano nem autorização para MM-O.

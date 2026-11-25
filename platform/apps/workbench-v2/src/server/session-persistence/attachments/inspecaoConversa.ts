@@ -80,15 +80,18 @@ export async function extrairItemZipConversa(sessionId: string, chatId: string, 
   if (sinal?.aborted) throw new Error('Extração cancelada antes de começar.')
   const fila = <T>(operacao: () => Promise<T>): Promise<T> => withSessionPersistenceQueue(sessionId, async () => {
     resolverDonoAnexos(sessionId, chatId)
-    if (sinal?.aborted) throw new Error('Extração cancelada antes da publicação.')
     // Também confirma que a fonte ainda pertence ao dono; bytes originais já foram verificados.
     const original = obterArtigo(artifactId)
     if (!original || original.sessionId !== sessionId || original.chatId !== chatId || original.sha256 !== fonte.sha256) return recusar()
     return operacao()
   })
-  const upload = await admitirUpload({ sessionId, chatId, name: posix.basename(item.nome), declaredBytes: item.bytes.length, mode: 'copy', scope: 'chat', workspaceRoot: null }, { fila })
+  const filaAdmissao = <T>(operacao: () => Promise<T>): Promise<T> => fila(async () => {
+    if (sinal?.aborted) throw new Error('Extração cancelada antes da admissão.')
+    return operacao()
+  })
+  const upload = await admitirUpload({ sessionId, chatId, name: posix.basename(item.nome), declaredBytes: item.bytes.length, mode: 'copy', scope: 'chat', workspaceRoot: null }, { fila: filaAdmissao })
   try {
-    const recibo = await receberConteudo(sessionId, chatId, upload.uploadId, Readable.from([item.bytes], { signal: sinal }), { fila })
+    const recibo = await receberConteudo(sessionId, chatId, upload.uploadId, Readable.from([item.bytes], { signal: sinal }), { fila, sinalPublicacao: sinal })
     return { artifactId: recibo.artifactId, nome: recibo.name, bytes: recibo.bytes, modalidade: 'arquivo' }
   } catch (erro) {
     const atual = (() => { try { return consultarUpload(sessionId, chatId, upload.uploadId) } catch { return null } })()
@@ -96,7 +99,13 @@ export async function extrairItemZipConversa(sessionId: string, chatId: string, 
     // Em publicação preparada, o destino pode já existir: preserve journal/stage
     // para recuperação e não afirme que não houve efeito.
     if (!atual || atual.state === 'preparado') throw Object.assign(new Error('Resultado da extração não confirmado; confira as fontes antes de repetir.'), { efeitoPossivel: true })
-    await cancelarUpload(sessionId, chatId, upload.uploadId).catch(() => undefined)
+    try {
+      const cancelado = await cancelarUpload(sessionId, chatId, upload.uploadId)
+      if (cancelado.state === 'pronto') return { artifactId: cancelado.artifactId, nome: cancelado.name, bytes: cancelado.bytes, modalidade: 'arquivo' }
+      if (cancelado.state !== 'cancelado') throw new Error('Cancelamento não confirmado.')
+    } catch {
+      throw Object.assign(new Error('Resultado da extração não confirmado; confira as fontes antes de repetir.'), { efeitoPossivel: true })
+    }
     throw erro
   }
 }
