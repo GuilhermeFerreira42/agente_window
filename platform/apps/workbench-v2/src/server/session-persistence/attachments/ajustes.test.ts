@@ -1,11 +1,11 @@
 // Reprodução dos dois ajustes de usabilidade pedidos na C-3a.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetDatabase, upsertSessionRecord } from '../database'
-import { admitirUpload, receberConteudo } from './estoque'
+import { admitirUpload, lerArtigo, receberConteudo } from './estoque'
 import { obterUpload } from './catalogo'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao } from '../deletions'
 
@@ -66,7 +66,6 @@ describe('Ajustes de usabilidade C-3a', () => {
   it('A3 — arquivos já armazenados com prefixo continuam acessíveis e não são renomeados', async () => {
     const legado = join(ws, 'uploads', 'abcdef12-antigo.txt')
     mkdirSync(join(ws, 'uploads'), { recursive: true })
-    const { writeFileSync } = await import('node:fs')
     writeFileSync(legado, 'ANTIGO')
     // Um novo envio com o mesmo nome NÃO toca no arquivo antigo.
     const novo = await enviarNoProjeto('antigo.txt', 'NOVO')
@@ -84,6 +83,19 @@ describe('Ajustes de usabilidade C-3a', () => {
     await receberConteudo(SID, CID, uploadId, Readable.from([Buffer.from('AAA')])).catch(() => undefined)
     const arquivos = readdirSync(join(ws, 'uploads')).filter((nome) => nome.endsWith('.txt'))
     expect(arquivos).toHaveLength(1)
+  })
+
+  // Diagnóstico do formato legado ANTES da migração MM-I: o catálogo guarda
+  // só o caminho e hash da cópia de projeto, não outros bytes históricos. Este
+  // teste deve ser substituído por jornadas de migração quando ela existir.
+  it('legado pré-migração — alteração ou exclusão da única cópia não fornece o original', async () => {
+    const alterado = await enviarNoProjeto('alterado.txt', 'ORIGINAL')
+    const excluido = await enviarNoProjeto('excluido.txt', 'ORIGINAL')
+    expect(readFileSync((await lerArtigo(alterado.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    writeFileSync(alterado.finalPath!, 'ALTERADO')
+    rmSync(excluido.finalPath!)
+    await expect(lerArtigo(alterado.artifactId!)).rejects.toMatchObject({ code: 'attachment_changed' })
+    await expect(lerArtigo(excluido.artifactId!)).rejects.toThrow()
   })
 
   it('A5 — excluir a conversa preserva a cópia explícita no projeto', async () => {

@@ -1,3 +1,13 @@
+# Nova rodada MM-I — diagnóstico inicial, não concluída
+
+A solicitação vigente substitui Fontes por Explorer normal e exige arquivos de trabalho editáveis separados dos originais históricos, uploads automáticos no projeto e áudio/vídeo funcionais. Nada disso foi implementado ou validado nesta etapa de diagnóstico. O roteiro Windows anterior está marcado como superado; não homologar esta rodada por ele.
+
+**Legado:** o upload de projeto anterior registra um único caminho no projeto mais tamanho e SHA-256; leitura e download verificam esses bytes, sem cópia histórica separada. Com uma cópia legada intacta será necessária migração segura antes de disponibilizá-la para edição. Se a única cópia já foi alterada ou excluída antes da migração, o hash detecta divergência mas não reconstrói o conteúdo; recuperar os bytes pode exigir backup externo. Não substituí-los silenciosamente nem prometer recuperação universal. Teste de diagnóstico em `attachments/ajustes.test.ts`: seis testes passaram em Debian/Node 26.13.0, incluindo arquivo legado intacto, modificado e excluído. Esse teste retrata o estado **pré-migração** e deve ser substituído pelas jornadas de migração ao implementar a solução.
+
+**Infraestrutura:** a troca de raiz `/fs/workspace` recria um servidor FS global, portanto alternância de chats e chamadas concorrentes precisam de tratamento explícito, não apenas de outro caminho no frontend. O sandbox atual não tem `ffmpeg`, `ffprobe` ou `whisper`; isso não prova impossibilidade de instalá-los. Não há transcrição nem extração de quadros integrada comprovada. Nenhum Playwright, typecheck, build ou validação Windows foi executado para os novos requisitos nesta etapa. Os resultados abaixo são históricos e não validam a nova arquitetura.
+
+---
+
 # MM-I — continuação a partir de `01c6742`
 
 **Escopo.** Pedido exclusivo reconhecido de espera desabilita anúncio e execução de ferramentas no servidor e não oferece envio de visão; nova tarefa pode usar o arquivo salvo. O reconhecedor é conservador e só cobre frases exclusivamente de espera (por exemplo “Aguarde instruções”, “Por favor, aguarde novas instruções”), não todas as formulações naturais, misturas ou pedidos contraditórios. A descrição da ferramenta também orienta não inspecionar por iniciativa própria; não é prova de que qualquer frase ambígua seja compreendida.
