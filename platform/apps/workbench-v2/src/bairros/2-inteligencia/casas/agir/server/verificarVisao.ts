@@ -7,12 +7,14 @@ import { partesVisaoOpenAI } from './visaoOpenAI'
 
 const REVISOES: RevisoesVisao = { configuracao: 'provedores-v1', api: 'openai-chat-completions-v1' }
 const TTL = 30 * 60_000
-const provas = new Map<string, { ate: number; consultadaEm: string }>()
+const provas = new Map<string, { ate: number; consultadaEm: string; destinoLiteLLM?: string }>()
 let verificando = false
 
 function podeVerificarVisao(alvo: AlvoConversa): boolean {
-  // Gateways compatíveis podem trocar de destino entre verificação e envio.
-  return alvo.baseUrl === 'https://api.openai.com/v1' && alvo.protocolo === 'openai-chat' && Boolean(alvo.configRevision && alvo.apiKey)
+  if (alvo.protocolo !== 'openai-chat' || !alvo.configRevision || !alvo.apiKey || !alvo.baseUrl) return false
+  const url = URL.parse(alvo.baseUrl)
+  return Boolean(url && (url.protocol === 'https:' || url.protocol === 'http:') &&
+    !url.username && !url.password && !url.search && !url.hash)
 }
 
 function chave(alvo: AlvoConversa): string | undefined {
@@ -30,7 +32,9 @@ export const fonteDeVisao: FonteVisao = (alvo) => {
   if (fixture) return fixture
   const atual = chave(alvo)
   const prova = atual ? provas.get(atual) : undefined
-  return prova && prova.ate > Date.now() ? construirProvaVisao(alvo, REVISOES, prova.consultadaEm) : undefined
+  if (!prova || prova.ate <= Date.now()) return undefined
+  const comprovada = construirProvaVisao(alvo, REVISOES, prova.consultadaEm)
+  return comprovada && { ...comprovada, destinoLiteLLM: prova.destinoLiteLLM }
 }
 
 const DIGITOS = [
@@ -79,27 +83,44 @@ async function receberTexto(resposta: Response): Promise<string | undefined> {
 /** Solicitação explícita. A prova usa um desafio sintético gerado aqui, sem dados do usuário. */
 export async function verificarVisao(alvo: AlvoConversa, iniciar: IniciarChamadaModelo): Promise<void> {
   const identidade = chave(alvo)
-  if (!identidade || !alvo.providerId || !alvo.modelId || verificando || fonteDeVisao(alvo)) return
+  const { providerId, modelId } = alvo
+  if (!identidade || !providerId || !modelId || verificando || fonteDeVisao(alvo)) return
   verificando = true
   try {
-    const esperado = String(randomInt(10000, 100000))
-    const imagem = imagemDaProva(esperado)
-    const resposta = await iniciar(alvo.providerId, alvo.modelId, config => {
-      if (chave({ ...config, modelo: config.modelId }) !== identidade) throw new Error('O destino mudou antes da verificação.')
-      return fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-        body: JSON.stringify({ model: config.modelId, max_completion_tokens: 128, messages: [{
-          role: 'user', content: partesVisaoOpenAI('Leia os cinco dígitos escritos na imagem. Responda só com os cinco dígitos, sem espaços.', [{ mime: 'image/png', bytes: imagem }]),
-        }] }),
+    const oficial = alvo.baseUrl === 'https://api.openai.com/v1'
+    const consultar = async (modelo: string) => {
+      const esperado = String(randomInt(10000, 100000))
+      const imagem = imagemDaProva(esperado)
+      const resposta = await iniciar(providerId, modelId, config => {
+        if (chave({ ...config, modelo: config.modelId }) !== identidade) throw new Error('O destino mudou antes da verificação.')
+        return fetch(`${config.baseUrl}/chat/completions`, {
+          method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+          headers: {
+            'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}`,
+            ...(!oficial && { 'x-litellm-num-retries': '0' }),
+          },
+          body: JSON.stringify({
+            model: modelo,
+            ...(oficial ? { max_completion_tokens: 128 } : { max_tokens: 512, disable_fallbacks: true }),
+            messages: [{
+              role: 'user', content: partesVisaoOpenAI('Leia os cinco dígitos escritos na imagem. Responda só com os cinco dígitos, sem espaços.', [{ mime: 'image/png', bytes: imagem }]),
+            }],
+          }),
+        })
       })
-    })
-    if (await receberTexto(resposta) === esperado) {
-      const agora = Date.now()
-      for (const [id, prova] of provas) if (prova.ate <= agora) provas.delete(id)
-      if (provas.size >= 32) provas.clear()
-      provas.set(identidade, { ate: agora + TTL, consultadaEm: new Date(agora).toISOString() })
+      if (await receberTexto(resposta) !== esperado) return undefined
+      return { destino: resposta.headers.get('x-litellm-model-id') }
     }
+    const inicial = await consultar(modelId)
+    if (!inicial) return
+    const destinoLiteLLM = oficial ? undefined : inicial.destino ?? undefined
+    // A credencial do alias também precisa aceitar chamadas pelo ID interno.
+    if (!oficial && (!destinoLiteLLM || destinoLiteLLM === modelId ||
+      (await consultar(destinoLiteLLM))?.destino !== destinoLiteLLM)) return
+    const agora = Date.now()
+    for (const [id, prova] of provas) if (prova.ate <= agora) provas.delete(id)
+    if (provas.size >= 32) provas.clear()
+    provas.set(identidade, { ate: agora + TTL, consultadaEm: new Date(agora).toISOString(), destinoLiteLLM })
   } catch { /* Sem resposta verificável, o suporte permanece desconhecido. */ }
   finally { verificando = false }
 }

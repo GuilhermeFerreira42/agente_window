@@ -49,8 +49,8 @@ test('fallback desconhecido: cancelar preserva os dois rascunhos; aceitar envia 
   await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'sintetica.png', mimeType: 'image/png', buffer: PNG.sync.write(png) })
   const chamadasAntesLanding = provedor.requisicoes.length
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
-  const dialogo = page.getByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados/ })
-  await expect(dialogo).toContainText('sintetica.png')
+  const dialogo = page.getByRole('dialog', { name: 'Verificar se o modelo aceita imagens?' })
+  await expect(dialogo).toContainText(modelo)
   await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await expect(landing).toHaveValue(texto)
   await expect(page.getByRole('group', { name: /sintetica\.png/ })).toBeVisible()
@@ -72,7 +72,7 @@ test('fallback desconhecido: cancelar preserva os dois rascunhos; aceitar envia 
   await page.locator('.chat-input-container input[type="file"]').first().setInputFiles({ name: 'azul.jpg', mimeType: 'image/jpeg', buffer: jpg })
   const chamadasAntesChat = provedor.requisicoes.length
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
-  await expect(dialogo).toContainText('azul.jpg')
+  await expect(dialogo).toContainText(modelo)
   await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await expect(chat).toHaveValue('Outra pergunta preservada.')
   await expect(page.getByRole('group', { name: /azul\.jpg/ })).toBeVisible()

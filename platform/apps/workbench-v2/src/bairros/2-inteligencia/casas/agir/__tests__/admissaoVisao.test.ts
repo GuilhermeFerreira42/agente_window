@@ -63,23 +63,27 @@ describe('MM-I: admissão e destino', () => {
     expect(carregar).toHaveBeenCalledTimes(2)
   })
 
-  it('exige desafio sintético no endpoint exato e invalida a prova após mudar a configuração', async () => {
+  function lerDesafio(init: RequestInit) {
     const desenhos = [
       '111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001',
       '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111',
     ]
+    const partes = JSON.parse(String(init.body)).messages[0].content
+    const imagem = PNG.sync.read(Buffer.from(partes[1].image_url.url.split(',')[1], 'base64'))
+    return Array.from({ length: 5 }, (_, posicao) => {
+      const bits = Array.from({ length: 15 }, (_, i) => {
+        const x = (i % 3 + 1 + posicao * 4) * 12 + 6
+        const y = (Math.floor(i / 3) + 1) * 12 + 6
+        return imagem.data[(y * imagem.width + x) * 4] === 0 ? '1' : '0'
+      }).join('')
+      return desenhos.indexOf(bits)
+    }).join('')
+  }
+
+  it('exige desafio sintético no endpoint exato e invalida a prova após mudar a configuração', async () => {
     let lido = ''
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
-      const partes = JSON.parse(String(init.body)).messages[0].content
-      const imagem = PNG.sync.read(Buffer.from(partes[1].image_url.url.split(',')[1], 'base64'))
-      lido = Array.from({ length: 5 }, (_, posicao) => {
-        const bits = Array.from({ length: 15 }, (_, i) => {
-          const x = (i % 3 + 1 + posicao * 4) * 12 + 6
-          const y = (Math.floor(i / 3) + 1) * 12 + 6
-          return imagem.data[(y * imagem.width + x) * 4] === 0 ? '1' : '0'
-        }).join('')
-        return desenhos.indexOf(bits)
-      }).join('')
+      lido = lerDesafio(init)
       return Response.json({ choices: [{ message: { content: lido } }] })
     })
     vi.stubGlobal('fetch', fetch)
@@ -98,5 +102,39 @@ describe('MM-I: admissão e destino', () => {
     expect(imagem.width).toBe(252)
     expect(proporVisao(alvo, fonteDeVisao, 'mensagem-provada', ctx.texto)).not.toBeNull()
     expect(fonteDeVisao({ ...alvo, configRevision: 'rev-2' })).toBeUndefined()
+  })
+
+  it('só admite anexos no LiteLLM após provar o destino fixo com uma segunda imagem', async () => {
+    const pool = { ...alvo, providerId: 'openai-compat', baseUrl: 'https://gateway.example/v1' }
+    const iniciarPool: IniciarChamadaModelo = async (_provedor, _modelo, callback) => callback({
+      ...pool, providerId: pool.providerId, modelId: 'modelo-sintetico', configRevision: 'rev-1',
+      protocolo: 'openai-chat', baseUrl: pool.baseUrl, apiKey: 'chave-falsa',
+    })
+    const chamadas: string[] = []
+    let roteiaParaOutro = true
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).toBe(pool.baseUrl + '/chat/completions')
+      expect(new Headers(init.headers).get('x-litellm-num-retries')).toBe('0')
+      const corpo = JSON.parse(String(init.body))
+      expect(corpo.disable_fallbacks).toBe(true)
+      chamadas.push(corpo.model)
+      const destino = corpo.model === 'destino-confirmado' && roteiaParaOutro ? 'destino-inesperado' : 'destino-confirmado'
+      return Response.json({ choices: [{ message: { content: lerDesafio(init) } }] }, {
+        headers: { 'x-litellm-model-id': destino },
+      })
+    }))
+    await verificarVisao(pool, iniciarPool)
+    expect(chamadas).toEqual(['modelo-sintetico', 'destino-confirmado'])
+    expect(proporVisao(pool, fonteDeVisao, 'mensagem', ctx.texto)).toBeNull()
+
+    roteiaParaOutro = false
+    await verificarVisao(pool, iniciarPool)
+    const proposta = proporVisao(pool, fonteDeVisao, 'mensagem', ctx.texto)
+    expect(proposta?.modelId).toBe(pool.modelId)
+    const ler = async () => ({ bytes: png })
+    const pedido = { proposta: proposta!.proposta, messageId: 'mensagem', artifactIds: ['imagem'] }
+    const efetivo = await comCorpoVisao(pedido, ctx, pool, fonteDeVisao, ler, async preparar =>
+      preparar(pool, { model: pool.modelId, messages: [{ role: 'user', content: ctx.texto }] }))
+    expect(efetivo).toMatchObject({ model: 'destino-confirmado', disable_fallbacks: true })
   })
 })

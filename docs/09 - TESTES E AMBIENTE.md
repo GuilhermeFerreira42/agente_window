@@ -1,4 +1,16 @@
-# 24/11/2026 — MM-I integrada e verificada com provedor simulado no Windows
+# 24/11/2026 — reteste de visão com LiteLLM real no Windows
+
+Base `5d2449e`, Node 26.13.0. O Playwright abriu o aplicativo em um perfil descartável e reaproveitou o provedor configurado para `meu-pool`. A primeira rodada parou na verificação sem oferecer envio de imagem. Na repetição a verificação passou. Um PNG na tela inicial e um JPEG numa conversa aberta foram enviados após o consentimento. O modelo identificou a cor em ambos e o aplicativo registrou os dois anexos como enviados. O ensaio usou somente imagens, textos e conversas sintéticos.
+
+Regressão focada no Windows com 43 testes Vitest e 2 jornadas Playwright locais aprovados. A checagem de tipos, o lint dos arquivos TypeScript alterados e o build Vite passaram. O build conserva avisos de terminal, CSS e tamanho dos pacotes.
+
+O alias fica selecionado na interface. Para imagens, o LiteLLM precisa confirmar o ID do destino e aceitar um segundo desafio nesse ID antes que o aplicativo habilite o anexo. O envio usa esse ID, pede zero retentativas e fallback desativado, e só registra sucesso se a resposta confirmar o destino. A prova expira em 30 minutos e perde validade quando o aplicativo reinicia ou a configuração local muda. Uma nova configuração de roteamento no gateway deve manter o significado do ID da implantação. Os protocolos nativos Gemini, Anthropic e Ollama permanecem fora deste recorte.
+
+Para homologar, usar o mesmo `meu-pool` no modo **Perguntar**, anexar um PNG ou JPEG com um detalhe que a pergunta não revela, clicar **Verificar visão** quando aparecer e depois em **Enviar imagens e texto**. Conferir a resposta e o estado do anexo. Repetir após F5, depois que a conversa salvar.
+
+---
+
+# 24/11/2026 — primeira validação com provedor simulado no Windows (histórico)
 
 Base de comparação `3f794cd`, Node 26.13.0 e dados descartáveis. O fluxo real de **Perguntar** usa o mesmo endpoint de Agir para texto com PNG/JPEG no primeiro envio e em conversas abertas. O Playwright compara modelo, texto e SHA-256 dos bytes na própria fixture HTTP e valida o streaming de resposta, cancelamento sem chamada, lote misto, pasta, retentativa sem duplicar a mensagem e F5 após publicação da revisão. A regressão do envio só de texto para um alvo desconhecido também foi validada.
 

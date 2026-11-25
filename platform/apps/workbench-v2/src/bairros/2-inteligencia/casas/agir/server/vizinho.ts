@@ -503,6 +503,8 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         } : alvo
         const { url, corpo: corpoTexto } = corpoDePedido(alvoAtual, mensagens, opcoes)
         const corpo = ajustes.prepararCorpoVisao?.(alvoAtual, corpoTexto) ?? corpoTexto
+        const destinoLiteLLM = ajustes.prepararCorpoVisao && corpo.disable_fallbacks === true && typeof corpo.model === 'string'
+          ? corpo.model : undefined
         chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens ??
           (corpo.generationConfig as { maxOutputTokens?: number } | undefined)?.maxOutputTokens ??
           (corpo.options as { num_predict?: number } | undefined)?.num_predict)
@@ -510,12 +512,16 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         if (chamada) opcoes?.aoContexto?.(completarMedicao(chamada, payloadMedido, {}, 'enviado'))
         const init = {
           method: 'POST',
-          headers: cabecalhos(alvoAtual),
+          headers: { ...cabecalhos(alvoAtual), ...(destinoLiteLLM && { 'x-litellm-num-retries': '0' }) },
           body: JSON.stringify(corpo),
           signal: controlador.signal,
           ...(ajustes.prepararCorpoVisao ? { redirect: 'error' as const } : {}),
         }
         return fetch(url, init).then(async (resposta) => {
+          if (resposta.ok && destinoLiteLLM && resposta.headers.get('x-litellm-model-id') !== destinoLiteLLM) {
+            await resposta.body?.cancel()
+            throw new ErroVizinho('resposta', 'O gateway não confirmou o destino verificado da imagem.')
+          }
           if (ajustes.prepararCorpoVisao || !corpo.stream_options || (resposta.status !== 400 && resposta.status !== 422)) return resposta
           const detalhe = await lerErroLimitado(resposta)
           if (!recusouOpcaoUso(resposta.status, detalhe)) return new Response(detalhe, { status: resposta.status })

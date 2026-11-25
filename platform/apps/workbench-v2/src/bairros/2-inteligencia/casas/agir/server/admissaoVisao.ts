@@ -17,7 +17,7 @@ export interface PedidoVisao {
   artifactIds: string[]
 }
 export type LerImagemVisao = (pedido: { sessionId: string; chatId: string; messageId: string; artifactId: string; artifactIds: readonly string[]; maxBytes: number; texto: string }) => Promise<{ bytes: Buffer }>
-export type FonteVisao = (alvo: AlvoConversa) => { revisoes: RevisoesVisao; prova: ProvaVisao } | undefined
+export type FonteVisao = (alvo: AlvoConversa) => { revisoes: RevisoesVisao; prova: ProvaVisao; destinoLiteLLM?: string } | undefined
 
 function assinatura(alvo: AlvoConversa, fonte: FonteVisao) {
   const origem = fonte(alvo)
@@ -26,7 +26,11 @@ function assinatura(alvo: AlvoConversa, fonte: FonteVisao) {
   if (!identidade) return undefined
   const decisao = avaliarAlvoVisao(alvo, origem.revisoes, origem.prova)
   if (decisao.estado !== 'disponivel' || !decisao.limites) return undefined
-  return { identidade: JSON.stringify([identidade, decisao.limites]), limites: decisao.limites }
+  return {
+    identidade: JSON.stringify([identidade, decisao.limites, origem.destinoLiteLLM]),
+    limites: decisao.limites,
+    destinoLiteLLM: origem.destinoLiteLLM,
+  }
 }
 
 export function proporVisao(alvo: AlvoConversa, fonte: FonteVisao, messageId: unknown, texto: unknown) {
@@ -87,7 +91,8 @@ export async function comCorpoVisao<T>(
       if (assinatura(alvoNoFetch, fonte)?.identidade !== proposta.identidade || proposta.limite <= Date.now()) {
         return recusar('O destino de imagem mudou antes do envio. Confirme novamente.')
       }
-      try { return construirCorpoVisaoOpenAI(corpo, imagens, atual.limites).corpo }
+      const corpoRoteado = atual.destinoLiteLLM ? { ...corpo, model: atual.destinoLiteLLM, disable_fallbacks: true } : corpo
+      try { return construirCorpoVisaoOpenAI(corpoRoteado, imagens, atual.limites).corpo }
       catch (erro) { return recusar(erro instanceof Error ? erro.message : 'A imagem não pôde ser enviada.') }
     })
   } finally {

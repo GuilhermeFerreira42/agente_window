@@ -1,3 +1,9 @@
+# 24/11/2026 — visão da MM-I pelo LiteLLM
+
+Adicionada verificação de um destino interno da rota LiteLLM para o envio de imagens. O aplicativo mantém o alias selecionado e pede consentimento específico antes de transmitir anexos. Estado em `03` e evidências em `09`.
+
+---
+
 # 24/11/2026 — integração da visão no fluxo real da MM-I
 
 O checkpoint da Arena em `3f794cd` foi conectado ao envio de PNG/JPEG, com prova de alvo, confirmação separada e retentativa explícita. O teste com simulador percorreu o aplicativo no Windows. Estado em `03` e evidências em `09`.

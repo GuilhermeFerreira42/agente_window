@@ -1,6 +1,6 @@
 # Leitura vigente do roadmap — 24/11/2026
 
-**MM-I — visão integrada e validada com simulador no Windows.** PNG e JPEG podem seguir ao modelo em Perguntar depois de verificar o alvo e confirmar o envio. A primeira mensagem, a conversa existente, o cancelamento, a retentativa e a restauração após publicação foram validados. O ensaio com provedor real e a homologação continuam pendentes. Detalhes e limites em `09`.
+**MM-I — visão validada no Windows com o LiteLLM real do proprietário.** PNG e JPEG em Perguntar passaram na tela inicial e no chat aberto usando `meu-pool`. A homologação humana permanece pendente. Detalhes, limites e roteiro em `09`.
 
 **Ponto atual:** C-3a e C-3b homologadas. O proprietário homologou a U-1 e a padronização dos diálogos que a Arena chamou de U-2, sobre `6a895ff`. O ajuste de retorno de foco no chat foi adiado a pedido do proprietário. Próxima fatia: [MM-I — entrada multimodal](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#mm-i--plano-de-execução), com a primeira entrega de visão em validação. Aceite em `08`, evidências em `09`.
 
