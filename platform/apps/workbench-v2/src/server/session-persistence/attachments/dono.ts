@@ -11,6 +11,7 @@ import { getDatabase, getSessionRecord, getSessionRecordRaw } from '../database'
 import { consultarDelecao } from '../deletions'
 import { resolverContextoAgir } from '../agirContext'
 import { PersistenceProblem } from '../persistenceErrors'
+import { validateWorkspacePath } from '../workspaces'
 import { validarSchemaAnexos } from './schemaAnexos'
 import type { EscopoAnexo } from './schemaAnexos'
 
@@ -146,6 +147,20 @@ export function raizDoPedido(dono: DonoAnexos, declarada: unknown): string | nul
     }
   }
   return dono.raiz
+}
+
+/** Uploads pertencem ao projeto escolhido, não a um worktree temporário. */
+export function raizDoUpload(dono: DonoAnexos, declarada: unknown): string | null {
+  if (dono.contextKind !== 'workspace') return raizDoPedido(dono, declarada)
+  const registro = getSessionRecord(dono.sessionId)
+  const projeto = registro?.workspacePath && validateWorkspacePath(registro.workspacePath)
+  if (!projeto || !projeto.valid || !projeto.exists || !projeto.isDir) {
+    throw new PersistenceProblem(409, 'session_context_mismatch', 'A pasta escolhida do projeto não está acessível.')
+  }
+  if (declarada !== undefined && declarada !== null && (typeof declarada !== 'string' || declarada !== projeto.realpath)) {
+    throw new PersistenceProblem(403, 'workspace_mismatch', 'A pasta informada não é a pasta escolhida desta conversa.')
+  }
+  return projeto.realpath
 }
 
 /** Campos de corpo aceitos por rota: qualquer extra é recusado (R08). */

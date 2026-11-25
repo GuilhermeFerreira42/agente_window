@@ -22,7 +22,7 @@ import {
 } from './estoque'
 import { registrarReferencia } from './referencias'
 import { confirmRecovery, prepareRecovery } from './recuperacao'
-import { exigirCampos, exigirVivo, escopoDoPedido, raizDoPedido, resolverDonoAnexos } from './dono'
+import { exigirCampos, exigirVivo, escopoDoPedido, raizDoPedido, raizDoUpload, resolverDonoAnexos } from './dono'
 import type { ModoAnexo } from './schemaAnexos'
 
 const PREFIXO = '/api/sessions'
@@ -153,7 +153,7 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
       const corpo = await lerJson(request)
       exigirCampos(corpo, ['uploadId', 'name', 'bytes', 'declaredBytes', 'mime', 'mode', 'scope', 'workspaceRoot'])
       const escopo = escopoDoPedido(dono, corpo.scope)
-      const raiz = raizDoPedido(dono, corpo.workspaceRoot)
+      const raiz = escopo === 'workspace' ? raizDoUpload(dono, corpo.workspaceRoot) : raizDoPedido(dono, corpo.workspaceRoot)
       if (raiz === null && escopo === 'workspace') {
         throw new PersistenceProblem(403, 'storage_out_of_scope', 'Esta conversa não tem pasta de projeto para receber cópia.')
       }

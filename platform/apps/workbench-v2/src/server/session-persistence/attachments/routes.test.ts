@@ -264,6 +264,22 @@ describe('C-3a rotas de anexo', () => {
     expect(existsSync(caminhoFinalChat(undefined, SID, CID, artifactId, 'exemplo.txt'))).toBe(true)
   })
 
+  it('uploads de worktree vão ao projeto escolhido e recusam raiz diversa', async () => {
+    const projeto = join(base, 'projeto-compartilhado'), worktree = join(base, 'worktree'), outra = join(base, 'outra')
+    mkdirSync(projeto); mkdirSync(worktree); mkdirSync(outra)
+    upsertSessionRecord({ id: SID, slug: 'worktree-teste', title: 'Worktree', workspacePath: projeto, contextKind: 'workspace', worktreePath: worktree,
+      messageCount: 0, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ id: SID, workspacePath: projeto, worktreePath: worktree, chats: [{ id: CID, messages: [] }] }) })
+    const dados = { name: 'nota.txt', bytes: 5, mode: 'copy', scope: 'workspace' }
+    const negado = await chamar('POST', rota('/uploads'), { ...dados, workspaceRoot: outra })
+    expect(negado.status).toBe(403)
+    const admitido = await chamar('POST', rota('/uploads'), { ...dados, workspaceRoot: projeto })
+    expect(admitido.status).toBe(201)
+    const recebido = await chamarBinario('PUT', rota(`/uploads/${admitido.corpo.uploadId}/content`), Buffer.from('texto'))
+    expect(recebido.status).toBe(200)
+    expect(readFileSync(join(projeto, 'uploads', 'nota.txt'), 'utf8')).toBe('texto')
+    expect(existsSync(join(worktree, 'uploads', 'nota.txt'))).toBe(false)
+  })
+
   it('download de upload de projeto conserva original mesmo após editar e excluir trabalho', async () => {
     const ws = join(base, 'ws-original')
     mkdirSync(ws, { recursive: true })
