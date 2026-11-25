@@ -62,7 +62,7 @@ describe('MMI-05 — leitura limitada da cópia vinculada à mensagem publicada'
   })
   it('recusa referência mutável e teto que ultrapassa a salvaguarda local', async () => {
     const id = await criarAnexo(); await publicar(id)
-    await expect(lerCopiaPublicadaParaVisao({ ...entrada(id), maxBytes: 4 * 1024 * 1024 + 1 })).rejects.toThrow()
+    await expect(lerCopiaPublicadaParaVisao({ ...entrada(id), maxBytes: 12 * 1024 * 1024 + 1 })).rejects.toThrow()
     getDatabase().prepare("UPDATE attachment_artifacts SET mode = 'reference' WHERE artifact_id = ?").run(id)
     await expect(lerCopiaPublicadaParaVisao(entrada(id))).rejects.toThrow()
   })

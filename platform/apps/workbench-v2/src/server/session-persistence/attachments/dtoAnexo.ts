@@ -1,8 +1,6 @@
 // C-3a — projeção segura do artefato para DTOs de mensagem/lista (P30):
 // apenas metadados aditivos; nunca bytes, base64, locator físico ou token.
-import path from 'node:path'
 import type { LinhaArtigo } from './schemaAnexos'
-import { getAppDir } from '../paths'
 import { caminhoAbsolutoDeArtigo, lerArtigo } from './estoque'
 
 export interface AnexoSeguro {
@@ -11,6 +9,7 @@ export interface AnexoSeguro {
   bytes: number
   sha256: string
   mode: 'copy' | 'reference'
+  origem: 'entrada' | 'gerado'
   estado: 'pronto' | 'ausente'
   presente: boolean
   /** Somente referência: caminho relativo ao workspace (nunca absoluto). */
@@ -39,6 +38,7 @@ export async function projetarArtigoSeguro(artigo: LinhaArtigo): Promise<AnexoSe
     bytes: artigo.bytes,
     sha256: artigo.sha256,
     mode: artigo.mode,
+    origem: artigo.papel === 'gerado-gerenciado' ? 'gerado' : 'entrada',
     estado: presente ? 'pronto' : 'ausente',
     presente,
   }

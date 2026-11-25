@@ -1,5 +1,7 @@
 import { fonteDeVisao, identidadeVerificacaoVisao, verificarVisao } from '../../bairros/2-inteligencia/casas/agir/server/verificarVisao'
 import { lerCopiaPublicadaParaVisao } from './attachments/leituraVisao'
+import { codecImagem } from './attachments/codecImagem'
+import { prepararInspecaoAgente } from './attachments/ferramentaAnexos'
 import { PersistenceProblem, receipt, mutationOwner } from './sessionMutations'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
@@ -883,6 +885,8 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       identidadeVerificacaoVisao,
       verificarVisao: (alvo) => verificarVisao(alvo, iniciarChamadaModelo),
       lerImagemVisao: lerCopiaPublicadaParaVisao,
+      codecImagemVisao: codecImagem,
+      prepararInspecaoAnexos: prepararInspecaoAgente,
       iniciarModelo: iniciarChamadaModelo,
       resolverContexto: resolverContextoAgir,
       resolverShell: resolveShell,

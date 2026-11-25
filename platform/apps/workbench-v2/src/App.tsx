@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 // FATIA-05 5.1 c1 — chassi (docs/24): Activity Bar à direita; views vêm do viewRegistry.
 import { ActivityBar, buildActivityBarMenuItems, activityBarPositionFromMenuId } from './shell/activityBar'
-import { SideBar, ExplorerView, SearchView, ScmView } from './shell/sideBar'
+import { SideBar, ExplorerView, FontesConversa, SearchView, ScmView } from './shell/sideBar'
 import { useLayoutState } from './shell/layoutState'
 import { viewsByIds, type ViewDescriptor } from './shell/viewRegistry'
 import { ViewsPanel } from './shell/panel'
@@ -453,6 +453,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
     ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined}
+        fontes={!landingVisible ? <FontesConversa key={`${activeSession.id}:${activeChatId}`} sessionId={activeSession.id} chatId={activeChatId} mensagens={activeSession.chats.find(chat => chat.id === activeChatId)?.messages ?? []} /> : undefined}
         // C-1/B3 — o seletor de pasta é da LANDING (entrada de sessão nova);
         // dentro de uma sessão Chat não há o que abrir e o botão não aparece.
         onOpenFolder={!explorerEnabled && landingVisible ? () => void handlePickWorkspace() : undefined} />

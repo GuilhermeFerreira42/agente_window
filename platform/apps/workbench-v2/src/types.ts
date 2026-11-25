@@ -19,7 +19,7 @@ export interface FerramentaNoChat {
   fontesHistoricas?: FonteEntreChats[]
   escolhasHistoricas?: EscolhaEntreChats[]
   id: string
-  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | FerramentaEntreChats
+  ferramenta: 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | 'anexos' | FerramentaEntreChats
   /** Caminho (ou padrão de busca) mostrado no cartão. */
   alvo: string
   /** Prévia do conteúdo quando o cartão pede permissão (Q3a). */

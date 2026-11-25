@@ -19,7 +19,7 @@ import { garantirDentroDaRaiz } from './contencao'
 // Limite local provisório de leitura, independente da quota C-3a. O futuro
 // adaptador deve também aplicar os menores limites comprovados do alvo e do
 // corpo codificado; esta constante não é evidência de suporte do provedor.
-export const TETO_LEITURA_VISAO_BYTES = 4 * 1024 * 1024
+export const TETO_LEITURA_VISAO_BYTES = 12 * 1024 * 1024
 const TETO_TRANSCRIPT_BYTES = 16 * 1024 * 1024
 
 export interface PedidoLeituraVisao {

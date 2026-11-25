@@ -194,10 +194,11 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
       }
 
       let liberado = true
-      if (ehMexida(pedido.ferramenta) && pedirAprovacao) {
-        // Quem pergunta é que anuncia o cartão (a rota emite `approval` só
-        // quando vai MESMO esperar o dono — permissão de sessão não faz
-        // cartão). O loop apenas pergunta e espera.
+      if (pedido.ferramenta === 'anexos') {
+        // Anexos sempre exigem autorização individual, inclusive sem pasta.
+        liberado = pedirAprovacao ? await pedirAprovacao(pedido) : false
+      } else if (ehMexida(pedido.ferramenta) && pedirAprovacao) {
+        // Quem pergunta anuncia o cartão somente quando espera o dono.
         liberado = await pedirAprovacao(pedido)
       }
       // Cancelamento é terminal: um cartão resolvido tarde nunca autoriza efeito.
@@ -205,7 +206,9 @@ export async function rodarAgir(opcoes: OpcoesAgir): Promise<ResultadoAgir> {
 
       // RF12-2: a negação do `excluir` diz "nada sumiu" (o "dono negou" a
       // tela usa para pintar o cartão de negado — mantido nos dois textos).
-      const textoNegacao = pedido.ferramenta === 'excluir'
+      const textoNegacao = pedido.ferramenta === 'anexos'
+        ? 'O dono negou o acesso aos anexos — nenhum conteúdo desta ferramenta foi enviado.'
+        : pedido.ferramenta === 'excluir'
         ? 'O dono negou esta exclusão — nada sumiu.'
         : pedido.ferramenta === 'executar'
           ? 'O dono negou este comando — nenhum processo foi iniciado.'

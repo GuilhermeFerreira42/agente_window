@@ -17,7 +17,7 @@ export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 /** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
 import type { FerramentaEntreChats, FonteEntreChats, EscolhaEntreChats } from '../../../../domain/consultaEntreChats'
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | FerramentaEntreChats
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | 'anexos' | FerramentaEntreChats
 
 /** Nível de aprovação separado do modo de trabalho. O servidor é autoridade. */
 export type NivelPermissaoAgir = 'manual' | 'allow-all'
@@ -37,6 +37,8 @@ export interface ArgumentosFerramenta {
   apos?: unknown
   ate?: unknown
   acao?: unknown
+  artifactId?: unknown
+  indice?: unknown
   consulta?: unknown
   messageId?: unknown
   caminho?: unknown

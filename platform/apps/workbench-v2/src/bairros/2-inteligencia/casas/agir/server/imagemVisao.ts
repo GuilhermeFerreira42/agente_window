@@ -24,14 +24,15 @@ export interface ImagemInspecionada {
 }
 
 function recusar(): never { throw new Error('Imagem inválida ou acima do limite local. O arquivo foi preservado e não foi enviado.') }
-function verificarDimensoes(largura: number, altura: number): void {
+const LIMITES_ORIGINAL = Object.freeze({ largura: 8192, altura: 8192, pixels: 12 * 1024 * 1024, descomprimido: 100 * 1024 * 1024 })
+function verificarDimensoes(largura: number, altura: number, limites: { largura: number; altura: number; pixels: number } = LIMITES_IMAGEM_VISAO): void {
   if (!Number.isSafeInteger(largura) || !Number.isSafeInteger(altura) || largura <= 0 || altura <= 0 ||
-      largura > LIMITES_IMAGEM_VISAO.largura || altura > LIMITES_IMAGEM_VISAO.altura || largura * altura > LIMITES_IMAGEM_VISAO.pixels) recusar()
+      largura > limites.largura || altura > limites.altura || largura * altura > limites.pixels) recusar()
 }
 
 // Número exato de bytes filtrados, inclusive cada linha dos sete passos Adam7.
 // Limitar pelo esperado protege também imagens pequenas com fluxo inflado grande.
-function tamanhoPNG(largura: number, altura: number, profundidade: number, cor: number, interlace: number): number {
+function tamanhoPNG(largura: number, altura: number, profundidade: number, cor: number, interlace: number, maxDescomprimido: number): number {
   const canais: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
   const profundidades: Record<number, readonly number[]> = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] }
   if (!profundidades[cor]?.includes(profundidade) || (interlace !== 0 && interlace !== 1)) return recusar()
@@ -43,15 +44,16 @@ function tamanhoPNG(largura: number, altura: number, profundidade: number, cor: 
     const w = dimensao(largura, x, dx), h = dimensao(altura, y, dy)
     if (w && h) total += (Math.ceil(w * bits / 8) + 1) * h
   }
-  if (total <= 0 || total > LIMITES_IMAGEM_VISAO.descomprimido) return recusar()
+  if (total <= 0 || total > maxDescomprimido) return recusar()
   return total
 }
 
-function inspecionarPNG(bytes: Buffer): ImagemInspecionada {
+function inspecionarPNG(bytes: Buffer, original = false): ImagemInspecionada {
   if (bytes.length < 33 || bytes.readUInt32BE(8) !== 13 || bytes.toString('ascii', 12, 16) !== 'IHDR') return recusar()
   const largura = bytes.readUInt32BE(16), altura = bytes.readUInt32BE(20)
-  verificarDimensoes(largura, altura)
-  const tamanhoEsperado = tamanhoPNG(largura, altura, bytes[24], bytes[25], bytes[28])
+  const limites = original ? LIMITES_ORIGINAL : LIMITES_IMAGEM_VISAO
+  verificarDimensoes(largura, altura, limites)
+  const tamanhoEsperado = tamanhoPNG(largura, altura, bytes[24], bytes[25], bytes[28], limites.descomprimido)
   // Examina chunks SEM confiar no comprimento declarado; exige fim exato e
   // recusa APNG (o recorte inicial não prevê múltiplos quadros).
   const idat: Buffer[] = []
@@ -80,15 +82,17 @@ function inspecionarPNG(bytes: Buffer): ImagemInspecionada {
   // @types/node ainda tipa a variante síncrona com info como Buffer simples.
   const inflado = inflateSync(comprimido, { maxOutputLength: tamanhoEsperado, info: true }) as unknown as { buffer: Buffer; engine: { bytesWritten: number } }
   if (inflado.buffer.length !== tamanhoEsperado || inflado.engine.bytesWritten !== comprimido.length) return recusar()
-  const decodificada = PNG.sync.read(bytes, { checkCRC: true })
-  if (decodificada.width !== largura || decodificada.height !== altura) return recusar()
+  if (!original) {
+    const decodificada = PNG.sync.read(bytes, { checkCRC: true })
+    if (decodificada.width !== largura || decodificada.height !== altura) return recusar()
+  }
   return { mime: 'image/png', largura, altura }
 }
 
 // Percorre segmentos e varreduras JPEG para garantir que o PRIMEIRO EOI real
 // encerra o arquivo. Não confunde FF D9 dentro de um bloco APP com o final;
 // na imagem comprimida respeita byte stuffing e marcadores de reinício.
-function verificarFimJPEG(bytes: Buffer): void {
+export function verificarFimJPEG(bytes: Buffer): void {
   let pos = 2
   while (pos < bytes.length) {
     if (bytes[pos++] !== 0xff) return recusar()
@@ -118,6 +122,21 @@ function verificarFimJPEG(bytes: Buffer): void {
     if (!encontrouMarcador) return recusar()
   }
   return recusar()
+}
+
+/** Valida estrutura do original maior; a decodificação completa pertence ao preparador. */
+export function validarEstruturaOriginal(bytes: Buffer, formato: string, largura: number, altura: number): void {
+  verificarDimensoes(largura, altura, LIMITES_ORIGINAL)
+  if (formato === 'png') {
+    if (!bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) return recusar()
+    const imagem = inspecionarPNG(bytes, true)
+    if (imagem.largura !== largura || imagem.altura !== altura) return recusar()
+  } else if (formato === 'jpeg') {
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return recusar()
+    verificarFimJPEG(bytes)
+  } else if (formato === 'webp') {
+    if (bytes.length < 20 || bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WEBP' || bytes.readUInt32LE(4) + 8 !== bytes.length) return recusar()
+  } else return recusar()
 }
 
 export function inspecionarImagemVisao(bytes: Buffer): ImagemInspecionada {

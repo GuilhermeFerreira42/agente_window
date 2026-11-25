@@ -1,3 +1,9 @@
+# MM-I — integração para avaliação, com ressalvas
+
+Integrados preparação de imagens pela fronteira, Fontes por conversa e ferramenta de inspeção com autorização individual, ZIP privado e PDF local limitado; áudio e vídeo retornam motivo de indisponibilidade. O shell e caminhos externos permanecem. Testes locais com simulador, lacunas e risco de publicação ZIP em `09`; roteiro único para o proprietário em `VALIDACAO_MM-I_WINDOWS.md`. Não há aceite humano nem autorização para MM-O.
+
+---
+
 # 25/11/2026 — escopo integrado da MM-I
 
 O proprietário confirmou a leitura de um PNG no Windows pelo LiteLLM e definiu uma única homologação após a entrega integrada. O planejamento reúne normalização de imagens, fontes por conversa no Explorer e inspeção dos anexos. A MM-O reaproveitará o Explorer para apresentar os resultados produzidos. Critérios em `06`.

@@ -22,7 +22,7 @@ export async function escolherEnvioVisao(texto: string, anexos: readonly Attachm
   if (!texto.trim() || !anexos.length) return undefined
   const candidatas = anexos.flatMap((anexo, index) =>
     anexo.mode !== 'reference' && (!reenvio || (anexo.artifactId && (anexo.envioModelo === 'pendente' || anexo.envioModelo === 'enviado'))) &&
-    /\.(png|jpe?g)$/iu.test(anexo.name) ? [index] : [])
+    /\.(png|jpe?g|webp)$/iu.test(anexo.name) ? [index] : [])
   let proposta = modo === 'ask' && !texto.trim().startsWith('/') && candidatas.length
     ? await consultarProposta(selecao, messageId, texto.trim()) : undefined
   if (proposta?.verificacao && !proposta.proposta) {
@@ -51,7 +51,7 @@ export async function escolherEnvioVisao(texto: string, anexos: readonly Attachm
   const guardadas = anexos.filter((_, index) => !indices.includes(index)).map(anexo => anexo.name)
   const aceitou = await portaDialogos().confirmar(pedidoDeConfirmacao({
     texto: 'Enviar imagens ao modelo?',
-    detalhe: `Destino: ${proposta.providerId} / ${proposta.modelId}. Imagens: ${enviadas.join(', ')}.`
+    detalhe: `Destino: ${proposta.providerId} / ${proposta.modelId}. Imagens: ${enviadas.join(', ')}. Quando necessário, será enviada uma cópia compatível; o original será mantido.`
       + (guardadas.length ? ` Estes arquivos ficarão apenas armazenados: ${guardadas.join(', ')}.` : ''),
     confirmar: 'Enviar imagens e texto', rotuloAcessivel: 'Confirmar envio de imagens', testId: 'confirmar-envio-visao',
   }))

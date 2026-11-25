@@ -24,6 +24,7 @@ export interface AnexoSeguroCliente {
   bytes: number
   sha256: string
   mode: 'copy' | 'reference'
+  origem?: 'entrada' | 'gerado'
   estado: 'pronto' | 'ausente'
   presente: boolean
   referencia?: string

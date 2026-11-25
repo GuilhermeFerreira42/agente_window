@@ -5,12 +5,14 @@
 // nada). Um jeito por protocolo (Q4=(b), D93), sempre com o MESMO catálogo.
 // ============================================================================
 import type { ProtocoloAgir } from '../contract'
-import { catalogoFerramentas, ferramentaHistorico, ferramentasEntreChats } from './ferramentas'
+import { catalogoFerramentas, ferramentaHistorico, ferramentaAnexos, ferramentasEntreChats } from './ferramentas'
 
 /** JSON Schema dos argumentos, ferramenta a ferramenta. */
 function esquemaDe(id: string): Record<string, unknown> {
   const caminho = { type: 'string', description: 'Caminho do arquivo/pasta DENTRO da pasta de trabalho (relativo ou absoluto).' }
   switch (id) {
+    case 'anexos':
+      return { type: 'object', properties: { acao: { type: 'string', enum: ['listar', 'listar_zip', 'extrair_zip', 'ler'] }, artifactId: { type: 'string', maxLength: 200 }, indice: { type: 'integer', minimum: 0, maximum: 127 } }, required: ['acao'], additionalProperties: false }
     case 'buscar_chats':
       return { type: 'object', properties: { consulta: { type: 'string', maxLength: 120 }, apos: { type: 'integer', minimum: 0 }, ate: { type: 'integer', minimum: 0 } }, required: ['consulta'], additionalProperties: false }
     case 'buscar_mensagens_chat':
@@ -64,6 +66,7 @@ export function anunciarFerramentas(protocolo: ProtocoloAgir, permitidas?: reado
     ? catalogoFerramentas.filter((f) => permitidas.includes(f.id))
     : catalogoFerramentas
   if (permitidas?.includes('historico')) ferramentas.push(ferramentaHistorico)
+  if (permitidas?.includes('anexos')) ferramentas.push(ferramentaAnexos)
   if (permitidas) ferramentas.push(...ferramentasEntreChats.filter(f => permitidas.includes(f.id)))
   // Gemini não recebe um grupo de funções vazio em conversas sem tools.
   if (protocolo === 'gemini' && ferramentas.length === 0) return {}

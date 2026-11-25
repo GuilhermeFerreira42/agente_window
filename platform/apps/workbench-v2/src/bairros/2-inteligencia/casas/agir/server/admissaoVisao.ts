@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { AlvoConversa } from '../../conversa'
 import { avaliarAlvoVisao, CHAVE_VISAO, identidadeVisao, type ProvaVisao, type RevisoesVisao } from './capacidadeVisao'
 import { construirCorpoVisaoOpenAI, LIMITES_LOCAIS_VISAO } from './limitesVisao'
+import { prepararImagemVisao, TETO_ORIGINAL_VISAO, type CodecImagemVisao } from './prepararImagemVisao'
 
 const DURACAO_PROPOSTA = 5 * 60_000
 const MAX_PROPOSTAS = 64
@@ -42,7 +43,7 @@ export function proporVisao(alvo: AlvoConversa, fonte: FonteVisao, messageId: un
   if (propostas.size >= MAX_PROPOSTAS) return null
   const proposta = randomUUID()
   propostas.set(proposta, { identidade: assinaturaAtual.identidade, limite: agora + DURACAO_PROPOSTA, messageId, textoHash: hashTexto(texto) })
-  return { proposta, quantidade: assinaturaAtual.limites.quantidade, arquivoBytes: assinaturaAtual.limites.arquivoBytes,
+  return { proposta, quantidade: assinaturaAtual.limites.quantidade, arquivoBytes: TETO_ORIGINAL_VISAO,
     providerId: alvo.providerId, modelId: alvo.modelId }
 }
 
@@ -63,7 +64,7 @@ export async function comCorpoVisao<T>(
   pedido: PedidoVisao, contexto: { sessionId: string; chatId: string; texto: string },
   alvo: AlvoConversa, fonte: FonteVisao, ler: LerImagemVisao, executar: (
     preparar: (alvo: AlvoConversa, corpo: Record<string, unknown>) => Record<string, unknown>,
-  ) => Promise<T>,
+  ) => Promise<T>, codec?: CodecImagemVisao,
 ): Promise<T> {
   const proposta = propostas.get(pedido.proposta)
   const atual = assinatura(alvo, fonte)
@@ -77,12 +78,10 @@ export async function comCorpoVisao<T>(
   emPreparacao++
   try {
     const imagens: Buffer[] = []
-    let restantes = atual.limites.conjuntoBytes
     for (const artifactId of pedido.artifactIds) {
       try {
-        const { bytes } = await ler({ ...contexto, messageId: pedido.messageId, artifactId, artifactIds: pedido.artifactIds, maxBytes: Math.min(restantes, atual.limites.arquivoBytes) })
-        imagens.push(bytes)
-        restantes -= bytes.length
+        const { bytes } = await ler({ ...contexto, messageId: pedido.messageId, artifactId, artifactIds: pedido.artifactIds, maxBytes: TETO_ORIGINAL_VISAO })
+        imagens.push(await prepararImagemVisao(bytes, codec))
       } catch (erro) {
         return recusar(erro instanceof Error ? erro.message : 'O anexo publicado não está disponível.')
       }

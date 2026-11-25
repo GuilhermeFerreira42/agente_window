@@ -37,6 +37,7 @@ import { FERRAMENTAS_ENTRE_CHATS, pedidoHumanoEntreChats, type ContextoEntreChat
 import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
 
 import { comCorpoVisao, proporVisao, validarPedidoVisao, type FonteVisao, type LerImagemVisao, type PedidoVisao } from './admissaoVisao'
+import type { CodecImagemVisao } from './prepararImagemVisao'
 
 const ROTAS_AGIR = ['/api/agir/vision', '/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
@@ -58,6 +59,11 @@ export interface DependenciasAgir {
   identidadeVerificacaoVisao?: (alvo: AlvoConversa) => string | undefined
   verificarVisao?: (alvo: AlvoConversa) => Promise<void>
   lerImagemVisao?: LerImagemVisao
+  codecImagemVisao?: CodecImagemVisao
+  prepararInspecaoAnexos?: (contexto: { sessionId: string; chatId: string }, argumentos: PedidoFerramenta['argumentos'], sinal: AbortSignal) => Promise<{
+    previa: string
+    executar: () => Promise<ResultadoFerramenta>
+  }>
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
@@ -249,7 +255,7 @@ function resolverModoEfetivo(deps: DependenciasAgir, sessionId: string, chatId: 
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
 function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa, runId: string): void {
   retomarPorFluxo.delete(fluxo)
-  if (contexto.entreChats) return // A fresh human message must own every MC1 budget and ambiguity decision.
+  if (contexto.entreChats || resultado.mensagensParaRetomar?.some(m => m.ferramenta === 'anexos')) return // Conteúdo autorizado nunca é reenviado por retomada implícita.
   const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
@@ -398,8 +404,32 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const executorComandoBase = fio.raiz !== null
     ? criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
     : recusarSemPasta('executar')
+  const planosAnexos = new WeakMap<PedidoFerramenta, { executar: () => Promise<ResultadoFerramenta> }>()
+  const falhasAnexos = new WeakSet<PedidoFerramenta>()
+  let alvoAnexos: string | undefined
+  let houveAnexos = false
+  const identidadeAlvo = (alvo: AlvoConversa) => JSON.stringify([alvo.providerId, alvo.modelId, alvo.protocolo, alvo.baseUrl, alvo.modelo, alvo.apiKey, alvo.configRevision])
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
+    anexos: async pedido => {
+      if (falhasAnexos.has(pedido)) return { ok: false, resumo: 'A fonte ou o item não está disponível nesta conversa, foi alterado ou excede os limites locais.' }
+      const plano = planosAnexos.get(pedido)
+      if (!plano || abort.signal.aborted || !validarContexto(pedido)) return { ok: false, resumo: 'Autorização de anexos indisponível ou expirada.' }
+      planosAnexos.delete(pedido)
+      const operacao = plano.executar().then(resultado => {
+        if (resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
+        if (resultado.ok) houveAnexos = true
+        return resultado
+      }, (erro: unknown): ResultadoFerramenta => {
+        if ((erro as { efeitoPossivel?: boolean })?.efeitoPossivel) {
+          fio.execucao.mutacoesConfirmadas += 1
+          return { ok: false, efeitoIniciado: true, resumo: 'Resultado da extração não confirmado. Confira as fontes antes de repetir; nenhum conteúdo foi enviado ao modelo.' }
+        }
+        return { ok: false, resumo: 'A fonte mudou ou não está disponível. Nenhum conteúdo foi entregue ao modelo.' }
+      })
+      fio.execucao.efeitoMutavelEmAndamento = operacao
+      try { return await operacao } finally { if (fio.execucao.efeitoMutavelEmAndamento === operacao) delete fio.execucao.efeitoMutavelEmAndamento }
+    },
     buscar_chats: executarConsultaOutroChat,
     buscar_mensagens_chat: executarConsultaOutroChat,
     ler_trecho_chat: executarConsultaOutroChat,
@@ -509,16 +539,18 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     resultado = await rodarAgir({
       vizinho: async (historico, opcoes) => {
         if (fio.execucao.entreChats && consultasOutros > 8) throw Object.assign(new Error('Limite desta consulta entre chats atingido. Refine a pergunta em uma nova mensagem.'), { code: 'limite' })
-        if (deps.prepararChamada && fio.alvo.providerId && fio.alvo.modelId) {
+        if ((deps.prepararChamada || alvoAnexos) && fio.alvo.providerId && fio.alvo.modelId) {
           const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
-          if (!atual.alvo) throw Object.assign(new Error('A seleção ficou indisponível antes de preparar o contexto.'), { code: 'selection_unavailable' })
+          if (!atual.alvo || (alvoAnexos && identidadeAlvo(atual.alvo) !== alvoAnexos)) throw Object.assign(new Error('O destino mudou após a confirmação dos anexos; nenhuma nova chamada foi iniciada.'), { code: 'selection_unavailable' })
           fio.alvo = atual.alvo
+        } else if (alvoAnexos && identidadeAlvo(fio.alvo) !== alvoAnexos) {
+          throw Object.assign(new Error('O destino confirmado dos anexos mudou.'), { code: 'selection_unavailable' })
         }
         if (registro) await gravarRegistro()
         if (abort.signal.aborted || !validarContexto()) {
           throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
         }
-        const preparar = deps.prepararChamada && !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
+        const preparar = deps.prepararChamada && !houveAnexos && !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
           ? (forcar: boolean) => deps.prepararChamada!(fio, historico, fio.alvo, abort.signal, emitirMemoria, forcar,
               (mensagens) => estimativaDoPedido(fio.alvo, mensagens, opcoes)) : undefined
         let contexto = preparar ? await preparar(false) : historico
@@ -539,7 +571,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
             fio.alvo, deps.fonteVisao, deps.lerImagemVisao, (prepararCorpoVisao) => criarVizinhoReal(fio.alvo, {
               prepararCorpoVisao,
               aoAceitarVisao: () => emitirMemoria({ type: 'vision_accepted', messageId: pedidoVisao.messageId, artifactIds: pedidoVisao.artifactIds }),
-            }, deps.iniciarModelo)(contexto, observadores))
+            }, deps.iniciarModelo)(contexto, observadores), deps.codecImagemVisao)
         }
         const atual = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
         try { return await atual(contexto, observadores) } catch (erro) {
@@ -562,16 +594,20 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      // C-1 (SPEC C §4) — Chat: catálogo vazio no provedor (nenhuma ferramenta
-      // de workspace é anunciada); a conversa roda somente com texto.
-      ferramentasPermitidas: fio.visao || fio.raiz === null ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
-        deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
+      // Chat continua sem ferramentas de pasta/shell; a porta de anexos é isolada.
+      ferramentasPermitidas: fio.visao ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+        fio.raiz === null ? (deps.prepararInspecaoAnexos ? ['anexos'] : []) :
+        [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), ...(deps.recuperarHistorico ? ['historico'] : []), ...(deps.prepararInspecaoAnexos ? ['anexos'] : [])],
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
         if (fio.execucao.entreChats && (evento.type === 'teto' ||
           (evento.type === 'error' && ['tempo', 'endereco', 'http'].includes(evento.code)))) {
           escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta entre chats foi interrompida ou atingiu seu limite. Envie uma nova mensagem ou selecione novamente a conversa; nenhuma ferramenta será repetida automaticamente.' })
+          return
+        }
+        if (houveAnexos && (evento.type === 'teto' || (evento.type === 'error' && evento.retomavel))) {
+          escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta de anexos foi interrompida. Envie uma nova mensagem e confirme novamente; o conteúdo não será reenviado automaticamente.' })
           return
         }
         if (fio.visao && (evento.type === 'teto' || (evento.type === 'error' && evento.retomavel))) {
@@ -591,6 +627,36 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         else escreverEvento(res, evento)
       },
       pedirAprovacao: async (pedido) => {
+        if (pedido.ferramenta === 'anexos') {
+          if (!deps.prepararInspecaoAnexos || abort.signal.aborted || fio.execucao.estado !== 'running') return false
+          let plano: Awaited<ReturnType<NonNullable<DependenciasAgir['prepararInspecaoAnexos']>>>
+          try { plano = await deps.prepararInspecaoAnexos({ sessionId: fio.sessionId, chatId: fio.chatId }, pedido.argumentos, abort.signal) }
+          catch { falhasAnexos.add(pedido); return true }
+          if (abort.signal.aborted || !validarContexto(pedido) || fio.execucao.estado !== 'running') return false
+          const identidade = identidadeAlvo(fio.alvo)
+          if (alvoAnexos && alvoAnexos !== identidade) return false
+          fio.execucao.estado = 'awaiting-approval'
+          const previa = `${plano.previa}\nDestino selecionado: ${fio.alvo.providerId ?? 'provedor'} / ${fio.alvo.modelId ?? fio.alvo.modelo}. Em gateways, o roteamento interno pode variar. Confirme apenas se concordar com este envio.`
+          const evento = { type: 'approval', pedido, previa, allowSession: false } as const
+          registro?.observar(evento)
+          await gravarRegistro()
+          if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
+          const liberado = await new Promise<boolean>(resolve => {
+            fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
+            escreverEvento(res, evento)
+          })
+          if (!abort.signal.aborted) { registro?.decisao(pedido.id, liberado); await gravarRegistro() }
+          fio.execucao.pendentes.delete(pedido.id)
+          if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
+          if (!liberado || abort.signal.aborted || !validarContexto(pedido)) return false
+          if (fio.alvo.providerId && fio.alvo.modelId) {
+            const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
+            if (!atual.alvo || identidadeAlvo(atual.alvo) !== identidade) return false
+          }
+          alvoAnexos = identidade
+          planosAnexos.set(pedido, plano)
+          return true
+        }
         // C-1 — Chat não tem pasta: nenhuma aprovação de arquivo/comando nasce.
         if (fio.raiz === null) return false
         const exigeReconfirmacao = recuperouLimite && efeitosTentados.size > 0
@@ -672,6 +738,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (fio.execucao.recuperacao && pedido.ferramenta !== 'historico') return 'A consulta histórica não autoriza acesso a arquivos nem execução de comandos.'
         if (!fio.execucao.recuperacao && !fio.execucao.recuperacaoAutomatica && pedido.ferramenta === 'historico') return 'A recuperação histórica não está disponível nesta execução.'
         if (pedido.ferramenta === 'historico') return null
+        if (pedido.ferramenta === 'anexos') return deps.prepararInspecaoAnexos && !fio.visao ? null : 'Inspeção de anexos indisponível nesta execução.'
         if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
