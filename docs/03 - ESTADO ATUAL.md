@@ -1,6 +1,6 @@
-# Leitura vigente do roadmap — 24/11/2026
+# Leitura vigente do roadmap — 25/11/2026
 
-**MM-I — visão validada no Windows com o LiteLLM real do proprietário.** PNG e JPEG em Perguntar passaram na tela inicial e no chat aberto usando `meu-pool`. A homologação humana permanece pendente. Detalhes, limites e roteiro em `09`.
+**MM-I — em andamento.** PNG e JPEG em Perguntar passaram no Windows com o LiteLLM real. O proprietário confirmou manualmente o envio e a leitura de um PNG pelo `meu-pool`. A próxima entrega da Arena reúne adaptação de imagens, Explorer por conversa e análise de arquivos anexados. A validação intermediária fica com a Arena e a homologação humana da MM-I inteira ocorre no Windows após a entrega integrada. Escopo e critérios em `06`.
 
 **Ponto atual:** C-3a e C-3b homologadas. O proprietário homologou a U-1 e a padronização dos diálogos que a Arena chamou de U-2, sobre `6a895ff`. O ajuste de retorno de foco no chat foi adiado a pedido do proprietário. Próxima fatia: [MM-I — entrada multimodal](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#mm-i--plano-de-execução), com a primeira entrega de visão em validação. Aceite em `08`, evidências em `09`.
 

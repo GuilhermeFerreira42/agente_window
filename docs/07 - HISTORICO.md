@@ -1,3 +1,9 @@
+# 25/11/2026 — escopo integrado da MM-I
+
+O proprietário confirmou a leitura de um PNG no Windows pelo LiteLLM e definiu uma única homologação após a entrega integrada. O planejamento reúne normalização de imagens, fontes por conversa no Explorer e inspeção dos anexos. A MM-O reaproveitará o Explorer para apresentar os resultados produzidos. Critérios em `06`.
+
+---
+
 # 24/11/2026 — visão da MM-I pelo LiteLLM
 
 Adicionada verificação de um destino interno da rota LiteLLM para o envio de imagens. O aplicativo mantém o alias selecionado e pede consentimento específico antes de transmitir anexos. Estado em `03` e evidências em `09`.
