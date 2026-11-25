@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
-import { join, posix } from 'node:path'
+import { basename, join, posix } from 'node:path'
 import { Readable } from 'node:stream'
 import { withSessionPersistenceQueue } from '../filaSessao'
 import { getAppDir } from '../paths'
@@ -14,6 +14,9 @@ import { resolverDonoAnexos } from './dono'
 import { admitirUpload, cancelarUpload, caminhoAbsolutoDeArtigo, consultarUpload, receberConteudo } from './estoque'
 import { extrairZipSeguro, listarZipSeguro, type EntradaZipSegura } from './zipSeguro'
 import { extrairTextoPdf } from './leitorPdf'
+import { caminhoTrabalhoPrivado, obterVinculoTrabalho, sincronizarTrabalhosPrivadosSobFila } from './trabalhoPrivado'
+import { raizPrivadaDaConversa } from '../raizPrivadaChat'
+import { resolverRaizExplorer } from '../raizExplorer'
 
 export const TETO_FONTE_BYTES = 32 * 1024 * 1024
 export interface FonteConversa { artifactId: string; nome: string; bytes: number; modalidade: string; estado?: 'trabalho' | 'trabalho_ausente' }
@@ -21,17 +24,23 @@ function recusar(): never { throw new PersistenceProblem(409, 'source_unavailabl
 
 export async function listarFontesConversa(sessionId: string, chatId: string): Promise<FonteConversa[]> {
   return withSessionPersistenceQueue(sessionId, async () => {
-    resolverDonoAnexos(sessionId, chatId)
+    const dono = resolverDonoAnexos(sessionId, chatId)
+    if (dono.contextKind === 'chat') await sincronizarTrabalhosPrivadosSobFila(sessionId, chatId)
     const artigos = listarArtigosChat(sessionId, chatId).filter(a => a.state === 'pronto' && a.papel !== 'gerado-gerenciado')
     return Promise.all(artigos.map(async a => {
       const fonte: FonteConversa = { artifactId: a.artifactId, nome: a.name, bytes: a.bytes, modalidade: a.modalidade }
-      if (a.rootKind !== 'workspace' || a.mode !== 'copy' || a.papel !== 'upload-workspace' || !a.workspaceRoot) return fonte
-      const caminho = caminhoAbsolutoDeArtigo(a)
+      const privado = dono.contextKind === 'chat' && a.rootKind === 'appdir' && a.mode === 'copy' && a.papel === 'upload-chat'
+      const projeto = a.rootKind === 'workspace' && a.mode === 'copy' && a.papel === 'upload-workspace' && !!a.workspaceRoot
+      if (!privado && !projeto) return fonte
       try {
-        await garantirDentroDaRaiz(a.workspaceRoot, caminho, { code: 'source_unavailable' })
+        const vinculo = privado ? obterVinculoTrabalho(a.artifactId) : undefined
+        if (privado && (!vinculo || vinculo.state !== 'pronto')) throw new Error('Arquivo de trabalho indisponível.')
+        const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : caminhoAbsolutoDeArtigo(a)
+        const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : a.workspaceRoot!
+        await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable' })
         const info = await lstat(caminho)
         if (!info.isFile() || info.isSymbolicLink()) throw new Error('Arquivo de trabalho indisponível.')
-        return { ...fonte, bytes: info.size, estado: 'trabalho' as const }
+        return { ...fonte, nome: basename(caminho), bytes: info.size, estado: 'trabalho' as const }
       } catch { return { ...fonte, estado: 'trabalho_ausente' as const } }
     }))
   })
@@ -44,16 +53,18 @@ export async function lerFonteConversa(sessionId: string, chatId: string, artifa
 }
 
 async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: string, maxBytes: number): Promise<{ nome: string; bytes: Buffer; sha256: string }> {
-  resolverDonoAnexos(sessionId, chatId)
+  const dono = resolverDonoAnexos(sessionId, chatId)
   const artigo = obterArtigo(artifactId)
   if (!artigo || artigo.sessionId !== sessionId || artigo.chatId !== chatId || artigo.state !== 'pronto' || artigo.papel === 'gerado-gerenciado' ||
       !Number.isSafeInteger(artigo.bytes) || artigo.bytes < 0 || !/^[a-f0-9]{64}$/.test(artigo.sha256)) return recusar()
-  // Cópia do projeto é trabalho mutável; anexos privados e referências
-  // continuam exigindo o hash original enquanto não houver outro vínculo.
-  const trabalhoMutavel = artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace'
+  const privado = dono.contextKind === 'chat' && artigo.rootKind === 'appdir' && artigo.mode === 'copy' && artigo.papel === 'upload-chat'
+  if (privado) await sincronizarTrabalhosPrivadosSobFila(sessionId, chatId)
+  const vinculo = privado ? obterVinculoTrabalho(artifactId) : undefined
+  if (privado && (!vinculo || vinculo.state !== 'pronto')) return recusar()
+  const trabalhoMutavel = privado || artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace'
   if (!trabalhoMutavel && artigo.bytes > maxBytes) return recusar()
-  const caminho = caminhoAbsolutoDeArtigo(artigo)
-  const raiz = artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
+  const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : caminhoAbsolutoDeArtigo(artigo)
+  const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
   if (!raiz) return recusar()
   await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable', mensagem: 'A fonte não está disponível nesta conversa.' })
   const antes = await lstat(caminho).catch(() => null)
@@ -72,7 +83,7 @@ async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: st
     }
     const bytes = buffer.subarray(0, total), sha256 = createHash('sha256').update(bytes).digest('hex')
     if (total !== info.size || (!trabalhoMutavel && sha256 !== artigo.sha256)) return recusar()
-    return { nome: artigo.name, bytes, sha256 }
+    return { nome: trabalhoMutavel ? basename(caminho) : artigo.name, bytes, sha256 }
   } finally { await arquivo.close() }
 }
 
@@ -109,6 +120,7 @@ export async function extrairItemZipConversa(sessionId: string, chatId: string, 
   const upload = await admitirUpload({ sessionId, chatId, name: posix.basename(item.nome), declaredBytes: item.bytes.length, mode: 'copy', scope: 'chat', workspaceRoot: null }, { fila: filaAdmissao })
   try {
     const recibo = await receberConteudo(sessionId, chatId, upload.uploadId, Readable.from([item.bytes], { signal: sinal }), { fila, sinalPublicacao: sinal })
+    if (resolverDonoAnexos(sessionId, chatId).contextKind === 'chat') await resolverRaizExplorer(sessionId, chatId).catch(() => undefined)
     return { artifactId: recibo.artifactId, nome: recibo.name, bytes: recibo.bytes, modalidade: 'arquivo' }
   } catch (erro) {
     const atual = (() => { try { return consultarUpload(sessionId, chatId, upload.uploadId) } catch { return null } })()

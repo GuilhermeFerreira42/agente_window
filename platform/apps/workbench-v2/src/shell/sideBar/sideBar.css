@@ -115,12 +115,3 @@
 .part.sidebar > .composite-title[draggable='true'] { cursor: grab; }
 .part.sidebar > .composite-title[draggable='true']:active { cursor: grabbing; }
 .part.sidebar.drop-target { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-dropBackground, var(--vscode-sideBar-background)); }
-
-/* Fontes da conversa ativa, sem substituir o Explorer da pasta. */
-.fontes-conversa { flex: 0 1 auto; min-height: 0; max-height: 40%; overflow: auto; border-bottom: 1px solid var(--vscode-sideBar-border); font-size: 12px; }
-.fontes-conversa h3 { margin: 0; padding: 8px 12px; font-size: 11px; text-transform: uppercase; }
-.fontes-conversa p { margin: 0; padding: 4px 12px 10px; }
-.fontes-conversa ul { margin: 0; padding: 0 8px 8px; list-style: none; }
-.fontes-conversa li { display: flex; align-items: center; gap: 8px; padding: 4px; }
-.fontes-conversa li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.fontes-conversa button { color: inherit; background: transparent; border: 0; cursor: pointer; }

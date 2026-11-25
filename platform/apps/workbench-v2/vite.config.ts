@@ -1,8 +1,9 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { ptyPlugin } from './vite-plugin-pty'
-import { fsPlugin } from './src/modules/explorer-search/server'
+import { fsPlugin, createExplorerFsServer, createExplorerGitServer } from './src/modules/explorer-search/server'
 import { sessionPersistencePlugin } from './src/server/session-persistence'
+import { explorerContextualPlugin } from './src/server/session-persistence/explorerContextual'
 import { montarSaidaDeTeste } from './src/server/session-persistence/attachments/saidaDeTeste'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 import path from 'path'
@@ -61,6 +62,7 @@ export default defineConfig({
     react(),
     ptyPlugin(),
     sessionPersistencePlugin({ repoRoot, ...(saidaDeTeste ? { saidaDeTeste } : {}) }),
+    explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer }),
     // FATIA-04 (4.3): FileSystemPort no Single Port (Q7). Raiz = repo
     // (relativa ao próprio config — NUNCA hardcoded); FS_TEST_ROOT E2E ganha.
     fsPlugin({ root: repoRoot }),

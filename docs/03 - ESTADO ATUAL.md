@@ -854,3 +854,26 @@ ajustes pedidos foram entregues sobre `0fb29d0`, cada um com jornada E2E nominal
 - **Não executado:** Windows, homologação humana da conferência visual e qualquer
   teste com provedor real/conta/chave. **Segue NÃO homologada; sem merge.** A
   correção da exclusão de chats fica **depois** da U-1.
+
+### MM-I — trabalho em andamento: Explorer contextual (não homologar)
+
+O painel Fontes foi retirado e o servidor Vite resolve o Explorer pela sessão e
+pelo chat persistidos. No Chat, o upload tem original privado separado e uma
+cópia de trabalho na árvore própria; uma cópia excluída não é recriada pelo
+sincronizador. Projeto continua usando a pasta escolhida. Ao excluir sessão, a
+árvore privada inteira é encaminhada à Lixeira por plano retomável. Verificação
+anti-link é mediada e não contém processos hostis do mesmo usuário.
+
+**Não é entrega MM-I**: falta rastrear renomear/mover/excluir (inclusive pastas,
+colisões e recuperação após interrupção), integração equivalente no servidor de
+preview/produção, fluxos reais de transcrição e análise visual de vídeo com
+consentimento e destino verificado, jornadas completas e homologação Windows.
+Não usar originais históricos como fallback para arquivo de trabalho ausente.
+
+Ensaios nesta etapa: typecheck e build passaram; Vitest focado 53/53, fronteira
+Explorer e migração 21/21; Playwright inspeção/Explorer 8/8 e imagens preparadas
+1/1 em Linux com dados descartáveis e provedor simulado. Suíte mais ampla: 630/634,
+com duas falhas históricas (`editorTabs`, `monacoLoadFailure`) e duas introduzidas
+nesta etapa corrigidas e retestadas em foco (fronteira e schema). Áudio e vídeo
+nessas jornadas ainda exercitam **fallback**, não transcrição/análise funcional.
+Windows e provedor real não foram testados. PR permanece aberto, sem merge.

@@ -1,21 +1,16 @@
 // Raiz de trabalho mediada por identidade persistida, nunca por caminho do cliente.
 // Não concede acesso a ferramentas genéricas e não é um sandbox físico.
-import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
-import path from 'node:path'
 import { getSessionRecord } from './database'
 import { withSessionPersistenceQueue } from './filaSessao'
-import { getAppDir } from './paths'
+import { raizPrivadaDaConversa } from './raizPrivadaChat'
 import { PersistenceProblem } from './persistenceErrors'
 import { validateWorkspacePath } from './workspaces'
 import { resolverDonoAnexos } from './attachments/dono'
 import { garantirDiretorioReal } from './attachments/contencao'
+import { sincronizarTrabalhosPrivadosSobFila } from './attachments/trabalhoPrivado'
 
 export type RaizExplorer = { tipo: 'chat' | 'projeto'; raiz: string }
-
-function chave(valor: string): string {
-  return createHash('sha256').update(valor, 'utf8').digest('hex')
-}
 
 /**
  * Chamada depois de validar a sessão e seu chat persistido. A raiz privada é
@@ -36,10 +31,11 @@ export async function resolverRaizExplorer(sessionId: string, chatId: string): P
       }
       return { tipo: 'projeto', raiz: projeto.realpath }
     }
-    const raiz = path.join(getAppDir(), 'workspaces', 'chats', chave(sessionId), chave(chatId))
+    const raiz = raizPrivadaDaConversa(sessionId, chatId)
     await garantirDiretorioReal(raiz)
     await mkdir(raiz, { recursive: true, mode: 0o700 })
     await garantirDiretorioReal(raiz)
+    await sincronizarTrabalhosPrivadosSobFila(sessionId, chatId)
     // Exclusão é revalidada antes de devolver o diretório.
     resolverDonoAnexos(sessionId, chatId)
     return { tipo: 'chat', raiz }

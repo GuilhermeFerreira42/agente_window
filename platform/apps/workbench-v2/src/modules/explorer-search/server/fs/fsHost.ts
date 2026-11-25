@@ -14,7 +14,7 @@
 //   - Fila serial por URI para escritas (VAL-FS-02).
 // Sem imports fora do módulo; apenas node:* (FT-02 permitido em server/**).
 // ============================================================================
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, lstatSync } from 'node:fs';
 import {
   access,
   cp,
@@ -164,12 +164,33 @@ export function toWorkspaceUri(rootPath: string, fsPath: string, p: PathApi = no
 export class FsHost {
   readonly rootPath: string;
 
-  constructor(root: WorkspaceUri) {
+  constructor(root: WorkspaceUri, private readonly rejectSymlinks = false) {
     this.rootPath = resolveRootPath(root);
   }
 
+  /** Em raízes privadas, nenhum componente existente pode ser link/junction.
+   * Protege a mediação do Explorer, não é sandbox contra troca concorrente pelo
+   * mesmo usuário entre lstat e syscall. */
+  assertSafeUri(uri: WorkspaceUri): string {
+    const target = toFsPath(this.rootPath, uri);
+    if (this.rejectSymlinks) {
+      const relative = nodePath.relative(this.rootPath, target);
+      let current = this.rootPath;
+      for (const component of ['', ...relative.split(nodePath.sep).filter(Boolean)]) {
+        if (component) current = join(current, component);
+        try {
+          if (lstatSync(current).isSymbolicLink()) throw new FsHostError('forbidden_path', 'Links não são permitidos nesta árvore privada.');
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+          throw error;
+        }
+      }
+    }
+    return target;
+  }
+
   private pathOf(uri: WorkspaceUri): string {
-    return toFsPath(this.rootPath, uri);
+    return this.assertSafeUri(uri);
   }
 
   private uriOf(path: string): WorkspaceUri {

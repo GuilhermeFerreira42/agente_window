@@ -2,10 +2,10 @@ import { createServer, type Server } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 import { zipDeTeste } from '../src/server/session-persistence/attachments/zipFixture.test-helper'
 import { pdfDeTeste } from '../src/server/session-persistence/attachments/pdfFixture.test-helper'
@@ -145,7 +145,7 @@ test('guardar ZIP, aguardar e depois inspecionar sem novo upload; recusa cruzada
   await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'seguro.zip', mimeType: 'application/zip', buffer: zip })
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
   await expect(page.getByText('Aguardarei instruções.')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('seguro.zip')).toBeVisible()
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'seguro.zip' })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Ferramenta: Inspecionar anexos desta conversa' })).toHaveCount(0)
   expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(1); expect(uploads).toBe(1)
   expect(JSON.stringify(pedidos)).not.toContain(segredo)
@@ -160,7 +160,7 @@ test('guardar ZIP, aguardar e depois inspecionar sem novo upload; recusa cruzada
   await permitir(page, 'texto UTF-8 do anexo nota.txt', 4)
   await expect(page.getByText('Resposta baseada no arquivo: 742.')).toBeVisible({ timeout: 30_000 })
   expect(pedidos).toHaveLength(5); expect(erroFixture).toBe(''); expect(uploads).toBe(1)
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('nota.txt')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'nota.txt' })).toBeVisible({ timeout: 20_000 })
   const id = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
   const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
   const session = await (await page.request.get(`${base}/api/sessions/${id}`, { headers })).json()
@@ -189,11 +189,11 @@ test('guardar ZIP, aguardar e depois inspecionar sem novo upload; recusa cruzada
   expect(pedidos).toHaveLength(1)
   expect(JSON.stringify(pedidos)).not.toContain(segredo)
   await page.reload()
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('nota.txt')).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('ignorado.txt')).toHaveCount(0)
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'nota.txt' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'ignorado.txt' })).toHaveCount(0)
   await pararApp(); await iniciarApp(); await page.reload()
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('nota.txt')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('region', { name: 'Fontes' }).getByText('ignorado.txt')).toHaveCount(0)
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'nota.txt' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'ignorado.txt' })).toHaveCount(0)
   cenario = 'cruzado'; pedidos = []
   await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
   await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Tente ler o identificador solicitado.')
@@ -207,7 +207,55 @@ test('guardar ZIP, aguardar e depois inspecionar sem novo upload; recusa cruzada
   expect((await page.request.get(`${rotaB}/media`, { headers })).status()).toBe(404)
 })
 
-test('dois chats da mesma sessão: Fontes, rotas e ferramenta isolados nos dois sentidos', async ({ page }) => {
+test('Explorer contextual separa chats sem trocar uma raiz global', async ({ page }) => {
+  const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
+  const sid = randomUUID(), a = randomUUID(), b = randomUUID()
+  const session = { id: sid, title: `Explorer ${sid}`, workspace: 'Chat', workspacePath: null, contexto: { tipo: 'chat' }, section: 'today', status: 'completed', updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: a,
+    chats: [{ id: a, title: 'Alfa', status: 'completed', messages: [] }, { id: b, title: 'Beta', status: 'completed', messages: [] }] }
+  expect((await page.request.post(`${base}/api/sessions`, { headers, data: { session, contexto: { tipo: 'chat' }, creationId: randomUUID() } })).ok()).toBe(true)
+  const endpoint = (chat: string, op: string) => `${base}/api/explorer/${sid}/${chat}/fs/${op}`
+  const raizDe = async (chat: string) => {
+    const response = await page.request.get(endpoint(chat, 'root'), { headers })
+    expect(response.status()).toBe(200)
+    return (await response.json()).root as string
+  }
+  const [raizA, raizB] = await Promise.all([raizDe(a), raizDe(b)])
+  expect(raizA).not.toBe(raizB)
+  const criar = (chat: string, uri: string, content: string) => page.request.post(endpoint(chat, 'createFile'), { headers, data: { uri, content } })
+  expect((await criar(a, `${raizA}/alfa.txt`, 'alfa privado')).status()).toBe(201)
+  expect((await criar(b, `${raizB}/beta.txt`, 'beta privado')).status()).toBe(201)
+  const ler = (chat: string, uri: string) => page.request.get(endpoint(chat, `read?uri=${encodeURIComponent(uri)}`), { headers })
+  expect((await (await ler(a, `${raizA}/alfa.txt`)).json()).content).toBe('alfa privado')
+  expect((await ler(b, `${raizA}/alfa.txt`)).status()).toBe(403)
+  expect((await ler(a, `${raizB}/beta.txt`)).status()).toBe(403)
+  if (process.platform !== 'win32') {
+    symlinkSync(fileURLToPath(raizB), join(fileURLToPath(raizA), 'atalho'))
+    expect((await ler(a, `${raizA}/atalho/beta.txt`)).status()).toBe(403)
+    expect((await criar(a, `${raizA}/atalho/invasao.txt`, 'não')).status()).toBe(403)
+    const busca = await page.request.post(endpoint(a, 'search'), { headers, data: { root: `${raizA}/atalho`, query: { pattern: 'beta' } } })
+    expect(busca.status()).toBe(403)
+  }
+  expect((await page.request.get(endpoint('inexistente', 'root'), { headers })).status()).toBe(404)
+  expect((await page.request.post(`${base}/api/explorer/${sid}/${a}/git/status`, { headers, data: { root: raizA } })).status()).toBe(403)
+  await pararApp(); await iniciarApp()
+  expect(await raizDe(a)).toBe(raizA)
+  expect((await (await ler(a, `${raizA}/alfa.txt`)).json()).content).toBe('alfa privado')
+  await page.goto(base)
+  await page.locator('.session-row').filter({ hasText: `Explorer ${sid}` }).first().click()
+  await page.getByRole('tab', { name: 'Alfa' }).click()
+  const arvore = page.getByRole('tree', { name: 'Files Explorer' })
+  await expect(arvore.getByRole('treeitem').filter({ hasText: 'alfa.txt' })).toBeVisible({ timeout: 30_000 })
+  await expect(arvore.getByRole('treeitem').filter({ hasText: 'beta.txt' })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Beta' }).click()
+  await expect(arvore.getByRole('treeitem').filter({ hasText: 'beta.txt' })).toBeVisible({ timeout: 30_000 })
+  await expect(arvore.getByRole('treeitem').filter({ hasText: 'alfa.txt' })).toHaveCount(0)
+  await page.reload()
+  await page.locator('.session-row').filter({ hasText: `Explorer ${sid}` }).first().click()
+  await page.getByRole('tab', { name: 'Alfa' }).click()
+  await expect(arvore.getByRole('treeitem').filter({ hasText: 'alfa.txt' })).toBeVisible({ timeout: 30_000 })
+})
+
+test('dois chats da mesma sessão: Explorer, rotas e ferramenta isolados nos dois sentidos', async ({ page }) => {
   const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
   const sid = randomUUID(), a = randomUUID(), b = randomUUID()
   const session = { id: sid, title: `Dois chats ${sid}`, workspace: 'Chat', workspacePath: null, contexto: { tipo: 'chat' }, section: 'today', status: 'completed', updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: a,
@@ -234,11 +282,11 @@ test('dois chats da mesma sessão: Fontes, rotas e ferramenta isolados nos dois 
   }
   await page.goto(base)
   await page.locator('.session-row').filter({ hasText: `Dois chats ${sid}` }).first().click()
-  const fontes = page.getByRole('region', { name: 'Fontes' })
+  const fontes = page.getByRole('tree', { name: 'Files Explorer' })
   const testarChat = async (titulo: string, proprio: string, alheio: string, id: string) => {
     await page.getByRole('tab', { name: titulo }).click()
-    await expect(fontes.getByText(proprio)).toBeVisible()
-    await expect(fontes.getByText(alheio)).toHaveCount(0)
+    await expect(fontes.getByRole('treeitem').filter({ hasText: proprio })).toBeVisible()
+    await expect(fontes.getByRole('treeitem').filter({ hasText: alheio })).toHaveCount(0)
     cenario = 'cruzado'; idAlheio = id; pedidos = []; erroFixture = ''
     await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Tente ler o identificador solicitado.')
     await page.getByRole('button', { name: 'Enviar mensagem' }).click()
@@ -250,11 +298,11 @@ test('dois chats da mesma sessão: Fontes, rotas e ferramenta isolados nos dois 
   await page.reload()
   await page.locator('.session-row').filter({ hasText: `Dois chats ${sid}` }).first().click()
   await page.getByRole('tab', { name: 'Chat Alfa' }).click()
-  await expect(fontes.getByText('alfa.png')).toBeVisible()
-  await expect(fontes.getByText('beta.png')).toHaveCount(0)
+  await expect(fontes.getByRole('treeitem').filter({ hasText: 'alfa.png' })).toBeVisible()
+  await expect(fontes.getByRole('treeitem').filter({ hasText: 'beta.png' })).toHaveCount(0)
   await page.getByRole('tab', { name: 'Chat Beta' }).click()
-  await expect(fontes.getByText('beta.png')).toBeVisible()
-  await expect(fontes.getByText('alfa.png')).toHaveCount(0)
+  await expect(fontes.getByRole('treeitem').filter({ hasText: 'beta.png' })).toBeVisible()
+  await expect(fontes.getByRole('treeitem').filter({ hasText: 'alfa.png' })).toHaveCount(0)
 })
 
 for (const modalidade of ['pdf', 'audio', 'video'] as const) {

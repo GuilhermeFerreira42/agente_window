@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 // FATIA-05 5.1 c1 — chassi (docs/24): Activity Bar à direita; views vêm do viewRegistry.
 import { ActivityBar, buildActivityBarMenuItems, activityBarPositionFromMenuId } from './shell/activityBar'
-import { SideBar, ExplorerView, FontesConversa, SearchView, ScmView } from './shell/sideBar'
+import { SideBar, ExplorerView, SearchView, ScmView } from './shell/sideBar'
 import { useLayoutState } from './shell/layoutState'
 import { viewsByIds, type ViewDescriptor } from './shell/viewRegistry'
 import { ViewsPanel } from './shell/panel'
@@ -186,17 +186,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const hasSessions = sessions.some((session) => !session.automation)
   const landingVisible = newSessionLanding || !hasSessions
   const editorSessionId = landingVisible ? BOOT_SESSION_ID : activeSessionId
-  const currentSessionWorkspacePath = sessions.find((session) => session.id === activeSessionId)?.worktreePath
-    ?? sessions.find((session) => session.id === activeSessionId)?.workspacePath
-  // A landing can sit above older sessions. Its selected folder is a pending
-  // context for the new session and must drive Explorer before the first chat
-  // message; it must not rewrite the older persisted session.
-  const explorerWorkspacePath = landingVisible ? (landingContexto === 'workspace' ? selectedWorkspace?.path : undefined) : (currentSessionWorkspacePath ?? undefined)
-  // C-1/B3 — ativação EXPLÍCITA: o Explorer só liga com uma raiz real. Sessão
-  // Chat (workspacePath nulo) fica DESLIGADA — sem /fs/workspace, sem
-  // discoverRoot, sem módulo montado sobre a raiz global; a vista vira o
-  // estado vazio existente. Pasta e landing com pasta escolhida inalteradas.
-  const explorerEnabled = !!explorerWorkspacePath
+  const explorerSession = sessions.find((session) => session.id === activeSessionId)
+  const explorerChat = explorerSession ? resolveActiveChatId(explorerSession, activeChatBySession) : undefined
+  const explorerWorkspacePath = landingVisible ? (landingContexto === 'workspace' ? selectedWorkspace?.path : undefined) : (explorerSession?.workspacePath ?? undefined)
+  // Uma conversa usa portas próprias vinculadas ao dono persistido; somente a
+  // landing sem conversa continua no seletor de pasta preexistente.
+  const explorerContext = !landingVisible && explorerSession && explorerChat
+    ? `/api/explorer/${encodeURIComponent(explorerSession.id)}/${encodeURIComponent(explorerChat)}` : ''
+  const explorerEnabled = landingVisible ? !!explorerWorkspacePath : !!explorerContext
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -227,8 +224,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const panelViews = useMemo(() => viewsByIds(layout.state.viewLayout.panel), [layout.state.viewLayout.panel])
   // FATIA-04 (4.4): módulo explorer-search — criado UMA vez no boot (raiz da
   // config do server, Q9: sem picker), sobrevive a trocas de sessão/aba.
-  const [loadedExplorer, setLoadedExplorer] = useState<{ module: IExplorerSearchModule; path?: string; landing: boolean } | null>(null)
-  const explorerModule = explorerEnabled && loadedExplorer && loadedExplorer.path === explorerWorkspacePath && loadedExplorer.landing === landingVisible
+  const [loadedExplorer, setLoadedExplorer] = useState<{ module: IExplorerSearchModule; path?: string; landing: boolean; context: string } | null>(null)
+  const explorerModule = explorerEnabled && loadedExplorer && loadedExplorer.path === explorerWorkspacePath && loadedExplorer.landing === landingVisible && loadedExplorer.context === explorerContext
     ? loadedExplorer.module : null
   // FATIA-05 5.3: badge do ícone Source Control = `git.count()` do módulo (evento `git.statusChanged`).
   const [scmBadge, setScmBadge] = useState(0)
@@ -304,7 +301,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     let watchClient: ExplorerFsWatchClient | undefined
     void (async () => {
       try {
-        if (explorerWorkspacePath) {
+        if (landingVisible && explorerWorkspacePath) {
           const response = await fetch('/fs/workspace', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ path: explorerWorkspacePath }),
@@ -312,8 +309,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (!response.ok) throw new Error(`Falha ao ativar workspace no Explorer (${response.status})`)
         }
         if (cancelled) return
-        watchClient = new ExplorerFsWatchClient({})
-        const fs = new BrowserFsPort({ watchClient })
+        const wsUrl = explorerContext ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${explorerContext}/fs/watch` : undefined
+        watchClient = new ExplorerFsWatchClient({ url: wsUrl })
+        const fs = new BrowserFsPort({ watchClient, baseUrl: explorerContext })
         explorerFsRef.current = fs
         const root: WorkspaceUri = await fs.discoverRoot()
         if (cancelled) return
@@ -323,6 +321,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           menus: explorerMenusRef.current,
           contextMenu: { open: (input) => setExplorerContextMenu(input) },
           workspaceRoot: root,
+          gitBaseUrl: explorerContext,
           // 5.3: "Open Source Control" (header do Explorer) → view `scm` da Side Bar.
         })
         await module.explorer.openFolder({ uri: root })
@@ -356,7 +355,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         if (!landingVisible) restoreAttachTabs(module)
         mountedModule = module
         explorerModuleRef.current = module
-        setLoadedExplorer({ module, path: explorerWorkspacePath, landing: landingVisible })
+        setLoadedExplorer({ module, path: explorerWorkspacePath, landing: landingVisible, context: explorerContext })
       } catch (err) {
         // Sem raiz configurada o Explorer fica vazio, mas NUNCA derruba o app.
         console.warn('[explorer-search] boot: raiz não descoberta', err)
@@ -368,7 +367,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       mountedModule?.dispose()
       watchClient?.dispose()
     }
-  }, [explorerEnabled, explorerWorkspacePath, landingVisible])
+  }, [explorerEnabled, explorerWorkspacePath, explorerContext, landingVisible])
   useEffect(() => {
     if (!explorerContextMenu) return
     const onDown = (ev: MouseEvent) => {
@@ -453,7 +452,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
     ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined}
-        fontes={!landingVisible ? <FontesConversa key={`${activeSession.id}:${activeChatId}`} sessionId={activeSession.id} chatId={activeChatId} mensagens={activeSession.chats.find(chat => chat.id === activeChatId)?.messages ?? []} /> : undefined}
         // C-1/B3 — o seletor de pasta é da LANDING (entrada de sessão nova);
         // dentro de uma sessão Chat não há o que abrir e o botão não aparece.
         onOpenFolder={!explorerEnabled && landingVisible ? () => void handlePickWorkspace() : undefined} />
@@ -1380,8 +1378,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       if (!activeSession.isDraft) await persistSession(activeSession)
       const { session } = await changeSessionWorkspace(activeSession.id, path)
       workspaceCommitted = true
-      const fsResponse = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: session.workspacePath }) })
-      if (!fsResponse.ok) throw new Error(`Falha ao atualizar Explorer (${fsResponse.status})`)
       // TerminalPanel observes the committed workspace prop and opens a fresh
       // PTY there while keeping existing shells and their live WS state intact.
       setSessions((current) => current.map((candidate) => candidate.id === session.id ? {
@@ -1402,7 +1398,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       try {
         if (workspaceCommitted && previousPath !== null) {
           await changeSessionWorkspace(activeSession.id, previousPath)
-          await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
         }
       } catch { /* o erro original é o relevante para o usuário */ }
       throw error

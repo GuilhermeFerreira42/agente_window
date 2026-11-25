@@ -13,6 +13,7 @@ import { validateLocalRequest } from '../../../../server/local-boundary.mjs'
 import { PersistenceProblem } from '../persistenceErrors'
 import { consultarDelecao } from '../deletions'
 import { withSessionPersistenceQueue } from '../filaSessao'
+import { resolverRaizExplorer } from '../raizExplorer'
 import { servirMidia } from './midia'
 import { obterArtigo, listarArtigosChat, listarUploads } from './catalogo'
 import { projetarArtigoSeguro } from './dtoAnexo'
@@ -178,6 +179,7 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
       const uploadId = casarConteudo[1]
       if (metodo === 'PUT') {
         const recibo = await receberConteudo(sessionId, chatId, uploadId, request)
+        if (dono.contextKind === 'chat' && recibo.state === 'pronto') await resolverRaizExplorer(sessionId, chatId).catch(() => undefined)
         sendJson(response, 200, reciboPublico(recibo))
         return true
       }
@@ -185,6 +187,7 @@ export async function tratarRotasAnexos(request: IncomingMessage, response: Serv
         // Variante de finalização (reconciliação/recovery) — mesmo dono.
         exigirVivo(sessionId)
         const recibo = await publicarPreparado(sessionId, chatId, uploadId)
+        if (dono.contextKind === 'chat' && recibo.state === 'pronto') await resolverRaizExplorer(sessionId, chatId).catch(() => undefined)
         sendJson(response, 200, reciboPublico(recibo))
         return true
       }

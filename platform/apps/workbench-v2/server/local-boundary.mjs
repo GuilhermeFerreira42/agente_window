@@ -66,7 +66,8 @@ export function validateLocalRequest(request, { requireOrigin = false } = {}) {
     // C-3a: o ÚNICO corpo binário aceito é o stream do upload de anexo
     // (mesma origem + Host exato + Fetch Metadata continuam obrigatórios).
     const binarioOk = /^application\/octet-stream(?:\s*;|\s*$)/i.test(tipo)
-      && /^\/api\/sessions\/[^/]+\/chats\/[^/]+\/attachments\/uploads\/[^/]+\/content$/.test(pathname)
+      && ((method === 'PUT' && /^\/api\/sessions\/[^/]+\/chats\/[^/]+\/attachments\/uploads\/[^/]+\/content$/.test(pathname))
+        || (method === 'POST' && /^\/api\/explorer\/[^/]+\/[^/]+\/fs\/upload$/.test(pathname)))
     if (!jsonOk && !binarioOk) return { ok: false, reason: 'json_required' }
   }
   return { ok: true }

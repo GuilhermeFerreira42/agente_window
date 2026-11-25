@@ -141,7 +141,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // 4.7-b c2 — Git: raiz = raiz do workspace (decisão do usuário); o primeiro status
   // acontece quando o ChangesPane monta (setRoot). 5.3: o pane vive na view `scm` da
   // Side Bar (montada 1× pelo shell), então o status — e o badge — nascem no boot.
-  const gitPort = new BrowserGitPort();
+  const gitPort = new BrowserGitPort(deps.gitBaseUrl);
   const gitService = new GitService(gitPort, {
     canChangeWorktree: uris => uris ? !uris.some(uri => editorService.hasDirtyUri(uri)) : !editorService.hasAnyDirty(),
   });
@@ -248,7 +248,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
   // 5.6 (A0.6) — Outline lê os símbolos do modelo ativo do Monaco do anexo; Timeline
   // fala com /git/log + /git/show(sha). Tudo aditivo: ExplorerView recebe `activeFile`.
   const outlineTracker = createMonacoOutlineTracker();
-  const timelinePort = new BrowserTimelinePort();
+  const timelinePort = new BrowserTimelinePort(deps.gitBaseUrl);
   const onEditorReady: AttachAreaProps['onEditorReady'] = (ed, api) => { attachMonaco = ed; attachPaneApi = api; outlineTracker.attach(ed); };
   // Onda 2b (D146): o painel do centro registra a api (é ela que salva).
   // Onda 2c-ii (D152 §3): e TAMBÉM entra na fila do outlineTracker. A dívida
@@ -573,7 +573,7 @@ export function createExplorerSearchModule(deps: IExplorerSearchModuleDeps): IEx
         createElement(ExplorerView, {
           toolbarTarget: root.closest('.part.sidebar')?.querySelector<HTMLElement>('.title-actions') ?? undefined,
           workspaceRoot: deps.workspaceRoot, service, menus: deps.menus, contextMenu: deps.contextMenu, fs: deps.fs,
-          activeFile: activeFileApi, editorList, // EditorService owns the list
+          baseUrl: deps.gitBaseUrl, activeFile: activeFileApi, editorList, // EditorService owns the list
         }),
       );
     },

@@ -256,6 +256,8 @@ export interface IExplorerSearchModuleDeps {
     }>; onExecute?: (id: string) => void }): void;
   };
   workspaceRoot: WorkspaceUri;   // raiz única (Q4: single-root nesta fase)
+  /** Prefixo HTTP contextual opcional, compartilhado por Git e Timeline. */
+  gitBaseUrl?: string;
   /** FATIA-05 5.3 (aditivo): o shell decide onde a Source Control View vive (view `scm`
    *  da Side Bar). "Open Source Control" (header do Explorer) chama isto em vez de abrir
    *  uma aba no anexo. OPCIONAL — ausente = a ação não é exibida. */

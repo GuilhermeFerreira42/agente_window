@@ -33,7 +33,6 @@ import {
   assertWorkspaceRoot,
   FsHost,
   FsHostError,
-  toFsPath,
   toWorkspaceUri,
 } from './fsHost';
 import { ExplorerFsWatcher, type FsChangedBatch } from './watcher';
@@ -49,6 +48,8 @@ export interface ExplorerFsServerOptions {
   root: WorkspaceUri;
   /** ms de coalescência do watcher (default 300 = WATCHER_COALESCE_MS). */
   watcherCoalesceMs?: number;
+  /** Raiz privada: recusa links/junctions no caminho. */
+  rejectSymlinks?: boolean;
   /** Fábrica do WebSocketServer (injetada p/ isolar 'ws' no adapter). */
   createWsServer: () => WsServerLike;
 }
@@ -128,7 +129,7 @@ export async function createExplorerFsServer(
   options: ExplorerFsServerOptions,
 ): Promise<ExplorerFsServer> {
   await assertWorkspaceRoot(options.root);
-  const host = new FsHost(options.root);
+  const host = new FsHost(options.root, options.rejectSymlinks);
   const watcher = new ExplorerFsWatcher(host, { coalesceMs: options.watcherCoalesceMs });
   watcher.start();
   const wss = options.createWsServer();
@@ -152,6 +153,7 @@ export async function createExplorerFsServer(
       try {
         const msg = JSON.parse(String(data)) as { op?: string; uri?: WorkspaceUri };
         if (msg?.op === 'watch' && typeof msg.uri === 'string') {
+          host.assertSafeUri(msg.uri);
           watcher.ensureWatch(msg.uri);
           ws.send(JSON.stringify({ op: 'watched', uri: msg.uri }));
         }
@@ -269,12 +271,12 @@ export async function createExplorerFsServer(
             typeof body[k] === 'number' && Number.isFinite(body[k] as number) && (body[k] as number) > 0 ? (body[k] as number) : undefined;
           const ac = new AbortController();
           req.on('close', () => ac.abort()); // cliente desistiu (última busca vence)
-          const [workspace, scope] = await Promise.all([realpath(host.rootPath), realpath(toFsPath(host.rootPath, root))]);
+          const [workspace, scope] = await Promise.all([realpath(host.rootPath), realpath(host.assertSafeUri(root))]);
           const scopeRelative = relative(workspace, scope);
           if (scopeRelative === '..' || scopeRelative.startsWith(`..${sep}`) || isAbsolute(scopeRelative)) {
             throw new FsHostError('forbidden_path', 'Escopo de pesquisa fora do workspace.');
           }
-          const trackedAndVisible = query.useIgnoreFiles
+          const trackedAndVisible = query.useIgnoreFiles && !options.rejectSymlinks
             ? await nodeGitExec(scope, ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '.'])
             : undefined;
           const visibleFiles = trackedAndVisible?.code === 0 ? new Set(trackedAndVisible.stdout.split('\0')) : undefined;

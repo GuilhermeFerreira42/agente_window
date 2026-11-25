@@ -11,6 +11,8 @@ import { withSessionPersistenceQueue } from '../filaSessao'
 import { listarFontesConversa, lerFonteConversa, listarZipConversa, extrairItemZipConversa, inspecionarTextoConversa } from './inspecaoConversa'
 import { zipDeTeste } from './zipFixture.test-helper'
 import { prepararInspecaoAgente } from './ferramentaAnexos'
+import { resolverRaizExplorer } from '../raizExplorer'
+import { obterVinculoTrabalho } from './trabalhoPrivado'
 
 const sid = '99999999-9999-4999-8999-222222222222'
 const a = `${sid}-a`, b = `${sid}-b`
@@ -31,6 +33,30 @@ async function anexar(chatId: string, nome: string, bytes: Buffer): Promise<stri
 }
 
 describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
+  it('upload privado tem trabalho independente; edição e exclusão não alteram o original nem fazem fallback', async () => {
+    const id = await anexar(a, 'nota.txt', Buffer.from('ORIGINAL'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    expect(obterVinculoTrabalho(id)).toMatchObject({ locator: 'nota.txt', state: 'pronto' })
+    expect(readFileSync(join(raiz, 'nota.txt'), 'utf8')).toBe('ORIGINAL')
+    writeFileSync(join(raiz, 'nota.txt'), 'EDIÇÃO')
+    expect((await lerFonteConversa(sid, a, id, 100)).bytes.toString()).toBe('EDIÇÃO')
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
+    rmSync(join(raiz, 'nota.txt'))
+    await resolverRaizExplorer(sid, a)
+    expect((await listarFontesConversa(sid, a))[0].estado).toBe('trabalho_ausente')
+    await expect(lerFonteConversa(sid, a, id, 100)).rejects.toThrow()
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
+    await expect(lerFonteConversa(sid, b, id, 100)).rejects.toThrow()
+  })
+  it('migração do privado não sobrescreve nome de trabalho existente', async () => {
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    writeFileSync(join(raiz, 'nota.txt'), 'ARQUIVO DO USUÁRIO')
+    const id = await anexar(a, 'nota.txt', Buffer.from('ORIGINAL'))
+    await resolverRaizExplorer(sid, a)
+    expect(readFileSync(join(raiz, 'nota.txt'), 'utf8')).toBe('ARQUIVO DO USUÁRIO')
+    expect(readFileSync(join(raiz, 'nota (1).txt'), 'utf8')).toBe('ORIGINAL')
+    expect(obterVinculoTrabalho(id)).toMatchObject({ locator: 'nota (1).txt', state: 'pronto' })
+  })
   it('cada chat vê e lê somente seus próprios artefatos, mesmo conhecendo o id alheio', async () => {
     const idA = await anexar(a, 'primeiro.txt', Buffer.from('segredo A'))
     const idB = await anexar(b, 'segundo.txt', Buffer.from('segredo B'))
@@ -183,7 +209,7 @@ describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
   it('recusa fonte alterada depois da prévia em vez de transmitir bytes novos', async () => {
     const id = await anexar(a, 'texto.txt', Buffer.from('original'))
     const plano = await prepararInspecaoAgente({ sessionId: sid, chatId: a }, { acao: 'ler', artifactId: id })
-    writeFileSync((await lerArtigo(id)).caminho, 'alterado')
+    writeFileSync(join((await resolverRaizExplorer(sid, a)).raiz, 'texto.txt'), 'alterado')
     await expect(plano.executar()).rejects.toThrow()
   })
   it('extrai texto de PDF local sintético, sem tratar PDF danificado como texto', async () => {
@@ -196,12 +222,13 @@ describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
     const fallback = await prepararInspecaoAgente({ sessionId: sid, chatId: a }, { acao: 'ler', artifactId: ruim })
     expect((await fallback.executar()).resumo).toMatch(/PDF/)
   })
-  it('recusa tamanho, integridade alterada e chat removido', async () => {
+  it('recusa tamanho e chat removido; adulteração do original não substitui trabalho', async () => {
     const id = await anexar(a, 'arquivo.txt', Buffer.from('conteudo'))
     await expect(lerFonteConversa(sid, a, id, 3)).rejects.toThrow()
     const path = (await lerArtigo(id)).caminho
     writeFileSync(path, 'alterado')
-    await expect(lerFonteConversa(sid, a, id, 100)).rejects.toThrow()
+    expect((await lerFonteConversa(sid, a, id, 100)).bytes.toString()).toBe('conteudo')
+    await expect(lerArtigo(id)).rejects.toThrow()
     const registro = getSessionRecord(sid)!
     const sessao = JSON.parse(registro.sessionJson); sessao.chats = sessao.chats.filter((c: { id: string }) => c.id !== a)
     upsertSessionRecord({ ...registro, sessionJson: JSON.stringify(sessao) })

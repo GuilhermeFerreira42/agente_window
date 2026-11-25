@@ -4,6 +4,7 @@ import { PersistenceProblem } from './persistenceErrors'
 import { deleteTranscript } from './transcripts'
 import { executarPlanoAnexos, registrarPlanoAnexos, removerStagesDaSessao, type OpcoesLimpeza } from './attachments/limpeza'
 import { removeWorktree, WorktreeDirtyError } from './worktrees'
+import { limparRaizPrivadaDaSessao } from './limpezaExplorer'
 
 // O tombstone mora no dono do catálogo (mesmo SQLite, primeira conexão);
 // este módulo é a orquestração da limpeza. Reexporta para os consumidores.
@@ -121,6 +122,10 @@ export async function executarLimpezaDelecao(sessionId: string, force: boolean, 
     // C-3a (T27–T29/R12) — arquivos por plano ANTES de qualquer cascade: o
     // plano foi capturado no tombstone e a Lixeira decide cada privado.
     // Falha de item NÃO apaga evidência: a limpeza fica pendente (B06).
+    if (!await limparRaizPrivadaDaSessao(sessionId, limpeza)) {
+      throw new PersistenceProblem(503, 'session_cleanup_pending',
+        'A pasta privada desta conversa não pôde ser confirmada na Lixeira. A exclusão permanece pendente; confira a origem e o destino antes de tentar novamente.')
+    }
     const anexosCompletos = await executarPlanoAnexos(sessionId, limpeza)
     if (!anexosCompletos) {
       throw new PersistenceProblem(503, 'session_cleanup_pending',

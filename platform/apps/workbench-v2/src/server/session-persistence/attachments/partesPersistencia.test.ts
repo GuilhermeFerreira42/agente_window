@@ -202,9 +202,9 @@ describe('C-3b — C3B-T22 migração aditiva e legado', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'attachment_%'")
       .all() as Array<{ name: string }>
     const nomes = tabelas.map((t) => t.name).sort()
-    // As MESMAS tabelas da C-3a: nenhum store novo foi criado.
+    // MM-I adiciona um vínculo de trabalho; as tabelas preexistentes continuam.
     expect(nomes).toEqual([
-      'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_uploads',
+      'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_uploads', 'attachment_working_files',
     ])
   })
 })

@@ -67,7 +67,10 @@ describe('local product boundary', () => {
     const cabecalhos = { host: 'localhost:5174', origin: 'http://localhost:5174', 'sec-fetch-site': 'same-origin' }
     // A rota de conteúdo do upload aceita o File como corpo binário…
     expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, upload)).ok).toBe(true)
-    // …e SOMENTE ela: qualquer outra mutação sensível continua exigindo JSON.
+    const explorer = '/api/explorer/abc/def/fs/upload'
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'POST', 5174, explorer)).ok).toBe(true)
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, explorer)).ok).toBe(false)
+    // As demais mutações sensíveis continuam exigindo JSON.
     expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'POST', 5174, '/api/providers')).ok).toBe(false)
     expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, '/api/sessions/abc')).ok).toBe(false)
     expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, `${upload}/extra`)).ok).toBe(false)
