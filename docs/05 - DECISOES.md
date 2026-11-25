@@ -2207,3 +2207,65 @@ O primeiro ensaio humano de MC1 mostrou uma conversa antiga renomeada para `memo
 **Contexto geral limitado.** Depois de localizar sem ambiguidade uma referência autorizada, `buscar_mensagens_chat` aceita `consulta:"*"` para até cinco mensagens recentes completas/seguras. Mantém filtros, trechos, bytes, tempo, digest e parcialidade de D200. Não devolve conversa inteira nem promete lembrança completa; busca lexical e mecanismos manuais continuam. M6 permanece no chat atual. Consentimentos não são grants de comandos/arquivos, memórias confirmadas de projeto ou aprovação operacional; nenhuma tarefa antiga é repetida.
 
 Revisão independente estática identificou o token antigo atravessando revogação e o falso aviso de legado já consentido; ambos corrigidos e cobertos por testes. Persistência/reinício, renomeação antes/depois do consentimento, acentos, seleção/revogação no menu, concorrência, expiração, mudança de escopo, fonte alterada/excluída e inferência real com dados sintéticos ficam em 09. Aceite humano de MC1/M permanece pendente; não iniciar extensibilidade por esta correção.
+
+
+## D202 — Configurações, Provedores e Personalizações numa única moldura (U-1, 13/11/2026)
+
+**Decisão.** As três superfícies passam a viver num **único modal** ("Configurações"),
+aberto expandido, com **uma** navegação à esquerda (3 grupos, 13 categorias) e o
+conteúdo da categoria à direita. As três telas existentes (Config, Provedores e
+Personalizações) foram **reaproveitadas como estão**, hospedadas dentro da moldura;
+nenhum serviço, contrato de rota ou store foi duplicado.
+
+- **Uma porta de entrada:** `abrirConfiguracoes(rota)`. Conta → Provedores,
+  Configurações (+ `Ctrl+,`) e Personalizações (lateral e menus) chamam a mesma
+  porta. Com o diálogo aberto, abrir outra categoria só **navega** — nunca cria
+  uma segunda instância.
+- **Abas legadas traduzidas antes de montar:** `config` e `providers` deixaram de
+  ser abas do editor; `aiCustomizations` deixou de ser custom view. Snapshots
+  antigos são drenados no boot e viram a categoria correspondente; `file`,
+  Browser, Changes e diff seguem donos das próprias abas.
+- **Rascunho continua sendo do painel.** A moldura só conhece FATO (`dirty`,
+  `saving`, `canLeave`) e nunca salva por conta própria. Fechar com rascunho pede
+  decisão ("Continuar editando" / "Descartar rascunhos"); escrita em voo bloqueia
+  o fechamento.
+- **Segredo não atravessa fronteira:** a chave revelada vive na memória do painel
+  de Provedores e é limpa ao trocar de categoria e ao fechar. Nada de chave em
+  rota, storage do navegador ou snapshot.
+- **Categorias futuras** (Notificações, Agentes e instruções, MCP, Hooks, Plugins,
+  Importação e backup) dizem "Esta funcionalidade ainda não está disponível nesta
+  versão" — sem botão que finja agir.
+
+**Onde mora.** Domínio puro em `src/domain/configuracoesUnificadas.ts`; moldura
+neutra em `src/shell/ConfiguracoesUnificadas.tsx`; ligação com as Casas em
+`src/shell/usePaineisConfiguracoes.tsx` + `ConfiguracoesUnificadasHost.tsx`; o App
+só faz o wiring (segue abaixo do teto de linhas do C-2).
+
+**Consequência para os testes.** Jornadas que exigiam "Provedores é aba nativa"
+passaram a exigir "Provedores é a categoria do modal" — a troca foi registrada
+teste a teste, sem afrouxar nenhum assert (a prova de que a aba NÃO existe ficou
+explícita). A seleção de modelo por conversa continua na lateral, como estava.
+
+**Aceite.** U-1 **não homologada**: implementação e provas técnicas entregues ao
+proprietário em 13/11/2026. Ver `docs/09` (como validar) e o relatório de entrega.
+
+**Revisão pós-primeira entrega (mesma data).** A revisão independente aprovou as 7
+jornadas no Windows e reprovou dois pontos: **perda de rascunho fora dos cenários
+cobertos** e **layouts quebrados**. A correção manteve a decisão acima e acrescentou
+seis contratos, todos com prova nominal: (a) o **tamanho** do modal passa a ser
+lembrado entre aberturas e após F5 — primeira abertura expandida, depois o último
+modo, validado no domínio (valor corrompido cai no inicial); (b) **fechar olha todos
+os painéis já visitados**, não só a categoria ativa, e qualquer salvamento em voo
+manda aguardar; (c) **ver a chave não é editar** — o reveal vive em mapa separado,
+não suja o formulário, não volta no PUT e é descartado quando a resposta chega
+atrasada; (d) **desativar provedor preserva** configuração, modelos e chave, tira o
+provedor das opções/Auto e deixa a conversa existente como "Indisponível", com a
+troca decidida pelo dono; (e) **abas antigas** são saneadas no boot sem roubar a aba
+ativa, e a aba `file` volta a ser restaurada sem conteúdo/`isRealFile`; (f) o
+**layout** de todos os painéis é medido no DOM (Salvar e Fechar sempre dentro da
+caixa, sem corte nem sobreposição) em 1400×900/1024×700/800×600 × claro/escuro ×
+expandido/restaurado. `App.tsx` permanece em 2887 linhas (teto 2889).
+
+## Consolidação documental do roadmap intercalado antes da Fatia 16 — 19/11/2026
+
+Por solicitação expressa do proprietário, a sequência operacional replanejada a partir de 13/11 está consolidada no topo de `06 - PROXIMAS FASES E DIVIDAS.md`, com entrada em `01` e ponto atual em `03`. A leitura isolada da D133 ou da numeração 13–20 é insuficiente para a próxima ação: persistência P-A/P-B/P-C, centro C-1/C-2/C-3a/C-3b, MM-0/MM-I/MM-O, U-1 e a discussão/retomada de E1–E6 intercalam-se antes da Fatia 16 conforme aquela tabela. Esta nota torna portátil o plano já discutido; não cria ordem rígida para todos os codecs, conteúdo para a discussão reservada, nova aprovação arquitetural E1–E6 ou aceite humano por inferência. Cada execução futura continua sujeita ao escopo/autorização e homologação individual acordados. Preservados D133 e registros anteriores como proveniência histórica.

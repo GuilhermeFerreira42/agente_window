@@ -14,7 +14,8 @@ export async function prepararAcessoHistorico(sessionId: string, chatId: string,
   if (!idHistoricoValido(sessionId) || !idHistoricoValido(chatId)) throw new Error('Conversa inválida.')
   return serializar(sessionId, async () => {
     const contexto = resolverContextoAgir(sessionId, chatId), anterior = origemChat(sessionId, chatId)
-    if (!contexto.ok || !anterior || anterior.operatorId !== operadorHistoricoLocal()) throw new Error('A conversa não está disponível neste perfil.')
+    // C-1 — Chat não tem pasta/projeto: o vínculo de histórico exige raiz real.
+    if (!contexto.ok || contexto.raiz === null || !anterior || anterior.operatorId !== operadorHistoricoLocal()) throw new Error('A conversa não está disponível neste perfil.')
     const identity = identidadeRaizHistorico(contexto.raiz)
     if (!identity) throw new Error('A pasta do projeto não está disponível.')
     invalidarOrigensForaDaRaiz(sessionId, contexto.raiz, identity)

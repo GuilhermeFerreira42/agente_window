@@ -19,7 +19,7 @@ import { reorderEditorTabs } from '../domain/dragAndDrop'
 import { enterDetailOnly, showEditorRestore, EMPTY_DOCKED_STATE, type DockedControllerState } from '../domain/dockedAuxiliaryController'
 import { abaExistentePara, atualizacaoDeAbaReusada, idDeAbaNova, montarAba, type PedidoDeAba } from './identidadeDaAba'
 import { dividirIdDoModulo, idDaAbaDoModulo } from './ponteAnexo'
-import { lerSnapshotNativas, salvarSnapshotNativas } from './persistenciaNativas'
+import { drenarAbasLegadas, lerSnapshotNativas, salvarSnapshotNativas } from './persistenciaNativas'
 
 export function useFaixaDeAbasNativas(
   onActivateModuleTab: (sessionId: string, uri: string) => void,
@@ -28,7 +28,10 @@ export function useFaixaDeAbasNativas(
 ) {
   // D175b: snapshot e dado de boot, NAO e' segundo estado. A fonte viva segue
   // sendo so este hook. `code` e diffs do modulo continuam fora deste snapshot.
-  const [initial] = useState(lerSnapshotNativas)
+  // U-1 R09: as abas legadas `config`/`providers` são drenadas ANTES de montar
+  // a faixa — a categoria equivalente abre no modal, não uma aba morta.
+  const [boot] = useState(() => drenarAbasLegadas(lerSnapshotNativas()))
+  const initial = boot.snapshot
   const [editorTabs, setEditorTabs] = useState<EditorTab[]>(initial.tabs)
   const [activeTabId, setActiveTabId] = useState<string | undefined>(
     initial.activeBySession[currentSessionId] ?? initial.activeTabId,
@@ -56,6 +59,12 @@ export function useFaixaDeAbasNativas(
       ordinalBySession: browserOrdinalBySession.current,
     })
   }, [editorTabs, browserViews, activeTabId, currentSessionId])
+
+  /**
+   * U-1 R09 — rotas das abas legadas encontradas no boot. O App consome uma vez
+   * (abrir a categoria) e a faixa já não tem mais essas abas.
+   */
+  const rotasLegadas = boot.rotas
 
   const activateEditorTab = useCallback((tab: EditorTab | undefined) => {
     if (!tab) {
@@ -203,6 +212,7 @@ export function useFaixaDeAbasNativas(
     editorTabs, activeTabId, setActiveTabId, browserViews,
     activeTabBySession, activeGlobalTabId,
     activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession, openEditorTab, createBrowser,
+    rotasLegadas,
     closeNativeTab, removeSessionResources, reorderNativeTabs, hideNativeTabs, restoreNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
   }

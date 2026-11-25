@@ -72,9 +72,18 @@ export interface PersonalizacoesViewProps {
    * que não há projeto. O caminho NUNCA é enviado: só a identidade (F1/D113).
    */
   alvo?: AlvoPersonalizacoes
+  /**
+   * U-1 R02: quando a moldura unificada hospeda a tela, a navegação lateral
+   * interna NÃO é desenhada — a navegação comum do modal já lista Visão
+   * geral/Habilidades/Ferramentas. A seção continua CONTROLADA por
+   * `sectionRequest`, então nada de duas colunas competindo.
+   */
+  semNavegacaoPropria?: boolean
+  /** U-1: título próprio omitido (o modal titula a categoria). */
+  semTitulo?: boolean
 }
 
-export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, onSectionChange }: PersonalizacoesViewProps) {
+export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, onSectionChange, semNavegacaoPropria = false, semTitulo = false }: PersonalizacoesViewProps) {
   const [visao, setVisao] = useState<VisaoPersonalizacoes | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erroCarregar, setErroCarregar] = useState('')
@@ -257,7 +266,7 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
 
   return (
     <section className="customizations-view personalizations-manager" aria-label="Personalizações">
-      <nav className="personalizations-navigation" aria-label="Seções de Personalizações" onKeyDown={event => {
+      {!semNavegacaoPropria && <nav className="personalizations-navigation" aria-label="Seções de Personalizações" onKeyDown={event => {
         const keys = ['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End']
         if (!keys.includes(event.key)) return
         const buttons = Array.from(event.currentTarget.querySelectorAll('button'))
@@ -279,13 +288,13 @@ export function PersonalizacoesView({ embedded = false, alvo, sectionRequest, on
             </button>
           )
         })}
-      </nav>
+      </nav>}
       <div ref={content} className="personalizations-manager-content">
       {!category.available && <div className="personalizations-unavailable" role="status"><h2>{category.label}</h2><p>Esta funcionalidade ainda não está disponível nesta versão.</p></div>}
       <div hidden={!category.available}>
       {embedded ? (
         <header className="personalizations-category-heading">
-          <h2>{category.label}</h2>
+          {!semTitulo && <h2>{category.label}</h2>}
           <p>{activeSection === 'habilidades' ? 'Instruções reutilizáveis que o agente carrega quando são relevantes para a tarefa.' : activeSection === 'ferramentas' ? 'Gerencie as ferramentas disponíveis para os agentes do seu workspace.' : 'Gerencie as personalizações disponíveis para a conversa e o workspace.'}</p>
         </header>
       ) : <header className="customizations-header">

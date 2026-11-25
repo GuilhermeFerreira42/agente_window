@@ -17,7 +17,7 @@ export type ProtocoloAgir = 'openai-chat' | 'anthropic' | 'gemini' | 'ollama'
 
 /** Ferramentas de arquivo existentes + executar one-shot da Fatia 13. O PTY visual permanece separado e intocado. */
 import type { FerramentaEntreChats, FonteEntreChats, EscolhaEntreChats } from '../../../../domain/consultaEntreChats'
-export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | FerramentaEntreChats
+export type FerramentaId = 'ler' | 'listar' | 'buscar' | 'criar' | 'escrever' | 'excluir' | 'executar' | 'historico' | 'anexos' | FerramentaEntreChats
 
 /** Nível de aprovação separado do modo de trabalho. O servidor é autoridade. */
 export type NivelPermissaoAgir = 'manual' | 'allow-all'
@@ -37,6 +37,8 @@ export interface ArgumentosFerramenta {
   apos?: unknown
   ate?: unknown
   acao?: unknown
+  artifactId?: unknown
+  indice?: unknown
   consulta?: unknown
   messageId?: unknown
   caminho?: unknown
@@ -121,6 +123,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 export type EventoAgir =
   | { type: 'memory_status'; estado: 'compactando' | 'compactado' | 'falhou'; ultimaEm?: number }
   | { type: 'chunk'; text: string }
+  | { type: 'vision_accepted'; messageId: string; artifactIds: string[] }
   | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean; fontesHistoricas?: FonteEntreChats[]; escolhasHistoricas?: EscolhaEntreChats[] }
@@ -244,3 +247,12 @@ export interface ResultadoRecuperacao {
 
 /** Quem executa um pedido. O loop e a rota continuam sendo donos de cancelamento e grants. */
 export type ExecutorFerramenta = (pedido: PedidoFerramenta, contexto?: ContextoExecucaoFerramenta) => Promise<ResultadoFerramenta>
+
+// ——— MM-0 (contrato neutro multimodal): reexport de TIPOS por composição ———
+// Sem payload novo no fluxo do agente; sem ativação de partes persistidas.
+export type {
+  ArtefatoMultimodal,
+  EnvelopeMensagemMultimodal,
+  Modalidade,
+  ParteMensagem,
+} from '../../../../domain/multimodal'

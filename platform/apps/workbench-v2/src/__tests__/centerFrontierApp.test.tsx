@@ -71,7 +71,7 @@ vi.mock('monaco-editor', () => {
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => ({
   ...await importOriginal<typeof SessionsClientModule>(),
   SessionPersistenceError: class SessionPersistenceError extends Error {},
-  loadPersistedSessions: vi.fn(async () => (await import('./fixtures/sessions')).testSessions),
+  loadPersistedSessions: vi.fn(async () => ({ sessions: (await import('./fixtures/sessions')).testSessions, unavailable: [], state: 'ok' as const })),
   persistSession: vi.fn(async () => undefined),
   pickSessionWorkspace: vi.fn(async () => undefined),
   createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),

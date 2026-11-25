@@ -16,6 +16,32 @@ type Batch = { session: Session; waiters: Waiter[]; keepalive: boolean }
 type Operation = { session: Session; fingerprint: string; mutationId: string; expectedRevision?: number; create: boolean; keepalive: boolean }
 type State = { revision?: number; fingerprint?: string; creationId: string; current?: Promise<void>; pending?: Batch; uncertain?: Operation; held?: SessionPersistenceError }
 const states = new Map<string, State>()
+const deleting = new Set<string>()
+
+function deletionInProgress(): SessionPersistenceError {
+  return new SessionPersistenceError('Esta conversa está sendo excluída.', 409, 'session_deletion_in_progress')
+}
+
+export async function withSessionDeletion<T>(
+  id: string,
+  options: { expectedRevision: number; resumeCleanup?: boolean },
+  remove: (revision: number) => Promise<T>,
+): Promise<T> {
+  if (deleting.has(id)) throw deletionInProgress()
+  deleting.add(id)
+  try {
+    const value = states.get(id)
+    while (value?.current) await value.current
+    if (options.resumeCleanup) return await remove(options.expectedRevision)
+    if (value?.uncertain) {
+      throw new SessionPersistenceError('Confirme o último salvamento em “Tentar novamente” antes de excluir esta conversa.', 503, 'session_save_uncertain')
+    }
+    // A revisão só pode avançar pelo ACK desta fila, sem aceitar uma edição concorrente.
+    return await remove(value?.revision ?? options.expectedRevision)
+  } finally {
+    deleting.delete(id)
+  }
+}
 function state(session: Session): State {
   let value = states.get(session.id)
   if (!value) {
@@ -67,6 +93,7 @@ async function drain(value: State): Promise<void> {
   }
 }
 export function persistSession(session: Session, options?: { creationId?: string; keepalive?: boolean }): Promise<Session> {
+  if (deleting.has(session.id)) return Promise.reject(deletionInProgress())
   const value = state(session)
   if (value.held) return Promise.reject(value.held)
   if (value.uncertain) return Promise.reject(new SessionPersistenceError('O resultado da gravação ainda precisa ser consultado. Tente novamente nesta conversa.', 503, 'session_save_uncertain'))
@@ -99,16 +126,29 @@ export function holdSessionPersistence(sessionId: string): void {
   value.held = new SessionPersistenceError('Há edições locais a recuperar. Recarregue a versão salva ou salve uma cópia.', 409, 'stale_session_snapshot')
   states.set(sessionId, value)
 }
-export async function loadPersistedSessions(signal?: AbortSignal): Promise<Session[]> {
+export interface SessaoIndisponivel { sessionId: string; code: string; titulo?: string; deletionRevision?: number }
+/** SPEC §4 — healthy sessions plus per-item diagnostics; total failure stays a 503. */
+export interface ResultadoHidratacao { sessions: Session[]; unavailable: SessaoIndisponivel[]; state: 'ok' | 'partial' }
+export async function loadPersistedSessions(signal?: AbortSignal): Promise<ResultadoHidratacao> {
   const response = await expectOk(await fetch('/api/sessions', { signal }))
-  const body = await response.json() as { sessions: Session[] }
-  for (const session of body.sessions) {
+  const body = await response.json() as Partial<ResultadoHidratacao>
+  const sessions = Array.isArray(body.sessions) ? body.sessions : []
+  const unavailable = (Array.isArray(body.unavailable) ? body.unavailable : [])
+    .filter((item): item is SessaoIndisponivel => typeof item?.sessionId === 'string' && typeof item?.code === 'string')
+    .map(({ sessionId, code, titulo, deletionRevision }) => ({
+      sessionId, code,
+      ...(typeof titulo === 'string' ? { titulo } : {}),
+      ...(code === 'session_cleanup_pending' && typeof deletionRevision === 'number'
+        && Number.isSafeInteger(deletionRevision) && deletionRevision >= 0 ? { deletionRevision } : {}),
+    }))
+  const state: ResultadoHidratacao['state'] = body.state === 'partial' || unavailable.length > 0 ? 'partial' : 'ok'
+  for (const session of sessions) {
     const value = states.get(session.id)
     // A list refresh cannot grant a newer base to unsent local edits. Only a
     // new identity, an explicit reload or a matching ACK can establish it.
     if (!value) resumeSessionPersistence(session)
   }
-  return body.sessions
+  return { sessions, unavailable, state }
 }
 export async function loadPersistedSession(id: string): Promise<{ session: Session; ack?: { mutationId: string; revision: number; creationId?: string; creationRevision?: number } }> {
   const response = await expectOk(await fetch(`/api/sessions/${encodeURIComponent(id)}`))
@@ -135,6 +175,7 @@ export async function persistRecoveryCopy(copy: Session, creationId: string): Pr
 export async function retrySessionPersistence(session: Session): Promise<Session> {
   const value = state(session)
   if (value.current) await value.current
+  if (deleting.has(session.id)) throw deletionInProgress()
   if (value.held) throw value.held
   const operation = value.uncertain
   if (operation) {

@@ -7,6 +7,13 @@
 // ============================================================================
 
 export type {
+  EnvelopeMensagemMultimodal,
+  Modalidade,
+  ParteMensagem,
+  ResultadoValidacao,
+} from './contract'
+
+export type {
   AlvoConversa,
   AlvoOuErro,
   ConfigChamadaModelo,

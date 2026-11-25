@@ -6,7 +6,7 @@
 //   §3.7  fio que termina sem "done" vira erro honesto (sem bolha vazia);
 //   §3.9  o rodapé da bolha rotula o modelo EFETIVO (chegou no "done").
 // ============================================================================
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -102,12 +102,17 @@ describe('FATIA 09 — conversa REAL no App (SPEC §3)', () => {
   it('retomada expirada encerra Trabalhando, marca o cartão e permite novo envio',async()=>{
     responderChatComSSE(['Pausa após efeito registrado.'],'teto',20)
     await enviarMensagem('tarefa controlada')
-    await waitFor(()=>expect(screen.queryByRole('button',{name:'Continuar'}),document.body.textContent??'').not.toBeNull(),{timeout:4000})
-    await userEvent.setup().click(screen.getByRole('button',{name:'Continuar'}))
-    await waitFor(()=>expect(screen.queryByRole('button',{name:'Parar execução'})).not.toBeInTheDocument(),{timeout:2000})
+    // Em jsdom, calcular o nome acessível de todos os botões a cada tentativa
+    // fica caro com as folhas de estilo do workbench e pode atrasar o React.
+    // Espera pelo cartão de forma barata e valida sua semântica uma única vez.
+    await waitFor(() => expect(document.querySelector('.chat-continue-card button[aria-label="Continuar"]')).not.toBeNull(), { timeout: 4000 })
+    const cartao = document.querySelector<HTMLElement>('.chat-continue-card')!
+    expect(cartao).toHaveAttribute('role', 'group')
+    await userEvent.setup().click(within(cartao).getByRole('button', { name: 'Continuar' }))
+    await waitFor(() => expect(document.querySelector('button[aria-label="Parar execução"]')).toBeNull(), { timeout: 2000 })
     expect(screen.getByText('A pausa expirou no servidor.')).toBeInTheDocument()
     expect(screen.queryByText('Trabalhando')).not.toBeInTheDocument()
-  })
+  }, 45000)
   it('§3.2/§3.9: a bolha cresce em pedaços e o rodapé rotula o modelo efetivo', async () => {
     responderChatComSSE(['Parcial um. ', 'Parcial dois.'], 'done', 80)
     await enviarMensagem('pergunta em pedaços')

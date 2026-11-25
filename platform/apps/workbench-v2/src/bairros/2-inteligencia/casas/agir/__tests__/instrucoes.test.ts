@@ -150,6 +150,7 @@ describe('rodarAgir — o loop apenas REPASSA o que o servidor compôs', () => {
     excluir: naoUsado,
     executar: naoUsado,
     historico: naoUsado,
+    anexos: naoUsado,
     buscar_chats: naoUsado,
     buscar_mensagens_chat: naoUsado,
     ler_trecho_chat: naoUsado,

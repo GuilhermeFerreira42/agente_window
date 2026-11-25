@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import {
+import { rotuloEnvioVisao } from '../services/sessions/envioVisao'
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { Download,
   Check,
   Clipboard,
   FileCode2,
@@ -16,10 +17,20 @@ import {
 } from 'lucide-react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { CartaoFerramenta } from './CartaoFerramenta'
+import { MessageParts } from './MessageParts'
+import {
+  lerEnvelopeParaApresentacao,
+  montarApresentacao,
+  type CardArtefato,
+  type ItemApresentacao,
+} from '../domain/apresentacaoMultimodal'
+import { sugerirPreviewPorNome, type ClassificacaoPreview } from '../domain/politicaPreview'
+import { baixarArtefato, urlDeMidia } from '../services/sessions/artefatosMediaClient'
 import { CartaoContinuar } from './CartaoContinuar'
 import { AUTOSCROLL_LIMITE_PX, AUTOSCROLL_PADRAO } from '../bairros/2-inteligencia/casas/config'
 import remarkGfm from 'remark-gfm'
 import type { Attachment, ChatCopyKind, ChatMessage, ChatVote, ComposerDraft, ComposerHistoryEntry, NestedChat, Session } from '../types'
+import { baixarAnexo } from '../services/sessions/anexosClient'
 import type { FonteEntreChats } from '../domain/consultaEntreChats'
 import { ChatInput, selecaoDoToken } from './ChatInput'
 import { BuscaHistorico } from './BuscaHistorico'
@@ -186,9 +197,111 @@ function createMarkdownComponents(onCopy: () => void): Components {
   }
 }
 
+function rotuloEstadoAnexo(estado: NonNullable<Attachment['estado']>): string {
+  if (estado === 'pronto') return ' · salvo'
+  if (estado === 'referencia') return ' · no workspace'
+  if (estado === 'transferindo') return ' · transferindo'
+  if (estado === 'falhou') return ' · indisponível (original)'
+  if (estado === 'selecionado') return ' · selecionado'
+  return ''
+}
+
+function estadoAnexoLabel(attachment: Attachment): string {
+  if (!attachment.artifactId && (!attachment.estado || attachment.estado === 'legado')) return ' · original indisponível'
+  return attachment.estado && attachment.estado !== 'legado' ? rotuloEstadoAnexo(attachment.estado) : ''
+}
+
+/** Download real do bytes armazenados (E01 — hash conferido no E2E). */
+async function baixarAnexoComNome(sessionId: string, chatId: string, artifactId: string, name: string): Promise<void> {
+  const blob = await baixarAnexo(sessionId, chatId, artifactId)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * C-3b — itens de apresentação de UMA mensagem.
+ *
+ * A ORDEM vem do domínio (`montarApresentacao`); aqui só traduzimos anexo →
+ * card. Card sem `estado` conhecido assume `pronto`: a C-3a já gravou o estado
+ * real no anexo, e inventar "ausente" esconderia arquivo que existe.
+ */
+/**
+ * Modalidade publicada pelo servidor → classificação de preview.
+ *
+ * `texto`/`arquivo`/ausente nunca viram mídia: o fallback honesto é o card de
+ * arquivo com download (R05). Isto não reabre a política: a rota de mídia
+ * reconfere os BYTES e responde 415 quando a assinatura não bate (R06), então
+ * um `falso.png` marcado como imagem ainda seria recusado lá.
+ */
+function modalidadeParaPreview(modalidade: Attachment['modalidade'] | undefined): ClassificacaoPreview {
+  if (modalidade === 'imagem') return { ok: true, tipo: 'imagem', mime: 'image/png', modalidade: 'imagem' }
+  if (modalidade === 'audio') return { ok: true, tipo: 'audio', mime: 'audio/wav', modalidade: 'audio' }
+  if (modalidade === 'video') return { ok: true, tipo: 'video', mime: 'video/webm', modalidade: 'video' }
+  return { ok: false, motivo: 'formato_nao_exibivel' }
+}
+
+function itensDaMensagem(mensagem: ChatMessage): {
+  itens: ItemApresentacao[]
+  envelopeValido: boolean
+  diagnostico?: string
+} {
+  const leitura = lerEnvelopeParaApresentacao(mensagem.multimodal)
+  // Só usa o caminho novo quando o envelope é VÁLIDO; qualquer outro estado
+  // cai no legado, que já funciona (inclusive `desconhecido`, com diagnóstico).
+  const envelope = leitura.estado === 'valido' ? leitura.envelope : undefined
+  const diagnostico = leitura.estado === 'desconhecido' ? leitura.diagnostico : undefined
+
+  const cardPara = (artifactId: string): CardArtefato => {
+    const anexo = mensagem.attachments?.find((a) => a.artifactId === artifactId)
+    // O DTO de mensagem NÃO carrega bytes (decisão da C-3a: nunca bytes no
+    // histórico). Quem já classificou foi o SERVIDOR, na publicação: a
+    // modalidade gravada no anexo é a autoridade. A extensão do nome é
+    // ignorada de propósito — `falso.png` que é HTML continua `arquivo`.
+    const classificacao = modalidadeParaPreview(anexo?.modalidade)
+    return {
+      artifactId,
+      name: anexo?.name ?? 'arquivo',
+      bytes: anexo?.bytes,
+      modalidade: anexo?.modalidade ?? 'arquivo',
+      // `pronto`/`referencia` = bytes servíveis. `transferindo`/`selecionado`
+      // ainda não têm arquivo final; `legado` já existia antes da C-3a.
+      estado: anexo?.estado === 'pronto' || anexo?.estado === 'referencia'
+        ? 'pronto'
+        : 'indisponivel',
+      preview: classificacao,
+    }
+  }
+
+  return {
+    itens: montarApresentacao({
+      conteudo: mensagem.content,
+      anexos: (mensagem.attachments ?? []).map((a) => ({
+        id: a.artifactId ?? a.id,
+        name: a.name,
+        bytes: a.bytes,
+        estado: a.estado === 'referencia' ? 'pronto' : (a.estado as 'pronto' | 'ausente' | undefined),
+      })),
+      ...(envelope ? { envelope } : {}),
+      cardPara: (artifactId: string) => cardPara(artifactId),
+    }),
+    // Envelope válido = caminho novo. Qualquer outro estado usa o legado,
+    // que a C-3a já entregou e continua igual.
+    envelopeValido: envelope !== undefined,
+    ...(diagnostico ? { diagnostico } : {}),
+  }
+}
+
 function MessageRow({
   onAbrirFonteHistorica,
   onEscolherHistorico,
+  sessionId,
+  chatId,
   message,
   onCopy,
   onCopyAll,
@@ -203,6 +316,9 @@ function MessageRow({
 }: {
   onAbrirFonteHistorica?: (referencia: string) => Promise<void>
   onEscolherHistorico?: (referencia: string) => void
+  /** C-3a — dono para download do artefato armazenado. */
+  sessionId?: string
+  chatId?: string
   message: ChatMessage
   onDecidirFerramenta: (ferramentaId: string, decisao: 'permitir' | 'negar' | 'sessao') => void
   onDecidirAguardarComando: (ferramentaId: string, decisao: 'continuar' | 'parar') => void
@@ -215,6 +331,9 @@ function MessageRow({
   onReport: (messageId: string) => void
   canRegenerate: boolean
 }) {
+  // C-3b — memo do que desenhar. `montarApresentacao` é puro e barato; o memo
+  // evita refazer a classificação a cada tecla digitada no composer.
+  const apresentacao = useMemo(() => itensDaMensagem(message), [message])
   return (
     <article className={`chat-message ${message.role === 'user' ? 'is-request' : 'is-response'}${message.running ? ' is-running' : ''}${message.cancelled ? ' is-cancelled' : ''}`} data-message-id={message.id} tabIndex={0}>
       <div className="chat-message-header">
@@ -227,20 +346,61 @@ function MessageRow({
         </div>
       </div>
       <div className="chat-message-body">
-        {message.attachments && message.attachments.length > 0 && (
+        {/* A mensagem com envelope segue a ordem das partes. Os anexos das outras
+            mensagens mantêm a lista original e ganham prévia quando compatíveis. */}
+        {apresentacao.envelopeValido ? (
+          <MessageParts
+            itens={apresentacao.itens.filter((item) => item.tipo !== 'texto' || item.texto.length > 0)}
+            urlPara={(artifactId) => urlDeMidia(sessionId ?? null, chatId ?? null, artifactId) ?? ''}
+            aoBaixar={(card) => {
+              if (!sessionId || !chatId) return
+              void baixarArtefato(sessionId, chatId, card.artifactId, card.name)
+            }}
+            {...(apresentacao.diagnostico ? { diagnosticoEnvelope: apresentacao.diagnostico } : {})}
+          />
+        ) : message.attachments && message.attachments.length > 0 && (
           <div className="chat-message-attachments" role="list" aria-label="Anexos enviados">
-            {message.attachments.map((attachment) => (
-              <span
+            {message.attachments.map((attachment) => {
+              const { artifactId, name, bytes, estado } = attachment
+              const preview = sugerirPreviewPorNome(name)
+              if (preview.ok && sessionId && chatId && artifactId && (estado === 'pronto' || estado === 'referencia')) {
+                const card: CardArtefato = { artifactId, name, bytes, estado: 'pronto', modalidade: preview.modalidade, preview }
+                return (
+                  <div key={attachment.id} role="listitem" data-artifact-id={artifactId} aria-label={`${name} — ${rotuloEnvioVisao(attachment)}`}>
+                    <MessageParts
+                      itens={[{ tipo: 'artefato', chave: artifactId, card }]}
+                      urlPara={() => urlDeMidia(sessionId, chatId, artifactId)}
+                      aoBaixar={() => { void baixarAnexoComNome(sessionId, chatId, artifactId, name) }}
+                    />
+                    {attachment.envioModelo && <small className="chat-message-attachment-estado">{rotuloEnvioVisao(attachment)}</small>}
+                  </div>
+                )
+              }
+              return <span
                 className="chat-message-attachment"
                 key={attachment.id}
                 role="listitem"
-                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
-                title={`${attachment.name} — só o nome do arquivo vai junto; o conteúdo ainda não é lido (FATIA 10)`}
+                data-artifact-id={attachment.artifactId ?? undefined}
+                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'}${estadoAnexoLabel(attachment)} — ${rotuloEnvioVisao(attachment)}`}
+                title={`${attachment.name} · ${attachment.kind === 'local' ? 'local' : 'workspace'}${estadoAnexoLabel(attachment)} · ${rotuloEnvioVisao(attachment)}`}
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>
+                {estadoAnexoLabel(attachment) && (
+                  <span className="chat-message-attachment-estado" aria-hidden="true">{estadoAnexoLabel(attachment)}</span>
+                )}
+                {sessionId && chatId && attachment.artifactId
+                  && (attachment.estado === 'pronto' || attachment.estado === 'referencia') && (
+                  <button
+                    className="chat-message-attachment-download"
+                    type="button"
+                    aria-label={`Baixar ${attachment.name}`}
+                    title="Baixar o arquivo armazenado"
+                    onClick={() => { void baixarAnexoComNome(sessionId, chatId, attachment.artifactId!, attachment.name) }}
+                  ><Download size={11} aria-hidden="true" /></button>
+                )}
               </span>
-            ))}
+            })}
           </div>
         )}
         {(message.ferramentas?.length ?? 0) + (message.continuar?.length ?? 0) > 0 && (
@@ -427,6 +587,8 @@ export function ChatPanel({
           {isEmpty ? <ChatWelcome onPrompt={(prompt) => onSend(prompt, [], { tipo: 'auto' })} /> : activeChat.messages.map((message) => (
             <MessageRow
               key={message.id}
+              sessionId={session.id}
+              chatId={activeChat.id}
               message={message}
               onAbrirFonteHistorica={onAbrirFonteHistorica}
               onEscolherHistorico={activeChat.status === 'working' ? undefined : referencia => onSend(`/chats selecionar ${referencia}`, [], selecaoDoToken(model))}

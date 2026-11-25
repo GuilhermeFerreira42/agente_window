@@ -27,7 +27,7 @@ export const SIDEBAR_WIDTH_MIN = 230
 
 export const SIDEBAR_WIDTH_MAX = 410
 
-export const SIDEBAR_WIDTH_DEFAULT = 280
+export const SIDEBAR_WIDTH_DEFAULT = 270
 
 export function clampSidebarWidth(width: number): number {
   if (!Number.isFinite(width)) return SIDEBAR_WIDTH_DEFAULT

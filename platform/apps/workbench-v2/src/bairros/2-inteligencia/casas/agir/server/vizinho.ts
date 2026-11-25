@@ -49,6 +49,8 @@ export interface AjustesVizinho {
   primeiroByteMs?: number
   totalMs?: number
   ociosoMs?: number
+  prepararCorpoVisao?: (alvo: AlvoConversa, corpo: Record<string, unknown>) => Record<string, unknown>
+  aoAceitarVisao?: () => void
 }
 
 // ── Enquadração (espelho de streaming.ts da casa Conversa) ──────────────────
@@ -205,7 +207,7 @@ function corpoDePedidoBruto(alvo: AlvoConversa, mensagens: MensagemAgir[], permi
   if (alvo.protocolo === 'openai-chat') {
     return {
       url: `${baseUrl}/chat/completions`,
-      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...temperatura, ...anuncio, tool_choice: 'auto' },
+      corpo: { model: alvo.modelo, messages: traduzido, stream: true, ...opcaoUsoOpenAI(baseUrl), ...(reserva ? { max_tokens: reserva } : {}), ...temperatura, ...anuncio, ...(Array.isArray(anuncio.tools) && anuncio.tools.length > 0 ? { tool_choice: 'auto' } : {}) },
     }
   }
   if (alvo.protocolo === 'anthropic') {
@@ -494,24 +496,33 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
           modelo: config.modelId,
           apiKey: config.apiKey,
           temperatura: config.temperatura,
+          configRevision: config.configRevision,
           maxSaida: config.maxSaida,
           limiteContexto: config.limiteContexto,
           capacidade: config.capacidade,
         } : alvo
-        const { url, corpo } = corpoDePedido(alvoAtual, mensagens, opcoes)
+        const { url, corpo: corpoTexto } = corpoDePedido(alvoAtual, mensagens, opcoes)
+        const corpo = ajustes.prepararCorpoVisao?.(alvoAtual, corpoTexto) ?? corpoTexto
+        const destinoLiteLLM = ajustes.prepararCorpoVisao && corpo.disable_fallbacks === true && typeof corpo.model === 'string'
+          ? corpo.model : undefined
         chamada = metadadosDaChamada(alvoAtual, corpo.max_tokens ??
           (corpo.generationConfig as { maxOutputTokens?: number } | undefined)?.maxOutputTokens ??
           (corpo.options as { num_predict?: number } | undefined)?.num_predict)
-        payloadMedido = corpo
-        if (chamada) opcoes?.aoContexto?.(completarMedicao(chamada, corpo, {}, 'enviado'))
+        payloadMedido = ajustes.prepararCorpoVisao ? corpoTexto : corpo
+        if (chamada) opcoes?.aoContexto?.(completarMedicao(chamada, payloadMedido, {}, 'enviado'))
         const init = {
           method: 'POST',
-          headers: cabecalhos(alvoAtual),
+          headers: { ...cabecalhos(alvoAtual), ...(destinoLiteLLM && { 'x-litellm-num-retries': '0' }) },
           body: JSON.stringify(corpo),
           signal: controlador.signal,
+          ...(ajustes.prepararCorpoVisao ? { redirect: 'error' as const } : {}),
         }
         return fetch(url, init).then(async (resposta) => {
-          if (!corpo.stream_options || (resposta.status !== 400 && resposta.status !== 422)) return resposta
+          if (resposta.ok && destinoLiteLLM && resposta.headers.get('x-litellm-model-id') !== destinoLiteLLM) {
+            await resposta.body?.cancel()
+            throw new ErroVizinho('resposta', 'O gateway não confirmou o destino verificado da imagem.')
+          }
+          if (ajustes.prepararCorpoVisao || !corpo.stream_options || (resposta.status !== 400 && resposta.status !== 422)) return resposta
           const detalhe = await lerErroLimitado(resposta)
           if (!recusouOpcaoUso(resposta.status, detalhe)) return new Response(detalhe, { status: resposta.status })
           delete corpo.stream_options
@@ -529,10 +540,12 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
         resposta = await iniciarFetch()
       }
       if (!resposta.ok) {
-        const corpoErro = await lerErroLimitado(resposta)
+        const corpoErro = ajustes.prepararCorpoVisao ? '' : await lerErroLimitado(resposta)
+        if (ajustes.prepararCorpoVisao) void resposta.body?.cancel().catch(() => undefined)
         throw erroPorStatus(resposta.status, corpoErro, alvo.apiKey)
       }
       if (resposta.body === null) throw new ErroVizinho('resposta', 'O serviço respondeu sem corpo.')
+      ajustes.aoAceitarVisao?.()
       byteViu = true
       rearmarOcioso()
 
@@ -598,6 +611,7 @@ export function criarVizinhoReal(alvo: AlvoConversa, ajustes: AjustesVizinho = {
       }
       if (erro instanceof ErroVizinho) throw erro
       const code = (erro as { code?: string })?.code
+      if (code === 'configuracao') throw new ErroVizinho(code, (erro as Error).message)
       if (code === 'model_disabled' || code === 'selection_unavailable' || code === 'credential_unavailable') {
         throw new ErroVizinho(code === 'credential_unavailable' ? 'chave' : code, (erro as Error).message)
       }

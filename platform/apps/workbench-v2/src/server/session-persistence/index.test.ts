@@ -208,7 +208,7 @@ describe('session persistence HTTP contract', () => {
     Object.assign(session.chats[0], { rawOutput: 'PRIVATE_CHAT_EXTENSION', approval: 'PRIVATE_CHAT_APPROVAL' })
     touched.push({ id, slug: id })
     const messages = session.chats[0].messages
-    const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytes: 'PRIVATE_ATTACHMENT' }
+    const local = { id: 'attachment-1', name: 'example.txt', kind: 'local' as const, bytesPrivate: 'PRIVATE_ATTACHMENT' }
     messages[0].attachments = [local]
     messages[1].ferramentas = [
       { id: 'cmd', ferramenta: 'executar', alvo: 'PRIVATE_COMMAND', status: 'ok', progresso: 'PRIVATE_STDOUT', resumo: 'PRIVATE_RESULT' },
@@ -274,7 +274,7 @@ describe('session persistence HTTP contract', () => {
     expect(await (await buscar('chat-main')).json()).toEqual({ hits: [], parcial: false })
   })
 
-  it('never loses an acknowledged snapshot when workspace change races with PUT', async () => {
+  it('C-1: change-workspace recusado em paralelo não derruba um PUT reconhecido nem mexe na raiz', async () => {
     const { mkdir } = await import('node:fs/promises')
     const { join } = await import('node:path')
     const workspace = join(process.env.AGENTE_WINDOW_TEST_HOME!, 'workspace-race')
@@ -283,29 +283,30 @@ describe('session persistence HTTP contract', () => {
     const slug = id
     touched.push({ id, slug })
     expect((await putSession(server, makeSession(id, slug, 'old-content', 1))).status).toBe(200)
-    const entered = new Promise<void>((resolve) => { persistenceFault.readStarted = resolve })
-    persistenceFault.blockNextRead = true
+    // SPEC C §3 — trocar de raiz depois da criação é recusado (409); a recusa
+    // não pode corromper nem descartar um PUT reconhecido em paralelo.
     const changing = fetch(`${server.baseUrl}/api/session/change-workspace`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: id, path: workspace }),
     })
-    await entered
     const newer = makeSession(id, slug, 'new-content', 2)
     newer.chats[0].messages[1].ferramentas = [{ id: 'tool', ferramenta: 'criar', alvo: 'test.ts', status: 'ok', resumo: 'preserved' }]
     const saving = putSession(server, newer)
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    persistenceFault.releaseRead!()
-    const saved = await saving
-    expect([200, 409]).toContain(saved.status)
-    expect((await changing).status).toBe(200)
+    const [changingRes, saved] = await Promise.all([changing, saving])
+    expect(changingRes.status).toBe(409)
+    expect(await changingRes.json()).toMatchObject({ code: 'session_context_immutable' })
+    expect(saved.status).toBe(200)
     const restored = (await loadSessions(server)).find((session) => session.id === id)!
-    // A newer PUT may be rejected explicitly if the workspace change commits
-    // first. A PUT acknowledged with 200 must NEVER subsequently disappear.
-    expect(restored.chats[0].messages).toEqual(saved.status === 200 ? newer.chats[0].messages : makeSession(id, slug, 'old-content', 1).chats[0].messages)
-    expect(restored.title).toBe(saved.status === 200 ? 'new-content' : 'old-content')
+    // PUT acknowledged with 200 must NEVER subsequently disappear. (O transcript
+    // normaliza id/resumo de ferramentas na gravação durável — comportamento P-B.)
+    expect(restored.chats[0].messages.map((m) => m.content)).toEqual(newer.chats[0].messages.map((m) => m.content))
+    expect(restored.chats[0].messages[1].ferramentas).toHaveLength(1)
+    expect(restored.chats[0].messages[1].ferramentas![0]).toMatchObject({ ferramenta: 'criar', alvo: 'test.ts', status: 'ok' })
+    expect(restored.title).toBe('new-content')
+    expect(restored.workspacePath).toBe(`/tmp/${slug}`)
   })
 
-  it('changes only current workspace metadata without republishing the transcript', async () => {
+  it('C-1: trocar de raiz é recusado sem republish do transcript (imutabilidade pós-criação)', async () => {
     const { mkdir } = await import('node:fs/promises')
     const { join } = await import('node:path')
     const workspace = join(process.env.AGENTE_WINDOW_TEST_HOME!, 'workspace-metadata')
@@ -316,16 +317,20 @@ describe('session persistence HTTP contract', () => {
     const latest = makeSession(id, slug, 'latest-accepted', 12)
     expect((await putSession(server, latest)).status).toBe(200)
     const before = await readTranscript(slug, id)
+    const antes = (await loadSessions(server)).find((session) => session.id === id)!
     persistenceFault.failNextRename = true
     const changed = await fetch(`${server.baseUrl}/api/session/change-workspace`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: id, path: workspace }),
     })
-    expect(changed.status).toBe(200)
-    const body = await changed.json() as { session: Session }
-    expect(body.session.persistenceRevision).toBe(2)
-    expect(body.session.chats[0].messages).toEqual(latest.chats[0].messages)
-    expect(body.session.workspacePath).toBe(workspace)
+    // SPEC C §3 — a rota não reloca mais: 409 explícito, NENHUMA escrita
+    // (nem revision bump, nem republish do transcript, nem rename de arquivo).
+    expect(changed.status).toBe(409)
+    expect(await changed.json()).toMatchObject({ code: 'session_context_immutable' })
+    const depois = (await loadSessions(server)).find((session) => session.id === id)!
+    expect(depois.persistenceRevision).toBe(antes.persistenceRevision)
+    expect(depois.workspacePath).toBe(latest.workspacePath)
+    expect(depois.chats[0].messages).toEqual(latest.chats[0].messages)
     expect(await readTranscript(slug, id)).toEqual(before)
     expect(persistenceFault.failNextRename).toBe(true)
   })
@@ -507,9 +512,12 @@ describe('session persistence HTTP contract', () => {
 
   it('P-A: earlier P-B intent with FK is preserved and blocks reads/writes without destructive migration', async () => {
     const id = randomUUID(), session = makeSession(id, id, 'old')
-    touched.push({ id, slug: id }); await putSession(server, session)
-    getDatabase().exec(`CREATE TABLE session_write_intents(session_id TEXT PRIMARY KEY REFERENCES sessions(id), marker TEXT);
-      INSERT INTO session_write_intents VALUES('${id}','preserve-fixture')`)
+    touched.push({ id, slug: id })
+    // The FK'd minimal journal of the earlier (non-homologated) attempt must
+    // pre-date this product's first touch of the profile: migration is additive.
+    getDatabase().exec(`CREATE TABLE session_write_intents(session_id TEXT PRIMARY KEY REFERENCES sessions(id), marker TEXT)`)
+    expect((await putSession(server, session)).status).toBe(200)
+    getDatabase().prepare(`INSERT INTO session_write_intents(session_id, marker) VALUES(?, 'preserve-fixture')`).run(id)
     resetDatabase()
     try {
       expect((await mutation({ ...session, title: 'blocked' }, 1)).status).toBe(503)
@@ -525,7 +533,7 @@ describe('session persistence HTTP contract', () => {
     touched.push({ id, slug: id }); await putSession(server, session)
     const native = globalThis.fetch
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => native(typeof input === 'string' && input.startsWith('/') ? server.baseUrl + input : input, init))
-    const hydrated = (await loadPersistedSessions()).find(s => s.id === id)!
+    const hydrated = (await loadPersistedSessions()).sessions.find(s => s.id === id)!
     await expect(persistSession({ ...hydrated, title: 'after reload' })).resolves.toMatchObject({ id, title: 'after reload', persistenceRevision: 2 })
     expect(getSessionRecord(id)?.title).toBe('after reload')
   })
@@ -535,7 +543,7 @@ describe('session persistence HTTP contract', () => {
     touched.push({ id, slug })
     await writeTranscript(slug, id, session.chats[0].messages.map(m => ({ type: m.role, chatId: 'chat-main', message: m, uuid: m.id, timestamp: 1 })))
     upsertSessionRecord({ id, slug, title: session.title, workspacePath: session.workspacePath, worktreePath: null,
-      messageCount: 3, createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ ...session, persistenceRevision: undefined, chats: session.chats.map(c => ({ ...c, messages: [] })) }) })
+      messageCount: 3, contextKind: 'workspace', createdAt: 1, updatedAt: 1, sessionJson: JSON.stringify({ ...session, persistenceRevision: undefined, chats: session.chats.map(c => ({ ...c, messages: [] })) }) })
     const response = await mutation({ ...session, title: 'legacy edited', persistenceRevision: 9999 }, 0)
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ sessionId: id, revision: 1 })

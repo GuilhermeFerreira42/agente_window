@@ -20,6 +20,7 @@ const TITULOS: Record<FerramentaNoChat['ferramenta'], string> = {
   excluir: 'Excluir (lixeira)',
   executar: 'Executar comando',
   historico: 'Recuperar histórico do chat',
+  anexos: 'Inspecionar anexos desta conversa',
   buscar_chats: 'Localizar outros chats',
   buscar_mensagens_chat: 'Buscar mensagens em outro chat',
   ler_trecho_chat: 'Ler trecho de outro chat',

@@ -1,0 +1,22 @@
+{
+  "imagem.png": {
+    "sha256": "3d0c94cd2e901b0c9ac46f08dff12b2ff87aaebc215c5b67d33cd05c5b2edd7a",
+    "bytes": 160
+  },
+  "audio.wav": {
+    "sha256": "6447655c6c4cf7c218dca1c7d4c7eb8fea996a57d594aed5dd2b7c6a6a157a87",
+    "bytes": 8044
+  },
+  "falso.png": {
+    "sha256": "1e88fe5a73e9700a27597a02ed7ec3c4cc1eb8e0d6ca580cd4473a5e7e6dc194",
+    "bytes": 38
+  },
+  "nao-exibivel.bin": {
+    "sha256": "2e383fddf78d1acc795830f56b4ec6464e408c418e67add6fa4c017afa618963",
+    "bytes": 8
+  },
+  "video.webm": {
+    "sha256": "70a44535ec1f47040a50620e586faa157b7163778f9499a204631e575528a8f4",
+    "bytes": 2851
+  }
+}

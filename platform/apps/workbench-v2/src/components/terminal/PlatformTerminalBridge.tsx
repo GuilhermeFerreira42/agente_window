@@ -11,7 +11,8 @@ interface Props {
   visible: boolean;
   sessionId: string;
   sessionLabel?: string;
-  workspace: string;
+  /** C-1/F4 — ver TerminalPanel: sem raiz não há shell (nunca `''`). */
+  workspace?: string | null;
   onClose: () => void;
 }
 

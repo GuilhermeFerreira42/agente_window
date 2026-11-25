@@ -5,12 +5,16 @@ import { getDatabasePath } from './paths'
 import type { Checkpoint } from './checkpoint'
 import type { MemoriaProjeto } from '../../domain/memoriaProjeto'
 import { PersistenceProblem } from './persistenceErrors'
+import { criarTabelasAnexos } from './attachments/schemaAnexos'
 
 export interface SessionRecord {
   id: string
   slug: string
   title: string
-  workspacePath: string
+  /** C-1 — `null` somente para modalidade `chat` (raiz nula real). */
+  workspacePath: string | null
+  /** C-1 — modalidade explícita; catálogo é a autoridade (não inferir de rótulo/título). */
+  contextKind: 'chat' | 'workspace'
   worktreePath: string | null
   messageCount: number
   createdAt: number
@@ -44,9 +48,36 @@ export function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS sessions_slug_idx ON sessions(slug);
   `)
   const columns = database.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string; notnull: number }>
-  if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
-    database.transaction(() => {
-      database!.exec(`
+  // Rebuilds renomeiam `sessions` e depois derrubam a tabela temporária. Desde
+  // o SQLite 3.25 (`legacy_alter_table = OFF`, padrão), o RENAME **segue e
+  // reescreve** as referências dos filhos (grants/receipts/checkpoints/origens)
+  // mesmo com `foreign_keys = OFF` — o DROP então deixa os filhos apontando
+  // para a tabela fantasma e todo INSERT filho falha com "no such table"
+  // (reproduzido pela sonda C-1/B1 em databaseMigration.test). Com
+  // `legacy_alter_table = ON` o RENAME muda somente o nome da própria tabela:
+  // os filhos seguem apontando para `sessions`, que reexiste na mesma
+  // transação. Os dois pragmas são LIDOS de volta antes de qualquer RENAME —
+  // se não pegarem (ex.: conexão dentro de transação alheia), a migração
+  // aborta sem tocar no schema. O `foreign_key_check` roda DENTRO da transação
+  // do rebuild: violação = rollback = estado original intacto (nunca migra pela
+  // metade nem deixa pragmas inseguros ativos).
+  database.pragma('foreign_keys = OFF')
+  database.pragma('legacy_alter_table = ON')
+  try {
+    const fkDesligadas = String(database.pragma('foreign_keys', { simple: true })) === '0'
+    const legacyAtivo = String(database.pragma('legacy_alter_table', { simple: true })) === '1'
+    if (!fkDesligadas || !legacyAtivo) {
+      throw new Error('Migração abortada: os pragmas de segurança (foreign_keys/legacy_alter_table) não foram aceitos; nenhum rebuild foi executado.')
+    }
+    const verificarIntegridade = (): void => {
+      const violacoes = database!.prepare('PRAGMA foreign_key_check').all()
+      if (violacoes.length > 0) {
+        throw new Error(`Migração abortada por violação de integridade referencial (${violacoes.length}); a transação foi revertida.`)
+      }
+    }
+    if (columns.find((column) => column.name === 'worktree_path')?.notnull === 1) {
+      database.transaction(() => {
+        database!.exec(`
         ALTER TABLE sessions RENAME TO sessions_legacy_064a;
         CREATE TABLE sessions (
           id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
@@ -60,7 +91,50 @@ export function getDatabase(): Database.Database {
         CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
         CREATE INDEX sessions_slug_idx ON sessions(slug);
       `)
-    })()
+        verificarIntegridade()
+      })()
+    }
+    // C-1 (SPEC C §3) — modalidade explícita: coluna `context_kind` + `workspace_path`
+    // anulável SOMENTE para Chat, com CHECK de coerência. Migração aditiva: IDs e
+    // metadata preservados; toda linha legada recebe `workspace` (compatibilidade —
+    // rótulo/título nunca reatribuem modalidade).
+    const possuiContexto = columns.find((column) => column.name === 'context_kind') !== undefined
+    const caminhoAnulavel = columns.find((column) => column.name === 'workspace_path')?.notnull === 0
+    if (!possuiContexto || !caminhoAnulavel) {
+      database.transaction(() => {
+        database!.exec(`
+          ALTER TABLE sessions RENAME TO sessions_legacy_c1;
+          CREATE TABLE sessions (
+            id TEXT PRIMARY KEY, slug TEXT NOT NULL, title TEXT NOT NULL,
+            workspace_path TEXT, worktree_path TEXT,
+            context_kind TEXT NOT NULL DEFAULT 'workspace' CHECK (context_kind IN ('chat', 'workspace')),
+            message_count INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            session_json TEXT NOT NULL,
+            CHECK ((context_kind = 'workspace' AND workspace_path IS NOT NULL)
+                OR (context_kind = 'chat' AND workspace_path IS NULL))
+          );
+          INSERT INTO sessions (id, slug, title, workspace_path, worktree_path, context_kind, message_count, created_at, updated_at, session_json)
+            SELECT id, slug, title, workspace_path, worktree_path, 'workspace', message_count, created_at, updated_at, session_json
+            FROM sessions_legacy_c1;
+          DROP TABLE sessions_legacy_c1;
+          CREATE INDEX sessions_updated_at_idx ON sessions(updated_at DESC);
+          CREATE INDEX sessions_slug_idx ON sessions(slug);
+        `)
+        verificarIntegridade()
+      })()
+    }
+  } finally {
+    database.pragma('legacy_alter_table = OFF')
+    database.pragma('foreign_keys = ON')
+  }
+  // Perfil já corrompido por uma versão ANTERIOR desta migração (o defeito que
+  // a revisão encontrou): torna a violação visível sem derrubar a abertura —
+  // a C-1 nunca saiu em produção e o reparo de schema já derrubado é fora do
+  // escopo autorizado (registrado na reentrega).
+  const violacoesPreexistentes = database.prepare('PRAGMA foreign_key_check').all()
+  if (violacoesPreexistentes.length > 0) {
+    console.warn(`[database] ${violacoesPreexistentes.length} violação(ões) de integridade pré-existente(s) no catálogo (migração anterior); verifique o perfil.`)
   }
   database.exec(`
     CREATE TABLE IF NOT EXISTS session_tool_grants (
@@ -94,6 +168,21 @@ export function getDatabase(): Database.Database {
     CREATE UNIQUE INDEX IF NOT EXISTS project_memory_current_idx
       ON project_memories (project_key, memory_id) WHERE current = 1;
   `)
+  // P-C §6 — tombstone mínimo da exclusão no MESMO SQLite (sem FK: tem de
+  // sobreviver ao próprio registro). Criado na PRIMEIRA conexão, inclusive
+  // em bases legadas já existentes; nenhum banco/fila paralelo.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS session_deletions (
+      session_id TEXT PRIMARY KEY,
+      deletion_id TEXT NOT NULL UNIQUE,
+      revision INTEGER NOT NULL,
+      requested_at INTEGER NOT NULL,
+      cleanup_state TEXT NOT NULL CHECK (cleanup_state IN ('preparado', 'limpeza_pendente', 'concluido'))
+    );
+  `)
+  // C-3a — ledger de anexos (migração aditiva na MESMA conexão; sem FK de
+  // propósito: as linhas de ownership sobrevivem até o plano de limpeza T27).
+  criarTabelasAnexos(database)
   return database
 }
 
@@ -164,6 +253,7 @@ export function saveCheckpoint(sessionId: string, chatId: string, checkpoint: Ch
 export function listSessionRecords(): SessionRecord[] {
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
+      context_kind AS contextKind,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions
@@ -174,16 +264,17 @@ export function listSessionRecords(): SessionRecord[] {
 export function upsertSessionRecord(record: SessionRecord): void {
   getDatabase().prepare(`
     INSERT INTO sessions (
-      id, slug, title, workspace_path, worktree_path, message_count,
+      id, slug, title, workspace_path, context_kind, worktree_path, message_count,
       created_at, updated_at, session_json
     ) VALUES (
-      @id, @slug, @title, @workspacePath, @worktreePath, @messageCount,
+      @id, @slug, @title, @workspacePath, @contextKind, @worktreePath, @messageCount,
       @createdAt, @updatedAt, @sessionJson
     )
     ON CONFLICT(id) DO UPDATE SET
       slug = excluded.slug,
       title = excluded.title,
       workspace_path = excluded.workspace_path,
+      context_kind = excluded.context_kind,
       worktree_path = excluded.worktree_path,
       message_count = excluded.message_count,
       updated_at = excluded.updated_at,
@@ -191,10 +282,47 @@ export function upsertSessionRecord(record: SessionRecord): void {
   `).run(record)
 }
 
+/** P-C §6 — identidade durável da exclusão no MESMO SQLite (sem FK: sobrevive
+ * ao próprio registro; não é um segundo catálogo). */
+export interface TombstoneDelecao {
+  sessionId: string
+  deletionId: string
+  revision: number
+  requestedAt: number
+  cleanupState: 'preparado' | 'limpeza_pendente' | 'concluido'
+}
+
+const SELECT_TOMBSTONE = `
+  SELECT session_id AS sessionId, deletion_id AS deletionId, revision,
+    requested_at AS requestedAt, cleanup_state AS cleanupState
+  FROM session_deletions WHERE session_id = ?`
+
+export function consultarDelecao(sessionId: string): TombstoneDelecao | undefined {
+  return getDatabase().prepare(SELECT_TOMBSTONE).get(sessionId) as TombstoneDelecao | undefined
+}
+
+/** 410 estável: registro excluído não reabre nem aceita gravação/execução. */
+export function problemaSessaoExcluida(): PersistenceProblem {
+  return new PersistenceProblem(410, 'session_deleted',
+    'Esta conversa foi excluída. Gravações, execuções e reaberturas não são mais aceitas.')
+}
+
 export function getSessionRecord(id: string): SessionRecord | undefined {
   assertSessionPublicationReadable(id)
+  // P-C §2 — o leitor de contrato único confere o ciclo de vida: nenhum
+  // callback/rota que passe por aqui serve conteúdo de conversa excluída.
+  if (consultarDelecao(id)) throw problemaSessaoExcluida()
+  return getSessionRecordRaw(id)
+}
+
+/** P-C — leitura interna do catálogo usada pelo fluxo de exclusão/limpeza:
+ * sem fronteiras de publicação nem de vida, porque o próprio tombstone é o
+ * estado que esta operação grava. Os consumidores de contrato continuam em
+ * `getSessionRecord`. */
+export function getSessionRecordRaw(id: string): SessionRecord | undefined {
   return getDatabase().prepare(`
     SELECT id, slug, title, workspace_path AS workspacePath,
+      context_kind AS contextKind,
       worktree_path AS worktreePath, message_count AS messageCount,
       created_at AS createdAt, updated_at AS updatedAt, session_json AS sessionJson
     FROM sessions WHERE id = ?
@@ -247,7 +375,7 @@ export function revokeSessionToolGrants(sessionId: string): void {
 }
 
 export function deleteSessionRecord(id: string): SessionRecord | undefined {
-  const existing = getSessionRecord(id)
+  const existing = getSessionRecordRaw(id)
   if (existing) getDatabase().prepare('DELETE FROM sessions WHERE id = ?').run(id)
   return existing
 }

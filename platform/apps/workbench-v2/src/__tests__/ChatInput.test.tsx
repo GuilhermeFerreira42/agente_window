@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '../components/ChatInput'
+import { esquecerPortaDialogos } from '../shell/portaDialogos'
 import type { NestedChat, Session } from '../types'
 
 const chat: NestedChat = {
@@ -22,7 +23,7 @@ beforeEach(() => {
     ],
   }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { esquecerPortaDialogos(); vi.unstubAllGlobals() })
 
 const session: Session = {
   id: 'session-test',
@@ -93,21 +94,38 @@ describe('ChatInput', () => {
 
   it('exclusões automáticas exigem ação explícita adicional, consentimento próprio e são reversíveis', async () => {
     const user=userEvent.setup(), alterar=vi.fn(async()=>undefined)
-    const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)
+    // U-2 — o consentimento é um diálogo INTERNO (nunca `window.confirm`).
+    const nativo=vi.spyOn(window,'confirm')
     const view=renderInput({permission:'allow-all',onChangeAutomaticDeletes:alterar})
     await user.click(screen.getByRole('button',{name:'Permitir tudo ativo'}))
     const opcao=screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/})
     expect(opcao).toHaveAttribute('aria-checked','false')
+
+    // Cancelar: nada muda.
     await user.click(opcao)
+    const recusa=await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    expect(recusa).toHaveTextContent('Não autoriza exclusão permanente')
+    await user.click(within(recusa).getByRole('button',{name:'Cancelar'}))
     expect(alterar).not.toHaveBeenCalled()
-    confirm.mockReturnValue(true)
+
+    // Esc também não liga a opção.
     await user.click(opcao)
+    await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    await user.keyboard('{Escape}')
+    expect(alterar).not.toHaveBeenCalled()
+
+    // Aceitar liga.
+    await user.click(opcao)
+    const aceite=await screen.findByRole('dialog',{name:/Ativar “Permitir exclusões automáticas”/})
+    await user.click(within(aceite).getByRole('button',{name:'Ativar exclusões automáticas'}))
     await waitFor(()=>expect(alterar).toHaveBeenCalledWith(true))
+
+    // Desligar NÃO pergunta (reversível por desenho).
     view.rerender(<ChatInput {...view.props} automaticDeletes={true} />)
     await user.click(screen.getByRole('menuitemcheckbox',{name:/Permitir exclusões automáticas/}))
     await waitFor(()=>expect(alterar).toHaveBeenCalledWith(false))
-    expect(confirm).toHaveBeenCalledTimes(2)
-    confirm.mockRestore()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(nativo).not.toHaveBeenCalled()
   })
 
   it('automação desativada em Manual não pode ser ativada pelo menu', async () => {
@@ -118,18 +136,41 @@ describe('ChatInput', () => {
   it('exige confirmação explícita para Permitir tudo e deixa Manual sem confirmação', async () => {
     const user = userEvent.setup()
     const onChangePermission = vi.fn(async () => undefined)
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const nativo = vi.spyOn(window, 'confirm')
     renderInput({ onChangePermission })
 
     await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
-    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
-    expect(confirm).toHaveBeenCalledOnce()
-    expect(confirm.mock.calls[0][0]).toContain('privilégios da sua conta no sistema operacional')
+    // Dois `menuitemradio` contêm "Permitir tudo" (o de permissão e o de
+    // exclusões automáticas) — o alvo é o primeiro, o da permissão.
+    const itemPermitirTudo = () => screen.getAllByRole('menuitemradio', { name: /Permitir tudo/ })[0]
+    await user.click(itemPermitirTudo())
+    // U-2 — diálogo INTERNO com o MESMO texto de risco de antes.
+    const dialogo = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    expect(dialogo).toHaveTextContent('ATENÇÃO — Permitir tudo')
+    expect(dialogo).toHaveTextContent('privilégios da sua conta no sistema operacional')
+    expect(dialogo).toHaveTextContent('Perguntar e Planejar continuam somente leitura')
+    expect(dialogo).toHaveTextContent('voltar a Permissões manuais')
     expect(onChangePermission).not.toHaveBeenCalled()
 
-    confirm.mockReturnValue(true)
-    await user.click(screen.getByRole('menuitemradio', { name: /Permitir tudo/ }))
+    // Cancelar (foco inicial) fecha sem aplicar.
+    await user.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onChangePermission).not.toHaveBeenCalled()
+
+    // Esc também não aplica (o menu de permissão é reaberto a cada tentativa).
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    await user.click(itemPermitirTudo())
+    await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    await user.keyboard('{Escape}')
+    expect(onChangePermission).not.toHaveBeenCalled()
+
+    // Aceitar aplica, como antes.
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    await user.click(itemPermitirTudo())
+    const aceite = await screen.findByRole('dialog', { name: 'Ativar “Permitir tudo” nesta conversa?' })
+    await user.click(within(aceite).getByRole('button', { name: 'Ativar Permitir tudo' }))
     await waitFor(() => expect(onChangePermission).toHaveBeenCalledWith('allow-all'))
+    expect(nativo).not.toHaveBeenCalled()
   })
 
   it('envia texto e limpa o composer', async () => {
@@ -535,3 +576,87 @@ describe('ChatInput', () => {
   })
 })
 
+
+// C-1 (SPEC C §4/§5.3) — conversa Chat sem pasta: Agent/Edit e "Permitir
+// tudo" ficam indisponíveis com motivo honesto; o modo efetivo é "Perguntar".
+describe('ChatInput — C-1 conversa Chat sem pasta', () => {
+  const chatSession: Session = { ...session, workspace: 'Chat', workspacePath: null, contexto: { tipo: 'chat' }, branch: null }
+  const itemPorTexto = (texto: string): HTMLButtonElement => {
+    const achado = Array.from(document.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes(texto))
+    expect(achado, `botão com texto "${texto}"`).toBeTruthy()
+    return achado as HTMLButtonElement
+  }
+
+  it('C-T08 — menu de modo: Agente e Editar desabilitados com motivo; Perguntar/Planejar disponíveis', async () => {
+    const user = userEvent.setup()
+    renderInput({ session: chatSession, mode: 'agent' })
+    // O trigger já mostra o modo EFETIVO (Perguntar), não a seleção armazenada.
+    const trigger = screen.getByRole('button', { name: 'Perguntar' })
+    await user.click(trigger)
+    expect(screen.getByRole('menu', { name: 'Selecionar modo' })).toBeInTheDocument()
+    const agente = itemPorTexto('AgenteConversa Chat não tem pasta')
+    expect(agente).toBeDisabled()
+    expect(agente).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+    const editar = itemPorTexto('EditarConversa Chat não tem pasta')
+    expect(editar).toBeDisabled()
+    expect(editar).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+    expect(itemPorTexto('Explore e entenda o código')).not.toBeDisabled()
+    expect(itemPorTexto('Descreva o plano de execução')).not.toBeDisabled()
+  })
+
+  it('C-T08 — seleção de Agent em Chat é ignorada (nenhum onChangeMode com modo de pasta)', async () => {
+    const user = userEvent.setup()
+    const onChangeMode = vi.fn()
+    renderInput({ session: chatSession, mode: 'ask', onChangeMode })
+    await user.click(screen.getByRole('button', { name: 'Perguntar' }))
+    await user.click(itemPorTexto('AgenteConversa Chat não tem pasta'))
+    expect(onChangeMode).not.toHaveBeenCalled()
+  })
+
+  it('C-T08 — picker de permissão: Permitir tudo desabilitado com motivo em Chat', async () => {
+    const user = userEvent.setup()
+    renderInput({ session: chatSession, permission: 'manual' })
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    // O item é `menuitemradio` (o texto inclui a descrição); o papel é o seletor
+    // estável — o mesmo que o teste de confirmação usa dois casos abaixo.
+    const allowAll = screen.getAllByRole('menuitemradio').find((item) => /^Permitir tudo/.test(item.textContent ?? '')) as HTMLButtonElement
+    expect(allowAll).toBeDisabled()
+    expect(allowAll).toHaveAttribute('title', expect.stringContaining('Conversa Chat não tem pasta'))
+  })
+
+  it('C-T08 — regressão: sessão workspace mantém Agent/Edit e Permitir tudo habilitados', async () => {
+    const user = userEvent.setup()
+    renderInput({ mode: 'agent', permission: 'manual' })
+    await user.click(screen.getByRole('button', { name: 'Agente' }))
+    expect(itemPorTexto('Descreva o que construir')).not.toBeDisabled()
+    expect(itemPorTexto('Descreva as alterações')).not.toBeDisabled()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Permissões manuais' }))
+    expect(itemPorTexto('Permitir tudo')).not.toBeDisabled()
+  })
+})
+
+describe('ChatInput — R03 seleção indisponível', () => {
+  it('R03 par escolhido fora do catálogo aparece como INDISPONÍVEL e não é trocado', async () => {
+    // Provedor desativado: o catálogo não o devolve mais. A conversa não pode
+    // escolher outro modelo sozinha — ela avisa e deixa a troca com o dono.
+    const token = `pair:${encodeURIComponent('openai')}:${encodeURIComponent('gpt-aposentado')}`
+    const { props } = renderInput({ model: token })
+    const aviso = await screen.findByText(/indisponível — escolha outro modelo/i)
+    expect(aviso).toBeTruthy()
+    expect(aviso.closest('[data-modelo-indisponivel]')?.getAttribute('data-modelo-indisponivel'))
+      .toBe('openai/gpt-aposentado')
+    // Nenhuma troca automática: o modelo segue o que o dono escolheu.
+    expect(props.onChangeModel).not.toHaveBeenCalled()
+    // O menu explica o rótulo em vez de simplesmente sumir com o par.
+    await userEvent.setup().click(screen.getByRole('button', { name: /Indisponível/ }))
+    expect(await screen.findByText(/fora do catálogo ativo/)).toBeTruthy()
+  })
+
+  it('R03 par disponível NÃO mostra aviso de indisponível', async () => {
+    const token = `pair:${encodeURIComponent('openai')}:${encodeURIComponent('gpt-4o')}`
+    renderInput({ model: token })
+    await waitFor(() => expect(screen.getByRole('button', { name: /OpenAI — gpt-4o/ })).toBeTruthy())
+    expect(screen.queryByText(/indisponível — escolha outro modelo/i)).toBeNull()
+  })
+})

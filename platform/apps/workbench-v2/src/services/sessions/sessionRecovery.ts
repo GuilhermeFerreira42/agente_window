@@ -7,12 +7,29 @@ const RECOVERY_KEY = 'workbench.sessions.unsaved.v1'
 export interface SessionRecovery {
   session: Session
   message: string
-  kind?: 'unavailable' | 'conflict' | 'local'
+  /** P-C (PC-R2) — `excluida`: identidade confirmada como morta no servidor
+   * (410). A cópia é PRESERVADA para oferecer uma cópia nova, mas nunca mais
+   * reanexa o original na restauração. */
+  kind?: 'unavailable' | 'conflict' | 'local' | 'excluida'
+  /** Ressalva 15/11 — RECIBO ESTRUTURADO da cópia já confirmada da origem
+   * excluída (ACK do servidor). A projeção é que escolhe o texto exibido;
+   * mensagem bruta gravada nunca vira UI. */
+  copyConfirmed?: boolean
   recovery?: { copy: Session; creationId: string; source?: string }
 }
 
-function projetarRecovery({ session, kind, recovery }: SessionRecovery): SessionRecovery {
-  return { message: 'A conversa possui alterações locais não salvas.', kind, session: projetarSessaoPersistida(session),
+/** Estados de comunicação da identidade excluída — textos FIXOS da projeção
+ * (nunca mensagens arbitrárias persistidas): distinguem conteúdo local
+ * preservado de cópia já confirmada. */
+export const MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO = 'Esta conversa foi excluída no servidor. Seu conteúdo local está preservado aqui; salve uma cópia nova para não perdê-lo.'
+export const MENSAGEM_EXCLUIDA_COPIA_SALVA = 'Cópia salva. A identidade excluída permanece bloqueada; nada foi reanexado a ela.'
+
+function projetarRecovery({ session, kind, recovery, copyConfirmed }: SessionRecovery): SessionRecovery {
+  const message = kind === 'excluida'
+    ? (copyConfirmed ? MENSAGEM_EXCLUIDA_COPIA_SALVA : MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO)
+    : 'A conversa possui alterações locais não salvas.'
+  return { message, kind, session: projetarSessaoPersistida(session),
+    ...(copyConfirmed === undefined ? {} : { copyConfirmed }),
     ...(recovery ? { recovery: { copy: projetarSessaoPersistida(recovery.copy), creationId: recovery.creationId, source: recovery.source } } : {}) }
 }
 
@@ -44,21 +61,30 @@ export function removeSessionRecovery(id: string): void {
   localStorage.setItem(RECOVERY_KEY, JSON.stringify(records))
 }
 
-export function restoreUnsavedSessions(saved: Session[]): Session[] {
-  const recoveries = readSessionRecoveries().map(({ session, message, kind }) => ({ message, kind, session: {
+/** Ciclo de vida honesto de uma cópia local: nada volta `working`/`running`
+ * — um run interrompido por F5 ou por exclusão já não existe. */
+export function sanitizarRecuperacao(session: Session): Session {
+  return {
     ...session,
     status: session.status === 'working' ? 'completed' as const : session.status,
     chats: session.chats.map((chat) => ({
       ...chat, status: chat.status === 'working' ? 'completed' as const : chat.status,
       messages: chat.messages.map((item) => item.running ? { ...item, running: false, cancelled: true } : item),
     })),
-  } }))
+  }
+}
+
+export function restoreUnsavedSessions(saved: Session[]): Session[] {
+  const recoveries = readSessionRecoveries().map(({ session, message, kind }) => ({ message, kind, session: sanitizarRecuperacao(session) }))
   for (const { session, kind } of recoveries) {
+    // P-C (PC-R2) — identidade excluída não reanexa, nem sequer entra na fila
+    // de hold: a identidade está morta no servidor e só volta como cópia nova.
+    if (kind === 'excluida') continue
     const remote = saved.find(s => s.id === session.id)
     if ((kind === 'unavailable' || kind === 'local') && remote && (remote.persistenceRevision === session.persistenceRevision || sessionFingerprint(remote) === sessionFingerprint(session))) resumeSessionPersistence(remote)
     else if (!(kind === 'unavailable' && !remote && !session.persistenceRevision)) holdSessionPersistence(session.id)
   }
-  const local = new Map(recoveries.map(({ session }) => [session.id, session]))
+  const local = new Map(recoveries.filter(({ kind }) => kind !== 'excluida').map(({ session }) => [session.id, session]))
   return [...saved.map((session) => {
     const recovery = local.get(session.id)
     if (!recovery) return session
@@ -68,7 +94,8 @@ export function restoreUnsavedSessions(saved: Session[]): Session[] {
       revisaoOperacional: session.chats.find((remote) => remote.id === chat.id)?.revisaoOperacional,
     })) }
   }),
-    ...recoveries.filter(({ session }) => !saved.some((item) => item.id === session.id)).map(({ session }) => session)]
+    // P-C (PC-R2) — o append nunca reanexa uma identidade marcada como excluída.
+    ...recoveries.filter(({ session, kind }) => kind !== 'excluida' && !saved.some((item) => item.id === session.id)).map(({ session }) => session)]
 }
 
 export function createRecoveryCopy(session: Session): Session {
@@ -91,4 +118,30 @@ export function mergeRecoveredSessions(current: Session[], copy: Session, source
 
 export function mergeHydratedSessions(current: Session[], saved: Session[]): Session[] {
   return [...current, ...saved.filter(s => !current.some(local => local.id === s.id))]
+}
+
+/** P-C §5 — na restauração, o status server-side da identidade decide: 410
+ * (excluída) MARCA a cópia local como `excluida` — preserva o registro para
+ * oferecer uma cópia nova e impede a reanexação do original; 404 continua
+ * sendo rascunho nunca confirmado e legítimo. */
+export async function descartarRecuperacoesExcluidas(servidor: readonly { id: string }[]): Promise<void> {
+  const conhecidas = new Set(servidor.map((s) => s.id))
+  for (const item of readSessionRecoveries()) {
+    const { session } = item
+    if (conhecidas.has(session.id)) continue
+    // P-C (PC-R2) — já marcada: consulta nenhuma e escrita nenhuma.
+    if (item.kind === 'excluida') continue
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`)
+      // P-C (PC-R2) — 410 NÃO destrói a cópia: o registro permanece marcado
+      // (`excluida`) e é a única porta de entrada para salvar uma cópia nova.
+      if (response.status === 410) {
+        // A UI lê via projeção (texto fixo por estado); gravar a mesma
+        // mensagem canônica mantém armazenamento e exibição coerentes.
+        storeSessionRecovery({ ...item, kind: 'excluida', message: MENSAGEM_EXCLUIDA_CONTEUDO_PRESERVADO })
+      }
+    } catch {
+      /* Sem rede não se apaga nada: higiene local nunca destrói conteúdo. */
+    }
+  }
 }

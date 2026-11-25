@@ -21,14 +21,17 @@ import { testSessions } from './fixtures/sessions'
 
 // Espelha o App.test: as abas do EDITOR ficam escopadas ao `.editor-tabs`
 // (a Activity Bar também expõe `role="tab"`).
-const editorTab = (name: string | RegExp) => within(document.querySelector('.editor-tabs') as HTMLElement).getByRole('tab', { name })
+// U-1: a faixa nativa não expõe mais aba de Provedores; o helper fica para
+// consultas futuras de abas do editor.
+const _editorTab = (name: string | RegExp) => within(document.querySelector('.editor-tabs') as HTMLElement).getByRole('tab', { name })
+void _editorTab
 
 vi.mock('../services/sessions/sessionsClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/sessions/sessionsClient')>()
   const { testSessions: sessions } = await import('./fixtures/sessions')
   return {
     ...actual,
-    loadPersistedSessions: vi.fn(async () => sessions),
+    loadPersistedSessions: vi.fn(async () => ({ sessions, unavailable: [], state: 'ok' as const })),
     persistSession: vi.fn(async () => undefined),
     pickSessionWorkspace: vi.fn(async () => undefined),
     createSessionWorktree: vi.fn(async () => ({ slug: 'workspace-local', path: null, branch: null, repoRoot: '/repo' })),
@@ -85,12 +88,15 @@ describe('FATIA 07 — Destravar', () => {
     await user.click(screen.getByRole('button', { name: 'Conta' }))
     await user.click(screen.getByRole('menuitem', { name: 'Provedores' }))
 
-    // A página abre no editor central — o mesmo fluxo homologado com sessões.
-    expect(await screen.findByRole('region', { name: 'Provedores' })).toBeInTheDocument()
-    expect(editorTab('Provedores')).toHaveAttribute('data-tab-type', 'providers')
-    // FATIA 08: a tela nova mostra a lista (o rail) e o formulário do primeiro provedor.
-    expect(await screen.findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
-    // A landing continua montada ao lado (a sessão futura segue disponível).
+    // U-1 R09: a página abre no MODAL unificado, na categoria Provedores e
+    // modelos — mesmo fluxo da conta, agora sem inventar aba no editor.
+    const dialogo = await screen.findByRole('dialog', { name: 'Configurações' })
+    expect(within(dialogo).getByRole('button', { name: 'Provedores e modelos' }))
+      .toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('tab', { name: 'Provedores' }), 'nada de aba legada').not.toBeInTheDocument()
+    // FATIA 08 preservada: a lista de provedores vem da Casa, com o formulário.
+    expect(await within(dialogo).findByRole('button', { name: 'OpenAI' })).toBeInTheDocument()
+    // A landing continua montada por baixo (a sessão futura segue disponível).
     expect(screen.getByRole('region', { name: 'Nova sessão' })).toBeInTheDocument()
   })
 
@@ -100,6 +106,9 @@ describe('FATIA 07 — Destravar', () => {
 
     const before = workspacePosts.length
     const landing = within(screen.getByRole('region', { name: 'Nova sessão' }))
+    // C-1: a landing nasce em Chat; a pasta (e o caminho manual) aparecem
+    // somente após a escolha explícita da modalidade Pasta.
+    await user.click(landing.getByTestId('contexto-workspace'))
     await user.click(landing.getByRole('button', { name: 'Digitar caminho' }))
     const input = landing.getByRole('combobox', { name: 'Caminho manual do workspace' })
     await user.type(input, '/tmp/pasta-nova')

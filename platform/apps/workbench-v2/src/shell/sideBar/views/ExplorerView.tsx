@@ -7,12 +7,14 @@ import type { ReactNode } from 'react'
 export interface ExplorerViewProps {
   /** Slot do módulo (ExplorerModuleSlot do App). Ausente = módulo ainda não subiu. */
   readonly slot?: ReactNode
+  readonly fontes?: ReactNode
   readonly onOpenFolder?: () => void
 }
 
-export function ExplorerView({ slot, onOpenFolder }: ExplorerViewProps) {
+export function ExplorerView({ slot, fontes, onOpenFolder }: ExplorerViewProps) {
   return (
     <div className="side-bar-view explorer" data-testid="side-bar-view-explorer">
+      {fontes}
       {slot ?? <div className="side-bar-view-empty">
         <p>Nenhuma pasta aberta.</p>
         {onOpenFolder && <button type="button" className="side-bar-open-folder" onClick={onOpenFolder}>Abrir pasta</button>}

@@ -23,11 +23,12 @@ const ROTA = '/api/personalizacoes'
 const ROTA_SKILLS = `${ROTA}/skills`
 const ROTA_ESTADO = `${ROTA}/estado`
 
-/** Estruturalmente compatível com `resolverContextoAgir` da prefeitura. */
+/** Estruturalmente compatível com `resolverContextoAgir` da prefeitura
+ * (C-1 — `raiz: null` = conversa Chat, sem escopo de projeto). */
 export type ResolverContextoPersonalizacoes = (
   sessionId: string,
   chatId: string,
-) => { ok: true; raiz: string } | { ok: false; message: string }
+) => { ok: true; raiz: string | null } | { ok: false; message: string }
 
 export interface DependenciasPersonalizacoes {
   resolverContexto?: ResolverContextoPersonalizacoes

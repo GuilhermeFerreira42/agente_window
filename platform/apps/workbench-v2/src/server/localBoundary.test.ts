@@ -62,6 +62,22 @@ describe('local product boundary', () => {
     expect(validateLocalRequest(request({ host: '127.0.0.1:5174', 'sec-fetch-site': 'none' }, 'GET', 5174, '/api/providers')).ok).toBe(false)
   })
 
+  it('C3a — only the upload content route accepts a binary octet-stream body (else json_required)', () => {
+    const upload = '/api/sessions/abc/chats/def/attachments/uploads/u1/content'
+    const cabecalhos = { host: 'localhost:5174', origin: 'http://localhost:5174', 'sec-fetch-site': 'same-origin' }
+    // A rota de conteúdo do upload aceita o File como corpo binário…
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, upload)).ok).toBe(true)
+    // …e SOMENTE ela: qualquer outra mutação sensível continua exigindo JSON.
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'POST', 5174, '/api/providers')).ok).toBe(false)
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, '/api/sessions/abc')).ok).toBe(false)
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream' }, 'PUT', 5174, `${upload}/extra`)).ok).toBe(false)
+    // Mesma origem/Host/Fetch Metadata continuam obrigatórios para o binário.
+    expect(validateLocalRequest(request({ host: 'localhost:5174', origin: 'http://attacker.test', 'content-type': 'application/octet-stream' }, 'PUT', 5174, upload)).ok).toBe(false)
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-stream', 'sec-fetch-site': 'cross-site' }, 'PUT', 5174, upload)).ok).toBe(false)
+    // Content-Type ambíguo (prefixo) não passa como binário.
+    expect(validateLocalRequest(request({ ...cabecalhos, 'content-type': 'application/octet-streamx' }, 'PUT', 5174, upload)).ok).toBe(false)
+  })
+
   it('requires Origin on upgrades and rejects cross-site fetch metadata', () => {
     expect(validateLocalRequest(request({ host: 'localhost:5174', origin: 'http://localhost:5174' }), { requireOrigin: true }).ok).toBe(true)
     expect(validateLocalRequest(request({ host: 'localhost:5174' }), { requireOrigin: true }).ok).toBe(false)

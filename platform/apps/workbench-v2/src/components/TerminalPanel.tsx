@@ -16,7 +16,12 @@ interface TerminalPanelProps {
   visible: boolean;
   sessionId: string;
   sessionLabel?: string;
-  workspace: string;
+  /**
+   * C-1/F4 — raiz real da sessão. `null`/ausente = sessão sem pasta (Chat):
+   * o painel fica indisponível e NENHUM shell sobe com cwd implícito. O
+   * antigo `''` mascarava a ausência de raiz como se fosse um diretório.
+   */
+  workspace?: string | null;
   snapshot?: TerminalSnapshot;
   onSnapshot?: (sessionId: string, snapshot: TerminalSnapshot) => void;
   onClose: () => void;

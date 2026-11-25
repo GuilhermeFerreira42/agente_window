@@ -1,0 +1,534 @@
+/* ============================================================================
+   U-1 — Configurações unificadas: moldura.
+   Só tokens do tema (claro/escuro sem segunda folha). A proporção herdada é a
+   D183: 80% com limites; o modo EXPANDIDO usa o viewport útil (R01).
+
+   Contrato de layout (R02/R07 — correção pós-revisão):
+   · a moldura é uma grade de 3 linhas (título · corpo · barra de ações), então
+     **Salvar/Fechar nunca saem da tela**;
+   · só o CONTEÚDO rola, nunca a moldura (nada some atrás do rodapé);
+   · o painel herda a largura do conteúdo — nenhuma tela de Casa fica com a
+     coluna de 190 px que ela usava como aba do editor.
+   ========================================================================== */
+
+.config-unificadas-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  display: grid;
+  place-items: center;
+  background: var(--vscode-agentsOverlay-background);
+}
+
+.config-unificadas {
+  display: flex;
+  flex-direction: column;
+  width: min(80vw, 1400px);
+  height: min(calc(80dvh - 28px), 900px);
+  min-width: min(560px, calc(100vw - 16px));
+  min-height: min(300px, calc(100dvh - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  padding: 0 4px 12px;
+  overflow: hidden;
+  resize: both;
+  container-type: size;
+  outline: none;
+  color: var(--vscode-foreground);
+  background: var(--vscode-agents-background);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px var(--vscode-widget-shadow);
+}
+
+/* Expandido = viewport útil, sem impor medida que a referência não mostrou. */
+.config-unificadas.is-expandido {
+  width: calc(100vw - 32px);
+  height: calc(100dvh - 32px);
+  resize: none;
+}
+
+.config-unificadas-title {
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px;
+}
+
+.config-unificadas-title h1 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-unificadas-title-acoes { display: flex; }
+
+.config-unificadas-title button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-unificadas-title button:hover { background: var(--vscode-toolbar-hoverBackground); }
+
+.config-unificadas-corpo {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+/* Navegação e conteúdo com rolagem INDEPENDENTE (R08). */
+.config-unificadas-nav {
+  min-height: 0;
+  padding: 0 8px 8px 4px;
+  overflow-y: auto;
+  border-right: 1px solid var(--vscode-widget-border);
+}
+
+.config-unificadas-grupo { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+
+.config-unificadas-grupo-titulo {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.config-unificadas-nav button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  overflow: hidden;
+  font-size: 12px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-unificadas-nav button:hover { background: var(--vscode-list-hoverBackground); }
+
+.config-unificadas-nav button[aria-current="page"] {
+  background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-foreground);
+}
+
+.config-unificadas-nav button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.config-unificadas-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-unificadas-item-futuro { margin-left: auto; color: var(--vscode-descriptionForeground); }
+
+/* Subseções de Personalizações: mesma navegação, indentadas (sem 2ª coluna). */
+.config-unificadas-subnav { display: flex; flex-direction: column; padding-left: 14px; }
+.config-unificadas-subnav button { min-height: 24px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+.config-unificadas-subnav button[aria-current="page"] { color: var(--vscode-foreground); }
+
+/* ---------------------------------------------------------------------------
+   Conteúdo: a ÚNICA área que rola. `container-type` deixa o painel reagir à
+   largura DESTA coluna (não à da janela), que é o que evita corte nos 3 modos.
+   ------------------------------------------------------------------------ */
+.config-unificadas-conteudo {
+  min-width: 0;
+  min-height: 0;
+  padding: 4px 16px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* `size` (e não só inline-size): o painel precisa reagir também à ALTURA
+     disponível — em 800x600 não se prende um cartão de 139 px. */
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+}
+
+.config-unificadas-titulo-conteudo {
+  flex: none;
+  margin: 4px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.config-unificadas-indisponivel {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  border: 1px dashed var(--vscode-widget-border);
+  border-radius: 6px;
+}
+
+.config-unificadas-indisponivel p { margin: 0; }
+
+/* ---------------------------------------------------------------------------
+   R07 — "Salvar e os controles sempre acessíveis" no painel LONGO (Provedores).
+   Com altura útil suficiente, o painel ocupa a altura, o CORPO do cartão rola e
+   o pé (Salvar/Testar) fica no rodapé do cartão: o botão que conclui o trabalho
+   nunca sai da tela. Em altura curta (800x600) o cartão de 139 px seria pior que
+   a rolagem, então ali o painel volta ao fluxo normal e o conteúdo rola inteiro.
+   ------------------------------------------------------------------------ */
+.config-unificadas-conteudo:has([data-painel="provedores"]:not([hidden])) {
+  overflow: hidden;
+}
+
+
+.config-unificadas-conteudo [data-painel="provedores"]:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.config-unificadas-conteudo .providers-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-unificadas-conteudo .providers-cols {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  /* A linha ocupa EXATAMENTE a altura disponível: sem isto o cartão cresce com
+     o próprio conteúdo e volta a empurrar o Salvar para fora da tela.
+     `overflow: clip` contém o transbordo mínimo (sempre interno e alcançável
+     pelo scroll do corpo) sem criar um segundo scroll. */
+  grid-template-rows: minmax(0, 1fr);
+  overflow: clip;
+}
+
+.config-unificadas-conteudo .providers-rail {
+  min-height: 0;
+  overflow: auto;
+}
+
+/* O cartão do provedor é o scroll: o CORPO rola e o pé fica FORA da rolagem. */
+.config-unificadas-conteudo .providers-form {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.config-unificadas-conteudo .providers-form-corpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 -22px -18px; /* sangra até a borda do cartão (padding 18/22) */
+  padding: 10px 22px;
+  background: var(--vscode-sideBar-background);
+  border-top: 1px solid var(--vscode-widget-border);
+  /* Sombra suave: deixa claro que o conteúdo CONTINUA abaixo do pé (o corpo
+     rola por baixo dele), em vez de parecer texto cortado. */
+  box-shadow: 0 -8px 12px -10px rgba(0, 0, 0, 0.5);
+}
+
+.config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] > .providers-grow {
+  display: block;
+  min-width: 0;
+}
+
+/* Geral é curto: o pé fica no rodapé da área do painel (não no meio dele),
+   sem empurrar o conteúdo. O cartão do Agente mantém a largura confortável. */
+.config-unificadas-conteudo .config-foot[data-na-moldura="sim"] {
+  margin-top: auto;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--vscode-widget-border);
+}
+
+.config-unificadas-conteudo [data-painel="geral"]:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.config-unificadas-conteudo .config-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  max-width: 780px;
+}
+
+/* As telas das Casas nasceram como aba do editor: `height:100%` + rolagem
+   própria + cabeçalho gigante. Hospedadas, quem rola é a moldura e o título é
+   o dela (R10: a Casa não perde nada do seu estado por causa disto). */
+.config-unificadas-conteudo .providers-view,
+.config-unificadas-conteudo .config-view {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  max-width: none;
+  background: transparent;
+}
+
+.config-unificadas-conteudo .providers-view h1 { display: none; }
+.config-unificadas-conteudo .providers-head > p { font-size: 12.5px; }
+
+/* Painel hospedado ocupa a largura toda e cresce com o conteúdo. */
+.config-unificadas-conteudo [data-painel] {
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   Telas de apresentação (Aparência, Permissões, Conversas, Workspaces) e a
+   moldura de Personalizações, que não tinham folha nenhuma: eram texto solto.
+   ------------------------------------------------------------------------ */
+.config-painel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+  padding: 16px 18px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+}
+
+/* Texto corrido: `inline-flex` alinharia cada palavra do parágrafo como uma
+   coluna (foi o que quebrou Workspaces em 800x600). Só as NOTAS (ícone +
+   frase) usam flex; o texto vira bloco normal. */
+.config-painel-texto { display: block; margin: 0; }
+.config-painel-nota { display: flex; align-items: flex-start; gap: 6px; margin: 0; }
+.config-painel-nota svg { flex: none; margin-top: 2px; }
+.config-painel-texto { color: var(--vscode-foreground); }
+.config-painel-nota { font-size: 11.5px; color: var(--vscode-descriptionForeground); }
+.config-painel-nota code { overflow-wrap: anywhere; }
+
+.config-painel-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+}
+
+.config-painel-opcoes legend {
+  padding: 0 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.config-painel-opcoes label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.config-painel-opcoes input { accent-color: var(--vscode-focusBorder); margin: 0; }
+
+.config-painel-acao {
+  align-self: flex-start;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border: 1px solid var(--vscode-button-background);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-painel-acao:hover { background: var(--vscode-button-hoverBackground); }
+
+/* Personalizações hospedada: o painel é a página inteira (sem nav interna),
+   então a grade de duas colunas do gerenciador não se aplica. */
+.config-unificadas-conteudo .customizations-view.personalizations-manager {
+  display: block;
+  height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
+.config-unificadas-conteudo .customizations-view {
+  height: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* Confirmação de descarte (R07): fica sobre o diálogo, não cria outro modal. */
+.config-unificadas-confirmacao {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  font-size: 12px;
+  background: var(--vscode-editorWidget-background);
+  border-top: 1px solid var(--vscode-widget-border);
+}
+
+.config-unificadas-confirmacao p { margin: 0; }
+.config-unificadas-confirmacao-nota { color: var(--vscode-descriptionForeground); }
+.config-unificadas-confirmacao-acoes { display: flex; gap: 8px; justify-content: flex-end; }
+
+.config-unificadas-confirmacao-acoes button {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-unificadas-confirmacao-acoes button[data-acao="descartar"] {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+}
+
+.config-unificadas-confirmacao-acoes button:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------------------------------------------------------------------------
+   Janela estreita / modal restaurado pequeno: a navegação empilha, mas continua
+   curta o bastante para o conteúdo não sumir. Medido em 800x600 e 1024x700.
+   ------------------------------------------------------------------------ */
+/* Em janela estreita a navegação AFINA (não empilha): empilhar gastava 144 px de
+   altura em 800x600 e deixava o painel com 254 px — o Salvar saía da tela. */
+@media (max-width: 900px) {
+  .config-unificadas-corpo { grid-template-columns: 176px minmax(0, 1fr); }
+  .config-unificadas-grupo { padding: 2px 0; }
+  .config-unificadas-grupo-titulo { padding: 2px 8px; }
+  .config-unificadas-conteudo { padding: 4px 10px 0; }
+}
+
+/* Só quando não cabe uma coluna de navegação de verdade (celular) ela empilha. */
+@media (max-width: 560px) {
+  .config-unificadas-corpo { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .config-unificadas-nav {
+    max-height: 30dvh;
+    padding: 0 4px 6px;
+    border-right: 0;
+    border-bottom: 1px solid var(--vscode-widget-border);
+  }
+}
+
+/* COLUNA ESTREITA (modal restaurado / 800x600): os dois painéis não cabem lado
+   a lado e empilhar a lista inteira espremia o formulário numa fresta. Aqui a
+   lista vira uma FAIXA de uma linha (chips com rolagem horizontal: os 8
+   provedores continuam alcançáveis) e o cartão fica com a altura restante — o
+   CORPO do cartão rola e o PÉ (Salvar/Testar) fica no rodapé do cartão, numa
+   linha só. O botão que conclui o trabalho nunca sai da tela. */
+@container (max-width: 700px) {
+  .config-unificadas-conteudo .providers-cols {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .config-unificadas-conteudo .providers-rail {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px 6px;
+  }
+  .config-unificadas-conteudo .providers-rail .providers-search { flex: none; padding: 5px 6px; }
+  .config-unificadas-conteudo .providers-rail .providers-search input { display: none; }
+  .config-unificadas-conteudo .providers-rail .providers-group { display: contents; }
+  .config-unificadas-conteudo .providers-rail .providers-group-title { display: none; }
+  .config-unificadas-conteudo .providers-rail .providers-item {
+    flex: none;
+    width: auto;
+    white-space: nowrap;
+    padding: 4px 8px;
+    gap: 6px;
+    font-size: 11.5px;
+  }
+  .config-unificadas-conteudo .providers-rail .providers-item-tag { display: none; }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] {
+    gap: 6px;
+    padding: 8px 14px;
+  }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] > .providers-grow { display: none; }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] .providers-btn { padding: 6px 10px; font-size: 12px; }
+  .config-unificadas-conteudo .providers-card { padding: 12px 14px; }
+}
+
+/* ALTURA CURTA com largura suficiente (1024x700 restaurado, 800x600 expandido):
+   o cartão continua lado a lado, a lista afina (132 px) e o pé vira compacto —
+   o corpo do formulário recupera a altura que o pé de duas linhas roubava. */
+@container (min-width: 701px) and (max-height: 500px) {
+  .config-unificadas-conteudo .providers-cols {
+    grid-template-columns: 132px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .config-unificadas-conteudo .providers-rail {
+    position: static;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 4px;
+  }
+  .config-unificadas-conteudo .providers-rail .providers-search { padding: 5px 6px; justify-content: center; }
+  .config-unificadas-conteudo .providers-rail .providers-search input { display: none; }
+  .config-unificadas-conteudo .providers-rail .providers-group-title { display: none; }
+  .config-unificadas-conteudo .providers-rail .providers-item { padding: 4px 6px; gap: 6px; font-size: 11.5px; }
+  .config-unificadas-conteudo .providers-rail .providers-item-tag { display: none; }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] { gap: 6px; padding: 8px 14px; }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] > .providers-grow { display: none; }
+  .config-unificadas-conteudo .providers-foot[data-na-moldura="sim"] .providers-btn { padding: 6px 10px; font-size: 12px; }
+  .config-unificadas-conteudo .providers-card { padding: 12px 14px; }
+}
+
+/* Personalizações em espaço curto: cartões e resumo em uma coluna. */
+@container (max-width: 760px) {
+  .config-unificadas-conteudo .personalizations-overview-cards,
+  .config-unificadas-conteudo .customizations-resumo { grid-template-columns: minmax(0, 1fr); }
+  .config-unificadas-conteudo .customizations-title,
+  .config-unificadas-conteudo .personalizations-category-heading { flex-wrap: wrap; }
+}
+
+@container (max-width: 520px) {
+  .config-unificadas-conteudo .providers-adv-grid { grid-template-columns: minmax(0, 1fr); }
+  .config-unificadas-conteudo .providers-input-row { flex-wrap: wrap; }
+}

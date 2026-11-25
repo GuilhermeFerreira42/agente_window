@@ -1,3 +1,578 @@
+# Nova rodada MM-I — diagnóstico inicial, não concluída
+
+A solicitação vigente substitui Fontes por Explorer normal e exige arquivos de trabalho editáveis separados dos originais históricos, uploads automáticos no projeto e áudio/vídeo funcionais. Esses recursos ainda não foram implementados nem validados; o roteiro Windows anterior está marcado como superado e não serve para homologar esta rodada.
+
+**Continuação parcial:** a mensagem agora identifica original indisponível, inclusive em envelope multimodal, e não oferece abrir/baixar o original indisponível. Legado sem identificador é rotulado sem casar por nome; órfãos usam o estado de presença informado pelo servidor. Na reconciliação de lista bem-sucedida, um item anteriormente pronto sem artefato nem upload é marcado indisponível, enquanto um item em transferência não é inferido ausente; o upload é localizado por `uploadId`. Isso não preserva bytes nem implementa migração ou versão de trabalho.
+
+Em Debian/Node 26.13.0: Vitest focado **71/71**, typecheck e build aprovados (build com avisos preexistentes de CSS, eval e chunks); lint dos arquivos alterados aprovado. Playwright integrado anterior com simulador **8/8**, que ainda verifica painel Fontes e fallback — não análise real de áudio/vídeo. Regressão C-3a/C-3b **27/27**: E08 removeu um original no perfil descartável e verificou a mensagem após F5, incluindo legado sem ID; mídia C-3b é reprodução passiva. Na primeira tentativa, os oito testes não iniciaram Chromium por falta de `libnspr4.so`; a repetição passou usando `LD_LIBRARY_PATH=/tmp/al2023/lib`. Nenhum Windows ou provedor real foi usado. Não há teste das novas jornadas Explorer ou de análise funcional de áudio/vídeo.
+
+**Legado:** o upload de projeto anterior registra um único caminho no projeto mais tamanho e SHA-256; leitura e download verificam esses bytes, sem cópia histórica separada. Com uma cópia legada intacta será necessária migração segura antes de disponibilizá-la para edição. Se a única cópia já foi alterada ou excluída antes da migração, o hash detecta divergência mas não reconstrói o conteúdo; recuperar os bytes pode exigir backup externo. Não substituí-los silenciosamente nem prometer recuperação universal. Teste de diagnóstico em `attachments/ajustes.test.ts`: seis testes passaram em Debian/Node 26.13.0, incluindo arquivo legado intacto, modificado e excluído. Esse teste retrata o estado **pré-migração** e deve ser substituído pelas jornadas de migração ao implementar a solução.
+
+**Infraestrutura:** a troca de raiz `/fs/workspace` recria um servidor FS global, portanto alternância de chats e chamadas concorrentes precisam de tratamento explícito, não apenas de outro caminho no frontend. O sandbox atual não tem `ffmpeg`, `ffprobe` ou `whisper`; isso não prova impossibilidade de instalá-los. Não há transcrição nem extração de quadros integrada comprovada. Nenhum Playwright, typecheck, build ou validação Windows foi executado para os novos requisitos nesta etapa. Os resultados abaixo são históricos e não validam a nova arquitetura.
+
+---
+
+# MM-I — continuação a partir de `01c6742`
+
+**Escopo.** Pedido exclusivo reconhecido de espera desabilita anúncio e execução de ferramentas no servidor e não oferece envio de visão; nova tarefa pode usar o arquivo salvo. O reconhecedor é conservador e só cobre frases exclusivamente de espera (por exemplo “Aguarde instruções”, “Por favor, aguarde novas instruções”), não todas as formulações naturais, misturas ou pedidos contraditórios. A descrição da ferramenta também orienta não inspecionar por iniciativa própria; não é prova de que qualquer frase ambígua seja compreendida.
+
+**Resultados desta continuação.** Playwright integrado com app real, Chromium, dados descartáveis e provedor simulado: **8/8** (`/tmp/mmi-final6.log`). Inclui PNG/JPEG, WebP, PNG grande, originais e confirmações; ZIP guardado com espera e usado na mesma conversa sem novo upload; extração privada de texto e projeto; PDF sintético; fallback WAV/WebM; dois chats da mesma sessão semeados como fixture, com alternância/F5 no Explorer e negações bidirecionais da ferramenta, metadata, download e prévia GET/HEAD. Na corrida, um preload **somente do teste** pausa o fsync do stage, a UI solicita Parar, o ACK é `cancelled`, e o item não aparece após F5 nem após reiniciar o servidor. Nenhum preload/rota de teste foi acrescentado ao produto. Foco Vitest rotas, espera e anexos **226/226** (`/tmp/mmi-unit3.log`); regressão de disco/shell **16/16** (`/tmp/mmi-shell.log`), incluindo leitura e edição de caminho externo autorizado; teste isolado da mensagem de parada no App **1/1** (`/tmp/mmi-app-test.log`, demais 82 filtrados). Typecheck, build (com aviso de chunks grandes) e lint direcionado passaram. Uma execução intermediária Playwright foi invalidada por renomear a fixture enquanto o servidor era reiniciado (`/tmp/mmi-final4.log`); a rodada final completa passou. Nenhum provedor real foi chamado. Não houve suíte ampla completa; os dois testes de fronteira históricos identificados na base anterior não foram resolvidos por esta continuação.
+
+**Cancelamento ZIP.** O stage permanece `recebendo` até adquirir a mesma fila da reconciliação. Sob essa fila, se o sinal já foi cancelado, grava `cancelado` antes de limpar o stage; senão prepara e publica sob a fila, sem janela em que a reconciliação possa publicar o `preparado` antes da decisão. Se a publicação iniciou primeiro, a parada espera o desfecho e registra efeito; se o resultado é incerto, não confirma cancelamento limpo. Testes unitários com a extração real e barreira após gravação exercitam cancelamento, recuperação concorrente e reabertura do banco; outro teste exercita commit vencedor; o teste de rota verifica ACK com efeitos e cartão de extração concluída. Em falha irrecuperável de armazenamento ou interrupção ANTES do ACK, não se afirma cancelamento confirmado; verificar Fontes antes de repetir. O mecanismo não altera o comportamento geral do shell, acessos externos ou uploads comuns.
+
+**Auditoria de dependências.** `npm audit --package-lock-only --json` nos dois lockfiles, base `3ab830f` e atual, consultados na mesma rodada: **22 em cada** (16 moderadas, 2 altas, 4 críticas). Comparação de nomes de pacotes e IDs de advisories diretos no campo `via` não encontrou novos alertas na entrega; `sharp`, `yauzl` e `pdfjs-dist` não apareceram como vulneráveis nesse resultado. Isso não garante ausência de vulnerabilidades desconhecidas e não corrige as 22 preexistentes. JSONs temporários `/tmp/mmi-audit-base-current.json` e `/tmp/mmi-audit-new-current.json`.
+
+**Áudio e vídeo — pendentes para decisão.** Neste sandbox não há `ffmpeg`, `ffprobe`, `whisper` ou `whisper-cli`; o projeto não fornece transcritor/modelo local nem executável de extração de quadros, e não há adaptador/prova de capacidade de áudio/vídeo do provedor para essa ferramenta. A prévia passiva WAV/WebM não é análise. Para implementar é preciso escolher/provisionar e licenciar runtime e modelo de transcrição compatíveis com Windows, limites de duração/memória/concorrência e idioma; para vídeo, fornecer decodificador confiável, limites de amostragem e um caminho autorizado para enviar quadros a um destino de visão comprovado (ou análise local), incluindo consentimento e revalidação. Alternativamente precisa-se especificar e comprovar um protocolo/modelo de provedor de áudio/vídeo e política de dados. Nenhum desses meios foi inventado ou testado aqui; o app continua informando indisponibilidade. O proprietário decide se adia esse requisito; MM-I completa não foi homologada.
+
+**Segurança:** Explorer, ferramenta e rotas são escopados por sessão/chat. Shell e ferramentas genéricas têm os direitos da conta e acesso a pastas externas autorizadas; não são sandbox físico. Resultados de modelo podem permanecer no histórico. Windows e LiteLLM real não foram usados nesta rodada; roteiro único `VALIDACAO_MM-I_WINDOWS.md`. Não iniciar MM-O.
+
+---
+
+# MM-I — evidências anteriores a esta correção (histórico)
+
+A ressalva de cancelamento abaixo descreve `01c6742` e foi sucedida pela seção anterior; as demais limitações históricas não são automaticamente resolvidas. Base de trabalho `3ab830f`; Debian x64, Node 26.13.0, aplicativo real e perfis/dados descartáveis. Nenhum provedor ou credencial real foi usado nesta rodada. O roteiro de homologação é `VALIDACAO_MM-I_WINDOWS.md`; Windows e LiteLLM real **não foram testados nesta rodada**.
+
+- Playwright integrado `mmi_imagens_preparadas`, `mmi_visao`, `mmi_inspecao_zip`: **7/7** (`/tmp/mmi-integrado-final.log`, logs temporários). PNG/JPEG, WebP e PNG 2048×1200; cópias e download do original, confirmação e cancelamento; Fontes/troca/F5 e recusa cruzada de metadata/download/mídia GET/HEAD entre duas sessões. Agente em Chat e projeto: ZIP, consentimentos individuais, listagem, extração privada e leitura de texto, resultado recebido pelo simulador via streaming; recusa de anexo de outra conversa, cancelamento de aprovação, PDF sintético e fallback de áudio/vídeo. O ZIP de navegador contém texto; PNG/WebM extraídos e conferidos byte a byte em unitários, não na jornada Playwright. Duas conversas da mesma sessão foram exercitadas na porta unitária, não na interface/rotas por Playwright.
+- Regressão Playwright C-3a + C-3b: **27/27** (`/tmp/mmi-reg-pw.log`). Foco Vitest anexos/Agir/c3aSend: **428 passaram, 6 pulados e 2 falharam** (`/tmp/mmi-allfocus.log`); FT-02 e FT-04 de fronteira foram reproduzidas na base `3ab830f` (`/tmp/mmi-baseline-frontier.log`): imports históricos jpeg-js/pngjs e cast histórico em imagemVisao. A nova infração Sharp foi removida sem afrouxar testes. Após o ajuste de mensagem e teste adicional de destino, rotas + inspeção + ZIP **73/73** (`/tmp/mmi-final-unit.log`), incluindo troca de destino após leitura, impedimento de segunda chamada e compactação. Checagem de tipos e lint direcionado passaram; build serial passou com aviso de chunks grandes (`/tmp/mmi-build-serial.log`). Build simultâneo à regressão foi encerrado por memória (137), não contado como sucesso. Suíte ampla integral não foi executada nesta rodada.
+- Imagens: original até 12 MiB/12 megapixels, lado até 8192; cópia PNG proporcional até 1024, 4 MiB por arquivo, 6 MiB no conjunto e JSON até 9 MiB. `sharp@0.35.5` está no adaptador da prefeitura; PNG/JPEG pequenos aceitos permanecem em bytes originais, WebP animado é recusado. Uma fotografia grande pode gerar PNG acima do teto e ser recusada. Nem orientação/transparência em todos os formatos, nem imagens maliciosas, nem pico de memória/concorrência, nem portabilidade nativa Windows foram exaustivamente provados.
+- ZIP `yauzl@3.4.0`: limites de 32 MiB no arquivo, 128 entradas, 4 MiB/item, 16 MiB descompactados e razão 200, validação de nomes e CRC do item extraído. Um item por ação, gravado pelo ledger em área privada do app. PDF `pdfjs-dist@6.5.438` em worker, até 8 MiB, 20 páginas, 16 mil caracteres, 8 s e dois workers; sem OCR. Apenas PDF sintético foi comprovado. UTF-8 até 16 KiB. Não há transcrição de áudio nem extração de quadros ou transcrição de vídeo; fallback explica indisponibilidade e preserva download. Outros formatos não são inferidos como suportados.
+- Aprovação individual nomeia operação/fonte e destino selecionado, revalida fonte e configuração; desabilita compactação e retomada automática do conteúdo da ferramenta. Gateway de texto pode rotear internamente, como informado no cartão: não se comprovou destino interno fixo para inspeção textual. Visão usa desafio e pin do destino LiteLLM, sem tratar declaração de modelo como prova. Respostas do modelo podem reproduzir conteúdo e permanecer no histórico: o consentimento inclui esse risco.
+- **Ressalva de segurança/lifecycle não resolvida:** se a extração alcança estado `preparado` e o cancelamento/erro ocorre na janela de publicação, o journal é preservado por segurança e a recuperação pode concluir depois. A rota trata resultado incerto como possível efeito, mas não foi demonstrado aviso visível em todos os estados de cancelamento nem cancelamento atômico ou concorrência com reconciliação/exclusão durante stream/commit. Um teste separado de duas extrações simultâneas comuns passou (inspeção **9/9**, `/tmp/mmi-conc.log`); não cobre essas corridas. Não repetir automaticamente; conferir Fontes e armazenamento antes de nova tentativa. Isso impede afirmar conclusão integral do requisito de cancelamento/lifecycle.
+- O isolamento é mediado por Explorer, ferramenta de anexos e rotas de prévia/download, por sessão/chat. O shell e ferramentas de arquivos continuam com direitos da conta e acesso a pastas externas escolhidas; não há sandbox físico contra eles. Cópias escolhidas em `uploads/` do projeto são compartilhadas. `npm audit` apontou 22 vulnerabilidades no grafo (16 moderadas, 2 altas, 4 críticas), sem comparação detalhada da base; não foram corrigidas nesta rodada.
+
+Não iniciar MM-O; aguardar avaliação e homologação do proprietário, sem equiparar estes resultados a aceite completo.
+
+---
+
+# 24/11/2026 — reteste de visão com LiteLLM real no Windows
+
+Base `5d2449e`, Node 26.13.0. O Playwright abriu o aplicativo em um perfil descartável e reaproveitou o provedor configurado para `meu-pool`. A primeira rodada parou na verificação sem oferecer envio de imagem. Na repetição a verificação passou. Um PNG na tela inicial e um JPEG numa conversa aberta foram enviados após o consentimento. O modelo identificou a cor em ambos e o aplicativo registrou os dois anexos como enviados. O ensaio usou somente imagens, textos e conversas sintéticos.
+
+Regressão focada no Windows com 43 testes Vitest e 2 jornadas Playwright locais aprovados. A checagem de tipos, o lint dos arquivos TypeScript alterados e o build Vite passaram. O build conserva avisos de terminal, CSS e tamanho dos pacotes.
+
+O alias fica selecionado na interface. Para imagens, o LiteLLM precisa confirmar o ID do destino e aceitar um segundo desafio nesse ID antes que o aplicativo habilite o anexo. O envio usa esse ID, pede zero retentativas e fallback desativado, e só registra sucesso se a resposta confirmar o destino. A prova expira em 30 minutos e perde validade quando o aplicativo reinicia ou a configuração local muda. Uma nova configuração de roteamento no gateway deve manter o significado do ID da implantação. Os protocolos nativos Gemini, Anthropic e Ollama permanecem fora deste recorte.
+
+Para homologar, usar o mesmo `meu-pool` no modo **Perguntar**, anexar um PNG ou JPEG com um detalhe que a pergunta não revela, clicar **Verificar visão** quando aparecer e depois em **Enviar imagens e texto**. Conferir a resposta e o estado do anexo. Repetir após F5, depois que a conversa salvar.
+
+---
+
+# 24/11/2026 — primeira validação com provedor simulado no Windows (histórico)
+
+Base de comparação `3f794cd`, Node 26.13.0 e dados descartáveis. O fluxo real de **Perguntar** usa o mesmo endpoint de Agir para texto com PNG/JPEG no primeiro envio e em conversas abertas. O Playwright compara modelo, texto e SHA-256 dos bytes na própria fixture HTTP e valida o streaming de resposta, cancelamento sem chamada, lote misto, pasta, retentativa sem duplicar a mensagem e F5 após publicação da revisão. A regressão do envio só de texto para um alvo desconhecido também foi validada.
+
+- Vitest focado: **93/93** em 12 arquivos, incluindo admissão, integridade, capacidade, codecs, seleção, fluxo de anexos e landing. O reteste de admissão com um caso adicional de concorrência passou **4/4**. Playwright MM-I: **2/2**. Tipos e build Vite passaram. Lint dos arquivos alterados: mesmos 22 apontamentos da base.
+- Teste de rotas de Agir no Windows: **45 passaram e 14 falharam**. A comparação em `3f794cd` reproduziu as mesmas 14 falhas nominais, incluindo fixtures com `/bin/sh` e Lixeira. Na C-3a, E01–E06 e E09–E15 passaram em rodadas separadas. E07 e E08 reproduziram HTTP 403 nos mesmos pontos de criação de referências na base e com a integração.
+- O estado após F5 foi verificado após o ACK do salvamento. Recarregar enquanto o salvamento ainda está em voo pode abrir o fluxo de recuperação local existente.
+- Prova externa MMI-09 continua pendente. O caminho real habilitável desta entrega é a conexão direta do protocolo `openai-chat` com a API oficial da OpenAI. O botão **Verificar visão** envia só um PNG sintético após confirmação explícita. A prova expira após 30 minutos, é invalidada por mudança de configuração ou reinício, e não autoriza o envio de anexos sem uma confirmação separada. Pool, proxy arbitrário ou outro protocolo permanece sem prova nesta entrega.
+
+**Validação manual com alvo autorizado:** iniciar o aplicativo no Windows, selecionar explicitamente um modelo da OpenAI direta, escolher **Perguntar**, anexar uma imagem descartável com um detalhe ausente do nome e da pergunta e enviar. Confirmar **Verificar visão** se for solicitado. Conferir o destino, clicar **Enviar imagens e texto** e verificar se a resposta usa aquele detalhe. Recarregar depois do salvamento e conferir o estado do anexo. Repetir com um JPEG em conversa já aberta e cancelar uma tentativa para confirmar que o rascunho permanece. Evitar imagens pessoais no teste.
+
+---
+
+# MM-I — continuação parcial com simulador local (histórico)
+
+**Código publicado anteriormente:** `5d344e1`. Novos trabalhos: `capacidadeVisao.ts` avalia MM-0 contra identidade efêmera e revisões fornecidas pelo dono, evidência, topologia e limites completos; não descobre nem fabrica prova e **não está ligado ao produto**. O dono de Provedores ainda não fornece a revisão completa ou uma fonte autorizada de provas. Sem elas, não existe habilitação para modelo real; não é seguro considerar nomes, declarações manuais ou protocolo como prova. A fonte futura precisa vincular prova, limites e topologia ao par/endpoint/configuração/API/adaptador, revalidar na chamada e resolver Auto sem troca implícita.
+
+A confirmação anterior de seguir sem mídia era pulada na landing e em anexos já prontos; corrigida em `useLandingSubmission` e `enviarComAnexos`, antes de publicar ou iniciar execução. O diálogo agora nomeia os arquivos que serão apenas guardados; cancelar preserva texto e seleção. Este é **apenas o fallback sem visão**, não a confirmação de envio de imagens que ainda deve ser implementada. O teste Playwright `e2e/mmi_checkpoint_local.spec.ts` verifica cancelamento nas duas entradas, zero chamadas ao simulador após cancelar, texto sem imagem ao confirmar e anexo após F5. O simulador escuta `127.0.0.1` em porta efêmera, compara modelo/texto/hash das imagens esperadas e simula SSE: o teste de imagem usa diretamente o construtor isolado; outro teste atravessa `/api/agir` real com **texto somente**. Não confundir com a prova de visão MMI-01/02.
+
+Debian, Node 26.13.0 e perfis descartáveis: foco **473 aprovados, 1 pulado, 0 falhas** (`/tmp/mmi-foco3.log`); App/arquitetura/C-2/rascunho/U-2 **112 aprovados, 13 pulados** (`/tmp/mmi-ui3.log`); Playwright checkpoint **1/1** (`/tmp/mmi-playwright-checkpoint2.log`), C-3a **15/15** (`/tmp/mmi-e2e-c3a3.log`) e U-2 **1/1** (`/tmp/mmi-e2e-u2.log`). `npm run typecheck` e `npm run build` passaram, com aviso de chunks grandes no Vite; ESLint dos arquivos alterados e `git diff --check` passaram. A primeira C-3a concorrente com U-2 sofreu colisão de artefatos Playwright; a tentativa seguinte foi interrompida no E11 aguardando a nova confirmação, e E11/E12/E15 foram atualizados para confirmar explicitamente antes do reteste 15/15. Os logs `/tmp` são temporários.
+
+**Pendente:** envio real PNG/JPEG pelo caminho da interface e Agir; política/fonte de evidências reais; aprovação específica e recibo de transporte; revalidação de mudanças, retry sem duplicação e estado após F5; testes MMI-01–09 completos, suíte ampla comparada à base e Windows. O sandbox **não** impediu o provedor local; a integração permanece trabalho de implementação, não falha de ambiente. Não há roteiro de homologação real executável enquanto não existir habilitação comprovada do alvo e envio integrado. Nenhuma imagem foi enviada a provedor externo.
+
+---
+
+# MM-I — checkpoint técnico anterior
+
+Foram adicionados componentes **isolados, sem chamador de produção**: leitura de cópia com dono/chat, mensagem de usuário no transcript, contenção, leitura limitada e SHA-256 dos bytes efetivos; decodificação PNG/JPEG por bytes (`pngjs@7.0.0`, `jpeg-js@0.4.4`); e montagem/medição exata do JSON de visão. O PNG é verificado para CRC de todos os chunks, fim de arquivo, IDAT contínuo e descompressão limitada ao tamanho calculado, inclusive Adam7, antes de chamar `pngjs` (que não limita a inflação interlaçada por si só). O JPEG usa limites de resolução/memória do decodificador e verifica fim real. Testes adversariais cobrem conteúdo excedente, bomba zlib, CRC auxiliar, outro chat, referência mutável, divergência de papel e symlink (este último não executado no Windows). Isso não constitui auditoria completa dos codecs nem uma autorização de envio.
+
+Tetos locais **provisórios**, antes do menor teto comprovado do alvo: 2 imagens, 4 MiB por arquivo, 6 MiB de conjunto, largura e altura de 1024, 1.048.576 pixels, 9 MiB de JSON, 4096 chunks e 10 MiB de descompressão PNG. Inicialmente, um ensaio isolado com tetos maiores e 3 PNG sintéticos de 2048 × 2048 (67.519 bytes cada; corpo de 270.391 bytes) mediu 691 ms e pico máximo do processo subindo de 166.812 para 333.076 KiB. Por esse custo, foram reduzidos quantidade e dimensões: nova amostra com 2 PNG de 1024 × 1024 (17.326 bytes cada; corpo de 46.449 bytes) mediu 134 ms e pico de 142.744 para 200.944 KiB. Ambas medições em Vitest/jsdom, amostras únicas, sem concorrência nem pior caso; um primeiro padrão excedeu o teto do conjunto e foi recusado. Avaliar concorrência/isolamento antes de integrar: os ensaios não aprovam os valores. Logs `/tmp/mmi-bench{,2,3}.log` enquanto disponíveis. Há um servidor HTTP efêmero de fixture que captura hash de um PNG sintético no formato de Chat Completions e devolve SSE; o teste chama o serializador diretamente, **não** o fluxo ativo do produto, e não demonstra a capacidade de um modelo.
+
+Debian, Node 26.13.0, perfil descartável: foco em MM-0, anexos C-3a/C-3b, Conversa, Provedores selecionados, rotas/vizinho Agir e os novos componentes **419 aprovados / 1 pulado / 0 falhas**, antes do teste adicional de quantidade de chunks, log `/tmp/mmi-focus2.log` enquanto disponível. Após a inclusão do teste adicional de chunks e a redução dos tetos, cinco arquivos novos **21/21** (`/tmp/mmi-final2.log`). `tsc --noEmit` de `tsconfig.app.json` e `server/tsconfig.server.json`, ESLint nos novos arquivos e `git diff --check` passaram. `npm audit` registrou 21 achados no conjunto instalado (16 moderados, 2 altos, 3 críticos); não apontou `pngjs` nem `jpeg-js` diretamente, sem análise comparativa completa da base.
+
+Ainda faltam integração, evidência vinculada ao alvo real, ensaio dos limites, matriz MMI-01–09 completa, Playwright, build integral, comparação da suíte ampla, prova externa autorizada e Windows. Nenhuma imagem saiu para provedor externo; nenhuma homologação é atribuída. Alterações locais sem commit ou push.
+
+---
+
+# MM-I — checkpoint inicial (histórico)
+
+Base após atualização: `9ddeffb`. O fluxo ativo da interface passa por `iniciarAgirReal` → `/api/agir` → `agir/server/vizinho.ts`, não por uma terceira rota de Conversa. A C-3a usa `src/server/session-persistence/attachments/{dono,catalogo,estoque}.ts`; `lerArtigo` confere existência e integridade, mas o futuro chamador ainda precisa comprovar titularidade, mensagem publicada e uso de cópia, e evitar corrida entre verificação e leitura dos bytes. As capacidades atuais de Provedores consultadas neste levantamento tratam limites de contexto, não comprovam visão.
+
+O primeiro teste do serializador falhou por módulo ausente; em seguida foi criado `agir/server/visaoOpenAI.ts`, sem chamada pelo produto, e dois testes de formatação. Os vetores desses testes são apenas bytes sintéticos para serialização, não imagens válidas nem comprovação de capacidade. Debian, Node 26.13.0, perfil descartável: MM-0, capacidades de Provedores, rotas Agir, envio C-3a e serializador **194/194**; testes do vizinho, capacidades e serializador **64/64**; `tsc --noEmit -p tsconfig.app.json` e `server/tsconfig.server.json` aprovados; ESLint nos dois arquivos novos aprovado. `server/tsconfig.server.json` cobre o adaptador FS, não prova o build integral da aplicação. Logs em `/tmp/mmi-red.log`, `/tmp/mmi-focus.log` e `/tmp/mmi-reg.log` enquanto disponíveis.
+
+**Ainda não executado:** testes MMI-01–09, destino externo autorizado, Playwright da nova funcionalidade, build integral, suíte ampla desta rodada e Windows. O serializador não valida imagens nem faz transmissão, e não deve ser conectado sem os gates de segurança da SPEC. Tetos de transporte continuam não definidos; a cota C-3a não foi alterada. Nenhum aceite da MM-I é atribuído.
+
+---
+
+# 24/11/2026 — revisão da U-1 e dos diálogos internos (U-2)
+
+Windows, Node 26.13.0, base `6a895ff` e dados descartáveis. Checagem de tipos aprovada. Vitest focado em oito arquivos: **183 aprovados, 13 pulados, 0 falhas**. Playwright: **14 aprovados** (13 de U-1 e um da casca de diálogos). A revisão não repetiu a suíte ampla da Arena.
+
+Em testes adicionais no Chromium, **Excluir conversa** e **Permitir tudo** abriram dentro da aplicação e confirmaram ou cancelaram corretamente em ambos os temas. A navegação pelo teclado revelou que, no chat, o Esc fecha o diálogo sem ativar a permissão, mas o foco cai no corpo da página quando o menu desaparece. O proprietário adiou o ajuste e homologou as entregas. Veja `08`.
+
+---
+
+# 24/11/2026 — exclusão de conversas e reteste da U-1 no Windows
+
+Windows, Node 26.13.0, perfil isolado. **Vitest em 8 arquivos: 176 passaram, 13 pulados, 0 falhas.** A checagem de tipos (`tsc -b tsconfig.json --force`) passou. **Playwright U-1: 13/13**, via `platform/scripts/e2e-u1.ps1`, incluindo tamanho do modal, layout e desativação de provedores. Resultados da validação técnica das correções locais, confirmadas depois pelo proprietário no aplicativo.
+
+- `sessionsClient.test.ts` verifica a espera da confirmação de salvamento, a revisão usada no DELETE e a preservação de conflito real.
+- `deletions.test.ts` verifica por HTTP que dois recarregamentos não acionam a Lixeira nem removem os bytes. A retomada explícita conclui e preserva as demais conversas. A porta da Lixeira foi simulada com recusa e movimentação em diretório descartável.
+- `App.test.tsx` verifica o aviso próprio, a retomada por clique e seu desaparecimento após confirmação. As demais suítes cobrem recuperação, avisos de persistência, ciclo de anexos e as duas suítes da U-1.
+
+A automação desta correção não acionou a janela nativa da Lixeira do Windows. O aceite manual comunicado pelo proprietário se refere à correção da exclusão de conversas.
+
+---
+
+# 19/11/2026 — proveniência no encerramento humano da C-3a
+
+Aceite humano informado pelo proprietário após pull, HEAD local `a49cc6c`; registro em `08`. **Nenhum teste automatizado reexecutado nesta rodada documental.** Código dos dois ajustes conferido; sem implementação local.
+
+- **Executado pelo Codex no Windows em `8af269e`:** foco 204/204, anexos 79/79 + fronteira HTTP 7/7, sondas independentes 9/9 e 13v2 13/13, E2E C-3a 10/10, C-1 6/6, C-2 17/17; tipos, lint dos alterados e build exit 0. Ampla não repetida. Evidência externa: `memoria-de-projeto/validacao-c3a-8af269e-2026-11-19/` (raiz operacional acordada, fora do repositório).
+- **Relatado pela Arena na reentrega de usabilidade até `a49cc6c`, Debian/Node 26.13.0:** A1–A5 5/5, SessionLanding 18/18, persistência 321 aprovados/1 pulado, foco 207/0/0, ampla 2111 aprovados/3 nominais/33 pulados, E2E C-3a 15/15 + C-1 6/6 + C-2 17/17, tipos 0, lint dos alterados 0/0 e build aprovado. Não foi execução Windows; sondas independentes não repetidas pela Arena nessa rodada.
+- **Relato humano:** testes de anexar/baixar/preservar e aceite da reentrega, conforme `08`. Não converte a automação de `8af269e` em automação da versão posterior, nem comprova codecs/geração/IA ligada.
+
+Os registros anteriores de “Windows pendente” referem-se às versões e rodadas ali descritas. A última mudança de usabilidade tem aceite humano, com automação local não repetida declarada. Sem merge ou avanço automático para C-3b.
+
+---
+
+## Rodada 19/11/2026 — ajustes de usabilidade da C-3a (Linux/Node 26.13.0)
+
+| Suíte | Comando | Resultado |
+|---|---|---|
+| Ajustes (novos A1–A5) | `vitest run src/server/session-persistence/attachments/ajustes.test.ts` | **5/5** (A1/A2 vermelhos antes da correção) |
+| Landing (3 novos casos) | `vitest run src/__tests__/SessionLanding.test.tsx` | **18/18** (2 dos novos vermelhos sem a correção) |
+| Persistência | `vitest run src/server/session-persistence` | **321 aprovados / 1 pulado** |
+| Foco | `VALIDAR_C3A.mjs --mode foco` | **207 · 0 · 0** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla` | **2111 · 3 nominais · 33 pulados** |
+| E2E C-3a | `sh platform/scripts/e2e-c3a.sh` | **15/15** (E11–E15 novos) |
+| E2E C-1 / C-2 | `e2e-c1.sh` / `e2e-c2.sh` | **6/6 · 17/17** |
+| Tipos / lint / build | `tsc -b --force` / `eslint` alterados / `vite build` | **0 · 0/0 · ✓ 44,5 s** |
+
+Novos E2E: E11 (landing marcada → `uploads/` com nome original e bytes certos), E12 (desmarcada → privado, nada no projeto), E13 (dois arquivos com o mesmo nome → `duplicado.txt` + `duplicado (1).txt`, downloads distintos), E14 (retentativa sem cópia extra, F5, exclusão preserva a cópia), E15 (landing e conversa nos temas claro/escuro).
+
+**Não executado:** sondas portáteis e Windows (aqui não executável). Os números Windows anteriores são de `b5cb48d` e não valem para este commit. Prova de reversão: sem a correção do Ajuste 1, A1/A2 voltam a falhar; sem o checkbox na landing, os 2 casos novos de `SessionLanding` falham com `Unable to find role="checkbox"`.
+
+# 19/11/2026 — C-3a U4: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; trigger SQLite para falha determinística; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <arquivos> --format json` | **0 erros / 0 avisos** |
+| Persistência | `vitest run …/session-persistence` | **318 aprovados · 1 pulado** |
+| Anexos | `vitest run …/attachments` | **79/79** (store 20, probes 19, reteste 13, routes 10, recovery 6, policy 6, lifecycle 5) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/41-foco` | **204 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/42-ampla` | **2103 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E C-3a | `sh platform/scripts/e2e-c3a.sh` | **10/10** |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.8s |
+| E2E C-1/C-2 | — | **não reexecutados** (última execução `b5cb48d`: 6/6, 17/17) |
+| Sondas | — | **não reexecutadas** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Foco e anexos se sobrepõem — não somar.
+
+**Windows:** não executado nesta rodada. Os números Windows da revisão são de `b5cb48d` e não se aplicam ao novo commit até reexecução; comando isolado e esperados em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md` (§4). Nada aqui atribui homologação ou execução Windows.
+
+---
+
+# 19/11/2026 — C-3a U1/U3/U2: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <7 arquivos> --format json` | **0 erros / 0 avisos** |
+| Persistência | `vitest run …/session-persistence` | **317 aprovados · 1 pulado** |
+| Anexos | `vitest run …/attachments` | **78/78** (store 20, probes 19, reteste 12, routes 10, recovery 6, policy 6, lifecycle 5) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/31-foco` | **204 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/32-ampla` | **2102 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.0s |
+| Sondas | runner canônico / v2 do revisor | **não reexecutadas nesta rodada** (antes: 10/13 e 13/13) |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Foco e anexos se sobrepõem — não somar como únicos.
+
+**Windows:** não executado nesta rodada. Os números Windows do revisor (foco 202/202, anexos 81/81, E2E 10/10, S01–S05 5/5) são de `bb96389` e **não** se aplicam ao novo commit até reexecução; comando isolado e esperados em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md` (§5). Nada aqui atribui homologação ou execução Windows.
+
+---
+
+# 19/11/2026 — C-3a correção R1–R5/W1–W3: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint (alterados) | `npx eslint <13 arquivos> --format json` | **0 erros / 0 avisos** |
+| Lint (repo) | `npx eslint src --format json` | 84 erros / 27 avisos — **iguais à base** (pré-existentes, intocados) |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 41.5s |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/25-foco` | **202 aprovados · 0 falhas · 0 pulados** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/22-ampla` | **2097 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| Anexos | `vitest run …/session-persistence/attachments` | **74/74** (store 20, probes 19, reteste 10, routes 8, recovery 6, policy 6, lifecycle 5) |
+| Persistência | `vitest run …/session-persistence` | **313 aprovados · 1 pulado** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Sondas | runner canônico / cópia portátil | **10/13** (defeito do template) / **13/13** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky. Build exigiu liberar o code-server do sandbox (OOM global em 3,9 GB; o processo foi morto por `oom-kill`, não por erro de código).
+
+**Windows:** não executado (sem SO Windows neste ambiente). W1 e W2 foram corrigidos nos testes; comando isolado e resultados esperados em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md` (§6). Nada aqui atribui homologação ou execução Windows.
+
+---
+
+# 19/11/2026 — C-3a reentrega: ambiente e gates (Linux/Debian, Node 26.13.0)
+
+Node canônico `platform/.runtime/node-v26.13.0-linux-x64`, Chromium local `/tmp/chromium`, perfil descartável por execução (`AGENTE_WINDOW_TEST_HOME`) e `NODE_OPTIONS=--require=platform/scripts/test-profile.cjs`. Dados sintéticos; provedor HTTP local; nenhuma API externa nem dado pessoal.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `npx tsc -b --force` | exit 0 |
+| Lint | `npx eslint src --format json` | 84 erros / 27 avisos — **iguais à base `3a78ca0`** (medida lado a lado): novos 0 |
+| Build | `NODE_OPTIONS=--max-old-space-size=1500 npx vite build` | ✓ built in 2m15s (OOM em 1024/1408 neste sandbox de 4 GB) |
+| Foco | `VALIDAR_C3A.mjs --mode foco --out …/11-foco` | **199 aprovados · 0 falhas · 0 pulados · `missingCriteria=[]`** |
+| Ampla | `VALIDAR_C3A.mjs --mode ampla --baseline-json c3a-base-run/vitest.json --out …/12-ampla` | **2085 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`** |
+| E2E | `sh platform/scripts/e2e-c3a.sh` / `e2e-c1.sh` / `e2e-c2.sh` | **10/10 · 6/6 · 17/17** |
+| Anexos | `vitest run …/session-persistence/attachments` | **61/61** (store 20, probes 19, lifecycle 5, routes 5, recovery 6, policy 6) |
+| Sondas | config dedicada em `/home/user/c3a-validacao/13-sondas` | **13/13** |
+
+Falhas nominais da ampla (pré-existentes, intocadas): `editorTabs`, `monacoLoadFailure`, `fatia07_destravar`; `providersRepo` continua flaky (aparece em `resolvedFailures` por ter sido vermelho na baseline).
+
+**Windows:** não executado (sem SO Windows neste ambiente). Correções de portabilidade aplicadas nos testes (T14–T17: `--pool=forks --poolOptions.forks.singleFork=true`, sem flags numéricas conflitantes, `cwd` na raiz do projeto; T32: `resetDatabase()` em `try/finally` antes do `rmSync`) e runner `platform/scripts/e2e-c3a.ps1` entregue. Procedimento e resultados esperados em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md` (§7). Nada aqui atribui homologação ou execução Windows.
+
+---
+
+# 17/11/2026 — autocomplete de subpastas: gates Windows
+
+Runtime Node26 canônico, Chrome e perfis descartáveis: **141 aprovados/13 pulados**, nove arquivos (oito da rodada anterior mais `workspaceDirectorySuggestions.test.tsx`); **C-2 E2E17/17 + C-1 E2E6/6**; typecheck/build/lint do hook/menu/porta cliente/testes alterados **exit0**. Ampla não repetida; não chamadas APIs reais de LLM nem dados pessoais. Scripts/logs/captura e gates.json externos em `memoria-de-projeto/autocomplete-pastas-2026-11-17/`; mesmas pré-condições de isolamento das rodadas abaixo.
+
+Hook: não consultar FS com menu fechado, vazio ou busca relativa; Windows parcial consulta pai/filtra prefixo; `C:` consulta raiz; resposta velha nunca substitui resultado novo mesmo se serviço ignora abort; permissão negada distinta de pasta vazia. UI: teclado explora sem validar; Usar pasta confirma pelo callback existente; drive normalizado também ao confirmar.
+
+**J17 integrado:** árvore real em perfil temporário, consulta por prefixo, clique em pasta/filha e recuperação do conteúdo, nenhuma validação ou chamada de modelo durante exploração; somente diretórios (arquivo fixture ausente da lista); negativa de permissão controlada e retomada; rascunho preservado e confirmação final única. Captura `landing_autocomplete_subpastas.png` conferida. J1–J16 e C-1 reexecutados; nenhum resultado atribui homologação humana. App.tsx não foi alterado.
+
+---
+
+# 17/11/2026 — correções de estado/tema/navegação da landing
+
+| Gate Windows (Node26 canônico/Chrome) | Resultado |
+|---|---|
+| Regressão dos sete arquivos anteriores + `landingContextState.test.tsx` | **135 aprovados / 13 pulados**, oito arquivos |
+| C-2 `e2e/c2_centro.spec.ts` | **16/16** |
+| C-1 `e2e/c1_correcoes.spec.ts` | **6/6** |
+| Typecheck / build | **exit0 / exit0** |
+| Lint hook/menu/testes alterados | **exit0** |
+| Lint App vs base33541c1 por stdin, mesmo nome de arquivo/regras | **17 = 17**, mesmas mensagens, zero novas |
+
+**J16 RED→GREEN real:** pré-condição cria conversa existente; alterna tema claro e verifica CSS computado dos dois composers; escolhe pasta validada, reabre menu e confere input; volta para Chat e exige árvore ausente/vista vazia; F5 exige landing visível mesmo com conversas no banco; fecha Explorer, Nova sessão deve mantê-lo fechado, abre e repete mantendo aberto. `expect.soft` capturou todas as divergências na base antes de corrigir. Acrescentados testes de prefill/busca e hook: remount, mudança de destino, limpeza da raiz e storage inválido/quota.
+
+Scripts/logs/RED/capturas e `gates.json`/`lint-app-comparacao.json` externos em `memoria-de-projeto/correcao-estado-landing-2026-11-17/`; comandos e política de perfil são os mesmos das rodadas abaixo. Perfis descartáveis, fixture HTTP local estrita; sem API remota/dados reais. Ampla não repetida. Primeiro rascunho da sonda foi interrompido por faltar conversa prévia no fixture; a reprodução documentada é a versão corrigida com essa pré-condição, não o timeout de infraestrutura. Nenhum teste dá aceite humano ou avança a fase.
+
+---
+
+# 17/11/2026 — validação de crescimento real e direção dos menus
+
+Node26 canônico, Chrome Windows, perfis descartáveis: **36/36** em LandingContextMenu/SessionLanding/c2Composer; **15/15** em `e2e/c2_centro.spec.ts`; typecheck, build e lint de SessionLanding/LandingExecutionControls **exit0**. Scripts/logs e capturas externos em `memoria-de-projeto/correcao-crescimento-menus-2026-11-17/`; infraestrutura de isolamento/reprodução igual às rodadas abaixo.
+
+**RED real:** J15 no código anterior devolveu card86px em vez de>136 após sete linhas. **GREEN:** J15 digita Shift+Enter, cola60 linhas, prova crescimento real de card/textarea, altura<=200px, conteúdo maior que área visível (rolagem), redução a86px ao retornar texto curto e adaptação800×600; J14 agora compara popup.y com o fim de cada acionador, exigindo abrir abaixo e caber no viewport. Capturas `landing_campo_expandido*` e `toolbar_*` conferidas.
+
+Não repetidas ampla/regressão completa/C-1 neste ajuste; sem APIs externas, dados pessoais, diálogo nativo ou homologação humana. Placar antigo não representa nova execução. Não habilitados Autopilot/assistência/sandbox/anexos; restrições de Chat e confirmação de allow-all permanecem.
+
+---
+
+# 17/11/2026 — correção pontual: menus da landing em Chat
+
+Foco `LandingContextMenu.test.tsx`, `SessionLanding.test.tsx`, `c2Composer.test.tsx`: **36/36**. E2E `e2e/c2_centro.spec.ts`: **14/14** no Chrome/Windows com Node26 canônico e perfil sintético; J4 abre os três menus em Chat e inspeciona opções restritas; J14 conserva prova de Workspace. Typecheck/build Vite e lint de LandingExecutionControls/c2Composer: **exit0**. Comandos e infraestrutura de perfil iguais às rodadas abaixo; scripts/logs/capturas da rodada em pasta externa `memoria-de-projeto/correcao-menus-chat-2026-11-17/`.
+
+Novo teste unitário: interagir com os três menus em Chat, tentar opções desabilitadas, selecionar Perguntar/Interativo/manual e enviar; snapshot continua contexto chat, modo ask, permissão manual e raiz null. Sem chamadas a modelos externos ou dados pessoais. Não repetidas ampla, regressão completa ou C-1 nesta mudança pontual; placares dessas baterias abaixo são históricos, não reexecuções desta rodada. Sem interação nativa manual, aceite humano ou próximo escopo.
+
+---
+
+# 17/11/2026 — revalidação dos controles da barra da landing
+
+Sobre a rodada do menu único, testes finais com Node26 canônico/Chrome Windows e perfis isolados: **35/35** nas três suítes da landing; **130 aprovados/13 pulados** nos sete arquivos já listados abaixo; **14/14 C-2 + 6/6 C-1**. Typecheck/build e lint do perímetro (agora incluindo `LandingExecutionControls.tsx`) exit0. Os resultados anteriores abaixo permanecem históricos.
+
+Novas provas em `c2Composer.test.tsx`: Interativo abre menu real; Planejar altera o snapshot; cancelar confirmação preserva manual, confirmar muda allow-all; teclado/seleção/Escape/clique fora funcionam após portal. **J14** em `e2e/c2_centro.spec.ts`: três menus em1872×1080 e800×600 com caixa dentro do viewport, escolha de Planejar, confirmação de Permitir tudo e `/api/agir` real recebe `mode: plan`, resposta completa da fixture. Capturas `toolbar_*` e logs finais `regressao.log`, `unit.log`, `e2e-c2-original.log`, `e2e-c1.log`, `gates.json` na pasta operacional externa `ajuste-landing-2026-11-17/`. Não houve APIs remotas, dados pessoais ou suíte ampla nesta rodada; diálogo nativo manual não foi testado.
+
+Anexos continuam C-3 por decisão explícita do proprietário; não testar upload nesta entrega nem considerar + uma ação de upload funcional. Nenhuma prova habilita Autopilot, assistência de permissões ou sandbox. Repetir comandos e pré-condições de isolamento da seção abaixo, agora com14 jornadas C-2.
+
+---
+
+# 17/11/2026 — Windows: ajuste da landing (base bb6857a)
+
+Node 26.13.0 do runtime versionado, Chrome instalado, perfis externos descartáveis com `test-profile.cjs`, credenciais removidas. Nenhum dado real/provedor remoto. O servidor de uso na porta 5174 foi preservado; servidores de teste nas portas 5211/5212 são próprios das suítes e encerrados por elas.
+
+| Verificação | Resultado observado |
+|---|---|
+| LandingContextMenu + SessionLanding + c2Composer | 33 aprovados |
+| Os três acima + App + c2PrimeiroEnvio + c2Arquitetura + c2SessaoLateral | 128 aprovados, 13 pulados, sete arquivos |
+| E2E C-2 `e2e/c2_centro.spec.ts` | 13/13; servidor real + provedor HTTP local estrito |
+| E2E C-1 `e2e/c1_correcoes.spec.ts` | 6/6; Chat sem FS/permission, Pasta, validação pendente, migração e falha assíncrona |
+| Typecheck / build Vite | exit 0 / exit 0 |
+| ESLint: componentes LandingContextMenu/SessionLanding, sessionsClient e seus três testes focais | exit 0 |
+
+**Reprodução:** após preparar o runtime e um perfil isolado conforme as regras abaixo, executar Vitest com um worker (`--maxWorkers=1 --minWorkers=1`) nos sete arquivos citados em `src/__tests__`; typecheck com `tsc --noEmit -p tsconfig.app.json`; build com `vite build`. Runners Windows de navegador existentes: `platform/scripts/e2e-c2.ps1` e `e2e-c1.ps1` na raiz, com o Node canônico no PATH. As specs criam seus perfis e fixtures e continuam portáveis para Linux. Não executar em perfil pessoal.
+
+**Provas novas:** histórico só é carregado ao abrir o menu; caminhos homônimos mantêm identidade; validação recusada deixa texto e caminho intactos; falha de histórico não se disfarça de lista vazia; Enter/teclado/Escape/clique fora; exclusão de duas opções separadas e dicas; atalho inferior seleciona modelo por ponteiro; trava de escolhas durante envio. J13 usa backend real, registra pasta, reabre após F5 e compara caixa do menu com a coluna e o viewport, além de capturas em 1872×1080 e 800×600.
+
+**Limites:** suíte ampla não repetida; avisos conhecidos de fixtures/React `act` e `NO_COLOR` não são considerados falhas nem removidos dos logs. Não houve chamada Google/NVIDIA, homologação humana, interação manual com diálogo nativo, commit/push/merge. Logs/scripts/capturas extensos ficam fora do Git em `memoria-de-projeto/ajuste-landing-2026-11-17/`. Não declarar paridade de toda a aplicação nem aprovação de C-2 por estes gates.
+
+---
+
+# C-2 — gates da entrega (Debian/Arena, 13/11/2026) — AGUARDA HOMOLOGAÇÃO + GATE WINDOWS
+
+**Escopo:** correções do parecer C-2 (RV01–RV08) sobre `7b0292e`, branch `0f2e5de2-agente-window`. Execução **Debian = Arena**; **Windows não executado**; E2E com backend controlado (fixture de provedor local); provedores reais não pagos chamados. Evidências em `/home/user/memoria-de-projeto/execucao-c2/`.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Typecheck | `npx tsc -b --force` | **0 erros — exit 0** |
+| Typecheck do E2E | `npx tsc --noEmit … e2e/c2_centro.spec.ts` | **0 erros — exit 0** |
+| Foco C-2 (lista do `VALIDAR_C2_WINDOWS.ps1`, 26 arquivos) | `npx vitest run <FOCO>` | **422 aprovados + 13 pulados + 0 falhas** |
+| Ampla | `sh memoria-de-projeto/execucao-c2/ampla-c2.sh` vs `baseline-nominal.json` | **diff nominal 0 novas / 0 resolvidas** (`ampla-final.json`, `comparacao-ampla.json`) |
+| Lint (piso do baseline) | `npx eslint src --format json` vs baseline worktree | **111 = 111** (84 erros — piso mantido; `lint-comparacao-final.json`) |
+| Build oficial | `NODE_OPTIONS=--max-old-space-size=1408 npx vite build` | **exit 0** |
+| **E2E C-2 (8 jornadas base + RV08)** | `sh platform/scripts/e2e-c2.sh` | **12 passed (1,2 min) — 0 failed** — `e2e-c2-jornadas.md` |
+| Windows | `VALIDAR_C2_WINDOWS.ps1` | **NÃO EXECUTADO — pendência declarada** |
+
+**Ressalvas:** (1) Windows pendente — repetir FOCO/ampla/E2E no runner do pacote; (2) comparação de screenshots com as 7 referências do parecer (1872×1080, 800×600, menus abertos) é etapa posterior de homologação; (3) E2E C-1 não reexecutado nesta rodada (RV08); (4) as 8 falhas de fronteira pré-existentes da ampla permanecem (não corrigidas por decisão de escopo). Homologação humana não atribuída; `08` intocado.
+
+---
+
+# Aceite e retorno manual do proprietário — 16/11/2026
+
+MM-0 homologada expressamente pelo proprietário (08); correção de transporte sem ferramentas em **055bbd4**. O proprietário confirmou resposta Google após a correção e trouxe resumo de teste bem-sucedido de listar/criar/ler/escrever/excluir/buscar/executar. Registro de relato humano: o Codex não inspecionou independentemente o arquivo final nem a Lixeira e não confirmou o backend exato de cada operação. Uma execução anterior parou após três ferramentas por 404 de acesso a Gemini 2.5 Flash; não foi atribuída ao funcionamento das ferramentas nem corrigida alterando o provedor silenciosamente. O aceite preserva as ressalvas da ampla Windows descritas abaixo. Não foram repetidos gates para esta atualização documental.
+
+---
+
+# Google/LiteLLM — Chat sem ferramentas — correção Windows (16/11/2026)
+
+Base d1dd69d; alteração local autorizada. Dados sintéticos, perfis externos isolados, Node canônico 26.13.0 e transporte HTTP real contra fixture local. Sem chamadas pagas, dados pessoais, alterações em LiteLLM ou bypass de produção.
+
+- Repro: `agir/__tests__/vizinho.test.ts`, describe `Chat sem ferramentas — transporte compatível`: fixture recusa configuração OpenAI de function calling sem tools e grupo Gemini com declarações vazias. **Antes: 2 falhas com 400; depois: ambas aprovadas**, resposta textual e zero chamadas de ferramentas, exatamente uma requisição.
+- Foco: vizinho + chatExecucao + instrucoes + domínio multimodal inteiro: **140 aprovados, zero falhas**, oito arquivos. Suítes existentes mantêm anúncio e execução com ferramentas, incluindo o protocolo OpenAI-compatible também usado com NVIDIA.
+- Typecheck workspace: **exit 0**. Lint dos três TS alterados: **exit 0**. Diff sem erros de whitespace.
+- Não repetidos ampla, build ou E2E por esta correção focal. **Não foi comprovada resposta remota Google/NVIDIA nesta rodada**: o usuário deve carregar o backend atualizado e repetir texto simples no Google configurado. Geração de imagens permanece fora desta correção.
+- Evidências externas: `memoria-de-projeto/correcao-google-sem-tools-2026-11-16/` (`vermelho.json`, `transporte-verde.json`, `typecheck.log`, `lint.log`, `testar-foco.ps1`).
+
+## MM-0 — consolidação do reteste independente Windows em d1dd69d
+
+Foco completo **99/99**, sondas externas originais **7/7**, tipos/build/lint exit 0. Regressão de onze arquivos **183/8/13**, mesmas oito falhas da base. Ampla Windows: base 775e4a6 **1797 aprovados/42 falhas/31 pulados (1870)**; atual **1894/44/31 (1969)**. Comparação nominal: 42 falhas comuns, duas ocorrências extras de timeout App (persistência de modo; excluir última sessão). Ambos aprovados no reteste dirigido **2/2**, sem alterar timeout/teste/fixture; também passaram na regressão focada. Causa dos timeouts não isolada; não afirmar delta bruto zero. As amplas tiveram sobreposição temporal com perfis separados. Parecer: apta à homologação com ressalva da instabilidade do gate amplo; homologação humana não inferida. Relatório e JSONs em `memoria-de-projeto/reteste-MM0-2026-11-16/`. Estes resultados substituem a pendência Windows dos registros históricos abaixo. Nenhum provedor remoto ou E2E foi executado no reteste MM-0.
+
+---
+
+# MM-0 — rodada de revisão independente: gates das correções (Debian, 16/11/2026)
+
+**Escopo:** correções MM0-A1..A6 sobre `47c9a77` (commits da rodada). Execução **Debian = Arena**; **foco Windows pendente** (reexecução pelos 4 arquivos corrigidos + runner v1.1 completo); provedor real não executado (E2E = backend controlado). Evidências em `/home/user/memoria-de-projeto/execucao-mm0/` (`ampla-rev.log`, `comparacao-rev.json`).
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Foco do domínio (4 suítes + `sondas-revisao`) | `sh platform/scripts/gate-unit.sh src/domain/multimodal/__tests__` | **99/99/0/0 — exit 0** |
+| Sondas do revisor (independentes) | incluídas no foco: `__tests__/sondas-revisao.test.ts` | **7/7** (antes 7/7 falhavam contra `47c9a77`) |
+| Regressão (lista do `VALIDAR_MM0_WINDOWS.ps1`) | `npx vitest run <11 arquivos>` com runtime canônico `node v26.13.0` | **204/191/0/13 — exit 0** |
+| T22 — fluxo real `/api/agir` | `npx vitest run …/agir/__tests__/{rotas,chatExecucao}.test.ts` | **63/63 — exit 0** |
+| Typecheck | `sh iniciar.sh typecheck` (`tsc -b --force`) | **0 erros — exit 0** |
+| Lint (escopo MM-0 + casas) | `npx eslint src/domain/multimodal …/casas/{conversa,agir,provedores}/{contract,index}.ts` | **exit 0** |
+| Ampla pós-correções | `sh platform/scripts/gate-unit.sh` | **1969/1932/4/33** — **diff nominal 0 novas/0 resolvidas** vs baseline (`comparacao-rev.json`; mesmas 4 pré-existentes) |
+| E2E C-1 | `sh platform/scripts/e2e-c1.sh` | **6 passed (43,6 s) — exit 0** |
+| Windows (foco corrigido + runner v1.1) | receita do revisor/pacote | **NÃO EXECUTADO — pendência** |
+
+**Armadilha ambiental registrada:** executar `npx vitest` fora do runtime canônico (`/usr/local/bin/node` v22) quebra o `better-sqlite3` nativo (`Module did not self-register`) e derruba as rotas de persistência com 500 — a regressão só é válida com `PATH` do `platform/.runtime/node-v26.13.0-linux-x64/bin`.
+
+**Classificação da MM-0 após a rodada:** correções completas e verdes em Debian; **aguarda reexecução Windows + homologação humana** (nenhum aceite inferido; `08` intocado).
+
+---
+
+# MM-0 — gates da implementação (Debian, 16/11/2026) — PRONTA PARA GATE WINDOWS
+
+**Escopo:** contratos neutros multimodais (commit local `d0e63d8`, base `775e4a6`). Execução **Debian = Arena**; **Windows não executado**; **build de produção com OOM no ambiente (3,9 GB)**; **provedor real não executado** (a bateria E2E é backend controlado). Evidências em `/home/user/memoria-de-projeto/execucao-mm0/`.
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Foco novo | `bash platform/scripts/gate-unit.sh src/domain/multimodal/__tests__` | **82/82/0/0 — exit 0** (mensagens 28, capacidades 32, artefatos 13, integração 9) |
+| Regressão (lista do `VALIDAR_MM0_WINDOWS.ps1`) | `bash platform/scripts/gate-unit.sh <11 arquivos: SessionLanding, App, sessionRecovery, session-persistence index/publicacaoRecuperavel/deletions/__tests__/checkpoint, provedores capacidades+frontier, conversa frontier, agir frontier>` | **204/191/0/13 — exit 0** (13 pulados = pré-existentes declarados) |
+| T22 — fluxo real `/api/agir` | `bash platform/scripts/gate-unit.sh src/bairros/…/agir/__tests__/rotas.test.ts src/bairros/…/agir/__tests__/chatExecucao.test.ts` | **63/63/0 — exit 0** |
+| Typecheck (cobre `@ts-expect-error` do T07) | `sh iniciar.sh typecheck` | **0 erros — exit 0** |
+| Lint (escopo MM-0) | `npx eslint src/domain/multimodal …/casas/{conversa,agir,provedores}/{contract,index}.ts` | **exit 0 — 0 problemas** |
+| Build oficial | `PATH=<runtime-fixado> npm run build -w agents-window-replica-v2` (cwd `platform/`) | `build:fs-boundary` **ok**; `tsc -b` **ok**; `vite build` **SIGKILL/OOM exit 137** (sandbox 3,9 GB; repetido com `--max-old-space-size=3072`) — **limitação de ambiente**, logs `build-mm0.log`/`build-mm0b.log` |
+| Baseline ampla (ANTES, 775e4a6 limpo) | `bash platform/scripts/gate-unit.sh` | **1870/1833/4/33** — `baseline-nominal.json` |
+| Ampla pós-mudança | `bash platform/scripts/gate-unit.sh` | **1952/1915/4/33** — **diff nominal: 0 novas, 0 resolvidas, mesmos 33 pulados** (`comparacao-nominal.json`) |
+| E2E C-1 (navegador + servidor real, backend controlado) | `sh platform/scripts/e2e-c1.sh` | **6 passed (43,1 s) — exit 0** |
+| Windows | `powershell … -File .\VALIDAR_MM0_WINDOWS.ps1 -Repositorio <repo> -Modo Completo` | **NÃO EXECUTADO — pendência** (runner do pacote; os 4 arquivos de teste existem com os nomes exigidos) |
+
+**Autoauditoria:** mutação proposital em `avaliarCapacidadeEfetiva` ("tudo disponível") → **24 falhas** em T10–T19 → restaurado → foco 82/82 (a suíte não é vazia). Tentativas adversáriais cobertas por teste: mídia sem texto (T05), endpoint trocado com mesmo modelId (T13/T19), pool parcial (T18), versão futura (T06), `pronto` sem SHA (T07), byte no limite/zero/NaN/unidade (T16), campo secreto extra (T06/T09), CRLF congelado (T03/T21), import que carregaria servidor (T01). Dois achados foram de autoria de teste (cenário T12 invertido; meta-teste T24 auto-casa) — corrigidos; **nenhum defeito do produto** encontrado; nenhum vermelho artificial apresentado.
+
+**Classificação exata: PRONTA PARA GATE WINDOWS** (não homologada, não "pronta final"). Reprodução Windows e roteiro humano focal: `ENTREGA_MM_0.md`. Números são os efetivamente coletados; nenhum skip novo foi tratado como executado; nenhuma falha preexistente foi ocultada.
+
+---
+
+# C-1 — correção Codex R2-1/R2-2 validada no Windows, 16/11/2026
+
+**Aceite posterior do proprietário (16/11):** C-1 homologada com a dívida C1-EXCLUSAO-01 (primeira exclusão recusa; após F5 funciona, conforme relato). O relato não é teste automatizado nem diagnóstico da causa. Ver 06/08. Nenhum gate adicional foi executado para essa dívida.
+
+Implementação local autorizada pelo proprietário sobre `7ac8260`, branch `0f2e5de2-agente-window`, publicação autorizada pelo proprietário nesta branch, sem merge na base. Esta seção é o resultado vigente e sucede os gates históricos abaixo. **Homologação humana C-1 confirmada posteriormente com dívida C1-EXCLUSAO-01; MM-0 não iniciado.**
+
+| Gate executado no Windows | Resultado |
+|---|---|
+| App + centerFrontierApp + SessionLanding (3 arquivos) | **91 aprovados / 13 pulados / 0 falhas** |
+| Runner original `platform/scripts/e2e-c1.ps1`, spec do repositório | **6/6**, sem adaptar cópia externa |
+| Build oficial `npm run build -w agents-window-replica-v2` (inclui `tsc -b` e Vite) | **exit 0** |
+| ESLint no hook, landing, testes da landing e spec E2E | **exit 0**, executado na pasta workbench-v2 |
+
+**R2-1:** `useLandingSubmission` conserva o texto visível até confirmação. Campo somente leitura, estado anunciado e botão/Enter bloqueados durante o pedido; `false`, rejeição ou exceção síncrona conservam o texto e liberam a edição/retentativa. Os três testes novos de componente provam esses caminhos, tentativa de edição concorrente e uma única chamada pendente. O cenário integrado novo segura `/api/worktrees`, tenta editar/reenviar durante a espera, devolve 500, verifica mensagem original preservada, libera a retentativa pela rota real e confirma uma única sessão também após F5. O cenário de validação pendente da Arena permanece verde.
+
+**R2-2:** comparações de `path` e `cwd` usam os campos obtidos por `JSON.parse`, não o JSON serializado inteiro. O runner original agora completa todos os cenários no Windows. O primeiro ensaio do novo teste encontrou seletor ambíguo de `role=status` (toast da pasta + aviso do envio); o teste foi corrigido para identificar o aviso de preservação, e a execução final passou 6/6.
+
+**Ambiente:** Windows, Node 26.13.0 fixado, Chrome local, dados/configurações/HOME em perfis descartáveis externos, sem credenciais de provedores. SQLite 12.11.1 compilado externamente para esse Node foi carregado por alias/preload apenas na validação; dependências versionadas não foram alteradas. Provedor SSE HTTP local de fixture: rotas reais do produto, backend controlado; não é teste com LightLLM/provedor de produção. No cenário de falha, apenas a criação é interceptada; a retentativa atravessa o servidor real.
+
+**Artefatos externos:** pasta acordada `memoria-de-projeto/correcao-c1-2026-11-16/` contém `foco.json/.log`, `integrado-oficial.log`, `build.log`, `lint-workbench.log`, scripts de isolamento e `ENTREGA_CORRECAO_C_1.md`. Não são parte do runtime nem da memória M1–M8. Uma primeira chamada de lint fora da pasta que contém a configuração falhou por ausência de config; o gate válido acima usa a pasta correta. O build mantém avisos já existentes de tamanho de chunk e boundary nativo desabilitado; não foram tratados como falhas desta correção.
+
+**Limites:** suíte ampla não repetida nesta correção; não se afirma resultado global novo nem se reaproveitam números Debian como execução Windows. Migração/P-B/P-C mantêm evidências datadas da revisão anterior; os cenários integrados de migração, cascata e reinício foram executados novamente aqui. Não houve acesso a dados pessoais, homologação humana presumida ou avanço de fatia.
+
+**Roteiro humano:** (1) abrir nova conversa Pasta; durante criação lenta, conferir texto visível, aviso e edição temporariamente bloqueada; (2) provocar falha controlada somente em perfil de teste, conferir texto editável e retentar sem duplicação; (3) confirmar Chat/Pasta, Explorer e terminal conforme modalidade; (4) registrar aceite no `08` somente quando o proprietário homologar.
+
+---
+# C-1 RODADA 2 (ressalvas do reteste 16/11) — gates, cenário determinístico e e2e Windows (16/11/2026)
+
+Commit **`6db61d1`** (push `50386ad..6db61d1`; PR #1 OPEN, sem merge, sem MM-0). Execução **Debian = Arena**; **Windows não executado por esta sessão**; **E2E com provedor real não executada** (mesma bateria backend controlado).
+
+## 1. Resultados desta rodada (execução real)
+
+| Escopo | Comando | Resultado |
+|---|---|---|
+| Typecheck | `sh iniciar.sh typecheck` | **0 erros** |
+| Foco rodada2 | `bash platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/SessionLanding.test.tsx` | **95/82/0/13** |
+| Foco clientes | `bash platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/SessionLanding.test.tsx src/__tests__/TerminalPanel.test.tsx src/__tests__/databaseMigration.test.ts` | **106/84/0/22** |
+| **Ampla** | `bash platform/scripts/gate-unit.sh` | **1867 / 1830 / 4 / 33** — 4 = baseline (`themeTokens`×2, `editorTabs`, `monacoLoadFailure`), **reconfirmadas com `git stash`** |
+| Lint delta | `npx eslint` nos 4 arquivos do diff × baseline com stash | **0 novos** — mesmos 17 problemas pré-existentes (só deslocamento de linha) |
+| **E2E integrado (5 cenários)** | `sh platform/scripts/e2e-c1.sh` | **5 passed (36,3 s)** |
+
+## 2. Cenário determinístico da ressalva “envio antecipado em Pasta”
+
+- **Unitário** (`App.test.tsx`, describe *rodada2*): `aoValidarWorkspace` do mock **segura** o `POST /api/workspaces/validate` até `liberarValidacao()`; envio durante a validação → `findByText(/ainda está sendo validada/)` + campo com o texto íntegro + `createSessionWorktree` **nunca** chamado + zero `/api/worktrees` → libera → `Workspace selecionado` → reenvio → `Resposta do modelo em Pasta.` com `createSessionWorktree` exatamente 1×.
+- **E2E** (`c1_correcoes.spec.ts`, teste *rodada2*): `page.route` segura o mesmo endpoint; garantias idênticas no navegador real e conclusão após liberar (`ultimaBolha` com `Resposta do modelo em Pasta.`).
+- **RED** (correção revertida via `git stash`): `Unable to find an element with the text: /ainda está sendo validada/` — o aviso nunca aparecia (sintoma relatado). Sem espera arbitrária em nenhum dos dois níveis.
+- **Fix:** `SessionLanding.submit` devolve o texto em recusa/falha; `handleLandingSubmit → Promise<boolean>` com `notify` em cada recusa; `setWorkspaceChangePending` cobre até a conclusão do envio aceito.
+
+## 3. e2e Windows (`.ps1`) — o que foi e o que NÃO foi executado
+
+`platform/scripts/e2e-c1.ps1` foi **escrito** (Chrome local do Windows, servidor porta 5211, mesmos 5 cenários, falha se a porta já estiver em uso) e o spec foi tornado portável (`tmpdir()`, normalização `\\`→`/`, botão `'Workspace atual'`). **Não executado por esta sessão** (Debian); a execução Windows é do avaliador. O runner Linux `e2e-c1.sh` permanece e foi executado: **5/5**.
+
+# C-1 REENTREGA (revisão do Codex) — gates, E2E e reprodução das correções B1/B2/B3/F4 (15/11/2026)
+
+Separação obrigatória mantida: **Debian = execução da Arena**; **Windows não executado** nesta rodada; **E2E com provedor real não executada** (a bateria nova é **backend controlado** — fixture SSE local + servidor Vite real + Chromium real). Log consolidado com a saída real de cada comando: **`/home/user/memoria-de-projeto/execucao-c1/rev-c1-gates.log`**.
+
+## 1. Resultados desta rodada (execução real)
+
+| Escopo | Comando | Resultado |
+|---|---|---|
+| Foco B1 | `sh platform/scripts/gate-unit.sh src/server/session-persistence/databaseMigration.test.ts` | **3/3** |
+| Foco B1 (pasta) | `sh platform/scripts/gate-unit.sh src/server/session-persistence` | **240/239/0/1** (55 arquivos) |
+| Foco cliente B2/B3/F4 | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/__tests__/TerminalPanel.test.tsx` | **91/69/0/22** |
+| Foco casa Agir | `sh platform/scripts/gate-unit.sh src/bairros/2-inteligencia/casas/agir` | **239/233/0/6** (frontier FT-05 verde) |
+| **Ampla** | `sh platform/scripts/gate-unit.sh` | **1866 / 1829 / 4 / 33** (518 arquivos) — 4 = baseline `themeTokens`×2/`editorTabs`/`monacoLoadFailure`, **confirmadas com as correções revertidas (stash)** |
+| Typecheck | `sh iniciar.sh typecheck` | **0 erros** |
+| Lint delta | `npx eslint` nos arquivos do diff (PATH do runtime) | **0 novos** — por-arquivo idêntico à baseline com stash (`VSCodeTerminal 20 / App 17 / TerminalPanel.test 2 / ChatInput 1`); novos `preparacao.ts` e `c1_correcoes.spec.ts` = **0** |
+| **E2E integrado** | `sh platform/scripts/e2e-c1.sh` | **4 passed** (34–37 s) |
+
+**RED → GREEN (sondas com a correção revertida via `git stash push`, teste já escrito):** B1 `foreign_key_check` **5 violações** → verde; B2 `expected […] to not include '/api/agir/permission'` → verde; B3 `expected [ '/fs/root' ] to deeply equal []` → verde; F4 `expected '' to be null` + `toHaveAttribute("data-pty-status", "sem-workspace")` → verdes.
+
+## 2. E2E integrado — o que é e o que NÃO é
+
+`platform/apps/workbench-v2/e2e/c1_correcoes.spec.ts` (4 testes): a spec **spawna o próprio Vite** (receita da `m7_restart`) com `AGENTE_WINDOW_DATA_DIR` descartável em `/tmp`, planta o **banco legado preenchido** antes do primeiro boot, dirige o **Chromium real** e usa provedor **fixture SSE local** = **backend CONTROLADO**. Cobertura: (1) migração legada com dependentes (API + `foreign_key_check` + UI + cascatas reais); (2) 1º envio em Chat completo no modelo, **zero** `/api/agir/permission|instruction`, `mode:'ask'`, **zero** 409, **zero** `/fs` e `/git`, terminal `sem-workspace` e **zero** frames `open` de PTY; (3) Pasta preservada (permission presente, `/fs/workspace` com raiz real, `open` com `cwd` real); (4) reboot real + `409 session_context_immutable` + integridade + F5.
+
+**NÃO é E2E com provedor real de produção** — esta **não foi executada** e não é declarada. Screenshots reais: `platform/apps/workbench-v2/test-results/c1_*.png`.
+
+Ambiente: o CDN do Playwright está fora da lista de hosts do sandbox; o runner aponta o Chromium do ambiente (`PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium` + `LD_LIBRARY_PATH=/tmp/al2023/lib` para as NSS). `playwright.config.ts` lê a variável (ausente = comportamento antigo).
+
+# C-1 — gates, reprodução e resultados (15/11/2026)
+
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows não executado para a C-1** (receitas na entrega, `/home/user/memoria-de-projeto/execucao-c1/ENTREGA_C_1.md` — nenhuma linha Windows é alegada aqui).
+
+## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
+
+| Fase | Comando | Resultado |
+|---|---|---|
+| Sondas RED C-T01–03 (antes da implementação) | `sh platform/scripts/gate-unit.sh src/server/session-persistence/sessionContext.test.ts` | **9 falhas exatas** (todas as sondas) |
+| Verde `sessionContext` (pós-implementação) | idem | **11/11** (9 originais + 2 negativos novos: `other-chat-source` 403 · `project-memory` 409) |
+| C-T04 + negativos Agir | `sh platform/scripts/gate-unit.sh src/bairros/2-inteligencia/casas/agir/__tests__/chatExecucao.test.ts` | **4/4** — anúncio `tools: []`, spy `criarExecutores` zero, forjado recusado com motivo, `instruction`→409 e `permission`→409 |
+| Cliente C-T05/C-T08 | `sh platform/scripts/gate-unit.sh src/__tests__/SessionLanding.test.tsx src/__tests__/ChatInput.test.tsx src/__tests__/App.test.tsx src/__tests__/fatia07_destravar.test.tsx` | **14/14** · **35/35** · **77 (64 pass/0 fail/13 skip)** · **3/3** |
+| Suites intermediárias (pós-GREEN) | session-persistence · agir · personalizacoes | **236/237** (1 pulado condicional) · **229/235** (6 pulados) · **135/135** |
+| **Foco completo** (arquivos tocados + suítes) | `sh platform/scripts/gate-unit.sh <lista da entrega §6>` | **636/0/20 (135 arq)** |
+| **Ampla** (`d589179`) | `sh platform/scripts/gate-unit.sh` | **1823/4/33 (514 arq)** |
+| Typecheck | `sh iniciar.sh typecheck` | **exit 0 / 0 erros** |
+| Lint delta | `npx eslint <25 arquivos>` agora vs. base `5720ca2` (worktree temporário + symlink `node_modules`) | **23 = 23 (0 novos)**; arquivos novos (`sessionContext.test`, `chatExecucao.test`): **0 problemas** |
+
+As **4 falhas** da ampla são **exatamente as pré-existentes** de todo o programa: `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. C-T16 (regressão de persistência/memória/MC1/editor/Explorer/terminal) é coberto pela ampla. Evidências em `/home/user/memoria-de-projeto/execucao-c1/`: `pos-c1-foco.log`, `pos-c1-ampla.log` + `pos-c1-ampla.json`, `pos-c1-typecheck.log`, `pos-c1-lint.log`.
+
+## 2. Cobertura dos critérios C-1 (C-T01–05/08/16)
+
+| Critério | Onde é provado | Estado |
+|---|---|---|
+| C-T01 — Chat sem FS/Git/shell; mensagem/restore funcionam | `sessionContext.test.ts` (2 testes; espelho `validateWorkspacePath` = 0 na criação) | GREEN |
+| C-T02 — POST/PUT/change-workspace forjados; negativos | `sessionContext.test.ts` (4 + 2 negativos servidor) + `index.test.ts` (change-workspace reescrito) | GREEN |
+| C-T03 — legados preservam pasta/worktree/origens | `sessionContext.test.ts` (2) + demais da suíte | GREEN |
+| C-T04 — anúncio vazio + spy de fábrica + forjado recusado | `chatExecucao.test.ts` (2) | GREEN |
+| C-T05 — recents/inacessível/picker nulo/erro nativo/retorno tardio, sem fallback de raiz | `SessionLanding.test.tsx` (3 novos + 6 ajustados) · `App.test.tsx` (4 novos) · `workspaces.test.ts` (recents/inexistente) | GREEN |
+| C-T08 — modos/permissões em workspace; Chat não amplia; Interativo sem Autopilot | `ChatInput.test.tsx` (4 novos: Agent/Editar desabilitados com motivo, guardas de seleção, Permitir tudo desabilitado, regressão workspace) | GREEN |
+| C-T16 — regressão geral sem novas falhas | ampla completa (1823/4/33 — 4 pré-existentes) | GREEN |
+
+## 3. Windows
+
+**Nenhuma execução Windows nesta sessão para C-1.** O pacote de receitas (`iniciar.cmd` foco/ampla/typecheck com esperados batendo com o Debian acima) está no § da entrega; resultados Windows, quando executados pelo dono/Codex, serão registrados como **comunicados**, nunca executados por esta sessão.
+
+## 4. Limites
+
+1. Suíte global **não** é integralmente verde (4 pré-existentes fora do perímetro da C-1).
+2. Nenhum aceite humano é produzido por estes gates — homologação humana vive em `08`.
+3. Dados somente sintéticos; perfis `mkdtemp` por teste; nenhum dado pessoal, banco, worktree ou processo real tocado nas provas da Arena.
+
+---
+
+# P-C — gates, reprodução e resultados por ambiente (15/11/2026)
+
+Separação obrigatória: **Debian = execução da Arena** neste workspace (runtime canônico `platform/.runtime` Node **26.13.0** / npm 11.20.0, gate `platform/scripts/gate-unit.sh`); **Windows = execução do Codex, com resultados comunicados pelo proprietário** — não executados por esta sessão e com artefatos externos ausentes deste ambiente. **Testes amplos** = regressão nominal completa da suíte; **retestes focados** = subconjuntos por escopo (protocolo, recovery, UI).
+
+## 1. Debian — execução da Arena (reprodução a partir da raiz do repositório)
+
+| Fase | Comando | Resultado |
+|---|---|---|
+| Sondas RED da reentrega | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/server/session-persistence/deletions.test.ts src/services/sessions/sessionRecovery.test.ts` (com as sondas no diff) | **3 falhas exatas** (App PC-R1 · T19 `200≠409` · recovery `undefined`) + 80/0/13 nos demais |
+| Verde pós-correção `6feef9f` | idem, sem sondas | **96: 83/0/13** |
+| Foco 5 alvos (reentrega) | `sh platform/scripts/gate-unit.sh src/server/session-persistence/deletions.test.ts src/server/session-persistence/databaseMigration.test.ts src/services/sessions src/__tests__/App.test.tsx` | **108/0/13 (121)** — deletions 19/19 · migração 2/2 · recovery 5/5 · client 11/11 · notice 12/12 · App 72 |
+| Foco combinado | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/services/sessions src/server/session-persistence` | **314/0/14 (328; 29 arq)** |
+| Ampla `6feef9f` | `sh platform/scripts/gate-unit.sh` | **1795/4/33 (1832; 186 arq)** |
+| Foco da correção da ressalva `69f4510` | `sh platform/scripts/gate-unit.sh src/__tests__/App.test.tsx src/services/sessions/sessionRecovery.test.ts src/server/session-persistence/deletions.test.ts` | **98/0/13** |
+| Ampla `69f4510` | `sh platform/scripts/gate-unit.sh` | **1797/4/33 (1834; 186 arq)** |
+| Typecheck | `sh iniciar.sh typecheck` (raiz) | **exit 0 / 0 erros** |
+| Lint delta | `PATH=platform/.runtime/node-v26.13.0-linux-x64/bin:$PATH npx eslint <arquivos>` em `platform/apps/workbench-v2`; baseline por `git worktree add /tmp/base-lint <base>` + symlink de `node_modules` | **0 novos** (ressalva: 1 = 1 pré-existente `_historica`) |
+
+As **4 falhas** da ampla são **pré-existentes**, reproduzidas em base (stash/worktree): `themeTokens` ×2, `editorTabs`, `monacoLoadFailure` — qualquer 5ª falha é divergência a investigar. P-B inalterada na P-C: `publicacaoRecuperavel` **22/22**; bateria P-B final **285/299** (histórico em `/home/user/memoria-de-projeto/execucao-pb/status.json`). Evidências JSON da reentrega: `/home/user/memoria-de-projeto/execucao-pc/pos-pc-re-foco.json` e `pos-pc-re-ampla.json`.
+
+## 2. Windows — validação do Codex (resultados comunicados pelo proprietário)
+
+| Rodada | Versão | Resultado comunicado |
+|---|---|---|
+| P-B — teste original de encerramento B1 | `c581bfa` | **6/6** (Windows aceita `{code, signal:null}` somente com saída confirmada; POSIX exige SIGKILL; `exit 1` genérico nunca basta) |
+| P-C — correções PC-R1/PC-R2 | rodada anterior à ressalva | confirmadas (reteste independente + validação) |
+| P-C — ressalva + reteste focado | `69f4510` | aviso “Cópia salva”; confirmação preservada após F5; retentativa sem duplicação; conteúdo local preservado; identidade original ainda excluída; **30 testes focados aprovados** |
+
+Nenhuma dessas linhas foi executada por esta sessão; os relatórios/log do Codex não estão neste ambiente. O registro aqui é o **relato do proprietário**, sem alegar leitura de arquivos ausentes.
+
+## 3. Comandos Windows de referência (receitas da entrega P-C, para reprodução do dono/Codex)
+
+```
+iniciar.cmd test src/server/session-persistence/deletions.test.ts src/server/session-persistence/databaseMigration.test.ts src/services/sessions src/__tests__/App.test.tsx > logs-pc\foco.log 2>&1
+iniciar.cmd test --maxWorkers=1 --reporter=dot > logs-pc\ampla.log 2>&1
+```
+
+Referência da rodada `6feef9f` (Debian, §1): foco 108/0/13; ampla 4 failed / 1795 passed / 33 skipped (1832; 186 arquivos). A rodada Windows `69f4510` corresponde aos **30 testes focados** comunicados. Diferenças Debian/Windows nominais devem ser classificadas como ambiente, nunca como falha silenciosa.
+
+## 4. Limites
+
+1. Suíte global **não** é integralmente verde (4 pré-existentes fora do perímetro da P-C).
+2. Nenhum aceite humano é produzido por estes gates — homologação humana vive em `08`.
+3. Dados somente sintéticos; perfis `mkdtemp` por teste; nenhum dado pessoal, banco, worktree ou processo real tocado nas provas da Arena.
+
+---
+
 # MC1 corretiva / D201 — autorização específica e renomeação (12/11/2026)
 
 Base `c4dbff6`, branch `arena`, somente `agente_window`. A inspeção somente leitura do caso humano confirmou título `memoria`, criação anterior à MC1, digest consistente e origem `unverifiable` sem identidade física histórica. O problema não era perda comprovada de vínculo por rename. Havia também falta de tolerância a acentos e uma recusa transformada pelo modelo em ausência. Contrato corrigido em D201; evidências anteriores D200 abaixo são históricas e não substituem esta rodada.
@@ -2294,3 +2869,64 @@ Base 36cba54; Node/npm oficiais, Windows/Chromium fixado. Artefatos externos em 
 7. lint-final.json: 21 erros herdados idênticos à base 36cba54 (App 17, index 3, outlineCandidates 1), nenhum novo; 10 avisos no perímetro alterado. Não comparar este perímetro ao anterior de 26 erros como se fossem a mesma seleção. Canceled/Delayer do Monaco nativo segue nos PAGEERRORS, sem perda demonstrada.
 
 Comando: powershell.exe -NoProfile -ExecutionPolicy Bypass -File platform/scripts/project.ps1 test [19 caminhos completos em gate-final.log] --maxWorkers=1 --minWorkers=1 --reporter=verbose --reporter=json --outputFile=[revisao]/gate.json. AGENTE_WINDOW_TEST_ROOT=[feedback]/unitarios. Typecheck pelo mesmo launcher. Testes de navegador são scripts Playwright locais via Node fixado. Fixtures só no workspace descartável do perfil 5199. Nenhuma inferência IA/chave real, build de produção ou homologação de terminal. A integral histórica 36 falhas/30 ignorados não foi repetida. Recuperação existente atualizada após commit com clone/HEAD/tree/fsck e extração/SHA256; metadados finais no operacional.
+
+## C-3b — como validar (Linux)
+
+- Gate de critérios: `node VALIDAR_C3B.mjs --repo <repo> --mode foco --out <NOVO>` — exige cada ID T01–T32 **no nome do teste**, sem skip.
+- Jornadas pelos runners da casa: `sh platform/scripts/e2e-c3b.sh` (Linux) e `powershell -File platform\scripts\e2e-c3b.ps1` (Windows) — mesma spec, porta 5216, `--retries=0`. Irmãos de `e2e-c3a.{sh,ps1}`.
+- **Portabilidade exigida nos testes:** nenhum `.test.ts` da C-3b pode gravar caminho absoluto de SO (`/home/...`, `/tmp/...`, `C:\`); a suíte roda em Debian e Windows. Caminho de recurso externo ao repo não é testável — os recursos precisam estar versionados.
+- **Encerramento forçado por plataforma:** POSIX registra `signal='SIGKILL'`; Windows devolve `{code:1, signal:null}`. Teste que exige SIGKILL reprova o Windows injustamente; usar o helper `verificarEncerramentoForcado` (padrão do B1 da C-3a), mantendo as provas de fronteira.
+- Comparação nominal: `--mode ampla --baseline-json <baseline>/vitest.json` — reprova em `newFailures`, `newSkips` e `missingCriteria`.
+- Jornadas: `node VALIDAR_E2E_C3B.mjs --repo <repo> --out <NOVO>` (porta 5216, `--retries=0`, sem skip).
+- **Pegadinha de ambiente (C-1):** `e2e/c1_correcoes.spec.ts` sobe o servidor na porta 5211, mas `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174). Sem `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5211` o spec falha com `ERR_CONNECTION_REFUSED`. Isso **não** é regressão: acontece igual na base homologada `a49cc6c`.
+- **Chromium no sandbox:** `LD_LIBRARY_PATH=/tmp/al2023/lib` e `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium`.
+- O produtor de teste só existe com `C3B_SAIDA_DE_TESTE=1` na composição; em produção a fábrica recusa.
+
+## U-1 — Configurações unificadas: como validar (Linux)
+
+- **Unitárias (critérios no NOME do teste, sem skip):**
+  `src/__tests__/u1ConfiguracoesShell.test.tsx` (**29**: U1-T01/T02/T08/T09/T10 +
+  R01/R04/R09) e `src/__tests__/u1ConfiguracoesPaineis.test.tsx` (**22**: U1-T03/T04/
+  T05/T06/T07 + R03/R04).
+- **Gate de critérios:** `node VALIDAR_U1.mjs --repo <repo> --mode foco --out <NOVO>`;
+  comparação nominal com `--mode ampla --baseline-json <baseline>/vitest.json`
+  (reprova em `newFailures`, `newSkips` e `missingCriteria`). O `--out` precisa
+  **não existir** — o runner recusa diretório já criado.
+- **E2E:** `node VALIDAR_E2E_U1.mjs --repo <repo> --out <NOVO>` (ou `sh platform/scripts/e2e-u1.sh`) — porta **5218**,
+  `--workers=1 --retries=0`, jornadas **U1-E01…U1-E13** (E01–E07 da matriz canônica;
+  E08–E13 dos seis ajustes da revisão) exigidas pelo nome. Para regerar as capturas,
+  `U1_EVIDENCIA_DIR=<pasta> sh platform/scripts/e2e-u1.sh` (61 PNG). Ambiente do
+  sandbox: `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/tmp/chromium` e
+  `LD_LIBRARY_PATH=/tmp/al2023/lib`.
+- **Layout (medição no DOM, 180 cenários):** harness externo ao repo
+  (`/tmp/u1-pw/inspecao_layout3.cjs`, porta 5218) percorre as 13 categorias + as 3
+  subseções de Personalizações em 1400×900 / 1024×700 / 800×600 × claro/escuro ×
+  expandido/restaurado e mede clipping, sobreposição, rolagem e alcance de
+  Salvar/Fechar. Evidência: `/home/user/u1-gates/28-layout-final/` (**180/0**); o
+  antes, com 34 defeitos, em `21-layout-depois/`.
+- **Regressões nominais obrigatórias** (além da comparação ampla): App,
+  SessionLanding, customView, persistenciaNativas, useWorkbenchHistory,
+  stableEditorSurface, ConfigView/rotas config, ProvidersView/rotas provedores,
+  PersonalizacoesView/rotas personalizacoes; E2E `provedores_fatia08`,
+  `c1_correcoes` (porta 5211 via `PLAYWRIGHT_BASE_URL`), `c2_centro` (5212) e
+  `c3b_multimodal` (5216).
+- **⚠️ Cada spec de regressão roda com o SEU runner** (`e2e-c1.sh` / `e2e-c2.sh` /
+  `e2e-c3b.sh`), que sobe o Vite e o banco descartável dela. Rodar `c1`/`c2` com
+  `PLAYWRIGHT_BASE_URL` apontando para a instância de outra suíte faz o `resetApp`
+  esperar `.session-row` num catálogo que não é o dela e o `C-1 B1` estoura por
+  timeout (240 s) — é ambiente, não regressão. Com o runner próprio: **c1 6/6,
+  c2 17/17, c3b 12/12**.
+- **Régua `provedores_fatia08`:** depende do stub canônico `uploads/stub_provider.cjs`
+  (porta 4599), que **não está no repo**. Neste sandbox ele foi reproduzido fora do
+  checkout; o contrato observado é catálogo de 5 modelos, 401 para chave inválida e
+  405 em `/sem-catalogo`. O app precisa estar na **5174** com
+  `AGENTE_WINDOW_PROVIDERS_PATH=/tmp/prov-fixture/providers.json` (a spec afirma
+  `storage:'fixture'` e esse caminho), e o banco dessa instância precisa ter **pelo
+  menos 1 sessão** (senão `resetApp` não acha `.session-row`). O `request` do
+  Playwright precisa mandar `Origin` (não `sec-fetch-site`: o header manual faz o
+  Chromium abortar as requisições do próprio app com `ERR_INVALID_ARGUMENT`) —
+  isso é **execução**, não mudança de spec.
+- **Falhas pré-existentes (não são regressão da U-1):** `fatia07_destravar` (DEBT-06),
+  `editorTabs` (breadcrumbs) e `monacoLoadFailure` (caminho feliz). Medidas iguais na
+  base `24d686a`.
+

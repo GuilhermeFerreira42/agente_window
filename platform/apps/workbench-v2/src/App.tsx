@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserFsPort, createExplorerSearchModule, ExplorerFsWatchClient, type IExplorerSearchModule, type WorkspaceUri } from './modules/explorer-search'
 // FATIA-05 5.1 c1 — chassi (docs/24): Activity Bar à direita; views vêm do viewRegistry.
 import { ActivityBar, buildActivityBarMenuItems, activityBarPositionFromMenuId } from './shell/activityBar'
-import { SideBar, ExplorerView, SearchView, ScmView } from './shell/sideBar'
+import { SideBar, ExplorerView, FontesConversa, SearchView, ScmView } from './shell/sideBar'
 import { useLayoutState } from './shell/layoutState'
 import { viewsByIds, type ViewDescriptor } from './shell/viewRegistry'
 import { ViewsPanel } from './shell/panel'
@@ -13,20 +13,30 @@ import { ExplorerContextMenuHost, type ExplorerContextMenuState } from './compon
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelGroupHandle } from 'react-resizable-panels'
 import { CheckCircle2, ChevronLeft, Info, X } from 'lucide-react'
 import { initialProviders, searchResults as allSearchResults } from './data'
-import { changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace, type WorkspaceDescriptor } from './services/sessions/sessionsClient'
-import { useSessionPersistence } from './services/sessions/useSessionPersistence'
-import { mergeRecoveredSessions, mergeHydratedSessions, removeSessionRecovery, restoreUnsavedSessions } from './services/sessions/sessionRecovery'
-import { SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
+import { type SessaoIndisponivel, changeSessionWorkspace, createSessionWorktree, loadPersistedSessions, persistSession, pickSessionWorkspace, removePersistedSession, SessionPersistenceError, validateSessionWorkspace } from './services/sessions/sessionsClient'
+import { useSessionPersistence, type SessionPersistenceIssue } from './services/sessions/useSessionPersistence'
+import { mergeRecoveredSessions, mergeHydratedSessions, readSessionRecoveries, removeSessionRecovery, restoreUnsavedSessions, descartarRecuperacoesExcluidas } from './services/sessions/sessionRecovery'
+import { SessionLoadNotices, SessionPersistenceNotice } from './services/sessions/SessionPersistenceNotice'
 import { validarFonteEntreChats } from './services/sessions/consultaEntreChatsClient'
 import type { FonteEntreChats } from './domain/consultaEntreChats'
 import { manageHistoryAccess } from './services/sessions/historyAccessClient'
+import { excluirConversa } from './domain/exclusaoConversa'
+import { semSessao } from './domain/limpezaDeSessao'
+import { pedidoDeConfirmacao } from './domain/dialogoConfirmacao'
+import { portaDialogos } from './shell/portaDialogos'
 // FATIA 14 (RNF14-3): a tela de Personalizações é da CASA. O síndico só a
 // renderiza — nenhum estado de personalização mora aqui.
-import { PersonalizacoesView, PersonalizationsModal, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
-import { ProvidersView } from './bairros/2-inteligencia/casas/provedores'
+import { PersonalizacoesView, type PersonalizationSection } from './bairros/2-inteligencia/casas/personalizacoes'
+import { useConfiguracoesUnificadas } from './shell/useConfiguracoesUnificadas'
+import { ConfiguracoesUnificadasHost } from './shell/ConfiguracoesUnificadasHost'
+import { ROTA_PERSONALIZACOES, rotaDaSecao } from './domain/configuracoesUnificadas'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
-import { AUTOSCROLL_PADRAO, ConfigView, carregarConfig } from './bairros/2-inteligencia/casas/config'
-import { continuarAgir, enviarAgir, responderAguardarComando, responderAprovacao, selecionarModoAgir, selecionarPermissaoAgir, registrarInstrucaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
+import { aplicarMensagemPrimeiroEnvio, executarPrimeiroEnvio } from './domain/primeiroEnvio'
+import { selecaoDoToken, tokenDaSelecao } from './domain/selecaoModelo'
+import { rascunhoInicial, type RascunhoLanding } from './domain/landingDraft'
+import { useLandingTentativa, type EntradaSubmitLanding } from './hooks/useLandingSubmission'
+import { AUTOSCROLL_PADRAO, carregarConfig } from './bairros/2-inteligencia/casas/config'
+import { continuarAgir, enviarAgir, prepararExecucaoAgir, responderAguardarComando, responderAprovacao, selecionarPermissaoAgir, type ControleAgir, type DecisaoAprovacao, type MensagemSimples, type OuvintesAgir, type PedidoFerramenta, type IdentidadeExecucaoAgir, type ModoAgir, type NivelPermissaoAgir } from './bairros/2-inteligencia/casas/agir'
 import type { ContinuarNoChat, FerramentaNoChat } from './types'
 import { sanarCartoesAposF5 } from './services/agir/sanar'
 import {
@@ -35,17 +45,19 @@ import {
   dismissCustomViewOnBack,
   dismissCustomViewOnSessionOpen,
   loadCustomViewState,
-  openCustomView,
   restoredPartVisibility,
   saveCustomViewState,
   shouldShowCustomViewGrid,
-  type CustomViewId,
 } from './domain/customView'
+import { escolherReenvioVisao, marcarVisaoAceita, type EscolhaVisao, type PedidoVisaoAgir } from './services/sessions/envioVisao'
+import { enviarMensagemComAnexos, portasEnvioApp, prepararAnexosDaLanding } from './services/sessions/enviarComAnexos'
+import { useFusaoAnexos } from './hooks/useFusaoAnexos'
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
 import type { MedicaoContexto, EstadoCompactacao } from './domain/usoContexto'
 import {
   assertWorkbenchInvariants,
   resolveActiveChatId,
+  sessaoSemPasta,
   setAllDiffAccepted,
   setDiffAccepted,
   toggleDiffViewed,
@@ -88,7 +100,6 @@ import { COMPOSER_HISTORY_MAX_ENTRIES, sameComposerHistoryEntry } from './domain
 import {
   EMPTY_NAVIGATION_STACK,
   navigateBack,
-  dismissLayer,
   pushLayer,
   resetForSessionSwitch,
   topLayer,
@@ -99,6 +110,7 @@ import { commitDraft, createManagementState, discardDraft, openDraft, selectProv
 import { ChatPanel } from './components/ChatPanel'
 import { EditorArea } from './components/EditorArea'
 import { MobileDiffView } from './components/MobileDiffView'
+import { useLandingContext } from './hooks/useLandingContext'
 import { SessionLanding } from './components/SessionLanding'
 import { SessionSidebar } from './components/SessionSidebar'
 import { SessionsPicker } from './components/SessionsPicker'
@@ -110,6 +122,7 @@ import {
   seedCreatedFromNewSession,
   type NewSessionViewState,
 } from './domain/newSessionViewState'
+
 
 const BOOT_SESSION_ID = 'draft-empty'
 // 4.8-B3 (hotfix): o Browser NÃO abre por padrão — começar com uma aba Browser
@@ -132,8 +145,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const initialSnapshot = useRef(initialSessionSnapshot ?? [])
   const initialSnapshotFirst = initialSnapshot.current[0]
   const [sessions, setSessions] = useState<Session[]>(initialSnapshot.current)
+  // P-C §2 — identidades em exclusão (suspensão de autosaves/envio) e falhas
+  // visíveis: o alvo não sai da lista como sucesso antes da confirmação.
+  const [excluindo, setExcluindo] = useState<ReadonlySet<string>>(new Set())
+  const [falhasExclusao, setFalhasExclusao] = useState<Map<string, string>>(new Map())
+  const sessionsRef = useRef(sessions); sessionsRef.current = sessions
   const [sessionsHydrated, setSessionsHydrated] = useState(Boolean(initialSessionSnapshot))
   const [sessionLoadError, setSessionLoadError] = useState<string>()
+  const [sessionLoadPartial, setSessionLoadPartial] = useState<SessaoIndisponivel[]>()
   const [hydrationAttempt, setHydrationAttempt] = useState(0)
   const persistedLayout = useRef(loadLayoutState())
   const [activeSessionId, setActiveSessionId] = useState(initialSnapshotFirst?.id ?? window.localStorage.getItem(ACTIVE_SESSION_KEY) ?? BOOT_SESSION_ID)
@@ -145,14 +164,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const hydrationView = useRef({ sessions, activeSessionId })
   hydrationView.current = { sessions, activeSessionId }
   const [fonteHistorica, setFonteHistorica] = useState<FonteEntreChats>()
-  const [newSessionLanding, setNewSessionLanding] = useState(false)
+  const { newSessionLanding, setNewSessionLanding,
+    selectedWorkspace, setSelectedWorkspace, landingContexto, setLandingContexto } = useLandingContext()
   // FATIA 09 (§3.8): persiste a sessão ativa — sem isto o F5 sempre reabria
   // a primeira da lista e a conversa "parecia" perdida.
   useEffect(() => {
     if (!activeSessionId) return
     try { window.localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId) } catch { /* Selection storage must not invalidate a confirmed save/copy. */ }
   }, [activeSessionId])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<WorkspaceDescriptor>()
+  // C-1 (SPEC C §2) — modalidade da landing: Chat é o DEFAULT; Pasta exige
+  // escolha explícita de pasta real (sem fallback 'workspace-local').
+  const [rascunhoLanding, setRascunhoLanding] = useState<RascunhoLanding>(rascunhoInicial)
+  const tentativaLanding = useLandingTentativa() // C2-RV05: lock/identidade sobrevivem a remount
   const [workspacePickerPending, setWorkspacePickerPending] = useState(false)
   const [workspaceChangePending, setWorkspaceChangePending] = useState(false)
   const [workspaceNativePickerAvailable, setWorkspaceNativePickerAvailable] = useState(true)
@@ -168,8 +191,12 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // A landing can sit above older sessions. Its selected folder is a pending
   // context for the new session and must drive Explorer before the first chat
   // message; it must not rewrite the older persisted session.
-  const explorerWorkspacePath = landingVisible ? selectedWorkspace?.path : currentSessionWorkspacePath
-  const explorerEnabled = !landingVisible || !!explorerWorkspacePath
+  const explorerWorkspacePath = landingVisible ? (landingContexto === 'workspace' ? selectedWorkspace?.path : undefined) : (currentSessionWorkspacePath ?? undefined)
+  // C-1/B3 — ativação EXPLÍCITA: o Explorer só liga com uma raiz real. Sessão
+  // Chat (workspacePath nulo) fica DESLIGADA — sem /fs/workspace, sem
+  // discoverRoot, sem módulo montado sobre a raiz global; a vista vira o
+  // estado vazio existente. Pasta e landing com pasta escolhida inalteradas.
+  const explorerEnabled = !!explorerWorkspacePath
   const [sidebarVisible, setSidebarVisible] = useState(persistedLayout.current.shell.sidebarVisible)
   // FATIA-05 5.8-c1 (RF-P-05): a coluna "Detalhes" não existe mais → o estado do shell é constante `false`.
   // O campo `auxiliaryVisible` continua nos tipos/persistência do domínio só por compatibilidade (D2.72: remover depois).
@@ -231,15 +258,22 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         s.chats.some(c => c.id === current[s.id]) ? current[s.id] : s.mainChatId])))
     }
     void loadPersistedSessions(controller.signal)
-      .then((restored) => {
+      .then(async (resultado) => {
+        if (controller.signal.aborted) return
+        // P-C §5 — cópia local de identidade excluída não ressuscita o original
+        // na restauração (410 server-side antes do merge).
+        await descartarRecuperacoesExcluidas(resultado.sessions)
         if (controller.signal.aborted) return
         // FATIA 10 (C4): cartão 'aguardando' que sobreviveu ao F5 vira 'expirado'.
-        install(restored)
+        install(resultado.sessions)
         setSessionLoadError(undefined)
+        // SPEC §4: unavailable ≠ absent — one broken item never empties the list.
+        setSessionLoadPartial(resultado.unavailable.length ? resultado.unavailable : undefined)
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           install([])
+          setSessionLoadPartial(undefined)
           setSessionLoadError('Não foi possível carregar as conversas salvas. As conversas locais foram preservadas; a lista do servidor está indisponível.')
           console.error('[sessions] hydration failed', error)
         }
@@ -255,7 +289,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setActiveSessionId(copy.id)
     setVisibleSessionIds([copy.id])
     setActiveChatBySession((current) => ({ ...current, [copy.id]: copy.mainChatId }))
-  })
+  }, excluindo)
 
   const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
   // FATIA-05 5.4 (RF-10): menu "Move Activity Bar …" — segundo host do mesmo menu de contexto do shell.
@@ -369,7 +403,17 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // (R-092 / LAYOUT.md §Custom View Grid) Superfície full-surface contribuída,
   // mutuamente exclusiva com Sessions Part, Editor, Auxiliary Bar e Panel.
   const [customView, setCustomView] = useState(() => loadCustomViewState())
+  // U-1 R09: `aiCustomizations` é categoria do modal, nunca superfície do grid.
   const customViewActive = shouldShowCustomViewGrid(customView) && customView.activeView !== 'aiCustomizations'
+
+  // U-1 — uma porta para Configurações/Provedores/Personalizações.
+  const config = useConfiguracoesUnificadas()
+  const abrirConfiguracoes = config.abrir
+  const openProviders = () => abrirConfiguracoes({ categoria: 'provedores' })
+  const openConfig = () => abrirConfiguracoes({ categoria: 'geral' })
+  const openCustomizations = useCallback(() => {
+    abrirConfiguracoes(ROTA_PERSONALIZACOES)
+  }, [abrirConfiguracoes])
 
 
   // FATIA 15 Onda 3 (D159): `handleOpenFileHandle` saiu daqui. Era o ÚNICO criador de aba
@@ -409,7 +453,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // 5.5: mesma fábrica de conteúdo para Side Bar e Views Panel — a view só muda de pai (mount 1× por host; ver ModuleSlots)
   const renderShellView = (view: ViewDescriptor) => (view.id === 'explorer'
     ? <ExplorerView slot={explorerModule ? <ExplorerModuleSlot module={explorerModule} /> : undefined}
-        onOpenFolder={!explorerEnabled ? () => void handlePickWorkspace() : undefined} />
+        fontes={!landingVisible ? <FontesConversa key={`${activeSession.id}:${activeChatId}`} sessionId={activeSession.id} chatId={activeChatId} mensagens={activeSession.chats.find(chat => chat.id === activeChatId)?.messages ?? []} /> : undefined}
+        // C-1/B3 — o seletor de pasta é da LANDING (entrada de sessão nova);
+        // dentro de uma sessão Chat não há o que abrir e o botão não aparece.
+        onOpenFolder={!explorerEnabled && landingVisible ? () => void handlePickWorkspace() : undefined} />
     : view.id === 'search'
       ? <SearchView slot={explorerModule ? <SearchModuleSlot module={explorerModule} focusRequest={searchFocusRequest} /> : undefined} />
       : view.id === 'scm'
@@ -522,7 +569,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   const {
     editorTabs, activeTabId, setActiveTabId, browserViews,
     activeGlobalTabId,
-    activateEditorTab, acceptModuleNavigation, hasNativeSurface, preferredEditorTabForSession,
+    activateEditorTab, acceptModuleNavigation, preferredEditorTabForSession, rotasLegadas,
     openEditorTab: openNativeTab, createBrowser, closeNativeTab, removeSessionResources,
     reorderNativeTabs,
     navigateBrowser, browserBack, browserForward, reloadBrowser, setBrowserStatus, setBrowserViewport,
@@ -693,6 +740,22 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     saveCustomViewState(customView)
   }, [customView])
 
+  // R09: só a aba legada ATIVA abre categoria; a de segundo plano não rouba o arquivo.
+  useEffect(() => {
+    const rotaLegada = rotasLegadas.find((entrada) => entrada.ativa)?.rota
+      ?? (customView.activeView === 'aiCustomizations' ? ROTA_PERSONALIZACOES : undefined)
+    if (rotaLegada) config.abrir(rotaLegada)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot-only
+  }, [])
+  useEffect(() => {
+    if (customView.activeView !== 'aiCustomizations') return
+    const desejada = restoredPartVisibility(customView)
+    setTerminalVisible(desejada.panel)
+    setEditorHidden(!desejada.editor)
+    setCustomView((atual) => closeCustomView(atual))
+    config.abrir(ROTA_PERSONALIZACOES)
+  }, [customView, config])
+
   const activePartSizes = partSizesForSession({ shell: persistedLayout.current.shell, partSizesBySession }, activeSession.id)
   const unreadCount = sessions.filter((session) => session.unread).length
   const filteredSearchResults = useMemo(() => filterSearchResults(allSearchResults, searchQuery), [searchQuery])
@@ -769,7 +832,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissCustomViewOnSessionOpen(customView))
-      setNavStack((current) => dismissLayer(current, 'custom-view-aiCustomizations'))
     }
     if (id === activeSessionId) return
     // R-030 — a captura/restauração do layout por sessão NÃO é imperativa: flui
@@ -806,7 +868,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
       setCustomView(dismissed.state)
-      setNavStack((current) => dismissLayer(current, 'custom-view-aiCustomizations'))
       return true
     }
     const result = navigateBack(navStack)
@@ -1131,14 +1192,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     carregarConfig().then((config) => setAutoScrollChat(config.autoScroll)).catch(() => {})
   }, [])
 
-  const openProviders = () => {
-    openEditorTab('providers', { title: 'Provedores' })
-    revealEditor()
-  }
-  const openConfig = () => {
-    openEditorTab('config', { title: 'Configurações' })
-    revealEditor()
-  }
   // FATIA-05 5.2 (RF-04): a busca vive na Side Bar — Ctrl+Shift+F, botão da titlebar e
   // menu "+" ativam a view `search` (sem alternar) e pedem foco ao módulo. A aba "Search"
   // do editor central não é mais criada.
@@ -1158,30 +1211,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     revealEditor()
   }
 
-  // D182: Personalizações usa modal. O dono de rota/persistência R-092 continua
-  // guardando a visibilidade anterior; as superfícies permanecem montadas.
-  const openCustomViewGrid = useCallback((view: CustomViewId) => {
-    setCustomView((current) =>
-      openCustomView(current, view, {
-        sessionsPart: true,
-        editor: !editorHidden,
-        auxiliaryBar: auxiliaryVisible,
-        panel: terminalVisible,
-      }),
-    )
-  }, [auxiliaryVisible, editorHidden, terminalVisible])
-
-  const [personalizationsRoute, setPersonalizationsRoute] = useState<{ section: PersonalizationSection; serial: number }>({ section: 'visao', serial: 0 })
-  const openCustomizations = useCallback(() => {
-    openCustomViewGrid('aiCustomizations')
-    // (LAYOUT.md) No phone a custom view entra na pilha de navegação, para que o
-    // back da plataforma consiga dispensá-la.
-    if (isPhone) {
-      setNavStack((current) =>
-        pushLayer(current, { id: 'custom-view-aiCustomizations', kind: 'custom-view', label: 'Personalizações' }),
-      )
-    }
-  }, [isPhone, openCustomViewGrid])
 
   // Fechar restaura EXATAMENTE a visibilidade retida (desired), nunca um default.
   const closeCustomViewGrid = useCallback(() => {
@@ -1190,7 +1219,6 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       const desired = restoredPartVisibility(current)
       setTerminalVisible(desired.panel)
       setEditorHidden(!desired.editor)
-      setNavStack((stack) => dismissLayer(stack, 'custom-view-aiCustomizations'))
       return closeCustomView(current)
     })
   }, [])
@@ -1199,12 +1227,15 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
   // resolver a raiz de projeto. O caminho NUNCA é enviado pela tela (F1/D113).
   const alvoPersonalizacoes = { sessionId: activeSession.id, chatId: activeChatId }
 
+  // Seção viva = a ROTA do modal (uma fonte só); `serial` só reaplica o pedido.
+  const secaoLegada = { section: (config.rota.subsecao ?? 'visao') as PersonalizationSection, serial: 0 }
+
   const customizationsSurfaceEmbedded = (
-    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
+    <PersonalizacoesView embedded alvo={alvoPersonalizacoes} sectionRequest={secaoLegada} />
   )
 
   const customizationsSurface = (
-    <PersonalizacoesView alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} />
+    <PersonalizacoesView alvo={alvoPersonalizacoes} sectionRequest={secaoLegada} />
   )
 
   // Hide/Show Editor (⌥⌘E). Par mutuamente exclusivo editor/detalhe: ocultar o
@@ -1301,9 +1332,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     // O rascunho e o worktree só passam a existir após a primeira mensagem.
     if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
     removeSessionResources(BOOT_SESSION_ID)
-    setSelectedWorkspace(undefined)
+    setLandingContexto('chat')
     setNewSessionLanding(true)
-    layout.showView('explorer')
     setMobilePane('chat')
     notify('Nova sessão pronta para escolher contexto')
   }
@@ -1313,7 +1343,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     setWorkspacePickerPending(true)
     try {
       const workspace = await pickSessionWorkspace()
-      if (workspace) setSelectedWorkspace(workspace)
+      if (workspace) { setSelectedWorkspace(workspace); setLandingContexto('workspace') }
       setWorkspaceNativePickerAvailable(true)
     } catch (error) {
       setWorkspaceNativePickerAvailable(false)
@@ -1333,6 +1363,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         const response = await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: workspace.path }) })
         if (!response.ok) throw new Error(`Falha ao atualizar Explorer (${response.status})`)
         setSelectedWorkspace(workspace)
+        setLandingContexto('workspace')
         document.title = workspace.path
         notify(`Workspace selecionado: ${workspace.path}`)
         return
@@ -1357,13 +1388,19 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         ...candidate, workspace: session.workspace, workspacePath: session.workspacePath,
         worktreePath: session.worktreePath, branch: session.branch, persistenceRevision: session.persistenceRevision,
       } : candidate))
-      document.title = session.workspacePath
-      notify(`Workspace alterado para ${session.workspacePath}`)
+      document.title = session.workspacePath ?? session.title
+      notify(`Workspace alterado para ${session.workspacePath ?? session.title}`)
     } catch (error) {
+      // C-1 (SPEC C §3) — pós-criação a modalidade/pasta são imutáveis: o
+      // servidor recusa com 409 e a orientação honesta é começar OUTRA conversa.
+      if (error instanceof SessionPersistenceError && error.status === 409 && error.code === 'session_context_immutable') {
+        notify('A pasta desta conversa é imutável. Use "Iniciar outra conversa nesta pasta" para começar uma nova conversa com esta pasta.')
+        return
+      }
       // Compensação: se a persistência já mudou antes de o Explorer falhar, restaura
       // o workspace anterior; terminais vivos não foram alterados nesta etapa.
       try {
-        if (workspaceCommitted) {
+        if (workspaceCommitted && previousPath !== null) {
           await changeSessionWorkspace(activeSession.id, previousPath)
           await fetch('/fs/workspace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: previousPath }) })
         }
@@ -1382,50 +1419,67 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     } finally { setWorkspacePickerPending(false) }
   }
 
-  // Estado inicial vazio (nenhuma sessão) → cria a sessão a partir da 1ª mensagem
-  // digitada na landing, derivando o título do texto (paridade com o original).
-  const handleLandingSubmit = async (text: string) => {
-    if (workspacePickerPending || workspaceChangePending || !editorFilesSaved()) return
-    const id = crypto.randomUUID()
-    const chatId = `${id}-main`
-    const title = text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
-    try {
-      const workspaceLabel = selectedWorkspace?.name ?? 'workspace-local'
-      const worktree = await createSessionWorktree(selectedWorkspace?.path ?? '', selectedWorkspace?.slug ?? 'workspace-local', id)
-      const seededLayout = seedCreatedFromNewSession(newSessionState)
-      setAuxiliaryTab(seededLayout.activeViewContainerId)
-      const next: Session = {
-        id,
-        title,
-        workspace: workspaceLabel,
-        workspacePath: worktree.repoRoot,
-        worktreePath: worktree.path,
-        slug: worktree.slug,
-        section: 'today',
-        status: 'completed',
-        updated: 'agora',
-        diffAdded: 0,
-        diffRemoved: 0,
-        branch: worktree.branch,
-        chats: [{ id: chatId, title: 'Novo chat', status: 'completed', messages: [] }],
-        mainChatId: chatId,
-      }
-      // F1: registrar sessão/contexto no servidor antes de abrir qualquer execução Agir.
-      await persistSession(next)
-      removeSessionResources(BOOT_SESSION_ID)
-      setSessions((current) => [next, ...current])
-      setActiveChatBySession((current) => ({ ...current, [id]: chatId }))
-      setActiveSessionId(id)
-      setVisibleSessionIds([id])
-      setNewSessionLanding(false)
-      setSelectedWorkspace(undefined)
-      layoutSyncRef.current?.setPreviousResource(id)
-      setMobilePane('chat')
-      window.setTimeout(() => handleSend(text, [], { sessionId: id, chatId }), 0)
-    } catch (error) {
-      console.error('[sessions] worktree creation failed', error)
-      notify(error instanceof Error ? error.message : 'Falha ao criar worktree da sessão')
+  // C-2 — abertura pós-criação: mesmas atualizações do fluxo da C-1 (seed+BOOT).
+  const abrirSessaoCriada = (sessao: Session) => {
+    const seededLayout = seedCreatedFromNewSession(newSessionState)
+    setAuxiliaryTab(seededLayout.activeViewContainerId)
+    removeSessionResources(BOOT_SESSION_ID)
+    setSessions((current) => [sessao, ...current.filter((s) => s.id !== sessao.id)])
+    setActiveChatBySession((current) => ({ ...current, [sessao.id]: `${sessao.id}-main` }))
+    setActiveSessionId(sessao.id)
+    setVisibleSessionIds([sessao.id])
+    setNewSessionLanding(false)
+    setSelectedWorkspace(undefined)
+    setLandingContexto('chat')
+    layoutSyncRef.current?.setPreviousResource(sessao.id)
+    setMobilePane('chat')
+  }
+  useFusaoAnexos({ sessions, activeSessionId, newSessionLanding, setSessions }) // C-3a F5/offline
+  // C-2 — primeiro envio: guardas + controlador de fases (domain), sem timer pós-create.
+  const handleLandingSubmit = async (entrada: EntradaSubmitLanding): Promise<boolean> => {
+    const { snapshot, confirmada, aoConfirmar, aoEncerrar } = entrada
+    // Ressalva do reteste 16/11 — recusa VISÍVEL com texto devolvido.
+    const motivoPasta = workspacePickerPending ? 'A pasta ainda está sendo escolhida; envie a mensagem de novo.'
+      : workspaceChangePending ? 'A pasta ainda está sendo validada; envie a mensagem de novo.'
+      : null
+    if (motivoPasta) { notify(motivoPasta); aoEncerrar(null); return false }
+    if (!editorFilesSaved()) { aoEncerrar(null); return false }
+    // C-1 — Pasta exige pasta escolhida (sem fallback 'workspace-local').
+    if (snapshot.contexto === 'workspace' && !selectedWorkspace) {
+      notify('Escolha uma pasta real do disco para começar uma conversa workspace.')
+      aoEncerrar(null)
+      return false
     }
+    const resultado = await executarPrimeiroEnvio({
+      snapshot,
+      confirmada,
+      aoConfirmar,
+      aoEncerrar,
+      gerarId: () => crypto.randomUUID(),
+      portas: {
+        // A mesma validação/criação de worktree de sempre (slug do dono).
+        criarWorktree: async (caminhoRaiz, id) => {
+          const slug = selectedWorkspace?.path === caminhoRaiz ? selectedWorkspace.slug : caminhoRaiz.split(/[\\/]/).filter(Boolean).pop() ?? 'pasta'
+          const worktree = await createSessionWorktree(caminhoRaiz, slug, id)
+          return { repoRoot: worktree.repoRoot, path: worktree.path, slug: worktree.slug, branch: worktree.branch }
+        },
+        persistir: async (sessao) => { await persistSession(sessao) },
+        publicar: async (sessao, chatId, snap) => {
+          const anexosLanding = await prepararAnexosDaLanding({ sessionId: sessao.id, chatId, texto: snap.texto, anexos: [...(snap.anexos ?? [])], workspaceRoot: snap.contexto === 'workspace' ? snap.workspacePath : null, escolhaJaFeita: true }) // C-3a — escolha+transferência antes de abrir a conversa
+          abrirSessaoCriada(sessao)
+          // C2-RV01 — admissão grava par/modo/permissão por runKey (composer+F5).
+          const runKey = `${sessao.id}:${chatId}`
+          setModelByChat((current) => ({ ...current, [runKey]: tokenDaSelecao(snap.selecaoModelo) }))
+          setModeByChat((current) => ({ ...current, [runKey]: snap.modo }))
+          if (snap.contexto === 'workspace') setPermissionByChat((current) => ({ ...current, [`${runKey}:${sessao.worktreePath ?? sessao.workspacePath}`]: snap.permissao }))
+          // C2-RV02 — publicação DURÁVEL (ACK da fila P) antes do efeito remoto.
+          const resultadoEnvio = await handleSend(snap.texto, anexosLanding, { sessionId: sessao.id, chatId }, snap.selecaoModelo, { modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true, escolhaJaFeita: true, escolhaVisao: entrada.escolhaVisao })
+          if (resultadoEnvio === 'abortado') throw new Error('O envio não foi concluído; o rascunho foi preservado.')
+        },
+      },
+    })
+    if (!resultado.ok && resultado.motivo) notify(resultado.motivo)
+    return resultado.ok
   }
 
   const handleToggleArchived = (id: string) => {
@@ -1457,83 +1511,104 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     notify(`Sessão removida do grupo "${groupName}"`)
   }
 
+  const limparExcluindo = (id: string) => {
+    setExcluindo((current) => { const next = new Set(current); next.delete(id); return next })
+  }
+  const marcarExcluindo = (id: string) => setExcluindo((current) => new Set(current).add(id))
+  const limparFalhaExclusao = (id: string) => setFalhasExclusao((current) => { const next = new Map(current); next.delete(id); return next })
+  const falhaDeExclusao = (id: string, error: unknown) => {
+    limparExcluindo(id)
+    const message = error instanceof Error && error.message
+      ? error.message
+      : 'Não foi possível concluir a exclusão da conversa. Tente novamente.'
+    setFalhasExclusao((current) => new Map(current).set(id, message))
+    notify(message)
+  }
+  // P-C §2 / P-T08 — a REGRA do fluxo mora em `domain/exclusaoConversa.ts`
+  // (alvo e consequência antes da solicitação; worktree sujo com confirmação
+  // própria; execução viva cancelada antes do DELETE; `limpeza_pendente`
+  // retomável). Aqui só conectamos as portas — nenhuma decisão de risco no App.
   const handleDelete = async (id: string) => {
-    try {
-      await removePersistedSession(id)
-    } catch (error) {
-      if (error instanceof SessionPersistenceError && error.code === 'worktree_dirty') {
-        const confirmed = window.confirm('Este worktree possui alterações locais. Excluir a sessão e descartar essas alterações?')
-        if (!confirmed) return
-        try {
-          await removePersistedSession(id, true)
-        } catch (forcedError) {
-          notify(forcedError instanceof Error ? forcedError.message : 'Falha ao remover worktree')
-          return
-        }
-      } else {
-        notify(error instanceof Error ? error.message : 'Falha ao excluir sessão')
-        return
-      }
+    if (excluindo.has(id)) return
+    const alvo = sessionsRef.current.find((s) => s.id === id)
+    if (!alvo) return
+    // Só marca e limpa falhas após o aceite; captura execuções naquele momento,
+    // não antes do diálogo assíncrono, e conserva controles não terminais.
+    const resultado = await excluirConversa(
+      { id, titulo: alvo.title, persistenciaRevisao: alvo.persistenceRevision ?? 0 },
+      {
+        confirmar: (pedido) => portaDialogos().confirmar(pedido),
+        comecar: () => { limparFalhaExclusao(id); marcarExcluindo(id) },
+        solicitarRemocao: (opcoes) => removePersistedSession(id, opcoes),
+        cancelarExecucoes: async () => {
+          const emVoo = [...agirAtivas.current.entries()].filter(([runKey]) => runKey.startsWith(`${id}:`))
+          const estados = await Promise.all(emVoo.map(async ([, controle]) => {
+            try { return await controle.abortar() } catch { return 'pending' as const }
+          }))
+          if (estados.every((estado) => estado !== 'pending')) for (const [chave, controle] of emVoo) if (agirAtivas.current.get(chave) === controle) agirAtivas.current.delete(chave)
+          return estados
+        },
+        concluir: () => concluirExclusaoLocal(id),
+        // `session_save_uncertain`: nada foi pedido; a mensagem do dono da fila basta.
+        falhar: (erro) => erro instanceof SessionPersistenceError && erro.code === 'session_save_uncertain'
+          ? (limparExcluindo(id), notify(erro.message)) : falhaDeExclusao(id, erro),
+        codigoDoErro: (erro) => erro instanceof SessionPersistenceError ? erro.code : undefined,
+      },
+    )
+    if (resultado === 'cancelada') limparExcluindo(id)
+  }
+
+  const concluirExclusaoLocal = (id: string, preservarRecuperacao = false) => {
+    limparExcluindo(id)
+    // Aviso de storage entra no MESMO recibo final: a exclusão concluiu e a
+    // falha de limpeza local não pode sumir atrás de um "sucesso" genérico.
+    let avisoLocal: string | undefined
+    if (!preservarRecuperacao) {
+      try { removeSessionRecovery(id) } catch { avisoLocal = 'Sessão excluída; não foi possível limpar a cópia de recuperação no navegador.' }
     }
-    try { removeSessionRecovery(id) } catch { notify('Sessão excluída; não foi possível limpar a cópia de recuperação no navegador.') }
     clearPendingTimersForSession(id)
     // (R-003) Excluir um draft abandonado descarta o rascunho pendente do
     // Management (deleteNewSession dispose — SESSIONS.md §Drafts).
     management.current = discardDraft(management.current, id)
-    const remaining = sessions.filter((session) => session.id !== id)
-    setSessions(remaining)
+    // P-C §6 — atualização funcional do estado ATUAL: uma edição feita em
+    // outra conversa durante o await não é substituída por array pré-await.
+    const restantes = sessionsRef.current.filter((session) => session.id !== id)
+    setSessions((current) => current.filter((session) => session.id !== id))
     const nextResources = removeSessionResources(id)
     sessionLayouts.current = forgetSessionLayout(sessionLayouts.current, id)
+    // Registros por sessão (chave === id ou `id:` + chat/caminho): a regra de
+    // chave mora em `domain/limpezaDeSessao` — um lugar só, sem 9 cópias.
+    const semId = <T,>(atual: Record<string, T>) => semSessao(atual, id)
+    setActiveChatBySession(semId); setModeByChat(semId); setPermissionByChat(semId); setModelByChat(semId)
+    setComposerDrafts(semId); setComposerHistoryByChat(semId); setDiffFilesBySession(semId)
+    setSelectedDiffFileBySession(semId); setChecksExpandedBySession(semId); setExpandedFoldersBySession(semId)
+    // Promove a vizinha (ao excluir a ÚLTIMA, cai na landing: promoted = '').
     if (activeSessionId === id) {
-      // Ao excluir a última sessão, cai na tela inicial (landing) — não há
-      // próxima sessão para ativar.
-      const nextSessionId = remaining[0]?.id
-      const nextTab = nextSessionId
-        ? preferredEditorTabForSession(nextResources.editorTabs, nextSessionId, activeGlobalTabId.current)
-        : undefined
+      const promoted = restantes[0]?.id ?? ''
+      const nextTab = promoted ? preferredEditorTabForSession(nextResources.editorTabs, promoted, activeGlobalTabId.current) : undefined
       activateEditorTab(nextTab)
       setTerminalVisible(false)
-    }
-    setActiveChatBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setModeByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setPermissionByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setModelByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setComposerDrafts((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setComposerHistoryByChat((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))))
-    setDiffFilesBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setSelectedDiffFileBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setChecksExpandedBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    setExpandedFoldersBySession((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    // remaining[0] pode não existir ao excluir a última sessão (→ landing).
-    if (activeSessionId === id) {
-      const promoted = remaining[0]?.id ?? ''
       setActiveSessionId(promoted)
       // R-030 — excluir a sessão ativa é transição passiva: rebaseia o previous
       // para não capturar a sessão excluída (o que a re-adicionaria ao mapa após
       // o forget) e não restaurar layout ao promover a vizinha.
       layoutSyncRef.current?.setPreviousResource(promoted || undefined)
     }
-    notify('Sessão excluída')
+    notify(avisoLocal ?? 'Sessão excluída')
+  }
+
+  const retomarLimpezaExclusao = async (id: string, revision: number) => {
+    if (excluindo.has(id)) return
+    marcarExcluindo(id)
+    limparFalhaExclusao(id)
+    try {
+      const estado = await removePersistedSession(id, { expectedRevision: revision, resumeCleanup: true })
+      if (estado !== 'concluido') throw new Error('A limpeza dos anexos continua pendente.')
+      concluirExclusaoLocal(id, true)
+      setSessionLoadPartial((current) => current?.filter(item => item.sessionId !== id))
+    } catch (error) {
+      falhaDeExclusao(id, error)
+    }
   }
 
   const handleApprove = (sessionId: string, chatId?: string) => {
@@ -1804,27 +1879,30 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     aoConcluir?: () => void,
     modelSelection: SelecaoModelo = { tipo: 'auto' },
     instrucaoHumana?: string,
+    // C-2: snapshot explícito do 1º envio (modo/permissão/sessão persistidos); sem opções o chat é a fonte.
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; vision?: PedidoVisaoAgir },
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
-    const modo = (modeByChat[runKey] ?? 'agent') as ModoAgir
-    const sessaoPermissao = sessions.find(session => session.id === sessionId)
-    const permissionKey = `${runKey}:${sessaoPermissao?.worktreePath ?? sessaoPermissao?.workspacePath ?? ''}`
-    const permissao = permissionByChat[permissionKey] ?? 'manual'
-    const entrada = {
-      instructionToken: undefined as string | undefined,
-      mensagens: historico,
-      modelSelection,
-      // Fluxo ÚNICO por troca (sessão:chat:resposta): o servidor isola as
-      // aprovações desta resposta — nada vaza para a próxima troca.
-      fluxo: `${sessionId}:${chatId}:${responseId}`,
-      sessionId,
-      chatId,
-      // O servidor ignora este campo; o modo é enviado separadamente pelo
-      // comando de seleção e permanece independente da resposta do modelo.
-      mode: modo,
+    const modo = (opcoes?.modo ?? modeByChat[runKey] ?? 'agent') as ModoAgir
+    // Espelho vivo (não o snapshot do closure) para envios de chat existente;
+    // o primeiro envio traz a sessão recém-persistida (mesmo tick, sem
+    // agendamento — o ref ainda não a contém).
+    const sessaoPreparacao = opcoes?.sessao ?? sessionsRef.current.find(session => session.id === sessionId)
+    if (!sessaoPreparacao) {
+      // Sem snapshot não há como resolver a modalidade — falha honesta.
+      notify('Sessão não encontrada para preparar a execução.')
+      return
     }
+    // C-1/B2 — a MODALIDADE resolve as políticas de permissão: Chat nunca usa
+    // a chave com raiz falsa (`?? ''`); o nível efetivo de Chat é 'manual'
+    // (autoridade do servidor) e a sincronização acontece só em workspace.
+    const semPasta = sessaoSemPasta(sessaoPreparacao)
+    const permissionKey = semPasta ? null : `${runKey}:${sessaoPreparacao.worktreePath ?? sessaoPreparacao.workspacePath}`
+    const permissao = opcoes?.permissao ?? (permissionKey === null ? 'manual' : (permissionByChat[permissionKey] ?? 'manual'))
+    const fluxo = `${sessionId}:${chatId}:${responseId}`
     const ouvintes = criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir)
+    ouvintes.onVisionAccepted = (evento) => updateSession(sessionId, (sessao) => marcarVisaoAceita(sessao, chatId, evento))
     let real: ControleAgir | null = null
     let canceladaAntesDoInicio = false
     const controladorModo = new AbortController()
@@ -1838,16 +1916,34 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       },
     }
     agirAtivas.current.set(runKey, controle)
-    void selecionarModoAgir(sessionId, chatId, modo, controladorModo.signal).then(async () => {
+    // C-1/B2 — a preparação (modo efetivo, permissão e instrução por
+    // modalidade) é responsabilidade do módulo de execução; o App só compõe
+    // o run e o estado React.
+    void prepararExecucaoAgir({
+      sessionId,
+      chatId,
+      fluxo,
+      sessao: sessaoPreparacao,
+      modo,
+      permissao,
+      instrucao: instrucaoHumana,
+      signal: controladorModo.signal,
+    }).then((preparada) => {
       if (canceladaAntesDoInicio) return
-      await selecionarPermissaoAgir(sessionId, chatId, permissao)
-      if (canceladaAntesDoInicio) return
-      if (instrucaoHumana !== undefined) entrada.instructionToken = await registrarInstrucaoAgir(sessionId, chatId, entrada.fluxo, instrucaoHumana, controladorModo.signal)
-      if (canceladaAntesDoInicio) return
-      real = enviarAgir(entrada, ouvintes)
+      real = enviarAgir({
+        instructionToken: preparada.instructionToken,
+        vision: opcoes?.vision,
+        mensagens: historico,
+        modelSelection,
+        fluxo,
+        sessionId,
+        chatId,
+        // Modo do PAYLOAD = modo efetivo resolvido ('ask' em Chat).
+        mode: preparada.modoEfetivo,
+      }, ouvintes)
     }).catch((erro: unknown) => {
       if (canceladaAntesDoInicio) return
-      ouvintes.onError('configuracao', erro instanceof Error ? erro.message : 'Não foi possível registrar o modo de execução.')
+      ouvintes.onError('configuracao', erro instanceof Error ? erro.message : 'Não foi possível preparar a execução.')
     })
   }
 
@@ -1944,20 +2040,35 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     agirAtivas.current.set(runKey, controle)
   }
 
-  const handleSend = (text: string, attachments: Attachment[], target?: { sessionId: string; chatId: string }, modelSelection: SelecaoModelo = { tipo: 'auto' }) => {
+  const handleSend = (
+    text: string,
+    attachments: Attachment[],
+    target?: { sessionId: string; chatId: string },
+    modelSelection: SelecaoModelo = { tipo: 'auto' },
+    // C-2: opções EXPLÍCITAS do snapshot; `esperarPublicacao` = ACK; C-3a: com anexos devolve Promise (R02).
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean; escolhaVisao?: EscolhaVisao },
+  ): void | 'abortado' | Promise<'publicado' | 'abortado'> => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
-    const attachmentText = attachments.length > 0 ? `Arquivos anexados: ${attachments.map((item) => item.name).join(', ')}` : ''
-    const messageContent = [text.trim(), attachmentText].filter(Boolean).join('\n\n')
+    // P-C §2 — durante `excluindo`, novas mensagens ficam suspensas nesse alvo
+    // (o servidor também recusa via ciclo de vida; aqui é a barreira honesta).
+    if (excluindo.has(sessionId)) {
+      notify('A conversa está sendo excluída; envio de mensagens suspenso até a conclusão.')
+      return attachments.length > 0 ? Promise.resolve('abortado' as const) : undefined
+    }
+    if (attachments.length > 0) return enviarMensagemComAnexos({ sessionId, chatId, text, attachments, modelSelection, opcoes, portas: portasEnvioApp({ sessions, sessionId, chatId, setSessions: (u) => setSessions((c) => u(c)), persistir: (r) => persistSession(r), notify, setComposerDrafts: (u) => setComposerDrafts((c) => u(c)), management, commitDraft: commitDraft as never, updateSessionAndChatStatus, iniciarAgirReal, timeLabel, selectedMode, montarHistorico }) }) // C-3a — anexos: fluxo fora do App (R11)
+    const messageContent = text.trim() // C-3a T23 — só o texto; nomes nunca disfarçados no modelo
     const requestLabel = text.trim() || attachments.map((item) => item.name).join(', ')
     const responseId = `response-${Date.now()}`
     const requestedModel = modelSelection.tipo === 'auto' ? 'Auto' : `${modelSelection.providerId} / ${modelSelection.modelId}`
+    const sessaoOrigem = sessions.find((session) => session.id === sessionId)
+    const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
     const userMessage = {
       id: `message-${Date.now()}`,
       role: 'user' as const,
       content: messageContent,
       time: timeLabel(),
-      mode: selectedMode,
+      mode: opcoes?.modo ?? selectedMode,
       attachments: attachments.length > 0 ? attachments.map((attachment) => ({ ...attachment })) : undefined,
     }
     const runningResponse = {
@@ -1970,18 +2081,24 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       inicioEm: Date.now(),
     }
     // Histórico da conversa atual (G5) + a mensagem nova — o que SAI para o servidor.
-    const sessaoOrigem = sessions.find((session) => session.id === sessionId)
-    const chatOrigem = sessaoOrigem?.chats.find((chat) => chat.id === chatId)
     const historico: MensagemSimples[] = [
       ...montarHistorico(chatOrigem?.messages ?? []),
       { id: userMessage.id, role: 'user', content: messageContent },
     ]
-
+    // C2-RV02 — primeiro envio: ACK da fila P antes do run (nada remoto antes).
+    if (opcoes?.esperarPublicacao && opcoes.sessao) {
+      return (async () => {
+        const atualizada = aplicarMensagemPrimeiroEnvio(opcoes.sessao!, chatId, userMessage, runningResponse)
+        setSessions((current) => current.map((session) => session.id === atualizada.id ? atualizada : session))
+        await persistSession(atualizada)
+        iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
+        return 'publicado' as const
+      })()
+    }
     updateSession(sessionId, (session) => {
       const next = updateSessionAndChatStatus(session, chatId, 'working')
-      // (R-003) Primeiro envio commita o draft: o Management deixa de possuir o
-      // rascunho e a sessão entra no catálogo. O título "Nova sessão" passa a
-      // ser derivado do texto enviado (paridade com o original).
+      // (R-003) Primeiro envio commita o draft no Management; o título deriva
+      // do texto enviado (paridade com o original).
       let committed = next
       if (session.isDraft) {
         management.current = commitDraft(management.current, sessionId)
@@ -2002,11 +2119,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         } : chat),
       }
     })
-
-    // (FATIA 10) AGIR real com o provedor ativo: o histórico vai para o
-    // servidor, a resposta chega em pedaços e as ferramentas viram cartões
-    // com aprovação do dono (SPEC PARTE 2D).
-    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim())
+    // FATIA 10 — AGIR real com o provedor ativo (cartões com aprovação do dono).
+    iniciarAgirReal(sessionId, chatId, responseId, historico, undefined, modelSelection, text.trim(), opcoes)
   }
 
   const handleStop = async () => {
@@ -2039,7 +2153,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
               messages: chat.messages.map((message) => message.running ? {
                 ...message,
                 content: chatsComEfeitosConfirmados.has(chat.id)
-                  ? `${message.content.trim() ? `${message.content.trim()}\n\n` : ''}Execução interrompida; alterações já concluídas foram mantidas. Confira os cartões das ferramentas.`
+                  ? `${message.content.trim() ? `${message.content.trim()}\n\n` : ''}Execução interrompida; alterações podem ter sido concluídas. Confira os cartões das ferramentas e as fontes antes de repetir.`
                   : message.content.trim()
                     ? message.content
                     : 'Execução interrompida antes da resposta. Envie uma nova mensagem para continuar.',
@@ -2062,34 +2176,29 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       return
     }
     clearPendingTimersForSession(sessionId)
-    if (chatsComEfeitosConfirmados.size > 0) notify('Execução interrompida; alterações já concluídas foram mantidas')
+    if (chatsComEfeitosConfirmados.size > 0) notify('Execução interrompida; alterações podem ter sido concluídas. Confira os cartões e as fontes.')
     else if (chatsCancelados.size > 0) notify('Execução interrompida')
   }
 
-  const handleRegenerate = (chatId: string, messageId: string) => {
+  const handleRegenerate = async (chatId: string, messageId: string) => {
     const sessionId = activeSession.id
     const targetChat = activeSession.chats.find((chat) => chat.id === chatId)
     const original = targetChat?.messages.find((message) => message.id === messageId)
-    if (!original || original.role !== 'assistant') return
+    if (!targetChat || !original || original.role !== 'assistant') return
 
-    // FATIA 09: regenerar = conversa real com o histórico ANTES da mensagem alvo.
-    const chatOrigemRegenerar = activeSession.chats.find((candidate) => candidate.id === chatId)
-    const indiceAlvo = chatOrigemRegenerar
-      ? chatOrigemRegenerar.messages.findIndex((candidate) => candidate.id === messageId)
-      : -1
-    const historicoRegenerar = montarHistorico(
-      indiceAlvo >= 0 ? (chatOrigemRegenerar?.messages ?? []).slice(0, indiceAlvo) : [],
-    )
+    const anteriores = targetChat.messages.slice(0, targetChat.messages.indexOf(original))
+    const historicoRegenerar = montarHistorico(anteriores)
     if (historicoRegenerar.length === 0) {
       notify('Não há histórico anterior para regenerar')
       return
     }
     const runKey = `${sessionId}:${chatId}`
+    const pergunta = [...anteriores].reverse().find(item => item.role === 'user')
+    const selecao = selecaoDoToken(pergunta?.attachments?.length ? (modelByChat[runKey] ?? 'Auto') : 'Auto')
+    const vision = pergunta?.attachments?.length ? await escolherReenvioVisao(pergunta, selecao, activeSession.workspacePath ? (modeByChat[runKey] ?? 'agent') : 'ask') : undefined
+    if (vision === null || agirAtivas.current.has(runKey)) return
     const previousTimer = pendingResponseTimers.current.get(runKey)
-    if (previousTimer !== undefined) {
-      window.clearTimeout(previousTimer)
-      pendingResponseTimers.current.delete(runKey)
-    }
+    if (previousTimer !== undefined) { window.clearTimeout(previousTimer); pendingResponseTimers.current.delete(runKey) }
     updateSession(sessionId, (session) => {
       const next = updateSessionAndChatStatus(session, chatId, 'working')
       return {
@@ -2101,14 +2210,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             ...message,
             content: '',
             time: timeLabel(),
-            running: true,
+            running: true, erro: false, cancelled: false,
           } : message),
         } : candidate),
       }
     })
     notify('Regenerando resposta')
 
-    iniciarAgirReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'))
+    iniciarAgirReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'), selecao, undefined, { vision })
   }
 
   const handleMessageCopy = (_chatId: string, _messageId: string, kind: ChatCopyKind) => {
@@ -2232,7 +2341,10 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         permission={permissionByChat[permissionKey] ?? 'manual'}
         automaticDeletes={automaticDeletesByChat[permissionKey] === true && permissionByChat[permissionKey] === 'allow-all'}
         onChangeAutomaticDeletes={async (permitir) => {
-          await selecionarPermissaoAgir(session.id, sessionChatId, permissionByChat[permissionKey] ?? 'manual', permitir)
+          // C-1/B2 — Chat não tem exclusões de pasta; a rota recusa com 409.
+          if (!sessaoSemPasta(session)) {
+            await selecionarPermissaoAgir(session.id, sessionChatId, permissionByChat[permissionKey] ?? 'manual', permitir)
+          }
           setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: permitir }))
         }}
         onSelectChat={(chatId) => { setActiveChatBySession((current) => ({ ...current, [session.id]: chatId })); markNestedChatRead(session.id, chatId) }}
@@ -2241,7 +2353,11 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           if (ehModoAgir(nextMode)) setModeByChat((current) => ({ ...current, [sessionChatKey]: nextMode }))
         }}
         onChangePermission={async (nextPermission) => {
-          await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
+          // C-1/B2 — em Chat a autoridade já responde 'manual' sem raiz; o
+          // seletor de pasta não tem o que sincronizar (a rota recusa 409).
+          if (!sessaoSemPasta(session)) {
+            await selecionarPermissaoAgir(session.id, sessionChatId, nextPermission)
+          }
           setPermissionByChat((current) => ({ ...current, [permissionKey]: nextPermission }))
           if (nextPermission === 'manual') setAutomaticDeletesByChat(current => ({ ...current, [permissionKey]: false }))
         }}
@@ -2281,12 +2397,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     landingVisible ? (
       // + GLOBAL abre sempre o landing. Na 06.2 a origem Git é o repositório
       // servido pelo Vite; outros repositórios entram na 06.3.
-      <SessionLanding workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'} onSubmit={(text) => void handleLandingSubmit(text)} onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending} isFileSystemSupported={workspaceNativePickerAvailable}
-        onValidateWorkspacePath={handleChangeActiveWorkspace}
-        onChangeMode={() => notify('Seletor de modo (mock)')}
-        onChangeModel={() => notify('Seletor de modelo (mock)')}
-        onAddContext={() => notify('Adicionar contexto (mock)')}
-        onDictate={() => notify('Ditar por voz (mock)')}
+      <SessionLanding
+        workspace={selectedWorkspace?.path ?? 'Nenhuma pasta aberta'}
+        workspacePath={selectedWorkspace?.path ?? null} workspaceName={selectedWorkspace?.name ?? 'Nenhuma pasta aberta'}
+        contexto={landingContexto} onChangeContexto={contexto => { if (editorFilesSaved()) setLandingContexto(contexto) }} onSubmit={handleLandingSubmit}
+        rascunhoControlado={rascunhoLanding} onChangeRascunho={setRascunhoLanding} tentativaControlada={tentativaLanding}
+        onPickWorkspace={() => void handlePickWorkspace()} workspacePickerPending={workspacePickerPending}
+        isFileSystemSupported={workspaceNativePickerAvailable} onValidateWorkspacePath={handleChangeActiveWorkspace}
+        onOpenProvedores={openProviders}
       />
     ) : (
       // (E14) Grid multi-sessão quando há peers visíveis (só fora do single-pane);
@@ -2376,8 +2494,9 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       onNewDiff={() => openDiff(activeSession.id)}
       onNewCustomizations={openCustomizations}
       customizationsSurface={customizationsSurface}
-      providersSurface={hasNativeSurface('providers') ? <ProvidersView /> : undefined}
-      configSurface={hasNativeSurface('config') ? <ConfigView aoSalvar={(config) => setAutoScrollChat(config.autoScroll)} /> : undefined}
+      // U-1 R09: aba legada (`config`/`providers`) é traduzida para o modal.
+      providersSurface={undefined}
+      configSurface={undefined}
       frontierTabs={abasProjetadasDoModulo}
       codeEditorSlot={codeEditorSlot}
       changesSlot={changesSlot}
@@ -2441,15 +2560,18 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
 
   const historyTabs = (sessionId: string) => fundirAbas(getEditorTabsVisibleForSession(editorTabs, sessionId), explorerModule ? projetarAbasDoModulo(sessionId, explorerModule.attach.getTabs({ sessionId })) : [])
   const navigation = useWorkbenchHistory({
-    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: customView.activeView === 'aiCustomizations', section: personalizationsRoute.section, mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
+    // R09: `modal`/`categoria` entram no histórico como fato (o antes vinha de customView).
+    route: { sessionId: persistedActiveSession.id, chatId: resolveActiveChatId(persistedActiveSession, activeChatBySession), tabId: landingVisible ? undefined : activeTabId, modal: config.aberta, categoria: config.rota.categoria, section: config.rota.subsecao ?? 'visao', mobilePane, landing: newSessionLanding, editorHidden, sideBarView: layout.state.activeView, sideBarVisible: layout.state.sideBarVisible },
     valid: route => sessions.some(session => session.id === route.sessionId) && (!route.tabId || historyTabs(route.sessionId).some(tab => tab.id === route.tabId)),
     restore: route => {
       if (landingVisible && !editorFilesSaved()) return
       selectSession(route.sessionId)
       setActiveChatBySession(current => ({ ...current, [route.sessionId]: route.chatId }))
       setNewSessionLanding(route.landing)
-      setPersonalizationsRoute(current => ({ section: route.section, serial: current.serial + 1 }))
-      if (route.modal) openCustomizations(); else closeCustomViewGrid()
+      // R09: voltar/avançar NAVEGA (não repete mutação); a categoria vem da entrada.
+      if (route.modal) config.abrir(rotaDaSecao(route.categoria === 'personalizacoes' ? route.section : route.categoria))
+      else config.fechar()
+      closeCustomViewGrid()
       activateEditorTab(historyTabs(route.sessionId).find(tab => tab.id === route.tabId))
       setEditorHidden(route.editorHidden); setMobilePane(route.mobilePane)
       layout.showView(route.sideBarView); layout.setSideBarVisible(route.sideBarVisible)
@@ -2477,7 +2599,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onOpenDiff={() => openDiff(activeSession.id)}
         onNewSession={handleNewSession}
         onShowSessions={showSessionPicker}
-        workspacePath={landingVisible ? (selectedWorkspace?.path ?? '') : (activeSession.worktreePath ?? activeSession.workspacePath)}
+        workspacePath={landingVisible ? (selectedWorkspace?.path ?? '') : (activeSession.worktreePath ?? activeSession.workspacePath ?? '')}
         workspaceChangePending={workspaceChangePending || workspacePickerPending}
         onChangeWorkspace={handleChangeActiveWorkspace}
         onFindFile={() => executeEditorCommand('workbench.action.quickOpen')}
@@ -2486,8 +2608,38 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         onBrowseWorkspace={() => void handleBrowseActiveWorkspace()}
         onAccountAction={(action) => action === 'open-providers' ? openProviders() : action === 'open-config' ? openConfig() : notify(action)}
       />
-      <SessionPersistenceNotice issues={persistence.issues} recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} />
+      <SessionPersistenceNotice
+        issues={[
+          // P-C §2 — um aviso por conversa: o estado de exclusão tem precedência
+          // sobre avisos de gravação antigos da mesma identidade.
+          ...persistence.issues.filter((issue) => !excluindo.has(issue.session.id) && !falhasExclusao.has(issue.session.id)),
+          ...[...excluindo]
+            .map((id) => sessions.find((session) => session.id === id))
+            .filter((session): session is Session => Boolean(session) && !sessionLoadPartial?.some(item => item.sessionId === session?.id && item.deletionRevision !== undefined))
+            .map((session): SessionPersistenceIssue => ({ session, kind: 'excluindo', message: 'Exclusão em andamento. O histórico desta conversa será removido; as outras conversas ficam intactas.', backupAvailable: false })),
+          ...[...falhasExclusao.entries()]
+            .filter(([id]) => !sessionLoadPartial?.some(item => item.sessionId === id && item.deletionRevision !== undefined))
+            .map(([id, message]) => sessions.find((session) => session.id === id) && { id, message, session: sessions.find((session) => session.id === id)! })
+            .filter((entry): entry is { id: string; message: string; session: Session } => Boolean(entry))
+            .map(({ session, message }): SessionPersistenceIssue => ({ session, kind: 'falha_exclusao', message, backupAvailable: false })),
+          // P-C (PC-R2) — aviso da identidade EXCLUÍDA composto FORA de
+          // `sessions.find`: a origem morta não está na lista (não reanexa),
+          // mas o snapshot preservado ainda oferece uma cópia nova.
+          ...readSessionRecoveries()
+            .filter((recovery) => recovery.kind === 'excluida'
+              && !sessions.some((session) => session.id === recovery.session.id)
+              && !excluindo.has(recovery.session.id) && !falhasExclusao.has(recovery.session.id))
+            .map((recovery): SessionPersistenceIssue => ({ session: recovery.session, kind: 'excluida', message: recovery.message, backupAvailable: true })),
+        ]}
+        recovering={persistence.recovering} onRecover={persistence.recover} onRetry={persistence.retry} onReload={persistence.reload} onExcluir={handleDelete} />
       {sessionLoadError && <div role="alert" className="session-persistence-notice"><p>{sessionLoadError}</p><button onClick={() => setHydrationAttempt(value => value + 1)}>Tentar carregar conversas novamente</button></div>}
+      {!sessionLoadError && <SessionLoadNotices
+        items={sessionLoadPartial}
+        deleting={excluindo}
+        failures={falhasExclusao}
+        onResumeDeletion={retomarLimpezaExclusao}
+        onReload={() => setHydrationAttempt(value => value + 1)}
+      />}
       {editorSurface.portal}
       {explorerModule && <EditorCommandsSlot module={explorerModule} />}
       <div className="workbench-body" style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` }}>
@@ -2503,13 +2655,23 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           onToggleArchived={handleToggleArchived}
           onDelete={handleDelete}
           onRename={(id, title) => updateSession(id, (session) => ({ ...session, title }))}
-          onManageHistoryAccess={(id, chatId) => { void manageHistoryAccess(id, chatId, { confirm: text => window.confirm(text), notify: text => window.alert(text) }) }}
+          onManageHistoryAccess={(id, chatId) => { void manageHistoryAccess(id, chatId, {
+            // Diálogo interno; quem decide autorizar/revogar segue sendo o cliente.
+            confirm: text => portaDialogos().confirmar(pedidoDeConfirmacao({
+              texto: text, confirmar: 'Continuar', rotuloAcessivel: 'Confirmar acesso ao histórico',
+              testId: 'historico-acesso-confirm',
+              // Título na mensagem; projeto e consequências no detalhe.
+              detalhe: text.split('\n').slice(1).join('\n').replace(/\n{2,}/g, '\n\n').trim() || undefined,
+            })),
+            notify,
+          }) }}
           onApprove={handleApprove}
           onOpenDiff={openDiff}
           onReorderSessions={handleReorderSessions}
           onAssignGroup={handleAssignGroup}
           onRemoveGroup={handleRemoveGroup}
-          onOpenPersonalizations={section => { setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 })); openCustomizations() }}
+          // U-1 R02/R05: seção de outra categoria vai para ela; nada inventado.
+          onOpenPersonalizations={section => abrirConfiguracoes(rotaDaSecao(section))}
           onOpenBeside={isSinglePane ? undefined : openSessionBeside}
         />
         {sidebarVisible && (
@@ -2690,7 +2852,8 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
         </div>
       </div>
       {toast && <div className="toast" role="status"><Info size={14} /><span>{toast}</span><button type="button" aria-label="Fechar aviso" title="Fechar aviso" onClick={() => setToast(undefined)}><X size={13} /></button></div>}
-      {customView.activeView === 'aiCustomizations' && <PersonalizationsModal alvo={alvoPersonalizacoes} sectionRequest={personalizationsRoute} onSectionChange={section => setPersonalizationsRoute(current => ({ section, serial: current.serial + 1 }))} onClose={closeCustomViewGrid} />}
+      {config.aberta && <ConfiguracoesUnificadasHost wiring={config} alvo={alvoPersonalizacoes} workspaceAtual={activeSession.workspacePath ?? undefined}
+        tema={theme} onAlternarTema={handleToggleTheme} onConfigSalva={(salva) => setAutoScrollChat(salva.autoScroll)} onNovaSessaoComPasta={handleNewSession} />}
       {explorerContextMenu && (
         <ExplorerContextMenuHost
           state={explorerContextMenu}

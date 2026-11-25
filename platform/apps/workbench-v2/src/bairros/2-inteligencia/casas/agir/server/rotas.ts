@@ -31,12 +31,16 @@ import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } f
 // D170-c (RNF15-2): protocolo HTTP e validação do pedido saíram daqui para
 // `protocoloHttp.ts`. Mesmas funções, mesmas mensagens — o arquivo só parou de
 // acumular três responsabilidades.
-import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, type PedidoValidado } from './protocoloHttp'
+import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, validarSelecaoModelo, type PedidoValidado } from './protocoloHttp'
 import { registrarExecucao, type RegistroExecucaoAgir } from './transcript'
 import { FERRAMENTAS_ENTRE_CHATS, pedidoHumanoEntreChats, type ContextoEntreChats, type PedidoEntreChats, type ResultadoEntreChats } from '../../../../../domain/consultaEntreChats'
 import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
+import { pediuSomenteAguardar } from '../../../../../domain/aguardarInstrucoes'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
+import { comCorpoVisao, proporVisao, validarPedidoVisao, type FonteVisao, type LerImagemVisao, type PedidoVisao } from './admissaoVisao'
+import type { CodecImagemVisao } from './prepararImagemVisao'
+
+const ROTAS_AGIR = ['/api/agir/vision', '/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -44,12 +48,23 @@ export function rotaPertenceAoModuloAgir(pathname: string): boolean {
 
 export interface ContextoAgir {
   ok: true
-  raiz: string
+  /** C-1 — `null` = conversa Chat: sem pasta, sem grant, sem filesystem. */
+  raiz: string | null
   permissoes: string[]
 }
 
 export interface DependenciasAgir {
   obterAlvo: ObterAlvo
+  obterAlvoVisao?: ObterAlvo
+  fonteVisao?: FonteVisao
+  identidadeVerificacaoVisao?: (alvo: AlvoConversa) => string | undefined
+  verificarVisao?: (alvo: AlvoConversa) => Promise<void>
+  lerImagemVisao?: LerImagemVisao
+  codecImagemVisao?: CodecImagemVisao
+  prepararInspecaoAnexos?: (contexto: { sessionId: string; chatId: string }, argumentos: PedidoFerramenta['argumentos'], sinal: AbortSignal) => Promise<{
+    previa: string
+    executar: () => Promise<ResultadoFerramenta>
+  }>
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
@@ -71,14 +86,14 @@ export interface DependenciasAgir {
   /** Teto desta mensagem (FATIA 11): a prefeitura lê da casa Config a cada pedido. */
   lerTeto: () => Promise<number>
   gravarExecucao?: (registro: RegistroExecucaoAgir) => Promise<void>
-  restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemSimples[]) =>
+  restaurarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, mensagens: MensagemSimples[]) =>
     Promise<{ mensagens: MensagemAgir[]; fonte: 'browser' | 'hibrido' | 'transcript'; checkpoint?: string }>
-  recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
-  recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string }, consulta: string) => Promise<ResultadoRecuperacao>
+  recuperarHistorico?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, pedido: PedidoRecuperacao) => Promise<ResultadoRecuperacao>
+  recuperarMemoriaProjeto?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, consulta: string) => Promise<ResultadoRecuperacao>
   criarConsultaEntreChats?: (contexto: ContextoEntreChats, sinal: AbortSignal, orcamentoBytes: number, textoHumano: string) => (pedido: PedidoEntreChats) => Promise<ResultadoEntreChats>
-  prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string }, mensagens: MensagemAgir[], alvo: AlvoConversa,
+  prepararChamada?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, mensagens: MensagemAgir[], alvo: AlvoConversa,
     sinal: AbortSignal, emitir: (evento: EventoAgir) => void, forcar?: boolean, medir?: (mensagens: MensagemAgir[]) => number) => Promise<MensagemAgir[]>
-  planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string }, runId: string) => Promise<string>
+  planejarRetomada?: (contexto: { sessionId: string; chatId: string; raiz: string | null }, runId: string) => Promise<string>
   /**
    * FATIA 14 / DP-06: a prefeitura compõe a instrução de produto e o filtro de
    * ferramentas. Esta casa NÃO sabe o que é skill, não lê estado de
@@ -103,7 +118,8 @@ interface AprovacaoPendente {
 interface ContextoFluxo {
   sessionId: string
   chatId: string
-  raiz: string
+  /** C-1 — Chat: `null`; a raiz nunca é deduzida de cwd/repoRoot. */
+  raiz: string | null
   modo: ModoAgir
   modoSelecionadoNoServidor: boolean
   permissao: NivelPermissaoAgir
@@ -152,6 +168,13 @@ export function conversaEmExecucao(sessionId: string, chatId: string): boolean {
 }
 export function conversaTemPausa(sessionId: string, chatId: string): boolean {
   return [...retomarPorFluxo.values()].some(({ contexto }) => contexto.sessionId === sessionId && contexto.chatId === chatId)
+}
+/** P-C (PC-R1) — guarda para fronteiras que não podem seguir com a identidade
+ * (ex.: DELETE) enquanto um run NÃO-TERMINAL da sessão ainda vive no mapa.
+ * Cancelamento já concluído (`estado` terminal) não bloqueia: o ACK veio e o
+ * `finally` do fio só limpa o mapa em seguida. */
+export function sessaoEmExecucao(sessionId: string): boolean {
+  return [...execucaoPorFluxo.values()].some((execucao) => execucao.sessionId === sessionId && !execucaoTerminal(execucao))
 }
 function criarExecucao(fluxo: string, contexto: ContextoFluxo): ExecucaoAgir {
   const generation = (geracaoPorFluxo.get(fluxo) ?? 0) + 1
@@ -216,15 +239,24 @@ async function concluirCancelamento(execucao: ExecucaoAgir): Promise<'cancelled'
 const retomarPorFluxo = new Map<string, { mensagens: MensagemAgir[]; contexto: ContextoFluxo; alvo: AlvoConversa; runId: string }>()
 const MAX_RETOMADAS = 20
 
-function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string): NivelPermissaoAgir {
+function lerPermissaoEfetiva(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string | null): NivelPermissaoAgir {
+  // C-1 — Chat não tem permissão de pasta: sempre manual, sem ler nem gravar grant.
+  if (raiz === null) return 'manual'
   return deps.lerPermissao?.(sessionId, chatId, raiz) ?? 'manual'
+}
+
+/** C-1 — modo efetivo da execução: Chat é sempre "Perguntar" (sem ferramentas);
+ * workspace usa a seleção do servidor com default conservador Agent. */
+function resolverModoEfetivo(deps: DependenciasAgir, sessionId: string, chatId: string, raiz: string | null): ModoAgir {
+  if (raiz === null) return 'ask'
+  return deps.lerModo(sessionId, chatId) ?? 'agent'
 }
 
 /** Guarda a retomada quando o teto pausou OU um erro transitório
  * (tempo/endereco/http) interrompeu o fio — outro fim limpa o fluxo. */
 function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: ContextoFluxo, alvo: AlvoConversa, runId: string): void {
   retomarPorFluxo.delete(fluxo)
-  if (contexto.entreChats) return // A fresh human message must own every MC1 budget and ambiguity decision.
+  if (contexto.entreChats || resultado.mensagensParaRetomar?.some(m => m.ferramenta === 'anexos')) return // Conteúdo autorizado nunca é reenviado por retomada implícita.
   const pausouNoTeto = resultado.status === 'iteracoes_excedidas'
   const caiuTransitorio =
     resultado.status === 'erro' &&
@@ -239,6 +271,30 @@ function guardarRetomada(fluxo: string, resultado: ResultadoAgir, contexto: Cont
   }
 }
 
+/** C-1 (SPEC C §4) — recusa honesta das ferramentas de pasta em conversa Chat:
+ * sem filesystem, sem permissão implícita, mensagem que explica a modalidade. */
+function recusarSemPasta(ferramenta: FerramentaId): ExecutorFerramenta {
+  return async () => ({
+    ok: false,
+    resumo: `Conversa Chat não tem pasta: "${ferramenta}" indisponível. Inicie uma conversa workspace para usar esta ferramenta.`,
+  })
+}
+
+function executoresSemPasta(): ExecutoresDisco {
+  return {
+    ler: recusarSemPasta('ler'),
+    listar: recusarSemPasta('listar'),
+    buscar: recusarSemPasta('buscar'),
+    criar: recusarSemPasta('criar'),
+    escrever: recusarSemPasta('escrever'),
+    excluir: recusarSemPasta('excluir'),
+    fechar: () => {},
+    prepararExclusao: async () => {
+      throw new Error('Conversa Chat não tem pasta: exclusão indisponível.')
+    },
+  }
+}
+
 interface FioAgir {
   execucao: ExecucaoAgir
   anterior?: string
@@ -248,11 +304,12 @@ interface FioAgir {
   sessionId: string
   chatId: string
   mensagens: MensagemAgir[]
-  raiz: string
+  raiz: string | null
   permissoes: string[]
   alvo: AlvoConversa
   teto: number
   instrucao?: InstrucaoHumana
+  visao?: PedidoVisao
 }
 
 /**
@@ -309,7 +366,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   let recuperouLimite = false
   const orcamentoMC1 = Math.min(24_000, Math.floor((orcamentoContexto(fio.alvo.capacidade, fio.alvo.maxSaida || 2048, fio.alvo.limiteContexto)?.preventivo ?? 24_000) / 4))
   let consultarOutroChat: ReturnType<NonNullable<DependenciasAgir['criarConsultaEntreChats']>> | undefined
-  try { consultarOutroChat = fio.execucao.entreChats ? deps.criarConsultaEntreChats?.(fio, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
+  // C-1 — MC1 exige raiz: Chat nunca cria consulta entre chats (tratarAgir
+  // já recusa `entreChats` sem raiz; aqui o estreitamento é explícito p/ TS).
+  try { consultarOutroChat = fio.execucao.entreChats && fio.raiz !== null ? deps.criarConsultaEntreChats?.({ sessionId: fio.sessionId, chatId: fio.chatId, raiz: fio.raiz }, abort.signal, orcamentoMC1, fio.execucao.instrucaoAtual ?? '') : undefined }
   catch { consultarOutroChat = async () => ({ status: 'scope_unverifiable', reason: 'catalog_unavailable', results: [], partial: true, sources: [], aviso: 'O catálogo histórico não está acessível.' }) }
   let consultasOutros = 0
   const executarConsultaOutroChat: ExecutorFerramenta = async pedido => {
@@ -330,16 +389,48 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
   const assinaturaEfeito = (pedido: PedidoFerramenta) => {
     const args = { ...pedido.argumentos }
     if (typeof args.caminho === 'string') {
-      const path = nodePath.resolve(fio.raiz, args.caminho).normalize('NFC')
+      // C-1 — Chat não tem raiz: a assinatura usa o caminho como veio (sem base).
+      const path = fio.raiz !== null ? nodePath.resolve(fio.raiz, args.caminho).normalize('NFC') : args.caminho.normalize('NFC')
       args.caminho = process.platform === 'win32' ? path.toLowerCase() : path
     }
     return `${pedido.ferramenta}:${JSON.stringify(Object.keys(args).sort().map((chave) => [chave, args[chave as keyof typeof args]]))}`
   }
   const efeitosTentados = new Set(fio.mensagens.flatMap((m) => m.pedidos ?? []).filter((p) => ehMexida(p.ferramenta)).map(assinaturaEfeito))
-  const executoresDisco = fio.instrucao?.executores ?? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
-  const executorComandoBase = criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
+  // C-1 (SPEC C §4) — Chat: nenhum executor de disco/comando nasce (a fábrica
+  // `criarExecutores` NUNCA é chamada com raiz nula) e qualquer chamada recebe
+  // recusa honesta sem tocar filesystem.
+  const executoresDisco = fio.instrucao?.executores ?? (fio.raiz !== null
+    ? (deps.criarExecutores ?? criarExecutoresReais)(fio.raiz)
+    : executoresSemPasta())
+  const executorComandoBase = fio.raiz !== null
+    ? criarExecutorComando(fio.raiz, { shellResolver: deps.resolverShell, timeoutMs: deps.timeoutComandoMs })
+    : recusarSemPasta('executar')
+  const planosAnexos = new WeakMap<PedidoFerramenta, { executar: () => Promise<ResultadoFerramenta> }>()
+  const falhasAnexos = new WeakSet<PedidoFerramenta>()
+  let alvoAnexos: string | undefined
+  let houveAnexos = false
+  const identidadeAlvo = (alvo: AlvoConversa) => JSON.stringify([alvo.providerId, alvo.modelId, alvo.protocolo, alvo.baseUrl, alvo.modelo, alvo.apiKey, alvo.configRevision])
   const executores: Record<FerramentaId, ExecutorFerramenta> = {
     ...executoresDisco,
+    anexos: async pedido => {
+      if (falhasAnexos.has(pedido)) return { ok: false, resumo: 'A fonte ou o item não está disponível nesta conversa, foi alterado ou excede os limites locais.' }
+      const plano = planosAnexos.get(pedido)
+      if (!plano || abort.signal.aborted || !validarContexto(pedido)) return { ok: false, resumo: 'Autorização de anexos indisponível ou expirada.' }
+      planosAnexos.delete(pedido)
+      const operacao = plano.executar().then(resultado => {
+        if (resultado.efeitoIniciado) fio.execucao.mutacoesConfirmadas += 1
+        if (resultado.ok) houveAnexos = true
+        return resultado
+      }, (erro: unknown): ResultadoFerramenta => {
+        if ((erro as { efeitoPossivel?: boolean })?.efeitoPossivel) {
+          fio.execucao.mutacoesConfirmadas += 1
+          return { ok: false, efeitoIniciado: true, resumo: 'Resultado da extração não confirmado. Confira as fontes antes de repetir; nenhum conteúdo foi enviado ao modelo.' }
+        }
+        return { ok: false, resumo: 'A fonte mudou ou não está disponível. Nenhum conteúdo foi entregue ao modelo.' }
+      })
+      fio.execucao.efeitoMutavelEmAndamento = operacao
+      try { return await operacao } finally { if (fio.execucao.efeitoMutavelEmAndamento === operacao) delete fio.execucao.efeitoMutavelEmAndamento }
+    },
     buscar_chats: executarConsultaOutroChat,
     buscar_mensagens_chat: executarConsultaOutroChat,
     ler_trecho_chat: executarConsultaOutroChat,
@@ -421,7 +512,9 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     }
   }
   const autorizacoesAutomaticas = new WeakSet<PedidoFerramenta>()
-  const automaticaAtiva = (): boolean => lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all' && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
+  const automaticaAtiva = (): boolean => fio.raiz !== null
+    && lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) === 'allow-all'
+    && deps.lerExclusaoAutomatica?.(fio.sessionId, fio.chatId, fio.raiz) === true
   let instrucaoConsumida = false
   const reconfirmacoes = fio.execucao.exclusoesTentadas ?? new Set<string>()
   fio.execucao.exclusoesTentadas = reconfirmacoes
@@ -429,7 +522,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     const permissoesAtuais = permissoesPorFluxo.get(fluxo)
     const usouGrantDeSessao = pedido && permiteSessao(pedido.ferramenta) && permissoesAtuais?.has(pedido.ferramenta)
     const contextoAtual = deps.resolverContexto(fio.sessionId, fio.chatId)
-    if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || (deps.lerModo(fio.sessionId, fio.chatId) ?? 'agent') !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
+    if (!contextoAtual.ok || contextoAtual.raiz !== fio.raiz || resolverModoEfetivo(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.modo || lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz) !== fio.execucao.permissao) return false
     if (pedido && usouGrantDeSessao && !contextoAtual.permissoes.includes(pedido.ferramenta)) return false
     permissoesPorFluxo.set(fluxo, new Set(contextoAtual.permissoes))
     return true
@@ -440,6 +533,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     // já vai ao modelo — não existe segunda fonte de texto, então não há como a
     // invocação detectada divergir do que o modelo vai ver.
     const textoDoDono = [...fio.mensagens].reverse().find((mensagem) => mensagem.papel === 'usuario')?.conteudo ?? ''
+    const somenteAguardar = pediuSomenteAguardar(textoDoDono)
     const composicao = !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada && deps.comporContexto
       ? await deps.comporContexto({ texto: textoDoDono, raizProjeto: fio.raiz })
       : null
@@ -447,16 +541,18 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
     resultado = await rodarAgir({
       vizinho: async (historico, opcoes) => {
         if (fio.execucao.entreChats && consultasOutros > 8) throw Object.assign(new Error('Limite desta consulta entre chats atingido. Refine a pergunta em uma nova mensagem.'), { code: 'limite' })
-        if (deps.prepararChamada && fio.alvo.providerId && fio.alvo.modelId) {
+        if ((deps.prepararChamada || alvoAnexos) && fio.alvo.providerId && fio.alvo.modelId) {
           const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
-          if (!atual.alvo) throw Object.assign(new Error('A seleção ficou indisponível antes de preparar o contexto.'), { code: 'selection_unavailable' })
+          if (!atual.alvo || (alvoAnexos && identidadeAlvo(atual.alvo) !== alvoAnexos)) throw Object.assign(new Error('O destino mudou após a confirmação dos anexos; nenhuma nova chamada foi iniciada.'), { code: 'selection_unavailable' })
           fio.alvo = atual.alvo
+        } else if (alvoAnexos && identidadeAlvo(fio.alvo) !== alvoAnexos) {
+          throw Object.assign(new Error('O destino confirmado dos anexos mudou.'), { code: 'selection_unavailable' })
         }
         if (registro) await gravarRegistro()
         if (abort.signal.aborted || !validarContexto()) {
           throw Object.assign(new Error('O contexto da execução mudou durante a gravação.'), { code: 'fluxo' })
         }
-        const preparar = deps.prepararChamada && !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
+        const preparar = deps.prepararChamada && !houveAnexos && !fio.execucao.entreChats && !fio.execucao.recuperacao && !fio.execucao.planejamentoRetomada
           ? (forcar: boolean) => deps.prepararChamada!(fio, historico, fio.alvo, abort.signal, emitirMemoria, forcar,
               (mensagens) => estimativaDoPedido(fio.alvo, mensagens, opcoes)) : undefined
         let contexto = preparar ? await preparar(false) : historico
@@ -467,6 +563,18 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || !validarContexto()) throw Object.assign(new Error('O projeto mudou durante a preparação do contexto.'), { code: 'fluxo' })
         let saiuTexto = false
         const observadores = { ...opcoes, validarAntesDaChamada: validarContexto, aoTexto: (texto: string) => { if (texto.length) saiuTexto = true; opcoes?.aoTexto?.(texto) } }
+        const pedidoVisao = fio.visao
+        if (pedidoVisao) {
+          const ultima = contexto.at(-1)
+          if (!deps.fonteVisao || !deps.lerImagemVisao || !ultima || ultima.papel !== 'usuario' || ultima.conteudo !== textoDoDono) {
+            throw Object.assign(new Error('O contexto da imagem mudou. Nenhuma imagem foi enviada.'), { code: 'configuracao' })
+          }
+          return comCorpoVisao(pedidoVisao, { sessionId: fio.sessionId, chatId: fio.chatId, texto: textoDoDono },
+            fio.alvo, deps.fonteVisao, deps.lerImagemVisao, (prepararCorpoVisao) => criarVizinhoReal(fio.alvo, {
+              prepararCorpoVisao,
+              aoAceitarVisao: () => emitirMemoria({ type: 'vision_accepted', messageId: pedidoVisao.messageId, artifactIds: pedidoVisao.artifactIds }),
+            }, deps.iniciarModelo)(contexto, observadores), deps.codecImagemVisao)
+        }
         const atual = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
         try { return await atual(contexto, observadores) } catch (erro) {
           if (!preparar || recuperouLimite || saiuTexto || abort.signal.aborted ||
@@ -488,14 +596,24 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       // Sem a dependência, os dois chegam undefined: nenhuma instrução e catálogo
       // completo, que é exatamente o comportamento anterior (D141, aditivo).
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
-      ferramentasPermitidas: fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
-        deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
+      // Chat continua sem ferramentas de pasta/shell; a porta de anexos é isolada.
+      ferramentasPermitidas: fio.visao || somenteAguardar ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+        fio.raiz === null ? (deps.prepararInspecaoAnexos ? ['anexos'] : []) :
+        [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), ...(deps.recuperarHistorico ? ['historico'] : []), ...(deps.prepararInspecaoAnexos ? ['anexos'] : [])],
       emitir: (evento) => {
         registro?.observar(evento)
         if ((abort.signal.aborted && evento.type !== 'tool_result') || res.writableEnded) return
         if (fio.execucao.entreChats && (evento.type === 'teto' ||
           (evento.type === 'error' && ['tempo', 'endereco', 'http'].includes(evento.code)))) {
           escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta entre chats foi interrompida ou atingiu seu limite. Envie uma nova mensagem ou selecione novamente a conversa; nenhuma ferramenta será repetida automaticamente.' })
+          return
+        }
+        if (houveAnexos && (evento.type === 'teto' || (evento.type === 'error' && evento.retomavel))) {
+          escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta de anexos foi interrompida. Envie uma nova mensagem e confirme novamente; o conteúdo não será reenviado automaticamente.' })
+          return
+        }
+        if (fio.visao && (evento.type === 'teto' || (evento.type === 'error' && evento.retomavel))) {
+          escreverEvento(res, { type: 'error', code: 'configuracao', message: (evento.type === 'error' ? evento.message + ' ' : '') + 'Use Regenerar para confirmar novamente o envio da imagem.' })
           return
         }
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
@@ -511,6 +629,38 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         else escreverEvento(res, evento)
       },
       pedirAprovacao: async (pedido) => {
+        if (pedido.ferramenta === 'anexos') {
+          if (!deps.prepararInspecaoAnexos || abort.signal.aborted || fio.execucao.estado !== 'running') return false
+          let plano: Awaited<ReturnType<NonNullable<DependenciasAgir['prepararInspecaoAnexos']>>>
+          try { plano = await deps.prepararInspecaoAnexos({ sessionId: fio.sessionId, chatId: fio.chatId }, pedido.argumentos, abort.signal) }
+          catch { falhasAnexos.add(pedido); return true }
+          if (abort.signal.aborted || !validarContexto(pedido) || fio.execucao.estado !== 'running') return false
+          const identidade = identidadeAlvo(fio.alvo)
+          if (alvoAnexos && alvoAnexos !== identidade) return false
+          fio.execucao.estado = 'awaiting-approval'
+          const previa = `${plano.previa}\nDestino selecionado: ${fio.alvo.providerId ?? 'provedor'} / ${fio.alvo.modelId ?? fio.alvo.modelo}. Em gateways, o roteamento interno pode variar. Confirme apenas se concordar com este envio.`
+          const evento = { type: 'approval', pedido, previa, allowSession: false } as const
+          registro?.observar(evento)
+          await gravarRegistro()
+          if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
+          const liberado = await new Promise<boolean>(resolve => {
+            fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
+            escreverEvento(res, evento)
+          })
+          if (!abort.signal.aborted) { registro?.decisao(pedido.id, liberado); await gravarRegistro() }
+          fio.execucao.pendentes.delete(pedido.id)
+          if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
+          if (!liberado || abort.signal.aborted || !validarContexto(pedido)) return false
+          if (fio.alvo.providerId && fio.alvo.modelId) {
+            const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
+            if (!atual.alvo || identidadeAlvo(atual.alvo) !== identidade) return false
+          }
+          alvoAnexos = identidade
+          planosAnexos.set(pedido, plano)
+          return true
+        }
+        // C-1 — Chat não tem pasta: nenhuma aprovação de arquivo/comando nasce.
+        if (fio.raiz === null) return false
         const exigeReconfirmacao = recuperouLimite && efeitosTentados.size > 0
         const concedidas = permissoesPorFluxo.get(fluxo)
         const nivelPermissao = lerPermissaoEfetiva(deps, fio.sessionId, fio.chatId, fio.raiz)
@@ -576,8 +726,14 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       },
       validarContexto,
       bloquearFerramenta: (pedido) => {
+        if (somenteAguardar) return 'O usuário pediu somente para aguardar instruções; nenhuma ferramenta será executada neste turno.'
         if (fio.execucao.entreChats) return (FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta) ? null : 'Esta consulta é somente de outros chats: não autoriza arquivos, comandos, memórias de projeto ou outras ferramentas.'
         if ((FERRAMENTAS_ENTRE_CHATS as readonly string[]).includes(pedido.ferramenta)) return 'Consulte outros chats somente mediante pedido humano explícito atual; use /chats seguido da consulta se necessário.'
+        // C-1 (SPEC C §4) — guarda da conversa Chat: nenhuma ferramenta de
+        // pasta/comando executa, mesmo com "Permitir tudo" ou grant antigo.
+        if (fio.raiz === null && ['ler', 'listar', 'buscar', 'criar', 'escrever', 'excluir', 'executar'].includes(pedido.ferramenta)) {
+          return `Conversa Chat não tem pasta: "${pedido.ferramenta}" indisponível. Inicie uma conversa workspace para usar esta ferramenta.`
+        }
         if (recuperouLimite && ehMexida(pedido.ferramenta) && efeitosTentados.has(assinaturaEfeito(pedido))) {
           return 'Ação já tentada antes da recuperação de contexto; não será repetida. Confira o resultado e peça nova autorização em uma tarefa nova se precisar repeti-la.'
         }
@@ -585,11 +741,12 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (fio.execucao.recuperacao && pedido.ferramenta !== 'historico') return 'A consulta histórica não autoriza acesso a arquivos nem execução de comandos.'
         if (!fio.execucao.recuperacao && !fio.execucao.recuperacaoAutomatica && pedido.ferramenta === 'historico') return 'A recuperação histórica não está disponível nesta execução.'
         if (pedido.ferramenta === 'historico') return null
+        if (pedido.ferramenta === 'anexos') return deps.prepararInspecaoAnexos && !fio.visao ? null : 'Inspeção de anexos indisponível nesta execução.'
         if ((fio.execucao.modo === 'ask' || fio.execucao.modo === 'plan') && !['ler', 'listar', 'buscar'].includes(pedido.ferramenta)) {
           const rotulo = fio.execucao.modo === 'ask' ? 'Perguntar' : 'Planejar'
           return `Bloqueado pelo modo ${rotulo}: esta execução é somente leitura; "${pedido.ferramenta}" não foi aprovada nem executada.`
         }
-        if ((pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever') && typeof pedido.argumentos.caminho === 'string') {
+        if (fio.raiz !== null && (pedido.ferramenta === 'criar' || pedido.ferramenta === 'escrever') && typeof pedido.argumentos.caminho === 'string') {
           const caminho = nodePath.resolve(fio.raiz, pedido.argumentos.caminho)
           if (/[\\/]docs[\\/]0[1-9] - [^\\/]+\.md$/iu.test(caminho)) {
             const texto = fio.execucao.instrucaoAtual ?? ''
@@ -679,7 +836,7 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     return true
   }
   const contextoAtual = deps.resolverContexto(execucao.sessionId, execucao.chatId)
-  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || (deps.lerModo(execucao.sessionId, execucao.chatId) ?? 'agent') !== execucao.modo || lerPermissaoEfetiva(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.permissao) {
+  if (!contextoAtual.ok || contextoAtual.raiz !== execucao.raiz || resolverModoEfetivo(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.modo || lerPermissaoEfetiva(deps, execucao.sessionId, execucao.chatId, execucao.raiz) !== execucao.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; esta aprovação foi invalidada e nenhuma ação foi executada.')
     return true
   }
@@ -695,6 +852,10 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
         ? 'Comandos de alto risco não aceitam grant de sessão; sempre exigem aprovação individual.'
         : 'Esta ferramenta não aceita grant de sessão; o cartão sempre pergunta antes de executar.'
       sendErro(res, 400, 'configuracao', motivo)
+      return true
+    }
+    if (execucao.raiz === null) {
+      sendErro(res, 400, 'configuracao', 'Conversa Chat não aceita grants de pasta.')
       return true
     }
     const ferramenta = pendente.pedido.ferramenta as 'criar' | 'escrever' | 'executar'
@@ -767,6 +928,12 @@ async function tratarInstrucaoHumana(req: IncomingMessage, res: ServerResponse, 
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
   if (!contexto.ok) { sendErro(res, 409, 'fluxo', contexto.message); return true }
+  // C-1 (SPEC C §4) — Chat não recebe instrução humana de arquivo/comando:
+  // sem raiz não há preparação de exclusão nem executores de pasta.
+  if (contexto.raiz === null) {
+    sendErro(res, 409, 'configuracao', 'Conversa Chat não tem pasta: instruções de arquivo e comando exigem uma conversa workspace.')
+    return true
+  }
   for (const [id, instrucao] of instrucoes) {
     if (Date.now() - instrucao.criada > 300_000 || (instrucao.sessionId === sessionId && instrucao.chatId === chatId) || instrucoes.size >= 20) {
       instrucao.executores.fechar(); instrucoes.delete(id)
@@ -816,7 +983,7 @@ async function tratarAgir(
   // Default conservador é Agent + aprovação manual. A seleção explícita do
   // servidor aplica a política do modo e ignora o `mode` de /api/agir.
   const modoSelecionado = deps.lerModo(validacao.pedido.sessionId, validacao.pedido.chatId)
-  const modoEfetivo = modoSelecionado ?? 'agent'
+  const modoEfetivo = resolverModoEfetivo(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
   const permissaoEfetiva = lerPermissaoEfetiva(deps, validacao.pedido.sessionId, validacao.pedido.chatId, contexto.raiz)
 
   const { alvo, erro } = await deps.obterAlvo(validacao.pedido.selecaoModelo)
@@ -848,7 +1015,19 @@ async function tratarAgir(
   }
   instrucoes.delete(token)
   const textoAtual = validacao.pedido.mensagens.at(-1)
-  const consultaEntreChats = !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
+  let visao: PedidoVisao | undefined
+  if (corpo.vision !== undefined) {
+    try {
+      visao = validarPedidoVisao(corpo.vision)
+      if (modoEfetivo !== 'ask' || textoAtual?.role !== 'user' || textoAtual.id !== visao.messageId || textoAtual.content.trim().startsWith('/') || pediuSomenteAguardar(textoAtual.content)) {
+        throw new Error('Imagens exigem uma pergunta publicada nesta conversa, no modo Perguntar.')
+      }
+    } catch (erro) {
+      sendErro(res, 409, 'configuracao', (erro as Error).message)
+      return true
+    }
+  }
+  const consultaEntreChats = contexto.raiz !== null && !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
     instrucao.texto === textoAtual.content && pedidoHumanoEntreChats(instrucao.texto)
   if (textoAtual?.role === 'user' && /^\/chats(?:\s|$)/iu.test(textoAtual.content.trim()) && !consultaEntreChats) {
     sendErro(res, 400, 'configuracao', 'Envie /chats seguido da consulta por uma nova mensagem humana. Nenhuma consulta foi iniciada.'); return true
@@ -900,8 +1079,9 @@ async function tratarAgir(
     alvo,
     teto,
     instrucao,
+    visao,
   }, deps)
-  guardarRetomada(fluxo, resultado, contextoFluxo, alvo, execucao.runId)
+  if (!visao) guardarRetomada(fluxo, resultado, contextoFluxo, alvo, execucao.runId)
   return true
 }
 
@@ -944,7 +1124,7 @@ async function tratarContinuar(
     return true
   }
   const contexto = deps.resolverContexto(sessionId, chatId)
-  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || (deps.lerModo(sessionId, chatId) ?? 'agent') !== retomada.contexto.modo || lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz) !== retomada.contexto.permissao) {
+  if (!contexto.ok || contexto.raiz !== retomada.contexto.raiz || resolverModoEfetivo(deps, sessionId, chatId, retomada.contexto.raiz) !== retomada.contexto.modo || lerPermissaoEfetiva(deps, sessionId, chatId, contexto.raiz) !== retomada.contexto.permissao) {
     sendErro(res, 409, 'fluxo', 'A sessão, pasta ou modo mudou; a continuação foi invalidada.')
     return true
   }
@@ -1026,6 +1206,11 @@ async function tratarSelecionarPermissao(req: IncomingMessage, res: ServerRespon
     sendErro(res, 409, 'fluxo', contexto.message)
     return true
   }
+  // C-1 — Chat não tem permissões de pasta: o seletor permanece em manual.
+  if (contexto.raiz === null) {
+    sendErro(res, 409, 'fluxo', 'Conversa Chat não tem permissões de pasta; a permissão permanece em modo manual.')
+    return true
+  }
   if (!deps.definirPermissao) {
     sendErro(res, 503, 'configuracao', 'A seleção de permissões não está conectada à autoridade server-side.')
     return true
@@ -1099,6 +1284,25 @@ export async function tratarRotasAgir(
 ): Promise<boolean> {
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
+  if (url.pathname === '/api/agir/vision') {
+    if (!deps.fonteVisao) { sendJson(res, 200, null); return true }
+    try {
+      const corpo = await lerCorpo(req)
+      const selecao = validarSelecaoModelo(corpo.modelSelection)
+      const alvo = selecao ? (await (deps.obterAlvoVisao ?? deps.obterAlvo)(selecao)).alvo : undefined
+      const verificacao = alvo && deps.identidadeVerificacaoVisao?.(alvo)
+      if (corpo.verificar !== undefined) {
+        if (!alvo || !verificacao || corpo.verificar !== verificacao) {
+          sendErro(res, 409, 'configuracao', 'O destino mudou. Confirme uma nova verificação.')
+          return true
+        }
+        await deps.verificarVisao?.(alvo)
+      }
+      const proposta = alvo ? proporVisao(alvo, deps.fonteVisao, corpo.messageId, corpo.texto) : null
+      sendJson(res, 200, proposta ?? (alvo && verificacao ? { verificacao, providerId: alvo.providerId, modelId: alvo.modelId } : null))
+    } catch { sendErro(res, 400, 'configuracao', 'Não foi possível avaliar o alvo de imagem.') }
+    return true
+  }
   if (url.pathname === '/api/agir/instruction') return tratarInstrucaoHumana(req, res, deps)
   if (url.pathname === '/api/agir/mode') return tratarSelecionarModo(req, res, deps)
   if (url.pathname === '/api/agir/permission') return tratarSelecionarPermissao(req, res, deps)

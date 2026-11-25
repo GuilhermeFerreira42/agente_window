@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, renameSync } from 'node:fs'
-import { mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { deleteTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
+import { deleteTranscript, digestTranscriptBytes, publishStagedTranscript, readTranscript, writeTranscript, type TranscriptEntry } from './transcripts'
 import { resolveProjectDir } from './paths'
 
 function makeEntries(marker: string): TranscriptEntry[] {
@@ -144,5 +144,74 @@ describe('JSONL transcript persistence', () => {
     expect((await readFile(published, 'utf8')).trim().split('\n').map(line => JSON.parse(line))).toEqual(candidate)
     await expect(readTranscript(slug, sessionId)).rejects.toMatchObject({ status: 503 })
     await expect(writeTranscript(slug, sessionId, candidate)).rejects.toMatchObject({ status: 503 })
+  })
+})
+
+describe('P-B writer boundaries (prepararIntencao)', () => {
+  let slug: string
+  let sessionId: string
+  let directory: string
+  let destination: string
+
+  beforeEach(async () => {
+    slug = `transcript-pb-${randomUUID()}`
+    sessionId = `session-${randomUUID()}`
+    directory = resolveProjectDir(slug)
+    await mkdir(directory, { recursive: true })
+    destination = join(directory, `${sessionId}.jsonl`)
+  })
+  afterEach(async () => { await rm(directory, { recursive: true, force: true }) })
+
+  const previous = (): TranscriptEntry[] => makeEntries('pb-old')
+  const candidate = (): TranscriptEntry[] => [...makeEntries('pb-old'), ...makeEntries('pb-new')]
+
+  it('P-B: runs the intent hook under the lock with a complete stage and the destination untouched', async () => {
+    await writeTranscript(slug, sessionId, previous())
+    const destinoAntes = await readFile(destination, 'utf8')
+    let commitChamado = false
+    let stageVisto: string | undefined
+    await writeTranscript(slug, sessionId, candidate(), {
+      expectedEntries: previous(),
+      commit: () => { commitChamado = true },
+      prepararIntencao: async ({ stagedPath, newDigest, oldDigest }) => {
+        stageVisto = stagedPath
+        // hook roda ANTES do rename: destino ainda é a base, stage completo
+        expect(await readFile(destination, 'utf8')).toBe(destinoAntes)
+        expect(digestTranscriptBytes(await readFile(stagedPath))).toBe(newDigest)
+        expect(oldDigest).toBe(digestTranscriptBytes(destinoAntes))
+      },
+    })
+    expect(stageVisto).toMatch(/\.tmp$/)
+    expect(commitChamado).toBe(true)
+    expect(await readFile(destination, 'utf8')).not.toBe(destinoAntes)
+    expect((await readdir(directory)).filter(name => name.includes('.tmp'))).toEqual([])
+  })
+
+  it('P-B: a failing intent hook aborts with the destination untouched, no temp files and no commit', async () => {
+    await writeTranscript(slug, sessionId, previous())
+    const destinoAntes = await readFile(destination, 'utf8')
+    let commitChamado = false
+    await expect(writeTranscript(slug, sessionId, candidate(), {
+      expectedEntries: previous(),
+      commit: () => { commitChamado = true },
+      prepararIntencao: () => { throw Object.assign(new Error('registro falhou'), { code: 'EIO' }) },
+    })).rejects.toThrow('registro falhou')
+    expect(commitChamado).toBe(false)
+    expect(await readFile(destination, 'utf8')).toBe(destinoAntes)
+    expect((await readdir(directory)).filter(name => name.includes('.tmp') || name.includes('.rollback'))).toEqual([])
+  })
+
+  it('P-B: publishStagedTranscript refuses a divergent destination without overwriting anything', async () => {
+    await writeTranscript(slug, sessionId, previous())
+    const destinoAntes = await readFile(destination, 'utf8')
+    const stage = `${destination}.stage-fixture.tmp`
+    await writeFile(stage, candidate().map(entry => JSON.stringify(entry)).join('\n') + '\n', 'utf8')
+    await writeFile(destination, 'MUNDO EXTERNO\n', 'utf8')
+    const divergente = await readFile(destination, 'utf8')
+    await expect(publishStagedTranscript(stage, destination, digestTranscriptBytes(destinoAntes)))
+      .rejects.toMatchObject({ status: 409, code: 'transcript_changed' })
+    expect(await readFile(destination, 'utf8')).toBe(divergente)
+    // o stage permanece intacto para revisão — nada foi apagado
+    expect((await readdir(directory)).some(name => name.endsWith('.stage-fixture.tmp'))).toBe(true)
   })
 })

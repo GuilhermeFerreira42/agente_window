@@ -120,3 +120,15 @@ export interface SalvarProvedoresInput {
   ativo?: string | null
   provedores: Record<string, ProvedorConfig>
 }
+
+// ——— MM-0 (contrato neutro multimodal): reexport de TIPOS por composição ———
+// PerfilMultimodal é composição ADICIONAL de domínio: não substitui
+// `limites`, fontes de D198 nem o schema v4 do arquivo salvo.
+export type {
+  EnvelopeMensagemMultimodal,
+  EvidenciaCapacidade,
+  IdentidadeAlvoMultimodal,
+  Modalidade,
+  ParteMensagem,
+  PerfilMultimodal,
+} from '../../../../domain/multimodal'

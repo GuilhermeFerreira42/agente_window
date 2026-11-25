@@ -1,3 +1,4 @@
 /iniciar.sh text eol=lf
+/platform/scripts/e2e-c3b.sh text eol=lf
 /iniciar.cmd text eol=crlf
 /platform/scripts/project.ps1 text eol=crlf

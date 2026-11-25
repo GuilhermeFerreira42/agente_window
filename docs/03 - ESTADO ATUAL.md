@@ -1,3 +1,255 @@
+# Leitura vigente do roadmap — 25/11/2026
+
+**Nova rodada MM-I — implementação ainda não concluída.** O proprietário substituiu o desenho de Fontes pelo Explorer normal com pasta por chat ou projeto, exige originais históricos separados dos arquivos de trabalho e fluxos funcionais de áudio e vídeo. A entrega descrita abaixo é anterior a essa mudança e não satisfaz esses critérios. Parcial nesta continuação: mensagens indicam quando o original não está disponível e não oferecem download falso, inclusive no envelope multimodal; a reconciliação usa o catálogo e o ID real da transferência. A preservação/migração de originais, o Explorer novo e a análise de áudio/vídeo ainda não foram implementados. Não há novo roteiro Windows executável para homologação nem autorização para iniciar MM-O. Um limite do legado é que cópias de projeto já alteradas ou excluídas antes da migração podem não ter mais os bytes originais: o hash permite detectar a perda, não reconstruí-los. Detalhes e testes em `09`.
+
+**MM-I — correção em avaliação; áudio/vídeo pendentes (estado anterior).** A extração ZIP decide cancelamento versus publicação sob a fila da sessão: cancelamento confirmado antes da publicação não pode ser recuperado como item pronto; publicação que vence é reportada como efeito, e resultado incerto nunca é cancelamento limpo. Pedido exclusivo reconhecido de “aguarde instruções” guarda os anexos sem inspecionar; uma tarefa posterior pode usar os mesmos arquivos. O Playwright cobre dois chats da mesma sessão e a corrida de escrita, com dados descartáveis. Detalhes, limites do reconhecimento e resultados em `09`. Áudio/vídeo não têm transcritor/extração de quadros integrada nem capacidade de provedor comprovada; permanece decisão do proprietário sobre adiamento. O isolamento é mediado por Explorer, rotas e ferramenta de anexos; shell e pastas externas autorizadas continuam, sem sandbox físico. Roteiro único em `VALIDACAO_MM-I_WINDOWS.md`; nenhuma homologação humana nem MM-O.
+
+**Ponto atual:** C-3a e C-3b homologadas. O proprietário homologou a U-1 e a padronização dos diálogos que a Arena chamou de U-2, sobre `6a895ff`. O ajuste de retorno de foco no chat foi adiado a pedido do proprietário. Próxima fatia: [MM-I — entrada multimodal](06%20-%20PROXIMAS%20FASES%20E%20DIVIDAS.md#mm-i--plano-de-execução), com a primeira entrega de visão em validação. Aceite em `08`, evidências em `09`.
+
+## Correção da exclusão de conversas
+
+- A exclusão aguarda a fila de salvamento da própria conversa e usa a última revisão confirmada. Conflitos reais com outra gravação e salvamentos sem confirmação continuam protegidos.
+- Reabrir ou recarregar a lista não aciona a Lixeira para anexos privados pendentes. O aviso **Exclusão pendente** oferece **Retomar exclusão** e identifica a conversa. Se o sistema não conseguir mover o anexo para a Lixeira, mantém o arquivo e a pendência.
+- Os avisos de falha real ao salvar ou carregar e a possibilidade de recuperar uma cópia seguem disponíveis. Validação manual da correção informada pelo proprietário em 24/11/2026. Evidência automatizada e seus limites em `09`.
+
+As entradas datadas abaixo são fotografias de suas rodadas. Use a mais recente aplicável a cada frente; títulos antigos “Estado vigente” não tornam simultaneamente atuais ordens já sucedidas. P-B/C-2: conclusão técnica não convertida em aceite humano não localizado; M1–M8/MC1 mantêm homologação própria pendente. Não inferir esses aceites do encerramento da C-3a.
+
+---
+
+# Reteste de prévias da C-3b no chat
+
+O teste manual mostrou que anexos enviados pelo usuário ainda apareciam só como download. A correção reaproveita o visualizador na lista de anexos, com formato conferido na rota de mídia. No Windows, o Playwright passou 12/12. Os testes agora enviam PNG, WAV e WebM pelo campo de mensagem e verificam a imagem após F5 e a reprodução nos próprios players da conversa. MP4, M4A e RAR continuam com download. Checagem de tipos e lint dos arquivos alterados passaram. O proprietário confirmou depois o teste manual por “Salvar uma cópia separada” e o aceite da C-3b, conforme 08. A automação de recuperação prova a cópia dos arquivos pela API. A integração do mapa de arquivos no fluxo da interface segue registrada como limitação técnica para outros cenários.
+
+---
+
+# Revisão da C-3b após a rodada da Arena
+
+- Exclusão e recuperação consultam o caminho do arquivo gerado no catálogo. A falha da Lixeira deixa a exclusão pendente e a retentativa pode concluir sem tocar uma cópia recuperada em outra sessão.
+- A saída gerenciada compara tamanho e hash também no reenvio por stream. Tentativas simultâneas publicam sob a fila da sessão, com estágios independentes. O cancelamento e a exclusão são revalidados antes de confirmar a saída.
+- Os testes Windows foram ajustados para usar o separador de caminho do sistema e preservar LF no script Linux em novos checkouts. A jornada de recuperação do Playwright verifica a cópia pelas rotas de anexos e lê o arquivo nos dois donos. A ação de recuperação do aviso de persistência na interface tem fluxo próprio e ainda não consome esse mapa de anexos.
+- Reteste local no Windows com Node 26.13.0 sobre `7082c38` mais as correções desta rodada: foco 431/431, Playwright 12/12, zero testes pulados, checagem de tipos, lint dos arquivos alterados e build Vite aprovados. A homologação humana segue pendente. Os números Debian abaixo são da rodada da Arena.
+
+---
+
+# Estado anterior — 20/11/2026 — entrega da Arena antes desta revisão
+
+**Autorizada pelo proprietário, executada com autonomia técnica, sem merge e sem iniciar a próxima fatia.** Base `069dc3f`; commits `165a221`, `0784778`, `e4f31ed`, `0920c6e`, `e1af802` (+ correções desta rodada) na branch `0f2e5de2-agente-window`, com push. Pacote executável: existe e roda (`VALIDAR_C3B.mjs`, `VALIDAR_E2E_C3B.mjs` no pacote; runners versionados `platform/scripts/e2e-c3b.{sh,ps1}`).
+
+**O que foi entregue:** imagem/áudio/vídeo na conversa com card único, diálogo acessível, download com nome original, fallback inerte para arquivos não exibíveis, rota de mídia com `Range`/`HEAD`/`416` e MIME reconferido por bytes, envelope MM-0 persistido (ordem texto→artefato→texto, mensagem só de artefatos válida), porta interna de saída reusando ledger/quota/writer/journal da C-3a, e produtor de teste injetado na porta real de servidor (inacessível em produção). Nenhum provedor de IA foi conectado: nada de interpretação ou geração.
+
+**Gates executados em Debian (Arena):** foco **426/0/0**; ampla **2259 asserções** com `newFailures=[]`, `newSkips=[]` e falhas/pulados nominais idênticos à base (`2147` → `2259`, +112); E2E C-3b **12/12** na porta 5216 sem retry; C-3a **15/15**; C-1 **6/6**; C-2 **17/17**; `src/server/session-persistence/attachments` **128/128**; `tsc -b --force` zero; `eslint` zero nos arquivos tocados (um achado `_anterior` é pré-existente); `vite build` 46,33 s.
+
+**Dois defeitos reais encontrados pelos próprios testes, não pelo unitário:**
+- Replay de transferência já publicada respondia `409 upload_already_finalized`, obrigando o cliente que perdeu o ACK a inventar um segundo artefato (violava R09). Agora confere SHA-256 e tamanho: idêntico devolve o mesmo recibo; divergente é `409 upload_payload_conflict`.
+- A resposta gerada usava `messageId` aleatório, então o retry criava **segunda mensagem e segundo artefato**. A identidade passou a derivar da tentativa (`idDaTentativa(runId, generation)`); geração nova continua sendo outro resultado.
+
+**Ressalvas pendentes (não homologadas):**
+- **Windows:** a automação não roda no ambiente da Arena. Correções de portabilidade aplicadas nesta rodada (T31 não usa mais caminho absoluto de Linux; T17 aceita a representação de término por plataforma, como o B1 da C-3a), mas **a execução Windows continua pendente** e não há alegação de resultado nela.
+- **Homologação humana:** pendente. Esta fatia não se declara homologada.
+- **C-1 exige ambiente:** o spec sobe na porta 5211 e `helpers.ts` usa `PLAYWRIGHT_BASE_URL` (default 5174); sem a variável falha por conexão recusada, igual em `a49cc6c`.
+- Entrega extensa desta fatia: `memoria-de-projeto/C-3b/ENTREGA_C3B.md` (fora dos nove canônicos). `08` intacto; nenhum aceite alterado.
+
+---
+
+# Estado vigente — 19/11/2026 — C-3a homologada pelo proprietário
+
+O proprietário informou que já fez pull e homologou o processo. HEAD local `a49cc6c` (`693051a` + evidência E13 em `a49cc6c`), branch `0f2e5de2-agente-window`. Aceite registrado em `08`: inclui nome original da cópia no projeto com sufixo em colisão e opção de cópia na landing; armazenamento privado segue padrão, arquivos antigos não são renomeados. Código e presença dos dois ajustes conferidos nesta sessão; sem mudança de implementação.
+
+Proveniência das verificações: revisão independente Windows de `8af269e` aprovada (foco 204/204, anexos+borda 86/86, sondas 9/9 e 13/13, E2E C-3a 10/10 + C-1 6/6 + C-2 17/17, tipos/lint/build exit 0). Na reentrega de usabilidade, números Debian são da Arena: foco 207/0/0, ampla 2111 aprovados + 3 nominais + 33 pulados, E2E C-3a 15/15, C-1 6/6 e C-2 17/17. **Automação Windows não reexecutada neste HEAD pelo Codex**; o aceite atual é relato humano do proprietário, não extensão dos números de `8af269e` à versão nova.
+
+Limites de codecs e dívidas fora da C-3a permanecem; estados anteriores abaixo são históricos. O estado da C-3b está na seção seguinte.
+
+---
+
+# Estado vigente — 19/11/2026 — C-3a: ajustes de usabilidade (nome original + opção na tela inicial)
+
+Dois ajustes pedidos **antes da homologação**, ambos só na C-3a: sem merge, sem C-3b, sem homologação automática.
+
+**Ajuste 1 — nome original na cópia do projeto.** `caminhoFinalWorkspace` montava `<raiz>/uploads/<artifactId>-<nome>`. Reproduzido vermelho antes (`A1` via `bb113d6e-…-relatorio final.txt`; `A2` dois `nota.txt` sem `nota (1).txt`) e corrigido: o destino agora é `<raiz>/uploads/<nome>`. A identidade interna continua sendo o `artifactId` (ledger, recibos, recuperação) — nada foi renomeado do lado do banco. Colisão nunca sobrescreve: o sufixo `arquivo (1).ext` é decidido na publicação por `destinoLivre` + `EEXIST` + posse por inode, que já existia. **Arquivos antigos com prefixo continuam intactos e acessíveis** (o ledger guarda o caminho; nada foi migrado nesta tarefa).
+
+**Ajuste 2 — "Salvar cópia na pasta do projeto" na tela inicial.** A opção existia só no composer da conversa. Agora a landing renderiza o mesmo `label.attachment-modocopia` junto aos chips, **só** com Pasta selecionada e anexo local, **desmarcado por padrão**. O estado vive no anexo (`modoCopia`), portanto o primeiro envio o respeita (`enviarAnexos` → `scope: 'workspace'`) e a retentativa o preserva sem código novo. Chat sem pasta continua sem a opção. `App.tsx` não ganhou responsabilidade: o componente já recebia `workspacePath`/`contexto` e `setAnexos` já persistia no rascunho.
+
+Gates no Debian/Node 26.13.0: `ajustes.test.ts` **5/5** (A1/A2 vermelhos antes), `SessionLanding.test.tsx` **18/18** (3 novos, 2 vermelhos sem a correção), anexos **79/79**, persistência **321 aprovados / 1 pulado**, foco **207/0/0**, ampla **2111 · 3 nominais · 33 pulados**, E2E **C-3a 15/15** (E11–E15 novos) **+ C-1 6/6 + C-2 17/17**, tipos 0, lint dos alterados 0/0, build ✓ 44,5 s. Sondas **não reexecutadas**. **Windows não executado** aqui: os números Windows anteriores são de `b5cb48d` e **não** valem para este commit até reexecução.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/ajustes-usabilidade/ENTREGA_C3A_AJUSTES.md`.
+
+**Arrumação do workspace (19/11):** ~1,65 GB liberados — perfis efêmeros de teste, saídas de gate, dois worktrees já contidos na história e `node_modules` versionado dentro do snapshot P-A da memória. Evidências JSON dos gates finais preservadas em `memoria-de-projeto/C-3a/ajustes-usabilidade/evidencias/`. Detalhe do que saiu e do que ficou: `…/ajustes-usabilidade/ARRUMACAO_WORKSPACE.md`. `git status` limpo antes e depois; nenhum artefato de produto afetado.
+
+# Estado vigente — 19/11/2026 — C-3a: U4 corrigido; correções anteriores confirmadas
+
+A revisão independente de `b5cb48d` confirmou U1, U2/W3 e U3 (e manteve foco 204/204, anexos 85/85 e E2E 10/10 no Windows) e apontou **um** bloqueio de recuperação: **U4**. Corrigido **somente na C-3a**, sem merge, sem C-3b e sem homologação.
+
+**U4** — a reserva **inicial** do `newId` ignorava o retorno de `gravarProgresso` antes de `copiarItem`: se a primeira gravação falhasse, a cópia era materializada sem vínculo durável no plano e, após reabrir o banco, o retry sorteava outro `newId` e **duplicava o arquivo**. Agora o chamador distingue as duas fronteiras: reserva inicial **indispensável** (falhou e o id não veio do plano → `503 recovery_progress_pending`, nada copiado) e atualização posterior **recuperável** (id já persistido → a cópia prossegue e é adotada no retry, como em U3). A procedência do id é a própria prova de durabilidade — sem flag nova, fila, tabela ou job.
+
+Gates no Debian/Node 26.13.0: `reteste.test.ts` **13/13** (U4 incorporado), anexos **79/79**, persistência **318 aprovados / 1 pulado**, foco **204/0/0**, ampla **2103 · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10**, tipos 0, lint dos alterados 0/0, build ✓ 41,8 s. E2E C-1/C-2 e sondas **não reexecutados** nesta rodada (registrado como não executado). **Windows não executado** aqui: os números Windows da revisão são de `b5cb48d` e não valem para o novo commit até reexecução.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md`.
+
+---
+
+# Estado vigente — 19/11/2026 — C-3a: U1/U3 e U2 corrigidos após segundo reteste
+
+O reteste independente sobre `bb96389` aprovou o avanço (foco 202/202 no Windows, anexos 81/81, E2E 10/10, S01–S05 5/5) mas manteve dois bloqueios de dados e uma pendência de explicação. Corrigidos **somente na C-3a**, sem merge, sem C-3b e sem homologação.
+
+**U1** — a identidade do artefato derivava só do `uploadId` (fornecido pelo cliente) e o upsert global redirecionava a linha de outro dono: a conversa A passava a ler os bytes de B. `artifactIdDe` passou a incluir `sessionId`/`chatId` (replay idempotente no mesmo dono, donos isolados) e o `ON CONFLICT` ganhou `WHERE` de dono, para nunca redirecionar linha alheia. **U3** — falha ao gravar o progresso depois de materializar a cópia selava o plano e o retry devolvia mapa vazio com o arquivo pronto. Agora `adotarCopiaExistente` adota a cópia já publicada pelo mesmo `newId` (sem recopiar/inserir), `gravarProgresso` não propaga falha e o plano só é selado quando tudo está durável. **U2/W3** — o trace de `554f400` foi de **PUT**, não de GET: a resolução de dono rodava fora da fila, então uma publicação viva vencia a corrida e o PUT recebia 503 sem esperar. A resolução de escrita passou a rodar dentro da fila do próprio dono (o stream não fica na fila); pendência abandonada continua 503. O comentário que tratava `/content` como GET foi corrigido: o GET foi um problema real e distinto, já corrigido, mas não explica o PUT.
+
+Gates no Debian/Node 26.13.0: `reteste.test.ts` **12/12** (U1/U3 incorporados), anexos **78/78**, persistência **317 aprovados / 1 pulado**, foco **204/0/0**, ampla **2102 · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10 + C-1 6/6 + C-2 17/17**, tipos 0, lint dos alterados 0/0, build ✓ 41,0 s. Sondas **não reexecutadas** nesta rodada (registrado como não executado). **Windows não executado** aqui: os números Windows do revisor são de `bb96389` e não valem para o novo commit até reexecução; comando isolado e esperados na entrega extensa.
+
+Fora do escopo preservado: C-3b, codecs, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md`.
+
+---
+
+# Estado vigente — 19/11/2026 — C-3a: R1–R5 e W1/W2/W3 corrigidos após reteste REPROVADA
+
+O reteste independente sobre `554f400` reprovou a C-3a com cinco reprodutores (R1–R5) e três achados de plataforma/teste (W1–W3). As correções foram feitas **exclusivamente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.
+
+Antes de corrigir, as cinco reproduções foram portadas para `attachments/reteste.test.ts` e **falharam** no Debian (S01 ids iguais, S02 `calls=0`, S03 mapas divergentes, S04 uma cópia indevida, S05 nenhum vencedor). Correções: identidade de artefato derivada da **tentativa** (`uploadId`), não de nome/tamanho (R1); **claim atômico** do escritor por `UPDATE … WHERE state IN (…)` antes do primeiro `await`, perdedor em 409 e sem `unlink` de stage alheio (R2); plano de limpeza com **dono (`chat_id`)** vindo do catálogo e remoções restritas ao chat (R3); `confirmRecovery` sob a fila existente com **progresso durável por item** e `newId` estável (R4); lifecycle da origem revalidado no confirm e antes de cada item (R5). W1: caminho nativo do vitest no launcher (a suíte de store coletava 0 no Windows). W2: Lixeira injetada no `lifecycle.test.ts`, sem ramo `win32`. W3: **causa comprovada** do 503 `session_publication_pending` do E05 — `resolverDonoAnexos` aplicava o journal de publicação à **leitura**; `GET` de arquivo já publicado passou a ler o registro commitado, e **toda escrita continua na fronteira completa** (regressão em `routes.test.ts`, que volta a falhar com 503 se a correção for revertida).
+
+Provas no Debian/Node 26.13.0: `reteste.test.ts` **10/10**, anexos **74/74**, `session-persistence` **313 aprovados / 1 pulado**, foco **202 aprovados · 0 falhas · 0 pulados** (era 177/2 com `store.test.ts` sem coletar), ampla **2097 aprovados · 3 nominais · 33 pulados · `newFailures=[]` · `newSkips=[]`**, E2E **C-3a 10/10 (inclui E05/E07) + C-1 6/6 + C-2 17/17**, tipos exit 0, lint dos 13 arquivos alterados 0/0, build `✓ built in 41.5s`, sondas 13/13 na cópia portátil (runner canônico: 10/13 por defeito de fixture/captura de rejeição do template, registrado). **Windows não foi executado** aqui: comando isolado e resultados esperados na entrega extensa.
+
+Fora do escopo preservado: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. `08` intacto; entrega extensa em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md`.
+
+---
+
+# Estado vigente — 19/11/2026 — C-3a corrigida após parecer REPROVADA (reentrega técnica)
+
+O parecer de revisão independente sobre `df86f6d` reprovou a C-3a (13 sondas vermelhas, 5 falhas de foco no Windows). A reentrega corrige B01–B11 e a seção 3 do parecer **somente na C-3a**, sem merge, sem C-3b e sem homologação: a parada é para aceite humano.
+
+Entregue nesta reentrega: dono/contexto e raiz derivados exclusivamente do catálogo (corpo nunca declara dono, raiz, escopo ou caminho); recuperação por `{recoveryId, token}` com plano durável e recibo idempotente; digest calculado e reconferido contra os bytes físicos; estado+ledger em transação única com intenção durável e reconciliação em processo novo; fila do dono compartilhada com a persistência e revalidação de lifecycle no commit; Lixeira como porta única (`moverParaLixeira`) com plano persistido antes de destruir; mesmo resolver em metadata/download/uso (409 `reference_changed`/`attachment_changed`); contenção canônica recusando junction/symlink em diretório pai; pedido imutável (409 `upload_conflict`); recibo do rascunho consultado antes do `File` (chip “salvo sem mensagem”); admissão atômica (IMMEDIATE) com stage no volume do destino e `flags:'wx'`.
+
+Defeito de produto encontrado durante a rodada (não estava no parecer): **leitura de anexos em Pasta offline devolvia 409**, quebrando C-1 e o contrato F5/offline. A leitura (`GET`) agora degrada com lista honesta; toda escrita continua 409 até a pasta voltar (`probes.test.ts` H1d).
+
+Provas no Debian/Node 26.13.0: anexos **61/61**, foco **199/0/0 com `missingCriteria=[]`**, ampla **2085 aprovados, 0 `newFailures`, 0 `newSkips`**, E2E **C-3a 10/10 + C-1 6/6 + C-2 17/17**, tipos exit 0, lint novos 0 (84 = base), build ok, e as 13 sondas transformadas em regressões verdes (`probes.test.ts`, 19 casos) mais 13/13 na cópia portátil. Windows **não foi executado** neste ambiente: as cinco falhas do foco foram corrigidas no launcher/teardown e o runner `platform/scripts/e2e-c3a.ps1` foi entregue com procedimento em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md`; os resultados Windows permanecem pendentes.
+
+Fora do escopo preservado: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal, C1-EXCLUSAO-01. Publicação apenas na branch de trabalho, sem merge; `08` intacto (nenhuma homologação atribuída). Entrega extensa fora dos nove canônicos, com referência no caminho acima.
+
+---
+
+# Estado vigente — 17/11/2026 — implementação C-2 encerrada, pronta para aceite final
+
+**Não há nova alteração funcional pendente dos pedidos desta rodada.** A implementação C-2 e os ajustes solicitados de aparência/interação estão tecnicamente concluídos no código publicado até `24bfd55`. Proprietário pediu encerrar o prolongamento da fatia, atualizar documentação e enviar tudo à branch de trabalho. Esta consolidação é **somente documental**; não inicia outra fatia nem transforma aprovação técnica em homologação humana. O aceite final C-2 ainda não foi declarado explicitamente; `08` permanece preservado.
+
+Entregue: menu único Chat/pasta com recentes, caminho atual e sugestões de subpastas; confirmação de destino pelo fluxo existente; controles reais de modo/execução/permissão; menus descendentes; composer expansível; cores claras nos dois composers; limpeza do Explorer em Chat; F5 preservando o destino inicial; Nova sessão respeitando a visibilidade do Explorer. Estados/consultas ficam em hooks/componentes próprios, sem ampliar responsabilidades do App. O histórico abaixo detalha cada alteração e suas provas.
+
+**Últimos gates efetivamente executados, sobre a entrega funcional:** Windows/Node canônico, 141 aprovados/13 pulados em nove arquivos; C-2 E2E17/17 e C-1 E2E6/6; tipos/build/lint do perímetro exit0. Perfis sintéticos e provedor HTTP local; sem dados pessoais/APIs externas. Suíte ampla não foi repetida. Não repetir nem atribuir novo resultado de testes nesta atualização somente documental.
+
+**Fora do escopo encerrado:** anexos (+ mantido indisponível por escolha expressa, C-3), Autopilot, permissões assistidas, sandbox de terminal e demais etapas do roadmap. C1-EXCLUSAO-01 e estados M1–M8/MC1 permanecem separados. Publicação na branch `0f2e5de2-agente-window`, sem merge na base. Próxima ação: conferência/aceite final do proprietário; outra fase exige sua orientação. Entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — sugestões de subpastas no caminho da landing
+
+Conforme pedido do proprietário, o menu de contexto agora lista **subpastas conforme o caminho digitado**, inclusive último segmento incompleto (consulta o pai e filtra prefixo). Usa o `GET /api/fs/list` já existente; novo hook `useWorkspaceDirectorySuggestions` cuida de debounce180ms, cancelamento e descarte de respostas antigas. Não há indexação/varredura recursiva, backend ou armazenamento novo. Caminhos locais absolutos Windows/POSIX; nome relativo continua buscando somente nas recentes. Drive `C:` é normalizado para raiz tanto na consulta quanto na confirmação.
+
+Clicar numa subpasta preenche o novo caminho e explora o conteúdo, mantendo rascunho/contexto/Explorer intactos. Setas e Enter permitem explorar com teclado. **Usar pasta ou Enter no campo** confirmam pelo mesmo fluxo de validação existente; recentes conservam a seleção direta. Erro de permissão, caminho inválido, carregamento e pasta vazia são estados distintos; novas consultas não recebem resultados do caminho anterior. App.tsx intocado.
+
+Windows: **141 aprovados/13 pulados** em nove arquivos; **E2E C-2 17/17 + C-1 6/6**; tipos/build/lint do perímetro **exit0**. J17 usa árvore real descartável, prefixo parcial, dois níveis, exclusão de arquivos da lista, erro de permissão controlado e confirmação final; prova nenhuma validação/ativação/LLM durante exploração, só uma validação ao confirmar. Testes de hook incluem resposta fora de ordem mesmo se a porta ignorar abort. Dados sintéticos/provedor HTTP local; ampla e APIs externas não executadas. Capturas/logs externos: `memoria-de-projeto/autocomplete-pastas-2026-11-17/`.
+
+Publicação na branch de trabalho sob autorização vigente, sem merge, aceite humano ou próxima fase. + continua C-3, guardas de Chat e de alterações não salvas preservados. Entradas seguintes históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — cinco correções de tema/contexto/navegação da landing
+
+Corrigidos os cinco achados do proprietário: **tema claro** agora define o fundo/cores centrais dos composers da landing e das conversas; **menu de contexto** preenche o caminho selecionado e mantém outras recentes visíveis até editar a busca; **voltar para Chat** limpa a seleção pendente e desmonta a árvore do Explorer; **F5 na landing** permanece na tela inicial; **Nova sessão** preserva aba/visibilidade atuais da Side Bar em vez de forçar o Explorer aberto.
+
+Novo `useLandingContext` é dono dos três estados de contexto/destino antes residentes no App. Guarda somente uma preferência booleana de destino em `agente-window:landing-visible:v1`, não conversas/rascunhos/pastas/permissões. Abrir uma conversa desmarca o destino inicial; root da landing continua exigindo escolha explícita validada e reinicia em Chat após reload. Falha de storage é best-effort, sem impedir navegação. A troca para Chat reutiliza o guarda de arquivos não salvos antes de limpar seleção. **App.tsx diminuiu duas linhas**, com wiring explícito; não houve implementação de memória ou armazenamento paralelo.
+
+Windows/runtime canônico: **135 aprovados / 13 pulados** em oito arquivos, **E2E C-2 16/16 + C-1 6/6**, tipos/build **exit0**. Lint do perímetro novo **exit0**; App conserva exatamente as17 mensagens da base, zero novas. J16 reproduziu e depois comprovou os cinco comportamentos no navegador, incluindo composers claro de landing/conversa, caminho atual, limpeza, F5 e Explorer aberto/fechado. Logs/RED/captura externos: `memoria-de-projeto/correcao-estado-landing-2026-11-17/`. Dados sintéticos e provedor HTTP local; nenhuma API externa/dado pessoal; ampla não repetida.
+
+Publicação no mandato vigente, mesma branch, sem merge/aceite de fatia ou avanço de fase. + continua C-3; recursos futuros e restrições de Chat preservados. Entradas abaixo históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — menus para baixo e composer expansível
+
+Por solicitação do proprietário, os menus da barra agora abrem **abaixo do acionador**, com altura limitada ao espaço restante e rolagem interna. Esta orientação substitui a anterior de abrir acima. O composer mantém altura inicial mínima86px, mas cresce com o textarea até200px/área útil; após o limite, rola, e reduz ao apagar texto. Largura/viewport são observados para recalcular quebras. Causa corrigida: `height:86px` no contêiner e flex-shrink comprimiam o campo mesmo após o cálculo de altura. App.tsx e backend intocados.
+
+Validação Windows: **36/36 foco**, **15/15 E2E C-2**, tipos/build/lint do perímetro **exit0**. Reprodução anterior real: esperado card>136px após sete linhas, obtido86px. Novo J15 prova crescimento por Shift+Enter, texto colado longo, teto/rolagem, redução e viewport800×600; J14 exige posição abaixo dos três botões. Capturas e logs externos em `memoria-de-projeto/correcao-crescimento-menus-2026-11-17/`. Ampla/regressão completa/C-1 não repetidas nesta correção de layout; perfis sintéticos e provedor HTTP local, sem dados pessoais/APIs externas.
+
+As opções Autopilot, permissões assistidas e sandbox permanecem indisponíveis porque **não há implementação dessas capacidades no runtime**; a referência visual não as habilita. Chat conserva ask/manual/null, e + segue C-3 por escolha expressa. Publicação na mesma branch sob autorização vigente, sem merge, aceite humano ou avanço de fase. Entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — menus também abrem no contexto Chat
+
+Correção após captura do proprietário: o bloqueio `semPasta || pending` desabilitava os três acionadores da barra em Chat. Agora **Perguntar, Interativo e Permissões manuais abrem seus menus também sem pasta**. Somente as opções incompatíveis ficam desabilitadas, com motivo visível: Agente/Editar/Planejar e Permitir tudo exigem conversa com pasta. Perguntar, Interativo e manual continuam selecionáveis em Chat; snapshot efetivo permanece `ask/manual`, raiz nula. Durante envio pendente, acionadores e opções continuam bloqueados. Backend, App.tsx e regras C-1 não foram alterados.
+
+Windows: foco **36/36**, E2E C-2 **14/14**, tipos/build/lint do perímetro **exit0**. J4 agora abre os três menus reais em Chat e verifica opções permitidas/bloqueadas; teste de componente envia após interação e comprova snapshot Chat ask/manual sem raiz. Perfil sintético/provedor HTTP local, sem dados pessoais; ampla/regressão completa e C-1 não repetidas nesta correção pontual. Capturas/logs externos: `memoria-de-projeto/correcao-menus-chat-2026-11-17/`. Publicação na mesma branch dentro da autorização vigente; sem merge/aceite humano ou próxima fatia. + continua reservado à C-3 por escolha expressa. Registros abaixo históricos.
+
+---
+
+# Estado vigente — 17/11/2026 — controles da landing corrigidos; publicação autorizada
+
+Proprietário autorizou commit e push dos ajustes da tela inicial e solicitou corrigir Agente/Interativo/permissões. `LandingExecutionControls` passou a ser dono apenas da apresentação desses controles; recebe modo/permissão do rascunho existente, sem estado de execução paralelo nem alteração no App.tsx. **Interativo deixou de ser texto estático:** abre a seção de execução, alterna Interativo/Planejar e compartilha o menu de permissões. O seletor de modos mantém Agente/Editar/Perguntar/Planejar. Menus abrem acima da barra, fora do recorte dos ancestrais, com teclado/Escape/clique fora e retorno de foco.
+
+Manual/Permitir tudo continuam reais; cada ativação de Permitir tudo exige confirmação. Planejar conserva o modo somente leitura do servidor. Chat continua Perguntar/manual; Autopilot, permissões assistidas e sandbox ainda indisponíveis e indicados como tais. **Decisão explícita adicional do proprietário: manter o botão + desabilitado até C-3.** Não antecipar anexos nem interpretar a publicação como aceite de todas as fatias.
+
+Validação final Windows: **130 aprovados/13 pulados** em sete arquivos; foco landing **35/35**; **E2E C-2 14/14 + C-1 6/6**. J14 prova abertura/visibilidade dos três menus em 1872×1080 e 800×600, seleção efetiva de Planejar, confirmação de permissão e primeiro pedido real ao backend com `mode: plan`. Typecheck/build/lint do perímetro **exit 0**. Apenas perfis descartáveis e provedor HTTP local; ampla não repetida e APIs externas não chamadas. Capturas e logs em `memoria-de-projeto/ajuste-landing-2026-11-17/`, fora do Git.
+
+Publicação autorizada na branch de trabalho `0f2e5de2-agente-window`, sem merge na base. Revisão a identificar pelo Git desta entrega. App.tsx preservado; canônico08 intocado; C1-EXCLUSAO-01 e M1–M8/MC1 mantêm estados separados. O menu único de contexto/histórico e a retirada das dicas continuam conforme registro abaixo. Entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 17/11/2026 — ajuste da tela inicial, aguardando validação humana
+
+Por autorização expressa do proprietário, a landing agora usa **um único menu de contexto**, como na referência fornecida: Chat, pastas recentes e campo para buscar/digitar caminho dentro do mesmo menu. **A faixa de dicas foi removida.** Esta decisão substitui somente os requisitos anteriores de dois botões Chat/Pasta e tip box; os contratos C-1/C-2 de segurança, seleção e publicação continuam vigentes.
+
+`LandingContextMenu` concentra a interação e consulta sob demanda o histórico já existente (`GET /api/workspaces/recent`, até dez pastas), sem novo armazenamento. Toda escolha recente/manual passa pela mesma validação e atualização de Explorer. Erros preservam caminho/rascunho. `SessionLanding` compõe o novo menu e corrige o fechamento indevido do seletor inferior de modelos por clique fora; contexto/modelo/modo/permissão ficam bloqueados durante envio. **App.tsx intocado** nesta rodada; nenhuma nova responsabilidade nele.
+
+Windows/Node canônico: regressão dirigida **128 aprovados / 13 pulados** (sete arquivos); foco landing **33/33**; navegador C-2 **13/13**, incluindo histórico após F5 e limites da coluna em 800×600/1872×1080; C-1 **6/6**; typecheck/build/lint do perímetro **exit 0**. Perfis sintéticos, provedor HTTP local controlado; sem dados reais nem chamadas a provedores externos. Suíte ampla não repetida nesta rodada. O seletor nativo não foi operado manualmente; falha/cancelamento continuam usando a porta existente e saída por caminho manual.
+
+Evidências externas: pasta operacional `ajuste-landing-2026-11-17/` (SPEC_AJUSTE, scripts/logs, gates.json e capturas). Sem commit/push/merge; C-2 segue sem aceite humano atribuído; C1-EXCLUSAO-01, M1–M8/MC1 e próximas fatias conservam seus estados. O servidor existente na porta 5174 foi preservado e respondeu HTTP 200. Entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 13/11/2026 (6) — C-2 IMPLEMENTADA; correções do parecer RV01–RV08; gates verdes; aguarda homologação
+
+**C-2 (tela central, sessões e composer) implementada na branch `0f2e5de2-agente-window`** contra o pacote `memoria-de-projeto/C-2/C-2/` (matriz `04` C2-T01..T30 + 8 jornadas; parecer `parecer/PARECER_C_2.md` com achados RV01–RV08). Entrega em duas etapas: commit `7b0292e` (landing do centro com seletor LLM real no lugar do Copilot, rascunho do App, adaptação 800×600) e a correção dos achados do parecer no mesmo working tree (RV01 seleção explícita preservada no primeiro envio; RV02 publicação confirmada antes do run com retry na MESMA sessão; RV03 rascunho do rascunho; RV04 Chats × grupos de projeto separados com contagem; RV05 menus/foco; RV06 `Contexto não medido` no composer; RV07 título/faixa/tip box na composição da referência). Sem "This Computer", textos PT-BR, LLMs reais no seletor; recursos das referências fora do escopo não aparecem como funcionais.
+
+**Gates da entrega (Debian/Arena, Node canônico 26.13.0):** typecheck 0 · FOCO do `VALIDAR_C2_WINDOWS.ps1` (26 arquivos) **422 aprovados + 13 pulados + 0 falhas** · lint `src` **111 = 111 do baseline** · build `vite` exit 0 (heap 1408) · **E2E C-2 `e2e/c2_centro.spec.ts` — 12/12 jornadas (J1–J12) aprovadas**. Evidências em `memoria-de-projeto/execucao-c2/` (`e2e-c2-jornadas.md`, `ampla-final.json`, `lint-comparacao-final.json`). **Windows: `VALIDAR_C2_WINDOWS.ps1` NÃO executado — pendência.** Homologação humana não atribuída; `08` intocado; sem merge (PR #1 OPEN). U-1/C-3/MM-I/MM-O permanecem não iniciadas.
+
+C1-EXCLUSAO-01 e homologações M1–M8/MC1 permanecem separadas. O 404 de acesso ao Gemini 2.5 Flash é configuração/disponibilidade do serviço, fora da correção de transporte. As entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 16/11/2026 (5) — MM-0 HOMOLOGADA; correção Google sem ferramentas em 055bbd4
+
+**Aceite humano explícito da MM-0 registrado em 08**, após os testes relatados pelo proprietário. Correção de transporte sem ferramentas versionada em **055bbd4**; publicação autorizada na branch **0f2e5de2-agente-window**, sem merge na base. Gates e ressalvas preservados em 09: 99/99 MM-0 + 7/7 sondas originais; tipos/build/lint aprovados no reteste; ampla com 42 falhas comuns e dois timeouts App aprovados no reteste 2/2. Correção Google/LiteLLM: 140/140 + tipos/lint, sem App alterado. Sucesso remoto de texto e resumo das sete ferramentas foram informados pelo proprietário; não equivalem a execução remota independente pelo Codex. Geração de imagens não implementada.
+
+**Próxima frente planejada: C-2.** Existe base geral em `memoria-de-projeto/replanejamento-2026-11-13/C_SPEC_TELA_CENTRAL_E_ANEXOS.md` (seção 5; C-T05–08/15/16) e planejamento em F/H. Ainda não há pacote específico C-2 consolidado contra o código pós-C-1/MM-0, com mapa atualizado de responsáveis, critérios de execução e roteiro Windows próprio. Preparar/revisar essa especificação antes de entregar implementação à Arena; não implementar por consequência deste aceite. Manter App como orquestrador, sem acrescentar responsabilidade a ele.
+
+C1-EXCLUSAO-01 e homologações M1–M8/MC1 permanecem separadas. O 404 de acesso ao Gemini 2.5 Flash é configuração/disponibilidade do serviço, fora da correção de transporte. As entradas seguintes são históricas.
+
+---
+
+# Estado vigente — 16/11/2026 (4) — compatibilidade Google/LiteLLM sem ferramentas corrigida localmente
+
+**Correção pontual autorizada pelo proprietário sobre d1dd69d, na branch 0f2e5de2-agente-window, ainda sem commit/push.** Chat sem pasta continuava enviando `tools: []` junto com `tool_choice: auto` no transporte OpenAI-compatible; o Google via LiteLLM recusou a configuração sem declarações de funções. Agora o transporte só acrescenta `tool_choice` quando o anúncio efetivo possui ferramentas. Gemini nativo também deixa de anunciar um grupo vazio de `functionDeclarations`. Com ferramentas habilitadas, o anúncio existente é preservado. Não houve fallback de provedor, retry automático, ativação de geração de imagens, alteração de permissões nem alteração no App.tsx.
+
+Prova Windows local: duas regressões HTTP falharam antes com a mensagem reportada e passam depois; bateria de transporte/Chat sem tools/instruções/MM-0 **140/140**, typecheck e lint do escopo **exit 0**. Google/NVIDIA reais não foram chamados nesta rodada; repetir mensagem comum no Google configurado após carregar o backend atualizado. Evidências externas: `memoria-de-projeto/correcao-google-sem-tools-2026-11-16/`. Sem ampla/build/E2E adicionais nesta correção focal.
+
+**MM-0, atualização do gate Windows anterior:** seis achados encerrados em d1dd69d; foco **99/99**, sondas originais **7/7**, tipos/build/lint aprovados. Ampla base 775e4a6 **1797/42/31**, atual **1894/44/31**; duas ocorrências extras de timeout no App passam no reteste dirigido **2/2** e na regressão focada. Apta à homologação com ressalva de instabilidade da ampla; causa exata dos timeouts não isolada. Parecer externo: `memoria-de-projeto/reteste-MM0-2026-11-16/PARECER_RETESTE_MM_0.md`. Homologação humana da MM-0 não atribuída. Os registros seguintes descrevem rodadas anteriores; não iniciar a próxima fatia automaticamente.
+
+---
+
+# Estado vigente — 16/11/2026 (3) — MM-0: parecer independente REPROVADO com 6 achados, TODOS CORRIGIDOS nesta rodada; revalidação verde; aguarda reexecução Windows + homologação
+
+**MM-0 (contratos multimodais — SPEC do proprietário, pacote `memoria-de-projeto/MM-0/`, base `775e4a6`): implementada em `d0e63d8`, documentada em `47c9a77` e publicadas a pedido do proprietário (push `775e4a6..8b57440`; `8b57440` = reorganização das evidências para `memoria-de-projeto/`). A revisão independente (Windows, recebida em 16/11 sobre `47c9a77`) emitiu **REPROVADA para homologação** com **seis achados (MM0-A1..A6)** — todos corrigidos nesta rodada:** A1 limite conhecido sem medida não vira mais `disponivel` (medida é obrigatória para satisfazer o limite) e a interseção do pool não apaga restrição assimétrica; A2 entradas duplicadas agregam de forma conservadora (a ordem não esconde negativo; menor teto prevalece); A3 o avaliador público não contorna mais a guarda de pool (`pool-exige-composicao` — identidade com `pool` exige `comporCapacidadeDePool`); A4 `ehObjetoPlano` exige protótipo genuinamente plano (propriedade herdada nunca confirma nem entra no DTO); A5 `adaptarMensagemLegada` preserva o ID opaco da mensagem legada verbatim (hash some; só `partId` deriva); A6 fronteira de imports do teste usa relação de caminho portável (`relative`/`isAbsolute`/`sep`) em vez de `startsWith(dir + "/")`. As **7 sondas do revisor** foram incorporadas como `sondas-revisao.test.ts` (falhavam 7/7 → passam 7/7). **Gates Debian da rodada de correção:** foco **99/99**, regressão **204/191/0/13**, agir **63/63**, typecheck **0**, lint **0**, ampla **1969/1932/4/33** com **diff nominal 0/0** vs baseline, E2E **6/6**. Pendências: **reexecução Windows do foco corrigido + runner v1.1 completo** (revisor/dono), `vite build` OOM no sandbox (limitação de ambiente), **homologação humana**. Entrega: `/home/user/memoria-de-projeto/execucao-mm0/ENTREGA_MM_0.md`; canônicos 03/04/06/07/09 atualizados, `08` intocado (nenhum aceite inferido); sem merge (PR #1 OPEN).
+
+**P-A, P-B e P-C concluídas tecnicamente. Aceite humano confirmado pelo proprietário para a P-A e para a P-C.** Aprovação técnica (gates, retestes e validações por ambiente) e homologação humana (aceite do proprietário) são coisas distintas e ficam registradas separadamente (`08` = aceite humano, `09` = resultados técnicos). Nenhum aceite é inferido por consequência desta entrega.
+
+- **P-A** (CAS, gravações em fila, recuperação estável) — commits `09a28f3` + `e0b337c`; entrega em `memoria-de-projeto/execucao-pa-2026-11-13/ENTREGA_P_A.md`; **concluída tecnicamente; aceite humano confirmado**.
+- **P-B** (publicação JSONL com journal + catálogo recuperável) — commits `d399ee5` … `c581bfa` (7 commits); rodadas de correção H1–H5 e verificações B1/B2 fechadas; **o teste original de encerramento B1 passou 6/6 em `c581bfa` (resultado informado pelo proprietário)**; **concluída tecnicamente; aceite humano não declarado**.
+- **P-C** (exclusão idempotente, limpeza retomável, proteção contra recriação) — commits `269e9e0` … `69f4510` (5 commits); reteste independente com achados **PC-R1/PC-R2** corrigidos em `6feef9f` e **ressalva de comunicação** corrigida em `69f4510` (recibo estruturado `copyConfirmed` + constantes de projeção); validação Windows do Codex sobre `69f4510` e **aceite humano confirmado** — comportamentos e proveniência em `08`, gates Debian/Windows em `09`.
+- **C-1** (Chat e workspace imutáveis) — implementada desde `d589179`, com correções B1/B2/B3/F4 e rodada2 até `7ac8260`. A revisão Windows encontrou preservação incompleta de rascunho em falha assíncrona e comparação incorreta de caminho serializado no E2E. **Correções autorizadas ao Codex em 16/11:** `useLandingSubmission` é o dono do rascunho e da criação pendente: texto permanece visível, edição/reenvio ficam bloqueados durante a confirmação, recusa/erro preservam o rascunho e liberam retentativa; somente aceitação limpa o campo. `App.tsx` não foi alterado nesta correção. E2E decodifica JSON antes de comparar `path`/`cwd` e inclui falha de criação, retentativa única e F5. Gates locais Windows: **91 aprovados/13 pulados/0 falhas** (App, fronteira e landing), **6/6 integrados** pelo runner do repositório sem cópia adaptada, **build exit 0** (TypeScript + Vite) e **lint exit 0** nos quatro arquivos TS/TSX alterados; detalhes e limites em `09`; **homologação humana da C-1 confirmada em 16/11, com dívida C1-EXCLUSAO-01 aceita para ajuste futuro**. Histórico e resultados Debian anteriores preservados em `07`/`09`.
+
+**Dívida aberta C1-EXCLUSAO-01:** o proprietário relata que a primeira exclusão pode recusar por revisão alterada; após recarregar a página, a exclusão funciona. Causa ainda não investigada; registro e critérios de fechamento em `06`. Não foi corrigida nem considerada impeditiva pelo proprietário neste aceite.
+
+**Sequência vigente:** C-1 **homologada** em 16/11 (`08`); MM-0 (contratos neutros multimodais) **implementada nesta data**, aguardando gate Windows e homologação própria — nenhuma fatia seguinte (C-2/C-3/MM-I/MM-O) foi autorizada ou iniciada. Nenhum merge na branch base. A PR #1 (`arena` → `0f2e5de2-agente-window`) segue **OPEN**, sem merge.
+
+**M1–M8, DEBT-25 e MC1** mantêm seus próprios estados (D197): esta consolidação **não lhes atribui homologação**. A rodada atual foi executada pelo Codex no Windows com dados sintéticos isolados; resultados anteriores da Arena permanecem identificados como Debian. Artefatos operacionais externos não são requisitos do produto.
+
 # Estado vigente — 12/11/2026
 
 **Correção MC1 / D201 tecnicamente validada, base `c4dbff6`, branch `arena`.** O chat `memoria` tinha título salvo corretamente, mas era anterior à proveniência MC1. Renomear não comprovava sua origem; a interface confundia a recusa com ausência. Busca agora tolera `memória`/`memoria`, renomeação preserva vínculos e uma recusa encerra a consulta com explicação fiel. O menu existente “Gerenciar acesso histórico” permite autorizar/revogar somente o chat selecionado neste projeto, com recibo de confirmação e validação de raiz, perfil, incarnação e digest. Não há transferência entre projetos nem permissão de comandos.
@@ -555,3 +807,50 @@ tela real ligada ao servidor) e sete commits.
 - **Aceite humano pendente** e três divergências relatadas: ver `docs/05`, D143.
 
 Próximo pela ordem da D133: **Fatia 15**.
+
+### Atualização 2026-11-13 — U-1 entregue para homologação (não homologada)
+
+As três superfícies de ajuste do produto agora são **uma só**: o modal
+"Configurações", aberto expandido, com uma navegação à esquerda (3 grupos,
+13 categorias) e o conteúdo da categoria à direita. Configurações, Provedores e
+Personalizações continuam sendo as MESMAS telas — foram hospedadas, não
+reescritas — e cada uma segue dona do seu estado, do seu rascunho e dos seus
+serviços. Decisão e consequências em `docs/05` D202; como validar em `docs/09`.
+
+- **Entradas:** conta (Provedores/Configurações), `Ctrl+,`, lateral
+  (Personalizações e seções) e os cards da própria tela. Todas passam por
+  `abrirConfiguracoes(rota)`; com o modal aberto, abrir outra categoria navega.
+- **Abas legadas `config`/`providers` e o id `aiCustomizations`** são traduzidos
+  antes da montagem: snapshot antigo abre a categoria equivalente; a faixa de abas
+  não ganha aba morta e o estado persistido é saneado.
+- **Placar medido neste Linux (Debian):** unitárias 2266 aprovadas / 3 reprovadas /
+  33 ignoradas — as 3 são exatamente as da base `24d686a` (0 novas, 0 skips novos);
+  U-1 foco 215 aprovadas / 0 falhas nominais; E2E U-1 7/7 (porta 5218, sem retry);
+  E2E nominais `provedores_fatia08` 6/6, `c1_correcoes` 6/6, `c2_centro` 17/17,
+  `c3b_multimodal` 12/12; typecheck 0.
+- **Não executado:** Windows (o ambiente é Linux), homologação humana e qualquer
+  teste com provedor real/conta/chave. **Não declarada homologada.**
+
+### Atualização 2026-11-13 — U-1, reentrega após a revisão independente
+
+A revisão aprovou as 7 jornadas no Windows mas **reproduziu perda de rascunho fora
+dos cenários cobertos**, e o proprietário encontrou **layouts quebrados**. Os seis
+ajustes pedidos foram entregues sobre `0fb29d0`, cada um com jornada E2E nominal:
+
+| Ajuste | Contrato agora provado | Jornada |
+|---|---|---|
+| Tamanho do modal | 1ª abertura expandida; depois o último modo, **inclusive após F5** | `U1-E08` |
+| Layout dos painéis | Salvar e Fechar dentro da caixa, sem corte/sobreposição, em 1400×900/1024×700/800×600 × claro/escuro × 2 modos — **180 cenários, 0 problemas**; cores por token (texto de Geral estava invisível no claro) | `U1-E09` |
+| Desativar provedor | preserva config, modelos e chave; sai do catálogo/Auto; conversa mostra "Indisponível"; reativar = 1 clique | `U1-E10` |
+| Rascunho oculto | fechar olha **todos** os painéis visitados; save em voo manda aguardar | `U1-E11` |
+| Chave revelada × editada | ver não suja o formulário, não volta no PUT; resposta tardia do olhinho é descartada | `U1-E12` |
+| Abas antigas | aba `file` restaurada sem conteúdo; aba antiga em 2º plano não rouba a ativa | `U1-E13` |
+
+- **Placar desta rodada:** E2E U-1 **13/13** (5218); foco **227 aprovadas / 0 falhas
+  nominais / 13 pulados**; ampla **2284 aprovadas / as mesmas 3 falhas da base / 33
+  pulados** (0 novas, 0 skips novos); nominais `provedores_fatia08` 6/6, `c1` 6/6,
+  `c2` 17/17, `c3b` 12/12; `tsc -b --force` 0; lint igual à base; `App.tsx` **2887**
+  linhas (teto 2889).
+- **Não executado:** Windows, homologação humana da conferência visual e qualquer
+  teste com provedor real/conta/chave. **Segue NÃO homologada; sem merge.** A
+  correção da exclusão de chats fica **depois** da U-1.

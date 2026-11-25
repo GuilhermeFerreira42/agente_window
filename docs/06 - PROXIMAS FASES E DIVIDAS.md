@@ -1,3 +1,212 @@
+# Sequencia vigente ate a Fatia 16
+
+**Mapa canônico consolidado em 19/11/2026, por solicitação do proprietário.** Este é o ponto de consulta da ordem e do objetivo das fatias; `03` indica o trabalho atual, `08` registra os aceites humanos e `09` as provas. Os números 13–20 continuam sendo a trilha original, mas **não descrevem sozinhos o planejamento atual**. As microfatias abaixo foram intercaladas antes da retomada da Fatia 16, sem renumerar a trilha antiga.
+
+## Como ler a sequência
+
+Antecedentes: Fatia 13 (terminal para o agente), MICRO-FATIA DELETE, Fatias 14 e 15; o programa M1–M8/MC1 é uma frente distinta de memória do produto. As Fatias 14/15 têm aceite informado registrado em `08`/D186; M1–M8/MC1 continuam com homologação humana própria pendente. O replanejamento de 13/11 introduziu persistência, centro, multimodalidade e configurações antes de retomar extensibilidade e a Fatia 16. A skill de memória operacional **não é** uma fatia nem requisito funcional desse programa.
+
+| Ordem de referência | Fatia | Objetivo | Situação confirmada nesta consolidação |
+| --- | --- | --- | --- |
+| 1 | **P-A — gravação e recuperação** | CAS/revisões, mutationId/ACK, fila de saves e rascunhos preservados em falhas/conflitos. | Concluída tecnicamente; homologação humana confirmada pelo proprietário. |
+| 2 | **P-B — publicação recuperável** | Manter JSONL e catálogo SQLite coerentes após interrupção; reconciliar intenções e diagnosticar sessões indisponíveis. | Concluída tecnicamente e validada no Windows; não foi localizado aceite humano explícito próprio em 08. Não inferir aceite pela P-C. |
+| 3 | **P-C — exclusão segura** | Exclusão idempotente, tombstone e limpeza retomável, sem gravação tardia recriar a conversa. | Homologada pelo proprietário em 15/11. |
+| 4 | **C-1 — Chat e workspace imutáveis** | Separar Chat sem pasta de conversa com pasta real; preservar a raiz original e o alcance das ferramentas. | Homologada em 16/11. C1-EXCLUSAO-01 corrigida e validada pelo proprietário em 24/11. |
+| 5 | **MM-0 — base multimodal neutra** | Contratos de mensagens/partes/artefatos/capacidades, avaliação conservadora e compatibilidade com texto. | Homologada em 16/11. Não implementa codecs nem geração por si só. |
+| 6 | **C-2 — tela inicial e seletores reais** | Composer inicial, modelo/provedor exatos, modos/permissões, Chat/pastas recentes, estado e navegação coerentes. | Implementação encerrada e publicada, com validação Windows; registro de 17/11 ainda distingue encerramento técnico de aceite humano final não explicitado em 08. Não reabrir implementação nem conceder aceite por consequência da C-3a. |
+| 7 | **C-3a — anexar, armazenar e baixar** | Upload de qualquer formato em Chat/Pasta, identidade/recuperação/lifecycle, download e cópia explícita em `uploads/` do projeto. | Homologada em 19/11, incluindo nome original com sufixo em colisão e opção de cópia na tela inicial. |
+| 8 | **C-3b — apresentar conteúdo e respostas multimodais** | Partes/eventos de saída, artefatos gerenciados, apresentação passiva de imagem/áudio/vídeo/arquivo, Abrir/Salvar/reabrir e retenção, usando a mesma porta C-3a. | Homologada pelo proprietário em 23/11/2026. O aceite manual e seus limites estão no documento 08. |
+| 9 | **U-1 — Configurações unificadas** | Reunir Configurações, Provedores e Personalizações reais no modal aprovado, reutilizando views e seus donos. | Homologada em 24/11. A padronização dos diálogos, chamada U-2 na entrega da Arena, foi homologada junto. |
+| 10 | **MM-I — entrada multimodal por adapter** | Preparar imagens e tornar anexos acessíveis ao agente e ao usuário na própria conversa. | PNG/JPEG validados no Windows com LiteLLM. Entrega integrada e homologação pendentes. |
+| 11 | **MM-O — saída multimodal por adapter** | Publicar arquivos gerados na resposta e em **Resultados** no Explorer da conversa, com prévia e download. | Planejada após a MM-I. |
+| 12 | **Discussão futura reservada pelo proprietário** | Reavaliar prioridade antes da retomada da extensibilidade. | Conteúdo e resultado ainda não definidos. Não inventar requisito nem pular a discussão por autonomia técnica. |
+| 13 | **E0 → E1–E6 — extensibilidade** | Retomar investigação/recortes de agentes personalizados, skills, instruções, hooks, MCP, plugins, instalações, configurações e permissões na estrutura existente. | E0 tem investigação externa; E1–E6 são propostas a reavaliar e especificar, não arquitetura definitiva nem implementação autorizada. Ruflo permanece integração opcional, não runtime obrigatório. |
+| 14 | **Fatia 16 — Terminal 2.0** | Retomar o plano original: paridade visual/comportamental do terminal, posicionamento/painéis, sessões preservadas e dívidas do terminal conforme SPEC própria. | Adiada até as prioridades anteriores serem tratadas e o proprietário confirmar a retomada. Não confundir com a Fatia 13 (terminal para o agente). |
+
+**Dependências e prioridade:** P-A → P-B → P-C → C-1 → MM-0 → C-2 → C-3a → C-3b. Depois vêm a U-1 e a padronização dos diálogos, já homologadas. MM-I é a próxima fatia. MM-I/MM-O são subentregas progressivas com autorização/homologação individual; as posições da tabela não exigem concluir todas as modalidades/codecs para retomar extensibilidade. A discussão reservada vem após o centro/Configurações e antes da eventual retomada E1–E6; sua relação com cada subentrega MM-I/MM-O depende da priorização do proprietário, sem reordenamento automático. As setas C-3b→U-1 e U-1→discussão representam prioridade, não acoplamento técnico entre módulos.
+
+**O que já existe não precisa ser reinventado:** persistência/fila/SQLite/JSONL, contratos MM-0, UI Personalizações e porta de artefatos C-3a são bases de reaproveitamento. A partir da C-3b, preparar uma SPEC executável por vez contra o código real, com critérios de aceite, testes Debian/Windows e parada para homologação. Não criar segundo store/composer, runtime externo obrigatório ou novas responsabilidades de domínio no App.
+
+## Ajuste adiado — retorno de foco nos diálogos
+
+A padronização dos diálogos foi homologada. Ao cancelar **Permitir tudo** no chat pelo teclado, o foco se perde após fechar o menu. O proprietário decidiu adiar esse ajuste para uma revisão futura do chat. O aceite consta em `08`.
+
+## MM-I — plano de execução
+
+**Entrega integrada acordada em 25/11/2026.** A Arena começa com o código da branch de trabalho atualizado e percorre os recortes abaixo no próprio workspace. O proprietário faz uma única homologação manual no Windows usando seu pool real, depois da entrega integrada.
+
+1. **Imagens.** Aceitar PNG, JPEG e WebP, incluindo capturas maiores que 1024 pixels. Separar os limites de admissão dos limites do pedido ao modelo. Validar os bytes, manter o original para prévia e download e, quando necessário, produzir em memória uma versão proporcional e compatível. Preservar o detalhe legível e a transparência quando o formato de saída permitir. Usar a lógica de normalização do DeepSeek Harness como referência e manter o fluxo existente de prova do destino e consentimento. Exibir o motivo quando o arquivo só puder ser armazenado.
+2. **Explorer da conversa.** Mostrar em **Fontes** os anexos de qualquer formato da conversa ativa, inclusive no Chat sem pasta. Reaproveitar o catálogo de anexos e o Explorer existentes. Na conversa com projeto, manter a árvore da pasta e a opção explícita de salvar cópia em `uploads/`. A troca de conversa troca o conjunto de fontes. A interface e as ferramentas do agente aplicam a mesma divisão por conversa, com acesso independente à pasta de projeto compartilhada quando houver. A raiz privada dos anexos continua sob controle do aplicativo.
+3. **Inspeção de arquivos.** Dar ao agente leitura dos anexos da conversa mediante a solicitação do usuário. No ZIP, permitir listar entradas e extrair itens selecionados para uma área privada de trabalho. Limitar expansão, quantidade de entradas e leitura, e confinar a extração à área autorizada. Para texto/documentos, áudio e vídeo, usar suporte comprovado do modelo ou ferramentas locais quando disponíveis. Identificar a representação usada, como texto extraído, transcrição ou quadros selecionados. Anexos de outros formatos continuam acessíveis em Fontes e para download, com motivo visível quando a análise não estiver disponível. Aplicar as permissões vigentes e exigir confirmação antes de enviar conteúdo ao provedor.
+4. **Validação e entrega.** Playwright com servidor real do aplicativo, dados descartáveis e provedor simulado. Cobrir PNG/JPEG existentes, WebP, captura maior que 1024 pixels, preservação do original pelo download, consentimento e cancelamento, duas conversas que não acessam os anexos uma da outra, troca de conversa e F5, Chat sem pasta e projeto, ZIP com texto/imagem/vídeo e extração confinada, documento, áudio e vídeo com caminhos suportados e fallback explícito. Rodar também checagem de tipos, build e regressões de anexos. Entregar commits na branch de trabalho, evidências, formatos efetivamente cobertos, limitações e roteiro único de homologação no Windows. A MM-O começa depois, com sua própria autorização.
+
+**Recorte LiteLLM.** Para PNG/JPEG em Perguntar, manter o alias escolhido no aplicativo e verificar visão com uma imagem sintética. O adaptador deve descobrir o destino efetivo do alias, provar visão com uma nova imagem nesse destino fixo e desabilitar fallback e retentativa do gateway no envio de imagens. Mudança da configuração ou do destino invalida o consentimento. O caminho direto e o envio de texto preservam o comportamento existente. Critérios: pin aplicado também no envio real, resposta de outro destino recusada, alias sem prova oferece texto e confirmação separada preservada na tela inicial e no chat. Validar com simulador e com o pool autorizado usando apenas arquivos sintéticos.
+
+Primeira entrega: adicionar análise de **PNG e JPEG** com pergunta de texto, na tela inicial e em conversas existentes, usando um adaptador de uma rota já integrada. O servidor confere os bytes do anexo publicado pela C-3a, sua titularidade, os limites e a capacidade do par provedor/modelo efetivamente selecionado. A interface distingue arquivo salvo de arquivo enviado ao modelo. Em alvo ou formato incompatível, o usuário pode conservar o anexo e autorizar seguir sem aquela mídia.
+
+O pacote operacional anterior na memória do projeto, `especificacoes/MM-I/MM-I_ARENA.zip`, detalha o recorte inicial. A conexão direta com a API oficial da OpenAI e o LiteLLM podem ser verificados sob o protocolo `openai-chat`. Os limites da primeira implementação são dois arquivos, 4 MiB por arquivo, 6 MiB somados, 1024 pixels por lado, 9 MiB no corpo codificado e uma transmissão de visão em andamento. A entrega integrada acima passa a reger o desenvolvimento e o momento da homologação.
+
+## Suficiência e proveniência
+
+Esta tabela resume o replanejamento do proprietário de 13/11 e suas entregas posteriores, confrontadas com `03`/`08`/`09`, sem inferir implementação por existência de uma SPEC. O detalhamento e as evidências externas ficam em `memoria-de-projeto/replanejamento-2026-11-13/` (F/H/C/E), `especificacoes/C-3a/` e nas entregas de cada microfatia. **Quem recebe apenas este repositório já consegue recuperar ordem, propósito, situação e próxima preparação.** Os pacotes externos continuam necessários para executar os critérios detalhados que ainda não foram consolidados em SPEC da próxima fatia; sua ausência não autoriza inventá-los.
+
+Esta consolidação não cria aceite humano para P-B/C-2/M1–M8/MC1, não invalida entregas posteriores já autorizadas pelo proprietário e não autoriza implementar ou fazer merge de outra fatia.
+
+## Registros anteriores — histórico, não próxima ação vigente
+
+As seções abaixo preservam decisões, descrições de dívidas e fotografias de cada rodada. Frases como “próxima C-1”, “MM-0 não iniciada”, “C-3 não iniciada” e títulos “Estado vigente” ou “Próximas fases” nas entradas datadas descrevem **aquela data**, não substituem esta tabela. A D133 e o mapa antigo 13–20 continuam referência da trilha original; o replanejamento intercalado acima prevalece para decidir o que consultar antes da Fatia 16. Uma dívida citada abaixo só é atual quando não sucedida por resolução/aceite posterior; não considerar toda anotação histórica uma pendência aberta.
+
+---
+
+# C-3a — encerramento por homologação humana, 19/11/2026
+
+C-3a homologada explicitamente pelo proprietário após pull da reentrega de usabilidade (HEAD local `a49cc6c`); aceite em `08`, estado e proveniência em `03`/`09`. Opção de cópia na landing e nome original em `uploads/` entregues, sem sobrescrever colisões e sem renomear arquivos antigos. Não há pendência de aceite humano da C-3a no estado vigente.
+
+A automação Windows da última mudança de usabilidade não foi reexecutada pelo Codex; números locais de `8af269e` não são prova automatizada de `a49cc6c`. Isso permanece como limite da evidência, sem desfazer o aceite informado. C-3b é a próxima etapa desta frente, ainda sem autorização de implementação. Codecs/MM-I/MM-O, C1-EXCLUSAO-01 e demais frentes continuam separados. Entradas abaixo preservam o histórico das rodadas, não reabrem o aceite atual.
+
+---
+
+# C-3a — dívidas e limites após U4 (19/11/2026)
+
+A C-3a foi corrigida após a revisão de `b5cb48d`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.
+
+Dívidas abertas e honestas: (1) **validação Windows pendente sobre o novo commit** — os números da revisão (foco 204/204, anexos 85/85, E2E 10/10, oito reprodutores 8/8) são de `b5cb48d`; (2) **E2E C-1/C-2 e sondas não reexecutados** nesta rodada — não são declarados verdes; (3) **política de espera em U2 mantida** por recomendação da revisão (escrita concorrente a publicação longa espera); mudar para falha imediata exigiria tratamento explícito de draft/retomada e é escolha separada; (4) **`artifactId` de tentativas novas muda** com o dono no hash; tentativas já publicadas continuam legíveis pelo id gravado, mas fixtures de desenvolvimento devem ser recriadas; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa em `memoria-de-projeto/C-3a/revisao-b5cb48d/ENTREGA_C3A_U4.md`.
+
+---
+
+# C-3a — dívidas e limites após U1/U3/U2 (19/11/2026)
+
+A C-3a foi corrigida após o segundo reteste, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01.
+
+Dívidas abertas e honestas: (1) **validação Windows pendente sobre o novo commit** — os números Windows medidos pelo revisor (foco 202/202, anexos 81/81, E2E 10/10) são de `bb96389` e não valem para a rodada atual até reexecução; (2) **sondas não reexecutadas** nesta rodada — o runner canônico segue 10/13 por defeito de template e 13/13 na v2 do revisor; não são declaradas verdes aqui; (3) **decisão de política em U2** — escrita concorrente a uma publicação longa agora **espera** em vez de falhar rápido com 503; pendência abandonada continua 503 (`U2b`). Se a preferência for resposta imediata, é ajuste de política, não de correção; (4) **`artifactId` de tentativas novas muda** (o dono entra no hash); tentativas já publicadas continuam legíveis pelo id gravado, mas fixtures de desenvolvimento devem ser recriadas; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa em `memoria-de-projeto/C-3a/reteste-bb96389/ENTREGA_C3A_U1-U2-U3.md`.
+
+---
+
+# C-3a — dívidas e limites após a correção de R1–R5/W1–W3 (19/11/2026)
+
+A C-3a foi corrigida após o reteste REPROVADA sobre `554f400`, sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção, Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.
+
+Dívidas abertas e honestas desta correção: (1) **validação Windows pendente** — W1 (caminho nativo do vitest) e W2 (Lixeira injetada) foram corrigidos no teste, mas não há SO Windows neste ambiente; comando isolado e resultados esperados na entrega extensa; (2) **sondas: 10/13 pelo runner canônico** — as três falhas são do template (fixture de `sessionJson` sem `workspacePath` e H3/H4 chamando sem capturar a rejeição do contrato), não do produto; 13/13 na cópia portátil corrigida, sem afrouxar expectativa; (3) **migração R3 é aditiva** e planos legados com `chat_id IS NULL` continuam executáveis apenas pela via sem `chatId` — bancos de desenvolvimento com plano em voo devem ser descartados, não migrados; (4) **W3 muda contrato observável** (`GET` de anexo publicado não herda journal de escrita) e está isolado em `OpcoesDono.leitura`, pendente de homologação; (5) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa e evidências em `memoria-de-projeto/C-3a/correcao-2026-11-19/ENTREGA_C3A_R1-R5_W1-W3.md`.
+
+---
+
+# C-3a — dívidas e limites após a reentrega técnica (19/11/2026)
+
+A C-3a foi corrigida após parecer REPROVADA (B01–B11 + seção 3), sem merge e sem homologação. Continua **fora do escopo** e não foi iniciado por consequência: C-3b, codecs de produção (apresentação/geração de mídia), Autopilot, permissões assistidas, sandbox de terminal e C1-EXCLUSAO-01. Nenhum desses itens ganhou código nesta rodada.
+
+Dívidas abertas e honestas desta entrega: (1) **validação Windows pendente** — as cinco falhas do foco foram corrigidas no launcher dos filhos (T14–T17) e no teardown SQLite (T32), mas não há SO Windows neste ambiente; o runner `platform/scripts/e2e-c3a.ps1` e o procedimento estão na entrega extensa externa; (2) **T36 não mata o processo fisicamente** — o cenário é “um escritor por tentativa” e a morte física fica coberta por T14–T17; (3) as 13 sondas do parecer foram executadas pela cópia portátil com config dedicada, porque o runner original grava o próprio template e falha por anti-padrão do template (registrado); (4) as três falhas nominais da ampla (`editorTabs`, `monacoLoadFailure`, `fatia07_destravar`) permanecem pré-existentes e intocadas, e `providersRepo` segue flaky.
+
+Regra preservada: anexo não cria armazenamento paralelo, não amplia permissões, não implementa funcionalidade futura e não usa Lixeira por `rm`. Entrega extensa e evidências em `memoria-de-projeto/C-3a/reentrega-2026-11-18/ENTREGA_C3A_REENTREGA.md`.
+
+---
+
+# Encerramento do recorte C-2 — 17/11/2026
+
+Implementação e correções solicitadas da tela inicial/controles estão tecnicamente concluídas, publicadas até24bfd55, prontas para aceite final do proprietário. Não prolongar C-2 para habilitar recursos futuros visíveis na referência: anexos seguem C-3; Autopilot, assistência de permissões e isolamento de terminal exigem escopo/especificação próprios. Não há novo código autorizado automaticamente por este encerramento. Estado/provas em03/09, escopos originais e dívidas abaixo preservados; C1-EXCLUSAO-01 e homologações de memória não são encerradas por consequência.
+
+---
+
+# Escolha de pasta — sugestões locais disponíveis (17/11/2026)
+
+Campo de caminho da landing oferece leitura de subpastas por caminho absoluto e prefixo parcial, reutilizando API existente. Clicar sugestão explora; confirmar em Usar pasta/Enter ativa o destino validado. Não trocar root nem criar sessão só ao navegar nas sugestões. Nomes relativos continuam filtrando recentes; autocomplete não faz busca recursiva ou pesquisa remota. Preservar debounce/cancelamento e erros distintos de lista vazia. App não ganhou responsabilidades. Sem novo armazenamento, anexos, autonomia, memória ou aceite de fatia; contexto/tema/F5 continuam como em03.
+
+---
+
+# Comportamento vigente da landing — tema/contexto/recarga (17/11/2026)
+
+Nova sessão preserva a visibilidade e a view ativa da Side Bar; não chamar `showView('explorer')` apenas para abrir a landing. F5 mantém o destino inicial quando o usuário estava nele; escolher conversa existente volta a preservar a conversa pelo mecanismo atual. Preferência de destino é UI, sem persistir conteúdo/permissões/pasta pendente. Trocar para Chat remove seleção da landing e árvore anterior, sem apagar histórico de pastas ou arquivos; alterações não salvas bloqueiam a troca pelo guarda existente. Menu mostra caminho atual ao abrir e filtra recentes somente após edição. Tema claro também cobre os dois composers. Gates em03/09; nenhuma dívida anterior, etapa de memória ou fase futura aceita por consequência.
+
+---
+
+# Preferência vigente da landing — 17/11/2026
+
+Menus da barra **para baixo**, conforme nova instrução do proprietário, com rolagem quando faltar altura. Composer expansível (mínimo inicial86px, textarea até200px/área útil, rolagem posterior); não reinstalar altura fixa para preservar somente a captura vazia do mockup. Autopilot, assistência de permissões e sandbox continuam sem implementação própria, fora deste ajuste; não confundir permitir tudo com isolamento ou autonomia adicional. + continua reservado à C-3. Nenhuma dívida anterior foi quitada por esses ajustes de layout; sem avanço de fase.
+
+---
+
+# Esclarecimento — Chat não desabilita os acionadores dos menus (17/11/2026)
+
+Na landing Chat, permitir abrir Perguntar, Interativo e Permissões manuais. Bloquear **as opções**, com motivo, quando dependem de pasta: Agente/Editar/Planejar e Permitir tudo. Não voltar a aplicar `semPasta` ao disabled do acionador inteiro. Restrições efetivas C-1 e trava durante envio permanecem. + segue C-3; nenhuma nova permissão de execução, modalidade ou fase foi habilitada.
+
+---
+
+# Esclarecimento de escopo — 17/11/2026: barra da landing
+
+Agente, Interativo/Planejar e permissões agora usam controles reais e o mesmo rascunho do primeiro envio; componentes próprios, sem mais lógica no App. **Proprietário escolheu expressamente manter anexos na C-3:** + permanece indisponível com motivo. Autopilot/permissões assistidas/sandbox não foram implementados apenas por constarem da referência visual. Publicação dos ajustes autorizada, sem avanço automático de fatia nem alteração de limites de segurança. Provas atuais em03/09; dívida C1-EXCLUSAO-01 preservada.
+
+---
+
+# Atualização de escopo C-2 — 17/11/2026
+
+Decisão direta do proprietário: **menu único Chat/pasta com histórico e caminho digitável dentro da lista; retirar dicas da landing**. Não restaurar os dois botões separados nem o tip box por seguir versões anteriores do pacote C-2. Histórico e validação reutilizam o servidor existente; a modalidade/raiz de conversas já criadas continua imutável. Modelos e permissões mantêm seus contratos reais; anexos/voz/funcionalidades futuras continuam indisponíveis com motivo.
+
+Ajuste técnico implementado e validado conforme 03/09; aguarda inspeção visual/homologação do proprietário. App.tsx não foi alterado, sem declarar quitada a dívida arquitetural anterior. C1-EXCLUSAO-01 continua registrada. Nenhuma próxima fatia foi iniciada ou aceita automaticamente. O pacote ZIP C-2 v2 anterior é histórico quanto a estes dois requisitos visuais; prevalecem esta orientação e o estado vigente em 03.
+
+---
+
+# Próximas fases — C-2 implementada em 13/11/2026; aguarda homologação e gate Windows
+
+**C-2 implementada e documentada (13/11/2026), aguardando homologação.** Entrega na branch `0f2e5de2-agente-window` (commit `7b0292e` + correções RV01–RV08 no mesmo working tree): landing central com seletor LLM real, seleção explícita preservada no primeiro envio (RV01), publicação confirmada antes do run com retry na mesma sessão (RV02), rascunho preservado (RV03), lateral `Chats × grupos` separada (RV04), menus/foco (RV05), estado `Contexto não medido` (RV06), composição da referência (RV07) e 12 jornadas E2E verdes (RV08). Gates: typecheck 0 · FOCO 422+13+0 · lint 111=111 · build 0 · E2E 12/12. Evidências em `memoria-de-projeto/execucao-c2/`. **Pendências:** execução do `VALIDAR_C2_WINDOWS.ps1` (Windows), comparação de screenshots com as referências do parecer e **homologação humana** (nenhum aceite inferido; `08` intocado). Sem merge (PR #1 OPEN).
+
+**Após a homologação:** U-1, C-3, MM-I e MM-O permanecem **não iniciadas** (nescumprir esta ordem = escopo indevido). C1-EXCLUSAO-01 segue aberta, separada.
+
+---
+
+# Próximas fases — MM-0 homologada em 16/11/2026; preparar SPEC executável C-2 (histórico)
+
+**MM-0 encerrada por aceite humano explícito** (08), sobre d1dd69d e correção de transporte 055bbd4. Gates Windows e ressalvas registrados em 09. A pendência Windows da rodada Debian abaixo é histórica; build passou no Windows, e os dois timeouts extras da ampla passaram no reteste dirigido. C1-EXCLUSAO-01 e dívida de responsabilidade/tamanho do App permanecem.
+
+**C-2 é a próxima microfatia planejada, ainda não iniciada.** Base documental existente: `memoria-de-projeto/replanejamento-2026-11-13/C_SPEC_TELA_CENTRAL_E_ANEXOS.md` seção 5 e C-T05–08/15/16; recorte/dependências em F/H. Escopo de referência: composer inicial adaptativo, seleção exata de provedor/modelo, modos/permissões já existentes, foco/pickers/menus e estados honestos; sem anexos funcionais, novos runtimes, ambientes remotos ou controles fictícios.
+
+**Preparação necessária antes de implementar:** consolidar recorte C-2 contra a C-1 e a MM-0 homologadas; discriminar reaproveitamento versus trabalho restante; atualizar mapa dos módulos e contratos de envio/retentativa; fornecer matriz de aceite, autorrevisão e gate Windows reproduzível; explicitar o que fica para U-1/C-3/MM-I/MM-O. Não foi encontrado pacote independente C-2 no diretório de especificações. Esta verificação não autoriza sua implementação nem inicia a elaboração integral da SPEC.
+
+---
+
+# Próximas fases — MM-0: revisão independente corrigida (6/6 achados); aguarda reexecução Windows + homologação
+
+## MM-0 — contratos neutros multimodais (implementada em 16/11/2026; aguarda gate Windows + homologação)
+
+**Escopo entregue (commits `d0e63d8` código+testes e `47c9a77` docs, publicados a pedido do proprietário; branch `0f2e5de2-agente-window`, sem merge):** núcleo puro `src/domain/multimodal/` (contrato v1, `adaptarMensagemLegada`/`projetarTextoLegado`/`validarMensagemMultimodal`, `validarArtefato`, `mesmaIdentidadeMultimodal`/`avaliarCapacidadeEfetiva`/`comporCapacidadeDePool`) + reexport de tipos pelas casas Conversa/Agir/Provedores + **99 testes** após a rodada de revisão (matriz MM0-T01–T26 + suíte `sondas-revisao`). **Fora (futuro, não autorizado por esta fatia):** upload/storage/SQLite de artefatos, mídia na UI, codecs, geração, jobs, descoberta/rede, ativação de `parts` (C-3b), MM-I/MM-O, plugins/MCP.
+
+**Rodada de revisão independente (16/11, Windows, sobre `47c9a77`):** parecer **REPROVADA para homologação** com os achados **MM0-A1..A6** — A1 medida obrigatória para limite conhecido + pool não apaga restrição assimétrica; A2 entradas duplicadas agregam conservadoramente; A3 avaliador público exige composição de pool (`pool-exige-composicao`); A4 protótipo herdado nunca confirma (objeto genuinamente plano); A5 ID legado preservado verbatim na adaptação; A6 fronteira de teste portável (Windows). **Todos corrigidos** nesta rodada, com testes positivos/negativos novos e as 7 sondas do revisor incorporadas (`sondas-revisao.test.ts`, 7/7 verdes; antes 7/7 vermelhas).
+
+**Gates Debian da rodada de correção (execução real):** foco **99/99**; regressão **204/191/0/13**; agir rotas+chatExecucao **63/63**; typecheck **0**; lint **0**; ampla **1969/1932/4/33** com diff nominal **ZERO** vs baseline `baseline-nominal.json` (`comparacao-rev.json`); E2E C-1 **6/6**. Nota de ambiente: uma execução da regressão com Node do sistema (`v22`) falhou por ABI do `better-sqlite3` ("did not self-register") — reexecutada com o runtime canônico `node v26.13.0` e passou 204/191/0/13.
+
+**Pendências:** (a) **reexecução Windows do foco corrigido** (99 esperados) e **execução final completa do runner v1.1** do revisor (a sintaxe foi conferida; o verde da v1.1 não se reaproveita) — revisor/dono; (b) `vite build` no Linux do sandbox morre com OOM (3,9 GB; `tsc -b` ok) — limitação de ambiente com diagnóstico em `/home/user/memoria-de-projeto/execucao-mm0/build-mm0*.log`; (c) **homologação humana** (dono). Entrega: `/home/user/memoria-de-projeto/execucao-mm0/ENTREGA_MM_0.md`. **Sem merge, sem MM-0-automática para a próxima fatia, sem `08`.**
+
+**Dívidas mantidas:** C1-EXCLUSAO-01 (abaixo) e a dívida de tamanho do App (2889 linhas em `7ac8260` — MM-0 NÃO alterou o App) seguem intactas; MM-0 não as incorpora.
+
+## C1-EXCLUSAO-01 — primeira exclusão recusa por revisão alterada (corrigida em 24/11/2026)
+
+**Relato e aceite do proprietário:** após testar a C-1, confirmou o encerramento da fatia e pediu expressamente registrar este comportamento para ajuste posterior. Na primeira tentativa de excluir uma conversa, aparece **“Exclusão não concluída”** e **“A revisão dessa conversa mudou durante a exclusão. Recarregue e tente novamente.”**, com botão **“Tentar excluir novamente”**. Segundo o proprietário, recarregar a página e excluir novamente funciona. Captura fornecida preservada na memória operacional externa; não contém diagnóstico de causa.
+
+**Resolução:** a exclusão passa a usar a revisão confirmada depois de aguardar salvamentos pendentes. A recarga também deixa de acionar a Lixeira para anexos privados pendentes. O proprietário validou a correção no aplicativo. Veja `03` e `09`.
+
+**Critérios verificados:** exclusão usa a revisão confirmada, mantém conflitos reais e impede a recriação por gravações tardias. Recarregar preserva o anexo privado pendente até uma retentativa explícita. A automação simulou a recusa da Lixeira.
+
+**Atualização local Codex, 16/11, após a revisão de 7ac8260:** R2-1 corrigida com rascunho visível e bloqueio de edição/reenvio até confirmação; recusa/falha libera retentativa sem apagar texto. R2-2 corrigida por comparação dos campos JSON decodificados no E2E Windows. Teste integrado agora contém 6 cenários, incluindo falha assíncrona, recuperação do mesmo envio e F5. Resultados em `09`. Esta atualização sucede a resposta da Arena transcrita abaixo; foi seguida de aceite humano registrado em `08`, com dívida C1-EXCLUSAO-01; não autoriza MM-0.
+
+
+**Bloqueios da P-C encerrados (retirados):** a espera de parecer/homologação da P-C, a trava de não avançar o programa enquanto a P-C estava em reteste e o estado “aguardando aceite” — tudo encerrado com o **aceite humano da P-C pelo proprietário em 15/11** (`08`), após a validação Windows de `69f4510` comunicada pelo proprietário. A entrega da P-C e suas correções ficam preservadas em `/home/user/memoria-de-projeto/execucao-pc/` (`ENTREGA_P_C.md` imutável + `ENTREGA_P_C_REENTREGA.md`, §§1–10).
+
+**Sequência aprovada mantida:** P-A ✓ → P-B ✓ → P-C ✓ → **C-1 ✓ (tecnicamente)** → **MM-0**. A **C-1 (Chat e workspace imutáveis)** foi **autorizada expressamente pelo proprietário em 15/11** e implementada no commit **`d589179`** (push `5720ca2..d589179`, PR #1 segue OPEN sem merge): modalidade explícita, raiz nula de Chat, imutabilidade backend/UI, compatibilidade legada e execução sem tools de workspace; critérios C-T01–05/08/16 com negativos nos endpoints relevantes; gates em `09`; entrega em `/home/user/memoria-de-projeto/execucao-c1/ENTREGA_C_1.md`. **Homologação humana da C-1 confirmada em 16/11, com dívida C1-EXCLUSAO-01 aceita** (apresentação ≠ aceite). Após a **revisão do Codex**, as correções **B1/B2/B3/F4** foram implementadas nesta rodada (`31f318c`/`4653f55`/`9dad771`) com RED→GREEN, gates e testes integrados `4/4` (backend controlado) — **reentrega em `/home/user/memoria-de-projeto/execucao-c1/ENTREGA_C_1_REENTREGA.md`**. **MM-0 não começa sem nova autorização após a revisão e a homologação.**
+
+**Pendências reais que permanecem (nada abaixo foi alterado por esta rodada):** a matriz de dívidas desta matriz (DEBTs abertos, PEND-01, DP-03/DP-06 e os gates da Fatia 14, conforme as notas vigentes), os **aceites humanos de M1–M8/DEBT-25/MC1 pendentes por D197**, a **P-B sem aceite humano declarado** (conclusão técnica + B1 6/6 em `c581bfa`, informado — **não** é pendência de execução Windows), a **MM-0 sem homologação** (pronta para gate Windows) e as limitações registradas em `09`. Homologação das Fatias 14/15 continua conforme D186 em `08`.
+
+**Nesta rodada:** correções da revisão do Codex sobre a C-1 — B1 (`31f318c`), B2/B3/F4 (`4653f55`), testes integrados (`9dad771`) + documentação canônica (`50386ad`), na branch `0f2e5de2-agente-window` — nenhum merge na base `arena`, sem MM-0. M1–M8/MC1 seguem separados; esta reentrega não lhes atribui homologação. Pendência nova registrada (sem ampliar escopo): decisão do botão “Abrir pasta” (ausente em Chat) a confirmar na homologação.
+
+**Reteste independente do Codex (16/11, comunicado pelo proprietário): APROVADA TECNICAMENTE COM RESSALVAS** — B1/B2/F4 confirmados no Windows, B3 confirmado na correção; 155 testes verdes e 4 cenários integrados no Windows. Ressalvas: (a) runner/spec Linux-only; (b) **envio antecipado em Pasta com causa não isolada** (campo esvaziado, sem `/api/worktrees` — não tratar corridas verdes posteriores como explicação); (c) `App.tsx` 2845→2875 linhas (+30), dívida de responsabilidade. Resposta em `6db61d1` (push `50386ad..6db61d1`): causa isolada no handshake da landing + bloqueio visível com texto mantido (cenário determinístico unitário e E2E com a validação segura, RED comprovação), runner `platform/scripts/e2e-c1.ps1` + spec portável, e a dívida do App **registrada explicitamente abaixo**. Gates da rodada2 em `09`; PR #1 segue OPEN, sem merge, sem MM-0; **nenhuma homologação atribuída**.
+
+**Dívida explícita do App (C-1):** tamanho em `7ac8260`: **2889 linhas físicas** (2845→2875 na primeira correção, +14 na rodada2). Criação de sessão, coordenação de execução e montagem do Explorer ainda são dívidas do App; `preparacao.ts` permanece na casa Agir. Nesta correção, o handshake pendente foi extraído para `hooks/useLandingSubmission.ts`, sem alterar o App. A redução geral de responsabilidades não foi concluída. Regra vigente: não acrescentar novas regras de negócio no App sem transferir responsabilidade para um módulo; preservar contratos e comportamento ao extrair.
+
+---
+
 # Programa M1–M8 — SPECs de execução e rastreabilidade (11/11/2026)
 
 ## MC1 corretiva — renomeação, legado e autorização específica (12/11/2026)
@@ -1775,3 +1984,23 @@ Elas não foram escondidas nesta parte: quem ler só a SPEC precisa saber que a
 execução existe e que tem ressalvas registradas em outro lugar.
 
 A sequência da D133 segue: **Fatia 15** é a próxima.
+
+## U-1 — Configurações unificadas (entrega de 13/11/2026)
+
+**Estado:** implementada e provada tecnicamente; **aguardando revisão e homologação
+do proprietário**. Sem merge.
+
+**O que fica em aberto, por decisão de escopo:**
+
+- **Notificações, Agentes e instruções, MCP, Hooks, Plugins e Importação e backup**
+  existem no menu como categorias **futuras**: explicam o limite e não oferecem
+  ação. Implementá-las é fatia própria.
+- **Conversas e armazenamento** informa a localização apenas quando houver fonte
+  confiável; o App não conhece o diretório de dados no render, então o painel diz
+  isso em vez de mostrar caminho inventado. Expor a fonte é trabalho do dono da
+  persistência.
+- **Permissões** explica os controles existentes e aponta a conversa atual. Nenhum
+  grant novo, nenhum toggle global — a regra da C-1 continua valendo.
+- **Roteiro de homologação no Windows** acompanha a entrega escrita; rodar em
+  Windows segue pendente de plataforma (`platform/scripts/*.ps1`), assim como a
+  conferência humana das capturas.

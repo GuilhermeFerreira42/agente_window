@@ -13,7 +13,7 @@ function fixture() {
   const raizes = new Map<string, string>([['atual', '/A']]); let owner = 'perfil-servidor', legado = false, locks = 0
   function add(id: string, title: string, entries = [linha('m1', 'Decidimos SQLite com WAL.')], raiz = '/A') {
     raizes.set(id, raiz); textos.set(id, entries)
-    registros.set(id, { id, slug: id, title, workspacePath: raiz, worktreePath: null, messageCount: entries.length, createdAt: 1, updatedAt: 1,
+    registros.set(id, { id, slug: id, title, workspacePath: raiz, worktreePath: null, messageCount: entries.length, contextKind: 'workspace', createdAt: 1, updatedAt: 1,
       sessionJson: JSON.stringify({ id, workspacePath: raiz, worktreePath: null, title, chats: [{ id: 'main', title: 'Main' }] }) })
     origens.set(id, { sessionId: id, chatId: 'main', epoch: `epoch-${id}`, operatorId: owner, projectKey: chaveProjetoHistorico(raiz),
       rootIdentity: raiz, state: 'verified', digest: digestChat(entries, 'main'), title, titleNorm: title.toLowerCase(), sessionTitle: title, chatTitle: 'Main', updatedAt: 17 })

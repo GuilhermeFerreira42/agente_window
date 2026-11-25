@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TerminalPanel } from '../components/TerminalPanel'
 
@@ -288,5 +288,67 @@ describe.skip('TerminalPanel (QUARENTENADO — ver QUARENTENA-UNITARIOS.md)', ()
     expect(second?.open).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('region', { name: 'Painel Inferior' })).toHaveAttribute('data-session-id', 'session-two')
     expect(screen.getByRole('region', { name: 'Painel Inferior' })).toHaveAttribute('data-pty-pid', '2468')
+  })
+})
+
+// ============================================================================
+// C-1/F4 (revisão Codex) — terminal sem workspace: sem instância inicial, sem
+// `open` com cwd implícito (raiz global do servidor) e estado honesto; com
+// pasta, o `open` leva a raiz real (Pasta preservada). Describe ATIVO — o
+// bloco acima continua quarentenado.
+// ============================================================================
+class WebSocketF4 {
+  static instances: WebSocketF4[] = []
+  static OPEN = 1
+  static CLOSED = 3
+  readyState = WebSocketF4.OPEN
+  onopen: (() => void) | null = null
+  onmessage: ((ev: { data: string }) => void) | null = null
+  onclose: ((ev: { code: number; reason: string }) => void) | null = null
+  onerror: ((ev: unknown) => void) | null = null
+  enviados: string[] = []
+  constructor(public url: string) { WebSocketF4.instances.push(this) }
+  send(dado: string) { this.enviados.push(dado) }
+  close() { this.readyState = WebSocketF4.CLOSED }
+  mensagens() { return this.enviados.map((dado) => JSON.parse(dado) as Record<string, unknown>) }
+}
+
+describe('C-1/F4 — terminal sem workspace', () => {
+  beforeEach(() => {
+    WebSocketF4.instances = []
+    vi.stubGlobal('WebSocket', WebSocketF4)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('sessão Chat: sem instância, sem `open` e estado honesto de indisponibilidade', () => {
+    render(<TerminalPanel visible sessionId="chat-sem-pasta" onClose={vi.fn()} />)
+
+    const painel = screen.getByRole('region', { name: 'Painel Inferior' })
+    expect(painel).toHaveAttribute('data-pty-status', 'sem-workspace')
+    expect(screen.getByText('Terminal indisponível nesta sessão: nenhuma pasta de trabalho aberta.')).toBeInTheDocument()
+    expect(xtermMock.MockTerminal.instances).toHaveLength(0)
+
+    // Nem abrindo o socket algum `open` é emitido — cwd implícito proibido.
+    const ws = WebSocketF4.instances.at(-1)
+    expect(ws).toBeDefined()
+    act(() => { ws!.onopen?.() })
+    expect(ws!.mensagens().filter((mensagem) => mensagem.type === 'open')).toHaveLength(0)
+  })
+
+  it('sessão com pasta: instância nasce e o `open` leva o cwd da raiz real (Pasta preservada)', () => {
+    render(<TerminalPanel visible sessionId="session-one" workspace="/projetos/loja" onClose={vi.fn()} />)
+
+    const painel = screen.getByRole('region', { name: 'Painel Inferior' })
+    expect(painel).toHaveAttribute('data-pty-status', 'connecting')
+    expect(screen.queryByText('Terminal indisponível nesta sessão: nenhuma pasta de trabalho aberta.')).not.toBeInTheDocument()
+
+    const ws = WebSocketF4.instances.at(-1)
+    expect(ws).toBeDefined()
+    act(() => { ws!.onopen?.() })
+    const opens = ws!.mensagens().filter((mensagem) => mensagem.type === 'open')
+    expect(opens).toHaveLength(1)
+    expect(opens[0].cwd).toBe('/projetos/loja')
   })
 })

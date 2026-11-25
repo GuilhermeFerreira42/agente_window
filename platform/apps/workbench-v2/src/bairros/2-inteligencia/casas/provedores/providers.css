@@ -73,3 +73,7 @@
 @keyframes providers-rodar{to{transform:rotate(360deg)}}
 
 @media(max-width:900px){.providers-cols{grid-template-columns:1fr}.providers-rail{position:static}.providers-view{padding:18px}}
+
+/* U-1: o wrapper do corpo existe só para o painel HOSPEDADO poder separar o que
+   rola do pé fixo. Fora do modal ele não muda nada (nem layout, nem semântica). */
+.providers-form-corpo { display: contents; }

@@ -29,7 +29,7 @@ suite('MC16 benchmark reproduzível em dados sintéticos', () => {
         }
         db.transaction(() => {
           for (const { id, title, entries } of lote) {
-            upsertSessionRecord({ id, slug: id, title, workspacePath: raiz, worktreePath: null, messageCount: 1, createdAt: 1, updatedAt: 1,
+            upsertSessionRecord({ id, slug: id, title, workspacePath: raiz, worktreePath: null, messageCount: 1, contextKind: 'workspace', createdAt: 1, updatedAt: 1,
               sessionJson: JSON.stringify({ id, title, chats: [{ id: 'main', title: 'Main' }] }) })
             inserir.run({ sessionId: id, epoch: id, owner, key: chaveProjetoHistorico(raiz), root, digest: digestChat(entries, 'main'), title, norm: title.toLowerCase(), data: 1 })
           }
