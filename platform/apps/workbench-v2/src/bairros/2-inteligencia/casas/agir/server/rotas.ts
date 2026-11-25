@@ -31,12 +31,14 @@ import { alvoDentroDoEscopo, alvoExplicitoExclusao, escopoExclusaoAutomatica } f
 // D170-c (RNF15-2): protocolo HTTP e validação do pedido saíram daqui para
 // `protocoloHttp.ts`. Mesmas funções, mesmas mensagens — o arquivo só parou de
 // acumular três responsabilidades.
-import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, type PedidoValidado } from './protocoloHttp'
+import { escreverEvento, lerCorpo, sendErro, sendJson, validarPedido, validarSelecaoModelo, type PedidoValidado } from './protocoloHttp'
 import { registrarExecucao, type RegistroExecucaoAgir } from './transcript'
 import { FERRAMENTAS_ENTRE_CHATS, pedidoHumanoEntreChats, type ContextoEntreChats, type PedidoEntreChats, type ResultadoEntreChats } from '../../../../../domain/consultaEntreChats'
 import { orcamentoContexto } from '../../../../../domain/capacidadeContexto'
 
-const ROTAS_AGIR = ['/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
+import { comCorpoVisao, proporVisao, validarPedidoVisao, type FonteVisao, type LerImagemVisao, type PedidoVisao } from './admissaoVisao'
+
+const ROTAS_AGIR = ['/api/agir/vision', '/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
 export function rotaPertenceAoModuloAgir(pathname: string): boolean {
   return ROTAS_AGIR.includes(pathname)
@@ -51,6 +53,11 @@ export interface ContextoAgir {
 
 export interface DependenciasAgir {
   obterAlvo: ObterAlvo
+  obterAlvoVisao?: ObterAlvo
+  fonteVisao?: FonteVisao
+  identidadeVerificacaoVisao?: (alvo: AlvoConversa) => string | undefined
+  verificarVisao?: (alvo: AlvoConversa) => Promise<void>
+  lerImagemVisao?: LerImagemVisao
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
@@ -295,6 +302,7 @@ interface FioAgir {
   alvo: AlvoConversa
   teto: number
   instrucao?: InstrucaoHumana
+  visao?: PedidoVisao
 }
 
 /**
@@ -521,6 +529,18 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (abort.signal.aborted || !validarContexto()) throw Object.assign(new Error('O projeto mudou durante a preparação do contexto.'), { code: 'fluxo' })
         let saiuTexto = false
         const observadores = { ...opcoes, validarAntesDaChamada: validarContexto, aoTexto: (texto: string) => { if (texto.length) saiuTexto = true; opcoes?.aoTexto?.(texto) } }
+        const pedidoVisao = fio.visao
+        if (pedidoVisao) {
+          const ultima = contexto.at(-1)
+          if (!deps.fonteVisao || !deps.lerImagemVisao || !ultima || ultima.papel !== 'usuario' || ultima.conteudo !== textoDoDono) {
+            throw Object.assign(new Error('O contexto da imagem mudou. Nenhuma imagem foi enviada.'), { code: 'configuracao' })
+          }
+          return comCorpoVisao(pedidoVisao, { sessionId: fio.sessionId, chatId: fio.chatId, texto: textoDoDono },
+            fio.alvo, deps.fonteVisao, deps.lerImagemVisao, (prepararCorpoVisao) => criarVizinhoReal(fio.alvo, {
+              prepararCorpoVisao,
+              aoAceitarVisao: () => emitirMemoria({ type: 'vision_accepted', messageId: pedidoVisao.messageId, artifactIds: pedidoVisao.artifactIds }),
+            }, deps.iniciarModelo)(contexto, observadores))
+        }
         const atual = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
         try { return await atual(contexto, observadores) } catch (erro) {
           if (!preparar || recuperouLimite || saiuTexto || abort.signal.aborted ||
@@ -544,7 +564,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
       instrucoesDeProduto: composicao?.instrucoesDeProduto,
       // C-1 (SPEC C §4) — Chat: catálogo vazio no provedor (nenhuma ferramenta
       // de workspace é anunciada); a conversa roda somente com texto.
-      ferramentasPermitidas: fio.raiz === null ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
+      ferramentasPermitidas: fio.visao || fio.raiz === null ? [] : fio.execucao.entreChats ? FERRAMENTAS_ENTRE_CHATS : fio.execucao.planejamentoRetomada ? [] : fio.execucao.recuperacao ? ['historico'] :
         deps.recuperarHistorico ? [...(composicao?.ferramentasPermitidas ?? catalogoFerramentas.map(({ id }) => id)), 'historico'] : composicao?.ferramentasPermitidas,
       emitir: (evento) => {
         registro?.observar(evento)
@@ -552,6 +572,10 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
         if (fio.execucao.entreChats && (evento.type === 'teto' ||
           (evento.type === 'error' && ['tempo', 'endereco', 'http'].includes(evento.code)))) {
           escreverEvento(res, { type: 'error', code: 'configuracao', message: 'A consulta entre chats foi interrompida ou atingiu seu limite. Envie uma nova mensagem ou selecione novamente a conversa; nenhuma ferramenta será repetida automaticamente.' })
+          return
+        }
+        if (fio.visao && (evento.type === 'teto' || (evento.type === 'error' && evento.retomavel))) {
+          escreverEvento(res, { type: 'error', code: 'configuracao', message: (evento.type === 'error' ? evento.message + ' ' : '') + 'Use Regenerar para confirmar novamente o envio da imagem.' })
           return
         }
         // A ferramenta já iniciada pode terminar durante o cancelamento; preserve seu resultado final,
@@ -921,6 +945,18 @@ async function tratarAgir(
   }
   instrucoes.delete(token)
   const textoAtual = validacao.pedido.mensagens.at(-1)
+  let visao: PedidoVisao | undefined
+  if (corpo.vision !== undefined) {
+    try {
+      visao = validarPedidoVisao(corpo.vision)
+      if (modoEfetivo !== 'ask' || textoAtual?.role !== 'user' || textoAtual.id !== visao.messageId || textoAtual.content.trim().startsWith('/')) {
+        throw new Error('Imagens exigem uma pergunta publicada nesta conversa, no modo Perguntar.')
+      }
+    } catch (erro) {
+      sendErro(res, 409, 'configuracao', (erro as Error).message)
+      return true
+    }
+  }
   const consultaEntreChats = contexto.raiz !== null && !!deps.criarConsultaEntreChats && !!instrucao && textoAtual?.role === 'user' &&
     instrucao.texto === textoAtual.content && pedidoHumanoEntreChats(instrucao.texto)
   if (textoAtual?.role === 'user' && /^\/chats(?:\s|$)/iu.test(textoAtual.content.trim()) && !consultaEntreChats) {
@@ -973,8 +1009,9 @@ async function tratarAgir(
     alvo,
     teto,
     instrucao,
+    visao,
   }, deps)
-  guardarRetomada(fluxo, resultado, contextoFluxo, alvo, execucao.runId)
+  if (!visao) guardarRetomada(fluxo, resultado, contextoFluxo, alvo, execucao.runId)
   return true
 }
 
@@ -1177,6 +1214,25 @@ export async function tratarRotasAgir(
 ): Promise<boolean> {
   const metodo = req.method ?? 'GET'
   if (metodo !== 'POST') return false
+  if (url.pathname === '/api/agir/vision') {
+    if (!deps.fonteVisao) { sendJson(res, 200, null); return true }
+    try {
+      const corpo = await lerCorpo(req)
+      const selecao = validarSelecaoModelo(corpo.modelSelection)
+      const alvo = selecao ? (await (deps.obterAlvoVisao ?? deps.obterAlvo)(selecao)).alvo : undefined
+      const verificacao = alvo && deps.identidadeVerificacaoVisao?.(alvo)
+      if (corpo.verificar !== undefined) {
+        if (!alvo || !verificacao || corpo.verificar !== verificacao) {
+          sendErro(res, 409, 'configuracao', 'O destino mudou. Confirme uma nova verificação.')
+          return true
+        }
+        await deps.verificarVisao?.(alvo)
+      }
+      const proposta = alvo ? proporVisao(alvo, deps.fonteVisao, corpo.messageId, corpo.texto) : null
+      sendJson(res, 200, proposta ?? (alvo && verificacao ? { verificacao, providerId: alvo.providerId, modelId: alvo.modelId } : null))
+    } catch { sendErro(res, 400, 'configuracao', 'Não foi possível avaliar o alvo de imagem.') }
+    return true
+  }
   if (url.pathname === '/api/agir/instruction') return tratarInstrucaoHumana(req, res, deps)
   if (url.pathname === '/api/agir/mode') return tratarSelecionarModo(req, res, deps)
   if (url.pathname === '/api/agir/permission') return tratarSelecionarPermissao(req, res, deps)

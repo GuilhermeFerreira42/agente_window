@@ -7,7 +7,7 @@
 // D84: chave salva manda; variável de ambiente é reserva (a tela mostra a origem).
 // Migração v1/v2/v3 → v4; propriedades antigas de canary são ignoradas ao ler e removidas ao salvar.
 // ============================================================================
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -240,7 +240,13 @@ export async function salvarArquivo(input: SalvarProvedoresInput, caminho = cami
   })
 }
 
+export function revisaoConfiguracaoModelo(provedor: { apiKey?: string | null }): string {
+  const semCredencial = JSON.stringify(provedor, (campo, valor: unknown) => campo === 'apiKey' ? undefined : valor)
+  return createHash('sha256').update(semCredencial).digest('hex')
+}
+
 export interface ConfigChamadaModelo {
+  configRevision?: string
   capacidade?: CapacidadeContexto
   providerId: string
   modelId: string
@@ -298,6 +304,7 @@ export async function iniciarChamadaModelo<T>(
       baseUrl: (provedor.baseUrl || descritor.baseUrlPadrao).replace(/\/+$/, ''),
       apiKey: chave,
       temperatura: provedor.temperatura,
+      configRevision: revisaoConfiguracaoModelo(provedor),
       maxSaida: saidaEfetiva(provedor.maxSaida, capacidade, modoContextoEfetivo(provedor)),
       limiteContexto: capacidade?.limites.total,
       capacidade,

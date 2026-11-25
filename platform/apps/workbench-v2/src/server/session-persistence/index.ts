@@ -1,3 +1,5 @@
+import { fonteDeVisao, identidadeVerificacaoVisao, verificarVisao } from '../../bairros/2-inteligencia/casas/agir/server/verificarVisao'
+import { lerCopiaPublicadaParaVisao } from './attachments/leituraVisao'
 import { PersistenceProblem, receipt, mutationOwner } from './sessionMutations'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
@@ -876,6 +878,11 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   if (rotaPertenceAoModuloAgir(url.pathname)) {
     if (await tratarRotasAgir(request, response, url, {
       obterAlvo: obterAlvoDeConversa,
+      obterAlvoVisao: (selecao) => obterAlvoDeConversa(selecao, true),
+      fonteVisao: fonteDeVisao,
+      identidadeVerificacaoVisao,
+      verificarVisao: (alvo) => verificarVisao(alvo, iniciarChamadaModelo),
+      lerImagemVisao: lerCopiaPublicadaParaVisao,
       iniciarModelo: iniciarChamadaModelo,
       resolverContexto: resolverContextoAgir,
       resolverShell: resolveShell,

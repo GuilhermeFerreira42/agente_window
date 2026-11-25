@@ -121,6 +121,7 @@ export type DecisaoAprovacao = 'permitir' | 'negar' | 'sessao'
 export type EventoAgir =
   | { type: 'memory_status'; estado: 'compactando' | 'compactado' | 'falhou'; ultimaEm?: number }
   | { type: 'chunk'; text: string }
+  | { type: 'vision_accepted'; messageId: string; artifactIds: string[] }
   | { type: 'context_usage'; medicao: MedicaoContexto }
   | { type: 'tool'; pedido: PedidoFerramenta }
   | { type: 'tool_result'; id: string; ferramenta: FerramentaId; ok: boolean; resumo: string; efeitoIniciado?: boolean; fontesHistoricas?: FonteEntreChats[]; escolhasHistoricas?: EscolhaEntreChats[] }

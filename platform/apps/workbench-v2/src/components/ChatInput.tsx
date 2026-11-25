@@ -838,7 +838,7 @@ export function ChatInput({
                   if (element) chipRefs.current.set(attachment.id, element)
                   else chipRefs.current.delete(attachment.id)
                 }}
-                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}${rotuloEstadoRascunho(attachment)}. Armazenado; não enviado ao modelo (sem codec nesta fase). Pressione Delete para remover.`}
+                aria-label={`${attachment.name}, ${attachmentTypeLabel(attachment)}${rotuloEstadoRascunho(attachment)}. A decisão de envio ao modelo é confirmada ao enviar a mensagem. Pressione Delete para remover.`}
                 title={`${attachment.name} · ${attachmentTypeLabel(attachment)}${rotuloEstadoRascunho(attachment)} · armazenado; não enviado ao modelo`}
                 onKeyDown={(event) => handleAttachmentChipKeyDown(attachment.id, event)}
               >

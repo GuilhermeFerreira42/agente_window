@@ -19,12 +19,12 @@ import type { Attachment } from '../types'
 import type { TentativaConfirmada } from '../domain/primeiroEnvio'
 import type { SelecaoModelo } from '../bairros/2-inteligencia/casas/conversa'
 import type { ModoAgir, NivelPermissaoAgir } from '../bairros/2-inteligencia/casas/agir'
-import { pedidoEscolhaAnexos } from '../domain/pedidosArquivo'
-import { portaDialogos } from '../shell/portaDialogos'
+import { escolherEnvioVisao, type EscolhaVisao } from '../services/sessions/envioVisao'
 
 export interface EntradaSubmitLanding {
   /** Snapshot imutável da tentativa (texto/contexto/raiz/seleção/mode/permissão). */
   snapshot: SnapshotPrimeiroEnvio
+  escolhaVisao?: EscolhaVisao
   /** Identidade confirmada de tentativa anterior da MESMA geração (retry). */
   confirmada: TentativaConfirmada | null
   aoConfirmar: (confirmada: TentativaConfirmada) => void
@@ -125,10 +125,11 @@ export function useLandingSubmission(
       )
       // Antes de criar sessão/worktree ou transferir: o recibo da landing
       // só é marcado como escolha feita após esta confirmação explícita.
-      if (snapshot.texto.trim() && snapshot.anexos?.length &&
-          !(await portaDialogos().confirmar(pedidoEscolhaAnexos(snapshot.anexos.map((anexo) => anexo.name))))) return false
+      const escolhaVisao = await escolherEnvioVisao(snapshot.texto, snapshot.anexos ?? [], snapshot.selecaoModelo, snapshot.modo)
+      if (escolhaVisao === null) return false
       const aceito = await onSubmit({
         snapshot,
+        ...(escolhaVisao ? { escolhaVisao } : {}),
         confirmada: confirmadaAtual,
         aoConfirmar: (t) => { setConfirmada(t) },
         aoEncerrar: (t) => { setConfirmada(t) },

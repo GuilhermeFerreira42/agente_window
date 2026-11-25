@@ -27,6 +27,8 @@ export interface PedidoLeituraVisao {
   chatId: string
   messageId: string
   artifactId: string
+  texto?: string
+  artifactIds?: readonly string[]
   /** Limite já escolhido pelo chamador; ausente, inválido ou desconhecido bloqueia. */
   maxBytes: number
 }
@@ -54,9 +56,13 @@ export async function lerCopiaPublicadaParaVisao(pedido: PedidoLeituraVisao): Pr
     const entradas = await readTranscript(registro.slug, pedido.sessionId, TETO_TRANSCRIPT_BYTES)
     const publicadas = entradas.filter((e) => e.type === 'user' && e.chatId === pedido.chatId && e.uuid === pedido.messageId)
     if (publicadas.length !== 1) return recusar('vision_message_unavailable', 'A mensagem publicada não foi encontrada ou é ambígua.')
-    const msg = publicadas[0].message as { id?: unknown; role?: unknown; attachments?: unknown }
-    if (msg.id !== pedido.messageId || msg.role !== 'user' || !Array.isArray(msg.attachments) || !msg.attachments.some((item: unknown) =>
-      typeof item === 'object' && item !== null && (item as { artifactId?: unknown }).artifactId === pedido.artifactId)) {
+    const msg = publicadas[0].message as { id?: unknown; role?: unknown; content?: unknown; attachments?: unknown }
+    const anexos = (Array.isArray(msg.attachments) ? msg.attachments : []) as Array<{ artifactId?: string; envioModelo?: string } | null>
+    const selecionados = anexos.filter(item => item?.envioModelo === 'pendente' || item?.envioModelo === 'enviado')
+    if (msg.id !== pedido.messageId || msg.role !== 'user' || !anexos.some(item => item?.artifactId === pedido.artifactId) ||
+        (pedido.texto !== undefined && (msg.content !== pedido.texto || !pedido.artifactIds ||
+          !selecionados.some(item => item?.artifactId === pedido.artifactId) ||
+          pedido.artifactIds.some(id => !selecionados.some(item => item?.artifactId === id))))) {
       return recusar('vision_attachment_unlinked', 'O anexo não pertence à mensagem publicada.')
     }
     // Reutiliza o resolver e a contenção da C-3a, mas evita o hash anterior de

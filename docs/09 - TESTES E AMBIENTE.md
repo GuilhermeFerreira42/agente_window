@@ -1,4 +1,17 @@
-# MM-I — continuação parcial com simulador local (ainda não é entrega de visão)
+# 24/11/2026 — MM-I integrada e verificada com provedor simulado no Windows
+
+Base de comparação `3f794cd`, Node 26.13.0 e dados descartáveis. O fluxo real de **Perguntar** usa o mesmo endpoint de Agir para texto com PNG/JPEG no primeiro envio e em conversas abertas. O Playwright compara modelo, texto e SHA-256 dos bytes na própria fixture HTTP e valida o streaming de resposta, cancelamento sem chamada, lote misto, pasta, retentativa sem duplicar a mensagem e F5 após publicação da revisão. A regressão do envio só de texto para um alvo desconhecido também foi validada.
+
+- Vitest focado: **93/93** em 12 arquivos, incluindo admissão, integridade, capacidade, codecs, seleção, fluxo de anexos e landing. O reteste de admissão com um caso adicional de concorrência passou **4/4**. Playwright MM-I: **2/2**. Tipos e build Vite passaram. Lint dos arquivos alterados: mesmos 22 apontamentos da base.
+- Teste de rotas de Agir no Windows: **45 passaram e 14 falharam**. A comparação em `3f794cd` reproduziu as mesmas 14 falhas nominais, incluindo fixtures com `/bin/sh` e Lixeira. Na C-3a, E01–E06 e E09–E15 passaram em rodadas separadas. E07 e E08 reproduziram HTTP 403 nos mesmos pontos de criação de referências na base e com a integração.
+- O estado após F5 foi verificado após o ACK do salvamento. Recarregar enquanto o salvamento ainda está em voo pode abrir o fluxo de recuperação local existente.
+- Prova externa MMI-09 continua pendente. O caminho real habilitável desta entrega é a conexão direta do protocolo `openai-chat` com a API oficial da OpenAI. O botão **Verificar visão** envia só um PNG sintético após confirmação explícita. A prova expira após 30 minutos, é invalidada por mudança de configuração ou reinício, e não autoriza o envio de anexos sem uma confirmação separada. Pool, proxy arbitrário ou outro protocolo permanece sem prova nesta entrega.
+
+**Validação manual com alvo autorizado:** iniciar o aplicativo no Windows, selecionar explicitamente um modelo da OpenAI direta, escolher **Perguntar**, anexar uma imagem descartável com um detalhe ausente do nome e da pergunta e enviar. Confirmar **Verificar visão** se for solicitado. Conferir o destino, clicar **Enviar imagens e texto** e verificar se a resposta usa aquele detalhe. Recarregar depois do salvamento e conferir o estado do anexo. Repetir com um JPEG em conversa já aberta e cancelar uma tentativa para confirmar que o rascunho permanece. Evitar imagens pessoais no teste.
+
+---
+
+# MM-I — continuação parcial com simulador local (histórico)
 
 **Código publicado anteriormente:** `5d344e1`. Novos trabalhos: `capacidadeVisao.ts` avalia MM-0 contra identidade efêmera e revisões fornecidas pelo dono, evidência, topologia e limites completos; não descobre nem fabrica prova e **não está ligado ao produto**. O dono de Provedores ainda não fornece a revisão completa ou uma fonte autorizada de provas. Sem elas, não existe habilitação para modelo real; não é seguro considerar nomes, declarações manuais ou protocolo como prova. A fonte futura precisa vincular prova, limites e topologia ao par/endpoint/configuração/API/adaptador, revalidar na chamada e resolver Auto sem troca implícita.
 

@@ -46,6 +46,7 @@ export type SelecaoModelo =
 
 /** Configuração atual usada apenas pelo servidor para admitir/iniciar um fetch. */
 export interface ConfigChamadaModelo {
+  configRevision?: string
   capacidade?: CapacidadeContexto
   providerId: string
   modelId: string
@@ -63,6 +64,7 @@ export type IniciarChamadaModelo = <T>(
 ) => Promise<T>
 
 export interface AlvoConversa {
+  configRevision?: string
   capacidade?: CapacidadeContexto
   /** D196: sumarização sem raciocínio adicional quando o endpoint suporta. */
   esforcoResumo?: 'none'

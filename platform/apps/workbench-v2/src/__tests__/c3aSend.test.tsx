@@ -459,7 +459,7 @@ describe('c3aSend — T23: sem codec, nome de arquivo NUNCA vira conteúdo de mo
    */
   async function escolherNoDialogo(aceitar: boolean) {
     const dialogo = await screen.findByRole('dialog', { name: /Enviar só o texto e manter os arquivos anexados\?/ })
-    expect(dialogo).toHaveTextContent('NÃO serão enviados ao modelo nesta fase (sem codec)')
+    expect(dialogo).toHaveTextContent('O envio ao modelo não está disponível para esses arquivos nesta seleção.')
     fireEvent.click(within(dialogo).getByRole('button', { name: aceitar ? 'Continuar com o texto' : 'Cancelar' }))
   }
 

@@ -1,3 +1,4 @@
+import { rotuloEnvioVisao } from '../services/sessions/envioVisao'
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Download,
   Check,
@@ -366,12 +367,13 @@ function MessageRow({
               if (preview.ok && sessionId && chatId && artifactId && (estado === 'pronto' || estado === 'referencia')) {
                 const card: CardArtefato = { artifactId, name, bytes, estado: 'pronto', modalidade: preview.modalidade, preview }
                 return (
-                  <div key={attachment.id} role="listitem" data-artifact-id={artifactId}>
+                  <div key={attachment.id} role="listitem" data-artifact-id={artifactId} aria-label={`${name} — ${rotuloEnvioVisao(attachment)}`}>
                     <MessageParts
                       itens={[{ tipo: 'artefato', chave: artifactId, card }]}
                       urlPara={() => urlDeMidia(sessionId, chatId, artifactId)}
                       aoBaixar={() => { void baixarAnexoComNome(sessionId, chatId, artifactId, name) }}
                     />
+                    {attachment.envioModelo && <small className="chat-message-attachment-estado">{rotuloEnvioVisao(attachment)}</small>}
                   </div>
                 )
               }
@@ -380,8 +382,8 @@ function MessageRow({
                 key={attachment.id}
                 role="listitem"
                 data-artifact-id={attachment.artifactId ?? undefined}
-                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'}${estadoAnexoLabel(attachment)} — armazenado; não enviado ao modelo (sem codec nesta fase)`}
-                title={`${attachment.name} · ${attachment.kind === 'local' ? 'local' : 'workspace'}${estadoAnexoLabel(attachment)} · armazenado; não enviado ao modelo`}
+                aria-label={`${attachment.name}, ${attachment.kind === 'local' ? 'arquivo local' : 'arquivo do workspace'}${estadoAnexoLabel(attachment)} — ${rotuloEnvioVisao(attachment)}`}
+                title={`${attachment.name} · ${attachment.kind === 'local' ? 'local' : 'workspace'}${estadoAnexoLabel(attachment)} · ${rotuloEnvioVisao(attachment)}`}
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>

@@ -1,7 +1,5 @@
-// Gate ISOLADO de visão. Não é fonte de evidência nem autorização humana;
-// ainda não é chamado pelo produto. Somente o dono de Provedores pode fornecer
-// revisões da configuração completa, API, topologia e um perfil comprovado.
-// Nenhum desses dados pode vir de uma declaração manual ou do navegador.
+// Avalia capacidade a partir da configuração e das provas fornecidas pelo servidor.
+// A autorização de cada envio é verificada separadamente.
 import { createHmac, randomBytes } from 'node:crypto'
 import type { AlvoConversa } from '../../conversa'
 import { avaliarCapacidadeEfetiva, type ChaveCapacidade, type IdentidadeAlvoMultimodal, type PerfilMultimodal, type ResultadoCapacidade } from '../../../../../domain/multimodal'
@@ -9,7 +7,7 @@ import { LIMITES_LOCAIS_VISAO, type LimitesVisao } from './limitesVisao'
 
 const CHAVE_PROCESSO = randomBytes(32)
 const REVISAO_ADAPTADOR = 'openai-chat-visao-mm-i-1'
-const CHAVE_VISAO: ChaveCapacidade = { operacao: 'analisar-imagem', direcao: 'entrada', modalidade: 'imagem', representacao: 'inline-base64' }
+export const CHAVE_VISAO: ChaveCapacidade = { operacao: 'analisar-imagem', direcao: 'entrada', modalidade: 'imagem', representacao: 'inline-base64' }
 
 /** Revisões obrigatórias fornecidas pelo dono, nunca inventadas do nome. */
 export interface RevisoesVisao {
@@ -39,7 +37,8 @@ export function identidadeVisao(alvo: AlvoConversa, revisoes: RevisoesVisao): Id
   // A revisão completa, fornecida pela autoridade, cobre também configurações
   // que AlvoConversa não projeta. Os campos projetados são protegidos em
   // profundidade; reinício invalida toda prova efêmera por uma nova chave.
-  const config = JSON.stringify([revisoes.configuracao, alvo.baseUrl, alvo.apiKey, alvo.temperatura, alvo.maxSaida, alvo.limiteContexto, alvo.capacidade])
+  const config = JSON.stringify([revisoes.configuracao, alvo.baseUrl, alvo.apiKey, alvo.temperatura,
+    alvo.configRevision ?? [alvo.maxSaida, alvo.limiteContexto, alvo.capacidade]])
   return {
     providerId: alvo.providerId, modelId: alvo.modelId, protocolo: alvo.protocolo,
     endpointIdentity: hmac('endpoint', alvo.baseUrl), configRevision: hmac('config', config),

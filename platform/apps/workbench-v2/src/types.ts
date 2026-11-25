@@ -242,7 +242,7 @@ export interface Attachment {
   /** C-3a: escolha EXPLÍCITA de cópia na pasta do projeto (R03; default privado). */
   modoCopia?: 'privado' | 'projeto'
   /** C-3a: destino de envio ao modelo registrado na publicação (R10). */
-  envioModelo?: 'excluido-sem-codec'
+  envioModelo?: 'excluido-sem-codec' | 'pendente' | 'enviado'
   /** C-3a: referência de projeto como caminho relativo ao workspace. */
   referencia?: string
   /** C-3a: marcador de item publicado sem artefato da C-3a. */

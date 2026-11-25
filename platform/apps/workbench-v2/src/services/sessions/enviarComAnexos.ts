@@ -11,6 +11,7 @@ import {
   admitirAnexo, enviarConteudoAnexo, estadoAnexo, registrarReferenciaAnexo,
 } from './anexosClient'
 import { guardarRecibo } from '../../domain/rascunhoTransferencia'
+import { escolherEnvioVisao, type EscolhaVisao, type PedidoVisaoAgir } from './envioVisao'
 import { pedidoEscolhaAnexos, TEXTO_ESCOLHA_ANEXOS } from '../../domain/pedidosArquivo'
 import { portaDialogos } from '../../shell/portaDialogos'
 
@@ -112,7 +113,7 @@ export interface PortasEnvioAnexos {
     historico: MensagemSimples[]
     modelSelection: SelecaoModelo
     texto: string
-    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean }
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; vision?: PedidoVisaoAgir }
   }) => void
   /** Relógio de rótulo do chat. */
   tempo: () => string
@@ -134,7 +135,7 @@ export function portasEnvioApp(p: {
   management: { current: unknown }
   commitDraft: (management: never, sessionId: string) => unknown
   updateSessionAndChatStatus: (sessao: Session, chatId: string, status: 'working' | 'completed') => Session
-  iniciarAgirReal: (sessionId: string, chatId: string, responseId: string, historico: MensagemSimples[], extra: undefined, modelSelection: SelecaoModelo, texto: string, opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean }) => void
+  iniciarAgirReal: (sessionId: string, chatId: string, responseId: string, historico: MensagemSimples[], extra: undefined, modelSelection: SelecaoModelo, texto: string, opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; vision?: PedidoVisaoAgir }) => void
   timeLabel: () => string
   selectedMode: ModoAgir
   montarHistorico: (mensagens: ChatMessage[]) => MensagemSimples[]
@@ -173,7 +174,7 @@ export async function enviarMensagemComAnexos(entrada: {
   text: string
   attachments: Attachment[]
   modelSelection: SelecaoModelo
-  opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean }
+  opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean; escolhaVisao?: EscolhaVisao }
   portas: PortasEnvioAnexos
 }): Promise<'publicado' | 'abortado'> {
   const { sessionId, chatId, text, attachments, modelSelection, opcoes, portas } = entrada
@@ -184,10 +185,9 @@ export async function enviarMensagemComAnexos(entrada: {
 
   // A escolha também é exigida quando os recibos já estão prontos: existência
   // do arquivo não é consentimento para enviar uma mensagem sem sua mídia.
-  if (text.trim() && attachments.length && !opcoes?.escolhaJaFeita) {
-    const escolha = await portaDialogos().confirmar(pedidoEscolhaAnexos(attachments.map((anexo) => anexo.name)))
-    if (!escolha) return 'abortado'
-  }
+  const escolha = opcoes?.escolhaJaFeita ? opcoes.escolhaVisao
+    : await escolherEnvioVisao(text, attachments, modelSelection, base?.workspacePath ? (opcoes?.modo ?? portas.modoAtual) : 'ask')
+  if (escolha === null) return 'abortado'
 
   // R02 — transferência completa ANTES da publicação da mensagem.
   const raizWorkspace = base?.workspacePath ?? null
@@ -201,12 +201,18 @@ export async function enviarMensagemComAnexos(entrada: {
     return 'abortado'
   }
 
-  const anexosPublicados = transferencia.anexos.map((anexo) => ({
+  const anexosPublicados = transferencia.anexos.map((anexo, index) => ({
     ...anexo,
-    envioModelo: (text.trim() ? ('excluido-sem-codec' as const) : undefined),
+    envioModelo: escolha?.indices.includes(index) ? 'pendente' as const : (text.trim() ? 'excluido-sem-codec' as const : undefined),
   }))
+  const artifactIds = escolha?.indices.map(index => anexosPublicados[index]?.artifactId) ?? []
+  if (escolha && artifactIds.some(id => !id)) {
+    portas.preservarRascunho(transferencia.anexos)
+    portas.notificar('Não foi possível identificar as imagens publicadas. Nada foi enviado.')
+    return 'abortado'
+  }
   const userMessage: ChatMessage = {
-    id: `message-${Date.now()}`,
+    id: escolha?.messageId ?? `message-${Date.now()}`,
     role: 'user',
     // T23 — só o texto: nomes de arquivo nunca entram disfarçados no histórico.
     content: text.trim(),
@@ -256,7 +262,8 @@ export async function enviarMensagemComAnexos(entrada: {
     return 'abortado'
   }
   if (vaiRodar && runningResponse) {
-    portas.iniciarRun({ responseId, historico, modelSelection, texto: text.trim(), opcoes })
+    const vision = escolha ? { proposta: escolha.proposta, messageId: userMessage.id, artifactIds: artifactIds as string[] } : undefined
+    portas.iniciarRun({ responseId, historico, modelSelection, texto: text.trim(), opcoes: vision ? { ...opcoes, vision } : opcoes })
   } else if (!vaiRodar) {
     // T23 — anexo sem texto: mensagem salva, NENHUMA chamada de IA.
     portas.notificar('Arquivos armazenados na conversa. Nada foi enviado ao modelo.')

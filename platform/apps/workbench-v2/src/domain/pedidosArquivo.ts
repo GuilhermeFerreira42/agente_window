@@ -12,7 +12,7 @@ import { pedidoDestrutivo, type PedidoDialogo, type PedidoEntrada } from './dial
 
 /** Anexos com texto: os arquivos ficam na conversa, mas não vão ao modelo. */
 export const TEXTO_ESCOLHA_ANEXOS =
-  'Os arquivos serão armazenados nesta conversa, mas NÃO serão enviados ao modelo nesta fase (sem codec). '
+  'Os arquivos serão armazenados nesta conversa. O envio ao modelo não está disponível para esses arquivos nesta seleção. '
   + 'Continuar apenas com o texto? Os arquivos ficam disponíveis para download na conversa.'
 
 export function pedidoEscolhaAnexos(nomes: readonly string[] = []): PedidoDialogo {

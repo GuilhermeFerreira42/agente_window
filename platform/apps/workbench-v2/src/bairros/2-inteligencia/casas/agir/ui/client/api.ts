@@ -23,6 +23,7 @@ export interface OuvintesAgir {
   onMemoryStatus?: (estado: Extract<EventoAgir, { type: 'memory_status' }>) => void
   onCheckpointInvalido?: () => void
   onContextUsage?: (medicao: Extract<EventoAgir, { type: 'context_usage' }>['medicao']) => void
+  onVisionAccepted?: (evento: Extract<EventoAgir, { type: 'vision_accepted' }>) => void
   onChunk: (texto: string) => void
   onTool: (pedido: PedidoFerramenta) => void
   onToolResult: (id: string, ferramenta: FerramentaId, ok: boolean, resumo: string, efeitoIniciado?: boolean, fontesHistoricas?: FonteEntreChats[], escolhasHistoricas?: EscolhaEntreChats[]) => void
@@ -62,6 +63,7 @@ export async function selecionarPermissaoAgir(sessionId: string, chatId: string,
 
 export interface EntradaAgir {
   instructionToken?: string
+  vision?: { proposta: string; messageId: string; artifactIds: string[] }
   mensagens: MensagemSimples[]
   modelSelection?: { tipo: 'auto' } | { tipo: 'explicita'; providerId: string; modelId: string }
   fluxo: string
@@ -116,6 +118,7 @@ async function bombearFio(
         try { evento = JSON.parse(payload) as EventoAgir } catch { continue }
         if (paradaSolicitada() && evento.type !== 'tool_result') return false
         if (evento.type === 'chunk') ouvintes.onChunk(evento.text)
+        else if (evento.type === 'vision_accepted') ouvintes.onVisionAccepted?.(evento)
         else if (evento.type === 'context_usage') ouvintes.onContextUsage?.(evento.medicao)
         else if (evento.type === 'memory_status') ouvintes.onMemoryStatus?.(evento)
         else if (evento.type === 'tool') ouvintes.onTool(evento.pedido)
@@ -247,6 +250,7 @@ function abrirFio(url: string, corpo: unknown, escopo: EscopoRun, ouvintes: Ouvi
 export function enviarAgir(entrada: EntradaAgir, ouvintes: OuvintesAgir): ControleAgir {
   return abrirFio('/api/agir', {
     instructionToken: entrada.instructionToken,
+    ...(entrada.vision ? { vision: entrada.vision } : {}),
     messages: entrada.mensagens,
     modelSelection: entrada.modelSelection ?? { tipo: 'auto' },
     fluxo: entrada.fluxo,

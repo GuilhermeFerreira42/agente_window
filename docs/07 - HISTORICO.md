@@ -1,3 +1,9 @@
+# 24/11/2026 — integração da visão no fluxo real da MM-I
+
+O checkpoint da Arena em `3f794cd` foi conectado ao envio de PNG/JPEG, com prova de alvo, confirmação separada e retentativa explícita. O teste com simulador percorreu o aplicativo no Windows. Estado em `03` e evidências em `09`.
+
+---
+
 # MM-I — checkpoints de implementação parcial
 
 Após o checkpoint isolado `5d344e1`, acrescentados um gate de capacidade ainda sem fonte/integração e um simulador HTTP local para provas. Corrigida a confirmação de envio sem mídia na landing e para anexos já prontos; o diálogo nomeia os arquivos guardados. Playwright cobriu esse fallback e cancelamento nas duas entradas, não o envio de visão. Ainda não constitui a entrega de visão; estado em `03` e provas e pendências em `09`.

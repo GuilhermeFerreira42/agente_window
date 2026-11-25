@@ -22,7 +22,7 @@ export interface RegistroProvedorLocal {
 }
 
 /** A captura retém somente texto sintético e hashes, nunca base64 ou bytes. */
-export async function criarProvedorVisaoLocal(esperado: PedidoEsperado): Promise<{
+export async function criarProvedorVisaoLocal(esperado: PedidoEsperado | PedidoEsperado[]): Promise<{
   baseUrl: string
   registros: RegistroProvedorLocal[]
   requisicoes: Array<{ metodo: string; caminho: string }>
@@ -66,8 +66,9 @@ export async function criarProvedorVisaoLocal(esperado: PedidoEsperado): Promise
             registro.imagens.push({ mime: correspondencia[1] as ImagemEsperada['mime'], sha256: createHash('sha256').update(bytes).digest('hex') })
           }
         } else throw new Error('conteúdo')
-        registro.valido = registro.modelo === esperado.modelo && registro.texto === esperado.texto &&
-          JSON.stringify(registro.imagens) === JSON.stringify(esperado.imagens)
+        const expectativa = Array.isArray(esperado) ? esperado[registros.length] : esperado
+        registro.valido = Boolean(expectativa && registro.modelo === expectativa.modelo && registro.texto === expectativa.texto &&
+          JSON.stringify(registro.imagens) === JSON.stringify(expectativa.imagens))
       } catch { /* a resposta de erro não expõe corpo nem dados binários */ }
       registros.push(registro)
       if (!registro.valido) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"fixture mismatch"}}'); return }

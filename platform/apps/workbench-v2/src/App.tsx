@@ -32,7 +32,7 @@ import { ConfiguracoesUnificadasHost } from './shell/ConfiguracoesUnificadasHost
 import { ROTA_PERSONALIZACOES, rotaDaSecao } from './domain/configuracoesUnificadas'
 import type { SelecaoModelo } from './bairros/2-inteligencia/casas/conversa'
 import { aplicarMensagemPrimeiroEnvio, executarPrimeiroEnvio } from './domain/primeiroEnvio'
-import { tokenDaSelecao } from './domain/selecaoModelo'
+import { selecaoDoToken, tokenDaSelecao } from './domain/selecaoModelo'
 import { rascunhoInicial, type RascunhoLanding } from './domain/landingDraft'
 import { useLandingTentativa, type EntradaSubmitLanding } from './hooks/useLandingSubmission'
 import { AUTOSCROLL_PADRAO, carregarConfig } from './bairros/2-inteligencia/casas/config'
@@ -49,6 +49,7 @@ import {
   saveCustomViewState,
   shouldShowCustomViewGrid,
 } from './domain/customView'
+import { escolherReenvioVisao, marcarVisaoAceita, type EscolhaVisao, type PedidoVisaoAgir } from './services/sessions/envioVisao'
 import { enviarMensagemComAnexos, portasEnvioApp, prepararAnexosDaLanding } from './services/sessions/enviarComAnexos'
 import { useFusaoAnexos } from './hooks/useFusaoAnexos'
 import type { Attachment, BrowserViewState, BrowserViewport, ChatCopyKind, ChatMessage, ComposerDraft, ComposerHistoryEntry, DiffFile, EditorTab, Session } from './types'
@@ -1471,7 +1472,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
           setModeByChat((current) => ({ ...current, [runKey]: snap.modo }))
           if (snap.contexto === 'workspace') setPermissionByChat((current) => ({ ...current, [`${runKey}:${sessao.worktreePath ?? sessao.workspacePath}`]: snap.permissao }))
           // C2-RV02 — publicação DURÁVEL (ACK da fila P) antes do efeito remoto.
-          const resultadoEnvio = await handleSend(snap.texto, anexosLanding, { sessionId: sessao.id, chatId }, snap.selecaoModelo, { modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true, escolhaJaFeita: true })
+          const resultadoEnvio = await handleSend(snap.texto, anexosLanding, { sessionId: sessao.id, chatId }, snap.selecaoModelo, { modo: snap.modo, permissao: snap.permissao, sessao, esperarPublicacao: true, escolhaJaFeita: true, escolhaVisao: entrada.escolhaVisao })
           if (resultadoEnvio === 'abortado') throw new Error('O envio não foi concluído; o rascunho foi preservado.')
         },
       },
@@ -1878,7 +1879,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     modelSelection: SelecaoModelo = { tipo: 'auto' },
     instrucaoHumana?: string,
     // C-2: snapshot explícito do 1º envio (modo/permissão/sessão persistidos); sem opções o chat é a fonte.
-    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session },
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; vision?: PedidoVisaoAgir },
   ): void => {
     const runKey = `${sessionId}:${chatId}`
     agirAtivas.current.get(runKey)?.abortar() // substitui uma corrida em voo
@@ -1900,6 +1901,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     const permissao = opcoes?.permissao ?? (permissionKey === null ? 'manual' : (permissionByChat[permissionKey] ?? 'manual'))
     const fluxo = `${sessionId}:${chatId}:${responseId}`
     const ouvintes = criarOuvintesAgir(sessionId, chatId, responseId, '', undefined, aoConcluir)
+    ouvintes.onVisionAccepted = (evento) => updateSession(sessionId, (sessao) => marcarVisaoAceita(sessao, chatId, evento))
     let real: ControleAgir | null = null
     let canceladaAntesDoInicio = false
     const controladorModo = new AbortController()
@@ -1929,6 +1931,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
       if (canceladaAntesDoInicio) return
       real = enviarAgir({
         instructionToken: preparada.instructionToken,
+        vision: opcoes?.vision,
         mensagens: historico,
         modelSelection,
         fluxo,
@@ -2042,7 +2045,7 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     target?: { sessionId: string; chatId: string },
     modelSelection: SelecaoModelo = { tipo: 'auto' },
     // C-2: opções EXPLÍCITAS do snapshot; `esperarPublicacao` = ACK; C-3a: com anexos devolve Promise (R02).
-    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean },
+    opcoes?: { modo?: ModoAgir; permissao?: NivelPermissaoAgir; sessao?: Session; esperarPublicacao?: boolean; escolhaJaFeita?: boolean; escolhaVisao?: EscolhaVisao },
   ): void | 'abortado' | Promise<'publicado' | 'abortado'> => {
     const sessionId = target?.sessionId ?? activeSession.id
     const chatId = target?.chatId ?? activeChatId
@@ -2176,30 +2179,25 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
     else if (chatsCancelados.size > 0) notify('Execução interrompida')
   }
 
-  const handleRegenerate = (chatId: string, messageId: string) => {
+  const handleRegenerate = async (chatId: string, messageId: string) => {
     const sessionId = activeSession.id
     const targetChat = activeSession.chats.find((chat) => chat.id === chatId)
     const original = targetChat?.messages.find((message) => message.id === messageId)
-    if (!original || original.role !== 'assistant') return
+    if (!targetChat || !original || original.role !== 'assistant') return
 
-    // FATIA 09: regenerar = conversa real com o histórico ANTES da mensagem alvo.
-    const chatOrigemRegenerar = activeSession.chats.find((candidate) => candidate.id === chatId)
-    const indiceAlvo = chatOrigemRegenerar
-      ? chatOrigemRegenerar.messages.findIndex((candidate) => candidate.id === messageId)
-      : -1
-    const historicoRegenerar = montarHistorico(
-      indiceAlvo >= 0 ? (chatOrigemRegenerar?.messages ?? []).slice(0, indiceAlvo) : [],
-    )
+    const anteriores = targetChat.messages.slice(0, targetChat.messages.indexOf(original))
+    const historicoRegenerar = montarHistorico(anteriores)
     if (historicoRegenerar.length === 0) {
       notify('Não há histórico anterior para regenerar')
       return
     }
     const runKey = `${sessionId}:${chatId}`
+    const pergunta = [...anteriores].reverse().find(item => item.role === 'user')
+    const selecao = selecaoDoToken(pergunta?.attachments?.length ? (modelByChat[runKey] ?? 'Auto') : 'Auto')
+    const vision = pergunta?.attachments?.length ? await escolherReenvioVisao(pergunta, selecao, activeSession.workspacePath ? (modeByChat[runKey] ?? 'agent') : 'ask') : undefined
+    if (vision === null || agirAtivas.current.has(runKey)) return
     const previousTimer = pendingResponseTimers.current.get(runKey)
-    if (previousTimer !== undefined) {
-      window.clearTimeout(previousTimer)
-      pendingResponseTimers.current.delete(runKey)
-    }
+    if (previousTimer !== undefined) { window.clearTimeout(previousTimer); pendingResponseTimers.current.delete(runKey) }
     updateSession(sessionId, (session) => {
       const next = updateSessionAndChatStatus(session, chatId, 'working')
       return {
@@ -2211,14 +2209,14 @@ export default function App({ initialSessionSnapshot }: AppProps = {}) {
             ...message,
             content: '',
             time: timeLabel(),
-            running: true,
+            running: true, erro: false, cancelled: false,
           } : message),
         } : candidate),
       }
     })
     notify('Regenerando resposta')
 
-    iniciarAgirReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'))
+    iniciarAgirReal(sessionId, chatId, messageId, historicoRegenerar, () => notify('Resposta regenerada'), selecao, undefined, { vision })
   }
 
   const handleMessageCopy = (_chatId: string, _messageId: string, kind: ChatCopyKind) => {
