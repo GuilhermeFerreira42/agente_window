@@ -63,7 +63,7 @@ export function ArtifactCard({
 
   const rodape = (
     <div className="artifact-card-acoes">
-      <button
+      {card.estado === 'pronto' && <button
         type="button"
         className="artifact-card-botao"
         aria-label={`Baixar ${card.name}`}
@@ -71,7 +71,7 @@ export function ArtifactCard({
         onClick={baixar}
       >
         <Download size={12} aria-hidden="true" />
-      </button>
+      </button>}
       {preview.ok && card.estado === 'pronto' && (
         <button
           type="button"
@@ -103,7 +103,7 @@ export function ArtifactCard({
       <div className="artifact-card artifact-card-indisponivel" role="group" aria-label={`${card.name}, indisponível`}>
         {cabecalho}
         <p className="artifact-card-motivo">
-          {motivoIndisponivel ?? 'Este arquivo não está mais disponível. O registro da conversa foi preservado.'}
+          {motivoIndisponivel ?? 'O original deste arquivo não está disponível. O registro da conversa foi preservado.'}
         </p>
       </div>
     )

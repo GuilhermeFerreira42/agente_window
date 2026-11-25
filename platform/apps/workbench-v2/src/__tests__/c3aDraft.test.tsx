@@ -16,6 +16,7 @@ import { ChatPanel } from '../components/ChatPanel'
 import { projetarSessaoPersistida } from '../domain/projecaoTranscript'
 import { rascunhoInicial, editarRascunho, snapshotDoRascunho, type RascunhoLanding } from '../domain/landingDraft'
 import { fundirEstadoAnexos, type ListaAnexos } from '../services/sessions/anexosClient'
+import { chipSalvoSemMensagem } from '../hooks/useFusaoAnexos'
 import type { Attachment, ChatMessage, NestedChat, Session } from '../types'
 
 const VENENO = {
@@ -146,6 +147,34 @@ describe('c3aDraft — T20: P30 mantém partes/metadados sem bytes/base64/locato
   })
 })
 
+describe('reconciliação de originais indisponíveis', () => {
+  it('catálogo vazio invalida download antigo sem inventar estado para rascunho', () => {
+    const mensagens = [{ attachments: [
+      { id: 'antigo', name: 'a.txt', kind: 'local' as const, artifactId: 'a', estado: 'pronto' as const },
+      { id: 'em-curso', name: 'b.txt', kind: 'local' as const, artifactId: 'b', estado: 'transferindo' as const },
+    ] }]
+    const fundida = fundirEstadoAnexos(mensagens, { attachments: [], uploads: [] }).mensagens[0].attachments!
+    expect(fundida[0].estado).toBe('falhou')
+    expect(fundida[1].estado).toBe('transferindo')
+  })
+
+  it('identifica transferência pelo uploadId distinto do artifactId', () => {
+    const mensagens = [{ attachments: [{ id: 'x', name: 'x.txt', kind: 'local' as const, artifactId: 'a', uploadId: 'u', estado: 'pronto' as const }] }]
+    const fundida = fundirEstadoAnexos(mensagens, { attachments: [], uploads: [
+      { uploadId: 'u', artifactId: 'a', name: 'x.txt', mode: 'copy', state: 'recebendo', errorCode: null },
+    ] }).mensagens[0].attachments!
+    expect(fundida[0].estado).toBe('transferindo')
+  })
+})
+
+describe('anexos órfãos', () => {
+  it('não apresenta um original ausente como salvo', () => {
+    const registro = { artifactId: 'a', name: 'a.txt', bytes: 1, sha256: 'a'.repeat(64), mode: 'copy' as const }
+    expect(chipSalvoSemMensagem({ ...registro, presente: false }).attachments?.[0].estado).toBe('falhou')
+    expect(chipSalvoSemMensagem({ ...registro, presente: true }).attachments?.[0].estado).toBe('pronto')
+  })
+})
+
 describe('c3aDraft — T21: legado metadata-only honesto', () => {
   const legado: Attachment = { id: 'antigo-1', name: 'documento-antigo.docx', kind: 'local' }
 
@@ -176,6 +205,10 @@ describe('c3aDraft — T21: legado metadata-only honesto', () => {
         { id: 'm2', role: 'user', content: 'mensagem com anexo quebrado', time: '09:01', attachments: [
           { id: 'quebrado-1', name: 'sumiu.pdf', kind: 'local', artifactId: 'ddddddd4-0000-4000-8000-000000000004', estado: 'falhou' },
         ] },
+        { id: 'm3', role: 'user', content: '', time: '09:02',
+          attachments: [{ id: 'quebrado-2', name: 'sumiu.png', kind: 'local', artifactId: 'ddddddd4-0000-4000-8000-000000000005', estado: 'falhou', modalidade: 'imagem' }],
+          multimodal: { versao: 1, messageId: 'm3', partes: [{ partId: 'p1', tipo: 'artefato', artifactId: 'ddddddd4-0000-4000-8000-000000000005', modalidade: 'imagem' }] },
+        },
       ],
     }
     const session: Session = {
@@ -210,13 +243,17 @@ describe('c3aDraft — T21: legado metadata-only honesto', () => {
 
     // Legado: nome honesto, sem botão de download e sem alegação "salvo".
     const chipLegado = screen.getByLabelText(/documento-antigo\.docx/)
-    expect(chipLegado.getAttribute('aria-label')).toContain('armazenado; não enviado ao modelo')
+    expect(chipLegado.getAttribute('aria-label')).toContain('original indisponível')
     expect(chipLegado.getAttribute('aria-label')).not.toContain(' · salvo')
     expect(screen.queryByLabelText('Baixar documento-antigo.docx')).toBeNull()
 
     // Artefato ausente no servidor: indisponibilidade honesta no chip.
-    expect(screen.getByLabelText(/sumiu\.pdf/).getAttribute('aria-label')).toContain(' · indisponível')
+    expect(screen.getByLabelText(/sumiu\.pdf/).getAttribute('aria-label')).toContain(' · indisponível (original)')
     expect(screen.queryByLabelText('Baixar sumiu.pdf')).toBeNull()
+    // Também no envelope multimodal: falhou jamais vira um card pronto.
+    expect(screen.getByRole('group', { name: 'sumiu.png, indisponível' })).toHaveTextContent('O original deste arquivo não está disponível')
+    expect(screen.queryByLabelText('Baixar sumiu.png')).toBeNull()
+    expect(screen.queryByRole('img', { name: 'sumiu.png' })).toBeNull()
   })
 })
 

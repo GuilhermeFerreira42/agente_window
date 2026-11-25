@@ -67,9 +67,12 @@ export async function escolherReenvioVisao(mensagem: ChatMessage | undefined, se
 }
 
 export function rotuloEnvioVisao(anexo: Attachment): string {
-  if (anexo.envioModelo === 'enviado') return 'Armazenado e enviado ao modelo'
-  if (anexo.envioModelo === 'pendente') return 'Armazenado; envio ao modelo ainda não confirmado'
-  return 'Armazenado; não enviado ao modelo'
+  const indisponivel = anexo.estado === 'falhou' || (!anexo.artifactId && (!anexo.estado || anexo.estado === 'legado'))
+  const estado = indisponivel ? 'Original indisponível' : 'Armazenado'
+  if (anexo.envioModelo === 'enviado') return indisponivel ? 'Original indisponível; enviado ao modelo' : 'Armazenado e enviado ao modelo'
+  if (anexo.envioModelo === 'pendente') return `${estado}; envio ao modelo ainda não confirmado`
+  if (!anexo.artifactId && (!anexo.estado || anexo.estado === 'legado')) return `${estado}; envio ao modelo não registrado`
+  return `${estado}; não enviado ao modelo`
 }
 
 export function marcarVisaoAceita(sessao: Session, chatId: string, evento: { messageId: string; artifactIds: string[] }): Session {

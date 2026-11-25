@@ -1,6 +1,6 @@
 # Roteiro único de avaliação MM-I no Windows
 
-**NÃO EXECUTAR PARA HOMOLOGAÇÃO DA NOVA RODADA MM-I.** O texto abaixo descreve a entrega anterior, com Fontes e fallback de áudio/vídeo; foi superado pela solicitação de Explorer por conversa, cópias históricas e análise funcional de áudio/vídeo. A implementação e o novo roteiro único ainda estão pendentes. Não conceder aceite integral nem iniciar MM-O. O conteúdo anterior permanece aqui somente como registro até ser substituído.
+**NÃO EXECUTAR PARA HOMOLOGAÇÃO DA NOVA RODADA MM-I.** O texto abaixo descreve a entrega anterior, com Fontes e fallback de áudio/vídeo; foi superado pela solicitação de Explorer por conversa, cópias históricas e análise funcional de áudio/vídeo. A continuação mais recente apenas melhorou o aviso quando o original está indisponível; ainda não preserva/migra os originais nem entrega os demais recursos pedidos. A implementação e o novo roteiro único ainda estão pendentes. Não conceder aceite integral nem iniciar MM-O. O conteúdo anterior permanece aqui somente como registro até ser substituído.
 
 **Roteiro anterior, não executado no Windows.** Use apenas dados sintéticos e um perfil/pasta de teste, sem documentos ou credenciais pessoais no conteúdo. A consulta real pode gerar custo e transmitir os dados de teste ao provedor. O roteiro é uma avaliação funcional delimitada, não prova de isolamento físico nem substitui o teste automatizado da corrida de cancelamento em `09 - TESTES E AMBIENTE.md`.
 

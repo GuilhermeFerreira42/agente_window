@@ -484,6 +484,17 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     const semOrigem = await page.request.get(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/${artifactId}?download=1`, { headers: { 'Sec-Fetch-Site': 'cross-site' } })
     expect(semOrigem.status(), 'download exige mesma origem').toBe(403)
 
+    // Simula perda externa SOMENTE no perfil descartável deste teste. Após F5,
+    // a mensagem deve informar que o original está indisponível, sem download.
+    const copia = join(raiz, 'data', 'uploads', 'chats', sessionId, chatId, artifactId!, 'e08.txt')
+    expect(existsSync(copia)).toBe(true)
+    rmSync(copia)
+    await page.reload()
+    const chipAusente = page.getByRole('listitem', { name: /e08\.txt.*indisponível/i })
+    await expect(chipAusente).toBeVisible({ timeout: 20_000 })
+    await expect(chipAusente).toContainText('indisponível (original)')
+    await expect(page.getByLabel('Baixar e08.txt')).toHaveCount(0)
+
     // Sessão LEGADA criada pelo SERVIDOR (metadata-only, sem artifactId): a UI
     // hidrata do transcript e exibe o chip honesto, sem botão de download.
     const legada = {
@@ -513,6 +524,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     await linhasSessao(page).filter({ hasText: 'legado e08 metadata-only' }).first().click()
     const legado = page.getByRole('listitem', { name: /legado-e08\.docx/ })
     await legado.waitFor({ timeout: 20_000 })
+    await expect(legado).toContainText('original indisponível')
     expect(await page.getByLabel('Baixar legado-e08.docx').count(), 'legado nunca oferece download falso').toBe(0)
     await shot(page, 'c3a_e08_indisponivel')
 

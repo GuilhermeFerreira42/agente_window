@@ -201,12 +201,13 @@ function rotuloEstadoAnexo(estado: NonNullable<Attachment['estado']>): string {
   if (estado === 'pronto') return ' · salvo'
   if (estado === 'referencia') return ' · no workspace'
   if (estado === 'transferindo') return ' · transferindo'
-  if (estado === 'falhou') return ' · indisponível'
+  if (estado === 'falhou') return ' · indisponível (original)'
   if (estado === 'selecionado') return ' · selecionado'
   return ''
 }
 
 function estadoAnexoLabel(attachment: Attachment): string {
+  if (!attachment.artifactId && (!attachment.estado || attachment.estado === 'legado')) return ' · original indisponível'
   return attachment.estado && attachment.estado !== 'legado' ? rotuloEstadoAnexo(attachment.estado) : ''
 }
 
@@ -272,9 +273,7 @@ function itensDaMensagem(mensagem: ChatMessage): {
       // ainda não têm arquivo final; `legado` já existia antes da C-3a.
       estado: anexo?.estado === 'pronto' || anexo?.estado === 'referencia'
         ? 'pronto'
-        : anexo?.estado === 'transferindo' || anexo?.estado === 'legado' || anexo?.estado === undefined
-          ? 'indisponivel'
-          : 'pronto',
+        : 'indisponivel',
       preview: classificacao,
     }
   }
@@ -387,8 +386,8 @@ function MessageRow({
               >
                 <FileCode2 size={11} aria-hidden="true" />
                 <span>{attachment.name}</span>
-                {attachment.estado && attachment.estado !== 'legado' && (
-                  <span className="chat-message-attachment-estado" aria-hidden="true">{rotuloEstadoAnexo(attachment.estado)}</span>
+                {estadoAnexoLabel(attachment) && (
+                  <span className="chat-message-attachment-estado" aria-hidden="true">{estadoAnexoLabel(attachment)}</span>
                 )}
                 {sessionId && chatId && attachment.artifactId
                   && (attachment.estado === 'pronto' || attachment.estado === 'referencia') && (

@@ -167,8 +167,8 @@ describe('C-3b — C3B-T09 estados honestos', () => {
     render(<ArtifactCard card={card} url={null} motivoIndisponivel="Arquivo removido do disco." />)
     expect(screen.getByText('Arquivo removido do disco.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Abrir/ })).toBeNull()
-    // Download continua disponível (o registro existe).
-    expect(screen.getByRole('button', { name: /Baixar sumiu\.png/ })).toBeInTheDocument()
+    // O registro não prova a presença dos bytes: nenhum download falso.
+    expect(screen.queryByRole('button', { name: /Baixar sumiu\.png/ })).toBeNull()
   })
 
   it('C3B-T09 legado sem bytes não ganha botão falso', () => {

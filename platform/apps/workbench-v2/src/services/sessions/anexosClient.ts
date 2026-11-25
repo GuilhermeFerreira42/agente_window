@@ -173,7 +173,6 @@ export function fundirEstadoAnexos(
   mensagens: Array<{ attachments?: Attachment[] }>,
   lista: ListaAnexos,
 ): ResultadoFusao {
-  if (lista.attachments.length === 0 && lista.uploads.length === 0) return { mensagens, orfaos: [] }
   const porArtigo = new Map(lista.attachments.map((item) => [item.artifactId, item]))
   const porUpload = new Map(lista.uploads.map((item) => [item.uploadId, item]))
   const citados = new Set<string>()
@@ -200,11 +199,19 @@ export function fundirEstadoAnexos(
             sha256: registro.sha256,
           }
         }
-        const upload = anexo.artifactId ? porUpload.get(anexo.artifactId) : undefined
+        const upload = (anexo.uploadId ? porUpload.get(anexo.uploadId) : undefined)
+          ?? (anexo.artifactId ? porUpload.get(anexo.artifactId) : undefined)
         if (upload && (upload.state === 'admitido' || upload.state === 'recebendo' || upload.state === 'preparado')) {
           return { ...anexo, estado: 'transferindo' as const }
         }
         if (upload && (upload.state === 'falhou' || upload.state === 'cancelado')) {
+          return { ...anexo, estado: 'falhou' as const }
+        }
+        // A lista veio do servidor e é completa para este dono: uma mensagem
+        // que afirma estar pronta, mas não possui artefato nem transferência
+        // no catálogo, não pode oferecer um download histórico fictício.
+        // Itens ainda selecionados/em transferência não são inferidos ausentes.
+        if (!registro && !upload && anexo.artifactId && (anexo.estado === 'pronto' || anexo.estado === 'referencia')) {
           return { ...anexo, estado: 'falhou' as const }
         }
         return anexo

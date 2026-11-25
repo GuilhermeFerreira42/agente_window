@@ -13,7 +13,7 @@ import { fundirEstadoAnexos, listarAnexos } from '../services/sessions/anexosCli
 const ID_PREFIXO = 'attachment-salvo-'
 
 /** Chip de artefato pronto sem mensagem (id estável; sem bytes nem locator). */
-export function chipSalvoSemMensagem(artigo: { artifactId: string; name: string; bytes: number; sha256: string; mode: 'copy' | 'reference'; referencia?: string }): ChatMessage {
+export function chipSalvoSemMensagem(artigo: { artifactId: string; name: string; bytes: number; sha256: string; mode: 'copy' | 'reference'; presente: boolean; referencia?: string }): ChatMessage {
   return {
     id: `${ID_PREFIXO}${artigo.artifactId}`,
     role: 'assistant',
@@ -26,7 +26,7 @@ export function chipSalvoSemMensagem(artigo: { artifactId: string; name: string;
       artifactId: artigo.artifactId,
       name: artigo.name,
       kind: artigo.mode === 'reference' ? 'workspace' : 'local',
-      estado: artigo.mode === 'reference' ? 'referencia' : 'pronto',
+      estado: !artigo.presente ? 'falhou' : artigo.mode === 'reference' ? 'referencia' : 'pronto',
       bytes: artigo.bytes,
       sha256: artigo.sha256,
       mode: artigo.mode,
