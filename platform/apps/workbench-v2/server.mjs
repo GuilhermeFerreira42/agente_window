@@ -97,7 +97,7 @@ async function start() {
   })
   const contexto = { middlewares: { use: middleware => middlewares.push(middleware) }, httpServer: server }
   sessionPersistencePlugin({ repoRoot: path.resolve(__dirname, '../../..') }).configureServer(contexto)
-  explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHostPrivado: root => new FsHost(root, true) }).configureServer(contexto)
+  explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHost: (root, privado) => new FsHost(root, privado) }).configureServer(contexto)
 
   function servir(req, res) {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`)

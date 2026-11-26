@@ -913,3 +913,18 @@ histórico permaneceu íntegro (1/1). Vitest 40/40, typecheck, lint direcionado 
 smoke do servidor compilado 1/1 passaram em Linux. Isso não cobre exclusão por
 shell externo nem substitui a validação Windows. Próximo: projeto compartilhado,
 audio/vídeo funcionais e testes integrados restantes; MM-I não concluída.
+
+**Projeto compartilhado (checkpoint Linux):** movimentos e exclusões mediados
+pelo Explorer mantêm vínculos de trabalho por raiz de projeto, inclusive quando
+operados por outra sessão. O original legado verificável é preservado antes da
+operação; original irrecuperável não é inventado. O ledger recupera movimentos
+interrompidos quando a identidade é inequívoca e mantém ausência após recriação.
+Playwright com servidor real/provedor simulado passou 9/9, incluindo duas sessões
+no mesmo projeto, movimento de arquivo e pasta, reinícios, consentimento,
+exclusão, substituição e original; Vitest dirigido 55/55 e esquema 14/14,
+typecheck, lint dirigido, build e smoke de produção 1/1 passaram em Linux.
+O smoke de produção não cobre esse fluxo de projeto. `rename` de diretório ainda
+possui janela entre verificação e operação e não garante ausência de substituição
+sob corrida externa; rastreamento cobre ações mediadas, não operações pelo shell.
+MM-I continua aberta: corrigir/avaliar concorrência, ampliar prova em produção,
+implementar áudio e vídeo reais e concluir regressões e roteiro único Windows.

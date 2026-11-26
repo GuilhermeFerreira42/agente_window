@@ -51,7 +51,7 @@ export interface LinhaArtigo {
   createdAt: number
 }
 
-const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_working_files', 'explorer_cleanup', 'explorer_work_moves', 'explorer_work_missing'] as const
+const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_working_files', 'explorer_cleanup', 'explorer_work_moves', 'explorer_work_missing', 'explorer_project_work', 'explorer_project_moves'] as const
 
 const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
   attachment_uploads: [
@@ -73,6 +73,8 @@ const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
   explorer_cleanup: ['session_id', 'state', 'dev', 'ino', 'destino'],
   explorer_work_moves: ['session_id', 'chat_id', 'origem', 'destino', 'dev', 'ino', 'itens'],
   explorer_work_missing: ['artifact_id', 'session_id', 'chat_id'],
+  explorer_project_work: ['artifact_id', 'session_id', 'chat_id', 'root', 'locator', 'missing'],
+  explorer_project_moves: ['root', 'origem', 'destino', 'dev', 'ino', 'itens'],
 }
 
 /** Cria as tabelas aditivas na primeira conexão (chamado por getDatabase). */
@@ -136,6 +138,23 @@ export function criarTabelasAnexos(db: Database.Database): void {
       destino TEXT,
       motivo TEXT,
       PRIMARY KEY (session_id, artifact_id)
+    );
+    CREATE TABLE IF NOT EXISTS explorer_project_work (
+      artifact_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
+      root TEXT NOT NULL,
+      locator TEXT NOT NULL,
+      missing INTEGER NOT NULL CHECK (missing IN (0,1))
+    );
+    CREATE INDEX IF NOT EXISTS explorer_project_work_root_idx ON explorer_project_work(root);
+    CREATE TABLE IF NOT EXISTS explorer_project_moves (
+      root TEXT PRIMARY KEY,
+      origem TEXT NOT NULL,
+      destino TEXT NOT NULL,
+      dev TEXT NOT NULL,
+      ino TEXT NOT NULL,
+      itens TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS explorer_work_missing (
       artifact_id TEXT PRIMARY KEY,

@@ -62,7 +62,7 @@ export default defineConfig({
     react(),
     ptyPlugin(),
     sessionPersistencePlugin({ repoRoot, ...(saidaDeTeste ? { saidaDeTeste } : {}) }),
-    explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHostPrivado: root => new FsHost(root, true) }),
+    explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHost: (root, privado) => new FsHost(root, privado) }),
     // FATIA-04 (4.3): FileSystemPort no Single Port (Q7). Raiz = repo
     // (relativa ao próprio config — NUNCA hardcoded); FS_TEST_ROOT E2E ganha.
     fsPlugin({ root: repoRoot }),

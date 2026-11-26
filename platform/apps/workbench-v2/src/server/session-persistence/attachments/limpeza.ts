@@ -173,10 +173,12 @@ export async function executarPlanoAnexos(sessionId: string, opcoes: OpcoesLimpe
     // `removerLedgerDoChat` já apaga artefatos E tentativas SÓ deste chat; o
     // vizinho permanece intacto (R3).
     removerLedgerDoChat(sessionId, opcoes.chatId)
+    getDatabase().prepare('DELETE FROM explorer_project_work WHERE session_id = ? AND chat_id = ? AND NOT EXISTS (SELECT 1 FROM explorer_project_moves m WHERE m.root = explorer_project_work.root)').run(sessionId, opcoes.chatId)
     getDatabase().prepare('DELETE FROM attachment_cleanup_plan WHERE session_id = ? AND chat_id = ? AND state = ?')
       .run(sessionId, opcoes.chatId, 'concluido')
   } else {
     getDatabase().prepare('DELETE FROM attachment_artifacts WHERE session_id = ?').run(sessionId)
+    getDatabase().prepare('DELETE FROM explorer_project_work WHERE session_id = ? AND NOT EXISTS (SELECT 1 FROM explorer_project_moves m WHERE m.root = explorer_project_work.root)').run(sessionId)
     getDatabase().prepare('DELETE FROM attachment_uploads WHERE session_id = ?').run(sessionId)
     getDatabase().prepare('DELETE FROM attachment_cleanup_plan WHERE session_id = ? AND state = ?')
       .run(sessionId, 'concluido')

@@ -17,6 +17,7 @@ import { extrairTextoPdf } from './leitorPdf'
 import { caminhoTrabalhoPrivado, obterVinculoTrabalho, sincronizarTrabalhosPrivadosSobFila } from './trabalhoPrivado'
 import { raizPrivadaDaConversa } from '../raizPrivadaChat'
 import { resolverRaizExplorer } from '../raizExplorer'
+import { caminhoDeTrabalhoProjeto } from '../movimentoProjeto'
 
 export const TETO_FONTE_BYTES = 32 * 1024 * 1024
 export interface FonteConversa { artifactId: string; nome: string; bytes: number; modalidade: string; estado?: 'trabalho' | 'trabalho_ausente' }
@@ -35,7 +36,7 @@ export async function listarFontesConversa(sessionId: string, chatId: string): P
       try {
         const vinculo = privado ? obterVinculoTrabalho(a.artifactId) : undefined
         if (privado && (!vinculo || vinculo.state !== 'pronto')) throw new Error('Arquivo de trabalho indisponível.')
-        const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : caminhoAbsolutoDeArtigo(a)
+        const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : projeto ? await caminhoDeTrabalhoProjeto(a) : caminhoAbsolutoDeArtigo(a)
         const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : a.workspaceRoot!
         await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable' })
         const info = await lstat(caminho)
@@ -63,7 +64,7 @@ async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: st
   if (privado && (!vinculo || vinculo.state !== 'pronto')) return recusar()
   const trabalhoMutavel = privado || artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace'
   if (!trabalhoMutavel && artigo.bytes > maxBytes) return recusar()
-  const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : caminhoAbsolutoDeArtigo(artigo)
+  const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : trabalhoMutavel && artigo.rootKind === 'workspace' ? await caminhoDeTrabalhoProjeto(artigo) : caminhoAbsolutoDeArtigo(artigo)
   const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
   if (!raiz) return recusar()
   await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable', mensagem: 'A fonte não está disponível nesta conversa.' })

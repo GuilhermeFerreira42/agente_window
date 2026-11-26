@@ -1,10 +1,10 @@
 // Reprodução dos dois ajustes de usabilidade pedidos na C-3a.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { resetDatabase, upsertSessionRecord } from '../database'
+import { getDatabase, resetDatabase, upsertSessionRecord } from '../database'
 import { admitirUpload, lerArtigo, receberConteudo } from './estoque'
 import { obterArtigo, obterUpload } from './catalogo'
 import { caminhoOriginalHistorico } from './originalHistorico'
@@ -12,6 +12,7 @@ import { lerFonteConversa, listarFontesConversa } from './inspecaoConversa'
 import { prepararInspecaoAgente } from './ferramentaAnexos'
 import { POLITICA_PADRAO } from './politica'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao } from '../deletions'
+import { excluirNoExplorerProjeto, moverNoExplorerProjeto } from '../movimentoProjeto'
 
 const SID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const CID = `${SID}-main`
@@ -48,6 +49,52 @@ async function enviarNoProjeto(nome: string, conteudo: string) {
 }
 
 describe('Ajustes de usabilidade C-3a', () => {
+  it('outra conversa do mesmo projeto move e exclui o trabalho sem trocar o original', async () => {
+    const linha = await enviarNoProjeto('compartilhado.txt', 'ORIGINAL')
+    writeFileSync(linha.finalPath!, 'EDITADO')
+    const sidB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', chatB = `${sidB}-main`
+    upsertSessionRecord({ id: sidB, slug: 'projeto-vizinho', title: 'Vizinho', workspacePath: ws, contextKind: 'workspace', worktreePath: null, messageCount: 0, createdAt: 1, updatedAt: 1,
+      sessionJson: JSON.stringify({ id: sidB, workspacePath: ws, worktreePath: null, chats: [{ id: chatB, messages: [] }] }) })
+    const destino = join(ws, 'movido.txt')
+    const host = { assertSafeUri: (uri: `file://${string}`) => uri === 'file:///origem' ? linha.finalPath! : destino }
+    await moverNoExplorerProjeto(sidB, chatB, ws, host, 'file:///origem', 'file:///destino')
+    resetDatabase()
+    expect((await lerFonteConversa(SID, CID, linha.artifactId!, 100))).toMatchObject({ nome: 'movido.txt', bytes: Buffer.from('EDITADO') })
+    expect(readFileSync((await lerArtigo(linha.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    await excluirNoExplorerProjeto(sidB, chatB, ws, host, 'file:///destino', false)
+    writeFileSync(destino, 'SUBSTITUTO')
+    resetDatabase()
+    expect((await listarFontesConversa(SID, CID))[0].estado).toBe('trabalho_ausente')
+    await expect(lerFonteConversa(SID, CID, linha.artifactId!, 100)).rejects.toThrow()
+    expect(readFileSync((await lerArtigo(linha.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync(destino, 'utf8')).toBe('SUBSTITUTO')
+  })
+  it('preserva legado íntegro antes de mover; legado editado continua sem original inventado', async () => {
+    const integro = await enviarNoProjeto('integro.txt', 'ORIGINAL')
+    const editado = await enviarNoProjeto('editado.txt', 'ORIGINAL')
+    rmSync(caminhoOriginalHistorico(obterArtigo(integro.artifactId!)!))
+    rmSync(caminhoOriginalHistorico(obterArtigo(editado.artifactId!)!))
+    writeFileSync(editado.finalPath!, 'EDITADO')
+    for (const [linha, nome] of [[integro, 'novo-integro.txt'], [editado, 'novo-editado.txt']] as const) {
+      const destino = join(ws, nome)
+      const host = { assertSafeUri: (uri: `file://${string}`) => uri === 'file:///origem' ? linha.finalPath! : destino }
+      await moverNoExplorerProjeto(SID, CID, ws, host, 'file:///origem', 'file:///destino')
+    }
+    expect(readFileSync((await lerArtigo(integro.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+    await expect(lerArtigo(editado.artifactId!)).rejects.toThrow()
+    expect((await lerFonteConversa(SID, CID, editado.artifactId!, 100)).bytes.toString()).toBe('EDITADO')
+  })
+  it('recupera movimento de projeto interrompido sem perder o original', async () => {
+    const linha = await enviarNoProjeto('antigo.txt', 'ORIGINAL')
+    const origem = linha.finalPath!, destino = join(ws, 'novo.txt'), info = lstatSync(origem)
+    getDatabase().prepare('INSERT INTO explorer_project_work (artifact_id, session_id, chat_id, root, locator, missing) VALUES (?, ?, ?, ?, ?, 0)')
+      .run(linha.artifactId, SID, CID, ws, 'uploads/antigo.txt')
+    getDatabase().prepare('INSERT INTO explorer_project_moves (root, origem, destino, dev, ino, itens) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(ws, origem, destino, String(info.dev), String(info.ino), JSON.stringify([{ artifactId: linha.artifactId, sessionId: SID, chatId: CID, anterior: 'uploads/antigo.txt', novo: 'novo.txt' }]))
+    renameSync(origem, destino); resetDatabase()
+    expect((await lerFonteConversa(SID, CID, linha.artifactId!, 100)).nome).toBe('novo.txt')
+    expect(readFileSync((await lerArtigo(linha.artifactId!)).caminho, 'utf8')).toBe('ORIGINAL')
+  })
   it('A1 — a cópia no projeto mantém o nome original', async () => {
     const linha = await enviarNoProjeto('relatorio final.txt', 'CONTEUDO')
     const nomeArquivo = basename(linha.finalPath!)

@@ -352,23 +352,44 @@ test('edição do projeto chega ao agente somente após autorização, preservan
   await expect(page.getByText('Aguardarei instruções.')).toBeVisible({ timeout: 30_000 })
   const trabalho = join(workspace, 'uploads', 'trabalho.txt')
   writeFileSync(trabalho, 'EDIÇÃO PROJETO 917')
-  cenario = 'texto-projeto'; pedidos = []
-  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo de trabalho.')
-  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
-  await permitir(page, 'trabalho.txt', 1)
-  await permitir(page, 'texto UTF-8 do anexo trabalho.txt', 2)
-  await expect(page.getByText('O arquivo de trabalho diz 917.')).toBeVisible({ timeout: 30_000 })
-  expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
   const sid = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
   const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
   const registro = await (await page.request.get(`${base}/api/sessions/${sid}`, { headers })).json()
+  const fs = `${base}/api/explorer/${sid}/${registro.session.mainChatId}/fs`
+  const raizUri = (await (await page.request.get(`${fs}/root`, { headers })).json()).root
+  const sidB = randomUUID(), chatB = randomUUID()
+  const sessionB = { id: sidB, title: 'Outro chat do projeto', workspace: 'Projeto', workspacePath: workspace, contexto: { tipo: 'workspace' }, section: 'today', status: 'completed', updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: chatB,
+    chats: [{ id: chatB, title: 'Principal', status: 'completed', messages: [] }] }
+  expect((await page.request.post(`${base}/api/sessions`, { headers, data: { session: sessionB, contexto: { tipo: 'workspace', path: workspace }, creationId: randomUUID() } })).status()).toBe(201)
+  const fsB = `${base}/api/explorer/${sidB}/${chatB}/fs`
+  expect((await (await page.request.get(`${fsB}/root`, { headers })).json()).root).toBe(raizUri)
+  expect((await page.request.post(`${fsB}/mkdir`, { headers, data: { uri: `${raizUri}/destino` } })).status()).toBe(201)
+  expect((await page.request.post(`${fsB}/rename`, { headers, data: { from: `${raizUri}/uploads/trabalho.txt`, to: `${raizUri}/destino/renomeado.txt` } })).status()).toBe(204)
+  expect((await page.request.post(`${fsB}/rename`, { headers, data: { from: `${raizUri}/destino`, to: `${raizUri}/outra` } })).status()).toBe(204)
+  await pararApp(); await iniciarApp(); await page.reload()
+  nomeTrabalho = 'renomeado.txt'; cenario = 'texto-projeto'; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo de trabalho.')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await permitir(page, 'renomeado.txt', 1)
+  await permitir(page, 'texto UTF-8 do anexo renomeado.txt', 2)
+  await expect(page.getByText('O arquivo de trabalho diz 917.')).toBeVisible({ timeout: 30_000 })
+  expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
   const artigos = await (await page.request.get(`${base}/api/sessions/${sid}/chats/${registro.session.mainChatId}/attachments`, { headers })).json()
   const original = (artigos.attachments as Array<{ artifactId: string; name: string }>).find(a => a.name === 'trabalho.txt')
   expect(original).toBeTruthy()
   const baixar = async () => (await (await page.request.get(`${base}/api/sessions/${sid}/chats/${registro.session.mainChatId}/attachments/${original!.artifactId}?download=1`, { headers })).body()).toString()
   expect(await baixar()).toBe('ORIGINAL 315')
-  rmSync(trabalho)
+  const atual = `${raizUri}/outra/renomeado.txt`
+  expect((await page.request.post(`${fsB}/delete`, { headers, data: { uri: atual } })).status()).toBe(204)
+  expect((await page.request.post(`${fsB}/createFile`, { headers, data: { uri: atual, content: 'ARQUIVO ALHEIO' } })).status()).toBe(201)
   expect(await baixar()).toBe('ORIGINAL 315')
+  await pararApp(); await iniciarApp(); await page.reload()
+  cenario = 'ausente'; idAusente = original!.artifactId; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('O arquivo de projeto ainda existe?')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await permitir(page, 'trabalho.txt', 1)
+  await expect(page.getByText('O arquivo de trabalho foi excluído.').last()).toBeVisible({ timeout: 30_000 })
+  expect(erroFixture).toBe('')
 })
 
 test('ZIP no projeto usa fontes da conversa e extrai fora da árvore compartilhada', async ({ page }) => {

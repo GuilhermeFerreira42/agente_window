@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws'
 import { resolverRaizExplorer } from './raizExplorer'
 import { PersistenceProblem } from './persistenceErrors'
 import { excluirNoExplorerPrivado, moverNoExplorerPrivado } from './movimentoPrivado'
+import { excluirNoExplorerProjeto, moverNoExplorerProjeto } from './movimentoProjeto'
 type WorkspaceUri = `file://${string}`
 interface ExplorerFsServer {
   tryHandleHttp(req: IncomingMessage, res: ServerResponse): Promise<boolean>
@@ -17,7 +18,7 @@ interface ExplorerGitServer { tryHandleHttp(req: IncomingMessage, res: ServerRes
 interface FabricaExplorer {
   createExplorerFsServer(options: { root: WorkspaceUri; rejectSymlinks: boolean; createWsServer: () => WebSocketServer }): Promise<ExplorerFsServer>
   createExplorerGitServer(options: { workspaceRoot: string }): ExplorerGitServer
-  criarHostPrivado(root: WorkspaceUri): { assertSafeUri(uri: WorkspaceUri): string }
+  criarHost(root: WorkspaceUri, privado: boolean): { assertSafeUri(uri: WorkspaceUri): string }
 }
 
 const PREFIX = '/api/explorer/'
@@ -37,7 +38,7 @@ function parse(req: IncomingMessage): Pedido | null {
   return { sessionId, chatId, sufixo: `/${match[3]}/${match[4]}${url.search}` }
 }
 
-export function explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHostPrivado }: FabricaExplorer): Plugin {
+export function explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHost }: FabricaExplorer): Plugin {
   const contextos = new Map<string, Contexto>()
   // Inicializações concorrentes do mesmo dono compartilham a mesma promessa.
   const criando = new Map<string, Promise<Contexto>>()
@@ -79,7 +80,7 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
           const contexto = await obter(pedido)
           if (pedido.sufixo.startsWith('/git/') && contexto.tipo === 'chat') throw new PersistenceProblem(403, 'git_unavailable', 'Git não está disponível na raiz privada do chat.')
           const operacao = pedido.sufixo.split('?')[0]
-          if (contexto.tipo === 'chat' && req.method === 'POST' && (operacao === '/fs/rename' || operacao === '/fs/delete')) {
+          if (req.method === 'POST' && (operacao === '/fs/rename' || operacao === '/fs/delete')) {
             const partes: Buffer[] = []; let tamanho = 0
             for await (const parte of req) {
               const bytes = Buffer.isBuffer(parte) ? parte : Buffer.from(parte)
@@ -90,13 +91,15 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
             let corpo: unknown
             try { corpo = JSON.parse(Buffer.concat(partes).toString('utf8')) } catch { throw new PersistenceProblem(400, 'invalid_json', 'Pedido inválido.') }
             const dados = corpo as { from?: unknown; to?: unknown; uri?: unknown; recursive?: unknown } | null
-            const host = criarHostPrivado(contexto.raiz as WorkspaceUri)
+            const host = criarHost(contexto.raiz as WorkspaceUri, contexto.tipo === 'chat')
             if (operacao === '/fs/rename') {
               if (!dados || typeof dados.from !== 'string' || typeof dados.to !== 'string' || !dados.from.startsWith('file://') || !dados.to.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
-              await moverNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.from as WorkspaceUri, dados.to as WorkspaceUri)
+              if (contexto.tipo === 'chat') await moverNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.from as WorkspaceUri, dados.to as WorkspaceUri)
+              else await moverNoExplorerProjeto(pedido.sessionId, pedido.chatId, contexto.raiz, host, dados.from as WorkspaceUri, dados.to as WorkspaceUri)
             } else {
               if (!dados || typeof dados.uri !== 'string' || !dados.uri.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
-              await excluirNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.uri as WorkspaceUri, dados.recursive === true)
+              if (contexto.tipo === 'chat') await excluirNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.uri as WorkspaceUri, dados.recursive === true)
+              else await excluirNoExplorerProjeto(pedido.sessionId, pedido.chatId, contexto.raiz, host, dados.uri as WorkspaceUri, dados.recursive === true)
             }
             res.statusCode = 204; res.end(); return true
           }
