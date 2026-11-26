@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws'
 import { createExplorerFsServer, FS_WATCH_PATH } from './dist-fs-server/server/fs/index.js'
 import { createExplorerGitServer, GIT_HTTP_PREFIX } from './dist-fs-server/server/git/index.js'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
+import { sessionPersistencePlugin, explorerContextualPlugin } from './dist-backend/backend.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -75,6 +76,9 @@ async function start() {
 
   const gitServer = createExplorerGitServer({ workspaceRoot: fsRoot })
 
+  // Os mesmos handlers de persistência/Explorer usados no Vite, compilados
+  // para Node no build. Uma única instância compartilha a fila e o SQLite.
+  const middlewares = []
   const server = http.createServer((req, res) => {
     const localDecision = validateLocalRequest(req)
     if (!localDecision.ok) {
@@ -82,6 +86,19 @@ async function start() {
       res.end(JSON.stringify({ code: 'local_only', message: 'Acesso local de mesma origem obrigatório.' }))
       return
     }
+    let indice = 0
+    const next = () => {
+      const middleware = middlewares[indice++]
+      if (middleware) middleware(req, res, next)
+      else servir(req, res)
+    }
+    next()
+  })
+  const contexto = { middlewares: { use: middleware => middlewares.push(middleware) }, httpServer: server }
+  sessionPersistencePlugin({ repoRoot: path.resolve(__dirname, '../../..') }).configureServer(contexto)
+  explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer }).configureServer(contexto)
+
+  function servir(req, res) {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`)
 
     if (url.pathname === '/health') {
@@ -120,9 +137,23 @@ async function start() {
       return
     }
 
+    if (url.pathname.startsWith('/api/')) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ code: 'not_found', message: 'API não encontrada.' }))
+      return
+    }
     sendFile(res, path.join(DIST_DIR, 'index.html'))
-  })
+  }
 
+  // server.close não encerra sockets já promovidos para WebSocket. Conserva
+  // apenas os do Explorer contextual para que o encerramento seja concluído;
+  // o bridge de PTY continua responsável pelos próprios sockets.
+  const socketsExplorer = new Set()
+  server.on('upgrade', (req, socket) => {
+    if (!req.url?.startsWith('/api/explorer/')) return
+    socketsExplorer.add(socket)
+    socket.once('close', () => socketsExplorer.delete(socket))
+  })
   server.prependListener('upgrade', (req, socket) => {
     if (!validateLocalRequest(req, { requireOrigin: true }).ok) socket.destroy()
   })
@@ -140,6 +171,7 @@ async function start() {
     detachUpgrade()
     fsServer.dispose()
     bridge.dispose()
+    for (const socket of socketsExplorer) socket.destroy()
     server.close(() => process.exit(0))
   }
 

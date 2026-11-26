@@ -865,8 +865,7 @@ sincronizador. Projeto continua usando a pasta escolhida. Ao excluir sessão, a
 anti-link é mediada e não contém processos hostis do mesmo usuário.
 
 **Não é entrega MM-I**: falta rastrear renomear/mover/excluir (inclusive pastas,
-colisões e recuperação após interrupção), integração equivalente no servidor de
-preview/produção, fluxos reais de transcrição e análise visual de vídeo com
+colisões e recuperação após interrupção), fluxos reais de transcrição e análise visual de vídeo com
 consentimento e destino verificado, jornadas completas e homologação Windows.
 Não usar originais históricos como fallback para arquivo de trabalho ausente.
 
@@ -877,3 +876,13 @@ com duas falhas históricas (`editorTabs`, `monacoLoadFailure`) e duas introduzi
 nesta etapa corrigidas e retestadas em foco (fronteira e schema). Áudio e vídeo
 nessas jornadas ainda exercitam **fallback**, não transcrição/análise funcional.
 Windows e provedor real não foram testados. PR permanece aberto, sem merge.
+
+**Retomada do servidor de produção:** `server.mjs` agora monta os mesmos handlers
+compilados de sessão e Explorer, sob a mesma fronteira local e uma única instância
+de persistência. Teste contra build servido pelo Node passou, incluindo criação,
+leitura, isolamento entre dois chats, WebSocket, origem recusada, encerramento com
+socket aberto, reinício e F5 (1/1). Antes da correção, a API retornava HTML em vez
+de criar a sessão. Typecheck/build e 31 testes focados passaram em Linux. Não foi
+validado no Windows nem prova o fluxo completo de anexos no servidor compilado.
+Próximo passo: vínculo durável dos arquivos movidos/renomeados/excluídos; depois
+áudio/vídeo reais, regressões e roteiro único Windows. MM-I continua aberta.
