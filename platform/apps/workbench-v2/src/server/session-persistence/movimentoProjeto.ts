@@ -5,6 +5,7 @@ import path from 'node:path'
 import { getDatabase, getSessionRecord } from './database'
 import { withSessionPersistenceQueue } from './filaSessao'
 import { PersistenceProblem } from './persistenceErrors'
+import { renomearDiretorioExclusivo } from './renomearDiretorioExclusivo'
 import { validateWorkspacePath } from './workspaces'
 import { resolverDonoAnexos } from './attachments/dono'
 import { garantirDiretorioReal } from './attachments/contencao'
@@ -32,7 +33,7 @@ function dentro(raiz: string, alvo: string): boolean {
   return !!rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
 }
 async function verificar(caminho: string) {
-  try { return await lstat(caminho) } catch (erro) { if ((erro as NodeJS.ErrnoException).code === 'ENOENT') return null; throw erro }
+  try { return await lstat(caminho, { bigint: true }) } catch (erro) { if ((erro as NodeJS.ErrnoException).code === 'ENOENT') return null; throw erro }
 }
 function fontes(raiz: string): Fonte[] {
   return getDatabase().prepare(`SELECT a.artifact_id AS artifactId, a.session_id AS sessionId, a.chat_id AS chatId,
@@ -52,7 +53,7 @@ async function recuperar(raiz: string): Promise<void> {
   if (!dentro(raiz, mov.origem) || !dentro(raiz, mov.destino)) return recusar('Movimento pendente fora do projeto.')
   await garantirDiretorioReal(path.dirname(mov.origem)); await garantirDiretorioReal(path.dirname(mov.destino))
   let [origem, destino] = await Promise.all([verificar(mov.origem), verificar(mov.destino)])
-  const identidade = (info: { dev: number; ino: number }) => String(info.dev) === mov.dev && String(info.ino) === mov.ino
+  const identidade = (info: { dev: bigint; ino: bigint }) => String(info.dev) === mov.dev && String(info.ino) === mov.ino
   if (origem?.isFile() && destino?.isFile() && !origem.isSymbolicLink() && !destino.isSymbolicLink() && identidade(origem) && identidade(destino)) {
     await unlink(mov.origem); origem = await verificar(mov.origem); destino = await verificar(mov.destino)
   }
@@ -143,7 +144,7 @@ export async function moverNoExplorerProjeto(sessionId: string, chatId: string, 
     if (await verificar(destino)) throw new PersistenceProblem(409, 'file_exists', 'O destino já existe; nada foi sobrescrito.')
     const afetados = selecionar(raiz, origem)
     await preservarLegados(raiz, afetados)
-    if (afetados.length && (!Number.isSafeInteger(info.ino) || !info.ino)) return recusar('O sistema de arquivos não informou identidade suficiente para rastrear este movimento.')
+    if (afetados.length && info.ino === 0n) return recusar('O sistema de arquivos não informou identidade suficiente para rastrear este movimento.')
     const itens = afetados.map(f => ({ ...f, anterior: f.locator, novo: path.relative(raiz, path.resolve(destino, path.relative(origem, path.resolve(raiz, f.locator)))) }))
     if (itens.some(i => !dentro(raiz, path.resolve(raiz, i.novo)))) return recusar('Destino fora do projeto.')
     const db = getDatabase()
@@ -154,6 +155,7 @@ export async function moverNoExplorerProjeto(sessionId: string, chatId: string, 
     }).immediate()
     try {
       if (itens.length && info.isFile()) await link(origem, destino)
+      else if (info.isDirectory()) await renomearDiretorioExclusivo(origem, destino)
       else await rename(origem, destino)
     } catch (erro) {
       if (itens.length && (erro as NodeJS.ErrnoException).code === 'EEXIST') {

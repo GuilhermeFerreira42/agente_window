@@ -1,4 +1,8 @@
-# Leitura vigente do roadmap — 25/11/2026
+# Leitura vigente do roadmap — 26/11/2026
+
+**MM-I — reteste no Windows sobre `cc5ecc6`.** A instalação isolada baixou e verificou os pesos oficiais do Whisper. O Explorer por conversa usa o identificador nativo de arquivo sem perda de precisão e os movimentos de diretório mediados recusam substituição no próprio sistema de arquivos. As duas falhas históricas de fronteira da Casa Agir foram corrigidas e o teste passou no Windows. Resultados e limites em `09`. A homologação humana permanece pendente. A MM-O aguarda o aceite.
+
+## Estado anterior — 25/11/2026
 
 **Nova rodada MM-I — implementação ainda não concluída.** O proprietário substituiu o desenho de Fontes pelo Explorer normal com pasta por chat ou projeto, exige originais históricos separados dos arquivos de trabalho e fluxos funcionais de áudio e vídeo. A entrega descrita abaixo é anterior a essa mudança e não satisfaz esses critérios. Parcial nesta continuação: mensagens indicam quando o original não está disponível e não oferecem download falso, inclusive no envelope multimodal; a reconciliação usa o catálogo e o ID real da transferência. Uploads novos de projeto agora preservam cópia histórica privada e usam automaticamente uploads/; legados íntegros podem ser migrados sob demanda e o agente lê a versão de trabalho no caminho registrado. Renomear/mover ainda não acompanha essa identidade. O Explorer novo e a análise de áudio/vídeo ainda não foram implementados. Não há novo roteiro Windows executável para homologação nem autorização para iniciar MM-O. Um limite do legado é que cópias de projeto já alteradas ou excluídas antes da migração podem não ter mais os bytes originais: o hash permite detectar a perda, não reconstruí-los. Detalhes e testes em `09`.
 

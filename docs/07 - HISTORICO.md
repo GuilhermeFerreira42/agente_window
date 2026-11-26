@@ -10,6 +10,12 @@ Integrados preparação de imagens pela fronteira, Fontes por conversa e ferrame
 
 ---
 
+# 26/11/2026 — portabilidade Windows e movimento exclusivo na MM-I
+
+Validação da instalação dos componentes multimídia no Windows, correção do rastreamento de movimentação no NTFS e verificação de destino no próprio movimento de diretório. Corrigida a portabilidade dos testes de fronteira e centralizado o acesso aos codecs de imagem no servidor. Evidências em `09`.
+
+---
+
 # 25/11/2026 — escopo integrado da MM-I
 
 O proprietário confirmou a leitura de um PNG no Windows pelo LiteLLM e definiu uma única homologação após a entrega integrada. O planejamento reúne normalização de imagens, fontes por conversa no Explorer e inspeção dos anexos. A MM-O reaproveitará o Explorer para apresentar os resultados produzidos. Critérios em `06`.

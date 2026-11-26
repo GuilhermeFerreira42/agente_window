@@ -1,6 +1,6 @@
 # MM-I — roteiro único de validação no Windows com LiteLLM
 
-Use este roteiro no checkout da branch do PR #1, **sem fazer merge**. Ele não foi executado em Windows nem com o LiteLLM de vocês neste ambiente. Registre o resultado de cada passo; MM-O continua aguardando a homologação de MM-I.
+Use este roteiro no checkout da branch do PR #1, **sem fazer merge**. A validação técnica de 26/11 no Windows está registrada em `09`. Registre o resultado da sua homologação por passo. A MM-O continua aguardando o aceite da MM-I.
 
 ## 1. Preparação
 
@@ -21,6 +21,6 @@ Use este roteiro no checkout da branch do PR #1, **sem fazer merge**. Ele não f
 
 ## 3. Limites da evidência
 
-Em Linux, instalação por wheels verificadas foi executada com cópia previamente obtida e conferida dos pesos oficiais (o download direto do Hugging Face é bloqueado neste ambiente). O Windows, o download direto pelo instalador, a instalação completa via `iniciar.cmd` e o LiteLLM real **ainda precisam ser comprovados por vocês**. Um teste com provedor simulado não comprova qualidade ou destino de provedor real. O vídeo é uma amostragem, não análise integral; a transcrição em português pode falhar. O aplicativo usa os direitos da conta e não é isolamento físico entre processos.
+O instalador do projeto passou no Windows em checkout descartável, inclusive o download direto e a conferência dos pesos oficiais. O vídeo é uma amostragem, e a transcrição em português pode falhar. A rodada técnica com simulador e o ensaio no LiteLLM real têm evidências distintas em `09`. O aplicativo usa os direitos da conta.
 
-**Pendência de segurança:** a serialização cobre operações mediadas, não operações de shell, ferramentas genéricas do agente ou outros processos. O `rename` de pasta ainda faz uma checagem seguida de syscall sem garantia atômica de não substituir um diretório vazio criado externamente entre essas etapas. Não tratar concorrência externa como resolvida nem homologar integralmente esta propriedade sem correção ou decisão explícita de escopo. A suíte de fronteira da Casa Agir também apresenta duas falhas anteriores (dependências de imagem e cast); não foram afrouxadas.
+**Movimento de pastas.** Se o destino já existir no momento de mover, o sistema de arquivos recusa a substituição. A operação usa Python disponível e exige suporte do volume. A fila cobre as operações mediadas do Explorer e a leitura de anexos. Alterações por shell, ferramentas genéricas ou outros processos continuam fora dessa fila e não reescrevem os vínculos históricos automaticamente.

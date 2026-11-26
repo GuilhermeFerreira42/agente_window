@@ -1,5 +1,5 @@
 import { createHash, randomInt } from 'node:crypto'
-import { PNG } from 'pngjs'
+import { codificarPNG } from '../../../../../server/codecRasterVisao'
 import type { AlvoConversa, IniciarChamadaModelo } from '../../conversa'
 import { construirProvaVisao, provaVisaoDoSimulador, type FonteVisao } from './admissaoVisao'
 import { identidadeVisao, type RevisoesVisao } from './capacidadeVisao'
@@ -44,20 +44,21 @@ const DIGITOS = [
 
 function imagemDaProva(texto: string): Buffer {
   const escala = 12
-  const png = new PNG({ width: (texto.length * 4 + 1) * escala, height: 7 * escala })
-  png.data.fill(255)
-  for (let posicao = 0; posicao < texto.length; posicao++) {
-    const desenho = DIGITOS[Number(texto[posicao])]
-    for (let i = 0; i < desenho.length; i++) {
-      if (desenho[i] !== '1') continue
-      for (let dy = 0; dy < escala; dy++) {
-        const linha = (Math.floor(i / 3) + 1) * escala + dy
-        const inicio = (linha * png.width + (i % 3 + 1 + posicao * 4) * escala) * 4
-        for (let x = inicio; x < inicio + escala * 4; x += 4) png.data.fill(0, x, x + 3)
+  const largura = (texto.length * 4 + 1) * escala
+  return codificarPNG(largura, 7 * escala, pixels => {
+    pixels.fill(255)
+    for (let posicao = 0; posicao < texto.length; posicao++) {
+      const desenho = DIGITOS[Number(texto[posicao])]
+      for (let i = 0; i < desenho.length; i++) {
+        if (desenho[i] !== '1') continue
+        for (let dy = 0; dy < escala; dy++) {
+          const linha = (Math.floor(i / 3) + 1) * escala + dy
+          const inicio = (linha * largura + (i % 3 + 1 + posicao * 4) * escala) * 4
+          for (let x = inicio; x < inicio + escala * 4; x += 4) pixels.fill(0, x, x + 3)
+        }
       }
     }
-  }
-  return PNG.sync.write(png)
+  })
 }
 
 async function receberTexto(resposta: Response): Promise<string | undefined> {

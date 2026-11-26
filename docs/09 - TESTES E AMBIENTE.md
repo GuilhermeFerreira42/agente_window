@@ -1,4 +1,14 @@
-# Nova rodada MM-I — diagnóstico inicial, não concluída
+# 26/11/2026 — MM-I no Windows
+
+- Base `cc5ecc6`. Checkout e perfis descartáveis, Windows x64, Node 26.13.0 e Python 3.11. O instalador do projeto baixou diretamente os pesos oficiais do Whisper e verificou os hashes de todos os arquivos. A primeira tentativa no checkout de trabalho encontrou o executável do esbuild em uso pelo servidor já aberto. A validação ocorreu no checkout separado, sem interromper esse servidor.
+- O NTFS forneceu identificadores de arquivo que não cabem em um inteiro seguro do JavaScript. O Explorer passou a conferir a identidade em `bigint` e a mantê-la como texto no diário existente. A movimentação mediada de diretório delega ao sistema de arquivos a recusa atômica de substituição do destino. O teste verifica que um destino vazio já ocupado e a origem são preservados e que um destino livre funciona. A validação cobriu Windows. Os caminhos equivalentes Linux e macOS não foram reexecutados nesta rodada. Mover pastas exige Python disponível e um sistema de arquivos com suporte à operação exclusiva; em caso de indisponibilidade, a operação informa a falha. Processos externos continuam fora da fila e não atualizam os vínculos do Explorer.
+- Vitest focado: **50 passaram, 1 pulado**. Inclui a frase transcrita pelo Whisper oficial, o detalhe de vídeo posterior ao primeiro quadro, a admissão de visão, o Explorer e **5/5** de fronteira Agir. Checagem de tipos, lint dos arquivos de produção alterados e build completos aprovados. O teste de fronteira passou a interpretar separadores nativos. O servidor centraliza as dependências de imagem e valida a estrutura retornada pelo descompressor em execução.
+- Playwright no Windows: **16/16** nas jornadas de produção, Explorer, ZIP, inspeção, WebP, transcrição e quadro selecionado, com provedor simulado e runtimes reais. A regressão C-3b passou **12/12** e a C-3a passou **15/15** no reteste. O teste C-3a E06 usava uma revisão lida antes do término do primeiro salvamento. Passou ao consultar a revisão confirmada imediatamente antes do DELETE, sem alterar o contrato de exclusão.
+- LiteLLM real em perfil descartável e com arquivos sintéticos. O aplicativo respondeu corretamente à pergunta visual sobre o quadro do MP4. No WAV, a transcrição autorizada terminou localmente em dois ensaios, seguidos de HTTP 404 do Gemini 2.5 Flash roteado pelo pool. Nesse destino, a resposta final sobre a transcrição permanece sem validação. A aplicação e o provedor simulado demonstraram o fluxo integral de áudio em separado.
+
+---
+
+# Nova rodada MM-I — diagnóstico inicial (histórico)
 
 A solicitação vigente substitui Fontes por Explorer normal e exige arquivos de trabalho editáveis separados dos originais históricos, uploads automáticos no projeto e áudio/vídeo funcionais. Explorer por conversa e áudio/vídeo funcionais ainda não foram implementados nem validados; o roteiro Windows anterior está marcado como superado e não serve para homologar esta rodada.
 

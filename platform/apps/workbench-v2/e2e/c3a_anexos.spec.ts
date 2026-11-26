@@ -385,7 +385,7 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     mkdirSync(projeto, { recursive: true })
     // A raiz é a da SESSÃO: enviá-la no corpo é recusado (B01).
     await criarSessaoDePasta(page, projeto, 'jornada e06 exclusao preserva projeto')
-    const { sessionId, chatId, revision } = await sessaoAtiva(page)
+    const { sessionId, chatId } = await sessaoAtiva(page)
 
     const conteudo = 'bytes do projeto que nunca podem sumir (E06)'
     const admissao = await page.request.post(`${BASE}/api/sessions/${sessionId}/chats/${chatId}/attachments/uploads`, {
@@ -408,7 +408,9 @@ test.describe('C-3a — anexos (servidor real + navegador)', () => {
     expect(existsSync(copiaNoProjeto), 'cópia explícita gravada no projeto').toBe(true)
     expect(readFileSync(copiaNoProjeto, 'utf8')).toBe(conteudo)
 
-    // Excluir a sessão pelo contrato real (deletionId + expectedRevision).
+    // A primeira resposta pode ter sido salva durante o upload. Consulte a
+    // revisão confirmada agora, como o fluxo de exclusão faz após salvar.
+    const { revision } = await sessaoAtiva(page)
     const exclusao = await page.request.delete(`${BASE}/api/sessions/${sessionId}`, {
       headers: { ...headersApi, 'Content-Type': 'application/json' },
       data: { deletionId: randomUUID(), expectedRevision: revision },

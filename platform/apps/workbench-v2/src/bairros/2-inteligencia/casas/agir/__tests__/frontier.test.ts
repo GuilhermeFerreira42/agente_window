@@ -12,7 +12,7 @@
 //           nasce na C3, no lugar certo (o segredo fica dentro da casa).
 // ============================================================================
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC_ROOT = resolve(process.cwd(), 'src')
@@ -24,6 +24,7 @@ if (!existsSync(CASA)) {
 }
 
 const EXTENSOES = ['.ts', '.tsx']
+const relPosix = (raiz: string, arquivo: string) => relative(raiz, arquivo).split(sep).join('/')
 
 function arquivosDe(raiz: string): string[] {
   const saida: string[] = []
@@ -40,7 +41,7 @@ function arquivosDe(raiz: string): string[] {
 }
 
 function arquivosDeSrc(): string[] {
-  return arquivosDe(SRC_ROOT).filter((caminho) => !caminho.startsWith(CASA + '/'))
+  return arquivosDe(SRC_ROOT).filter((caminho) => !caminho.startsWith(CASA + sep))
 }
 
 function importsDe(arquivo: string): string[] {
@@ -56,8 +57,8 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
   it('FT-01: fora da casa, ninguém importa abaixo do barrel — exceto a prefeitura no server/**', () => {
     const infratores: string[] = []
     for (const arquivo of arquivosDeSrc()) {
-      const rel = relative(SRC_ROOT, arquivo)
-      const ehPrefeitura = rel.startsWith(`server${'/'}`)
+      const rel = relPosix(SRC_ROOT, arquivo)
+      const ehPrefeitura = rel.startsWith('server/')
       for (const alvo of importsDe(arquivo)) {
         const casaIdx = alvo.indexOf('2-inteligencia/casas/agir')
         if (casaIdx === -1) continue
@@ -77,8 +78,8 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
       for (const alvo of importsDe(arquivo)) {
         if (alvo.startsWith('.')) {
           const destino = resolve(arquivo, '..', alvo)
-          if (destino.startsWith(CASA + '/')) continue // interno
-          const outraCasa = destino.startsWith(CASAS + '/') ? destino.slice(CASAS.length + 1) : null
+          if (destino.startsWith(CASA + sep)) continue // interno
+          const outraCasa = destino.startsWith(CASAS + sep) ? relPosix(CASAS, destino) : null
           if (outraCasa !== null) {
             // A Casa Provedores expõe uma porta pública separada para o backend;
             // consumidores server-side não podem furar esse barrel até providersRepo.
@@ -86,12 +87,12 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
             if (outraCasa.includes('/')) infratores.push(`${relative(CASA, arquivo)} → ${alvo} (abaixo do barrel de outra casa)`)
             continue
           }
-          if (!destino.startsWith(SRC_ROOT)) infratores.push(`${relative(CASA, arquivo)} → ${alvo}`)
+          if (!destino.startsWith(SRC_ROOT + sep)) infratores.push(`${relative(CASA, arquivo)} → ${alvo}`)
           continue
         }
         const pacote = alvo.startsWith('node:') ? alvo : alvo.split('/')[0]
         if (pacote.startsWith('node:')) {
-          if (!relative(CASA, arquivo).startsWith('server/')) {
+          if (!relPosix(CASA, arquivo).startsWith('server/')) {
             infratores.push(`${relative(CASA, arquivo)} usa ${alvo} fora de server/`)
           }
           continue
@@ -124,7 +125,7 @@ describe('Fronteira da Casa Agir (LEGO)', () => {
     // ui/client/api.ts; nenhum outro arquivo (e o App NUNCA) a cita.
     const infratores: string[] = []
     for (const arquivo of arquivosDe(CASA)) {
-      const rel = relative(CASA, arquivo)
+      const rel = relPosix(CASA, arquivo)
       if (rel.endsWith('server/rotas.ts') || rel.endsWith('ui/client/api.ts')) continue
       if (readFileSync(arquivo, 'utf8').includes('/api/agir')) infratores.push(rel)
     }

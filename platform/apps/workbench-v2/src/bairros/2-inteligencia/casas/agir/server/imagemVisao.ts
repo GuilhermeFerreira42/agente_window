@@ -3,8 +3,7 @@
 // os tetos comprovados do alvo e do corpo, quando conhecidos. Isto sozinho
 // não autoriza envio nem substitui a verificação de dono e integridade.
 import { crc32, inflateSync } from 'node:zlib'
-import jpeg from 'jpeg-js'
-import { PNG } from 'pngjs'
+import { dimensoesJPEG, dimensoesPNG } from '../../../../../server/codecRasterVisao'
 
 export const LIMITES_IMAGEM_VISAO = Object.freeze({
   bytes: 4 * 1024 * 1024,
@@ -80,10 +79,12 @@ function inspecionarPNG(bytes: Buffer, original = false): ImagemInspecionada {
   // limitar a MESMA sequência IDAT ao tamanho exato e recusar bytes ignorados.
   const comprimido = Buffer.concat(idat)
   // @types/node ainda tipa a variante síncrona com info como Buffer simples.
-  const inflado = inflateSync(comprimido, { maxOutputLength: tamanhoEsperado, info: true }) as unknown as { buffer: Buffer; engine: { bytesWritten: number } }
-  if (inflado.buffer.length !== tamanhoEsperado || inflado.engine.bytesWritten !== comprimido.length) return recusar()
+  const inflado: unknown = inflateSync(comprimido, { maxOutputLength: tamanhoEsperado, info: true })
+  if (!inflado || typeof inflado !== 'object' || !('buffer' in inflado) || !Buffer.isBuffer(inflado.buffer) ||
+      !('engine' in inflado) || !inflado.engine || typeof inflado.engine !== 'object' || !('bytesWritten' in inflado.engine) ||
+      inflado.buffer.length !== tamanhoEsperado || inflado.engine.bytesWritten !== comprimido.length) return recusar()
   if (!original) {
-    const decodificada = PNG.sync.read(bytes, { checkCRC: true })
+    const decodificada = dimensoesPNG(bytes)
     if (decodificada.width !== largura || decodificada.height !== altura) return recusar()
   }
   return { mime: 'image/png', largura, altura }
@@ -147,7 +148,7 @@ export function inspecionarImagemVisao(bytes: Buffer): ImagemInspecionada {
       verificarFimJPEG(bytes)
       // Decodificador com limites explícitos de memória e resolução; o erro de
       // biblioteca não é repassado, pois pode conter bytes do arquivo.
-      const imagem = jpeg.decode(bytes, { useTArray: true, tolerantDecoding: false, maxResolutionInMP: LIMITES_IMAGEM_VISAO.pixels / 1_000_000, maxMemoryUsageInMB: 64 })
+      const imagem = dimensoesJPEG(bytes, LIMITES_IMAGEM_VISAO.pixels)
       verificarDimensoes(imagem.width, imagem.height)
       return { mime: 'image/jpeg', largura: imagem.width, altura: imagem.height }
     }

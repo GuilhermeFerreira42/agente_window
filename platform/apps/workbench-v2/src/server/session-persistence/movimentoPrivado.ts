@@ -6,6 +6,7 @@ import path from 'node:path'
 import { getDatabase } from './database'
 import { withSessionPersistenceQueue } from './filaSessao'
 import { PersistenceProblem } from './persistenceErrors'
+import { renomearDiretorioExclusivo } from './renomearDiretorioExclusivo'
 import { raizPrivadaDaConversa } from './raizPrivadaChat'
 import { resolverDonoAnexos } from './attachments/dono'
 import { garantirDiretorioReal } from './attachments/contencao'
@@ -27,11 +28,11 @@ function dentro(raiz: string, alvo: string): boolean {
   const rel = path.relative(raiz, alvo)
   return !!rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
 }
-function identificar(info: { dev: number; ino: number }, registro: Intencao): boolean {
+function identificar(info: { dev: bigint; ino: bigint }, registro: Intencao): boolean {
   return String(info.dev) === registro.dev && String(info.ino) === registro.ino
 }
 async function verificar(caminho: string) {
-  try { return await lstat(caminho) } catch (erro) { if ((erro as NodeJS.ErrnoException).code === 'ENOENT') return null; throw erro }
+  try { return await lstat(caminho, { bigint: true }) } catch (erro) { if ((erro as NodeJS.ErrnoException).code === 'ENOENT') return null; throw erro }
 }
 
 /** Chamar sob a fila da sessão, inclusive na recuperação após reinício. */
@@ -107,7 +108,7 @@ export async function moverNoExplorerPrivado(sessionId: string, chatId: string, 
     const afetados = new Set(itens.map(item => item.artifactId))
     const ocupados = new Set(linhas.filter(l => !afetados.has(l.artifactId)).map(l => l.locator.toLowerCase()))
     if (itens.some(item => ocupados.has(item.novo.toLowerCase()))) return recusar('O destino já está vinculado a outro anexo; nada foi sobrescrito.')
-    if (itens.length && (!Number.isSafeInteger(info.ino) || info.ino === 0)) return recusar('O sistema de arquivos não informou identidade suficiente para rastrear este movimento.')
+    if (itens.length && info.ino === 0n) return recusar('O sistema de arquivos não informou identidade suficiente para rastrear este movimento.')
     if (itens.length) getDatabase().prepare('INSERT INTO explorer_work_moves (session_id, chat_id, origem, destino, dev, ino, itens) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(sessionId, chatId, origem, destino, String(info.dev), String(info.ino), JSON.stringify(itens))
     try {
@@ -115,6 +116,7 @@ export async function moverNoExplorerPrivado(sessionId: string, chatId: string, 
       // substitui outro arquivo, inclusive em corrida após a checagem inicial.
       // A recuperação termina a retirada da origem depois de conferir o inode.
       if (itens.length && info.isFile()) await link(origem, destino)
+      else if (info.isDirectory()) await renomearDiretorioExclusivo(origem, destino)
       else await rename(origem, destino)
     } catch (erro) {
       if (itens.length && (erro as NodeJS.ErrnoException).code === 'EEXIST') {
