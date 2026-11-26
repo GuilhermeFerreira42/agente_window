@@ -23,7 +23,7 @@ export async function escolherEnvioVisao(texto: string, anexos: readonly Attachm
   if (!texto.trim() || !anexos.length || pediuSomenteAguardar(texto)) return undefined
   const candidatas = anexos.flatMap((anexo, index) =>
     anexo.mode !== 'reference' && (!reenvio || (anexo.artifactId && (anexo.envioModelo === 'pendente' || anexo.envioModelo === 'enviado'))) &&
-    /\.(png|jpe?g|webp)$/iu.test(anexo.name) ? [index] : [])
+    /\.(png|jpe?g|webp|mp4)$/iu.test(anexo.name) ? [index] : [])
   let proposta = modo === 'ask' && !texto.trim().startsWith('/') && candidatas.length
     ? await consultarProposta(selecao, messageId, texto.trim()) : undefined
   if (proposta?.verificacao && !proposta.proposta) {
@@ -48,13 +48,18 @@ export async function escolherEnvioVisao(texto: string, anexos: readonly Attachm
     return await portaDialogos().confirmar(pedidoEscolhaAnexos(anexos.map(anexo => anexo.name))) ? undefined : null
   }
 
-  const enviadas = indices.map(index => anexos[index].name)
+  const imagens = indices.filter(index => !/\.mp4$/iu.test(anexos[index].name)).map(index => anexos[index].name)
+  const videos = indices.filter(index => /\.mp4$/iu.test(anexos[index].name)).map(index => anexos[index].name)
   const guardadas = anexos.filter((_, index) => !indices.includes(index)).map(anexo => anexo.name)
+  const temVideo = videos.length > 0
   const aceitou = await portaDialogos().confirmar(pedidoDeConfirmacao({
-    texto: 'Enviar imagens ao modelo?',
-    detalhe: `Destino: ${proposta.providerId} / ${proposta.modelId}. Imagens: ${enviadas.join(', ')}. Quando necessário, será enviada uma cópia compatível; o original será mantido.`
+    texto: temVideo ? 'Enviar imagens e primeiro quadro de vídeo ao modelo?' : 'Enviar imagens ao modelo?',
+    detalhe: `Destino: ${proposta.providerId} / ${proposta.modelId}.`
+      + (imagens.length ? ` Imagens: ${imagens.join(', ')}. Quando necessário, será enviada uma cópia compatível.` : '')
+      + (temVideo ? ` Vídeos: ${videos.join(', ')}. Será extraído localmente e enviado somente o primeiro quadro visual de cada vídeo; nenhum áudio ou vídeo completo será enviado. O quadro não representa necessariamente o restante do vídeo. Requer decodificador local e MP4 MPEG-4 compatível.` : '')
+      + ' Os originais serão mantidos.'
       + (guardadas.length ? ` Estes arquivos ficarão apenas armazenados: ${guardadas.join(', ')}.` : ''),
-    confirmar: 'Enviar imagens e texto', rotuloAcessivel: 'Confirmar envio de imagens', testId: 'confirmar-envio-visao',
+    confirmar: temVideo ? 'Enviar quadros e texto' : 'Enviar imagens e texto', rotuloAcessivel: temVideo ? 'Confirmar envio de quadros' : 'Confirmar envio de imagens', testId: 'confirmar-envio-visao',
   }))
   return aceitou ? { proposta: proposta.proposta, messageId, indices } : null
 }
@@ -69,6 +74,7 @@ export async function escolherReenvioVisao(mensagem: ChatMessage | undefined, se
 export function rotuloEnvioVisao(anexo: Attachment): string {
   const indisponivel = anexo.estado === 'falhou' || (!anexo.artifactId && (!anexo.estado || anexo.estado === 'legado'))
   const estado = indisponivel ? 'Original indisponível' : 'Armazenado'
+  if (anexo.envioModelo === 'enviado' && /\.mp4$/iu.test(anexo.name)) return indisponivel ? 'Original indisponível; quadro inicial enviado ao modelo' : 'Armazenado; quadro inicial enviado ao modelo'
   if (anexo.envioModelo === 'enviado') return indisponivel ? 'Original indisponível; enviado ao modelo' : 'Armazenado e enviado ao modelo'
   if (anexo.envioModelo === 'pendente') return `${estado}; envio ao modelo ainda não confirmado`
   if (!anexo.artifactId && (!anexo.estado || anexo.estado === 'legado')) return `${estado}; envio ao modelo não registrado`

@@ -16,6 +16,7 @@ import { resolverDonoAnexos } from './dono'
 import { caminhoAbsolutoDeArtigo } from './estoque'
 import { garantirDentroDaRaiz } from './contencao'
 import { preservarOriginalHistorico } from './originalHistorico'
+import { primeiroQuadroVideo } from './primeiroQuadroVideo'
 
 // Limite local provisório de leitura, independente da quota C-3a. O futuro
 // adaptador deve também aplicar os menores limites comprovados do alvo e do
@@ -30,6 +31,7 @@ export interface PedidoLeituraVisao {
   artifactId: string
   texto?: string
   artifactIds?: readonly string[]
+  sinal?: AbortSignal
   /** Limite já escolhido pelo chamador; ausente, inválido ou desconhecido bloqueia. */
   maxBytes: number
 }
@@ -43,7 +45,7 @@ export async function lerCopiaPublicadaParaVisao(pedido: PedidoLeituraVisao): Pr
   if (!Number.isSafeInteger(pedido.maxBytes) || pedido.maxBytes <= 0 || pedido.maxBytes > TETO_LEITURA_VISAO_BYTES) {
     return recusar('vision_limit_unknown', 'O limite seguro de leitura da imagem não foi confirmado.')
   }
-  return withSessionPersistenceQueue(pedido.sessionId, async () => {
+  const original = await withSessionPersistenceQueue(pedido.sessionId, async () => {
     resolverDonoAnexos(pedido.sessionId, pedido.chatId)
     const registro = getSessionRecord(pedido.sessionId)
     if (!registro) return recusar('vision_session_missing', 'A conversa não está disponível.')
@@ -96,9 +98,14 @@ export async function lerCopiaPublicadaParaVisao(pedido: PedidoLeituraVisao): Pr
       const bytes = buffer.subarray(0, lidos)
       const sha256 = createHash('sha256').update(bytes).digest('hex')
       if (lidos !== artigo.bytes || sha256 !== artigo.sha256) return recusar('vision_attachment_changed', 'A cópia foi alterada. Nada foi enviado.')
-      return { bytes, sha256 }
+      return { bytes, sha256, nome: artigo.name }
     } finally {
       await arquivo.close()
     }
   })
+  if (pedido.sinal?.aborted) return recusar('vision_cancelled', 'A análise foi cancelada; nenhum conteúdo foi enviado.')
+  if (!original.nome.toLowerCase().endsWith('.mp4')) return { bytes: original.bytes, sha256: original.sha256 }
+  const quadro = await primeiroQuadroVideo(original.bytes, pedido.sinal)
+  if (!quadro || pedido.sinal?.aborted) return recusar('video_frame_unavailable', 'Quadro inicial indisponível: configure o decodificador local e use MP4 MPEG-4 de até 60 segundos e 1024 por lado. Nenhum vídeo ou quadro foi enviado.')
+  return { bytes: quadro, sha256: original.sha256 }
 }

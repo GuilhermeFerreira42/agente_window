@@ -39,6 +39,7 @@ import { pediuSomenteAguardar } from '../../../../../domain/aguardarInstrucoes'
 
 import { comCorpoVisao, proporVisao, validarPedidoVisao, type FonteVisao, type LerImagemVisao, type PedidoVisao } from './admissaoVisao'
 import type { CodecImagemVisao } from './prepararImagemVisao'
+import { analisarVideoAnexo } from './analisarVideoAnexo'
 
 const ROTAS_AGIR = ['/api/agir/vision', '/api/agir', '/api/agir/aprovar', '/api/agir/continuar', '/api/agir/cancel', '/api/agir/mode', '/api/agir/permission', '/api/agir/command-wait', '/api/agir/instruction']
 
@@ -64,6 +65,7 @@ export interface DependenciasAgir {
   prepararInspecaoAnexos?: (contexto: { sessionId: string; chatId: string }, argumentos: PedidoFerramenta['argumentos'], sinal: AbortSignal) => Promise<{
     previa: string
     executar: () => Promise<ResultadoFerramenta>
+    quadro?: { artifactId: string; ler: () => Promise<Buffer> }
   }>
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
@@ -573,7 +575,7 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
             fio.alvo, deps.fonteVisao, deps.lerImagemVisao, (prepararCorpoVisao) => criarVizinhoReal(fio.alvo, {
               prepararCorpoVisao,
               aoAceitarVisao: () => emitirMemoria({ type: 'vision_accepted', messageId: pedidoVisao.messageId, artifactIds: pedidoVisao.artifactIds }),
-            }, deps.iniciarModelo)(contexto, observadores), deps.codecImagemVisao)
+            }, deps.iniciarModelo)(contexto, observadores), deps.codecImagemVisao, abort.signal)
         }
         const atual = criarVizinhoReal(fio.alvo, {}, deps.iniciarModelo)
         try { return await atual(contexto, observadores) } catch (erro) {
@@ -637,26 +639,45 @@ async function executarFioAgir(res: ServerResponse, fio: FioAgir, deps: Dependen
           if (abort.signal.aborted || !validarContexto(pedido) || fio.execucao.estado !== 'running') return false
           const identidade = identidadeAlvo(fio.alvo)
           if (alvoAnexos && alvoAnexos !== identidade) return false
-          fio.execucao.estado = 'awaiting-approval'
+          const aprovarAnexo = async (previa: string) => {
+            fio.execucao.estado = 'awaiting-approval'
+            const evento = { type: 'approval', pedido, previa, allowSession: false } as const
+            registro?.observar(evento)
+            await gravarRegistro()
+            if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
+            const liberado = await new Promise<boolean>(resolve => {
+              fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
+              escreverEvento(res, evento)
+            })
+            if (!abort.signal.aborted) { registro?.decisao(pedido.id, liberado); await gravarRegistro() }
+            fio.execucao.pendentes.delete(pedido.id)
+            if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
+            return liberado && !abort.signal.aborted && validarContexto(pedido)
+          }
+          let execucaoVideo: (() => Promise<ResultadoFerramenta>) | undefined
+          if (plano.quadro) {
+            const quadro = plano.quadro, fonte = deps.fonteVisao
+            const messageId = `video-${randomUUID()}`
+            const proposta = fonte && proporVisao(fio.alvo, fonte, messageId, textoDoDono)
+            if (!fonte || !proposta) {
+              plano = { previa: 'Enviar ao modelo somente o motivo de indisponibilidade: o destino de visão não foi comprovado. Nenhum quadro ou vídeo será enviado.',
+                executar: async () => ({ ok: true, resumo: 'Destino de visão não comprovado.', conteudo: JSON.stringify({ disponivel: false, motivo: 'O destino de visão não foi comprovado; verifique a capacidade de visão antes de analisar o vídeo.' }) }) }
+            } else {
+              const pedidoVisao: PedidoVisao = { proposta: proposta.proposta, messageId, artifactIds: [quadro.artifactId] }
+              const destino = fonte(fio.alvo)?.destinoLiteLLM
+              plano.previa += destino ? ` Destino efetivo de visão comprovado no gateway: ${destino}.` : ' Destino de visão comprovado para esta configuração.'
+              execucaoVideo = () => analisarVideoAnexo({ pedido: pedidoVisao, sessionId: fio.sessionId, chatId: fio.chatId, texto: textoDoDono, alvo: fio.alvo, fonte, lerQuadro: quadro.ler,
+                validarContexto: () => validarContexto(pedido) && identidadeAlvo(fio.alvo) === identidade, sinal: abort.signal, codec: deps.codecImagemVisao, iniciarModelo: deps.iniciarModelo })
+            }
+          }
           const previa = `${plano.previa}\nDestino selecionado: ${fio.alvo.providerId ?? 'provedor'} / ${fio.alvo.modelId ?? fio.alvo.modelo}. Em gateways, o roteamento interno pode variar. Confirme apenas se concordar com este envio.`
-          const evento = { type: 'approval', pedido, previa, allowSession: false } as const
-          registro?.observar(evento)
-          await gravarRegistro()
-          if (abort.signal.aborted || fio.execucao.estado !== 'awaiting-approval') return false
-          const liberado = await new Promise<boolean>(resolve => {
-            fio.execucao.pendentes.set(pedido.id, { resolver: resolve, pedido })
-            escreverEvento(res, evento)
-          })
-          if (!abort.signal.aborted) { registro?.decisao(pedido.id, liberado); await gravarRegistro() }
-          fio.execucao.pendentes.delete(pedido.id)
-          if (!abort.signal.aborted && fio.execucao.estado === 'awaiting-approval') fio.execucao.estado = 'running'
-          if (!liberado || abort.signal.aborted || !validarContexto(pedido)) return false
+          if (!await aprovarAnexo(previa)) return false
           if (fio.alvo.providerId && fio.alvo.modelId) {
             const atual = await deps.obterAlvo({ tipo: 'explicita', providerId: fio.alvo.providerId, modelId: fio.alvo.modelId })
             if (!atual.alvo || identidadeAlvo(atual.alvo) !== identidade) return false
           }
           alvoAnexos = identidade
-          planosAnexos.set(pedido, plano)
+          planosAnexos.set(pedido, execucaoVideo ? { executar: execucaoVideo } : plano)
           return true
         }
         // C-1 — Chat não tem pasta: nenhuma aprovação de arquivo/comando nasce.

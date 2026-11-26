@@ -35,6 +35,13 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   }
   const raizA = await root(a), raizB = await root(b)
   expect(raizA).not.toBe(raizB)
+  const externa = join(data, 'outra-pasta'); mkdirSync(externa)
+  expect((await request.post(`${base}/fs/workspace`, { headers, data: { path: join(data, 'inexistente') } })).status()).toBe(400)
+  const troca = await request.post(`${base}/fs/workspace`, { headers, data: { path: externa } })
+  expect(troca.status(), await troca.text()).toBe(200)
+  expect((await troca.json()).root).toBe(externa)
+  expect(await root(a)).toBe(raizA)
+  expect(await root(b)).toBe(raizB)
   const anexos = `${base}/api/sessions/${sid}/chats/${a}/attachments`
   const original = Buffer.from('original imutável')
   const admissao = await request.post(`${anexos}/uploads`, { headers, data: { name: 'anexo.txt', bytes: original.length, mime: 'text/plain', mode: 'copy', scope: 'chat' } })

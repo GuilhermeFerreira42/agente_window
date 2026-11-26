@@ -12,7 +12,7 @@ function esquemaDe(id: string): Record<string, unknown> {
   const caminho = { type: 'string', description: 'Caminho do arquivo/pasta DENTRO da pasta de trabalho (relativo ou absoluto).' }
   switch (id) {
     case 'anexos':
-      return { type: 'object', properties: { acao: { type: 'string', enum: ['listar', 'listar_zip', 'extrair_zip', 'ler'] }, artifactId: { type: 'string', maxLength: 200 }, indice: { type: 'integer', minimum: 0, maximum: 127 } }, required: ['acao'], additionalProperties: false }
+      return { type: 'object', properties: { acao: { type: 'string', enum: ['listar', 'listar_zip', 'extrair_zip', 'ler', 'analisar_video'] }, artifactId: { type: 'string', maxLength: 200 }, indice: { type: 'integer', minimum: 0, maximum: 127 } }, required: ['acao'], additionalProperties: false }
     case 'buscar_chats':
       return { type: 'object', properties: { consulta: { type: 'string', maxLength: 120 }, apos: { type: 'integer', minimum: 0 }, ate: { type: 'integer', minimum: 0 } }, required: ['consulta'], additionalProperties: false }
     case 'buscar_mensagens_chat':

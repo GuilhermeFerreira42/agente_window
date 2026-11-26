@@ -2,11 +2,13 @@
 // chamador obter autorização individual. Nenhum path vem do modelo.
 import { extrairItemZipConversa, inspecionarTextoConversa, lerFonteConversa, listarFontesConversa, TETO_FONTE_BYTES } from './inspecaoConversa'
 import { listarZipSeguro } from './zipSeguro'
+import { primeiroQuadroVideo } from './primeiroQuadroVideo'
 
 export interface PedidoInspecao { acao?: unknown; artifactId?: unknown; indice?: unknown }
 export interface PlanoInspecao {
   previa: string
   executar: () => Promise<{ ok: boolean; resumo: string; conteudo?: string; efeitoIniciado?: boolean }>
+  quadro?: { artifactId: string; ler: () => Promise<Buffer> }
 }
 
 /** O plano é transitório, de uso único; não contém uma autorização por si só. */
@@ -15,6 +17,7 @@ export async function prepararInspecaoAgente(dono: { sessionId: string; chatId: 
   if (sinal?.aborted || !pedido || typeof pedido !== 'object' || Object.keys(pedido).some(chave => !['acao', 'artifactId', 'indice'].includes(chave))) throw new Error('Pedido de anexo inválido ou cancelado.')
   const acao = pedido.acao
   let previa: string
+  let quadro: PlanoInspecao['quadro']
   let operacao: () => Promise<{ ok: boolean; resumo: string; conteudo?: string; efeitoIniciado?: boolean }>
   if (acao === 'listar') {
     if (pedido.artifactId !== undefined || pedido.indice !== undefined) throw new Error('Parâmetros inválidos.')
@@ -33,7 +36,23 @@ export async function prepararInspecaoAgente(dono: { sessionId: string; chatId: 
       const atual = await lerFonteConversa(sessionId, chatId, id, TETO_FONTE_BYTES)
       if (atual.sha256 !== fonte.sha256 || atual.nome !== fonte.nome) throw new Error('A fonte mudou após a confirmação.')
     }
-    if (acao === 'listar_zip') {
+    if (acao === 'analisar_video') {
+      if (pedido.indice !== undefined) throw new Error('Parâmetros inválidos.')
+      if (!fonte.nome.toLowerCase().endsWith('.mp4') || fonte.bytes.length > 12 * 1024 * 1024) {
+        previa = `Enviar ao modelo o motivo de indisponibilidade da análise visual de ${fonte.nome}; o original não será enviado.`
+        operacao = async () => { await verificar(); return { ok: true, resumo: 'Vídeo incompatível.', conteudo: JSON.stringify({ disponivel: false, motivo: 'Somente MP4 MPEG-4 de até 12 MiB é aceito para análise do primeiro quadro.' }) } }
+      } else {
+        previa = `Extrair localmente o primeiro quadro visual de ${fonte.nome} e enviá-lo com a pergunta atual ao modelo de visão comprovado; enviar a análise textual ao modelo. Nenhum áudio ou vídeo completo será enviado. O quadro não representa necessariamente o restante do vídeo.`
+        quadro = { artifactId: id, ler: async () => {
+          await verificar()
+          const imagem = await primeiroQuadroVideo(fonte.bytes, sinal)
+          await verificar()
+          if (!imagem || sinal?.aborted) throw new Error('Quadro indisponível: configure o decodificador local e use MP4 MPEG-4 de até 60 segundos e 1024 por lado.')
+          return imagem
+        } }
+        operacao = async () => { throw new Error('A análise visual precisa de destino comprovado.') }
+      }
+    } else if (acao === 'listar_zip') {
       if (pedido.indice !== undefined) throw new Error('Parâmetros inválidos.')
       const itens = await listarZipSeguro(fonte.bytes)
       previa = `Enviar ao modelo os nomes e tamanhos dos itens do ZIP ${fonte.nome} (${itens.length} itens).`
@@ -73,9 +92,13 @@ export async function prepararInspecaoAgente(dono: { sessionId: string; chatId: 
     } else throw new Error('Ação de anexo desconhecida.')
   }
   let consumido = false
-  return { previa, executar: async () => {
+  const consumir = () => {
     if (consumido || sinal?.aborted) throw new Error('Esta preparação expirou ou foi cancelada.')
     consumido = true
+  }
+  const quadroPreparado = quadro && { artifactId: quadro.artifactId, ler: async () => { consumir(); return quadro!.ler() } }
+  return { previa, ...(quadroPreparado && { quadro: quadroPreparado }), executar: async () => {
+    consumir()
     return operacao()
   } }
 }

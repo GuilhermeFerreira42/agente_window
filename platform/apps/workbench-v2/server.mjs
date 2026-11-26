@@ -70,12 +70,13 @@ async function start() {
   // FATIA-04 (4.3): FileSystemPort no preview também (Single Port, Q7).
   // Raiz = repo (relativa a este arquivo) ou FS_TEST_ROOT. Sem PTY tocar.
   const fsRoot = process.env.FS_TEST_ROOT ?? `file://${path.resolve(__dirname, '../../..')}`
-  const fsServer = await createExplorerFsServer({
+  let fsServer = await createExplorerFsServer({
     root: fsRoot,
     createWsServer: () => new WebSocketServer({ noServer: true }),
   })
 
-  const gitServer = createExplorerGitServer({ workspaceRoot: fsRoot })
+  let gitServer = createExplorerGitServer({ workspaceRoot: fsRoot })
+  let filaWorkspace = Promise.resolve()
 
   // Os mesmos handlers de persistência/Explorer usados no Vite, compilados
   // para Node no build. Uma única instância compartilha a fila e o SQLite.
@@ -111,6 +112,39 @@ async function start() {
     if (url.pathname === PTY_WS_PATH) {
       res.writeHead(426, { 'Content-Type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify({ error: 'Upgrade Required' }))
+      return
+    }
+
+    // Paridade com o plugin Vite: a seleção inicial de pasta atualiza a
+    // porta legada. Explorers de conversas persistidas continuam contextuais.
+    if (url.pathname === '/fs/workspace' && req.method === 'POST') {
+      const operacao = filaWorkspace.catch(() => undefined).then(async () => {
+        const partes = []; let tamanho = 0
+        for await (const parte of req) {
+          const bytes = Buffer.isBuffer(parte) ? parte : Buffer.from(parte)
+          tamanho += bytes.length
+          if (tamanho > 64 * 1024) throw new Error('Pedido grande demais.')
+          partes.push(bytes)
+        }
+        const input = JSON.parse(Buffer.concat(partes).toString('utf8'))
+        if (typeof input?.path !== 'string' || !input.path.trim()) throw new Error('Workspace path is required')
+        const raiz = await fs.promises.realpath(input.path.trim())
+        if (!(await fs.promises.stat(raiz)).isDirectory()) throw new Error('Workspace path is not a directory')
+        const novoFs = await createExplorerFsServer({ root: raiz, createWsServer: () => new WebSocketServer({ noServer: true }) })
+        let novoGit
+        try { novoGit = createExplorerGitServer({ workspaceRoot: raiz }) } catch (erro) { novoFs.dispose(); throw erro }
+        const anterior = fsServer
+        fsServer = novoFs; gitServer = novoGit
+        anterior.dispose()
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ root: raiz }))
+      })
+      filaWorkspace = operacao.catch(() => undefined)
+      operacao.catch((erro) => {
+        if (res.headersSent) { res.destroy(); return }
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ code: 'invalid_workspace', message: erro instanceof Error ? erro.message : 'Workspace inválido.' }))
+      })
       return
     }
 

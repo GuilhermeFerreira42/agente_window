@@ -17,7 +17,7 @@ export interface PedidoVisao {
   messageId: string
   artifactIds: string[]
 }
-export type LerImagemVisao = (pedido: { sessionId: string; chatId: string; messageId: string; artifactId: string; artifactIds: readonly string[]; maxBytes: number; texto: string }) => Promise<{ bytes: Buffer }>
+export type LerImagemVisao = (pedido: { sessionId: string; chatId: string; messageId: string; artifactId: string; artifactIds: readonly string[]; maxBytes: number; texto: string; sinal?: AbortSignal }) => Promise<{ bytes: Buffer }>
 export type FonteVisao = (alvo: AlvoConversa) => { revisoes: RevisoesVisao; prova: ProvaVisao; destinoLiteLLM?: string } | undefined
 
 function assinatura(alvo: AlvoConversa, fonte: FonteVisao) {
@@ -64,11 +64,11 @@ export async function comCorpoVisao<T>(
   pedido: PedidoVisao, contexto: { sessionId: string; chatId: string; texto: string },
   alvo: AlvoConversa, fonte: FonteVisao, ler: LerImagemVisao, executar: (
     preparar: (alvo: AlvoConversa, corpo: Record<string, unknown>) => Record<string, unknown>,
-  ) => Promise<T>, codec?: CodecImagemVisao,
+  ) => Promise<T>, codec?: CodecImagemVisao, sinal?: AbortSignal,
 ): Promise<T> {
   const proposta = propostas.get(pedido.proposta)
   const atual = assinatura(alvo, fonte)
-  if (!proposta || proposta.limite <= Date.now() || !atual || proposta.identidade !== atual.identidade ||
+  if (sinal?.aborted || !proposta || proposta.limite <= Date.now() || !atual || proposta.identidade !== atual.identidade ||
       proposta.messageId !== pedido.messageId || proposta.textoHash !== hashTexto(contexto.texto)) {
     return recusar('O modelo ou a autorização de imagens mudou. Confirme novamente antes de enviar.')
   }
@@ -80,14 +80,15 @@ export async function comCorpoVisao<T>(
     const imagens: Buffer[] = []
     for (const artifactId of pedido.artifactIds) {
       try {
-        const { bytes } = await ler({ ...contexto, messageId: pedido.messageId, artifactId, artifactIds: pedido.artifactIds, maxBytes: TETO_ORIGINAL_VISAO })
+        const { bytes } = await ler({ ...contexto, messageId: pedido.messageId, artifactId, artifactIds: pedido.artifactIds, maxBytes: TETO_ORIGINAL_VISAO, sinal })
+        if (sinal?.aborted) return recusar('A análise foi cancelada. Nenhuma imagem foi enviada.')
         imagens.push(await prepararImagemVisao(bytes, codec))
       } catch (erro) {
         return recusar(erro instanceof Error ? erro.message : 'O anexo publicado não está disponível.')
       }
     }
     return await executar((alvoNoFetch, corpo) => {
-      if (assinatura(alvoNoFetch, fonte)?.identidade !== proposta.identidade || proposta.limite <= Date.now()) {
+      if (sinal?.aborted || assinatura(alvoNoFetch, fonte)?.identidade !== proposta.identidade || proposta.limite <= Date.now()) {
         return recusar('O destino de imagem mudou antes do envio. Confirme novamente.')
       }
       const corpoRoteado = atual.destinoLiteLLM ? { ...corpo, model: atual.destinoLiteLLM, disable_fallbacks: true } : corpo

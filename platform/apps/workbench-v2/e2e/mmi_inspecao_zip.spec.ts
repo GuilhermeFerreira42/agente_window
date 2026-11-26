@@ -22,14 +22,23 @@ function tool(acao: string, args: Record<string, unknown> = {}) {
 }
 function texto(conteudo: string) { return { choices: [{ index: 0, delta: { content: conteudo } }] } }
 async function iniciarApp() {
-  app = spawn(process.execPath, [resolve('../../node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
-    cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, AGENTE_WINDOW_DATA_DIR: join(raiz, 'data'), AGENTE_WINDOW_PROVIDERS_PATH: join(raiz, 'providers.json'), AGENTE_WINDOW_PERSONALIZACOES_PATH: join(raiz, 'personalizacoes.json'), AGENTE_WINDOW_SETTINGS_PATH: join(raiz, 'settings.json'), FS_TEST_ROOT: raiz, AGENTE_WINDOW_TEST_HOME: raiz,
+  const comando = process.env.MMI_TEST_PRODUCTION === '1'
+    ? [resolve('server.mjs')]
+    : [resolve('../../node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort']
+  app = spawn(process.execPath, comando, {
+    cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), AGENTE_WINDOW_DATA_DIR: join(raiz, 'data'), AGENTE_WINDOW_PROVIDERS_PATH: join(raiz, 'providers.json'), AGENTE_WINDOW_PERSONALIZACOES_PATH: join(raiz, 'personalizacoes.json'), AGENTE_WINDOW_SETTINGS_PATH: join(raiz, 'settings.json'), FS_TEST_ROOT: raiz, AGENTE_WINDOW_TEST_HOME: raiz,
       MMI_FSYNC_FIXTURE: raiz, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${JSON.stringify(pathToFileURL(resolve('e2e/fixtures/pausarFsync.mjs')).href)}` },
   })
   await expect.poll(async () => { try { return (await fetch(base)).status } catch { return 0 } }, { timeout: 60_000 }).toBe(200)
 }
 async function pararApp() {
   if (app && app.exitCode === null) { const terminou = once(app, 'exit'); app.kill('SIGKILL'); await terminou }
+}
+// Evita que o HMR do Vite reconecte e navegue simultaneamente ao reload do
+// teste após SIGKILL; a nova navegação continua exercitando persistência real.
+async function reiniciarAppNaPagina(page: Page) {
+  await page.goto('about:blank')
+  await pararApp(); await iniciarApp(); await page.goto(base)
 }
 
 test.setTimeout(120_000)
@@ -213,7 +222,7 @@ test('guardar ZIP, aguardar e depois inspecionar sem novo upload; recusa cruzada
   await page.reload()
   await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'nota.txt' })).toBeVisible({ timeout: 20_000 })
   await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'ignorado.txt' })).toHaveCount(0)
-  await pararApp(); await iniciarApp(); await page.reload()
+  await reiniciarAppNaPagina(page)
   await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'nota.txt' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('tree', { name: 'Files Explorer' }).getByRole('treeitem').filter({ hasText: 'ignorado.txt' })).toHaveCount(0)
   cenario = 'cruzado'; pedidos = []
@@ -352,13 +361,17 @@ for (const modalidade of ['pdf', 'audio', 'video'] as const) {
 
 test('áudio WAV: transcrição local autorizada chega ao provedor simulado sem enviar o original', async ({ page }) => {
   test.skip(!process.env.AGENTE_WINDOW_WHISPER_PYTHON || !process.env.AGENTE_WINDOW_WHISPER_MODEL, 'Transcritor local não configurado')
-  cenario = 'audio-real'; pedidos = []; erroFixture = ''
+  cenario = 'aguardar'; pedidos = []; erroFixture = ''
   await page.goto(base)
   await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
-  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('O que a frase gravada menciona?')
+  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Aguarde instruções.')
   await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'frase.wav', mimeType: 'audio/wav', buffer: readFileSync(resolve('e2e/fixtures/frase-lanterna.wav')) })
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
-  await page.getByRole('dialog', { name: 'Enviar só o texto e manter os arquivos anexados?' }).getByRole('button', { name: 'Continuar com o texto' }).click()
+  await expect(page.getByText('Aguardarei instruções.')).toBeVisible({ timeout: 30_000 })
+  expect(JSON.stringify(pedidos)).not.toContain('madeira')
+  cenario = 'audio-real'; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('O que a frase gravada menciona?')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
   await permitir(page, 'frase.wav', 1)
   await permitir(page, 'Transcrever localmente', 2)
   await expect(page.getByText('A frase menciona uma mesa de madeira.')).toBeVisible({ timeout: 100_000 })
@@ -403,7 +416,7 @@ test('edição do projeto chega ao agente somente após autorização, preservan
   expect((await page.request.post(`${fsB}/mkdir`, { headers, data: { uri: `${raizUri}/destino` } })).status()).toBe(201)
   expect((await page.request.post(`${fsB}/rename`, { headers, data: { from: `${raizUri}/uploads/trabalho.txt`, to: `${raizUri}/destino/renomeado.txt` } })).status()).toBe(204)
   expect((await page.request.post(`${fsB}/rename`, { headers, data: { from: `${raizUri}/destino`, to: `${raizUri}/outra` } })).status()).toBe(204)
-  await pararApp(); await iniciarApp(); await page.reload()
+  await reiniciarAppNaPagina(page)
   nomeTrabalho = 'renomeado.txt'; cenario = 'texto-projeto'; pedidos = []
   await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo de trabalho.')
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
@@ -420,7 +433,7 @@ test('edição do projeto chega ao agente somente após autorização, preservan
   expect((await page.request.post(`${fsB}/delete`, { headers, data: { uri: atual } })).status()).toBe(204)
   expect((await page.request.post(`${fsB}/createFile`, { headers, data: { uri: atual, content: 'ARQUIVO ALHEIO' } })).status()).toBe(201)
   expect(await baixar()).toBe('ORIGINAL 315')
-  await pararApp(); await iniciarApp(); await page.reload()
+  await reiniciarAppNaPagina(page)
   cenario = 'ausente'; idAusente = original!.artifactId; pedidos = []
   await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('O arquivo de projeto ainda existe?')
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
@@ -483,7 +496,7 @@ test('Chat: trabalho movido e renomeado continua acessível ao agente e original
   expect((await page.request.post(`${fs}/rename`, { headers, data: { from: atual, to: colisao } })).status()).toBe(409)
   expect((await (await page.request.get(`${fs}/read?uri=${encodeURIComponent(colisao)}`, { headers })).json()).content).toBe('CONSERVADO')
   expect((await (await page.request.get(`${attachments}/${id}?download=1`, { headers })).body()).toString()).toBe('ORIGINAL 315')
-  await pararApp(); await iniciarApp(); await page.reload()
+  await reiniciarAppNaPagina(page)
   cenario = 'texto-projeto'; pedidos = []
   await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo movido.')
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()
@@ -494,7 +507,7 @@ test('Chat: trabalho movido e renomeado continua acessível ao agente e original
   expect((await page.request.post(`${fs}/delete`, { headers, data: { uri: atual } })).status()).toBe(204)
   expect((await page.request.post(`${fs}/createFile`, { headers, data: { uri: atual, content: 'ARQUIVO ALHEIO' } })).status()).toBe(201)
   expect((await (await page.request.get(`${attachments}/${id}?download=1`, { headers })).body()).toString()).toBe('ORIGINAL 315')
-  await pararApp(); await iniciarApp(); await page.reload()
+  await reiniciarAppNaPagina(page)
   cenario = 'ausente'; idAusente = id; pedidos = []
   await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('O arquivo movido ainda existe?')
   await page.getByRole('button', { name: 'Enviar mensagem' }).click()

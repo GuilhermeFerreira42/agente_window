@@ -923,11 +923,11 @@ Playwright com servidor real/provedor simulado passou 9/9, incluindo duas sessõ
 no mesmo projeto, movimento de arquivo e pasta, reinícios, consentimento,
 exclusão, substituição e original; Vitest dirigido 55/55 e esquema 14/14,
 typecheck, lint dirigido, build e smoke de produção 1/1 passaram em Linux.
-O smoke de produção não cobre esse fluxo de projeto. `rename` de diretório ainda
+Este checkpoint anterior ainda não cobria o fluxo de projeto em produção (veja atualização abaixo). `rename` de diretório ainda
 possui janela entre verificação e operação e não garante ausência de substituição
 sob corrida externa; rastreamento cobre ações mediadas, não operações pelo shell.
-MM-I continua aberta: corrigir/avaliar concorrência, ampliar prova em produção,
-implementar áudio e vídeo reais e concluir regressões e roteiro único Windows.
+MM-I continua aberta: corrigir/avaliar concorrência, consolidar provas em produção,
+empacotar áudio/vídeo e concluir regressões e roteiro único Windows.
 
 **Transcrição local experimental (checkpoint Linux):** áudio WAV PCM mono,
 16 bits/16 kHz, até 60 s e 2 MiB, pode ser transcrito em português no CPU
@@ -959,7 +959,41 @@ não a procedência. **Não demonstra Windows nem um provedor real.**
 
 Produção passou também no smoke de duas sessões compartilhando movimento e
 exclusão, com reinícios e download do original; isso não testa o agente no
-build. Falta vídeo funcional com destino de visão comprovado, cancelamento e
-aprovações de áudio adicionais, prova integrada de produção e regressões gerais;
+build (veja a atualização posterior abaixo). Faltavam vídeo funcional, provas
+integradas de produção e regressões gerais nessa etapa;
 também faltam solucionar/qualificar a corrida de rename de diretórios e montar
 um único roteiro Windows final. Não homologar MM-I nem iniciar MM-O.
+
+**Atualização de vídeo e produção (checkpoint Linux, MM-I ainda aberta):** MP4
+MPEG-4 de até 12 MiB/60 s/1024 pixels por lado pode ter o primeiro quadro
+extraído localmente via PyAV opcional (`AGENTE_WINDOW_VIDEO_PYTHON`), após
+aprovação e comprovação de visão. O PNG do quadro, não o vídeo nem seu áudio,
+é enviado ao destino comprovado; não representa os quadros seguintes. Em tarefa
+posterior sem novo upload, a ferramenta de anexos pede autorização para consultar
+a fonte e, para o envio do quadro ao destino previamente comprovado. A verificação de
+visão deve ser feita separadamente antes desta tarefa. Não havendo prova ou codec, retorna motivo de
+indisponibilidade. O arquivo e o alvo são revalidados; há limite de tempo e
+concorrência no processo. O protótipo não instala PyAV nem constitui distribuição.
+
+Após corrigir `POST /fs/workspace` ausente no servidor de produção, a rodada
+Linux no build passou 10/10 (um teste cobriu prova automática que foi
+posteriormente retirada por risco de replay entre aprovações): ZIP, WAV em tarefa posterior, edição em projeto,
+movimento em Chat, dois smokes de persistência/projeto e três fluxos de vídeo e uma prova automática simulada retirada. Vitest dirigido 39/39,
+typecheck e build passaram. Esses testes usam provedor simulado e dependências e
+pesos locais experimentais, não comprovam provedor real nem Windows. Wheels de
+algumas dependências foram encontrados para Windows x64/Python 3.11, mas isso
+não comprova instalação, funcionamento, procedência dos pesos nem distribuição.
+O roteiro Windows foi substituído por um guia provisório explicitamente não
+homologável. Continuam pendentes distribuição confiável, validação Windows,
+concorrência de diretórios e regressões; MM-O segue bloqueada pelo aceite.
+A regressão integrada mais recente ficou em 31/32: o caso de edição em projeto
+terminou com cartão “Expirou (a página recarregou no meio)” após reinício em
+Vite; o mesmo fluxo passou em produção. A causa ainda não foi estabelecida, e
+não se deve tratar a regressão como aprovada. Uma tentativa de prova de visão
+encadeada na mesma chamada de ferramenta foi retirada: reutilizar o ID de
+aprovação permitiria replay entre confirmações. A comprovação de visão deve ser
+realizada separadamente até existir identidade única por confirmação e teste de
+replay.
+Após retirar a prova automática, novo build e nove jornadas dirigidas de
+produção passaram 9/9; o teste que falhou na regressão integrada passou 2/2
+isoladamente em Vite, sem explicar a falha intermitente.

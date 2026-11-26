@@ -34,6 +34,18 @@ async function anexar(chatId: string, nome: string, bytes: Buffer): Promise<stri
 }
 
 describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
+  it('quadro de vídeo exige o dono, revalida a versão e não reutiliza a confirmação', async () => {
+    const id = await anexar(a, 'video.mp4', Buffer.from('vídeo de teste'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    await expect(prepararInspecaoAgente({ sessionId: sid, chatId: b }, { acao: 'analisar_video', artifactId: id })).rejects.toThrow()
+    const plano = await prepararInspecaoAgente({ sessionId: sid, chatId: a }, { acao: 'analisar_video', artifactId: id })
+    expect(plano.previa).toContain('primeiro quadro visual')
+    expect(plano.quadro).toBeDefined()
+    writeFileSync(join(raiz, 'video.mp4'), 'OUTRO')
+    await expect(plano.quadro!.ler()).rejects.toThrow(/mudou/)
+    await expect(plano.quadro!.ler()).rejects.toThrow(/expirou/)
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('vídeo de teste')
+  })
   it('recupera movimento comprovado após reinício, sem alterar o original', async () => {
     const id = await anexar(a, 'antigo.txt', Buffer.from('ORIGINAL'))
     const raiz = (await resolverRaizExplorer(sid, a)).raiz
