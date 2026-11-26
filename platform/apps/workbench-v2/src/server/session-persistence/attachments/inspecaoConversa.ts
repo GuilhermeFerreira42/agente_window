@@ -18,6 +18,7 @@ import { caminhoTrabalhoPrivado, obterVinculoTrabalho, sincronizarTrabalhosPriva
 import { raizPrivadaDaConversa } from '../raizPrivadaChat'
 import { resolverRaizExplorer } from '../raizExplorer'
 import { caminhoDeTrabalhoProjeto } from '../movimentoProjeto'
+import { transcreverAudioLocal } from './leitorAudio'
 
 export const TETO_FONTE_BYTES = 32 * 1024 * 1024
 export interface FonteConversa { artifactId: string; nome: string; bytes: number; modalidade: string; estado?: 'trabalho' | 'trabalho_ausente' }
@@ -141,7 +142,7 @@ export async function extrairItemZipConversa(sessionId: string, chatId: string, 
 }
 
 export type ResultadoTextoConversa =
-  | { disponivel: true; representacao: 'texto UTF-8' | 'texto extraído de PDF'; nome: string; texto: string }
+  | { disponivel: true; representacao: 'texto UTF-8' | 'texto extraído de PDF' | 'transcrição local de áudio'; nome: string; texto: string; idioma?: string }
   | { disponivel: false; nome: string; motivo: string }
 
 /** Esta porta não concede envio ao modelo: o chamador deve pedir consentimento. */
@@ -154,7 +155,12 @@ export async function inspecionarTextoConversa(sessionId: string, chatId: string
     if (!extraido?.texto) return indisponivel('PDF sem texto extraível, inválido ou análise local indisponível (limites: 8 MiB, 20 páginas, 16 mil caracteres, tempo e concorrência); OCR não está disponível.')
     return { disponivel: true, representacao: 'texto extraído de PDF', nome: fonte.nome, texto: extraido.texto }
   }
-  if (/\.(wav|mp3|m4a|ogg|flac|aac|opus)$/u.test(nome)) return indisponivel('Transcrição de áudio ainda não está disponível: não há transcritor local integrado nem capacidade de áudio comprovada para este fluxo.')
+  if (nome.endsWith('.wav')) {
+    const resultado = await transcreverAudioLocal(fonte.bytes, sinal)
+    if (!resultado) return indisponivel('Transcrição local de áudio indisponível ou formato não suportado. É necessário configurar o transcritor local; somente WAV PCM mono de 16 bits, 16 kHz e até 60 segundos é aceito.')
+    return { disponivel: true, representacao: 'transcrição local de áudio', nome: fonte.nome, texto: resultado.texto, idioma: resultado.idioma }
+  }
+  if (/\.(mp3|m4a|ogg|flac|aac|opus)$/u.test(nome)) return indisponivel('Este formato de áudio não tem transcrição disponível; use WAV PCM mono de 16 bits e 16 kHz com o transcritor local configurado.')
   if (/\.(mp4|webm|mov|mkv|avi)$/u.test(nome)) return indisponivel('Extração de quadros ou transcrição de vídeo ainda não está disponível: não há ferramenta local integrada nem capacidade de vídeo comprovada para este fluxo.')
   if (!/\.(txt|md|csv|tsv|json|xml|log)$/u.test(nome)) return indisponivel('Este formato não possui um leitor de texto disponível.')
   if (fonte.bytes.length > 16 * 1024) return indisponivel('O texto excede o limite de leitura de 16 KiB.')

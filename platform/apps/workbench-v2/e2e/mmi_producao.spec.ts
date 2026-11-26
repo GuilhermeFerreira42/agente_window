@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
@@ -84,4 +84,38 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   await page.locator('.session-row').filter({ hasText: 'Explorer de produção' }).first().click()
   await page.getByRole('tab', { name: 'A', exact: true }).click()
   await expect(arvore.getByRole('treeitem').filter({ hasText: 'producao.txt' })).toBeVisible({ timeout: 30_000 })
+})
+
+test('produção: sessões de projeto compartilham movimento e preservam o original', async ({ request }) => {
+  const projeto = join(data, 'projeto')
+  mkdirSync(projeto)
+  const criarSessao = async () => {
+    const sid = randomUUID(), chat = randomUUID()
+    const session = { id: sid, title: 'Projeto compartilhado', workspace: 'Projeto', workspacePath: projeto, contexto: { tipo: 'workspace' }, section: 'today', status: 'completed', updated: 'agora', diffAdded: 0, diffRemoved: 0, branch: null, mainChatId: chat,
+      chats: [{ id: chat, title: 'Principal', status: 'completed', messages: [] }] }
+    const res = await request.post(`${base}/api/sessions`, { headers, data: { session, contexto: { tipo: 'workspace', path: projeto }, creationId: randomUUID() } })
+    expect(res.status(), await res.text()).toBe(201)
+    return { sid, chat }
+  }
+  const a = await criarSessao(), b = await criarSessao()
+  const anexos = `${base}/api/sessions/${a.sid}/chats/${a.chat}/attachments`
+  const fs = `${base}/api/explorer/${b.sid}/${b.chat}/fs`
+  const raiz = (await (await request.get(`${fs}/root`, { headers })).json()).root
+  const original = Buffer.from('original do projeto')
+  const admissao = await request.post(`${anexos}/uploads`, { headers, data: { name: 'projeto.txt', bytes: original.length, mime: 'text/plain', mode: 'copy', scope: 'workspace', workspaceRoot: projeto } })
+  expect(admissao.status(), await admissao.text()).toBe(201)
+  const { uploadId } = await admissao.json()
+  const transferencia = await request.put(`${anexos}/uploads/${uploadId}/content`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: original })
+  expect(transferencia.status(), await transferencia.text()).toBe(200)
+  const { artifactId } = await transferencia.json()
+  expect((await request.post(`${fs}/write`, { headers, data: { uri: `${raiz}/uploads/projeto.txt`, content: 'edição compartilhada' } })).status()).toBe(204)
+  expect((await request.post(`${fs}/rename`, { headers, data: { from: `${raiz}/uploads/projeto.txt`, to: `${raiz}/movido.txt` } })).status()).toBe(204)
+  await parar(); await iniciar()
+  expect((await (await request.get(`${fs}/read?uri=${encodeURIComponent(`${raiz}/movido.txt`)}`, { headers })).json()).content).toBe('edição compartilhada')
+  expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
+  expect((await request.post(`${fs}/delete`, { headers, data: { uri: `${raiz}/movido.txt` } })).status()).toBe(204)
+  expect((await request.post(`${fs}/createFile`, { headers, data: { uri: `${raiz}/movido.txt`, content: 'substituto' } })).status()).toBe(201)
+  await parar(); await iniciar()
+  expect((await (await request.get(`${fs}/read?uri=${encodeURIComponent(`${raiz}/movido.txt`)}`, { headers })).json()).content).toBe('substituto')
+  expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
 })

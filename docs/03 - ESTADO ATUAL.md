@@ -928,3 +928,38 @@ possui janela entre verificação e operação e não garante ausência de subst
 sob corrida externa; rastreamento cobre ações mediadas, não operações pelo shell.
 MM-I continua aberta: corrigir/avaliar concorrência, ampliar prova em produção,
 implementar áudio e vídeo reais e concluir regressões e roteiro único Windows.
+
+**Transcrição local experimental (checkpoint Linux):** áudio WAV PCM mono,
+16 bits/16 kHz, até 60 s e 2 MiB, pode ser transcrito em português no CPU
+após confirmação explícita; o cartão avisa sobre transcrição, possíveis erros,
+destino selecionado e que o WAV original não será enviado. Revalida a fonte
+antes e depois, restringe concorrência/tempo e usa processo descartável. Sem
+configuração ou em formato incompatível informa indisponibilidade. A configuração
+é manual: `AGENTE_WINDOW_WHISPER_PYTHON` aponta para Python com
+`faster-whisper==1.1.1` e `requests`; `AGENTE_WINDOW_WHISPER_MODEL` aponta para
+modelo CTranslate2 local confiável. Modelos/dependências não são instalados pelo
+app e não entram no repositório. O modo demonstrado exige português e pode
+transcrever incorretamente; seleção de idioma ainda não existe. O gateway de
+texto continua podendo rotear internamente (o cartão mostra o destino selecionado,
+sem prova do destino interno equivalente à de visão).
+
+Em Linux, Python 3.11, faster-whisper 1.1.1, CTranslate2 4.9.1, CPU int8, e
+Whisper small convertido (modelo obtido de `@skillninja/shortmovie-telop-model-p0`
+até `p3` 1.0.0; `model.bin` SHA-256
+`ca732cb1379efc49417d028465f543d83a39de2c61f3027678de103dc404ce73`),
+a frase sintética no fixture `e2e/fixtures/frase-lanterna.wav` foi transcrita
+com erros parciais, mas incluiu “mesa” e “madeira”. O provedor simulado recebeu
+a transcrição após confirmação e respondeu sobre esses detalhes; download
+preservou o WAV e a requisição não incluiu áudio base64. Playwright áudio 2/2,
+Vitest dirigido 35/35 (incluindo concorrência e cancelamento), typecheck, lint,
+build e smoke produção 2/2 passaram.
+A frase foi sintetizada com eSpeak NG WASM 1.0.2 e convertida para o formato
+limitado; os pesos são de terceiro e seu hash só comprova os bytes testados,
+não a procedência. **Não demonstra Windows nem um provedor real.**
+
+Produção passou também no smoke de duas sessões compartilhando movimento e
+exclusão, com reinícios e download do original; isso não testa o agente no
+build. Falta vídeo funcional com destino de visão comprovado, cancelamento e
+aprovações de áudio adicionais, prova integrada de produção e regressões gerais;
+também faltam solucionar/qualificar a corrida de rename de diretórios e montar
+um único roteiro Windows final. Não homologar MM-I nem iniciar MM-O.

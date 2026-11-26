@@ -14,7 +14,7 @@ const port = 5225, base = `http://127.0.0.1:${port}`, modelo = 'simulador-zip'
 const pergunta = 'Liste o conteúdo deste ZIP e leia o arquivo nota.txt.'
 const segredo = 'A resposta sintética é 742.'
 let server: Server, app: ChildProcess, raiz: string
-let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' | 'texto-projeto' | 'ausente' = 'zip'
+let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'audio-real' | 'video' | 'texto-projeto' | 'ausente' = 'zip'
 let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = '', nomeTrabalho = 'trabalho.txt', idAusente = ''
 
 function tool(acao: string, args: Record<string, unknown> = {}) {
@@ -96,6 +96,20 @@ test.beforeAll(async () => {
             if (fontes.find(f => f.artifactId === idAusente)?.estado !== 'trabalho_ausente') throw new Error('trabalho excluído não foi marcado como ausente')
             if (JSON.stringify(corpo).includes('ARQUIVO ALHEIO')) throw new Error('arquivo substituto foi enviado')
             resposta = texto('O arquivo de trabalho foi excluído.')
+          }
+        } else if (cenario === 'audio-real') {
+          if (!resultados.length) {
+            if (JSON.stringify(corpo).includes('lanterna')) throw new Error('transcrição vazou antes do consentimento')
+            resposta = tool('listar')
+          } else if (resultados.length === 1) {
+            const fontes = JSON.parse(ultimo!) as Array<{ artifactId: string; nome: string }>
+            const fonte = fontes.find(f => f.nome === 'frase.wav')
+            if (!fonte) throw new Error('áudio ausente')
+            resposta = tool('ler', { artifactId: fonte.artifactId })
+          } else {
+            const resultado = JSON.parse(ultimo!) as { texto?: string; representacao?: string }
+            if (resultado.representacao !== 'transcrição local de áudio' || !resultado.texto?.toLowerCase().includes('mesa') || !resultado.texto?.toLowerCase().includes('madeira')) throw new Error(`transcrição inesperada: ${ultimo}`)
+            resposta = texto('A frase menciona uma mesa de madeira.')
           }
         } else if (cenario === 'pdf' || cenario === 'audio' || cenario === 'video') {
           if (!resultados.length) resposta = tool('listar')
@@ -329,12 +343,35 @@ for (const modalidade of ['pdf', 'audio', 'video'] as const) {
     await page.getByRole('button', { name: 'Enviar mensagem' }).click()
     await page.getByRole('dialog', { name: 'Enviar só o texto e manter os arquivos anexados?' }).getByRole('button', { name: 'Continuar com o texto' }).click()
     await permitir(page, arquivo.nome, 1)
-    await permitir(page, modalidade === 'pdf' ? 'texto extraído de PDF' : 'motivo de indisponibilidade', 2)
+    await permitir(page, modalidade === 'pdf' ? 'texto extraído de PDF' : modalidade === 'audio' ? 'Transcrever localmente' : 'motivo de indisponibilidade', 2)
     await expect(page.getByText(modalidade === 'pdf' ? 'PDF contém Valor sintetico 742.' : `Análise de ${modalidade} indisponível.`)).toBeVisible({ timeout: 30_000 })
-    if (modalidade !== 'pdf') await expect(page.getByText(modalidade === 'audio' ? /Transcrição de áudio ainda não está disponível/ : /Extração de quadros ou transcrição de vídeo ainda não está disponível/)).toBeVisible()
+    if (modalidade !== 'pdf') await expect(page.getByText(modalidade === 'audio' ? /Transcrição local de áudio indisponível/ : /Extração de quadros ou transcrição de vídeo ainda não está disponível/)).toBeVisible()
     expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
   })
 }
+
+test('áudio WAV: transcrição local autorizada chega ao provedor simulado sem enviar o original', async ({ page }) => {
+  test.skip(!process.env.AGENTE_WINDOW_WHISPER_PYTHON || !process.env.AGENTE_WINDOW_WHISPER_MODEL, 'Transcritor local não configurado')
+  cenario = 'audio-real'; pedidos = []; erroFixture = ''
+  await page.goto(base)
+  await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
+  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('O que a frase gravada menciona?')
+  await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'frase.wav', mimeType: 'audio/wav', buffer: readFileSync(resolve('e2e/fixtures/frase-lanterna.wav')) })
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await page.getByRole('dialog', { name: 'Enviar só o texto e manter os arquivos anexados?' }).getByRole('button', { name: 'Continuar com o texto' }).click()
+  await permitir(page, 'frase.wav', 1)
+  await permitir(page, 'Transcrever localmente', 2)
+  await expect(page.getByText('A frase menciona uma mesa de madeira.')).toBeVisible({ timeout: 100_000 })
+  expect(erroFixture).toBe(''); expect(pedidos).toHaveLength(3)
+  expect(JSON.stringify(pedidos)).not.toContain('UklGR')
+  const sid = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
+  const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
+  const registro = await (await page.request.get(`${base}/api/sessions/${sid}`, { headers })).json()
+  const attachments = `${base}/api/sessions/${sid}/chats/${registro.session.mainChatId}/attachments`
+  const artigos = await (await page.request.get(attachments, { headers })).json()
+  const item = (artigos.attachments as Array<{ name: string; artifactId: string }>).find(a => a.name === 'frase.wav')!
+  expect((await (await page.request.get(`${attachments}/${item.artifactId}?download=1`, { headers })).body()).equals(readFileSync(resolve('e2e/fixtures/frase-lanterna.wav')))).toBe(true)
+})
 
 test('edição do projeto chega ao agente somente após autorização, preservando o original', async ({ page }) => {
   nomeTrabalho = 'trabalho.txt'; cenario = 'aguardar'; pedidos = []; erroFixture = ''

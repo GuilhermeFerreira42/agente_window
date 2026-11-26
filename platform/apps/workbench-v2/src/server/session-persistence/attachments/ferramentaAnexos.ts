@@ -51,11 +51,24 @@ export async function prepararInspecaoAgente(dono: { sessionId: string; chatId: 
       }
     } else if (acao === 'ler') {
       if (pedido.indice !== undefined) throw new Error('Parâmetros inválidos.')
-      const texto = await inspecionarTextoConversa(sessionId, chatId, id, sinal)
-      previa = texto.disponivel ? `Enviar ao modelo o ${texto.representacao} do anexo ${fonte.nome}.` : `Enviar ao modelo o motivo de indisponibilidade de análise do anexo ${fonte.nome}; o original não será enviado.`
-      operacao = async () => {
-        await verificar()
-        return { ok: true, resumo: texto.disponivel ? `Texto extraído de ${fonte.nome}.` : texto.motivo, conteudo: JSON.stringify(texto) }
+      // Reconhecimento é uma inspeção local: somente após autorização. A
+      // confirmação também abrange o envio da transcrição (nunca do áudio) ao
+      // destino selecionado. Outras representações seguem o fluxo existente.
+      if (fonte.nome.toLowerCase().endsWith('.wav')) {
+        previa = `Transcrever localmente em português o áudio ${fonte.nome} e enviar ao modelo a transcrição, ou o motivo de indisponibilidade. O áudio original não será enviado; a transcrição automática pode conter erros.`
+        operacao = async () => {
+          await verificar()
+          const texto = await inspecionarTextoConversa(sessionId, chatId, id, sinal)
+          await verificar()
+          return { ok: true, resumo: texto.disponivel ? `Transcrição local de ${fonte.nome}.` : texto.motivo, conteudo: JSON.stringify(texto) }
+        }
+      } else {
+        const texto = await inspecionarTextoConversa(sessionId, chatId, id, sinal)
+        previa = texto.disponivel ? `Enviar ao modelo o ${texto.representacao} do anexo ${fonte.nome}.` : `Enviar ao modelo o motivo de indisponibilidade de análise do anexo ${fonte.nome}; o original não será enviado.`
+        operacao = async () => {
+          await verificar()
+          return { ok: true, resumo: texto.disponivel ? `Texto extraído de ${fonte.nome}.` : texto.motivo, conteudo: JSON.stringify(texto) }
+        }
       }
     } else throw new Error('Ação de anexo desconhecida.')
   }
