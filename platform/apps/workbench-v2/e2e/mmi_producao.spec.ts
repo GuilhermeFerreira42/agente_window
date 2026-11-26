@@ -47,6 +47,8 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   expect((await request.post(`${fs}/write`, { headers, data: { uri: `${raizA}/anexo.txt`, content: 'versão editada' } })).status()).toBe(204)
   expect((await request.post(`${fs}/rename`, { headers, data: { from: `${raizA}/anexo.txt`, to: `${raizA}/alterado.txt` } })).status()).toBe(204)
   expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
+  expect((await request.post(`${fs}/delete`, { headers, data: { uri: `${raizA}/alterado.txt` } })).status()).toBe(204)
+  expect((await request.post(`${fs}/createFile`, { headers, data: { uri: `${raizA}/alterado.txt`, content: 'arquivo substituto' } })).status()).toBe(201)
   const arquivo = `${raizA}/producao.txt`
   const socket = new WebSocket(`ws://127.0.0.1:${port}/api/explorer/${sid}/${a}/fs/watch`, { origin: base })
   try {
@@ -69,7 +71,7 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   expect(await root(a)).toBe(raizA)
   const lido = await request.get(`${base}/api/explorer/${sid}/${a}/fs/read?uri=${encodeURIComponent(arquivo)}`, { headers })
   expect((await lido.json()).content).toBe('privado')
-  expect((await (await request.get(`${fs}/read?uri=${encodeURIComponent(`${raizA}/alterado.txt`)}`, { headers })).json()).content).toBe('versão editada')
+  expect((await (await request.get(`${fs}/read?uri=${encodeURIComponent(`${raizA}/alterado.txt`)}`, { headers })).json()).content).toBe('arquivo substituto')
   expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
   await page.goto(base)
   await page.locator('.session-row').filter({ hasText: 'Explorer de produção' }).first().click()

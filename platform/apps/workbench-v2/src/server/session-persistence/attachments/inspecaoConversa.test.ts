@@ -13,6 +13,7 @@ import { zipDeTeste } from './zipFixture.test-helper'
 import { prepararInspecaoAgente } from './ferramentaAnexos'
 import { resolverRaizExplorer } from '../raizExplorer'
 import { obterVinculoTrabalho } from './trabalhoPrivado'
+import { excluirNoExplorerPrivado } from '../movimentoPrivado'
 
 const sid = '99999999-9999-4999-8999-222222222222'
 const a = `${sid}-a`, b = `${sid}-b`
@@ -89,6 +90,19 @@ describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
     await expect(lerFonteConversa(sid, a, id, 100)).rejects.toThrow()
     expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
     await expect(lerFonteConversa(sid, b, id, 100)).rejects.toThrow()
+  })
+  it('exclusão mediada mantém original e não vincula substituto após reinício', async () => {
+    const id = await anexar(a, 'nota.txt', Buffer.from('ORIGINAL'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    const alvo = join(raiz, 'nota.txt')
+    await excluirNoExplorerPrivado(sid, a, { assertSafeUri: () => alvo }, 'file:///nota.txt', false)
+    writeFileSync(alvo, 'SUBSTITUTO')
+    resetDatabase()
+    expect((await listarFontesConversa(sid, a))[0].estado).toBe('trabalho_ausente')
+    await expect(lerFonteConversa(sid, a, id, 100)).rejects.toThrow()
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync(alvo, 'utf8')).toBe('SUBSTITUTO')
+    await expect(excluirNoExplorerPrivado(sid, b, { assertSafeUri: () => alvo }, 'file:///nota.txt', false)).rejects.toThrow()
   })
   it('migração do privado não sobrescreve nome de trabalho existente', async () => {
     const raiz = (await resolverRaizExplorer(sid, a)).raiz

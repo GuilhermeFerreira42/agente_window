@@ -897,7 +897,19 @@ exclusivo evita sobrescrever destino existente; a recuperação cobre interrupç
 entre link e remoção. Vitest focado 30/30; typecheck, lint direcionado e teste do
 servidor compilado 1/1 passaram. Verificação de caminho
 continua sujeita a corrida entre checagem e syscall, não é sandbox físico.
-**Retomada exata:** implementar exclusão seguida de recriação sem substituição,
-projeto compartilhado e recuperação/conflitos equivalentes; repetir jornadas no
-servidor de produção. Depois implementar áudio/vídeo reais e os demais gates.
+**Retomada exata:** implementar projeto compartilhado e recuperação/conflitos
+equivalentes; repetir jornadas no servidor de produção. Depois implementar
+áudio/vídeo reais e os demais gates.
 Não homologar nem iniciar MM-O.
+
+**Exclusão de trabalho em Chat:** antes de remover arquivo ou pasta via Explorer,
+o ledger marca os vínculos afetados como indisponíveis; um arquivo recriado no
+mesmo caminho não substitui o original nem vira o trabalho do anexo. Em erro ou
+interrupção, a operação é conservadora: o vínculo pode permanecer indisponível
+mesmo se parte dos arquivos ainda existir, e é necessário conferir a árvore.
+Playwright com provedor simulado demonstrou edição, movimento, exclusão,
+recriação, reinício e resposta de ausência sem vazar o substituto; o download
+histórico permaneceu íntegro (1/1). Vitest 40/40, typecheck, lint direcionado e
+smoke do servidor compilado 1/1 passaram em Linux. Isso não cobre exclusão por
+shell externo nem substitui a validação Windows. Próximo: projeto compartilhado,
+audio/vídeo funcionais e testes integrados restantes; MM-I não concluída.

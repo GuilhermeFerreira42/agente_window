@@ -6,7 +6,7 @@ import { copyFile, link, lstat, mkdir, statfs, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { getDatabase } from '../database'
 import { raizPrivadaDaConversa } from '../raizPrivadaChat'
-import { recuperarMovimentoPrivadoSobFila, trabalhoComMovimentoPendente } from '../movimentoPrivado'
+import { recuperarMovimentoPrivadoSobFila, trabalhoComMovimentoPendente, trabalhoMarcadoAusente } from '../movimentoPrivado'
 import { PersistenceProblem } from '../persistenceErrors'
 import { listarArtigosChat } from './catalogo'
 import { garantirDiretorioReal } from './contencao'
@@ -19,7 +19,7 @@ const hash = (valor: string) => createHash('sha256').update(valor).digest('hex')
 const sqlSelect = `SELECT artifact_id AS artifactId, session_id AS sessionId, chat_id AS chatId, locator, state FROM attachment_working_files WHERE artifact_id = ?`
 export function obterVinculoTrabalho(artifactId: string): VinculoTrabalho | undefined {
   const vinculo = getDatabase().prepare(sqlSelect).get(artifactId) as VinculoTrabalho | undefined
-  if (vinculo && trabalhoComMovimentoPendente(vinculo.sessionId, vinculo.chatId, artifactId)) return undefined
+  if (vinculo && (trabalhoMarcadoAusente(vinculo.sessionId, vinculo.chatId, artifactId) || trabalhoComMovimentoPendente(vinculo.sessionId, vinculo.chatId, artifactId))) return undefined
   return vinculo
 }
 function nomeAlternativo(nome: string, indice: number): string {
@@ -49,6 +49,7 @@ async function mesmaEtapa(stage: string, destino: string): Promise<boolean> {
 
 /** Vincula uma única vez. Um vínculo pronto nunca é recriado após exclusão. */
 async function prepararArtigo(artigo: LinhaArtigo, raiz: string): Promise<void> {
+  if (trabalhoMarcadoAusente(artigo.sessionId, artigo.chatId, artigo.artifactId)) return
   if (!seguro(artigo.name)) throw new PersistenceProblem(409, 'source_unavailable', 'Nome de trabalho inválido.')
   const db = getDatabase()
   let vinculo = obterVinculoTrabalho(artigo.artifactId)

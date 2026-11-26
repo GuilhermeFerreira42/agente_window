@@ -6,7 +6,7 @@ import type { Plugin } from 'vite'
 import { WebSocketServer } from 'ws'
 import { resolverRaizExplorer } from './raizExplorer'
 import { PersistenceProblem } from './persistenceErrors'
-import { moverNoExplorerPrivado } from './movimentoPrivado'
+import { excluirNoExplorerPrivado, moverNoExplorerPrivado } from './movimentoPrivado'
 type WorkspaceUri = `file://${string}`
 interface ExplorerFsServer {
   tryHandleHttp(req: IncomingMessage, res: ServerResponse): Promise<boolean>
@@ -78,7 +78,8 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
           if (!pedido) return false
           const contexto = await obter(pedido)
           if (pedido.sufixo.startsWith('/git/') && contexto.tipo === 'chat') throw new PersistenceProblem(403, 'git_unavailable', 'Git não está disponível na raiz privada do chat.')
-          if (contexto.tipo === 'chat' && req.method === 'POST' && pedido.sufixo.split('?')[0] === '/fs/rename') {
+          const operacao = pedido.sufixo.split('?')[0]
+          if (contexto.tipo === 'chat' && req.method === 'POST' && (operacao === '/fs/rename' || operacao === '/fs/delete')) {
             const partes: Buffer[] = []; let tamanho = 0
             for await (const parte of req) {
               const bytes = Buffer.isBuffer(parte) ? parte : Buffer.from(parte)
@@ -88,9 +89,15 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
             }
             let corpo: unknown
             try { corpo = JSON.parse(Buffer.concat(partes).toString('utf8')) } catch { throw new PersistenceProblem(400, 'invalid_json', 'Pedido inválido.') }
-            const dados = corpo as { from?: unknown; to?: unknown } | null
-            if (!dados || typeof dados.from !== 'string' || typeof dados.to !== 'string' || !dados.from.startsWith('file://') || !dados.to.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
-            await moverNoExplorerPrivado(pedido.sessionId, pedido.chatId, criarHostPrivado(contexto.raiz as WorkspaceUri), dados.from as WorkspaceUri, dados.to as WorkspaceUri)
+            const dados = corpo as { from?: unknown; to?: unknown; uri?: unknown; recursive?: unknown } | null
+            const host = criarHostPrivado(contexto.raiz as WorkspaceUri)
+            if (operacao === '/fs/rename') {
+              if (!dados || typeof dados.from !== 'string' || typeof dados.to !== 'string' || !dados.from.startsWith('file://') || !dados.to.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
+              await moverNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.from as WorkspaceUri, dados.to as WorkspaceUri)
+            } else {
+              if (!dados || typeof dados.uri !== 'string' || !dados.uri.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
+              await excluirNoExplorerPrivado(pedido.sessionId, pedido.chatId, host, dados.uri as WorkspaceUri, dados.recursive === true)
+            }
             res.statusCode = 204; res.end(); return true
           }
           req.url = pedido.sufixo

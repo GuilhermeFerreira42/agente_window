@@ -14,8 +14,8 @@ const port = 5225, base = `http://127.0.0.1:${port}`, modelo = 'simulador-zip'
 const pergunta = 'Liste o conteúdo deste ZIP e leia o arquivo nota.txt.'
 const segredo = 'A resposta sintética é 742.'
 let server: Server, app: ChildProcess, raiz: string
-let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' | 'texto-projeto' = 'zip'
-let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = '', nomeTrabalho = 'trabalho.txt'
+let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' | 'texto-projeto' | 'ausente' = 'zip'
+let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = '', nomeTrabalho = 'trabalho.txt', idAusente = ''
 
 function tool(acao: string, args: Record<string, unknown> = {}) {
   return { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: `call-${pedidos.length}`, type: 'function', function: { name: 'anexos', arguments: JSON.stringify({ acao, ...args }) } }] } }] }
@@ -88,6 +88,14 @@ test.beforeAll(async () => {
             const resultado = JSON.parse(ultimo!) as { texto?: string; representacao?: string }
             if (resultado.texto !== 'EDIÇÃO PROJETO 917' || resultado.representacao !== 'texto UTF-8') throw new Error('o modelo não recebeu a edição de trabalho')
             resposta = texto('O arquivo de trabalho diz 917.')
+          }
+        } else if (cenario === 'ausente') {
+          if (!resultados.length) resposta = tool('listar')
+          else {
+            const fontes = JSON.parse(ultimo!) as Array<{ artifactId: string; estado?: string }>
+            if (fontes.find(f => f.artifactId === idAusente)?.estado !== 'trabalho_ausente') throw new Error('trabalho excluído não foi marcado como ausente')
+            if (JSON.stringify(corpo).includes('ARQUIVO ALHEIO')) throw new Error('arquivo substituto foi enviado')
+            resposta = texto('O arquivo de trabalho foi excluído.')
           }
         } else if (cenario === 'pdf' || cenario === 'audio' || cenario === 'video') {
           if (!resultados.length) resposta = tool('listar')
@@ -424,5 +432,15 @@ test('Chat: trabalho movido e renomeado continua acessível ao agente e original
   await permitir(page, 'renomeado.txt', 1)
   await permitir(page, 'texto UTF-8 do anexo renomeado.txt', 2)
   await expect(page.getByText('O arquivo de trabalho diz 917.').last()).toBeVisible({ timeout: 30_000 })
+  expect(erroFixture).toBe('')
+  expect((await page.request.post(`${fs}/delete`, { headers, data: { uri: atual } })).status()).toBe(204)
+  expect((await page.request.post(`${fs}/createFile`, { headers, data: { uri: atual, content: 'ARQUIVO ALHEIO' } })).status()).toBe(201)
+  expect((await (await page.request.get(`${attachments}/${id}?download=1`, { headers })).body()).toString()).toBe('ORIGINAL 315')
+  await pararApp(); await iniciarApp(); await page.reload()
+  cenario = 'ausente'; idAusente = id; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('O arquivo movido ainda existe?')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await permitir(page, 'trabalho.txt', 1)
+  await expect(page.getByText('O arquivo de trabalho foi excluído.').last()).toBeVisible({ timeout: 30_000 })
   expect(erroFixture).toBe('')
 })

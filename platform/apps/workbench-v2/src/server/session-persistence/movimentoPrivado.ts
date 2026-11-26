@@ -1,7 +1,7 @@
 // Rastreia movimentos feitos PELO Explorer na árvore privada. O ledger de
 // intenção é gravado antes da operação e só é resolvido por identidade; em
 // dúvida nenhuma cópia histórica é apresentada como trabalho atual.
-import { link, lstat, rename, unlink } from 'node:fs/promises'
+import { link, lstat, rename, rm, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { getDatabase } from './database'
 import { withSessionPersistenceQueue } from './filaSessao'
@@ -71,6 +71,10 @@ export async function recuperarMovimentoPrivadoSobFila(sessionId: string, chatId
 }
 
 /** Um vínculo pendente nunca pode ser lido pelo caminho anterior. */
+export function trabalhoMarcadoAusente(sessionId: string, chatId: string, artifactId: string): boolean {
+  return !!getDatabase().prepare('SELECT 1 FROM explorer_work_missing WHERE artifact_id = ? AND session_id = ? AND chat_id = ?').get(artifactId, sessionId, chatId)
+}
+
 export function trabalhoComMovimentoPendente(sessionId: string, chatId: string, artifactId: string): boolean {
   const pendente = obterIntencao(sessionId, chatId)
   if (!pendente) return false
@@ -91,6 +95,7 @@ export async function moverNoExplorerPrivado(sessionId: string, chatId: string, 
     const linhas = getDatabase().prepare("SELECT artifact_id AS artifactId, locator FROM attachment_working_files WHERE session_id = ? AND chat_id = ? AND state = 'pronto'").all(sessionId, chatId) as Array<{ artifactId: string; locator: string }>
     const itens: Item[] = []
     for (const linha of linhas) {
+      if (trabalhoMarcadoAusente(sessionId, chatId, linha.artifactId)) continue
       const absoluto = path.resolve(raiz, linha.locator), abaixo = path.relative(origem, absoluto)
       if (!dentro(raiz, absoluto)) return recusar('Vínculo de trabalho inválido.')
       if (abaixo === '' || (abaixo !== '..' && !abaixo.startsWith(`..${path.sep}`) && !path.isAbsolute(abaixo))) {
@@ -122,5 +127,36 @@ export async function moverNoExplorerPrivado(sessionId: string, chatId: string, 
       throw erro
     }
     if (itens.length) await recuperarMovimentoPrivadoSobFila(sessionId, chatId)
+  })
+}
+
+/** Marca os vínculos ANTES de remover. Falha ou interrupção pode deixar
+ * trabalho não confirmado, mas nunca troca a fonte por um arquivo recriado. */
+export async function excluirNoExplorerPrivado(sessionId: string, chatId: string, host: HostMovimento, uri: `file://${string}`, recursive: boolean): Promise<void> {
+  await withSessionPersistenceQueue(sessionId, async () => {
+    if (resolverDonoAnexos(sessionId, chatId).contextKind !== 'chat') return recusar('O contexto da conversa mudou.')
+    await recuperarMovimentoPrivadoSobFila(sessionId, chatId)
+    const raiz = raizPrivadaDaConversa(sessionId, chatId), alvo = host.assertSafeUri(uri)
+    if (!dentro(raiz, alvo)) return recusar('Não é permitido excluir a raiz da conversa.')
+    await garantirDiretorioReal(path.dirname(alvo))
+    const info = await verificar(alvo)
+    if (!info || info.isSymbolicLink()) return recusar('O alvo não está disponível.')
+    if (info.isDirectory() && !recursive) return recusar('A exclusão da pasta exige confirmação recursiva.')
+    const db = getDatabase()
+    const linhas = db.prepare("SELECT artifact_id AS artifactId, locator FROM attachment_working_files WHERE session_id = ? AND chat_id = ? AND state = 'pronto'").all(sessionId, chatId) as Array<{ artifactId: string; locator: string }>
+    const afetados = linhas.filter(linha => {
+      const absoluto = path.resolve(raiz, linha.locator), relativo = path.relative(alvo, absoluto)
+      if (!dentro(raiz, absoluto)) return recusar('Vínculo de trabalho inválido.')
+      return relativo === '' || (relativo !== '..' && !relativo.startsWith(`..${path.sep}`) && !path.isAbsolute(relativo))
+    })
+    db.transaction(() => {
+      const marcar = db.prepare('INSERT OR IGNORE INTO explorer_work_missing (artifact_id, session_id, chat_id) VALUES (?, ?, ?)')
+      for (const linha of afetados) marcar.run(linha.artifactId, sessionId, chatId)
+    }).immediate()
+    try { await rm(alvo, { recursive, force: false }) } catch {
+      // rm(recursive) pode ter efeito parcial. Não reata os vínculos nem
+      // anuncia ausência de efeito: o usuário deve conferir a árvore.
+      return recusar('A exclusão não foi confirmada e pode ter sido parcial. Confira a árvore; os vínculos afetados permanecem indisponíveis.')
+    }
   })
 }
