@@ -6,6 +6,7 @@ import { copyFile, link, lstat, mkdir, statfs, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { getDatabase } from '../database'
 import { raizPrivadaDaConversa } from '../raizPrivadaChat'
+import { recuperarMovimentoPrivadoSobFila, trabalhoComMovimentoPendente } from '../movimentoPrivado'
 import { PersistenceProblem } from '../persistenceErrors'
 import { listarArtigosChat } from './catalogo'
 import { garantirDiretorioReal } from './contencao'
@@ -17,7 +18,9 @@ export interface VinculoTrabalho { artifactId: string; sessionId: string; chatId
 const hash = (valor: string) => createHash('sha256').update(valor).digest('hex')
 const sqlSelect = `SELECT artifact_id AS artifactId, session_id AS sessionId, chat_id AS chatId, locator, state FROM attachment_working_files WHERE artifact_id = ?`
 export function obterVinculoTrabalho(artifactId: string): VinculoTrabalho | undefined {
-  return getDatabase().prepare(sqlSelect).get(artifactId) as VinculoTrabalho | undefined
+  const vinculo = getDatabase().prepare(sqlSelect).get(artifactId) as VinculoTrabalho | undefined
+  if (vinculo && trabalhoComMovimentoPendente(vinculo.sessionId, vinculo.chatId, artifactId)) return undefined
+  return vinculo
 }
 function nomeAlternativo(nome: string, indice: number): string {
   if (!indice) return nome
@@ -115,6 +118,7 @@ async function prepararArtigo(artigo: LinhaArtigo, raiz: string): Promise<void> 
 
 /** Migra uploads verificáveis, mas não torna uma falha em arquivo falso positivo. */
 export async function sincronizarTrabalhosPrivadosSobFila(sessionId: string, chatId: string): Promise<void> {
+  await recuperarMovimentoPrivadoSobFila(sessionId, chatId)
   const raiz = raizPrivadaDaConversa(sessionId, chatId)
   await garantirDiretorioReal(raiz); await mkdir(raiz, { recursive: true, mode: 0o700 }); await garantirDiretorioReal(raiz)
   const artigos = listarArtigosChat(sessionId, chatId).filter(a => a.rootKind === 'appdir' && a.mode === 'copy' && a.papel === 'upload-chat')

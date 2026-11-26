@@ -886,3 +886,18 @@ de criar a sessão. Typecheck/build e 31 testes focados passaram em Linux. Não 
 validado no Windows nem prova o fluxo completo de anexos no servidor compilado.
 Próximo passo: vínculo durável dos arquivos movidos/renomeados/excluídos; depois
 áudio/vídeo reais, regressões e roteiro único Windows. MM-I continua aberta.
+
+**Movimentos de trabalho em Chat, etapa parcial:** o `/fs/rename` contextual do
+Chat registra intenção antes do syscall e atualiza o vínculo por identidade,
+inclusive quando uma pasta inteira é movida; recuperação ambígua bloqueia em vez
+de escolher outra fonte. E2E com provedor simulado passou: upload, edição,
+movimento, renomeio da pasta, colisão recusada, reinício, aprovação e resposta com
+texto editado, preservando download do original. Para arquivos rastreados, link
+exclusivo evita sobrescrever destino existente; a recuperação cobre interrupção
+entre link e remoção. Vitest focado 30/30; typecheck, lint direcionado e teste do
+servidor compilado 1/1 passaram. Verificação de caminho
+continua sujeita a corrida entre checagem e syscall, não é sandbox físico.
+**Retomada exata:** implementar exclusão seguida de recriação sem substituição,
+projeto compartilhado e recuperação/conflitos equivalentes; repetir jornadas no
+servidor de produção. Depois implementar áudio/vídeo reais e os demais gates.
+Não homologar nem iniciar MM-O.

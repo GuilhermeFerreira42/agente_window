@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as filaSessao from '../filaSessao'
-import { getSessionRecord, resetDatabase, upsertSessionRecord } from '../database'
+import { getDatabase, getSessionRecord, resetDatabase, upsertSessionRecord } from '../database'
 import { admitirUpload, consultarUpload, lerArtigo, receberConteudo, reconciliarIdentidade } from './estoque'
 import { withSessionPersistenceQueue } from '../filaSessao'
 import { listarFontesConversa, lerFonteConversa, listarZipConversa, extrairItemZipConversa, inspecionarTextoConversa } from './inspecaoConversa'
@@ -33,6 +33,48 @@ async function anexar(chatId: string, nome: string, bytes: Buffer): Promise<stri
 }
 
 describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
+  it('recupera movimento comprovado após reinício, sem alterar o original', async () => {
+    const id = await anexar(a, 'antigo.txt', Buffer.from('ORIGINAL'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    const origem = join(raiz, 'antigo.txt'), destino = join(raiz, 'novo.txt')
+    writeFileSync(origem, 'EDIÇÃO')
+    const info = lstatSync(origem)
+    getDatabase().prepare('INSERT INTO explorer_work_moves (session_id, chat_id, origem, destino, dev, ino, itens) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(sid, a, origem, destino, String(info.dev), String(info.ino), JSON.stringify([{ artifactId: id, anterior: 'antigo.txt', novo: 'novo.txt' }]))
+    renameSync(origem, destino)
+    resetDatabase()
+    expect((await lerFonteConversa(sid, a, id, 100))).toMatchObject({ nome: 'novo.txt', bytes: Buffer.from('EDIÇÃO') })
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM explorer_work_moves').get()).toEqual({ n: 0 })
+  })
+  it('recupera publicação exclusiva interrompida entre link e remoção da origem', async () => {
+    const id = await anexar(a, 'antigo.txt', Buffer.from('ORIGINAL'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    const origem = join(raiz, 'antigo.txt'), destino = join(raiz, 'novo.txt')
+    const info = lstatSync(origem)
+    getDatabase().prepare('INSERT INTO explorer_work_moves (session_id, chat_id, origem, destino, dev, ino, itens) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(sid, a, origem, destino, String(info.dev), String(info.ino), JSON.stringify([{ artifactId: id, anterior: 'antigo.txt', novo: 'novo.txt' }]))
+    linkSync(origem, destino)
+    resetDatabase()
+    expect((await lerFonteConversa(sid, a, id, 100)).nome).toBe('novo.txt')
+    expect(existsSync(origem)).toBe(false)
+    expect(readFileSync(destino, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync((await lerArtigo(id)).caminho, 'utf8')).toBe('ORIGINAL')
+  })
+  it('estado ambíguo de movimento bloqueia leitura em vez de escolher outro arquivo', async () => {
+    const id = await anexar(a, 'antigo.txt', Buffer.from('ORIGINAL'))
+    const raiz = (await resolverRaizExplorer(sid, a)).raiz
+    const origem = join(raiz, 'antigo.txt'), destino = join(raiz, 'novo.txt')
+    const info = lstatSync(origem)
+    getDatabase().prepare('INSERT INTO explorer_work_moves (session_id, chat_id, origem, destino, dev, ino, itens) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(sid, a, origem, destino, String(info.dev), String(info.ino), JSON.stringify([{ artifactId: id, anterior: 'antigo.txt', novo: 'novo.txt' }]))
+    writeFileSync(destino, 'OUTRO ARQUIVO')
+    resetDatabase()
+    await expect(lerFonteConversa(sid, a, id, 100)).rejects.toThrow(/confirmar o movimento/)
+    expect(readFileSync(origem, 'utf8')).toBe('ORIGINAL')
+    expect(readFileSync(destino, 'utf8')).toBe('OUTRO ARQUIVO')
+    expect(getDatabase().prepare('SELECT COUNT(*) AS n FROM explorer_work_moves').get()).toEqual({ n: 1 })
+  })
   it('upload privado tem trabalho independente; edição e exclusão não alteram o original nem fazem fallback', async () => {
     const id = await anexar(a, 'nota.txt', Buffer.from('ORIGINAL'))
     const raiz = (await resolverRaizExplorer(sid, a)).raiz

@@ -6,6 +6,7 @@ import type { Plugin } from 'vite'
 import { WebSocketServer } from 'ws'
 import { resolverRaizExplorer } from './raizExplorer'
 import { PersistenceProblem } from './persistenceErrors'
+import { moverNoExplorerPrivado } from './movimentoPrivado'
 type WorkspaceUri = `file://${string}`
 interface ExplorerFsServer {
   tryHandleHttp(req: IncomingMessage, res: ServerResponse): Promise<boolean>
@@ -16,6 +17,7 @@ interface ExplorerGitServer { tryHandleHttp(req: IncomingMessage, res: ServerRes
 interface FabricaExplorer {
   createExplorerFsServer(options: { root: WorkspaceUri; rejectSymlinks: boolean; createWsServer: () => WebSocketServer }): Promise<ExplorerFsServer>
   createExplorerGitServer(options: { workspaceRoot: string }): ExplorerGitServer
+  criarHostPrivado(root: WorkspaceUri): { assertSafeUri(uri: WorkspaceUri): string }
 }
 
 const PREFIX = '/api/explorer/'
@@ -35,7 +37,7 @@ function parse(req: IncomingMessage): Pedido | null {
   return { sessionId, chatId, sufixo: `/${match[3]}/${match[4]}${url.search}` }
 }
 
-export function explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer }: FabricaExplorer): Plugin {
+export function explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHostPrivado }: FabricaExplorer): Plugin {
   const contextos = new Map<string, Contexto>()
   // Inicializações concorrentes do mesmo dono compartilham a mesma promessa.
   const criando = new Map<string, Promise<Contexto>>()
@@ -76,15 +78,31 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
           if (!pedido) return false
           const contexto = await obter(pedido)
           if (pedido.sufixo.startsWith('/git/') && contexto.tipo === 'chat') throw new PersistenceProblem(403, 'git_unavailable', 'Git não está disponível na raiz privada do chat.')
+          if (contexto.tipo === 'chat' && req.method === 'POST' && pedido.sufixo.split('?')[0] === '/fs/rename') {
+            const partes: Buffer[] = []; let tamanho = 0
+            for await (const parte of req) {
+              const bytes = Buffer.isBuffer(parte) ? parte : Buffer.from(parte)
+              tamanho += bytes.length
+              if (tamanho > 64 * 1024) throw new PersistenceProblem(413, 'payload_too_large', 'Pedido grande demais.')
+              partes.push(bytes)
+            }
+            let corpo: unknown
+            try { corpo = JSON.parse(Buffer.concat(partes).toString('utf8')) } catch { throw new PersistenceProblem(400, 'invalid_json', 'Pedido inválido.') }
+            const dados = corpo as { from?: unknown; to?: unknown } | null
+            if (!dados || typeof dados.from !== 'string' || typeof dados.to !== 'string' || !dados.from.startsWith('file://') || !dados.to.startsWith('file://')) throw new PersistenceProblem(400, 'invalid_path', 'Caminho inválido.')
+            await moverNoExplorerPrivado(pedido.sessionId, pedido.chatId, criarHostPrivado(contexto.raiz as WorkspaceUri), dados.from as WorkspaceUri, dados.to as WorkspaceUri)
+            res.statusCode = 204; res.end(); return true
+          }
           req.url = pedido.sufixo
           const tratado = await (pedido.sufixo.startsWith('/git/') ? contexto.git : contexto.fs).tryHandleHttp(req, res)
           if (!tratado) throw new PersistenceProblem(404, 'not_found', 'Rota do Explorer não encontrada.')
           return true
         })().then(tratado => { if (!tratado) next() }).catch((erro: unknown) => {
           if (res.headersSent) { res.destroy(); return }
-          res.statusCode = erro instanceof PersistenceProblem ? erro.status : 500
+          const codigo = erro instanceof PersistenceProblem ? erro.code : typeof (erro as { code?: unknown })?.code === 'string' ? (erro as { code: string }).code : 'explorer_error'
+          res.statusCode = erro instanceof PersistenceProblem ? erro.status : codigo === 'forbidden_path' ? 403 : codigo === 'file_exists' ? 409 : 500
           res.setHeader('Content-Type', 'application/json; charset=utf-8')
-          res.end(JSON.stringify({ code: erro instanceof PersistenceProblem ? erro.code : 'explorer_error', message: erro instanceof PersistenceProblem ? erro.message : 'Não foi possível acessar o Explorer.' }))
+          res.end(JSON.stringify({ code: codigo, message: erro instanceof PersistenceProblem ? erro.message : 'Não foi possível acessar o Explorer.' }))
         })
       })
       server.httpServer?.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {

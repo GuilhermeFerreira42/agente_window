@@ -35,6 +35,18 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   }
   const raizA = await root(a), raizB = await root(b)
   expect(raizA).not.toBe(raizB)
+  const anexos = `${base}/api/sessions/${sid}/chats/${a}/attachments`
+  const original = Buffer.from('original imutável')
+  const admissao = await request.post(`${anexos}/uploads`, { headers, data: { name: 'anexo.txt', bytes: original.length, mime: 'text/plain', mode: 'copy', scope: 'chat' } })
+  expect(admissao.status()).toBe(201)
+  const { uploadId } = await admissao.json()
+  const transferencia = await request.put(`${anexos}/uploads/${uploadId}/content`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: original })
+  expect(transferencia.status()).toBe(200)
+  const { artifactId } = await transferencia.json()
+  const fs = `${base}/api/explorer/${sid}/${a}/fs`
+  expect((await request.post(`${fs}/write`, { headers, data: { uri: `${raizA}/anexo.txt`, content: 'versão editada' } })).status()).toBe(204)
+  expect((await request.post(`${fs}/rename`, { headers, data: { from: `${raizA}/anexo.txt`, to: `${raizA}/alterado.txt` } })).status()).toBe(204)
+  expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
   const arquivo = `${raizA}/producao.txt`
   const socket = new WebSocket(`ws://127.0.0.1:${port}/api/explorer/${sid}/${a}/fs/watch`, { origin: base })
   try {
@@ -57,6 +69,8 @@ test('produção: sessão persistida e Explorer por chat sobrevivem reinício', 
   expect(await root(a)).toBe(raizA)
   const lido = await request.get(`${base}/api/explorer/${sid}/${a}/fs/read?uri=${encodeURIComponent(arquivo)}`, { headers })
   expect((await lido.json()).content).toBe('privado')
+  expect((await (await request.get(`${fs}/read?uri=${encodeURIComponent(`${raizA}/alterado.txt`)}`, { headers })).json()).content).toBe('versão editada')
+  expect((await (await request.get(`${anexos}/${artifactId}?download=1`, { headers })).body()).equals(original)).toBe(true)
   await page.goto(base)
   await page.locator('.session-row').filter({ hasText: 'Explorer de produção' }).first().click()
   await page.getByRole('tab', { name: 'A', exact: true }).click()

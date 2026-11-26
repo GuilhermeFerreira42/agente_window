@@ -15,7 +15,7 @@ const pergunta = 'Liste o conteúdo deste ZIP e leia o arquivo nota.txt.'
 const segredo = 'A resposta sintética é 742.'
 let server: Server, app: ChildProcess, raiz: string
 let cenario: 'aguardar' | 'zip' | 'cruzado' | 'cancelar' | 'pdf' | 'audio' | 'video' | 'texto-projeto' = 'zip'
-let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = ''
+let idAlheio = '', zipId = '', extraido = '', pedidos: Array<Record<string, unknown>> = [], erroFixture = '', nomeTrabalho = 'trabalho.txt'
 
 function tool(acao: string, args: Record<string, unknown> = {}) {
   return { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: `call-${pedidos.length}`, type: 'function', function: { name: 'anexos', arguments: JSON.stringify({ acao, ...args }) } }] } }] }
@@ -81,7 +81,7 @@ test.beforeAll(async () => {
             resposta = tool('listar')
           } else if (resultados.length === 1) {
             const fontes = JSON.parse(ultimo!) as Array<{ artifactId: string; nome: string; estado?: string }>
-            const fonte = fontes.find(f => f.nome === 'trabalho.txt')
+            const fonte = fontes.find(f => f.nome === nomeTrabalho)
             if (!fonte || fonte.estado !== 'trabalho') throw new Error('versão de trabalho não identificada')
             resposta = tool('ler', { artifactId: fonte.artifactId })
           } else {
@@ -329,7 +329,7 @@ for (const modalidade of ['pdf', 'audio', 'video'] as const) {
 }
 
 test('edição do projeto chega ao agente somente após autorização, preservando o original', async ({ page }) => {
-  cenario = 'aguardar'; pedidos = []; erroFixture = ''
+  nomeTrabalho = 'trabalho.txt'; cenario = 'aguardar'; pedidos = []; erroFixture = ''
   const workspace = join(raiz, 'projeto-texto'); mkdirSync(workspace)
   await page.goto(base)
   await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
@@ -387,5 +387,42 @@ test('ZIP no projeto usa fontes da conversa e extrai fora da árvore compartilha
   expect(readFileSync(join(raiz, 'data', 'uploads', 'chats', sid!, cid, extraido, 'nota.txt')).toString()).toBe(segredo)
   expect(existsSync(join(workspace, 'nota.txt'))).toBe(false)
   expect(readFileSync(join(workspace, 'projeto.txt')).toString()).toBe('árvore do projeto preservada')
+  expect(erroFixture).toBe('')
+})
+
+test('Chat: trabalho movido e renomeado continua acessível ao agente e original é preservado', async ({ page }) => {
+  cenario = 'aguardar'; pedidos = []; erroFixture = ''; nomeTrabalho = 'renomeado.txt'
+  await page.goto(base)
+  await page.locator('.sessions-sidebar').getByRole('button', { name: 'Nova sessão' }).first().click()
+  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Aguarde instruções.')
+  await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'trabalho.txt', mimeType: 'text/plain', buffer: Buffer.from('ORIGINAL 315') })
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await expect(page.getByText('Aguardarei instruções.').last()).toBeVisible({ timeout: 30_000 })
+  const sid = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
+  const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
+  const sessao = await (await page.request.get(`${base}/api/sessions/${sid}`, { headers })).json()
+  const chat = sessao.session.mainChatId
+  const attachments = `${base}/api/sessions/${sid}/chats/${chat}/attachments`
+  const lista = await (await page.request.get(attachments, { headers })).json()
+  const id = lista.attachments.find((a: { name: string }) => a.name === 'trabalho.txt').artifactId
+  const fs = `${base}/api/explorer/${sid}/${chat}/fs`
+  const raizUri = (await (await page.request.get(`${fs}/root`, { headers })).json()).root
+  const origem = `${raizUri}/trabalho.txt`, destino = `${raizUri}/subpasta/renomeado.txt`
+  expect((await page.request.post(`${fs}/mkdir`, { headers, data: { uri: `${raizUri}/subpasta` } })).status()).toBe(201)
+  expect((await page.request.post(`${fs}/write`, { headers, data: { uri: origem, content: 'EDIÇÃO PROJETO 917' } })).status()).toBe(204)
+  expect((await page.request.post(`${fs}/rename`, { headers, data: { from: origem, to: destino } })).status()).toBe(204)
+  expect((await page.request.post(`${fs}/rename`, { headers, data: { from: `${raizUri}/subpasta`, to: `${raizUri}/outra` } })).status()).toBe(204)
+  const atual = `${raizUri}/outra/renomeado.txt`, colisao = `${raizUri}/ocupado.txt`
+  expect((await page.request.post(`${fs}/createFile`, { headers, data: { uri: colisao, content: 'CONSERVADO' } })).status()).toBe(201)
+  expect((await page.request.post(`${fs}/rename`, { headers, data: { from: atual, to: colisao } })).status()).toBe(409)
+  expect((await (await page.request.get(`${fs}/read?uri=${encodeURIComponent(colisao)}`, { headers })).json()).content).toBe('CONSERVADO')
+  expect((await (await page.request.get(`${attachments}/${id}?download=1`, { headers })).body()).toString()).toBe('ORIGINAL 315')
+  await pararApp(); await iniciarApp(); await page.reload()
+  cenario = 'texto-projeto'; pedidos = []
+  await page.getByRole('textbox', { name: 'Mensagem para o agente' }).fill('Leia o arquivo movido.')
+  await page.getByRole('button', { name: 'Enviar mensagem' }).click()
+  await permitir(page, 'renomeado.txt', 1)
+  await permitir(page, 'texto UTF-8 do anexo renomeado.txt', 2)
+  await expect(page.getByText('O arquivo de trabalho diz 917.').last()).toBeVisible({ timeout: 30_000 })
   expect(erroFixture).toBe('')
 })

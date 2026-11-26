@@ -18,6 +18,7 @@ export async function limparRaizPrivadaDaSessao(sessionId: string, opcoes: Opcoe
   const concluir = db.transaction((destino: string | null) => {
     db.prepare("UPDATE explorer_cleanup SET state = 'concluido', destino = ? WHERE session_id = ?").run(destino, sessionId)
     db.prepare('DELETE FROM attachment_working_files WHERE session_id = ?').run(sessionId)
+    db.prepare('DELETE FROM explorer_work_moves WHERE session_id = ?').run(sessionId)
   })
   let plano = obter()
   if (plano?.state === 'concluido') return true

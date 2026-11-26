@@ -51,7 +51,7 @@ export interface LinhaArtigo {
   createdAt: number
 }
 
-const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_working_files', 'explorer_cleanup'] as const
+const TABELAS = ['attachment_uploads', 'attachment_artifacts', 'attachment_cleanup_plan', 'attachment_recovery_plans', 'attachment_working_files', 'explorer_cleanup', 'explorer_work_moves'] as const
 
 const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
   attachment_uploads: [
@@ -71,6 +71,7 @@ const COLUNAS: Record<(typeof TABELAS)[number], string[]> = {
   ],
   attachment_working_files: ['artifact_id', 'session_id', 'chat_id', 'locator', 'state'],
   explorer_cleanup: ['session_id', 'state', 'dev', 'ino', 'destino'],
+  explorer_work_moves: ['session_id', 'chat_id', 'origem', 'destino', 'dev', 'ino', 'itens'],
 }
 
 /** Cria as tabelas aditivas na primeira conexão (chamado por getDatabase). */
@@ -134,6 +135,16 @@ export function criarTabelasAnexos(db: Database.Database): void {
       destino TEXT,
       motivo TEXT,
       PRIMARY KEY (session_id, artifact_id)
+    );
+    CREATE TABLE IF NOT EXISTS explorer_work_moves (
+      session_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
+      origem TEXT NOT NULL,
+      destino TEXT NOT NULL,
+      dev TEXT NOT NULL,
+      ino TEXT NOT NULL,
+      itens TEXT NOT NULL,
+      PRIMARY KEY (session_id, chat_id)
     );
     CREATE TABLE IF NOT EXISTS explorer_cleanup (
       session_id TEXT PRIMARY KEY,

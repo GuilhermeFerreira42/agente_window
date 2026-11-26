@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { assertNodePtyAvailable, createPtyWebSocketBridge, PTY_WS_PATH } from '../../../platform/services/pty-server/dist/singlePort.js'
 import { WebSocketServer } from 'ws'
 import { createExplorerFsServer, FS_WATCH_PATH } from './dist-fs-server/server/fs/index.js'
+import { FsHost } from './dist-fs-server/server/fs/fsHost.js'
 import { createExplorerGitServer, GIT_HTTP_PREFIX } from './dist-fs-server/server/git/index.js'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 import { sessionPersistencePlugin, explorerContextualPlugin } from './dist-backend/backend.mjs'
@@ -96,7 +97,7 @@ async function start() {
   })
   const contexto = { middlewares: { use: middleware => middlewares.push(middleware) }, httpServer: server }
   sessionPersistencePlugin({ repoRoot: path.resolve(__dirname, '../../..') }).configureServer(contexto)
-  explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer }).configureServer(contexto)
+  explorerContextualPlugin({ createExplorerFsServer, createExplorerGitServer, criarHostPrivado: root => new FsHost(root, true) }).configureServer(contexto)
 
   function servir(req, res) {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`)
