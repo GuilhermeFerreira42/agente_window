@@ -24,6 +24,7 @@ import { getAppDir } from '../paths'
 import { PersistenceProblem } from '../persistenceErrors'
 import { consultarDelecao } from '../deletions'
 import { withSessionPersistenceQueue } from '../filaSessao'
+import { comFilaProjeto } from '../movimentoProjeto'
 import {
   atualizarUpload, bytesPublicadosChat, finalizarPublicacao, listarUploads, obterArtigo, obterUpload,
   obterUploadPorId, reivindicarEscritor, reservarAdmissao, uploadsAtivos,
@@ -232,7 +233,8 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
     ? await raizCanonica(entrada.workspaceRoot)
     : null
 
-  return filaDe(entrada.sessionId, opcoes)(async () => {
+  return filaDe(entrada.sessionId, opcoes)(() => {
+    const admitir = async () => {
     exigirDonoVivo(entrada.sessionId)
     const reserva = reservarAdmissao(entrada.sessionId, entrada.chatId, (ativos) => {
       const existente = obterUpload(entrada.sessionId, entrada.chatId, uploadId)
@@ -296,6 +298,8 @@ export async function admitirUpload(entrada: EntradaAdmissao, opcoes: OpcoesEsto
       await garantirVolume(caminhoFinalChat(opcoes.appDir, reaberta.sessionId, reaberta.chatId, reaberta.artifactId, reaberta.name), entrada.declaredBytes ?? 0, politica)
     }
     return reciboDe(reaberta)
+    }
+    return raizWorkspace ? comFilaProjeto(raizWorkspace, admitir) : admitir()
   })
 }
 

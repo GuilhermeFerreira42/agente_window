@@ -2,6 +2,7 @@
 // A disponibilidade exige configuração explícita do operador; o modelo permanece
 // fora do repositório. O chamador deve obter consentimento antes de chamar.
 import { spawn } from 'node:child_process'
+import { ambienteMultimidia } from './ambienteMultimidia'
 
 const MAX_BYTES = 2 * 1024 * 1024
 const MAX_TEXTO = 16_000
@@ -22,7 +23,9 @@ try:
         raise ValueError('dados')
     amostras = np.frombuffer(frames, dtype='<i2').astype(np.float32) / 32768.0
     modelo = WhisperModel(os.environ['AGENTE_WINDOW_WHISPER_MODEL'], device='cpu', compute_type='int8', cpu_threads=2, local_files_only=True)
-    segmentos, info = modelo.transcribe(amostras, language='pt', beam_size=3, vad_filter=False)
+    # Sem fallback de amostragem aleatória: a mesma fonte deve produzir uma
+    # transcrição reproduzível; isso não elimina erros do modelo.
+    segmentos, info = modelo.transcribe(amostras, language='pt', beam_size=3, vad_filter=False, temperature=0.0)
     texto = ' '.join(segmento.text.strip() for segmento in segmentos).strip()
     if not texto or len(texto) > 16000:
         raise ValueError('texto')
@@ -40,7 +43,7 @@ export async function transcreverAudioLocal(bytes: Buffer, sinal?: AbortSignal):
   try {
     return await new Promise(resolve => {
       let finalizado = false, saida = '', tamanho = 0
-      const filho = spawn(python, ['-I', '-c', programa], { stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', OMP_NUM_THREADS: '2' }, windowsHide: true })
+      const filho = spawn(python, ['-I', '-c', programa], { stdio: ['pipe', 'pipe', 'ignore'], env: ambienteMultimidia({ AGENTE_WINDOW_WHISPER_MODEL: modelo, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', OMP_NUM_THREADS: '2' }), windowsHide: true })
       const finalizar = (valor: { texto: string; idioma: string } | null) => {
         if (finalizado) return
         finalizado = true; clearTimeout(relogio); sinal?.removeEventListener('abort', cancelar)

@@ -39,7 +39,7 @@ describe('fontes mediadas por conversa: catálogo e leitura limitada', () => {
     const raiz = (await resolverRaizExplorer(sid, a)).raiz
     await expect(prepararInspecaoAgente({ sessionId: sid, chatId: b }, { acao: 'analisar_video', artifactId: id })).rejects.toThrow()
     const plano = await prepararInspecaoAgente({ sessionId: sid, chatId: a }, { acao: 'analisar_video', artifactId: id })
-    expect(plano.previa).toContain('primeiro quadro visual')
+    expect(plano.previa).toContain('quadro selecionado próximo à metade')
     expect(plano.quadro).toBeDefined()
     writeFileSync(join(raiz, 'video.mp4'), 'OUTRO')
     await expect(plano.quadro!.ler()).rejects.toThrow(/mudou/)

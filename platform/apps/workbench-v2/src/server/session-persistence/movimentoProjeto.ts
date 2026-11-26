@@ -17,7 +17,7 @@ type Registro = { origem: string; destino: string; dev: string; ino: string; ite
 type Fonte = { artifactId: string; sessionId: string; chatId: string; locator: string; missing: number }
 type Host = { assertSafeUri(uri: `file://${string}`): string }
 const filas = new Map<string, Promise<void>>()
-function naRaiz<T>(raiz: string, operacao: () => Promise<T>): Promise<T> {
+export function comFilaProjeto<T>(raiz: string, operacao: () => Promise<T>): Promise<T> {
   const anterior = filas.get(raiz) ?? Promise.resolve()
   let liberar!: () => void
   const bloqueio = new Promise<void>(resolve => { liberar = resolve })
@@ -92,6 +92,14 @@ function selecionar(raiz: string, alvo: string): Fonte[] {
     return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel))
   })
 }
+function recusarTransferenciaAtiva(raiz: string, ...alvos: string[]): void {
+  const linhas = getDatabase().prepare("SELECT stage_path AS stage, final_path AS final FROM attachment_uploads WHERE workspace_root = ? AND state IN ('admitido', 'recebendo', 'preparado')").all(raiz) as Array<{ stage: string | null; final: string | null }>
+  for (const linha of linhas) for (const caminho of [linha.stage, linha.final]) {
+    if (caminho && alvos.some(alvo => path.resolve(alvo) === path.resolve(caminho) || dentro(alvo, caminho))) {
+      throw new PersistenceProblem(409, 'upload_in_flight', 'Há transferência em andamento nesta pasta. Conclua ou cancele antes de mover ou excluir.')
+    }
+  }
+}
 function inserirVinculos(raiz: string, itens: Fonte[]): void {
   const inserir = getDatabase().prepare('INSERT OR IGNORE INTO explorer_project_work (artifact_id, session_id, chat_id, root, locator, missing) VALUES (?, ?, ?, ?, ?, 0)')
   for (const item of itens) inserir.run(item.artifactId, item.sessionId, item.chatId, raiz, item.locator)
@@ -110,24 +118,25 @@ async function preservarLegados(raiz: string, afetados: Fonte[]): Promise<void> 
 }
 
 /** Chamador já está sob a fila da sessão e validou o dono do artefato. */
-export async function caminhoDeTrabalhoProjeto(artigo: LinhaArtigo): Promise<string> {
+export async function usarTrabalhoProjeto<T>(artigo: LinhaArtigo, operacao: (caminho: string) => Promise<T>): Promise<T> {
   const raiz = artigo.workspaceRoot
   if (!raiz) return recusar('Projeto indisponível.')
-  return naRaiz(raiz, async () => {
+  return comFilaProjeto(raiz, async () => {
     await recuperar(raiz)
     const vinculo = getDatabase().prepare('SELECT root, locator, missing FROM explorer_project_work WHERE artifact_id = ? AND session_id = ? AND chat_id = ?').get(artigo.artifactId, artigo.sessionId, artigo.chatId) as { root: string; locator: string; missing: number } | undefined
     if (vinculo && (vinculo.root !== raiz || vinculo.missing)) return recusar('O arquivo de trabalho foi excluído ou está indisponível.')
     const alvo = path.resolve(raiz, vinculo?.locator ?? artigo.locator)
     if (!dentro(raiz, alvo)) return recusar('Vínculo do projeto inválido.')
-    return alvo
+    return operacao(alvo)
   })
 }
 
 export async function moverNoExplorerProjeto(sessionId: string, chatId: string, raiz: string, host: Host, from: `file://${string}`, to: `file://${string}`): Promise<void> {
-  await withSessionPersistenceQueue(sessionId, () => naRaiz(raiz, async () => {
+  await withSessionPersistenceQueue(sessionId, () => comFilaProjeto(raiz, async () => {
     validarRaiz(sessionId, chatId, raiz); await recuperar(raiz)
     const origem = host.assertSafeUri(from), destino = host.assertSafeUri(to)
     if (!dentro(raiz, origem) || !dentro(raiz, destino)) return recusar('Não é permitido mover a raiz do projeto.')
+    recusarTransferenciaAtiva(raiz, origem, destino)
     await garantirDiretorioReal(path.dirname(origem)); await garantirDiretorioReal(path.dirname(destino))
     const info = await verificar(origem)
     if (!info || info.isSymbolicLink()) return recusar('A origem não está disponível.')
@@ -159,10 +168,11 @@ export async function moverNoExplorerProjeto(sessionId: string, chatId: string, 
 }
 
 export async function excluirNoExplorerProjeto(sessionId: string, chatId: string, raiz: string, host: Host, uri: `file://${string}`, recursive: boolean): Promise<void> {
-  await withSessionPersistenceQueue(sessionId, () => naRaiz(raiz, async () => {
+  await withSessionPersistenceQueue(sessionId, () => comFilaProjeto(raiz, async () => {
     validarRaiz(sessionId, chatId, raiz); await recuperar(raiz)
     const alvo = host.assertSafeUri(uri)
     if (!dentro(raiz, alvo)) return recusar('Não é permitido excluir a raiz do projeto.')
+    recusarTransferenciaAtiva(raiz, alvo)
     await garantirDiretorioReal(path.dirname(alvo))
     const info = await verificar(alvo)
     if (!info || info.isSymbolicLink()) return recusar('O alvo não está disponível.')

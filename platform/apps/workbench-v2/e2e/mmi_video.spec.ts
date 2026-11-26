@@ -46,13 +46,13 @@ test.beforeAll(async () => {
             if (analise.disponivel !== false || !analise.motivo?.includes('não foi comprovado')) throw new Error('fallback de destino não comprovado ausente')
             sse({ content: 'A visão deste destino não foi comprovada.' }); return
           }
-          if (analise.representacao !== 'análise visual do primeiro quadro' || !analise.texto?.includes('retângulo vermelho')) throw new Error('análise visual não chegou à ferramenta')
-          sse({ content: 'No primeiro quadro há um retângulo vermelho.' }); return
+          if (analise.representacao !== 'análise visual de quadro selecionado próximo à metade' || !analise.texto?.includes('retângulo vermelho')) throw new Error('análise visual não chegou à ferramenta')
+          sse({ content: 'No quadro selecionado próximo à metade há um retângulo vermelho.' }); return
         }
         if (modo === 'incompativel') throw new Error('quadro enviado ao destino não comprovado')
         if (!Array.isArray(mensagem?.content)) throw new Error('faltou quadro')
         const conteudo = mensagem.content as Array<{ type: string; text?: string; image_url?: { url: string } }>
-        const pergunta = modo === 'direto' ? 'Qual detalhe aparece no primeiro quadro?' : 'Qual detalhe aparece no vídeo guardado?'
+        const pergunta = modo === 'direto' ? 'Qual detalhe aparece no quadro selecionado?' : 'Qual detalhe aparece no vídeo guardado?'
         if (conteudo.length !== 2 || conteudo[0].text !== pergunta || conteudo[1].type !== 'image_url') throw new Error('conteúdo inválido')
         const dataUrl = conteudo[1].image_url?.url ?? ''
         if (!dataUrl.startsWith('data:image/png;base64,')) throw new Error('quadro não é PNG')
@@ -64,7 +64,7 @@ test.beforeAll(async () => {
         if (pixel(80, 60)[0] < 180 || pixel(80, 60)[2] > 50 || pixel(5, 5)[2] < 130) throw new Error('detalhe visual incorreto')
         quadros++
         res.writeHead(200, { 'Content-Type': 'text/event-stream' })
-        res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: 'O primeiro quadro tem um retângulo vermelho.' }, finish_reason: 'stop' }] })}\n\n`)
+        res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: 'O quadro selecionado próximo à metade tem um retângulo vermelho.' }, finish_reason: 'stop' }] })}\n\n`)
         res.end('data: [DONE]\n\n')
       } catch (e) { erro = String(e); res.writeHead(400); res.end(erro) }
     })() })
@@ -91,22 +91,22 @@ test.afterAll(async () => {
 test('MP4: cancela, confirma quadro e recebe resposta visual sem enviar o vídeo', async ({ page }) => {
   test.skip(!process.env.AGENTE_WINDOW_VIDEO_PYTHON, 'Decodificador local não configurado')
   await page.goto(base)
-  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Qual detalhe aparece no primeiro quadro?')
+  await page.getByRole('textbox', { name: 'Mensagem para a nova sessão' }).fill('Qual detalhe aparece no quadro selecionado?')
   await page.getByLabel('Selecionar arquivos para anexar').setInputFiles({ name: 'quadro.mp4', mimeType: 'video/mp4', buffer: video })
   const enviar = page.getByRole('button', { name: 'Enviar mensagem' })
-  const dialogo = page.getByRole('dialog', { name: 'Enviar imagens e primeiro quadro de vídeo ao modelo?' })
+  const dialogo = page.getByRole('dialog', { name: 'Enviar imagens e quadro selecionado de vídeo ao modelo?' })
   await enviar.click()
-  await expect(dialogo).toContainText('primeiro quadro visual')
+  await expect(dialogo).toContainText('quadro selecionado próximo à metade')
   await expect(dialogo).toContainText('nenhum áudio ou vídeo completo será enviado')
   await expect(dialogo).toContainText(modelo)
   await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click()
   expect(chamadas).toBe(0)
   await enviar.click()
   await dialogo.getByRole('button', { name: 'Enviar quadros e texto' }).click()
-  await expect(page.getByText('O primeiro quadro tem um retângulo vermelho.')).toBeVisible({ timeout: 45_000 })
+  await expect(page.getByText('O quadro selecionado próximo à metade tem um retângulo vermelho.')).toBeVisible({ timeout: 45_000 })
   expect(chamadas).toBe(1); expect(erro).toBe('')
   await page.reload()
-  await expect(page.getByLabel(/quadro\.mp4.+quadro inicial enviado ao modelo/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel(/quadro\.mp4.+quadro selecionado próximo à metade enviado ao modelo/)).toBeVisible({ timeout: 30_000 })
   const sid = await page.evaluate(() => localStorage.getItem('workbench.sessions.active.v1'))
   const headers = { Origin: base, 'Sec-Fetch-Site': 'same-origin' }
   const sessao = await (await page.request.get(`${base}/api/sessions/${sid}`, { headers })).json()
@@ -139,11 +139,12 @@ test('vídeo guardado: ferramenta usa trabalho após nova tarefa, sem novo uploa
   const card = page.getByRole('group', { name: 'Ferramenta: Inspecionar anexos desta conversa' }).filter({ hasText: 'Esperando você permitir' })
   await expect(card).toContainText('guardado.mp4', { timeout: 30_000 })
   await card.getByRole('button', { name: 'Permitir esta mexida' }).click()
-  await expect(card).toContainText('primeiro quadro visual', { timeout: 30_000 })
+  await expect(card).toContainText('quadro selecionado próximo à metade', { timeout: 30_000 })
   await expect(card).toContainText('Destino de visão comprovado')
   expect(quadros).toBe(inicioQuadros)
   await card.getByRole('button', { name: 'Permitir esta mexida' }).click()
-  await expect(page.getByText('No primeiro quadro há um retângulo vermelho.')).toBeVisible({ timeout: 45_000 })
+  await expect(page.getByText('No quadro selecionado próximo à metade há um retângulo vermelho.')).toBeVisible({ timeout: 45_000 })
+  await expect(page.getByText('Foi analisado um quadro selecionado próximo à metade; trechos não amostrados e áudio não foram analisados. O vídeo completo não foi enviado.')).toBeVisible()
   expect(erro).toBe(''); expect(quadros).toBe(inicioQuadros + 1)
   const depois = await (await page.request.get(anexos, { headers })).json()
   expect(depois.attachments).toHaveLength(1)

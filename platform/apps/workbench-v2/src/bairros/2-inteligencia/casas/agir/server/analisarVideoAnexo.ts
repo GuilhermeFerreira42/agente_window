@@ -29,7 +29,7 @@ export async function analisarVideoAnexo(entrada: {
     if (entrada.sinal.aborted || !entrada.validarContexto() || resposta.pedidos.length || !resposta.texto.trim() || resposta.texto.length > 16_000) {
       return { ok: false, resumo: 'Não foi possível concluir a análise visual. Confira o destino antes de tentar novamente.' }
     }
-    return { ok: true, resumo: 'Primeiro quadro visual analisado; o vídeo completo não foi enviado.', conteudo: JSON.stringify({ disponivel: true, representacao: 'análise visual do primeiro quadro', texto: resposta.texto }) }
+    return { ok: true, resumo: 'Foi analisado um quadro selecionado próximo à metade; trechos não amostrados e áudio não foram analisados. O vídeo completo não foi enviado.', conteudo: JSON.stringify({ disponivel: true, representacao: 'análise visual de quadro selecionado próximo à metade', texto: resposta.texto }) }
   } catch (erro) {
     const msg = erro instanceof Error && erro.message.startsWith('Quadro indisponível:')
       ? erro.message : 'Não foi possível concluir a análise visual. Verifique o destino e a configuração; o quadro pode ter sido enviado antes da falha.'

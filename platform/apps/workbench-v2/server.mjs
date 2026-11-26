@@ -9,6 +9,7 @@ import { FsHost } from './dist-fs-server/server/fs/fsHost.js'
 import { createExplorerGitServer, GIT_HTTP_PREFIX } from './dist-fs-server/server/git/index.js'
 import { isLoopbackBind, validateLocalRequest } from './server/local-boundary.mjs'
 import { sessionPersistencePlugin, explorerContextualPlugin } from './dist-backend/backend.mjs'
+import { ativarMultimidia } from '../../scripts/multimidia.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -60,6 +61,7 @@ function resolveStaticFile(urlPath) {
 }
 
 async function start() {
+  await ativarMultimidia(process.env)
   if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
     throw new Error('[server.mjs] dist/index.html não encontrado. Rode npm run build antes do preview.')
   }

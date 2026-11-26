@@ -17,7 +17,7 @@ import { extrairTextoPdf } from './leitorPdf'
 import { caminhoTrabalhoPrivado, obterVinculoTrabalho, sincronizarTrabalhosPrivadosSobFila } from './trabalhoPrivado'
 import { raizPrivadaDaConversa } from '../raizPrivadaChat'
 import { resolverRaizExplorer } from '../raizExplorer'
-import { caminhoDeTrabalhoProjeto } from '../movimentoProjeto'
+import { usarTrabalhoProjeto } from '../movimentoProjeto'
 import { transcreverAudioLocal } from './leitorAudio'
 
 export const TETO_FONTE_BYTES = 32 * 1024 * 1024
@@ -37,12 +37,14 @@ export async function listarFontesConversa(sessionId: string, chatId: string): P
       try {
         const vinculo = privado ? obterVinculoTrabalho(a.artifactId) : undefined
         if (privado && (!vinculo || vinculo.state !== 'pronto')) throw new Error('Arquivo de trabalho indisponível.')
-        const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : projeto ? await caminhoDeTrabalhoProjeto(a) : caminhoAbsolutoDeArtigo(a)
-        const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : a.workspaceRoot!
-        await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable' })
-        const info = await lstat(caminho)
-        if (!info.isFile() || info.isSymbolicLink()) throw new Error('Arquivo de trabalho indisponível.')
-        return { ...fonte, nome: basename(caminho), bytes: info.size, estado: 'trabalho' as const }
+        const verificar = async (caminho: string) => {
+          const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : a.workspaceRoot!
+          await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable' })
+          const info = await lstat(caminho)
+          if (!info.isFile() || info.isSymbolicLink()) throw new Error('Arquivo de trabalho indisponível.')
+          return { ...fonte, nome: basename(caminho), bytes: info.size, estado: 'trabalho' as const }
+        }
+        return projeto ? await usarTrabalhoProjeto(a, verificar) : await verificar(caminhoTrabalhoPrivado(vinculo!))
       } catch { return { ...fonte, estado: 'trabalho_ausente' as const } }
     }))
   })
@@ -65,7 +67,7 @@ async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: st
   if (privado && (!vinculo || vinculo.state !== 'pronto')) return recusar()
   const trabalhoMutavel = privado || artigo.rootKind === 'workspace' && artigo.mode === 'copy' && artigo.papel === 'upload-workspace'
   if (!trabalhoMutavel && artigo.bytes > maxBytes) return recusar()
-  const caminho = vinculo ? caminhoTrabalhoPrivado(vinculo) : trabalhoMutavel && artigo.rootKind === 'workspace' ? await caminhoDeTrabalhoProjeto(artigo) : caminhoAbsolutoDeArtigo(artigo)
+  const lerCaminho = async (caminho: string) => {
   const raiz = privado ? raizPrivadaDaConversa(sessionId, chatId) : artigo.rootKind === 'workspace' ? artigo.workspaceRoot : join(getAppDir(), 'uploads')
   if (!raiz) return recusar()
   await garantirDentroDaRaiz(raiz, caminho, { code: 'source_unavailable', mensagem: 'A fonte não está disponível nesta conversa.' })
@@ -87,6 +89,10 @@ async function lerFonteSobFila(sessionId: string, chatId: string, artifactId: st
     if (total !== info.size || (!trabalhoMutavel && sha256 !== artigo.sha256)) return recusar()
     return { nome: trabalhoMutavel ? basename(caminho) : artigo.name, bytes, sha256 }
   } finally { await arquivo.close() }
+  }
+  return trabalhoMutavel && artigo.rootKind === 'workspace'
+    ? usarTrabalhoProjeto(artigo, lerCaminho)
+    : lerCaminho(vinculo ? caminhoTrabalhoPrivado(vinculo) : caminhoAbsolutoDeArtigo(artigo))
 }
 
 /** A listagem pertence à conversa e valida o ZIP inteiro antes de retornar metadados. */

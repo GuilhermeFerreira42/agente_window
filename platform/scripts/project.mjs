@@ -6,6 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertRuntime, runtime } from './check-runtime.mjs'
 import testHomePolicy from './test-home-policy.cjs'
+import { ativarMultimidia, instalarMultimidia } from './multimidia.mjs'
 
 const { DEFAULT_PROFILE_ROOT_NAME, profileRootProblem } = testHomePolicy
 
@@ -74,7 +75,11 @@ async function main() {
     mkdirSync(path.dirname(marker), { recursive: true })
     writeFileSync(marker, JSON.stringify({ node: runtime.nodeVersion, npm: runtime.npmVersion, platform: process.platform, arch: process.arch, fingerprint }, null, 2) + '\n')
   }
-  if (action === 'install') return
+  if (action === 'install') { await instalarMultimidia(); return }
+  if (action === 'dev') {
+    const disponivel = await ativarMultimidia(env)
+    if (!disponivel) console.log('[multimídia] Ambiente verificado não encontrado; áudio/vídeo locais ficam indisponíveis. Execute iniciar install para preparar.')
+  }
   if (action === 'build') return npm(['run', 'build', '--workspaces', ...(args.length ? ['--', ...args] : [])])
   if (action === 'test') {
     // PEND-01 (D140): o perfil descartável precisa morar FORA do repositório e fora de qualquer

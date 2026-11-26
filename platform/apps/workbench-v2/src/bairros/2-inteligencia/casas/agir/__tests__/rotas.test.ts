@@ -389,6 +389,24 @@ describe('rotas — POST /api/agir', () => {
     expect(JSON.parse(res.corpo()).message).toContain('Sessão não registrada')
   })
 
+  it('aprovação aguarda publicação em curso e revalida depois da fila', async () => {
+    stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
+    const res = fakeRes()
+    let liberar!: () => void, entrou!: () => void
+    const barreira = new Promise<void>(resolve => { liberar = resolve })
+    const entrada = new Promise<void>(resolve => { entrou = resolve })
+    const deps = { ...DEPS, serializarAprovacao: async <T,>(_id: string, operacao: () => Promise<T>): Promise<T> => { entrou(); await barreira; return operacao() } }
+    const fio = tratarRotasAgir(fakeReq(PEDIDO_BASE), res, URL_AGIR, deps)
+    await esperaFio(res, '"type":"approval"')
+    const resposta = fakeRes()
+    const decisao = tratarRotasAgir(fakeReq(approvalBody(res, { fluxo: 'sessao-1', id: 'c1', decisao: 'negar' })), resposta, URL_APROVAR, deps)
+    await entrada
+    expect(resposta.ended).toBe(false)
+    liberar(); expect(await decisao).toBe(true); expect(resposta.statusCode).toBe(200)
+    await fio
+    expect(frames(res)).toContainEqual(expect.objectContaining({ type: 'tool_result', ok: false }))
+  })
+
   it('ciclo completo: tool → approval → NEGAR → tool_result "dono negou" → resposta em texto', async () => {
     stubProvedor([SSE_TOOL, SSE_TOOL_DEPOIS_DE_RESULTADO])
     const res = fakeRes()

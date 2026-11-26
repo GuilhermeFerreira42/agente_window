@@ -7,7 +7,8 @@ import { WebSocketServer } from 'ws'
 import { resolverRaizExplorer } from './raizExplorer'
 import { PersistenceProblem } from './persistenceErrors'
 import { excluirNoExplorerPrivado, moverNoExplorerPrivado } from './movimentoPrivado'
-import { excluirNoExplorerProjeto, moverNoExplorerProjeto } from './movimentoProjeto'
+import { comFilaProjeto, excluirNoExplorerProjeto, moverNoExplorerProjeto } from './movimentoProjeto'
+import { withSessionPersistenceQueue } from './filaSessao'
 type WorkspaceUri = `file://${string}`
 interface ExplorerFsServer {
   tryHandleHttp(req: IncomingMessage, res: ServerResponse): Promise<boolean>
@@ -104,7 +105,13 @@ export function explorerContextualPlugin({ createExplorerFsServer, createExplore
             res.statusCode = 204; res.end(); return true
           }
           req.url = pedido.sufixo
-          const tratado = await (pedido.sufixo.startsWith('/git/') ? contexto.git : contexto.fs).tryHandleHttp(req, res)
+          // Todas as operações mediadas de leitura/escrita compartilham a
+          // mesma fila do movimento até terminarem, inclusive entre sessões
+          // do mesmo projeto. A ordem é sempre sessão antes de projeto.
+          const executar = () => (pedido.sufixo.startsWith('/git/') ? contexto.git : contexto.fs).tryHandleHttp(req, res)
+          const tratado = contexto.tipo === 'chat'
+            ? await withSessionPersistenceQueue(pedido.sessionId, executar)
+            : await comFilaProjeto(contexto.raiz, executar)
           if (!tratado) throw new PersistenceProblem(404, 'not_found', 'Rota do Explorer não encontrada.')
           return true
         })().then(tratado => { if (!tratado) next() }).catch((erro: unknown) => {

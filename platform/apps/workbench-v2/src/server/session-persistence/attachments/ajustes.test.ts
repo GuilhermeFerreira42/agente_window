@@ -12,7 +12,7 @@ import { lerFonteConversa, listarFontesConversa } from './inspecaoConversa'
 import { prepararInspecaoAgente } from './ferramentaAnexos'
 import { POLITICA_PADRAO } from './politica'
 import { executarLimpezaDelecao, iniciarOuConsultarDelecao } from '../deletions'
-import { excluirNoExplorerProjeto, moverNoExplorerProjeto } from '../movimentoProjeto'
+import { excluirNoExplorerProjeto, moverNoExplorerProjeto, usarTrabalhoProjeto } from '../movimentoProjeto'
 
 const SID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const CID = `${SID}-main`
@@ -49,6 +49,40 @@ async function enviarNoProjeto(nome: string, conteudo: string) {
 }
 
 describe('Ajustes de usabilidade C-3a', () => {
+  it('movimento de pasta aguarda leitura mediada de outra sessão e depois atualiza o vínculo', async () => {
+    const linha = await enviarNoProjeto('concorrente.txt', 'ORIGINAL')
+    const artigo = obterArtigo(linha.artifactId!)!
+    const sidB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', chatB = `${sidB}-main`
+    upsertSessionRecord({ id: sidB, slug: 'projeto-concorrente', title: 'Vizinho', workspacePath: ws, contextKind: 'workspace', worktreePath: null, messageCount: 0, createdAt: 1, updatedAt: 1,
+      sessionJson: JSON.stringify({ id: sidB, workspacePath: ws, worktreePath: null, chats: [{ id: chatB, messages: [] }] }) })
+    let liberar!: () => void, iniciou!: () => void
+    const barreira = new Promise<void>(resolve => { liberar = resolve })
+    const entrada = new Promise<void>(resolve => { iniciou = resolve })
+    const leitura = usarTrabalhoProjeto(artigo, async caminho => { iniciou(); await barreira; return readFileSync(caminho, 'utf8') })
+    await entrada
+    const origem = join(ws, 'uploads'), destino = join(ws, 'movida')
+    const host = { assertSafeUri: (uri: `file://${string}`) => uri === 'file:///origem' ? origem : destino }
+    let terminou = false
+    const movimento = moverNoExplorerProjeto(sidB, chatB, ws, host, 'file:///origem', 'file:///destino').then(() => { terminou = true })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(terminou).toBe(false); expect(existsSync(origem)).toBe(true); expect(existsSync(destino)).toBe(false)
+    liberar()
+    expect(await leitura).toBe('ORIGINAL'); await movimento
+    expect((await lerFonteConversa(SID, CID, linha.artifactId!, 100))).toMatchObject({ nome: 'concorrente.txt', bytes: Buffer.from('ORIGINAL') })
+    expect(existsSync(join(destino, 'concorrente.txt'))).toBe(true)
+  })
+  it('não move nem exclui pasta com upload de projeto admitido por outra sessão', async () => {
+    await enviarNoProjeto('pronto.txt', 'EXISTENTE')
+    const upload = await admitirUpload({ sessionId: SID, chatId: CID, name: 'novo.txt', declaredBytes: 4, mode: 'copy', scope: 'workspace', workspaceRoot: ws })
+    const origem = join(ws, 'uploads'), destino = join(ws, 'movida')
+    const host = { assertSafeUri: (uri: `file://${string}`) => uri === 'file:///origem' ? origem : destino }
+    await expect(moverNoExplorerProjeto(SID, CID, ws, host, 'file:///origem', 'file:///destino')).rejects.toMatchObject({ code: 'upload_in_flight' })
+    await expect(excluirNoExplorerProjeto(SID, CID, ws, host, 'file:///origem', true)).rejects.toMatchObject({ code: 'upload_in_flight' })
+    await receberConteudo(SID, CID, upload.uploadId, Readable.from([Buffer.from('NOVO')]))
+    await moverNoExplorerProjeto(SID, CID, ws, host, 'file:///origem', 'file:///destino')
+    expect(readFileSync(join(destino, 'novo.txt'), 'utf8')).toBe('NOVO')
+    expect((await lerFonteConversa(SID, CID, upload.artifactId, 100)).bytes.toString()).toBe('NOVO')
+  })
   it('outra conversa do mesmo projeto move e exclui o trabalho sem trocar o original', async () => {
     const linha = await enviarNoProjeto('compartilhado.txt', 'ORIGINAL')
     writeFileSync(linha.finalPath!, 'EDITADO')

@@ -2,7 +2,7 @@
 // chamador obter autorização individual. Nenhum path vem do modelo.
 import { extrairItemZipConversa, inspecionarTextoConversa, lerFonteConversa, listarFontesConversa, TETO_FONTE_BYTES } from './inspecaoConversa'
 import { listarZipSeguro } from './zipSeguro'
-import { primeiroQuadroVideo } from './primeiroQuadroVideo'
+import { quadroSelecionadoVideo } from './quadroSelecionadoVideo'
 
 export interface PedidoInspecao { acao?: unknown; artifactId?: unknown; indice?: unknown }
 export interface PlanoInspecao {
@@ -40,12 +40,12 @@ export async function prepararInspecaoAgente(dono: { sessionId: string; chatId: 
       if (pedido.indice !== undefined) throw new Error('Parâmetros inválidos.')
       if (!fonte.nome.toLowerCase().endsWith('.mp4') || fonte.bytes.length > 12 * 1024 * 1024) {
         previa = `Enviar ao modelo o motivo de indisponibilidade da análise visual de ${fonte.nome}; o original não será enviado.`
-        operacao = async () => { await verificar(); return { ok: true, resumo: 'Vídeo incompatível.', conteudo: JSON.stringify({ disponivel: false, motivo: 'Somente MP4 MPEG-4 de até 12 MiB é aceito para análise do primeiro quadro.' }) } }
+        operacao = async () => { await verificar(); return { ok: true, resumo: 'Vídeo incompatível.', conteudo: JSON.stringify({ disponivel: false, motivo: 'Somente MP4 MPEG-4 de até 12 MiB é aceito para análise de um quadro próximo à metade.' }) } }
       } else {
-        previa = `Extrair localmente o primeiro quadro visual de ${fonte.nome} e enviá-lo com a pergunta atual ao modelo de visão comprovado; enviar a análise textual ao modelo. Nenhum áudio ou vídeo completo será enviado. O quadro não representa necessariamente o restante do vídeo.`
+        previa = `Extrair localmente um quadro selecionado próximo à metade de ${fonte.nome} e enviá-lo com a pergunta atual ao modelo de visão comprovado; enviar a análise textual ao modelo. Nenhum áudio ou vídeo completo será enviado. O quadro não representa os trechos não amostrados.`
         quadro = { artifactId: id, ler: async () => {
           await verificar()
-          const imagem = await primeiroQuadroVideo(fonte.bytes, sinal)
+          const imagem = await quadroSelecionadoVideo(fonte.bytes, sinal)
           await verificar()
           if (!imagem || sinal?.aborted) throw new Error('Quadro indisponível: configure o decodificador local e use MP4 MPEG-4 de até 60 segundos e 1024 por lado.')
           return imagem

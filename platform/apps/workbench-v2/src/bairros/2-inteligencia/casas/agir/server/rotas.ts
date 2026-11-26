@@ -70,6 +70,8 @@ export interface DependenciasAgir {
   iniciarModelo?: IniciarChamadaModelo
   /** A prefeitura resolve a sessão persistida e sua raiz; o browser não escolhe território nem grant. */
   resolverContexto: (sessionId: string, chatId: string) => ContextoAgir | { ok: false; message: string }
+  /** Serializa a decisão com o autosave; nunca ignora publicação pendente. */
+  serializarAprovacao?: <T>(sessionId: string, operacao: () => Promise<T>) => Promise<T>
   /** O shell padrão é resolvido pela prefeitura pelo detector compartilhado do PTY; esta casa não cria outro catálogo. */
   resolverShell?: ResolverShellComando
   /** Janela encurtável em testes controlados; produção usa o limite padrão do executor. */
@@ -847,6 +849,7 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
     sendErro(res, 400, 'configuracao', 'Resposta de aprovação inválida (fluxo, runId, generation, id, sessionId e decisao são obrigatórios).')
     return true
   }
+  const decidir = async (): Promise<boolean> => {
   const execucao = execucaoPorId.get(runId)
   if (!execucao || execucao.fluxo !== fluxo || execucao.generation !== generation || execucao.estado !== 'awaiting-approval' || execucaoPorFluxo.get(fluxo) !== execucao) {
     sendErro(res, 409, 'approval_expired', 'Esta aprovação expirou, pertence a outra geração ou a execução já terminou.')
@@ -888,6 +891,8 @@ async function tratarAprovar(req: IncomingMessage, res: ServerResponse, deps: De
   pendente.resolver(decisao !== 'negar')
   sendJson(res, 200, { ok: true })
   return true
+  }
+  return deps.serializarAprovacao ? deps.serializarAprovacao(sessionId, decidir) : decidir()
 }
 
 /** POST /api/agir/cancel — invalidation terminal, vinculada à identidade F1 e à geração. */

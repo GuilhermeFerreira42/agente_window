@@ -33,7 +33,7 @@ const ROTULOS_STATUS: Record<FerramentaNoChat['status'], string> = {
   ok: 'Feito',
   negado: 'Negado por você',
   erro: 'Não executou',
-  expirado: 'Expirou (a página recarregou no meio)',
+  expirado: 'Aprovação expirada ou não confirmada; confira a execução',
 }
 
 const COR_STATUS: Record<FerramentaNoChat['status'], string> = {

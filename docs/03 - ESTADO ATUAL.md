@@ -997,3 +997,47 @@ replay.
 Após retirar a prova automática, novo build e nove jornadas dirigidas de
 produção passaram 9/9; o teste que falhou na regressão integrada passou 2/2
 isoladamente em Vite, sem explicar a falha intermitente.
+
+**Checkpoint de integração posterior a 91f8cb2 (Linux):** o inicializador
+`install` prepara ambiente Python 3.11 previamente instalado pelo operador,
+com wheels fixadas por hash e PyAV/FFmpeg, faster-whisper e modelo Systran
+`536b0662742c02347bc0e980a01041f333bce120`. O modelo é conferido por SHA-256
+e tamanho em quatro arquivos antes da ativação; subprocessos recebem ambiente
+mínimo sem chaves dos provedores. Em Linux, a instalação das wheels, `pip check`,
+imports, hashes e ativação foram comprovados, inclusive recusa ao adulterar a
+configuração. Os pesos foram obtidos por espelho GitHub e verificados; o download
+direto do Hugging Face, o bootstrap `iniciar.cmd`, Windows e LiteLLM real não
+puderam ser executados neste ambiente. Python é pré-requisito externo, não foi
+baixado nem autenticado pelo instalador. A compatibilidade Windows x64 ainda
+precisa de prova em máquina real.
+
+O vídeo agora usa um quadro selecionado próximo à metade, indicado no chat e na
+confirmação; não analisa áudio ou outros momentos. O fixture contém retângulo
+vermelho somente depois do primeiro quadro; teste independente verificou
+abertura azul e a jornada enviou e identificou o detalhe posterior. A análise
+posterior ao upload também mostra a limitação no cartão. Áudio WAV real foi
+transcrito com o modelo instalado e chegou ao provedor simulado após confirmação;
+é limitado a português e pode conter erros. Em uma rodada o fallback aleatório
+do Whisper produziu transcrição diferente e a jornada de produção falhou 8/9;
+fixar temperatura zero tornou o ensaio reproduzível, sem garantir precisão.
+
+A falha integrada anterior NÃO foi recarga comprovada: o trace mostrou que
+`/api/agir/aprovar` recebeu `503 session_publication_pending` durante autosave;
+o rótulo de página recarregada era enganoso. A aprovação agora aguarda a fila
+da sessão e revalida o contexto sem passar por cima de intenção pendente; um
+teste controlado cobre a espera. A regressão final em conjunto passou 31/31,
+incluindo áudio e vídeo, e produção dirigida 9/9; Vitest dirigido 114/114,
+typecheck e build passaram. Essas evidências usam provedor simulado. O teste
+`agir/__tests__/frontier.test.ts` executado separadamente teve 2/5 falhas de
+fronteira anteriores: dependências de imagem na casa e `as unknown as`; não
+foram alteradas as regras do teste. ESLint dirigido também apontou `_anterior`
+não usado em `index.ts`, anterior à mudança deste checkpoint.
+
+A fila de projeto agora acompanha até o fim leitura/listagem de anexos e
+operações mediadas do Explorer entre sessões; mover/excluir pasta com upload
+ativo é recusado. Ensaio com barreira comprovou que o movimento aguarda uma
+leitura em outra sessão e atualiza o vínculo após a leitura. Isso não resolve
+concorrência de shell, ferramentas genéricas ou outros processos: rename de
+pasta ainda tem janela não atômica de não-substituição. Portanto **MM-I não
+está integralmente fechada**, apesar das jornadas acima, e MM-O permanece
+bloqueada pelo aceite. O roteiro único está em `VALIDACAO_MM-I_WINDOWS.md`.

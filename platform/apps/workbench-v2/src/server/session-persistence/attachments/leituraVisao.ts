@@ -16,7 +16,7 @@ import { resolverDonoAnexos } from './dono'
 import { caminhoAbsolutoDeArtigo } from './estoque'
 import { garantirDentroDaRaiz } from './contencao'
 import { preservarOriginalHistorico } from './originalHistorico'
-import { primeiroQuadroVideo } from './primeiroQuadroVideo'
+import { quadroSelecionadoVideo } from './quadroSelecionadoVideo'
 
 // Limite local provisório de leitura, independente da quota C-3a. O futuro
 // adaptador deve também aplicar os menores limites comprovados do alvo e do
@@ -105,7 +105,7 @@ export async function lerCopiaPublicadaParaVisao(pedido: PedidoLeituraVisao): Pr
   })
   if (pedido.sinal?.aborted) return recusar('vision_cancelled', 'A análise foi cancelada; nenhum conteúdo foi enviado.')
   if (!original.nome.toLowerCase().endsWith('.mp4')) return { bytes: original.bytes, sha256: original.sha256 }
-  const quadro = await primeiroQuadroVideo(original.bytes, pedido.sinal)
-  if (!quadro || pedido.sinal?.aborted) return recusar('video_frame_unavailable', 'Quadro inicial indisponível: configure o decodificador local e use MP4 MPEG-4 de até 60 segundos e 1024 por lado. Nenhum vídeo ou quadro foi enviado.')
+  const quadro = await quadroSelecionadoVideo(original.bytes, pedido.sinal)
+  if (!quadro || pedido.sinal?.aborted) return recusar('video_frame_unavailable', 'Quadro selecionado indisponível: configure o decodificador local e use MP4 MPEG-4 de até 60 segundos e 1024 por lado. Nenhum vídeo ou quadro foi enviado.')
   return { bytes: quadro, sha256: original.sha256 }
 }

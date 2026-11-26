@@ -1,6 +1,7 @@
-// Um quadro inicial de MP4, preparado localmente após a confirmação explícita.
+// Um quadro selecionado próximo ao meio de MP4, preparado após confirmação.
 // O decodificador é opcional e isolado em subprocesso; o vídeo não sai do app.
 import { spawn } from 'node:child_process'
+import { ambienteMultimidia } from './ambienteMultimidia'
 
 const MAX_VIDEO = 12 * 1024 * 1024
 const MAX_QUADRO = 4 * 1024 * 1024
@@ -20,9 +21,25 @@ try:
         if codec.name != 'mpeg4' or not 0 < codec.width <= 1024 or not 0 < codec.height <= 1024 or codec.width * codec.height > 1048576:
             raise ValueError('codec ou dimensões')
         codec.thread_count = 1
-        quadro = next(video.decode(stream))
-        if quadro.width != codec.width or quadro.height != codec.height:
-            raise ValueError('dimensões alteradas')
+        # Seleciona o primeiro quadro decodificado a partir da metade. Não
+        # interpreta intervalos não amostrados nem usa timestamps do cliente.
+        quadro = None
+        inicio = None
+        anterior = None
+        for numero, candidato in enumerate(video.decode(stream)):
+            if numero >= 5000 or candidato.time is None:
+                raise ValueError('limite ou tempo')
+            tempo = float(candidato.time)
+            if inicio is None:
+                inicio = tempo
+            if anterior is not None and tempo < anterior:
+                raise ValueError('tempo não monotônico')
+            anterior = tempo
+            if tempo - inicio >= video.duration / 2000000:
+                quadro = candidato
+                break
+        if quadro is None or quadro.width != codec.width or quadro.height != codec.height:
+            raise ValueError('quadro ou dimensões')
         encoder = av.CodecContext.create('png', 'w')
         encoder.width = quadro.width
         encoder.height = quadro.height
@@ -39,7 +56,7 @@ except Exception:
 `
 
 /** Retorna um PNG efêmero ou null. O processo não recebe caminhos de usuário. */
-export async function primeiroQuadroVideo(bytes: Buffer, sinal?: AbortSignal): Promise<Buffer | null> {
+export async function quadroSelecionadoVideo(bytes: Buffer, sinal?: AbortSignal): Promise<Buffer | null> {
   const python = process.env.AGENTE_WINDOW_VIDEO_PYTHON
   if (!python || ativo || sinal?.aborted || bytes.length > MAX_VIDEO || bytes.length < 16 || bytes.toString('ascii', 4, 8) !== 'ftyp') return null
   ativo = true
@@ -47,7 +64,7 @@ export async function primeiroQuadroVideo(bytes: Buffer, sinal?: AbortSignal): P
     return await new Promise(resolve => {
       let finalizado = false, tamanho = 0
       const partes: Buffer[] = []
-      const filho = spawn(python, ['-I', '-c', programa], { stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, OMP_NUM_THREADS: '1' }, windowsHide: true })
+      const filho = spawn(python, ['-I', '-c', programa], { stdio: ['pipe', 'pipe', 'ignore'], env: ambienteMultimidia({ OMP_NUM_THREADS: '1' }), windowsHide: true })
       const finalizar = (valor: Buffer | null) => {
         if (finalizado) return
         finalizado = true; clearTimeout(relogio); sinal?.removeEventListener('abort', cancelar)
