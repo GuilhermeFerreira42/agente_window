@@ -1,3 +1,9 @@
+# 26/11/2026 — ditado do microfone e retorno do teste manual
+
+O checkout local ganhou a escolha entre reconhecimento do navegador e Parakeet Ultra. O proprietário testou e confirmou que o Parakeet transcreveu corretamente. No navegador, relatou duplicação de palavras e frases. Pediu indicadores animados para gravação e transcrição nos dois modos e deixou a conversa na etapa de alinhamento com a Arena. Estado da árvore em `03`, critérios em `06` e evidências em `09`.
+
+---
+
 # MM-I — cancelamento, espera e dois chats
 
 Após `01c6742`, a decisão de cancelar/publicar o item ZIP foi serializada com a recuperação; espera reconhecida não anuncia nem executa ferramentas e não envia anexos; testes cobrem uso posterior sem reenvio e escopo entre chats da mesma sessão. Áudio/vídeo continuam pendentes por ausência de runtime/modelo local ou capacidade comprovada de provedor para esse fluxo. Resultados, lacunas e comparação de auditoria em `09`; roteiro único em `VALIDACAO_MM-I_WINDOWS.md`. Não foi dado aceite humano e MM-O não foi iniciada.

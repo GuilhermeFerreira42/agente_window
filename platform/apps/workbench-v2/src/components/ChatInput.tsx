@@ -27,6 +27,7 @@ import { ocupacaoContexto, type MedicaoContexto, type EstadoCompactacao } from '
 import { orcamentoContexto } from '../domain/capacidadeContexto'
 import { pedidoCompactarContexto, pedidoExclusoesAutomaticas, pedidoPermitirTudo } from '../domain/pedidosPermissao'
 import { portaDialogos } from '../shell/portaDialogos'
+import { useDitado } from './useDitado'
 
 interface ChatInputProps {
   session: Session
@@ -134,21 +135,6 @@ function CompactarContexto({ sessionId, chatId, model, disabled, onEstado }: {
       disabled={disabled || estado.ativo} onClick={() => void compactar()}><Sparkles size={14} /></button>
     {(estado.ativo || estado.mensagem) && <span className="context-usage" role="status">{estado.ativo ? 'Compactando…' : estado.mensagem}</span>}
   </>
-}
-
-interface SpeechRecognitionLike {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start: () => void
-  stop: () => void
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onend: (() => void) | null
-}
-
-type SpeechWindow = Window & {
-  SpeechRecognition?: new () => SpeechRecognitionLike
-  webkitSpeechRecognition?: new () => SpeechRecognitionLike
 }
 
 // FATIA 15 Onda 3 (D161): a regra do histórico do compositor estava duplicada
@@ -267,9 +253,7 @@ export function ChatInput({
   const [attachmentPickerView, setAttachmentPickerView] = useState<AttachmentPickerView>('sources')
   const [isFileDropTarget, setIsFileDropTarget] = useState(false)
   const [workspaceQuery, setWorkspaceQuery] = useState('')
-  const [isListening, setIsListening] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const speechRef = useRef<SpeechRecognitionLike | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modeButtonRef = useRef<HTMLButtonElement>(null)
   const modeWrapRef = useRef<HTMLDivElement>(null)
@@ -394,7 +378,10 @@ export function ChatInput({
     restoreHistoryEntry(cursor.overlays.get(cursor.index) ?? history[cursor.index], direction)
   }
 
-  useEffect(() => () => speechRef.current?.stop(), [])
+  const ditado = useDitado(draftKey, (transcricao) => {
+    setDraftText(current => `${current}${current && !/\s$/u.test(current) ? ' ' : ''}${transcricao}`)
+    textareaRef.current?.focus()
+  })
 
   // A picker belongs to the active composer target, but the draft itself is
   // retained in the keyed store when changing session or nested chat.
@@ -495,6 +482,7 @@ export function ChatInput({
   const submit = (event?: FormEvent) => {
     event?.preventDefault()
     if (!hasSendableContent || isWorking || submitLockRef.current || enviando) return
+    ditado.cancelar()
 
     submitLockRef.current = true
     appendHistoryEntry(getCurrentHistoryEntry())
@@ -712,32 +700,6 @@ export function ChatInput({
     modelOptionRefs.current.get(filteredModels[nextIndex].id)?.focus()
   }
 
-  const startVoice = () => {
-    const speechWindow = window as SpeechWindow
-    const Constructor = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
-    if (!Constructor) {
-      setDraftText((current) => `${current}${current ? ' ' : ''}Descreva a alteração que você quer revisar.`)
-      return
-    }
-    if (isListening) {
-      speechRef.current?.stop()
-      setIsListening(false)
-      return
-    }
-    const recognition = new Constructor()
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.lang = 'pt-BR'
-    recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? ''
-      setDraftText((current) => `${current}${current ? ' ' : ''}${transcript}`)
-    }
-    recognition.onend = () => setIsListening(false)
-    speechRef.current = recognition
-    setIsListening(true)
-    recognition.start()
-  }
-
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     // Mirrors CancelAction's Ctrl/Cmd+Escape binding. The Windows workbench
     // also exposes Alt+Backspace; keeping both here makes cancellation work
@@ -768,6 +730,11 @@ export function ChatInput({
         onDrop={handleComposerDrop}
       >
         {isFileDropTarget && <div className="chat-input-dropzone" aria-hidden="true">Solte para anexar ao chat</div>}
+        {(ditado.fase || ditado.aviso) && <div className="chat-input-dictation-status" role="status">
+          {ditado.aviso ?? (ditado.fase === 'gravando' ? 'Gravando…' : ditado.fase === 'preparando'
+            ? 'Acessando o microfone…' : ditado.motor === 'parakeet'
+              ? 'Transcrevendo localmente… O primeiro uso pode exigir download.' : 'Transcrevendo…')}
+        </div>}
         <div className="chat-input-editor-row">
           <textarea
             ref={textareaRef}
@@ -982,7 +949,15 @@ export function ChatInput({
             }}
           />
           <button className="chat-input-tool-button" type="button" title="Inserir menção" aria-label="Inserir menção" onClick={() => setDraftText((current) => `${current}${current ? ' ' : ''}@`)}><AtSign size={14} /></button>
-          <button className={`chat-input-tool-button${isListening ? ' is-active' : ''}`} type="button" title="Ditado por voz" aria-label="Ditado por voz" onClick={startVoice}><Mic size={14} /></button>
+          <button className={`chat-input-tool-button${ditado.fase === 'gravando' ? ' is-active' : ''}`} type="button"
+            title={ditado.fase === 'gravando' ? 'Parar e transcrever' : 'Ditado por voz'}
+            aria-label={ditado.fase === 'gravando' ? 'Parar e transcrever' : 'Ditado por voz'}
+            disabled={enviando || ditado.fase === 'preparando' || ditado.fase === 'transcrevendo'}
+            onClick={ditado.fase === 'gravando' ? ditado.parar : ditado.iniciar}>
+            {ditado.fase === 'gravando' ? <Square size={14} /> : <Mic size={14} />}
+          </button>
+          {ditado.fase && <button className="chat-input-tool-button" type="button" title="Cancelar ditado"
+            aria-label="Cancelar ditado" onClick={ditado.cancelar}><X size={14} /></button>}
           <div className="input-toolbar-spacer" />
           <IndicadorContexto medicao={usoContexto} selecao={selecaoDoToken(model)} />
           {estadoDaCompactacao && <span className="context-usage" role="status"

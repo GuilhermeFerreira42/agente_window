@@ -2034,6 +2034,12 @@ svg {
   flex: 1;
 }
 
+.chat-input-dictation-status {
+  padding: 6px 10px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
 .context-usage {
   padding: 0 5px;
   color: var(--vscode-descriptionForeground);

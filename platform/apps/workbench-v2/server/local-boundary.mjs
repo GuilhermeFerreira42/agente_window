@@ -63,11 +63,11 @@ export function validateLocalRequest(request, { requireOrigin = false } = {}) {
     const contentType = request.headers?.['content-type']
     const tipo = typeof contentType === 'string' ? contentType.trim() : ''
     const jsonOk = /^application\/json(?:\s*;|\s*$)/i.test(tipo)
-    // C-3a: o ÚNICO corpo binário aceito é o stream do upload de anexo
-    // (mesma origem + Host exato + Fetch Metadata continuam obrigatórios).
+    // Binário só nas rotas explícitas de upload e ditado local.
     const binarioOk = /^application\/octet-stream(?:\s*;|\s*$)/i.test(tipo)
       && ((method === 'PUT' && /^\/api\/sessions\/[^/]+\/chats\/[^/]+\/attachments\/uploads\/[^/]+\/content$/.test(pathname))
-        || (method === 'POST' && /^\/api\/explorer\/[^/]+\/[^/]+\/fs\/upload$/.test(pathname)))
+        || (method === 'POST' && (/^\/api\/explorer\/[^/]+\/[^/]+\/fs\/upload$/.test(pathname)
+          || pathname === '/api/sessions/dictation')))
     if (!jsonOk && !binarioOk) return { ok: false, reason: 'json_required' }
   }
   return { ok: true }

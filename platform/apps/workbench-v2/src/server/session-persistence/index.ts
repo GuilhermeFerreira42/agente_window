@@ -53,6 +53,8 @@ import { tratarRotasAnexos } from './attachments/rotas'
 import { tratarConversaDeTeste } from './attachments/rotaConversaDeTeste'
 import type { SaidaDeTeste } from './attachments/saidaDeTeste'
 import { validarAnexosPublicados } from './attachments/publicacao'
+import { tratarDitado } from '../ditadoParakeet'
+import { ROTA_DITADO } from '../../domain/ditado'
 
 const API_PREFIX = '/api/sessions'
 const WORKTREES_ENDPOINT = '/api/worktrees'
@@ -752,6 +754,10 @@ async function saveSession(
  */
 async function handleRequest(request: IncomingMessage, response: ServerResponse, repoRoot: string, saidaDeTeste?: SaidaDeTeste): Promise<boolean> {
   const url = new URL(request.url ?? '/', 'http://localhost')
+  if (url.pathname === ROTA_DITADO && request.method === 'POST') {
+    await tratarDitado(request, response)
+    return true
+  }
   if (!url.pathname.startsWith(API_PREFIX) && !url.pathname.startsWith('/api/session/') && !url.pathname.startsWith('/api/workspaces') && url.pathname !== WORKTREES_ENDPOINT && !rotaPertenceAoModulo(url.pathname) && !rotaPertenceAoModuloConversa(url.pathname) && !rotaPertenceAoModuloAgir(url.pathname) && !rotaPertenceAoModuloConfig(url.pathname) && !rotaPertenceAoModuloPersonalizacoes(url.pathname) && !url.pathname.startsWith('/api/fs/')) return false
 
   // C-3a — rotas de anexo (subrotas de sessão; o byId ancorado em `$` não as

@@ -1,5 +1,9 @@
 # Leitura vigente do roadmap — 26/11/2026
 
+**Ponto de retomada — ditado na MM-I.** Em Configurações → Geral, a implementação oferece **Navegador** (padrão) e **Parakeet Ultra (local)**. O proprietário confirmou que o Parakeet transcreveu corretamente no teste manual. No navegador, o proprietário conseguiu transcrever, mas o rascunho recebeu palavras e frases repetidas. Nos dois modos, foi solicitado feedback animado distinto para gravação e transcrição. Os critérios e a decisão em aberto sobre a tela inicial estão em `06`. A evidência do teste e as pistas técnicas estão em `09`.
+
+**Base para a Arena — 27/11/2026.** A branch de trabalho `0f2e5de2-agente-window` reúne o ditado e a validação Windows do commit `756f230`. O proprietário encaminha a SPEC de roteamento da MM-I em separado, na memória do projeto. Os pesos são baixados e verificados na máquina que usa o recurso e ficam fora do Git. A MM-I ainda aguarda homologação geral, incluindo validar a resposta final do LiteLLM após a transcrição do WAV. A MM-O aguarda o aceite.
+
 **MM-I — reteste no Windows sobre `cc5ecc6`.** A instalação isolada baixou e verificou os pesos oficiais do Whisper. O Explorer por conversa usa o identificador nativo de arquivo sem perda de precisão e os movimentos de diretório mediados recusam substituição no próprio sistema de arquivos. As duas falhas históricas de fronteira da Casa Agir foram corrigidas e o teste passou no Windows. Resultados e limites em `09`. A homologação humana permanece pendente. A MM-O aguarda o aceite.
 
 ## Estado anterior — 25/11/2026

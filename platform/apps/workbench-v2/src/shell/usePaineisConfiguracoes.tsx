@@ -21,6 +21,7 @@ import type { ItemPainel } from './ConfiguracoesUnificadas'
 import {
   AparenciaPainel,
   ConversasArmazenamentoPainel,
+  DitadoPainel,
   PermissoesPainel,
   WorkspacesPainel,
 } from './paineisConfiguracoes'
@@ -71,7 +72,8 @@ export function usePaineisConfiguracoes(deps: DependenciasPaineis): PaineisCompo
   const paineis: Partial<Record<CategoriaConfiguracoes, ItemPainel>> = {
     geral: {
       montavel: true,
-      conteudo: (
+      conteudo: <>
+        <DitadoPainel />
         <ConfigView
           hospedado
           semTitulo
@@ -79,7 +81,7 @@ export function usePaineisConfiguracoes(deps: DependenciasPaineis): PaineisCompo
           aoMudarEstado={reportarGeral}
           aoSalvar={onConfigSalva}
         />
-      ),
+      </>,
     },
     aparencia: {
       montavel: true,

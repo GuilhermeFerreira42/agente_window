@@ -71,10 +71,37 @@ describe('P8.2 ChatInput — handlers interativos', () => {
     expect(input).toHaveValue('@')
 
     await user.click(screen.getByRole('button', { name: 'Ditado por voz' }))
-    expect((input as HTMLTextAreaElement).value).toContain('Descreva a alteração')
+    expect(await screen.findByText(/Reconhecimento indisponível neste navegador/)).toBeInTheDocument()
+    expect(input).toHaveValue('@')
 
     if (original !== undefined) (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition = original
     if (originalWebkit !== undefined) (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = originalWebkit
+  })
+
+  it('insere o ditado do navegador no rascunho e preserva o envio explícito', async () => {
+    const user = userEvent.setup()
+    class Reconhecimento {
+      onresult?: (evento: { results: Array<Array<{ transcript: string }>> }) => void
+      onend?: () => void
+      start = vi.fn()
+      stop = vi.fn(() => {
+        this.onresult?.({ results: [[{ transcript: 'texto ditado' }]] })
+        this.onend?.()
+      })
+      abort = vi.fn()
+    }
+    vi.stubGlobal('SpeechRecognition', Reconhecimento)
+    try {
+      const { props } = renderInput()
+      const input = screen.getByRole('textbox', { name: 'Mensagem para o agente' })
+      await user.type(input, 'rascunho')
+      await user.click(screen.getByRole('button', { name: 'Ditado por voz' }))
+      await user.click(screen.getByRole('button', { name: 'Parar e transcrever' }))
+      expect(input).toHaveValue('rascunho texto ditado')
+      expect(props.onSend).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('abre e fecha os popovers de modo e modelo com Escape', async () => {

@@ -9,7 +9,36 @@
 // de IA). As três Casas reais são compostas pelo App pelos seus barrels.
 // ============================================================================
 import { FolderOpen, HardDrive, Info, Monitor, Moon, Sun } from 'lucide-react'
+import { useState } from 'react'
 import type { AlvoPersonalizacoes } from '../bairros/2-inteligencia/casas/personalizacoes'
+import { lerMotorDitado, salvarMotorDitado, type MotorDitado } from '../client/preferenciaDitado'
+
+export function DitadoPainel() {
+  const [motor, setMotor] = useState(lerMotorDitado)
+  const [erro, setErro] = useState(false)
+  function selecionar(opcao: MotorDitado) {
+    try {
+      salvarMotorDitado(opcao)
+      setMotor(opcao)
+      setErro(false)
+    } catch {
+      setErro(true)
+    }
+  }
+  return <section className="config-painel" aria-label="Ditado por voz">
+    <fieldset className="config-painel-opcoes">
+      <legend>Reconhecimento do microfone</legend>
+      <label><input type="radio" name="motor-ditado" checked={motor === 'navegador'}
+        onChange={() => selecionar('navegador')} /> Navegador</label>
+      <label><input type="radio" name="motor-ditado" checked={motor === 'parakeet'}
+        onChange={() => selecionar('parakeet')} /> Parakeet Ultra (local)</label>
+    </fieldset>
+    <p className="config-painel-nota">
+      O navegador pode usar um serviço externo. O Parakeet roda no computador e baixa cerca de 706 MiB no primeiro ditado.
+    </p>
+    {erro && <p role="alert">Não foi possível salvar a preferência de ditado neste navegador.</p>}
+  </section>
+}
 
 /** Aparência: o MESMO dono de tema da barra superior (agents-theme). */
 export function AparenciaPainel({ tema, onAlternarTema }: { tema: 'dark' | 'light'; onAlternarTema(): void }) {

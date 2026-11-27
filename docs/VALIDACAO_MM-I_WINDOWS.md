@@ -21,6 +21,8 @@ Use este roteiro no checkout da branch do PR #1, **sem fazer merge**. A validaç
 
 ## 3. Limites da evidência
 
+**Ditado do microfone.** Em Configurações → Geral, selecione **Parakeet Ultra (local)**, recarregue e confira a seleção. Dentro de uma conversa, clique no microfone, diga uma frase em português e clique em **Parar e transcrever**. No primeiro uso, aguarde o download de cerca de 706 MiB. O texto deve entrar no rascunho e permanecer editável até você enviar. Repita com **Cancelar ditado** e confira que o rascunho anterior foi preservado. O motor nativo usa CPU e dispensa Python para ditado. No Windows x64, o pacote nativo usa o Microsoft Visual C++ Redistributable 2015–2022 (x64), versão 14.40 ou mais recente. O reconhecimento **Navegador** depende do suporte e da permissão do navegador. A transcrição de arquivos anexados usa o Whisper no passo 7.
+
 O instalador do projeto passou no Windows em checkout descartável, inclusive o download direto e a conferência dos pesos oficiais. O vídeo é uma amostragem, e a transcrição em português pode falhar. A rodada técnica com simulador e o ensaio no LiteLLM real têm evidências distintas em `09`. O aplicativo usa os direitos da conta.
 
 **Movimento de pastas.** Se o destino já existir no momento de mover, o sistema de arquivos recusa a substituição. A operação usa Python disponível e exige suporte do volume. A fila cobre as operações mediadas do Explorer e a leitura de anexos. Alterações por shell, ferramentas genéricas ou outros processos continuam fora dessa fila e não reescrevem os vínculos históricos automaticamente.
